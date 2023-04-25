@@ -1,5 +1,5 @@
-import { compatibilityChart } from "$root/components/compatibilityChart";
-import { warnBox } from "$root/components/warnBox";
+import { compatibilityChart } from "$src/components/compatibilityChart";
+import { warnBox } from "$src/components/warnBox";
 import { html, render } from "lit-html";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential

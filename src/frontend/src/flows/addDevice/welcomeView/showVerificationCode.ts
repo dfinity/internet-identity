@@ -2,14 +2,14 @@ import {
   AddTentativeDeviceResponse,
   CredentialId,
 } from "$generated/internet_identity_types";
-import { displayError } from "$root/components/displayError";
-import { mainWindow } from "$root/components/mainWindow";
-import { toast } from "$root/components/toast";
-import { AsyncCountdown } from "$root/utils/countdown";
-import { Connection } from "$root/utils/iiConnection";
-import { renderPage } from "$root/utils/lit-html";
-import { setAnchorUsed } from "$root/utils/userNumber";
-import { delayMillis, unknownToString } from "$root/utils/utils";
+import { displayError } from "$src/components/displayError";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { Connection } from "$src/utils/iiConnection";
+import { renderPage } from "$src/utils/lit-html";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { delayMillis, unknownToString } from "$src/utils/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 

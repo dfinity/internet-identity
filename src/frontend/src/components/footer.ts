@@ -1,4 +1,4 @@
-import { PORTAL_II_URL } from "$root/config";
+import { PORTAL_II_URL } from "$src/config";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 

@@ -1,4 +1,4 @@
-import { TemplateElement } from "$root/utils/lit-html";
+import { TemplateElement } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 

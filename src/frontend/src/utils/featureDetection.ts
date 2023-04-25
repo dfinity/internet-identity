@@ -1,4 +1,4 @@
-import { features } from "$root/features";
+import { features } from "$src/features";
 import { isNullish } from "@dfinity/utils";
 import { wrapError } from "./utils";
 

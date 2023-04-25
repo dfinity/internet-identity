@@ -22,8 +22,8 @@ import {
   VerifyTentativeDeviceResponse,
   _SERVICE,
 } from "$generated/internet_identity_types";
-import { fromMnemonicWithoutValidation } from "$root/crypto/ed25519";
-import { features } from "$root/features";
+import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { features } from "$src/features";
 import {
   Actor,
   ActorSubclass,

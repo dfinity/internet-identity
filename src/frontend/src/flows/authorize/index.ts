@@ -1,15 +1,15 @@
 import {
   authenticateBox,
   AuthnTemplates,
-} from "$root/components/authenticateBox";
-import { displayError } from "$root/components/displayError";
-import { caretDownIcon, spinner } from "$root/components/icons";
-import { showMessage } from "$root/components/message";
-import { recoveryWizard } from "$root/flows/recovery/recoveryWizard";
-import { DynamicKey, I18n } from "$root/i18n";
-import { Connection } from "$root/utils/iiConnection";
-import { TemplateElement, withRef } from "$root/utils/lit-html";
-import { unreachable } from "$root/utils/utils";
+} from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { caretDownIcon, spinner } from "$src/components/icons";
+import { showMessage } from "$src/components/message";
+import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { DynamicKey, I18n } from "$src/i18n";
+import { Connection } from "$src/utils/iiConnection";
+import { TemplateElement, withRef } from "$src/utils/lit-html";
+import { unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { authenticationProtocol } from "./postMessageInterface";

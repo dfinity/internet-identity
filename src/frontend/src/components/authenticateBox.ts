@@ -1,22 +1,22 @@
-import { PORTAL_II_URL } from "$root/config";
-import { registerTentativeDevice } from "$root/flows/addDevice/welcomeView/registerTentativeDevice";
-import { useRecovery } from "$root/flows/recovery/useRecovery";
+import { PORTAL_II_URL } from "$src/config";
+import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
+import { useRecovery } from "$src/flows/recovery/useRecovery";
 import {
   apiResultToLoginFlowResult,
   LoginData,
   LoginFlowError,
   LoginFlowResult,
   LoginFlowSuccess,
-} from "$root/utils/flowResult";
-import { Connection } from "$root/utils/iiConnection";
-import { TemplateElement, withRef } from "$root/utils/lit-html";
-import { registerIfAllowed } from "$root/utils/registerAllowedCheck";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { TemplateElement, withRef } from "$src/utils/lit-html";
+import { registerIfAllowed } from "$src/utils/registerAllowedCheck";
 import {
   getAnchors,
   parseUserNumber,
   setAnchorUsed,
-} from "$root/utils/userNumber";
-import { isNonEmptyArray, NonEmptyArray, unreachable } from "$root/utils/utils";
+} from "$src/utils/userNumber";
+import { isNonEmptyArray, NonEmptyArray, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";

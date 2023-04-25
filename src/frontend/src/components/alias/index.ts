@@ -1,7 +1,7 @@
-import { mainWindow } from "$root/components/mainWindow";
-import { I18n } from "$root/i18n";
-import { renderPage, withRef } from "$root/utils/lit-html";
-import { validateAlias } from "$root/utils/validateAlias";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { validateAlias } from "$src/utils/validateAlias";
 import { html, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 

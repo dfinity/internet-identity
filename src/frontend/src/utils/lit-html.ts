@@ -1,6 +1,6 @@
 /* A couple of lit-html helpers */
 
-import { toast } from "$root/components/toast";
+import { toast } from "$src/components/toast";
 import { isNullish } from "@dfinity/utils";
 import { render, TemplateResult } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";

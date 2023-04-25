@@ -1,8 +1,8 @@
-import { checkmarkIcon, copyIcon } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
-import { toast } from "$root/components/toast";
-import { warnBox } from "$root/components/warnBox";
-import { renderPage, withRef } from "$root/utils/lit-html";
+import { checkmarkIcon, copyIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { warnBox } from "$src/components/warnBox";
+import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 

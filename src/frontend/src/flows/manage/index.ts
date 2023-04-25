@@ -2,32 +2,32 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
-import { showWarning } from "$root/banner";
+import { showWarning } from "$src/banner";
 import {
   authenticateBox,
   AuthnTemplates,
-} from "$root/components/authenticateBox";
-import { displayError } from "$root/components/displayError";
-import { withLoader } from "$root/components/loader";
-import { logoutSection } from "$root/components/logout";
-import { mainWindow } from "$root/components/mainWindow";
-import { toast } from "$root/components/toast";
-import { LEGACY_II_URL } from "$root/config";
-import { addDevice } from "$root/flows/addDevice/manage/addDevice";
-import { dappsExplorer } from "$root/flows/dappsExplorer";
-import { DappDescription, getDapps } from "$root/flows/dappsExplorer/dapps";
-import { dappsTeaser } from "$root/flows/dappsExplorer/teaser";
-import { recoveryWizard } from "$root/flows/recovery/recoveryWizard";
-import { setupKey, setupPhrase } from "$root/flows/recovery/setupRecovery";
-import { AuthenticatedConnection, Connection } from "$root/utils/iiConnection";
-import { renderPage } from "$root/utils/lit-html";
+} from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { logoutSection } from "$src/components/logout";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { LEGACY_II_URL } from "$src/config";
+import { addDevice } from "$src/flows/addDevice/manage/addDevice";
+import { dappsExplorer } from "$src/flows/dappsExplorer";
+import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
+import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import { renderPage } from "$src/utils/lit-html";
 import {
   hasRecoveryPhrase,
   isProtected,
   isRecoveryDevice,
   isRecoveryPhrase,
-} from "$root/utils/recoveryDevice";
-import { unreachable } from "$root/utils/utils";
+} from "$src/utils/recoveryDevice";
+import { unreachable } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";

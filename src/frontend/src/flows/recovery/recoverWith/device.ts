@@ -1,14 +1,14 @@
-import { displayError } from "$root/components/displayError";
-import { mainWindow } from "$root/components/mainWindow";
+import { displayError } from "$src/components/displayError";
+import { mainWindow } from "$src/components/mainWindow";
 import {
   apiResultToLoginFlowResult,
   cancel,
   LoginFlowCanceled,
   LoginFlowSuccess,
-} from "$root/utils/flowResult";
-import { Connection } from "$root/utils/iiConnection";
-import { RecoveryDevice } from "$root/utils/recoveryDevice";
-import { unreachable } from "$root/utils/utils";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { unreachable } from "$src/utils/utils";
 import { html, render } from "lit-html";
 
 const pageContent = () => {

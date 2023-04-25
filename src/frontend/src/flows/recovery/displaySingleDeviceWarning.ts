@@ -1,5 +1,5 @@
-import { mainWindow } from "$root/components/mainWindow";
-import { AuthenticatedConnection } from "$root/utils/iiConnection";
+import { mainWindow } from "$src/components/mainWindow";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { html, render } from "lit-html";
 
 const pageContent = () => {

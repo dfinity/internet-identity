@@ -1,6 +1,6 @@
-import { mainWindow } from "$root/components/mainWindow";
-import { I18n } from "$root/i18n";
-import { renderPage } from "$root/utils/lit-html";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage } from "$src/utils/lit-html";
 import { html, render } from "lit-html";
 import copyJson from "./addDeviceSuccess.json";
 

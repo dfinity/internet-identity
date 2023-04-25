@@ -1,5 +1,5 @@
-import { autofocus } from "$root/utils/lit-html";
-import { NonEmptyArray } from "$root/utils/utils";
+import { autofocus } from "$src/utils/lit-html";
+import { NonEmptyArray } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { arrowRight } from "./icons";
 

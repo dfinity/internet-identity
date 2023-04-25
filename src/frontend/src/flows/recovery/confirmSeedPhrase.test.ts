@@ -1,4 +1,4 @@
-import { I18n } from "$root/utils/i18n";
+import { I18n } from "$src/utils/i18n";
 import { render } from "lit-html";
 import { createRef } from "lit-html/directives/ref.js";
 import { confirmSeedPhrasePage, wordTemplate } from "./confirmSeedPhrase";

@@ -1,8 +1,8 @@
-import { checkmarkIcon, warningIcon } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
-import { I18n } from "$root/i18n";
-import { renderPage, withRef } from "$root/utils/lit-html";
-import { Chan } from "$root/utils/utils";
+import { checkmarkIcon, warningIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";

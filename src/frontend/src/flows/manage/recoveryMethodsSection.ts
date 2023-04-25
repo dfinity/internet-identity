@@ -3,11 +3,11 @@ import {
   lockedIcon,
   warningIcon,
   warningRoundIcon,
-} from "$root/components/icons";
+} from "$src/components/icons";
 import {
   recoveryKeyLabel,
   recoveryPhraseLabel,
-} from "$root/utils/recoveryDevice";
+} from "$src/utils/recoveryDevice";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";

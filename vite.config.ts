@@ -16,7 +16,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
         stream: "stream-browserify",
         // Custom alias we are using to shorten and make absolute the imports
         $generated: resolve(__dirname, "src/frontend/generated"),
-        $root: resolve(__dirname, "src/frontend/src"),
+        $src: resolve(__dirname, "src/frontend/src"),
       },
     },
     build: {

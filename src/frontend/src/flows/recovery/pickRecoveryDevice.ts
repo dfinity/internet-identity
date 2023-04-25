@@ -1,10 +1,10 @@
-import { securityKeyIcon, seedPhraseIcon } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
+import { securityKeyIcon, seedPhraseIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
 import {
   isRecoveryPhrase,
   RecoveryDevice,
   recoveryDeviceToLabel,
-} from "$root/utils/recoveryDevice";
+} from "$src/utils/recoveryDevice";
 import { html, render } from "lit-html";
 
 const pageContent = () => {

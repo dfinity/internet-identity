@@ -1,11 +1,11 @@
 import { VerifyTentativeDeviceResponse } from "$generated/internet_identity_types";
-import { displayError } from "$root/components/displayError";
-import { withLoader } from "$root/components/loader";
-import { mainWindow } from "$root/components/mainWindow";
-import { AsyncCountdown } from "$root/utils/countdown";
-import { AuthenticatedConnection } from "$root/utils/iiConnection";
-import { renderPage, withRef } from "$root/utils/lit-html";
-import { Chan, unknownToString, unreachableLax } from "$root/utils/utils";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { mainWindow } from "$src/components/mainWindow";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { Chan, unknownToString, unreachableLax } from "$src/utils/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref } from "lit-html/directives/ref.js";

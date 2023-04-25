@@ -1,5 +1,5 @@
-import { mount, withRef } from "$root/utils/lit-html";
-import { parseUserNumber } from "$root/utils/userNumber";
+import { mount, withRef } from "$src/utils/lit-html";
+import { parseUserNumber } from "$src/utils/userNumber";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";

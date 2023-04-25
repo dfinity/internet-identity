@@ -1,21 +1,21 @@
-import { warningIcon } from "$root/components/icons";
-import { withLoader } from "$root/components/loader";
-import { mainWindow } from "$root/components/mainWindow";
-import { toast } from "$root/components/toast";
+import { warningIcon } from "$src/components/icons";
+import { withLoader } from "$src/components/loader";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
 import {
   dropLeadingUserNumber,
   RECOVERYPHRASE_WORDCOUNT,
-} from "$root/crypto/mnemonic";
+} from "$src/crypto/mnemonic";
 import type {
   LoginFlowCanceled,
   LoginFlowError,
   LoginFlowSuccess,
-} from "$root/utils/flowResult";
-import { apiResultToLoginFlowResult } from "$root/utils/flowResult";
-import { Connection } from "$root/utils/iiConnection";
-import { renderPage, withRef } from "$root/utils/lit-html";
-import { RecoveryDevice } from "$root/utils/recoveryDevice";
-import { Chan } from "$root/utils/utils";
+} from "$src/utils/flowResult";
+import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { Chan } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { html, TemplateResult } from "lit-html";

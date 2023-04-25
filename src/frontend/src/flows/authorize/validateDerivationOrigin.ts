@@ -1,4 +1,4 @@
-import { wrapError } from "$root/utils/utils";
+import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
 

@@ -1,4 +1,4 @@
-import { renderPage } from "$root/utils/lit-html";
+import { renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 import { createRef, Ref, ref } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "./anchorInput";

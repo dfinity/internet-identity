@@ -2,9 +2,9 @@ import {
   IdentityAnchorInfo,
   Timestamp,
 } from "$generated/internet_identity_types";
-import { displayError } from "$root/components/displayError";
-import { withLoader } from "$root/components/loader";
-import { AuthenticatedConnection } from "$root/utils/iiConnection";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { renderAddDeviceSuccess } from "./addDeviceSuccess";
 import { addFIDODevice } from "./addFIDODevice";

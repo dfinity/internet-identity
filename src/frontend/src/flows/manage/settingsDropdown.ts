@@ -1,4 +1,4 @@
-import { dropdownIcon } from "$root/components/icons";
+import { dropdownIcon } from "$src/components/icons";
 import { html, TemplateResult } from "lit-html";
 
 export const settingsDropdown = ({

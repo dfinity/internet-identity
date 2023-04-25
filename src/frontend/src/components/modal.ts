@@ -1,4 +1,4 @@
-import { withRef } from "$root/utils/lit-html";
+import { withRef } from "$src/utils/lit-html";
 import { html, render, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 

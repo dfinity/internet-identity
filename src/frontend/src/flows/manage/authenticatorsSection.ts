@@ -1,4 +1,4 @@
-import { warningIcon } from "$root/components/icons";
+import { warningIcon } from "$src/components/icons";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";

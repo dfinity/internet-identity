@@ -19,8 +19,8 @@
     "paths": {
       "$generated": ["./src/frontend/generated"],
       "$generated/*": ["./src/frontend/generated/*"],
-      "$root": ["./src/frontend/src"],
-      "$root/*": ["./src/frontend/src/*"]
+      "$src": ["./src/frontend/src"],
+      "$src/*": ["./src/frontend/src/*"]
     }
   },
   "exclude": [

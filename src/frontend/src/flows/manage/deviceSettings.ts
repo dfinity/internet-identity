@@ -1,19 +1,19 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { displayError } from "$root/components/displayError";
-import { withLoader } from "$root/components/loader";
-import { recoverWithPhrase } from "$root/flows/recovery/recoverWith/phrase";
-import { phraseWizard } from "$root/flows/recovery/setupRecovery";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { recoverWithPhrase } from "$src/flows/recovery/recoverWith/phrase";
+import { phraseWizard } from "$src/flows/recovery/setupRecovery";
 import {
   AuthenticatedConnection,
   bufferEqual,
   Connection,
-} from "$root/utils/iiConnection";
+} from "$src/utils/iiConnection";
 import {
   isProtected,
   isRecoveryDevice,
   RecoveryPhrase,
-} from "$root/utils/recoveryDevice";
-import { unknownToString, unreachable } from "$root/utils/utils";
+} from "$src/utils/recoveryDevice";
+import { unknownToString, unreachable } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 
 /* Remove the device and return */

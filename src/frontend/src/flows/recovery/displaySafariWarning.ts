@@ -1,6 +1,6 @@
-import { mainWindow } from "$root/components/mainWindow";
-import { warnBox } from "$root/components/warnBox";
-import { AuthenticatedConnection } from "$root/utils/iiConnection";
+import { mainWindow } from "$src/components/mainWindow";
+import { warnBox } from "$src/components/warnBox";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { html, render } from "lit-html";
 
 const pageContent = () => {

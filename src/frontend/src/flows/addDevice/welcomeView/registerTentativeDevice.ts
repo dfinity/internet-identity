@@ -3,22 +3,18 @@ import {
   CredentialId,
   DeviceData,
 } from "$generated/internet_identity_types";
-import { promptDeviceAlias } from "$root/components/alias";
-import { displayError } from "$root/components/displayError";
-import { withLoader } from "$root/components/loader";
-import { authenticatorAttachmentToKeyType } from "$root/utils/authenticatorAttachment";
-import { Connection, creationOptions } from "$root/utils/iiConnection";
-import { setAnchorUsed } from "$root/utils/userNumber";
-import {
-  unknownToString,
-  unreachable,
-  unreachableLax,
-} from "$root/utils/utils";
+import { promptDeviceAlias } from "$src/components/alias";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
+import { Connection, creationOptions } from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
 import {
   displayCancelError,
   isCancel,
   isDuplicateDeviceError,
-} from "$root/utils/webAuthnErrorUtils";
+} from "$src/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { html } from "lit-html";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";

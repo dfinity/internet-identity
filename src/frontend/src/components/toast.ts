@@ -1,5 +1,5 @@
-import { TemplateElement } from "$root/utils/lit-html";
-import { Chan } from "$root/utils/utils";
+import { TemplateElement } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { repeat } from "lit-html/directives/repeat.js";

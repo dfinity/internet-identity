@@ -1,5 +1,5 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { domainWarning } from "$root/flows/manage";
+import { domainWarning } from "$src/flows/manage";
 
 function onOrigin(origin: string, fn: () => void) {
   const oldOrigin = window.origin;

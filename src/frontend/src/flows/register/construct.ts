@@ -1,12 +1,12 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { spinner } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
-import { features } from "$root/features";
+import { spinner } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { features } from "$src/features";
 import {
   creationOptions,
   DummyIdentity,
   IIWebAuthnIdentity,
-} from "$root/utils/iiConnection";
+} from "$src/utils/iiConnection";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";

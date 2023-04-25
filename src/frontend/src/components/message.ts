@@ -1,4 +1,4 @@
-import { renderPage, TemplateElement } from "$root/utils/lit-html";
+import { renderPage, TemplateElement } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { mainWindow } from "./mainWindow";

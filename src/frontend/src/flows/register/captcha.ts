@@ -1,15 +1,15 @@
 import { Challenge } from "$generated/internet_identity_types";
-import { spinner } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
-import { DynamicKey, I18n } from "$root/i18n";
-import { cancel, LoginFlowCanceled } from "$root/utils/flowResult";
+import { spinner } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { DynamicKey, I18n } from "$src/i18n";
+import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
 import {
   Connection,
   IIWebAuthnIdentity,
   RegisterResult,
-} from "$root/utils/iiConnection";
-import { autofocus, renderPage, withRef } from "$root/utils/lit-html";
-import { Chan } from "$root/utils/utils";
+} from "$src/utils/iiConnection";
+import { autofocus, renderPage, withRef } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";

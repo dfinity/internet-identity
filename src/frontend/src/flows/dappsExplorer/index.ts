@@ -1,7 +1,7 @@
-import { closeIcon } from "$root/components/icons";
-import { mainWindow } from "$root/components/mainWindow";
-import { I18n } from "$root/i18n";
-import { renderPage } from "$root/utils/lit-html";
+import { closeIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
 import { DappDescription } from "./dapps";

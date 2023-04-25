@@ -1,4 +1,4 @@
-import { randomString, wrapError } from "$root/utils/utils";
+import { randomString, wrapError } from "$src/utils/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fs from "fs";
 import * as fsasync from "fs/promises";

@@ -1,5 +1,5 @@
-import { AuthenticatedConnection } from "$root/utils/iiConnection";
-import { iOSOrSafari } from "$root/utils/utils";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { iOSOrSafari } from "$src/utils/utils";
 import { html } from "lit-html";
 import { displaySafariWarning } from "./displaySafariWarning";
 import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
