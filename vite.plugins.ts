@@ -1,5 +1,8 @@
 import { assertNonNullish } from "@dfinity/utils";
 import { readFileSync } from "fs";
+import { extname } from "path";
+import { Plugin } from "vite";
+import viteCompression from "vite-plugin-compression";
 
 /**
  * Read the II canister ID from dfx's local state
@@ -58,3 +61,14 @@ export const stripInjectJsScript = (): {
     return html.replace(match, ``);
   },
 });
+
+/**
+ * GZip generated resources e.g. index.js => index.js.gz
+ */
+export const compression = (): Plugin =>
+  viteCompression({
+    // II canister only supports one content type per resource. That is why we remove the original file.
+    deleteOriginFile: true,
+    filter: (file: string): boolean =>
+      ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
+  });
