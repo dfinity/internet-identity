@@ -28,33 +28,6 @@ export const authnTemplateAuthorize = ({
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
 
-  const marketingBlocks = [
-    {
-      title: copy.secure_and_convenient,
-      body: copy.instead_of_passwords,
-    },
-    {
-      title: copy.no_tracking,
-      body: copy.get_privacy,
-    },
-    {
-      title: copy.control_your_identity,
-      body: copy.securely_access,
-    },
-    {
-      title: copy.own_and_participate,
-      body: copy.share_and_vote,
-    },
-    {
-      title: copy.sign_in_to_web3,
-      body: copy.manages_keys,
-    },
-    {
-      title: copy.opensource_and_transparent,
-      body: copy.internet_identity_codebase,
-    },
-  ];
-
   const chasm =
     derivationOrigin !== undefined && derivationOrigin !== origin
       ? mkChasm({
@@ -79,22 +52,11 @@ export const authnTemplateAuthorize = ({
     </div>
   `;
 
-  const marketing = (block: {
-    title: DynamicKey;
-    body: DynamicKey;
-  }): TemplateResult => html`
-    <div class="c-marketing-block">
-      <h2 class="t-title t-title--main">${block.title}</h2>
-      <p class="t-paragraph t-weak">${block.body}</p>
-    </div>
-  `;
-
   return {
     firstTime: {
       slot: wrap(copy.first_time_create),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
-      marketingBlocks: html`${marketingBlocks.map(marketing)}`,
     },
     useExisting: {
       slot: wrap(copy.use_existing_enter_anchor),
@@ -131,6 +93,7 @@ export const authFlowAuthorize = async (
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
         connection,
+        i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,

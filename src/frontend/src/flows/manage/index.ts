@@ -39,6 +39,7 @@ import {
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import { I18n } from "$src/i18n";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = (): AuthnTemplates => {
@@ -80,10 +81,10 @@ export const authnTemplateManage = (): AuthnTemplates => {
 };
 
 /* the II authentication flow */
-export const authFlowManage = async (connection: Connection) => {
+export const authFlowManage = async (connection: Connection, i18n: I18n) => {
   // Go through the login flow, potentially creating an anchor.
   const { userNumber, connection: authenticatedConnection } =
-    await authenticateBox(connection, authnTemplateManage());
+    await authenticateBox(connection, i18n, authnTemplateManage());
 
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.

@@ -100,14 +100,14 @@ const init = async () => {
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
+
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
   if (addDeviceAnchor !== undefined) {
     // Register this device (tentatively)
     await registerTentativeDevice(addDeviceAnchor, connection);
-
-    const i18n = new I18n();
-    const copy = i18n.i18n(copyJson);
 
     // Show a good bye message
     showMessage({
@@ -123,7 +123,7 @@ const init = async () => {
     void authFlowAuthorize(connection);
   } else {
     // The default flow
-    void authFlowManage(connection);
+    void authFlowManage(connection, i18n);
   }
 };
 
