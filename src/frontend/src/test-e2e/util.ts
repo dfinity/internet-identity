@@ -1,4 +1,4 @@
-import { WebAuthnCredential } from "$root/test-setup";
+import { WebAuthnCredential } from "../../test-setup";
 import { randomString, wrapError } from "$root/utils/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fs from "fs";
