@@ -92,7 +92,7 @@ test("Register new identity and add additional device", async () => {
     await browser.pause(10_000);
 
     // success page
-    const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+    const addDeviceSuccessView = new AddDeviceSuccessView(browser);
     await addDeviceSuccessView.waitForDisplay();
     await addDeviceSuccessView.continue();
 
@@ -148,7 +148,7 @@ const registerRemoteDevice = async ({
   await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
   await addRemoteDeviceView.continue();
 
-  const verificationCodeView = await new AddRemoteDeviceVerificationCodeView(
+  const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
     browser2
   );
   await verificationCodeView.waitForDisplay();
@@ -156,13 +156,13 @@ const registerRemoteDevice = async ({
 
   // browser 1 again
   await focusBrowser(browser1);
-  const verificationView = await new VerifyRemoteDeviceView(browser1);
+  const verificationView = new VerifyRemoteDeviceView(browser1);
   await verificationView.waitForDisplay();
   await verificationView.enterVerificationCode(code);
   await verificationView.continue();
 
   // success page
-  const addDeviceSuccessView = await new AddDeviceSuccessView(browser1);
+  const addDeviceSuccessView = new AddDeviceSuccessView(browser1);
   await addDeviceSuccessView.waitForDisplay();
   await addDeviceSuccessView.continue();
 };
@@ -198,14 +198,13 @@ test.only("Register new identity and sign-in with new additional remote device",
       // browser 2 again
       await focusBrowser(browser2);
 
+      // add authenticator because we will sign in on continue
+      await addVirtualAuthenticator(browser2);
+
       // success page
-      const addDeviceSuccessView = await new AddDeviceSuccessView(browser2);
+      const addDeviceSuccessView = new AddDeviceSuccessView(browser2);
       await addDeviceSuccessView.waitForDisplay();
       await addDeviceSuccessView.continue();
-
-      await browser2.pause(10000);
-
-      // TODO: following pass but is inaccurate I think. To be double checked
 
       // sign-in succeeded and we continue without registering a recovery method
       const recoveryMethodSelectorView = new RecoveryMethodSelectorView(
@@ -213,8 +212,6 @@ test.only("Register new identity and sign-in with new additional remote device",
       );
       await recoveryMethodSelectorView.waitForDisplay();
       await recoveryMethodSelectorView.skipRecovery();
-
-      await browser2.pause(10000);
 
       // we accept the single device warning
       const singleDeviceWarningView = new SingleDeviceWarningView(browser2);
@@ -268,19 +265,19 @@ test("Register new identity and add additional remote device starting on new dev
       await focusBrowser(browser2);
       await notInRegistrationModeView.retry();
       const verificationCodeView =
-        await new AddRemoteDeviceVerificationCodeView(browser2);
+        new AddRemoteDeviceVerificationCodeView(browser2);
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
 
       // browser 1 again
       await focusBrowser(browser);
-      const verificationView = await new VerifyRemoteDeviceView(browser);
+      const verificationView = new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
 
       // success page
-      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      const addDeviceSuccessView = new AddDeviceSuccessView(browser);
       await addDeviceSuccessView.waitForDisplay();
       await addDeviceSuccessView.continue();
     });
