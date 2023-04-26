@@ -1,5 +1,5 @@
 /** parse the II_VERSION, see ./scripts/version for more information */
-export const versionString = process.env.II_VERSION ?? "";
+export const versionString = import.meta.env.II_VERSION ?? "";
 export const versionList = versionString.split(",");
 
 export type VersionInfo = {
