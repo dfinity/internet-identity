@@ -11,6 +11,7 @@ use internet_identity_interface::internet_identity::types::*;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
@@ -60,9 +61,31 @@ fn delegation_bookkeeping(frontend: FrontendHostname, ii_domain: &Option<IIDomai
     state::usage_metrics_mut(|metrics| {
         metrics.delegation_counter += 1;
     });
-    if ii_domain.is_some() {
+    if ii_domain.is_some() && !is_dev_frontend(&frontend) {
         update_latest_delegation_origins(frontend);
     }
+}
+
+/// Filter out derivation origins that most likely point to development setups.
+/// This is not bullet proof but given the data we collected so far it should be good for now.
+fn is_dev_frontend(frontend: &FrontendHostname) -> bool {
+    if frontend.starts_with("http://") || frontend.contains("localhost") {
+        // we don't care about insecure origins or localhost
+        return true;
+    }
+
+    // lets check for local IP addresses
+    if let Some(hostname) = frontend
+        .strip_prefix("https://")
+        .and_then(|s| s.split(':').next())
+    {
+        return match hostname.parse::<IpAddr>() {
+            Ok(IpAddr::V4(addr)) => addr.is_private() || addr.is_loopback(),
+            Ok(IpAddr::V6(addr)) => addr.is_loopback(),
+            Err(_) => false,
+        };
+    }
+    false
 }
 
 /// Add the current front-end to the list of latest used front-end origins.
