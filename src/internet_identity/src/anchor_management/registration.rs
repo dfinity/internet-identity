@@ -134,6 +134,7 @@ lazy_static! {
         ('Y', 'y'),
         ('Z', 'z'),
         ('P', 'p'),
+        ('W', 'w'),
     ].into_iter().collect();
 }
 

@@ -158,7 +158,7 @@ jobs:
 
       # Build the showcase with a special base URL (used in links and esp. routing)
       # to match the deploy URL: https://dfinity.github.io/internet-identity/
-      - run: npm run build:showcase -- --base '/internet-identity'
+      - run: npm run build:showcase -- --base '/internet-identity/'
       # the showcase needs the same index.html served on all routes; on GH pages we just show a fake 404 page
       # that is actually the index.
       - run: cp dist-showcase/index.html dist-showcase/404.html

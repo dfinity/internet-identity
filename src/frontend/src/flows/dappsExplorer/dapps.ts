@@ -1,4 +1,5 @@
 import { toast } from "$src/components/toast";
+import { BASE_URL } from "$src/environment";
 import { isNullish } from "@dfinity/utils";
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
@@ -37,6 +38,6 @@ export const getDapps = async (): Promise<DappDescription[]> => {
   return dapps.map((dapp) => ({
     ...dapp,
     /* fix up logo path (inherited from dfinity/portal) to match our assets */
-    logo: dapp.logo.replace("/img/showcase/", "/icons/"),
+    logo: dapp.logo.replace("/img/showcase/", BASE_URL + "icons/"),
   }));
 };

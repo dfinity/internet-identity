@@ -433,11 +433,15 @@ const iiPages: Record<string, () => void> = {
 const showcase: TemplateResult = html`
   <h1 class="t-title t-title--main">showcase</h1>
   <div class="showcase-grid l-stack">
-    ${Object.entries(iiPages).map(([key, _]) => {
+    ${Object.entries(iiPages).map(([pageName, _]) => {
+      // '/' or '/internet-identity/'
+      const baseUrl = import.meta.env.BASE_URL ?? "/";
+      // '/myPage' or '/internet-identity/myPage'
+      const pageLink = baseUrl + pageName;
       return html`<aside>
-        <a data-page-name="${key}" href="${key}">
-          <iframe src="${key}" title="${key}"></iframe>
-          <h2>${key}</h2>
+        <a data-page-name=${pageName} href=${pageLink}>
+          <iframe src=${pageLink} title=${pageName}></iframe>
+          <h2>${pageName}</h2>
         </a>
       </aside>`;
     })}
@@ -457,7 +461,7 @@ const components = (): TemplateResult => {
           div.innerText = anchor.toString();
         }),
       moreOptions: () => console.log("More options requested"),
-          focus: false,
+      focus: false,
     }).template;
 
   const chan = new Chan<TemplateResult>(html`loading...`);
@@ -614,16 +618,37 @@ const pageContent = html`
   ${showcase} ${i18nExample()} ${components()} ${styleguide}
 `;
 
+// The 404 page
+const notFound = ({
+  baseUrl,
+  pageName,
+}: {
+  baseUrl: string;
+  pageName: string;
+}) => {
+  showMessagePage({
+    message: html`<h1>404 not found</h1>
+      <p class="t-paragraph">
+        Page '${pageName}' was not found on '${baseUrl}${pageName}'
+      </p> `,
+  });
+};
+
 const init = () => {
   // We use the URL's path to route to the correct page.
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
-  const route = window.location.pathname
-    .replace(import.meta.env.BASE_URL ?? "/", "");
-  const page = iiPages[route] ?? defaultPage;
-
-  page();
+  // '/myPage' -> 'myPage'
+  // '/internet-identity/myPage' -> 'myPage'
+  const baseUrl = import.meta.env.BASE_URL;
+  const pageName = window.location.pathname.replace(baseUrl, "");
+  if (pageName === "") {
+    defaultPage();
+  } else {
+    const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
+    page();
+  }
 };
 
 init();
