@@ -264,8 +264,9 @@ test("Register new identity and add additional remote device starting on new dev
       // browser 2 again
       await focusBrowser(browser2);
       await notInRegistrationModeView.retry();
-      const verificationCodeView =
-        new AddRemoteDeviceVerificationCodeView(browser2);
+      const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
+        browser2
+      );
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
 
