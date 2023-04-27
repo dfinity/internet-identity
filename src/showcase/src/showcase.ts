@@ -1,68 +1,55 @@
 /** A showcase for static pages. II pages are given a fake connection and loaded from here
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
-import { html, render, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   Challenge,
   DeviceData,
   Timestamp,
-} from "../../frontend/generated/internet_identity_types";
-import { showWarning } from "../../frontend/src/banner";
-import { promptDeviceAliasPage } from "../../frontend/src/components/alias";
-import { mkAnchorPicker } from "../../frontend/src/components/anchorPicker";
-import { authnPages } from "../../frontend/src/components/authenticateBox";
-import { displayError } from "../../frontend/src/components/displayError";
-import { withLoader } from "../../frontend/src/components/loader";
-import {
-  showMessage,
-  showMessagePage,
-} from "../../frontend/src/components/message";
-import { promptUserNumber } from "../../frontend/src/components/promptUserNumber";
-import { toast } from "../../frontend/src/components/toast";
-import { addDeviceSuccessPage } from "../../frontend/src/flows/addDevice/manage/addDeviceSuccess";
-import { pollForTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/pollForTentativeDevice";
-import { verifyTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/verifyTentativeDevice";
-import { deviceRegistrationDisabledInfoPage } from "../../frontend/src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
-import { showVerificationCodePage } from "../../frontend/src/flows/addDevice/welcomeView/showVerificationCode";
-import { authnTemplateAuthorize } from "../../frontend/src/flows/authorize";
-import { compatibilityNotice } from "../../frontend/src/flows/compatibilityNotice";
-import { dappsExplorerPage } from "../../frontend/src/flows/dappsExplorer";
-import { getDapps } from "../../frontend/src/flows/dappsExplorer/dapps";
-import {
-  authnTemplateManage,
-  displayManagePage,
-} from "../../frontend/src/flows/manage";
-import { chooseRecoveryMechanismPage } from "../../frontend/src/flows/recovery/chooseRecoveryMechanism";
+} from "$generated/internet_identity_types";
+import { showWarning } from "$src/banner";
+import { promptDeviceAliasPage } from "$src/components/alias";
+import { mkAnchorPicker } from "$src/components/anchorPicker";
+import { authnPages } from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { showMessage, showMessagePage } from "$src/components/message";
+import { promptUserNumber } from "$src/components/promptUserNumber";
+import { toast } from "$src/components/toast";
+import { addDeviceSuccessPage } from "$src/flows/addDevice/manage/addDeviceSuccess";
+import { pollForTentativeDevicePage } from "$src/flows/addDevice/manage/pollForTentativeDevice";
+import { verifyTentativeDevicePage } from "$src/flows/addDevice/manage/verifyTentativeDevice";
+import { deviceRegistrationDisabledInfoPage } from "$src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showVerificationCode";
+import { authnTemplateAuthorize } from "$src/flows/authorize";
+import { compatibilityNotice } from "$src/flows/compatibilityNotice";
+import { dappsExplorerPage } from "$src/flows/dappsExplorer";
+import { getDapps } from "$src/flows/dappsExplorer/dapps";
+import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
+import { chooseRecoveryMechanismPage } from "$src/flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
   confirmSeedPhrasePage,
-} from "../../frontend/src/flows/recovery/confirmSeedPhrase";
-import { displaySafariWarning } from "../../frontend/src/flows/recovery/displaySafariWarning";
-import { displaySeedPhrasePage } from "../../frontend/src/flows/recovery/displaySeedPhrase";
-import { displaySingleDeviceWarning } from "../../frontend/src/flows/recovery/displaySingleDeviceWarning";
-import { pickRecoveryDevice } from "../../frontend/src/flows/recovery/pickRecoveryDevice";
-import { deviceRecoveryPage } from "../../frontend/src/flows/recovery/recoverWith/device";
-import { recoverWithPhrasePage } from "../../frontend/src/flows/recovery/recoverWith/phrase";
-import {
-  badChallenge,
-  promptCaptchaPage,
-} from "../../frontend/src/flows/register/captcha";
-import { renderConstructing } from "../../frontend/src/flows/register/construct";
-import { displayUserNumberPage } from "../../frontend/src/flows/register/finish";
-import { registerDisabled } from "../../frontend/src/flows/registerDisabled";
-import { styleguide } from "../../frontend/src/styleguide";
-import "../../frontend/src/styles/main.css";
-import { I18n } from "../../frontend/src/utils/i18n";
-import { AuthenticatedConnection } from "../../frontend/src/utils/iiConnection";
-import { mount, withRef } from "../../frontend/src/utils/lit-html";
-import { RecoveryDevice } from "../../frontend/src/utils/recoveryDevice";
-import {
-  asNonEmptyArray,
-  Chan,
-  NonEmptyArray,
-} from "../../frontend/src/utils/utils";
+} from "$src/flows/recovery/confirmSeedPhrase";
+import { displaySafariWarning } from "$src/flows/recovery/displaySafariWarning";
+import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
+import { displaySingleDeviceWarning } from "$src/flows/recovery/displaySingleDeviceWarning";
+import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
+import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
+import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
+import { renderConstructing } from "$src/flows/register/construct";
+import { displayUserNumberPage } from "$src/flows/register/finish";
+import { registerDisabled } from "$src/flows/registerDisabled";
+import { styleguide } from "$src/styleguide";
+import "$src/styles/main.css";
+import { I18n } from "$src/utils/i18n";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { mount, withRef } from "$src/utils/lit-html";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { asNonEmptyArray, Chan, NonEmptyArray } from "$src/utils/utils";
+import { html, render, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
