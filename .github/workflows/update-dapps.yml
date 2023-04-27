@@ -1,0 +1,50 @@
+# A GitHub Actions workflow that regularly creates a pull request to update dapps list
+name: Dapps Update
+
+on:
+  schedule:
+    # create a new pull request every day
+    - cron:  '0 0 * * *'
+
+jobs:
+  dapps-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+        # First, check if there is a newer version and update the JSON file
+      - name: Check new dapps file
+        id: update
+        run: |
+          # 1. Download the latest version from GitHub
+          # 2. Only select a dapp if it "usesInternetIdentity"
+          # 3. Keep only the fields we care about
+          # 4. Write to the codebase
+          curl \
+            https://raw.githubusercontent.com/dfinity/portal/master/showcase.json | \
+            jq '[.[] | select(.usesInternetIdentity == true) | with_entries(select([.k ey] | inside(["name", "website", "oneLiner", "logo"])))]' \
+                                                                                              > src/frontend/src/flows/dappsExplorer/dapps.json 
+
+      # If the dapps file commit was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: src/frontend/src/flows/dappsExplorer/dapps.json
+          commit-message: Update dapps file
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-dapps-update
+          delete-branch: true
+          title: 'Update dapps.json'
+
+            # Since the this is a scheduled job, a failure won't be shown on any
+            # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Dapps update failed"
