@@ -124,11 +124,11 @@ const authzTemplatesAlt = authnTemplateAuthorize({
   i18n,
 });
 
-const authz = authnPages({ ...authnCnfg, ...authzTemplates });
-const authzAlt = authnPages({ ...authnCnfg, ...authzTemplatesAlt });
+const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
+const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
 
 const manageTemplates = authnTemplateManage();
-const manage = authnPages({ ...authnCnfg, ...manageTemplates });
+const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
   displayUserNumber: () =>

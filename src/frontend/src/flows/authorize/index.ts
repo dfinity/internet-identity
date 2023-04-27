@@ -91,6 +91,7 @@ export const authFlowAuthorize = async (
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
         connection,
+        i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
