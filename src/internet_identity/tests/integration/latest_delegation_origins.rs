@@ -30,6 +30,22 @@ fn should_record_used_delegation_origin() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Verifies that dev origins (such as loopback and insecure origins) are not recorded.
+#[test]
+fn should_not_record_development_origins() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    delegation_for_origin(&env, canister_id, user_number, "http://some-dapp.com")?;
+    delegation_for_origin(&env, canister_id, user_number, "https://localhost:8443")?;
+    delegation_for_origin(&env, canister_id, user_number, "https://172.17.5.233:8443")?;
+
+    let latest_origins = api::stats(&env, canister_id)?.latest_delegation_origins;
+    assert!(latest_origins.is_empty());
+    Ok(())
+}
+
 /// Verifies that the configured limit for the number of latest used origins is respected.
 #[test]
 fn should_record_max_delegation_origins() -> Result<(), CallError> {

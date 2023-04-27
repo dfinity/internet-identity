@@ -20,6 +20,7 @@ fn ii_upgrade_works() -> Result<(), CallError> {
         canister_id,
         II_WASM.clone(),
         candid::encode_one(None::<InternetIdentityInit>).unwrap(),
+        None,
     )?;
     api::health_check(&env, canister_id);
     Ok(())
