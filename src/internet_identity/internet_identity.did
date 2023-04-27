@@ -348,7 +348,7 @@ service : (opt InternetIdentityInit) -> {
     update : (UserNumber, DeviceKey, DeviceData) -> ();
     // Atomically replace device matching the device key with the new device data
     replace : (UserNumber, DeviceKey, DeviceData) -> ();
-    remove : (UserNumber, DeviceKey) -> ();
+    remove : (UserNumber, DeviceKey, sig: opt blob, pubkey: opt blob) -> ();
     // Returns all devices of the user (authentication and recovery) but no information about device registrations.
     // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
     // Deprecated: Use 'get_anchor_credentials' instead.

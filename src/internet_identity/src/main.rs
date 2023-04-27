@@ -4,7 +4,7 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::{caller, instruction_counter, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -22,6 +22,7 @@ mod hash;
 mod http;
 mod state;
 mod storage;
+mod web_authn;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -132,13 +133,21 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 
 #[update]
 #[candid_method]
-fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
+fn remove(
+    anchor_number: AnchorNumber,
+    device_key: DeviceKey,
+    sig: Option<ByteBuf>,
+    pubkey: Option<PublicKey>,
+) {
+    let start_counter = instruction_counter();
     authenticated_anchor_operation(anchor_number, |anchor| {
         Ok((
             (),
-            anchor_management::remove(anchor_number, anchor, device_key),
+            anchor_management::remove(anchor_number, anchor, device_key, sig, pubkey),
         ))
-    })
+    });
+    let end_counter = instruction_counter();
+    ic_cdk::println!("remove in {} cycles", end_counter - start_counter);
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.

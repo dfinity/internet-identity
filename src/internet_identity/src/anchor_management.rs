@@ -1,13 +1,17 @@
 use crate::active_anchor_stats::IIDomain;
 use crate::archive::{archive_operation, device_diff};
+use crate::hash::{hash_of_map, Value};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
+use crate::web_authn::check_webauthn_signature;
 use crate::{active_anchor_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::*;
+use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 pub mod registration;
 pub mod tentative_device_registration;
@@ -147,7 +151,20 @@ pub fn remove(
     anchor_number: AnchorNumber,
     anchor: &mut Anchor,
     device_key: DeviceKey,
+    sig: Option<ByteBuf>,
+    pubkey: Option<PublicKey>,
 ) -> Operation {
+    let device = anchor.device(&device_key).unwrap();
+    if device.key_type != KeyType::SeedPhrase && device.ii_domain().is_some() {
+        let key_value_pairs = HashMap::from([
+            ("op", Value::String("remove")),
+            ("anchor_number", Value::U64(anchor_number)),
+            ("device_key", Value::Bytes(&device_key)),
+        ]);
+        let hash = hash_of_map(key_value_pairs);
+        check_webauthn_signature(&hash, &sig.unwrap(), &pubkey.unwrap()).unwrap();
+    }
+
     anchor
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));

@@ -29,6 +29,7 @@ import {
   ActorSubclass,
   DerEncodedPublicKey,
   HttpAgent,
+  requestIdOf,
   SignIdentity,
 } from "@dfinity/agent";
 import {
@@ -542,7 +543,21 @@ export class AuthenticatedConnection extends Connection {
 
   remove = async (publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
-    await actor.remove(this.userNumber, publicKey);
+    // requestIdOf actually just calculates the representation independent hash of the argument
+    const val = {
+      op: "remove",
+      anchor_number: this.userNumber,
+      device_key: publicKey,
+    };
+    const argHash = requestIdOf(val);
+    // sign using WebAuthn
+    const sig = await this.identity.sign(argHash);
+    await actor.remove(
+      this.userNumber,
+      publicKey,
+      [new Uint8Array(sig)],
+      [new Uint8Array(this.identity.getPublicKey().toDer())]
+    );
   };
 
   prepareDelegation = async (

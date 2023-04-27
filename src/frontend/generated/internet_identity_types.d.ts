@@ -227,7 +227,15 @@ export interface _SERVICE {
     [DeviceData, ChallengeResult, [] | [Principal]],
     RegisterResponse
   >,
-  'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
+  'remove' : ActorMethod<
+    [
+      UserNumber,
+      DeviceKey,
+      [] | [Uint8Array | number[]],
+      [] | [Uint8Array | number[]],
+    ],
+    undefined
+  >,
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,

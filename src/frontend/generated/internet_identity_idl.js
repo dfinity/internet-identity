@@ -262,7 +262,16 @@ export const idlFactory = ({ IDL }) => {
         [RegisterResponse],
         [],
       ),
-    'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'remove' : IDL.Func(
+        [
+          UserNumber,
+          DeviceKey,
+          IDL.Opt(IDL.Vec(IDL.Nat8)),
+          IDL.Opt(IDL.Vec(IDL.Nat8)),
+        ],
+        [],
+        [],
+      ),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
