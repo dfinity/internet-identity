@@ -6,20 +6,6 @@ jest.mock("./src/environment.ts", () => ({
   BASE_URL: "/",
 }));
 
-jest.mock("./src/features.ts", () => ({
-  FETCH_ROOT_KEY: false,
-  DUMMY_AUTH: false,
-  DUMMY_CAPTCHA: false,
-}));
-
-jest.mock("./src/version.ts", () => ({
-  version: {
-    commit: "",
-    release: undefined,
-    dirty: false,
-  },
-}));
-
 export type WebAuthnCredential = {
   credentialId: string;
   isResidentCredential: boolean;
