@@ -162,6 +162,9 @@
 
   --rc-card: var(--rc-background-transparent);
   --rc-card-background: var(--vc-mist);
+  --rc-card-backdrop: rgba(255, 255, 255, 0.2);
+
+  --rc-background-card--background: var(--rc-background-transparent);
 
   --rc-line: var(--vc-brand-alt);
   --rc-line-interaction: var(--vc-brand-alt);
@@ -217,6 +220,10 @@
   --rs-inline-icon-gap: var(--vs-inline);
   --rs-inline-button-gap: var(--vs-inline);
 
+  --rs-stack-section: calc(var(--vs-stack) * 3);
+  --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
+  --rs-stack-section--tight: var(--vs-stack);
+
   --rs-list-counter-space: calc(var(--vs-inline) * 2);
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
   --rs-list-parcel-bezel: var(--vs-bezel);
@@ -227,6 +234,8 @@
   --rs-footer-gap: var(--vs-inline);
 
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
+  --rs-logo-stack--top: var(--rs-logo-stack);
+  --rs-logo-stack--bottom: var(--rs-logo-stack);
   --rs-logo-type-stack: var(--vs-stack);
 
   --rs-card-bezel: calc(var(--vs-gutter) * 5);
@@ -269,6 +278,12 @@
 
   --vs-border-radius: 0.8rem;
 
+  --vs-gutter: 0.4rem;
+
+  --rs-stack-section: calc(var(--vs-stack) * 4);
+  --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
+  --rs-stack-section--tight: var(--vs-stack);
+
   --rc-line: var(--vc-light-grey);
   --rc-line-interaction: var(--vc-brand-purple);
 
@@ -281,6 +296,9 @@
   --rc-button-pair: var(--vc-brand-purple-light);
   --rc-onButton: var(--rc-text-interaction-inverted);
 
+  --rc-card-backdrop: transparent;
+  --rc-background-card--background: transparent;
+
   /* 
     color used to elevate something from its background 
     secondary button, card, icon button
@@ -289,6 +307,21 @@
 
   --rc-button-secondary: var(--rc-surface);
   --rc-onButton-secondary: var(--rc-text-interaction);
+
+  --rs-logo-stack--top: calc(var(--vs-gutter) * 8);
+  --rs-logo-stack--bottom: calc(var(--vs-gutter) * 4);
+
+  --rs-card-bezel: calc(var(--vs-gutter) * 6);
+  --rs-card-bezel-x: calc(var(--vs-gutter) * 8);
+  --rs-inline-button-gap: calc(var(--vs-inline) * 1.5);
+
+  --rs-button-bezel: calc(var(--vs-bezel) * 1.2);
+
+  /*
+
+  --rs-card-stack: calc(var(--vs-stack) * 1.5);
+  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
+  */
 }
 
 /***
@@ -602,9 +635,15 @@ a:hover,
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   min-height: 100vh;
-  padding: var(--rs-card-bezel);
+  padding: 5vmax;
+}
+
+@media (max-width: 512px) {
+  #pageContent,
+  .l-wrap {
+    padding: var(--rs-card-bezel);
+  }
 }
 
 .l-container {
@@ -777,8 +816,12 @@ a:hover,
   --bezel-x: var(--rs-card-bezel);
   --bezel-y: var(--rs-card-bezel);
 
-  background-color: var(--rc-background-transparent);
-  border-color: transparent;
+  background-color: var(--rc-background-card--background);
+}
+
+:root:is([data-theme="new"]) .c-card--highlight,
+:root:is([data-theme="new"]) .c-card--background {
+  border: none;
 }
 
 /**
@@ -805,7 +848,7 @@ a:hover,
   --bezel-x: calc(var(--rs-card-bezel) * 0.3);
   --bezel-y: calc(var(--rs-card-bezel) * 0.3);
 
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--rc-card-backdrop);
 }
 
 @media (max-width: 512px) {
@@ -1046,7 +1089,7 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  padding: var(--rs-logo-stack) 0;
+  padding: var(--rs-logo-stack--top) 0 var(--rs-logo-stack--bottom);
   font-weight: 600;
   font-size: 0.6em;
 }
@@ -1057,9 +1100,17 @@ a:hover,
   width: 7rem;
 }
 
+:root:is([data-theme="new"]) .c-logo svg {
+  width: 4rem;
+}
+
 .c-logo__type {
   text-align: center;
   margin-top: var(--rs-logo-type-stack);
+}
+
+:root:is([data-theme="new"]) .c-logo__type {
+  display: none;
 }
 
 .t-title + .c-logo {
@@ -2368,16 +2419,17 @@ input[type="checkbox"] {
  * it is fine to use value tokens here, because these are generic design
  * helpers. They are not specific to a particular component.
  */
+
 .l-stack {
-  margin-top: calc(var(--vs-stack) * 3);
+  margin-top: var(--rs-stack-section);
 }
 
 .l-stack--spacious {
-  margin-top: calc(var(--vs-stack) * 5);
+  margin-top: var(--rs-stack-section--spacious);
 }
 
 .l-stack--tight {
-  margin-top: var(--vs-stack);
+  margin-top: var(--rs-stack-section--tight);
 }
 
 .l-stack--none {

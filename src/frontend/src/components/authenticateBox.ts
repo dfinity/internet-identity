@@ -170,7 +170,7 @@ export const authnTemplates = (
           >
         </li>
       </ul>
-      <div class="l-stack c-button-group">
+      <div class="c-button-group">
         <button
           @click=${() => props.register()}
           class="c-button c-button--secondary"
