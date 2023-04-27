@@ -58,14 +58,14 @@ export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
 /* Template for a single dapp */
 const dappTemplate = ({
-  link,
+  website,
   logo,
   name,
   oneLiner,
 }: DappDescription): TemplateResult => {
   return html`
     <a
-      href=${link}
+      href=${website}
       target="_blank"
       class="c-action-list__item"
       rel="noopener noreferrer"
