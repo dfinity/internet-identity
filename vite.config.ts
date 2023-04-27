@@ -7,12 +7,22 @@ import {
 } from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
+  // Expand process.env variables with default values to ensure build reproducibility
+  process.env = {
+    ...process.env,
+    II_FETCH_ROOT_KEY: `${process.env.II_FETCH_ROOT_KEY ?? "0"}`,
+    II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
+    II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
+    II_VERSION: `${process.env.II_VERSION ?? ""}`,
+  };
+
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
   // root = src/frontend
   // outDir = ../../dist
   return {
     publicDir: "assets",
+    envPrefix: "II_",
     resolve: {
       alias: {
         // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -59,14 +69,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       port: 8080,
       proxy: {
         "/api": "http://127.0.0.1:4943",
-      },
-    },
-    define: {
-      "process.env": {
-        II_FETCH_ROOT_KEY: `${process.env.II_FETCH_ROOT_KEY ?? "0"}`,
-        II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
-        II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
-        II_VERSION: `${process.env.II_VERSION ?? ""}`,
       },
     },
   };
