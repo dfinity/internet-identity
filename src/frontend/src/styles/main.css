@@ -171,7 +171,6 @@
   --rc-interaction-text: var(--vc-brand-blue--dark);
   --rc-loading: var(--vc-brand-purple);
 
-
   --rc-button: var(--vc-brand-purple);
   --rc-button-pair: var(--vc-brand-purple);
 
@@ -179,7 +178,7 @@
 
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
   --rc-onButton-secondary: var(--vc-brand-purple);
-  
+
   --rc-onButton: var(--rc-light);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
@@ -263,11 +262,10 @@
 /* II) Theme Settings: DarkMode, LightMode, Product Specific stuff */
 
 :root:is([data-theme="new"]) {
-  --vc-brand-purple: #4B19D6;
+  --vc-brand-purple: #4b19d6;
   --vc-brand-purple-light: #890eed;
 
   --vc-light-grey: #d4d8e5;
-
 
   --vs-border-radius: 0.8rem;
 
@@ -1109,11 +1107,8 @@ a:hover,
  */
 
 .c-button {
-  background: linear-gradient(
-    90deg,
-    var(--rg-button)
-  );
-  
+  background: linear-gradient(90deg, var(--rg-button));
+
   color: var(--rc-onButton);
   padding: calc(0.8 * var(--rs-button-bezel)) var(--rs-button-bezel);
   margin-top: var(--rs-button-stack);
