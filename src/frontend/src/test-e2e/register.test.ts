@@ -1,4 +1,4 @@
-import { FLOWS } from "./flows";
+import { FLOWS, initDeviceLink, registerRemoteDevice } from "./flows";
 import {
   addVirtualAuthenticator,
   addWebAuthnCredential,
@@ -31,6 +31,7 @@ import {
 // This assumes that they have been successfully dfx-deployed
 import { readFileSync } from "fs";
 import { II_URL, REPLICA_URL } from "./constants";
+
 export const test_app_canister_ids = JSON.parse(
   readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
 );
@@ -105,77 +106,19 @@ test("Register new identity and add additional device", async () => {
   });
 }, 300_000);
 
-const initDeviceLink = async (
-  browser: WebdriverIO.Browser
-): Promise<{
-  mainView: MainView;
-  addDeviceLink: string;
-}> => {
-  await addVirtualAuthenticator(browser);
-  await browser.url(II_URL);
-  const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-    DEVICE_NAME1,
-    browser
-  );
-  const mainView = new MainView(browser);
-  await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-  await mainView.addAdditionalDevice();
-
-  const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-    browser
-  );
-  const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
-
-  return {
-    mainView,
-    addDeviceLink,
-  };
-};
-
-const registerRemoteDevice = async ({
-  browser1,
-  browser2,
-  addDeviceLink,
-}: {
-  browser1: WebdriverIO.Browser;
-  browser2: WebdriverIO.Browser;
-  addDeviceLink: string;
-}) => {
-  await addVirtualAuthenticator(browser2);
-  await browser2.url(addDeviceLink);
-  const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
-  await addRemoteDeviceView.waitForDisplay();
-  await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
-  await addRemoteDeviceView.continue();
-
-  const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
-    browser2
-  );
-  await verificationCodeView.waitForDisplay();
-  const code = await verificationCodeView.getVerificationCode();
-
-  // browser 1 again
-  await focusBrowser(browser1);
-  const verificationView = new VerifyRemoteDeviceView(browser1);
-  await verificationView.waitForDisplay();
-  await verificationView.enterVerificationCode(code);
-  await verificationView.continue();
-
-  // success page
-  const addDeviceSuccessView = new AddDeviceSuccessView(browser1);
-  await addDeviceSuccessView.waitForDisplay();
-  await addDeviceSuccessView.continue();
-};
-
 test("Register new identity and add additional remote device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { addDeviceLink, mainView } = await initDeviceLink(browser);
+    const { addDeviceLink, mainView } = await initDeviceLink({
+      browser,
+      deviceName: DEVICE_NAME1,
+    });
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await registerRemoteDevice({
         browser1: browser,
         browser2,
         addDeviceLink,
+        deviceName: DEVICE_NAME2,
       });
     });
 
@@ -184,15 +127,19 @@ test("Register new identity and add additional remote device", async () => {
   });
 }, 300_000);
 
-test.only("Register new identity and sign-in with new additional remote device", async () => {
+test("Register new identity and sign-in with new additional remote device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { addDeviceLink, mainView } = await initDeviceLink(browser);
+    const { addDeviceLink, mainView } = await initDeviceLink({
+      browser,
+      deviceName: DEVICE_NAME1,
+    });
 
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await registerRemoteDevice({
         browser1: browser,
         browser2,
         addDeviceLink,
+        deviceName: DEVICE_NAME2,
       });
 
       // browser 2 again
