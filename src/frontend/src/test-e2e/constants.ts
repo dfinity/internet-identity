@@ -12,7 +12,6 @@ export const TEST_APP_NICE_URL = "https://nice-name.com";
 export const REPLICA_URL = "https://icp-api.io";
 export const II_URL =
   process.env.II_URL ?? "https://identity.internetcomputer.org";
-export const ABOUT_URL = `${II_URL}/about`;
 
 export const DEVICE_NAME1 = "Virtual WebAuthn device";
 export const DEVICE_NAME2 = "Other WebAuthn device";

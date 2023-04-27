@@ -1,6 +1,6 @@
+import { isUserNumber } from "$src/utils/userNumber";
 import { toHexString } from "@dfinity/identity/lib/cjs/buffer";
 import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
-import { isUserNumber } from "../utils/userNumber";
 
 /**
  * @returns A random BIP39 mnemonic with 256 bits of entropy (generates a list of 24 words)
@@ -18,7 +18,7 @@ export function generate(): string {
 export const RECOVERYPHRASE_WORDCOUNT = 24;
 
 /** The list of words used to make the recovery phrase */
-// NOTE: "english" is the only one actually bundled in (see webpack config)
+// NOTE: "english" is the only one actually bundled in (see bundler config)
 export const RECOVERYPHRASE_WORDLIST: string[] = wordlists.english;
 
 /**

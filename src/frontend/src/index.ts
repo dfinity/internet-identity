@@ -1,17 +1,24 @@
-import { html, render } from "lit-html";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
+import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
-import { aboutView } from "./flows/about";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage } from "./flows/manage";
+import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
+
+import { isNullish } from "@dfinity/utils";
+import copyJson from "./index.json";
+
+// Polyfill Buffer globally for the browser
+import { Buffer } from "buffer";
+globalThis.Buffer = Buffer;
 
 /** Reads the canister ID from the <script> tag.
  *
@@ -20,7 +27,7 @@ import { version } from "./version";
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
-  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
+  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -85,10 +92,6 @@ const init = async () => {
     window.location.replace(faqUrl);
   }
 
-  if (window.location.pathname === "/about") {
-    return aboutView();
-  }
-
   const okOrReason = await checkRequiredFeatures(url);
   if (okOrReason !== true) {
     return compatibilityNotice(okOrReason);
@@ -103,17 +106,14 @@ const init = async () => {
     // Register this device (tentatively)
     await registerTentativeDevice(addDeviceAnchor, connection);
 
+    const i18n = new I18n();
+    const copy = i18n.i18n(copyJson);
+
     // Show a good bye message
-    const container = document.getElementById("pageContent") as HTMLElement;
-    render(
-      html`<h1
-        style="position: absolute; max-width: 100%; top: 50%; transform: translate(0, -50%);"
-        data-role="notify-auth-success"
-      >
-        You may close this page.
-      </h1>`,
-      container
-    );
+    showMessage({
+      message: copy.close_page_device_added,
+      role: "notify-device-added",
+    });
     return;
   }
 

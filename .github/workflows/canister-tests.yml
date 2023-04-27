@@ -46,7 +46,7 @@ jobs:
       matrix:
         include:
           # The production build
-          - name: internet_identity_production.wasm
+          - name: internet_identity_production.wasm.gz
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_CAPTCHA: 0
             II_DUMMY_AUTH: 0
@@ -54,7 +54,7 @@ jobs:
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # selenium.
-          - name: internet_identity_test.wasm
+          - name: internet_identity_test.wasm.gz
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 0
@@ -62,7 +62,7 @@ jobs:
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
-          - name: internet_identity_dev.wasm
+          - name: internet_identity_dev.wasm.gz
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 1
@@ -97,10 +97,8 @@ jobs:
           outputs: ./out
           target: scratch_internet_identity
 
-      - run: mv out/internet_identity.wasm ${{ matrix.name }}
-      - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}.gz
+      - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}
       - run: sha256sum ${{ matrix.name }}
-      - run: sha256sum ${{ matrix.name }}.gz
       - name: 'Upload ${{ matrix.name }}'
         uses: actions/upload-artifact@v3
         with:
@@ -109,14 +107,6 @@ jobs:
           # path is the name used as the file to upload and the name of the
           # downloaded file
           path: ${{ matrix.name }}
-      - name: 'Upload ${{ matrix.name }}.gz'
-        uses: actions/upload-artifact@v3
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: ${{ matrix.name }}.gz
-          # path is the name used as the file to upload and the name of the
-          # downloaded file
-          path: ${{ matrix.name }}.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -137,18 +127,8 @@ jobs:
           outputs: ./out
           target: scratch_archive
 
-      - run: mv out/archive.wasm archive.wasm
       - run: mv out/archive.wasm.gz archive.wasm.gz
-      - run: sha256sum archive.wasm
       - run: sha256sum archive.wasm.gz
-      - name: 'Upload archive.wasm'
-        uses: actions/upload-artifact@v3
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: archive.wasm
-          # path is the name used as the file to upload and the name of the
-          # downloaded file
-          path: archive.wasm
       - name: 'Upload archive.wasm.gz'
         uses: actions/upload-artifact@v3
         with:
@@ -266,11 +246,7 @@ jobs:
         run: |
           mkdir dist
           touch dist/index.html
-          touch dist/about.html
           touch dist/index.js.gz
-          touch dist/index.css
-          touch dist/loader.webp
-          touch dist/favicon.ico
 
       # Caching ~/.cargo
 
@@ -369,23 +345,23 @@ jobs:
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_test.wasm
+          name: internet_identity_test.wasm.gz
           path: .
 
       - name: 'Download archive wasm'
         uses: actions/download-artifact@v3
         with:
-          name: archive.wasm
+          name: archive.wasm.gz
           path: .
 
       - name: Run Tests
         run: |
-          mv internet_identity_test.wasm internet_identity.wasm
+          mv internet_identity_test.wasm.gz internet_identity.wasm.gz
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm -o archive_previous.wasm
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
           cargo test --release
         env:
           RUST_BACKTRACE: 1
@@ -523,10 +499,10 @@ jobs:
           # Copy example to make sure it does not rely on living inside the II repo
           builddir=$(mktemp -d)
           cp -r ./demos/using-dev-build/. "$builddir"
-          
+
           ii_wasm="$PWD/internet_identity_dev.wasm.gz"
           ii_did="$PWD/src/internet_identity/internet_identity.did"
-          
+
           pushd "$builddir"
 
           # Install npm deps
@@ -557,13 +533,13 @@ jobs:
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
         with:
-          name: internet_identity_production.wasm
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: 'Download archive wasm'
         uses: actions/download-artifact@v3
         with:
-          name: archive.wasm
+          name: archive.wasm.gz
           path: .
 
       - name: 'Install key'
@@ -578,14 +554,14 @@ jobs:
       - name: "Deploy II"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          sha=$(shasum -a 256 ./archive.wasm | cut -d ' ' -f1 | sed 's/../\\&/g')
+          sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             --wasm internet_identity_production.wasm.gz \
             internet_identity
 
       - name: "Deploy archive"
-        run: scripts/deploy-archive --wasm archive.wasm --canister-id internet_identity --network ic
+        run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id internet_identity --network ic
 
 
   # This ... releases
@@ -597,22 +573,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v3
-        with:
-          name: internet_identity_test.wasm
-          path: .
-
       - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_test.wasm.gz
-          path: .
-
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v3
-        with:
-          name: internet_identity_dev.wasm
           path: .
 
       - name: 'Download wasm.gz'
@@ -621,22 +585,10 @@ jobs:
           name: internet_identity_dev.wasm.gz
           path: .
 
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v3
-        with:
-          name: internet_identity_production.wasm
-          path: .
-
       - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm.gz
-          path: .
-
-      - name: 'Download wasm'
-        uses: actions/download-artifact@v3
-        with:
-          name: archive.wasm
           path: .
 
       - name: Prepare release
@@ -644,13 +596,10 @@ jobs:
         id: prepare-release
         with:
           assets: |
-            internet_identity_production.wasm
             internet_identity_production.wasm.gz
-            internet_identity_dev.wasm
             internet_identity_dev.wasm.gz
-            internet_identity_test.wasm
             internet_identity_test.wasm.gz
-            archive.wasm
+            archive.wasm.gz
           production_asset: internet_identity_production.wasm.gz
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -660,14 +609,11 @@ jobs:
             --tag ${{ github.ref }} \
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
             -- \
-            internet_identity_production.wasm \
             internet_identity_production.wasm.gz \
-            internet_identity_dev.wasm \
             internet_identity_dev.wasm.gz \
-            internet_identity_test.wasm \
             internet_identity_test.wasm.gz \
             src/internet_identity/internet_identity.did \
-            archive.wasm
+            archive.wasm.gz
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow

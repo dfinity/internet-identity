@@ -3,6 +3,7 @@ use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::*;
+use std::collections::HashMap;
 use std::{fmt, iter};
 
 #[cfg(test)]
@@ -27,6 +28,7 @@ impl Device {
         self.key_type = device_data.key_type;
         self.protection = device_data.protection;
         self.origin = device_data.origin;
+        self.metadata = device_data.metadata;
     }
 }
 
@@ -41,6 +43,7 @@ impl From<DeviceData> for Device {
             protection: device_data.protection,
             origin: device_data.origin,
             last_usage_timestamp: None,
+            metadata: device_data.metadata,
         }
     }
 }
@@ -55,6 +58,7 @@ impl From<Device> for DeviceData {
             key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
+            metadata: device.metadata,
         }
     }
 }
@@ -70,6 +74,7 @@ impl From<Device> for DeviceWithUsage {
             protection: device.protection,
             origin: device.origin,
             last_usage: device.last_usage_timestamp,
+            metadata: device.metadata,
         }
     }
 }
@@ -83,6 +88,10 @@ impl From<Device> for DeviceDataWithoutAlias {
             key_type: device_data.key_type,
             protection: device_data.protection,
             origin: device_data.origin,
+            metadata_keys: device_data
+                .metadata
+                .as_ref()
+                .map(|m| m.keys().cloned().collect()),
         }
     }
 }
@@ -279,6 +288,7 @@ pub struct Device {
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage_timestamp: Option<Timestamp>,
+    pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 impl Device {
@@ -287,6 +297,22 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
+            + self.metadata.as_ref().map(Self::metadata_len).unwrap_or(0)
+    }
+
+    fn metadata_len(metadata: &HashMap<String, MetadataEntry>) -> usize {
+        metadata
+            .iter()
+            .map(|(key, value)| key.len() + Self::metadata_entry_len(value))
+            .sum()
+    }
+
+    fn metadata_entry_len(entry: &MetadataEntry) -> usize {
+        match entry {
+            MetadataEntry::String(value) => value.len(),
+            MetadataEntry::Bytes(value) => value.len(),
+            MetadataEntry::Map(data) => Self::metadata_len(data),
+        }
     }
 
     pub fn ii_domain(&self) -> Option<IIDomain> {
@@ -341,15 +367,13 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
     /// due to the `VARIABLE_FIELDS_LIMIT`.
     const MAX_DEVICES_PER_ANCHOR: usize = 10;
 
-    /// Single devices can use up to 564 bytes for the variable length fields alone.
+    /// Single devices can use >500 bytes for the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector, we limit the sum of the
     /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
     /// or change anchors in the future.
-    /// The value 2048 was chosen because it is the max anchor size before the stable memory migration.
-    /// This means that all pre-existing anchors are below this limit. And after the migration, the
-    /// candid encoded `vec devices` will stay far below 4KB in size (testing showed anchors of
-    /// ~2500 bytes).
-    const VARIABLE_FIELDS_LIMIT: usize = 2348;
+    /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
+    /// plus an additional 452 bytes to fit new fields introduced since.
+    const VARIABLE_FIELDS_LIMIT: usize = 2500;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {
@@ -387,11 +411,39 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 /// This checks device invariants, in particular:
 ///   * Sizes of various fields do not exceed limits
 ///   * Only recovery phrases can be protected
+///   * Recovery phrases cannot have a credential id
+///   * Metadata does not contain reserved keys
 ///
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
+    const RESERVED_KEYS: [&str; 9] = [
+        "pubkey",
+        "alias",
+        "credential_id",
+        "purpose",
+        "key_type",
+        "protection",
+        "origin",
+        "last_usage_timestamp",
+        "metadata",
+    ];
+
+    if let Some(metadata) = &device.metadata {
+        for key in RESERVED_KEYS {
+            if metadata.contains_key(key) {
+                return Err(AnchorError::ReservedMetadataKey {
+                    key: key.to_string(),
+                });
+            }
+        }
+    }
+
     check_device_limits(device)?;
+
+    if device.key_type == KeyType::SeedPhrase && device.credential_id.is_some() {
+        return Err(AnchorError::RecoveryPhraseCredentialIdMismatch);
+    }
 
     if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
         return Err(AnchorError::InvalidDeviceProtection {
@@ -471,6 +523,7 @@ pub enum AnchorError {
     InvalidDeviceProtection {
         key_type: KeyType,
     },
+    RecoveryPhraseCredentialIdMismatch,
     MutationNotAllowed {
         authorized_principal: Principal,
         actual_principal: Principal,
@@ -482,6 +535,9 @@ pub enum AnchorError {
     },
     DuplicateDevice {
         device_key: DeviceKey,
+    },
+    ReservedMetadataKey {
+        key: String,
     },
 }
 
@@ -516,6 +572,8 @@ impl fmt::Display for AnchorError {
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
+            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key),
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id.")
         }
     }
 }

@@ -37,15 +37,12 @@ jobs:
       - name: Create dummy assets
         run: |
           mkdir dist
-          touch dist/index.html
-          touch dist/about.html
-          touch dist/index.js.gz
-          touch dist/index.css
-          touch dist/loader.webp
-          touch dist/favicon.ico
 
       - run: rustup component add clippy
       - name: Cargo clippy
+        # We run clippy twice (once without tests), so that it accurately reports dead code in the non-test configuration.
         # `manual_range_contains` is disabled because a >= x && a < y reads more clearly than (x..y).contains(a) and
         # there are additional caveats for floating point numbers (https://github.com/rust-lang/rust-clippy/issues/6455)
-        run: cargo clippy --tests --benches -- -D clippy::all -A clippy::manual_range_contains
+        run: |
+          cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
+          cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains

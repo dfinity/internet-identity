@@ -1,5 +1,7 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
+import { isNullish } from "@dfinity/utils";
+
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
   // Object's toString, and if not we go through the remaining types.
@@ -52,7 +54,7 @@ export function asNonEmptyArray<T>(
 
   const first = arr.shift();
 
-  if (first === undefined) {
+  if (isNullish(first)) {
     return undefined;
   }
 
@@ -144,7 +146,7 @@ export function wrapError(err: unknown): string {
  * Values can be sent (`send()`) and received (`recv()`) asynchronously
  * on the other end.
  */
-export class Chan<A> {
+export class Chan<A> implements AsyncIterable<A> {
   /* The `recv` function will read values both from a blocking `snd` function
    * and from a buffer. We always _first_ write to `snd` and _then_ write
    * to `buffer` and _first_ read from the buffer and _then_ read from `snd`
@@ -165,12 +167,16 @@ export class Chan<A> {
   // sent to us
   // We use weak references to the channels so that they do not need to deregister explicitely,
   // but instead we simply drop them when they're gone.
-  private listeners: WeakRef<Chan<A>>[] = [];
+  private listeners: WeakRef<{ notify: (a: A) => void }>[] = [];
 
-  private latest?: A;
+  // Reference to a parent (whose listeners we've added ourselves to) to prevent garbage collection of parent (necessary if parent itself is a listener, to prevent dropping the listener).
+  // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
+  protected parent?: unknown;
+
+  private latest: A;
 
   // Constructor with latest which is "initial" and then latest
-  constructor(initial?: A) {
+  constructor(initial: A) {
     this.latest = initial;
   }
 
@@ -189,7 +195,7 @@ export class Chan<A> {
       (acc, ref) => {
         const listener = ref.deref();
         if (listener !== undefined) {
-          listener.send(a);
+          listener.notify(a);
           acc.push(ref);
         }
         return acc;
@@ -203,8 +209,8 @@ export class Chan<A> {
 
   // Receive all values sent to this `Chan`. Note that this effectively
   // consumes the values: if you need to read the value from different
-  // places use `.map()` instead.
-  async *recv(): AsyncIterable<A> {
+  // places use `.values()` instead.
+  protected async *recv(): AsyncIterable<A> {
     if (this.latest !== undefined) {
       yield this.latest;
     }
@@ -225,19 +231,72 @@ export class Chan<A> {
     }
   }
 
-  // Return a new generator yielding the values or `.recv()`, mapped
-  // with `f`.
-  map<B>(f: (a: A) => B): AsyncIterable<B> {
-    const input = new Chan<A>(this.latest);
+  // Signal to `map` that the element should remain unchanged
+  static readonly unchanged = Symbol("unchanged");
+
+  // Return a new Chan mapped with `f`.
+  // In the simplest case, a mapping function is provided.
+  // For advanced cases, the mapping function may return 'Chan.unchanged' signalling
+  // that the element shouldn't be changed, in which case a default (initial) value
+  // also needs to be provided.
+  map<B>(
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+  ): Chan<B> {
+    const { handleValue, latest } = this.__handleMapOpts(opts);
+
+    // Create a chan that the WeakRef can hang on to, but that automatically
+    // translates As into Bs
+    class MappedChan extends Chan<B> {
+      notify(value: A) {
+        handleValue({ send: (a: B) => this.send(a), value });
+      }
+    }
+    const input = new MappedChan(latest);
     this.listeners.push(new WeakRef(input));
+    this.parent = input; // keep a ref to prevent parent being garbage collected
+    return input;
+  }
+
+  // How the mapped chan should handle the value
+  protected __handleMapOpts<B>(
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+  ): {
+    handleValue: (arg: { send: (b: B) => void; value: A }) => void;
+    latest: B;
+  } {
+    if (typeof opts === "function") {
+      // Case of a simple mapper
+      const f = opts;
+      return {
+        handleValue: ({ send, value }) => send(f(value)),
+        latest: f(this.latest),
+      };
+    }
+
+    // Advanced case with "unchanged" handling, where sending is skipped on "unchanged" (and initial/latest value may
+    // be set to "def")
+    const result = opts.f(this.latest);
 
     return {
-      async *[Symbol.asyncIterator]() {
-        for await (const val of input.recv()) {
-          yield f(val);
+      handleValue: ({ send, value }) => {
+        const result = opts.f(value);
+        if (result !== Chan.unchanged) {
+          send(result);
         }
       },
+      latest: result === Chan.unchanged ? opts.def : result,
     };
+  }
+
+  // Read all the values sent to this `Chan`.
+  values(): AsyncIterable<A> {
+    const dup = this.map((x) => x);
+    return dup.recv();
+  }
+
+  // When used directly as an async iterator, return values()
+  [Symbol.asyncIterator](): AsyncIterator<A> {
+    return this.values()[Symbol.asyncIterator]();
   }
 }
 

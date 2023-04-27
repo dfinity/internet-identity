@@ -8,6 +8,7 @@ use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -26,8 +27,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         Ok(())
     }
@@ -54,8 +54,7 @@ mod deployment_tests {
         );
         env.add_cycles(ii_canister, 150_000_000_000);
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         assert_eq!(env.cycle_balance(ii_canister), 50_000_000_000);
         Ok(())
@@ -71,7 +70,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &EMPTY_WASM)?;
         match result {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "invalid wasm module".to_string())
@@ -90,8 +89,7 @@ mod deployment_tests {
         let env = env();
         let ii_canister = install_ii_canister(&env, II_WASM.clone());
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         match result {
             DeployArchiveResult::Failed(msg) => {
                 assert_eq!(msg, "archive deployment disabled".to_string())
@@ -115,8 +113,7 @@ mod deployment_tests {
         );
         upgrade_ii_canister(&env, ii_canister, II_WASM.clone());
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
         Ok(())
     }
@@ -131,7 +128,7 @@ mod deployment_tests {
             arg_with_wasm_hash(EMPTY_WASM.clone()),
         );
 
-        let result = ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(EMPTY_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &EMPTY_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
 
         upgrade_ii_canister_with_arg(
@@ -142,8 +139,7 @@ mod deployment_tests {
         )
         .unwrap();
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         let DeployArchiveResult::Success(archive_canister) = result else {
             panic!("Unexpected result")
         };
@@ -164,8 +160,7 @@ mod deployment_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         let DeployArchiveResult::Success(archive_canister) = result else {
             panic!("Unexpected result")
         };
@@ -193,8 +188,7 @@ mod deployment_tests {
         )
         .unwrap();
 
-        let result =
-            ii_api::deploy_archive(&env, ii_canister, ByteBuf::from(ARCHIVE_WASM.clone()))?;
+        let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)?;
         assert!(matches!(result, DeployArchiveResult::Success(_)));
 
         let status = archive_api::status(&env, archive_canister)?;
@@ -224,29 +218,22 @@ mod pull_entries_tests {
         let anchor = flows::register_anchor(&env, ii_canister);
 
         let mut device = device_data_2();
-        ii_api::add(&env, ii_canister, principal_1(), anchor, device.clone())?;
+        ii_api::add(&env, ii_canister, principal_1(), anchor, &device)?;
 
         device.purpose = Purpose::Recovery;
         let pubkey = device.pubkey.clone();
-        ii_api::update(
-            &env,
-            ii_canister,
-            principal_1(),
-            anchor,
-            pubkey.clone(),
-            device,
-        )?;
+        ii_api::update(&env, ii_canister, principal_1(), anchor, &pubkey, &device)?;
 
         ii_api::replace(
             &env,
             ii_canister,
             principal_1(),
             anchor,
-            pubkey.clone(),
-            device_data_2(),
+            &pubkey,
+            &device_data_2(),
         )?;
 
-        ii_api::remove(&env, ii_canister, principal_1(), anchor, pubkey.clone())?;
+        ii_api::remove(&env, ii_canister, principal_1(), anchor, &pubkey)?;
         let timestamp = env
             .time()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -271,6 +258,7 @@ mod pull_entries_tests {
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
                     origin: device_data_1().origin,
+                    metadata_keys: None,
                 },
             },
             timestamp,
@@ -307,6 +295,7 @@ mod pull_entries_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
+                    metadata_keys: None,
                 },
             },
             timestamp,
@@ -344,6 +333,127 @@ mod pull_entries_tests {
             entries.entries.get(4).unwrap().as_ref().unwrap(),
             &delete_entry
         );
+        Ok(())
+    }
+
+    /// Test to verify that the archive pulls device metadata keys for new devices from II.
+    #[test]
+    fn should_record_metadata_for_new_device() -> Result<(), CallError> {
+        const METADATA_KEY: &str = "key";
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let mut device = DeviceData::auth_test_device();
+        device.metadata = Some(HashMap::from_iter(vec![(
+            METADATA_KEY.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]));
+        let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        // the archive polls for entries once per second
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_eq!(entries.entries.len(), 1);
+
+        let expected_register_entry = Entry {
+            anchor,
+            operation: Operation::RegisterAnchor {
+                device: DeviceDataWithoutAlias::from(device.clone()),
+            },
+            timestamp,
+            caller: device.principal(),
+            sequence_number: 0,
+        };
+        assert_eq!(
+            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            &expected_register_entry
+        );
+
+        Ok(())
+    }
+
+    /// Test to verify that the archive pulls device metadata changes from II.
+    #[test]
+    fn should_record_metadata_change() -> Result<(), CallError> {
+        const METADATA_KEY: &str = "key";
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let mut device = DeviceData::auth_test_device();
+        let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        device.metadata = Some(HashMap::from_iter(vec![(
+            METADATA_KEY.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]));
+
+        ii_api::update(
+            &env,
+            ii_canister,
+            device.principal(),
+            anchor,
+            &device.pubkey,
+            &device,
+        )?;
+
+        // the archive polls for entries once per second
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_eq!(entries.entries.len(), 2);
+
+        let expected_update_entry = Entry {
+            anchor,
+            operation: Operation::UpdateDevice {
+                device: device.pubkey.clone(),
+                new_values: DeviceDataUpdate {
+                    alias: None,
+                    credential_id: None,
+                    purpose: None,
+                    key_type: None,
+                    protection: None,
+                    origin: None,
+                    metadata_keys: Some(vec![METADATA_KEY.to_string()]),
+                },
+            },
+            timestamp,
+            caller: device.principal(),
+            sequence_number: 1,
+        };
+        assert_eq!(
+            entries.entries.get(1).unwrap().as_ref().unwrap(),
+            &expected_update_entry
+        );
+
         Ok(())
     }
 
@@ -474,6 +584,45 @@ mod pull_entries_tests {
         Ok(())
     }
 
+    /// Tests that II exposes metrics regarding the archive config.
+    #[test]
+    fn should_report_archive_config_metrics() -> Result<(), CallError> {
+        let env = env();
+
+        let init_arg = InternetIdentityInit {
+            assigned_user_number_range: None,
+            archive_config: Some(ArchiveConfig {
+                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                entries_buffer_limit: 10_000,
+                polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+                entries_fetch_limit: 10,
+            }),
+            canister_creation_cycles_cost: Some(0),
+            register_rate_limit: None,
+            max_num_latest_delegation_origins: None,
+        };
+
+        let ii_canister = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));
+        deploy_archive_via_ii(&env, ii_canister);
+
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_entries_buffer_limit",
+            10_000f64,
+        );
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_fetch_limit",
+            10f64,
+        );
+        assert_metric(
+            &get_metrics(&env, ii_canister),
+            "internet_identity_archive_config_polling_interval",
+            10f64,
+        );
+        Ok(())
+    }
+
     /// Tests that the archive reports on fetch errors.
     #[test]
     fn should_report_call_errors() -> Result<(), CallError> {
@@ -488,7 +637,7 @@ mod pull_entries_tests {
         assert!(env.canister_exists(archive_canister));
 
         // stop the II canister to provoke failures
-        env.stop_canister(ii_canister)?;
+        env.stop_canister(ii_canister, None)?;
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -532,7 +681,7 @@ mod pull_entries_tests {
         assert!(env.canister_exists(archive_canister));
 
         // stop the II canister to provoke failures
-        env.stop_canister(ii_canister)?;
+        env.stop_canister(ii_canister, None)?;
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -544,7 +693,7 @@ mod pull_entries_tests {
         assert_eq!(status.call_info.last_successful_fetch, None);
 
         // start II again to resolve the issue
-        env.start_canister(ii_canister)?;
+        env.start_canister(ii_canister, None)?;
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
         // execute the timer

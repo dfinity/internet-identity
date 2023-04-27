@@ -1,21 +1,7 @@
 /**
  * This module contains everything related to connecting to the canister.
  */
-import {
-  Actor,
-  ActorSubclass,
-  DerEncodedPublicKey,
-  HttpAgent,
-  SignIdentity,
-} from "@dfinity/agent";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
-import * as tweetnacl from "tweetnacl";
-import { idlFactory as internet_identity_idl } from "../../generated/internet_identity_idl";
+import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
   AddTentativeDeviceResponse,
   Challenge,
@@ -35,12 +21,29 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
   _SERVICE,
-} from "../../generated/internet_identity_types";
-import { fromMnemonicWithoutValidation } from "../crypto/ed25519";
-import { features } from "../features";
+} from "$generated/internet_identity_types";
+import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { features } from "$src/features";
+import {
+  Actor,
+  ActorSubclass,
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@dfinity/agent";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+  Ed25519KeyIdentity,
+} from "@dfinity/identity";
+import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
+import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { isCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -76,13 +79,15 @@ export type LoginResult =
   | UnknownUser
   | AuthFail
   | ApiError
-  | SeedPhraseFail;
+  | SeedPhraseFail
+  | CancelOrTimeout;
 export type RegisterResult =
   | LoginSuccess
   | AuthFail
   | ApiError
   | RegisterNoSpace
-  | BadChallenge;
+  | BadChallenge
+  | CancelOrTimeout;
 
 type LoginSuccess = {
   kind: "loginSuccess";
@@ -96,8 +101,9 @@ type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
+type CancelOrTimeout = { kind: "cancelOrTimeout" };
 
-export type { ChallengeResult } from "../../generated/internet_identity_types";
+export type { ChallengeResult } from "$generated/internet_identity_types";
 
 /**
  * Interface around the agent-js WebAuthnIdentity that allows us to provide
@@ -114,16 +120,18 @@ export class Connection {
 
   register = async ({
     identity,
+    tempIdentity,
     alias,
     challengeResult,
   }: {
     identity: IIWebAuthnIdentity;
+    tempIdentity: SignIdentity;
     alias: string;
     challengeResult: ChallengeResult;
   }): Promise<RegisterResult> => {
     let delegationIdentity: DelegationIdentity;
     try {
-      delegationIdentity = await this.requestFEDelegation(identity);
+      delegationIdentity = await this.requestFEDelegation(tempIdentity);
     } catch (error: unknown) {
       if (error instanceof Error) {
         return { kind: "authFail", error };
@@ -152,8 +160,10 @@ export class Connection {
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),
+          metadata: [],
         },
-        challengeResult
+        challengeResult,
+        [tempIdentity.getPrincipal()]
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -217,24 +227,26 @@ export class Connection {
     devices: Omit<DeviceData, "alias">[]
   ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
-     * If "II_DUMMY_AUTH" is set, we use a dummy identity, the same identity
+     * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
-    const identity =
-      process.env.II_DUMMY_AUTH === "1"
-        ? new DummyIdentity()
-        : MultiWebAuthnIdentity.fromCredentials(
-            devices.flatMap((device) =>
-              device.credential_id.map((credentialId: CredentialId) => ({
-                pubkey: derFromPubkey(device.pubkey),
-                credentialId: Buffer.from(credentialId),
-              }))
-            )
-          );
+    const identity = features.DUMMY_AUTH
+      ? new DummyIdentity()
+      : MultiWebAuthnIdentity.fromCredentials(
+          devices.flatMap((device) =>
+            device.credential_id.map((credentialId: CredentialId) => ({
+              pubkey: derFromPubkey(device.pubkey),
+              credentialId: Buffer.from(credentialId),
+            }))
+          )
+        );
     let delegationIdentity: DelegationIdentity;
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      if (isCancel(e)) {
+        return { kind: "cancelOrTimeout" };
+      }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };
       } else {
@@ -294,7 +306,7 @@ export class Connection {
           findDeviceByPubkey(devices, Buffer.from(device.pubkey))
         )
         .then((device) => {
-          if (device === undefined) {
+          if (isNullish(device)) {
             // this can happen if the device has been deleted between authentication and now
             throw Error("device is undefined");
           }
@@ -390,7 +402,7 @@ export class Connection {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       ...device,
-      origin: window?.origin === undefined ? [] : [window.origin],
+      origin: isNullish(window?.origin) ? [] : [window.origin],
     });
   };
 
@@ -428,7 +440,7 @@ export class Connection {
   requestFEDelegation = async (
     identity: SignIdentity
   ): Promise<DelegationIdentity> => {
-    const sessionKey = Ed25519KeyIdentity.generate();
+    const sessionKey = await ECDSAKeyIdentity.generate({ extractable: false });
     const tenMinutesInMsec = 10 * 1000 * 60;
     // Here the security device is used. Besides creating new keys, this is the only place.
     const chain = await DelegationChain.create(
@@ -464,7 +476,7 @@ export class AuthenticatedConnection extends Connection {
       }
     }
 
-    if (this.actor === undefined) {
+    if (isNullish(this.actor)) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await this.requestFEDelegation(this.identity);
       this.actor = await this.createActor(this.delegationIdentity);
@@ -514,6 +526,7 @@ export class AuthenticatedConnection extends Connection {
       purpose,
       protection,
       origin: readDeviceOrigin(),
+      metadata: [],
     });
   };
 
@@ -573,7 +586,7 @@ export class AuthenticatedConnection extends Connection {
 //
 // The return type is odd but that's what our didc version expects.
 export const readDeviceOrigin = (): [] | [string] => {
-  if (window?.origin === undefined || window.origin.length > 50) {
+  if (isNullish(window?.origin) || window.origin.length > 50) {
     return [];
   }
 
@@ -668,9 +681,19 @@ export const inferHost = (): string => {
   const IC_API_DOMAIN = "icp-api.io";
 
   const location = window?.location;
-  if (location === undefined) {
+  if (isNullish(location)) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off but we return something valid just in case.
+    return "https://" + IC_API_DOMAIN;
+  }
+
+  if (
+    location.hostname.endsWith("icp0.io") ||
+    location.hostname.endsWith("ic0.app") ||
+    location.hostname.endsWith("internetcomputer.org")
+  ) {
+    // If this is a canister running on one of the official IC domains, then return the
+    // official API endpoint
     return "https://" + IC_API_DOMAIN;
   }
 
@@ -687,6 +710,6 @@ export const inferHost = (): string => {
     return location.protocol + "//" + location.host;
   }
 
-  // In general, use the official IC HTTP domain.
-  return location.protocol + "//" + IC_API_DOMAIN;
+  // Otherwise assume it's a custom setup and use the host itself as API.
+  return location.protocol + "//" + location.host;
 };

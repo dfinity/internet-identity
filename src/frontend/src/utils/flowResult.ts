@@ -1,4 +1,6 @@
+import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
+import { webAuthnCancelTemplate } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
@@ -19,9 +21,9 @@ export type LoginFlowError = {
 } & LoginError;
 
 export type LoginError = {
-  title: string;
-  message: string;
-  detail?: string;
+  title: string | DynamicKey;
+  message: string | DynamicKey;
+  detail?: string | DynamicKey;
 };
 
 /** The result of a login flow that was canceled */
@@ -87,6 +89,12 @@ export const apiResultToLoginFlowResult = (
         title: "Invalid Seed Phrase",
         message:
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
+      };
+    }
+    case "cancelOrTimeout": {
+      return {
+        tag: "err",
+        ...webAuthnCancelTemplate(),
       };
     }
   }

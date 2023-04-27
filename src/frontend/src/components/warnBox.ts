@@ -1,3 +1,4 @@
+import { TemplateElement } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 import { warningIcon } from "./icons";
 
@@ -7,8 +8,8 @@ import { warningIcon } from "./icons";
 // By default the component will be an <aside>. The other option is a <div> wrapper.
 
 interface warnBoxProps {
-  title: string | TemplateResult;
-  message: string | TemplateResult;
+  title: TemplateElement;
+  message: TemplateElement;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";
   additionalClasses?: string[];

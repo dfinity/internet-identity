@@ -19,6 +19,7 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -29,9 +30,9 @@ use std::time::{Duration, SystemTime};
 /* The first few lines deal with actually getting the Wasm module(s) to test */
 
 lazy_static! {
-    /** The Wasm module for the current II build, i.e. the one we're testing */
+    /** The gzipped Wasm module for the current II build, i.e. the one we're testing */
     pub static ref II_WASM: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("internet_identity.wasm");
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity.wasm.gz");
         let err = format!("
         Could not find Internet Identity Wasm module for current build.
 
@@ -43,9 +44,9 @@ lazy_static! {
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };
 
-    /** The Wasm module for the current archive build, i.e. the one we're testing */
+    /** The gzipped Wasm module for the current archive build, i.e. the one we're testing */
     pub static ref ARCHIVE_WASM: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("archive.wasm");
+        let def_path = path::PathBuf::from("..").join("..").join("archive.wasm.gz");
         let err = format!("
         Could not find Archive Wasm module for current build.
 
@@ -57,32 +58,32 @@ lazy_static! {
         get_wasm_path("ARCHIVE_WASM".to_string(), &def_path).expect(&err)
     };
 
-    /** The Wasm module for the _previous_ II build, or latest release, which is used when testing
+    /** The gzipped Wasm module for the _previous_ II build, or latest release, which is used when testing
      * upgrades and downgrades */
     pub static ref II_WASM_PREVIOUS: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_previous.wasm");
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_previous.wasm.gz");
         let err = format!("
         Could not find Internet Identity Wasm module for previous build/latest release.
 
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm -o internet_identity_previous.wasm
+            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
-        /** The Wasm module for the _previous_ archive build, or latest release, which is used when testing
+        /** The gzipped Wasm module for the _previous_ archive build, or latest release, which is used when testing
             * upgrades and downgrades */
     pub static ref ARCHIVE_WASM_PREVIOUS: Vec<u8> = {
-        let def_path = path::PathBuf::from("..").join("..").join("archive_previous.wasm");
+        let def_path = path::PathBuf::from("..").join("..").join("archive_previous.wasm.gz");
         let err = format!("
         Could not find Archive Wasm module for previous build/latest release.
 
         I will look for it at {:?}, and you can specify another path with the environment variable ARCHIVE_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm -o archive_previous.wasm
+            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("ARCHIVE_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
@@ -161,8 +162,8 @@ pub fn install_ii_canister_with_arg(
     arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
     let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
-    let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, byts);
+    let canister_id = env.create_canister(None);
+    env.install_canister(canister_id, wasm, byts, None);
     canister_id
 }
 
@@ -220,7 +221,7 @@ pub fn upgrade_ii_canister_with_arg(
     arg: Option<InternetIdentityInit>,
 ) -> Result<(), CallError> {
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
-    env.upgrade_canister(canister_id, wasm, byts)
+    env.upgrade_canister(canister_id, wasm, byts, None)
 }
 
 /// Utility function to create compressed stable memory backups for use in backup tests.
@@ -277,10 +278,8 @@ pub fn device_data_1() -> DeviceData {
         pubkey: ByteBuf::from(PUBKEY_1),
         alias: "My Device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 1")),
-        purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
         origin: Some("https://identity.internetcomputer.org".to_string()),
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -289,22 +288,22 @@ pub fn device_data_2() -> DeviceData {
         pubkey: ByteBuf::from(PUBKEY_2),
         alias: "My second device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 2")),
-        purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
         origin: Some("https://identity.ic0.app".to_string()),
+        ..DeviceData::auth_test_device()
     }
 }
 
-pub fn max_size_device() -> DeviceData {
+pub fn large_size_device() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([255u8; 300]),
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
-        purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
+        metadata: Some(HashMap::from([(
+            "key".to_string(),
+            MetadataEntry::String("a".repeat(100)),
+        )])),
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -312,11 +311,9 @@ pub fn recovery_device_data_1() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(RECOVERY_PUBKEY_1),
         alias: "Recovery Phrase 1".to_string(),
-        credential_id: None,
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -324,11 +321,9 @@ pub fn recovery_device_data_2() -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(RECOVERY_PUBKEY_2),
         alias: "Recovery Phrase 2".to_string(),
-        credential_id: None,
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
-        protection: DeviceProtection::Unprotected,
-        origin: None,
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -337,10 +332,8 @@ pub fn device_with_origin(origin: Option<String>) -> DeviceData {
         pubkey: ByteBuf::from(origin.as_deref().unwrap_or(PUBKEY_1)),
         alias: "My Device".to_string(),
         credential_id: Some(ByteBuf::from("credential id 1")),
-        purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
-        protection: DeviceProtection::Unprotected,
         origin,
+        ..DeviceData::auth_test_device()
     }
 }
 
@@ -455,7 +448,7 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
     let response = http_request(
         env,
         canister_id,
-        HttpRequest {
+        &HttpRequest {
             method: "GET".to_string(),
             url: "/metrics".to_string(),
             headers: vec![],
@@ -537,24 +530,20 @@ pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
-    match api::internet_identity::deploy_archive(
-        env,
-        ii_canister,
-        ByteBuf::from(ARCHIVE_WASM.clone()),
-    ) {
+    match api::internet_identity::deploy_archive(env, ii_canister, &ARCHIVE_WASM) {
         Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
         err => panic!("archive deployment failed: {err:?}"),
     }
 }
 
 pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, encode_config(principal_1()));
+    let canister_id = env.create_canister(None);
+    env.install_canister(canister_id, wasm, encode_config(principal_1()), None);
     canister_id
 }
 
 pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
-    env.upgrade_canister(canister_id, wasm, encode_config(principal_1()))
+    env.upgrade_canister(canister_id, wasm, encode_config(principal_1()), None)
         .unwrap();
 }
 
@@ -589,6 +578,7 @@ pub fn log_entry_1() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: None,
+                metadata_keys: None,
             },
         },
         sequence_number: 0,
@@ -608,6 +598,7 @@ pub fn log_entry_2() -> Entry {
                 key_type: KeyType::Unknown,
                 protection: DeviceProtection::Unprotected,
                 origin: Some("foo.bar".to_string()),
+                metadata_keys: None,
             },
         },
         sequence_number: 1,
@@ -628,6 +619,7 @@ pub fn log_entry(idx: u64, timestamp: u64, anchor: AnchorNumber) -> Entry {
                 key_type: None,
                 protection: Some(DeviceProtection::Unprotected),
                 origin: Some(Some("foo.bar".to_string())),
+                metadata_keys: None,
             },
         },
         sequence_number: idx,

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { isNullish } from "@dfinity/utils";
 import extract from "extract-zip";
 import { createWriteStream, mkdirSync } from "fs";
 import { stat, unlink } from "fs/promises";
@@ -128,7 +129,7 @@ function downloadToFile({
 
 function nodeModulesPath(): string {
   const packageJsonPath = process.env.npm_package_json;
-  if (packageJsonPath === null || packageJsonPath === undefined) {
+  if (isNullish(packageJsonPath)) {
     throw new Error("It's not there!!");
   }
   const needle = "package.json";

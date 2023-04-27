@@ -27,7 +27,7 @@ function help() {
 
 Starts the docker compose environment, executes the subcommand and stops docker compose again.
 
-NOTE: This requires docker, docker-compose, a running dfx replica with II and the test app deployed and running II dev server (npm run start).
+NOTE: This requires docker, docker-compose, a running dfx replica with II and the test app deployed and running II dev server (npm run dev).
 EOF
 }
 

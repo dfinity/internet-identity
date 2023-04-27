@@ -1,5 +1,6 @@
+import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
-import { wrapError } from "../../utils/utils";
+import { isNullish } from "@dfinity/utils";
 
 // Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
 // Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
@@ -26,10 +27,7 @@ export const validateDerivationOrigin = async (
   authRequestOrigin: string,
   derivationOrigin?: string
 ): Promise<ValidationResult> => {
-  if (
-    derivationOrigin === undefined ||
-    derivationOrigin === authRequestOrigin
-  ) {
+  if (isNullish(derivationOrigin) || derivationOrigin === authRequestOrigin) {
     // this is the default behaviour -> no further validation necessary
     return { result: "valid" };
   }

@@ -1,16 +1,20 @@
 /* A couple of lit-html helpers */
 
+import { toast } from "$src/components/toast";
+import { isNullish } from "@dfinity/utils";
 import { render, TemplateResult } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
-import { toast } from "../components/toast";
+
+// Helper for types that can (meaningfully) be inserted in a template
+export type TemplateElement = string | TemplateResult | DirectiveResult;
 
 // Read a "lit-html" ref, showing an error message (in the console) in case the
 // element is not available.
 export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
   const value = ref.value;
 
-  if (value === undefined) {
+  if (isNullish(value)) {
     toast.error(
       "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
     );

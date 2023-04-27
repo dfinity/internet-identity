@@ -459,8 +459,8 @@ mod read_tests {
             error_buffer_limit: 1,
         })
         .unwrap();
-        let canister_id = env.create_canister();
-        env.install_canister(canister_id, ARCHIVE_WASM.clone(), config);
+        let canister_id = env.create_canister(None);
+        env.install_canister(canister_id, ARCHIVE_WASM.clone(), config, None);
 
         // 257 entries because we need the index to not fit in a single byte
         for i in 0..257 {
@@ -731,6 +731,7 @@ mod stable_memory_tests {
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
                     origin: None,
+                    metadata_keys: None,
                 },
             },
             timestamp: TIMESTAMP,
@@ -752,6 +753,7 @@ mod stable_memory_tests {
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,
                     origin: None,
+                    metadata_keys: None,
                 },
             },
             timestamp: TIMESTAMP,
@@ -774,6 +776,7 @@ mod stable_memory_tests {
                     key_type: None,
                     protection: None,
                     origin: None,
+                    metadata_keys: None,
                 },
             },
             timestamp: TIMESTAMP,

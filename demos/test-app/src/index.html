@@ -1,22 +1,22 @@
 <html>
   <body>
-  <style>
+    <style>
       .postMessage {
-          border: black solid thin;
-          padding: 1rem;
-          margin: 1rem 0;
-          overflow-wrap: break-word;
+        border: black solid thin;
+        padding: 1rem;
+        margin: 1rem 0;
+        overflow-wrap: break-word;
       }
       .postMessage-title {
-          font-weight: bold;
+        font-weight: bold;
       }
       .received {
-          background-color: lightblue;
+        background-color: lightblue;
       }
       .sent {
-          background-color: lightgreen;
+        background-color: lightgreen;
       }
-  </style>
+    </style>
     <div>
       <h1>Identity</h1>
       <h2>Sign In</h2>
@@ -24,29 +24,21 @@
         <label for="iiUrl" style="display: inline-block; width: 200px"
           >Identity Provider:
         </label>
-        <input
-          type="text"
-          id="iiUrl"
-          value="https://identity.ic0.app/"
-        />
+        <input type="text" id="iiUrl" value="https://identity.ic0.app/" />
       </div>
       <div>
         <label for="maxTimeToLive" style="display: inline-block; width: 200px"
-          >Max Time to live (ms):</label>
-        <input
-          type="number"
-          id="maxTimeToLive"
-          placeholder="(use default)"
-        />
+          >Max Time to live (ms):</label
+        >
+        <input type="number" id="maxTimeToLive" placeholder="(use default)" />
       </div>
       <div>
-        <label for="derivationOrigin" style="display: inline-block; width: 200px"
-        >Derivation Origin:</label>
-        <input
-          type="text"
-          id="derivationOrigin"
-          placeholder="(use default)"
-        />
+        <label
+          for="derivationOrigin"
+          style="display: inline-block; width: 200px"
+          >Derivation Origin:</label
+        >
+        <input type="text" id="derivationOrigin" placeholder="(use default)" />
       </div>
       <button id="signinBtn">Sign In</button>
       <button id="signoutBtn">Sign Out</button>
@@ -81,18 +73,37 @@
         Set new value for /.well-known/ii-alternative-origins:
       </label>
       <div>
-        <input type="radio" id="certified" name="alternativeOriginsMode" value="certified"
-               checked>
+        <input
+          type="radio"
+          id="certified"
+          name="alternativeOriginsMode"
+          value="certified"
+          checked
+        />
         <label for="certified">Certified</label>
       </div>
       <div>
-        <input type="radio" id="uncertified" name="alternativeOriginsMode" value="uncertified">
+        <input
+          type="radio"
+          id="uncertified"
+          name="alternativeOriginsMode"
+          value="uncertified"
+        />
         <label for="uncertified">Uncertified</label>
       </div>
       <div>
-        <input type="radio" id="redirect" name="alternativeOriginsMode" value="redirect">
+        <input
+          type="radio"
+          id="redirect"
+          name="alternativeOriginsMode"
+          value="redirect"
+        />
         <label for="redirect">Redirect</label>
-        <input type="text" id="redirectLocation" value="/.well-known/evil-alternative-origins" />
+        <input
+          type="text"
+          id="redirectLocation"
+          value="/.well-known/evil-alternative-origins"
+        />
       </div>
       <input type="text" id="newAlternativeOrigins" />
       <button id="updateNewAlternativeOrigins">Update Value</button>
@@ -104,7 +115,7 @@
     <button id="validMessageBtn">Send valid message</button>
     <button id="closeIIWindowBtn">Close II tab</button>
     <div>
-      <label for="customMessage" style="display: inline-block;">
+      <label for="customMessage" style="display: inline-block">
         Send custom message:
       </label>
       <input type="text" id="customMessage" />
@@ -112,5 +123,7 @@
     </div>
     <h3>WindowPostMessages:</h3>
     <div id="messages"></div>
+
+    <script type="module" src="/main.js"></script>
   </body>
 </html>

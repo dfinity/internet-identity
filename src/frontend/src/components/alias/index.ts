@@ -1,9 +1,9 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { validateAlias } from "$src/utils/validateAlias";
 import { html, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { renderPage, withRef } from "../../utils/lit-html";
-import { validateAlias } from "../../utils/validateAlias";
 
 import copyJson from "./index.json";
 
@@ -18,10 +18,6 @@ export const promptDeviceAliasTemplate = (props: {
   i18n: I18n;
 }): TemplateResult => {
   const copy = props.i18n.i18n(copyJson);
-
-  // static copy required because lit doesn't support template attributes (placeholder)
-  // https://github.com/lit/lit/issues/1862
-  const staticCopy = props.i18n.staticLang(copyJson);
 
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
@@ -59,7 +55,7 @@ export const promptDeviceAliasTemplate = (props: {
           );
           e.currentTarget.setCustomValidity(message);
         }}
-        placeholder=${staticCopy.placeholder}
+        placeholder=${copy.placeholder}
         aria-label="device name"
         type="text"
         required

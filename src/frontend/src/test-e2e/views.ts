@@ -332,23 +332,6 @@ export class AddDeviceAliasView extends View {
   }
 }
 
-export class AddDeviceFlowSelectorView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#cancelAddDevice")
-      .waitForDisplayed({ timeout: 10_000 });
-  }
-
-  async selectLocalDevice(): Promise<void> {
-    await this.browser.$("#local").click();
-  }
-
-  async selectRemoteDevice(): Promise<string> {
-    await this.browser.$("#remote").click();
-    return await this.browser.$(`[data-role="add-device-link"]`).getText();
-  }
-}
-
 export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
@@ -394,6 +377,14 @@ export class AddRemoteDeviceInstructionsView extends View {
   async cancel(): Promise<void> {
     await this.browser.$("#cancelAddRemoteDevice").click();
   }
+
+  async addFIDODevice(): Promise<void> {
+    await this.browser.$('[data-action="use-fido"]').click();
+  }
+
+  async addDeviceLink(): Promise<string> {
+    return await this.browser.$(`[data-role="add-device-link"]`).getText();
+  }
 }
 
 export class AddRemoteDeviceVerificationCodeView extends View {
@@ -419,6 +410,18 @@ export class VerifyRemoteDeviceView extends View {
 
   async continue(): Promise<void> {
     await this.browser.$("#verifyDevice").click();
+  }
+}
+
+export class AddDeviceSuccessView extends View {
+  private readonly SELECTOR = "[data-action='next']";
+
+  async waitForDisplay(): Promise<void> {
+    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async continue(): Promise<void> {
+    await this.browser.$(this.SELECTOR).click();
   }
 }
 

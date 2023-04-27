@@ -1,8 +1,9 @@
+import { mount, withRef } from "$src/utils/lit-html";
+import { parseUserNumber } from "$src/utils/userNumber";
+import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { mount, withRef } from "../utils/lit-html";
-import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({
@@ -43,7 +44,7 @@ export const mkAnchorInput = ({
     if (result === "invalid") {
       return showHint("Invalid Anchor");
     }
-    if (result === undefined) {
+    if (isNullish(result)) {
       return showHint("Please enter an Anchor");
     }
     onSubmit(result);

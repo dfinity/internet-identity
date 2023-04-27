@@ -1,14 +1,15 @@
-import { html, TemplateResult } from "lit-html";
 import {
   checkmarkRoundIcon,
   lockedIcon,
   warningIcon,
   warningRoundIcon,
-} from "../../components/icons";
+} from "$src/components/icons";
 import {
   recoveryKeyLabel,
   recoveryPhraseLabel,
-} from "../../utils/recoveryDevice";
+} from "$src/utils/recoveryDevice";
+import { isNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Devices, RecoveryKey, RecoveryPhrase } from "./types";
 
@@ -29,10 +30,10 @@ export const recoveryMethodsSection = ({
       </div>
       <div class="c-action-list">
         <ul>
-          ${recoveryPhrase === undefined
+          ${isNullish(recoveryPhrase)
             ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
             : recoveryPhraseItem({ recoveryPhrase })}
-          ${recoveryKey === undefined
+          ${isNullish(recoveryKey)
             ? missingRecovery({ recovery: "key", addRecoveryKey })
             : recoveryKeyItem({ recoveryKey })}
         </ul>
@@ -159,7 +160,12 @@ export const recoveryKeyItem = ({
 const checkmark = (): TemplateResult => {
   return html`
     <div class="c-action-list__status">
-      <span class="c-icon c-icon--ok">${checkmarkRoundIcon}</span>
+      <span class="c-icon c-icon--ok c-tooltip"
+        >${checkmarkRoundIcon}
+        <span class="c-tooltip__message c-card c-card--tight"
+          >You enabled a recovery phrase.</span
+        >
+      </span>
     </div>
   `;
 };

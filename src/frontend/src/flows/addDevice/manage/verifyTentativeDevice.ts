@@ -1,14 +1,14 @@
+import { VerifyTentativeDeviceResponse } from "$generated/internet_identity_types";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { mainWindow } from "$src/components/mainWindow";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { Chan, unknownToString } from "$src/utils/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref } from "lit-html/directives/ref.js";
-import { VerifyTentativeDeviceResponse } from "../../../../generated/internet_identity_types";
-import { displayError } from "../../../components/displayError";
-import { withLoader } from "../../../components/loader";
-import { mainWindow } from "../../../components/mainWindow";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { renderPage, withRef } from "../../../utils/lit-html";
-import { Chan, unknownToString, unreachableLax } from "../../../utils/utils";
 
 // The type that we return, pretty much the result of the canister
 // except that all retries have been exhausted
@@ -132,95 +132,96 @@ export const verifyTentativeDevice = async ({
   connection: AuthenticatedConnection;
   alias: string;
   endTimestamp: bigint;
-}): Promise<void> => {
-  const countdown = AsyncCountdown.fromNanos(endTimestamp);
+}): Promise<"verified" | "failed"> => {
+  const countdown: AsyncCountdown<VerifyResult | "canceled"> =
+    AsyncCountdown.fromNanos(endTimestamp);
 
-  // The verification page
-  const verification = new Promise<VerifyResult | { canceled: null }>(
-    (resolve) =>
-      verifyTentativeDevicePage({
-        alias,
-        cancel: async () => {
-          await withLoader(() => connection.exitDeviceRegistrationMode());
-          // NOTE: we resolve before stopping the countdown to avoid Promise.race below
-          // thinking it was a "stop-by-timeout"
-          resolve({ canceled: null });
-          countdown.stop();
-        },
+  verifyTentativeDevicePage({
+    alias,
+    cancel: async () => {
+      await withLoader(() => connection.exitDeviceRegistrationMode());
+      countdown.stop("canceled");
+    },
 
-        // To verify the code, we query the canister, and return _except_ if the code is wrong
-        // _and_ there are some attemps left, in which case we update the UI and prompt the user
-        // to try again.
-        verify: async (value: string): Promise<VerifyResultOrRetry> => {
-          const result = await withLoader(() =>
-            connection.verifyTentativeDevice(value)
-          );
+    // To verify the code, we query the canister, and return _except_ if the code is wrong
+    // _and_ there are some attemps left, in which case we update the UI and prompt the user
+    // to try again.
+    verify: async (value: string): Promise<VerifyResultOrRetry> => {
+      const result = await withLoader(() =>
+        connection.verifyTentativeDevice(value)
+      );
 
-          if ("wrong_code" in result) {
-            if (result.wrong_code.retries_left === 0) {
-              return { too_many_attempts: null };
-            } else {
-              return { retry: null };
-            }
-          } else {
-            return result;
-          }
-        },
-        doContinue: resolve,
-        remaining: countdown.remainingFormattedAsync(),
-      })
-  );
-
-  // A timeout promise, that returns
-  const timeout = async () => {
-    await countdown.wait();
-    return { timeout: null };
-  };
-
-  // We race the verification with the timeout to set a time limit
-  const result = await Promise.race([timeout(), verification]);
+      if ("wrong_code" in result) {
+        if (result.wrong_code.retries_left === 0) {
+          return { too_many_attempts: null };
+        } else {
+          return { retry: null };
+        }
+      } else {
+        return result;
+      }
+    },
+    doContinue: (res) => countdown.stop(res),
+    remaining: countdown.remainingFormattedAsync(),
+  });
 
   // We handle the result and yield back control
-  return handleVerifyResult(result);
+  return handleVerifyResult(await countdown.wait());
 };
 
 const handleVerifyResult = async (
-  result: VerifyResult | { canceled: null } | { timeout: null }
-) => {
+  result: VerifyResult | "canceled" | typeof AsyncCountdown.timeout
+): Promise<"verified" | "failed"> => {
   // If the verification worked or the user canceled, then we don't show anything special
-  if ("verified" in result || "canceled" in result) {
-    return;
+  if (result === "canceled") {
+    return "failed";
+  } else if (typeof result === "object" && "verified" in result) {
+    result satisfies VerifyResult;
+    return "verified";
   }
 
   // otherwise it's an error, and we tell the user what happened
   const showError = ({ title, message }: { title: string; message: string }) =>
     displayError({ title, message, primaryButton: "Ok" });
 
-  if ("too_many_attempts" in result) {
+  if (result === AsyncCountdown.timeout) {
+    await showError({
+      title: "Timeout Reached",
+      message:
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+    });
+    return "failed";
+  } else if ("too_many_attempts" in result) {
     await showError({
       title: "Too Many Wrong Verification Codes Entered",
       message:
         "Adding the device has been aborted due to too many invalid code entries.",
     });
+    return "failed";
   } else if ("device_registration_mode_off" in result) {
     await showError({
       title: "Device Registration Not Enabled",
       message:
         "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
     });
+    return "failed";
   } else if ("timeout" in result) {
     await showError({
       title: "Timeout Reached",
       message:
         'The timeout has been reached. For security reasons the "add device" process has been aborted.',
     });
+    return "failed";
   } else if ("no_device_to_verify" in result) {
     await showError({
       title: "No Device To Verify",
       message:
         "Verification not possible because the device is no longer in a state to be verified.",
     });
+    return "failed";
   } else {
+    result satisfies never;
+
     await displayError({
       title: "Something Went Wrong",
       message: "Device could not be verified.",
@@ -228,7 +229,6 @@ const handleVerifyResult = async (
       primaryButton: "Continue",
     });
 
-    // If something really unexpected happens then we just return control to the caller
-    unreachableLax(result);
+    return "failed";
   }
 };

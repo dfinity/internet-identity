@@ -1,5 +1,5 @@
+import { dropdownIcon } from "$src/components/icons";
 import { html, TemplateResult } from "lit-html";
-import { dropdownIcon } from "../../components/icons";
 
 export const settingsDropdown = ({
   alias,
@@ -15,6 +15,7 @@ export const settingsDropdown = ({
       class="c-dropdown__trigger c-action-list__action"
       aria-expanded="false"
       aria-controls="dropdown-${id}"
+      aria-label="Open settings"
       data-device=${alias}
     >
       ${dropdownIcon}

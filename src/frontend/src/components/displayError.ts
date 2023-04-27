@@ -1,12 +1,13 @@
-import { html, render, TemplateResult } from "lit-html";
+import { TemplateElement } from "$src/utils/lit-html";
+import { html, render } from "lit-html";
 import { mainWindow } from "./mainWindow";
 import { warnBox } from "./warnBox";
 
 export type ErrorOptions = {
-  title: string | TemplateResult;
-  message: string | TemplateResult;
-  detail?: string | TemplateResult;
-  primaryButton: string | TemplateResult;
+  title: TemplateElement;
+  message: TemplateElement;
+  detail?: TemplateElement;
+  primaryButton: TemplateElement;
 };
 
 const pageContent = (options: ErrorOptions) =>

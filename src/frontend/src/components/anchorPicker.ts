@@ -1,12 +1,13 @@
+import { autofocus } from "$src/utils/lit-html";
+import { NonEmptyArray } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
-import { autofocus } from "../utils/lit-html";
-import { NonEmptyArray } from "../utils/utils";
 import { arrowRight } from "./icons";
 
 type PickerProps = {
   savedAnchors: NonEmptyArray<bigint>;
   pick: PickCB;
   moreOptions: () => void;
+  focus?: boolean;
 };
 
 type PickCB = (userNumber: bigint) => void;
@@ -18,13 +19,14 @@ export const mkAnchorPicker = (
 ): {
   template: TemplateResult;
 } => {
+  const focus = props.focus ?? true;
   const elems = props.savedAnchors.map((anchor, i) =>
-    anchorItem({ anchor, pick: props.pick, focus: i === 0 })
+    anchorItem({ anchor, pick: props.pick, focus: focus && i === 0 })
   );
 
   const moreOptions = html` <li class="c-list__item c-list__item--noFocusStyle">
     <button
-      class="t-link c-list__parcel c-list__parcel--fullwidth c-list__parcel--summary"
+      class="t-link c-list__parcel c-list__parcel--fullwidth"
       @click="${() => props.moreOptions()}"
       data-role="more-options"
     >

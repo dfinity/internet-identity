@@ -1,19 +1,21 @@
-import { html, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { Challenge } from "../../../generated/internet_identity_types";
-import { spinner } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { cancel, LoginFlowCanceled } from "../../utils/flowResult";
+import { Challenge } from "$generated/internet_identity_types";
+import { spinner } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { DynamicKey, I18n } from "$src/i18n";
+import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
 import {
   Connection,
   IIWebAuthnIdentity,
   RegisterResult,
-} from "../../utils/iiConnection";
-import { autofocus, renderPage, withRef } from "../../utils/lit-html";
-import { Chan } from "../../utils/utils";
+} from "$src/utils/iiConnection";
+import { autofocus, renderPage, withRef } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
+import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
 
 // A symbol that we can differentiate from generic `T` types
@@ -26,6 +28,7 @@ export const promptCaptchaTemplate = <T>({
   verifyChallengeChars,
   onContinue,
   i18n,
+  focus: focus_,
 }: {
   cancel: () => void;
   requestChallenge: () => Promise<Challenge>;
@@ -35,30 +38,27 @@ export const promptCaptchaTemplate = <T>({
   }) => Promise<T | typeof badChallenge>;
   onContinue: (result: T) => void;
   i18n: I18n;
+  focus?: boolean;
 }) => {
+  const focus = focus_ ?? true;
   const copy = i18n.i18n(copyJson);
 
-  // We define a few Chans that are used to update the page in a
-  // reactive way; see template returned by this function
-
-  // The image shown
-  const img = new Chan<TemplateResult>();
-
-  // The text input where the chars can be typed
-  const input: Ref<HTMLInputElement> = createRef();
-
-  // The error shown on bad input
-  const errorText = new Chan<TemplateResult | undefined>();
-  const hasError = errorText.map((e) => (e !== undefined ? "has-error" : ""));
-
-  // The "next" button behavior
-  const next = new Chan<((e: SubmitEvent) => void) | undefined>();
-  const nextDisabled = next.map((f) => f === undefined);
-  const nextCaption = new Chan<TemplateResult>();
-
-  // The "retry" button behavior
-  const retry = new Chan<(() => void) | undefined>();
-  const retryDisabled = retry.map((f) => f === undefined);
+  const spinnerImg: TemplateResult = html`
+    <div
+      class="c-captcha-placeholder c-spinner-wrapper"
+      aria-label="Loading image"
+    >
+      <div class="c-spinner">${spinner}</div>
+    </div>
+  `;
+  const captchaImg = (base64: string): TemplateResult =>
+    html`<div class="c-captcha-placeholder" aria-label="CAPTCHA challenge">
+      <img
+        src="data:image/png;base64,${base64}"
+        class="c-image"
+        alt="CAPTCHA Characters"
+      />
+    </div>`;
 
   // The various states the component can inhabit
   type State =
@@ -67,77 +67,77 @@ export const promptCaptchaTemplate = <T>({
     | { status: "verifying" }
     | { status: "bad" };
 
+  // We define a few Chans that are used to update the page in a
+  // reactive way based on state; see template returned by this function
+  const state = new Chan<State>({ status: "requesting" });
+
+  // The image shown
+  const img: Chan<TemplateResult> = state.map({
+    f: (state) =>
+      state.status === "requesting"
+        ? spinnerImg
+        : state.status === "prompting"
+        ? captchaImg(state.challenge.png_base64)
+        : Chan.unchanged,
+    def: spinnerImg,
+  });
+
+  // The text input where the chars can be typed
+  const input: Ref<HTMLInputElement> = createRef();
+
+  // The error shown on bad input
+  const errorText = state.map(({ status }) =>
+    status === "bad" ? copy.incorrect : undefined
+  );
+  const hasError = state.map(({ status }) =>
+    status === "bad" ? "has-error" : ""
+  );
+
+  // The "next" button behavior
+  const next: Chan<((e: SubmitEvent) => void) | undefined> = state.map(
+    (state) =>
+      state.status === "prompting"
+        ? (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            doVerify(state.challenge);
+          }
+        : undefined
+  );
+
+  const nextDisabled: Chan<boolean> = next.map(isNullish);
+  const nextCaption: Chan<DynamicKey> = state.map(({ status }) =>
+    status === "requesting"
+      ? copy.generating
+      : status === "verifying"
+      ? copy.verifying
+      : copy.next
+  );
+
+  // The "retry" button behavior
+  const retry: Chan<(() => Promise<void>) | undefined> = state.map((state) =>
+    state.status === "prompting" || state.status === "bad" ? doRetry : undefined
+  );
+  const retryDisabled: Chan<boolean> = retry.map(isNullish);
+
   // On retry, request a new challenge
   const doRetry = async () => {
-    update({ status: "requesting" });
+    state.send({ status: "requesting" });
     const challenge = await requestChallenge();
-    update({ status: "prompting", challenge });
+    state.send({ status: "prompting", challenge });
   };
 
   // On verification, check the chars and either continue (on good challenge)
   // or go to "bad" state
   const doVerify = (challenge: Challenge) => {
-    update({ status: "verifying" });
+    state.send({ status: "verifying" });
     void withRef(input, async (input) => {
       const res = await verifyChallengeChars({
         chars: input.value,
         challenge,
       });
-      res === badChallenge ? update({ status: "bad" }) : onContinue(res);
+      res === badChallenge ? state.send({ status: "bad" }) : onContinue(res);
     });
-  };
-
-  // The update function, transitioning between states
-  const update = (state: State) => {
-    switch (state.status) {
-      case "requesting":
-        img.send(
-          html`
-            <div class="c-captcha-placeholder c-spinner-wrapper">
-              <div class="c-spinner">${spinner}</div>
-            </div>
-          `
-        );
-        errorText.send(undefined);
-        next.send(undefined);
-        nextCaption.send(copy.generating);
-        retry.send(undefined);
-        break;
-      case "prompting":
-        img.send(
-          html`<div class="c-captcha-placeholder">
-            <img
-              src="data:image/png;base64,${state.challenge.png_base64}"
-              id="captchaImg"
-              class="c-image"
-              alt="captcha image"
-            />
-          </div>`
-        );
-        errorText.send(undefined);
-        next.send((e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          doVerify(state.challenge);
-        });
-        nextCaption.send(copy.next);
-        retry.send(doRetry);
-        break;
-      case "verifying":
-        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
-        errorText.send(undefined);
-        next.send(undefined);
-        nextCaption.send(copy.verifying);
-        retry.send(undefined);
-        break;
-      case "bad":
-        // omit updating `img` on purpose; we just leave whatever is shown (captcha)
-        errorText.send(copy.incorrect);
-        next.send(undefined);
-        nextCaption.send(copy.next);
-        retry.send(doRetry);
-        break;
-    }
   };
 
   // Kickstart everything
@@ -146,18 +146,14 @@ export const promptCaptchaTemplate = <T>({
   const promptCaptchaSlot = html`
     <article>
       <h1 class="t-title t-title--main">${copy.title}</h1>
-      <form
-        autocomplete="off"
-        @submit=${asyncReplace(next.recv())}
-        class="l-stack"
-      >
+      <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div class="c-input c-input--icon">
-          ${asyncReplace(img.recv())}
+          ${asyncReplace(img)}
           <i
             tabindex="0"
             id="seedCopy"
             class="c-button__icon"
-            @click=${asyncReplace(retry.recv())}
+            @click=${asyncReplace(retry)}
             ?disabled=${asyncReplace(retryDisabled)}
           >
             <span>${copy.retry}</span>
@@ -166,14 +162,12 @@ export const promptCaptchaTemplate = <T>({
         <label>
           <strong class="t-strong">${copy.instructions}</strong>
           <input
-            ${autofocus}
+            ${focus ? autofocus : undefined}
             ${ref(input)}
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"
           />
-          <strong class="c-input__message">
-            ${asyncReplace(errorText.recv())}
-          </strong>
+          <strong class="c-input__message">${asyncReplace(errorText)}</strong>
         </label>
         <p class="t-paragraph confirm-paragraph"></p>
         <div class="c-button-group">
@@ -190,7 +184,7 @@ export const promptCaptchaTemplate = <T>({
             id="confirmRegisterButton"
             ?disabled=${asyncReplace(nextDisabled)}
           >
-            ${asyncReplace(nextCaption.recv())}
+            ${asyncReplace(nextCaption)}
           </button>
         </div>
       </form>
@@ -231,8 +225,12 @@ export const promptCaptcha = ({
     promptCaptchaPage({
       cancel: () => resolve(cancel),
       verifyChallengeChars: async ({ chars, challenge }) => {
+        const tempIdentity = await ECDSAKeyIdentity.generate({
+          extractable: false,
+        });
         const result = await connection.register({
           identity,
+          tempIdentity,
           alias,
           challengeResult: {
             key: challenge.challenge_key,

@@ -1,31 +1,33 @@
-import { wordlists } from "bip39";
-import { html, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { warningIcon } from "../../../components/icons";
-import { withLoader } from "../../../components/loader";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
+import { warningIcon } from "$src/components/icons";
+import { withLoader } from "$src/components/loader";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
 import {
   dropLeadingUserNumber,
   RECOVERYPHRASE_WORDCOUNT,
-} from "../../../crypto/mnemonic";
+} from "$src/crypto/mnemonic";
 import type {
   LoginFlowCanceled,
   LoginFlowError,
   LoginFlowSuccess,
-} from "../../../utils/flowResult";
-import { apiResultToLoginFlowResult } from "../../../utils/flowResult";
-import { Connection } from "../../../utils/iiConnection";
-import { renderPage, withRef } from "../../../utils/lit-html";
-import { RecoveryDevice } from "../../../utils/recoveryDevice";
-import { Chan } from "../../../utils/utils";
+} from "$src/utils/flowResult";
+import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
+import { DynamicKey } from "$src/utils/i18n";
+import { Connection } from "$src/utils/iiConnection";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { Chan } from "$src/utils/utils";
+import { isNullish } from "@dfinity/utils";
+import { wordlists } from "bip39";
+import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 const recoverWithPhraseTemplate = <
   /* The successful return type on verification */
   T extends { tag: "ok" },
   /* The error return type on verification */
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 >({
   confirm,
   verify,
@@ -49,7 +51,7 @@ const recoverWithPhraseTemplate = <
     const strings = [];
     for (const wordRef of wordRefs) {
       const value = withRef(wordRef, (input) => input.value);
-      if (value === undefined) {
+      if (isNullish(value)) {
         return undefined;
       }
 
@@ -62,7 +64,7 @@ const recoverWithPhraseTemplate = <
   // Read phrase from the page, verify it, and confirm back to the caller on success
   const verifyAndConfirm = async () => {
     const phrase = readPhrase();
-    if (phrase === undefined) {
+    if (isNullish(phrase)) {
       toast.error("Could not read phrase");
       return;
     }
@@ -211,7 +213,7 @@ export const wordTemplate = ({
             .trimStart()
             .split(" ")
             .filter(Boolean);
-          if (word === undefined) {
+          if (isNullish(word)) {
             return;
           }
 
@@ -235,7 +237,7 @@ export const wordTemplate = ({
           const next = element
             .closest("li")
             ?.nextElementSibling?.querySelector("input");
-          if (next === undefined || next === null) {
+          if (isNullish(next)) {
             return;
           }
 
@@ -245,11 +247,7 @@ export const wordTemplate = ({
       class="c-recoveryInput"
       ${ref(wordRef)}
       data-role="recovery-word-input"
-      data-state=${asyncReplace(
-        state.map(
-          (x: State) => x
-        ) /* workaround because chan supports only one .recv() */
-      )}
+      data-state=${asyncReplace(state)}
       @input=${(e: InputEvent) =>
         withElement(e, (_e, element) => {
           // Reset validity
@@ -268,12 +266,12 @@ export const wordTemplate = ({
 
 type TemplateProps<
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 > = Parameters<typeof recoverWithPhraseTemplate<T, E>>[0];
 
 export const recoverWithPhrasePage = <
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 >(
   props: TemplateProps<T, E>
 ) => renderPage(recoverWithPhraseTemplate<T, E>)(props);

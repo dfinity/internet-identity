@@ -20,6 +20,7 @@ fn ii_upgrade_works() -> Result<(), CallError> {
         canister_id,
         II_WASM.clone(),
         candid::encode_one(None::<InternetIdentityInit>).unwrap(),
+        None,
     )?;
     api::health_check(&env, canister_id);
     Ok(())
@@ -217,7 +218,7 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
+        frontend_hostname,
     )?;
 
     // roll back
@@ -233,8 +234,8 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        ByteBuf::from("session key"),
+        frontend_hostname,
+        &ByteBuf::from("session key"),
         None,
     )?;
     assert_eq!(Principal::self_authenticating(user_key), principal);
@@ -245,7 +246,7 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     Ok(())
 }

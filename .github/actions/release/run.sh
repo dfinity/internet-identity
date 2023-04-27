@@ -44,7 +44,7 @@ git checkout $GITHUB_SHA
 ./scripts/docker-build
 sha256sum internet_identity.wasm.gz
 ./scripts/docker-build --archive
-sha256sum archive.wasm
+sha256sum archive.wasm.gz
 \`\`\`
 EOF
 

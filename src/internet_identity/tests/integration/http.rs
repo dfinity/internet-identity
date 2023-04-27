@@ -11,15 +11,13 @@ use internet_identity_interface::internet_identity::types::ChallengeAttempt;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, UNIX_EPOCH};
 
-/// Verifies that expected assets are delivered, certified and have security headers.
+/// Verifies that some expected assets are delivered, certified and have security headers.
 #[test]
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
     let assets: Vec<(&str, Option<&str>)> = vec![
         ("/", None),
-        ("/index.html", None),
         ("/index.js", Some("gzip")),
-        ("/loader.webp", None),
-        ("/favicon.ico", None),
+        ("/.well-known/ic-domains", None),
     ];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -29,7 +27,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         let http_response = http_request(
             &env,
             canister_id,
-            HttpRequest {
+            &HttpRequest {
                 method: "GET".to_string(),
                 url: asset.to_string(),
                 headers: vec![],
@@ -87,6 +85,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
+        "internet_identity_max_num_latest_delegation_origins",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
@@ -167,8 +166,8 @@ fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
             canister_id,
             principal_1(),
             user_number,
-            frontend_hostname.to_string(),
-            ByteBuf::from(format!("session key {count}")),
+            frontend_hostname,
+            &ByteBuf::from(format!("session key {count}")),
             None,
         )?;
 
@@ -192,8 +191,8 @@ fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        frontend_hostname.to_string(),
-        ByteBuf::from("last session key"),
+        frontend_hostname,
+        &ByteBuf::from("last session key"),
         None,
     )?;
 
@@ -279,10 +278,11 @@ fn metrics_inflight_challenges() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         &device_data_1(),
-        ChallengeAttempt {
+        &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge_1.challenge_key,
         },
+        None,
     )?;
 
     let metrics = get_metrics(&env, canister_id);
@@ -337,7 +337,7 @@ fn metrics_device_registration_mode() -> Result<(), CallError> {
         canister_id,
         principal_2(),
         user_number_2,
-        device_data_2(),
+        &device_data_2(),
     )?;
 
     let metrics = get_metrics(&env, canister_id);
@@ -372,7 +372,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2(),
+        &device_data_2(),
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),
@@ -387,8 +387,8 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device.pubkey.clone(),
-        device,
+        &device.pubkey,
+        &device,
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),
@@ -401,7 +401,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         canister_id,
         principal_1(),
         user_number,
-        device_data_2().pubkey,
+        &device_data_2().pubkey,
     )?;
     assert_metric(
         &get_metrics(&env, canister_id),

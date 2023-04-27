@@ -1,12 +1,16 @@
-import { promptDeviceAlias } from "../../components/alias";
+import { promptDeviceAlias } from "$src/components/alias";
 import {
   apiResultToLoginFlowResult,
   cancel,
   LoginFlowResult,
-} from "../../utils/flowResult";
-import { Connection } from "../../utils/iiConnection";
-import { setAnchorUsed } from "../../utils/userNumber";
-import { unknownToString } from "../../utils/utils";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { unknownToString } from "$src/utils/utils";
+import {
+  isCancel,
+  webAuthnCancelTemplate,
+} from "$src/utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
@@ -46,6 +50,12 @@ export const register = async ({
       return result;
     }
   } catch (e) {
+    if (isCancel(e)) {
+      return {
+        tag: "err",
+        ...webAuthnCancelTemplate(),
+      };
+    }
     return {
       tag: "err",
       title: "Failed to create anchor",

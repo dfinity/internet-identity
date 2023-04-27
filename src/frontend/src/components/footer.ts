@@ -1,3 +1,4 @@
+import { PORTAL_II_URL } from "$src/config";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
@@ -32,7 +33,7 @@ export const footer = html`<footer class="l-footer">
   ${navigationLink({
     labelText: "About",
     id: "aboutLink",
-    url: "/about",
+    url: PORTAL_II_URL,
     classes: "t-link--discreet l-footer__link",
   })}
   ${navigationLink({

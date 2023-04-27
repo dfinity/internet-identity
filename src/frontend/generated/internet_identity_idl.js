@@ -1,4 +1,5 @@
 export const idlFactory = ({ IDL }) => {
+  const MetadataMap = IDL.Rec();
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -17,6 +18,18 @@ export const idlFactory = ({ IDL }) => {
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
+  MetadataMap.fill(
+    IDL.Vec(
+      IDL.Tuple(
+        IDL.Text,
+        IDL.Variant({
+          'map' : MetadataMap,
+          'string' : IDL.Text,
+          'bytes' : IDL.Vec(IDL.Nat8),
+        }),
+      )
+    )
+  );
   const DeviceProtection = IDL.Variant({
     'unprotected' : IDL.Null,
     'protected' : IDL.Null,
@@ -36,6 +49,7 @@ export const idlFactory = ({ IDL }) => {
   const CredentialId = IDL.Vec(IDL.Nat8);
   const DeviceData = IDL.Record({
     'alias' : IDL.Text,
+    'metadata' : IDL.Opt(MetadataMap),
     'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
@@ -80,6 +94,7 @@ export const idlFactory = ({ IDL }) => {
   const DeviceWithUsage = IDL.Record({
     'alias' : IDL.Text,
     'last_usage' : IDL.Opt(Timestamp),
+    'metadata' : IDL.Opt(MetadataMap),
     'origin' : IDL.Opt(IDL.Text),
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
@@ -243,7 +258,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'register' : IDL.Func(
-        [DeviceData, ChallengeResult],
+        [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
         [],
       ),

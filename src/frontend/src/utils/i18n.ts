@@ -3,7 +3,7 @@
  * This module provides helper for loading multi-language copy definitions and updating the lit templates
  * depending on the user-selected language dynamically. */
 
-import { html, TemplateResult } from "lit-html";
+import { DirectiveResult } from "lit-html/async-directive.js";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Chan } from "./utils";
 
@@ -12,8 +12,11 @@ type StringCopy<Keys extends string, Lang extends string> = {
   [key in Lang]: { [key in Keys]: string };
 };
 
+// The keys of the dynamic copy (just an async directive result that can be inserted as-in in a template)
+export type DynamicKey = DirectiveResult;
+
 // The dynamic templates, i.e. { some_key_title: <language-dependent template> }
-type DynamicCopy<Keys extends string> = { [key in Keys]: TemplateResult };
+type DynamicCopy<Keys extends string> = { [key in Keys]: DynamicKey };
 
 /// A class that converts a string copy definition into dynamic lit templates dependent on the
 // currently selected language.
@@ -42,19 +45,11 @@ export class I18n<Lang extends string> {
         return copy[lang][k];
       });
 
-      acc[k] = html`${asyncReplace(value)}`;
+      acc[k] = asyncReplace(value);
       return acc;
     }, {} as DynamicCopy<Keys>);
 
     return internationalized;
-  }
-
-  // A "static" (i.e. "string" instead of "TemplateResult") version of the copy, for cases that require
-  // strings (under the assumption that the language won't change)
-  staticLang<Keys extends string>(
-    copy: StringCopy<Keys, Lang>
-  ): { [key in Keys]: string } {
-    return copy[this.lang];
   }
 
   // Set the language, causing all templates to update
@@ -65,7 +60,6 @@ export class I18n<Lang extends string> {
 
   // Retrieve the currently selected language
   getLanguageAsync(): AsyncIterable<Lang> {
-    // Workaround to copy the chan
-    return this.chan.map((x) => x);
+    return this.chan.values();
   }
 }

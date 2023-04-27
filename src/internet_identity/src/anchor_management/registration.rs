@@ -133,6 +133,8 @@ lazy_static! {
         ('X', 'x'),
         ('Y', 'y'),
         ('Z', 'z'),
+        ('P', 'p'),
+        ('W', 'w'),
     ].into_iter().collect();
 }
 
@@ -187,20 +189,29 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
-pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> RegisterResponse {
+pub fn register(
+    device_data: DeviceData,
+    challenge_result: ChallengeAttempt,
+    // A temporary key than can be used in lieu of 'device_data' for a brief period of time
+    // The key is optional for backwards compatibility
+    temp_key: Option<Principal>,
+) -> RegisterResponse {
     rate_limit::process_rate_limit();
     if let Err(()) = check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }
 
     let device = Device::from(device_data);
-    if caller() != Principal::self_authenticating(&device.pubkey) {
-        trap(&format!(
-            "{} could not be authenticated against {:?}",
-            caller(),
-            device.pubkey
-        ));
+    let device_principal = Principal::self_authenticating(&device.pubkey);
+
+    if let Some(ref temp_key) = temp_key {
+        if temp_key == &device_principal {
+            panic!("temp_key and device key must not be equal")
+        }
     }
+
+    // sanity check
+    verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
 
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());
     let Some((anchor_number, mut anchor)) = allocation else {
@@ -221,11 +232,43 @@ pub fn register(device_data: DeviceData, challenge_result: ChallengeAttempt) -> 
         });
     });
 
+    // Save the 'temp_key' as a mean of authenticating for a short period of time, see
+    // `TempKeys`
+    if let Some(temp_key) = temp_key {
+        state::with_temp_keys_mut(|temp_keys| {
+            temp_keys.add_temp_key(&device.pubkey, anchor_number, temp_key)
+        });
+    }
+
     let operation = Operation::RegisterAnchor {
         device: DeviceDataWithoutAlias::from(device),
     };
     post_operation_bookkeeping(anchor_number, operation);
     RegisterResponse::Registered {
         user_number: anchor_number,
+    }
+}
+
+/// Perform a sanity check on the caller. If the caller is neither the device nor the temporary key, then we
+/// could technically allow this to go through but it's most likely a mistake.
+fn verify_caller_is_device_or_temp_key(temp_key: &Option<Principal>, device_principal: &Principal) {
+    let caller = caller();
+    if &caller != device_principal {
+        if let Some(temp_key) = temp_key {
+            if &caller != temp_key {
+                trap(&format!(
+                    "caller {} could not be authenticated against device pubkey {} or temporary key {}",
+                    caller,
+                    device_principal,
+                    temp_key
+                ));
+            }
+        } else {
+            trap(&format!(
+                "caller {} could not be authenticated against device pubkey {} and no temporary key was sent",
+                caller,
+                device_principal,
+            ));
+        }
     }
 }

@@ -1,22 +1,23 @@
-import { html, render, TemplateResult } from "lit-html";
-import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
-import { useRecovery } from "../flows/recovery/useRecovery";
+import { PORTAL_II_URL } from "$src/config";
+import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
+import { useRecovery } from "$src/flows/recovery/useRecovery";
 import {
   apiResultToLoginFlowResult,
   LoginData,
   LoginFlowError,
   LoginFlowResult,
   LoginFlowSuccess,
-} from "../utils/flowResult";
-import { Connection } from "../utils/iiConnection";
-import { withRef } from "../utils/lit-html";
-import { registerIfAllowed } from "../utils/registerAllowedCheck";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { TemplateElement, withRef } from "$src/utils/lit-html";
+import { registerIfAllowed } from "$src/utils/registerAllowedCheck";
 import {
   getAnchors,
   parseUserNumber,
   setAnchorUsed,
-} from "../utils/userNumber";
-import { isNonEmptyArray, NonEmptyArray, unreachable } from "../utils/utils";
+} from "$src/utils/userNumber";
+import { isNonEmptyArray, NonEmptyArray, unreachable } from "$src/utils/utils";
+import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
 import { displayError } from "./displayError";
@@ -29,12 +30,8 @@ import { promptUserNumber } from "./promptUserNumber";
 export type AuthnTemplates = {
   firstTime: {
     slot: TemplateResult;
-    useExistingText:
-      | string
-      | TemplateResult /** text shown on the button leading to "useExisting" */;
-    createAnchorText:
-      | string
-      | TemplateResult /** text shown on the button leading to anchor creation */;
+    useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
+    createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
   };
   useExisting: {
     slot: TemplateResult;
@@ -54,7 +51,7 @@ export const authenticateBox = async (
     new Promise<LoginFlowResult>((resolve) => {
       const pages = authnPages({
         ...templates,
-        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
+        addDevice: (userNumber) => asNewDevice(connection, userNumber),
         onSubmit: (userNumber) => {
           resolve(authenticate(connection, userNumber));
         },
@@ -133,7 +130,7 @@ export const authnTemplates = (
       <p class="t-paragraph t-centered l-stack">
         <a
           class="t-link"
-          href="https://internetcomputer.org/internet-identity"
+          href=${PORTAL_II_URL}
           target="_blank"
           rel="noopener noreferrer"
           >Learn More</a
@@ -255,9 +252,8 @@ const page = (slot: TemplateResult) => {
   render(template, container);
 };
 
-// Start the "remote device" add flow by prompting for an anchor, and then
-// adding a device to that anchor.
-const addRemoteDevice = async (connection: Connection, userNumber?: bigint) => {
+// Register this device as a new device with the anchor
+const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
   const askUserNumber = async () => {
     const result = await promptUserNumber({

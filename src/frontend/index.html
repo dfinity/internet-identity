@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- CSP directives injected by the canister -->
+    <meta replaceme-with-csp />
+    <title>Internet Identity</title>
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <script type="module" src="src/index.ts"></script>
+  </head>
+  <body>
+    <main id="pageContent" class="l-wrap" aria-live="polite"></main>
+    <div id="loaderContainer"></div>
+
+    <!-- this is replaced by the backend before serving -->
+    <!-- XXX: DO NOT CHANGE! or if you do, change the bit that matches on this
+      exact string in the canister code-->
+    <script id="setupJs"></script>
+  </body>
+</html>
