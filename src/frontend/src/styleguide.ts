@@ -45,11 +45,19 @@ const recoveryWords = [
   "tongue",
 ];
 
+// used for style switching
 type Theme = "new" | "default";
 
 const selectStyle = (themeName: Theme): void => {
   document.documentElement.setAttribute("data-theme", themeName);
+  localStorage.setItem("theme", themeName);
 };
+
+// Check for theme preference in local storage
+const themeName = localStorage.getItem("theme");
+if (themeName !== null) {
+  document.documentElement.setAttribute("data-theme", themeName);
+}
 
 export const styleguide = html`
   <style>
