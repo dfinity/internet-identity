@@ -35,7 +35,6 @@ const deviceRegistrationDisabledInfoTemplate = ({
           >Add new device</strong
         >”
       </li>
-      <li>Select “<strong class="t-string">Browser</strong>”</li>
     </ol>
     <p class="t-paragraph t-strong">Then, press Retry below.</p>
     <div class="l-stack">
