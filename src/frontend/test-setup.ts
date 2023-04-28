@@ -4,20 +4,10 @@ import { TextEncoder } from "util";
 // We mock the environment variable because jest is not able to load import.meta.env
 jest.mock("./src/environment.ts", () => ({
   BASE_URL: "/",
-}));
-
-jest.mock("./src/features.ts", () => ({
   FETCH_ROOT_KEY: false,
   DUMMY_AUTH: false,
   DUMMY_CAPTCHA: false,
-}));
-
-jest.mock("./src/version.ts", () => ({
-  version: {
-    commit: "",
-    release: undefined,
-    dirty: false,
-  },
+  VERSION: ",,clean",
 }));
 
 export type WebAuthnCredential = {
