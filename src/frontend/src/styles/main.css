@@ -206,6 +206,8 @@
   --rs-card-border-radius: var(--vs-border-radius);
   --rs-card-item-stack: calc(var(--vs-stack) * 0.75);
 
+  --rs-marketing-block-stack: calc(var(--vs-stack) * 5);
+
   --rs-irregularity-stack: calc(var(--vs-stack) * 0.5);
   --rs-toast-stack: var(--rs-irregularity-stack);
 
@@ -849,6 +851,11 @@ a:hover,
   background: var(--rc-background);
   border-radius: var(--rs-card-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.c-marketing-block {
+  margin-top: var(--rs-marketing-block-stack);
+  max-width: 17em;
 }
 
 /**

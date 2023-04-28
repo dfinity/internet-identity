@@ -43,6 +43,14 @@
     "logo": "/img/showcase/openchat_logo.webp"
   },
   {
+    "id": "juno",
+    "name": "Juno",
+    "link": "https://juno.build",
+    "oneLiner": "Build Web3 Apps Like It's Web2",
+    "description": "Juno is an open-source platform that combines the power of Web3 with the ease and simplicity of Web2 development, enabling programmers to build decentralized apps faster and easier than ever before.",
+    "logo": "/img/showcase/juno_logo.webp"
+  },
+  {
     "id": "uniswapfrontendontheic",
     "name": "Uniswap Front End on the IC",
     "link": "https://uniswap-on-ic.xyz",
@@ -62,6 +70,7 @@
     "id": "papyrs",
     "name": "Papyrs",
     "link": "https://app.papy.rs",
+    "oneLiner": "Blog on Web3",
     "description": "An open-source, privacy-first, decentralized blogging platform that lives 100% on chain. Have an unstoppable voice and full control over your data.",
     "logo": "/img/showcase/papyrs_logo.webp"
   },
@@ -184,9 +193,9 @@
   {
     "id": "aedile",
     "name": "Aedile",
-    "link": "https://eemeo-taaaa-aaaad-qakjq-cai.ic.fleek.co/",
+    "link": "https://aedile.io",
     "derivationOrigin": "https://vqdn4-miaaa-aaaaf-qaawa-cai.ic0.app",
-    "description": "Aedile brings your team's work together in one shared space, completely built on-chain. Manage your boards, columns & cards to transform your projects, serving web experiences directly from the Internet Computer blockchain. ",
+    "description": "Build and fund, 100% on chain aedile is the first open and decentralized service offering individuals, teams, and communities, an alternative to their favorite management tools.",
     "logo": "/img/showcase/aedile_logo.webp"
   },
   {

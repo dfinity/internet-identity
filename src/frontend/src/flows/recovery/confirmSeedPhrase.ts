@@ -31,7 +31,7 @@ const confirmSeedPhraseTemplate = ({
   back,
   i18n,
 }: {
-  words: Omit<Word, "elem" | "shouldFocus">[];
+  words: Pick<Word, "word" | "check">[];
   confirm: () => void;
   back: () => void;
   i18n: I18n;

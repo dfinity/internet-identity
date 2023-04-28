@@ -1,5 +1,4 @@
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
@@ -7,11 +6,14 @@ import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerT
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage, renderManage } from "./flows/manage";
+import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
+
+import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
 import {
@@ -130,7 +132,7 @@ const init = async () => {
     void authFlowAuthorize(connection);
   } else {
     // The default flow
-    void authFlowManage(connection);
+    void authFlowManage(connection, new I18n());
   }
 };
 
