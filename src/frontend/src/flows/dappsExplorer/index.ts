@@ -36,7 +36,7 @@ const dappsExplorerTemplate = ({
     <p class="t-paragraph t-centered">
       ${copy.add_your_dapp}
       <a
-        href="https://github.com/dfinity/internet-identity/issues/new"
+        href="https://github.com/dfinity/portal#showcase-submission-guidelines"
         target="_blank"
         rel="noopener noreferrer"
       >
