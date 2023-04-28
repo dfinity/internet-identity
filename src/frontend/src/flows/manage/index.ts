@@ -85,16 +85,6 @@ export const authFlowManage = async (connection: Connection) => {
   const { userNumber, connection: authenticatedConnection } =
     await authenticateBox(connection, authnTemplateManage());
 
-  await manage({ userNumber, authenticatedConnection });
-};
-
-export const manage = async ({
-  userNumber,
-  authenticatedConnection,
-}: {
-  userNumber: bigint;
-  authenticatedConnection: AuthenticatedConnection;
-}) => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
   await recoveryWizard(userNumber, authenticatedConnection);

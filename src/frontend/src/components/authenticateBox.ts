@@ -78,7 +78,7 @@ export const authenticateBox = async (
   // Retry until user has successfully authenticated
   for (;;) {
     const result = await promptAuth();
-    const { success: loginData } = await handleLoginFlowResult(result);
+    const loginData = await handleLoginFlowResult(result);
 
     if (nonNullish(loginData)) {
       return loginData;
@@ -88,11 +88,11 @@ export const authenticateBox = async (
 
 export const handleLoginFlowResult = async (
   result: LoginFlowResult
-): Promise<{ success: LoginData | undefined }> => {
+): Promise<LoginData | undefined> => {
   switch (result.tag) {
     case "ok":
       setAnchorUsed(result.userNumber);
-      return { success: result };
+      return result;
     case "err":
       await displayError({
         title: result.title,
@@ -108,7 +108,7 @@ export const handleLoginFlowResult = async (
       break;
   }
 
-  return { success: undefined };
+  return undefined;
 };
 
 /** The templates for the authentication pages */

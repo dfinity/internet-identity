@@ -6,7 +6,7 @@ import { anyFeatures, features } from "./features";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { authFlowManage, manage } from "./flows/manage";
+import { authFlowManage, renderManage } from "./flows/manage";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -104,8 +104,9 @@ const init = async () => {
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
   if (addDeviceAnchor !== undefined) {
+    const userNumber = addDeviceAnchor;
     // Register this device (tentatively)
-    const { userNumber, alias: deviceAlias } = await registerTentativeDevice(
+    const { alias: deviceAlias } = await registerTentativeDevice(
       addDeviceAnchor,
       connection
     );
@@ -115,13 +116,11 @@ const init = async () => {
 
     // If user "Click" continue in success page, proceed with authentication
     const result = await authenticate(connection, userNumber);
-    const { success } = await handleLoginFlowResult(result);
+    const loginData = await handleLoginFlowResult(result);
 
     // User have successfully signed-in we can jump to manage page
-    if (nonNullish(success)) {
-      const { connection: authenticatedConnection } = success;
-      await manage({ userNumber, authenticatedConnection });
-      return;
+    if (nonNullish(loginData)) {
+      return await renderManage(userNumber, loginData.connection);
     }
   }
 
