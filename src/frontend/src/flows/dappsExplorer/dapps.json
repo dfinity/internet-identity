@@ -70,6 +70,7 @@
     "id": "papyrs",
     "name": "Papyrs",
     "link": "https://app.papy.rs",
+    "oneLiner": "Blog on Web3",
     "description": "An open-source, privacy-first, decentralized blogging platform that lives 100% on chain. Have an unstoppable voice and full control over your data.",
     "logo": "/img/showcase/papyrs_logo.webp"
   },
