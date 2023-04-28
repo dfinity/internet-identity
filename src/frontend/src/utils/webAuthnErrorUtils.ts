@@ -1,15 +1,26 @@
 import { displayError } from "$src/components/displayError";
 import { I18n } from "../i18n";
-import copyJson from "./webAuthnErrorUtils.json";
+import cancelCopy from "./webAuthnErrorCancel.json";
+import duplicateDeviceCopy from "./webAuthnErrorDuplicate.json";
 
-export const webAuthnCancelTemplate = () => {
+export const webAuthnErrorCancelCopy = () => {
   const i18n = new I18n();
-  return i18n.i18n(copyJson);
+  return i18n.i18n(cancelCopy);
 };
 
 export const displayCancelError = (primaryButton: string): Promise<void> => {
   return displayError({
-    ...webAuthnCancelTemplate(),
+    ...webAuthnErrorCancelCopy(),
+    primaryButton,
+  });
+};
+
+export const displayDuplicateDeviceError = (
+  primaryButton: string
+): Promise<void> => {
+  const i18n = new I18n();
+  return displayError({
+    ...i18n.i18n(duplicateDeviceCopy),
     primaryButton,
   });
 };

@@ -10,6 +10,7 @@ import {
 import { setAnchorUsed } from "$src/utils/userNumber";
 import {
   displayCancelError,
+  displayDuplicateDeviceError,
   isCancel,
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
@@ -22,15 +23,6 @@ const displayFailedToAddDevice = (error: Error) =>
     message:
       "We failed to add the new device to this Identity Anchor. Please try again.",
     detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayAlreadyRegisteredDevice = () =>
-  displayError({
-    title: "Duplicate Device",
-    message: "This device has already been added to your anchor.",
-    detail:
-      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
     primaryButton: "Back to manage",
   });
 
@@ -54,7 +46,7 @@ export const addFIDODevice = async (
     });
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
-      await displayAlreadyRegisteredDevice();
+      await displayDuplicateDeviceError("Back to manage");
     } else if (isCancel(error)) {
       await displayCancelError("Back to manage");
     } else {

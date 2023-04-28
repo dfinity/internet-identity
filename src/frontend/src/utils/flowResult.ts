@@ -1,6 +1,6 @@
 import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
-import { webAuthnCancelTemplate } from "./webAuthnErrorUtils";
+import { webAuthnErrorCancelCopy } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
@@ -94,7 +94,7 @@ export const apiResultToLoginFlowResult = (
     case "cancelOrTimeout": {
       return {
         tag: "err",
-        ...webAuthnCancelTemplate(),
+        ...webAuthnErrorCancelCopy(),
       };
     }
   }

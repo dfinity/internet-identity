@@ -8,6 +8,12 @@ import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { isRecoveryPhrase } from "$src/utils/recoveryDevice";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
+import {
+  displayCancelError,
+  displayDuplicateDeviceError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "$src/utils/webAuthnErrorUtils";
 import { html } from "lit-html";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { deviceRecoveryPage } from "./recoverWith/device";
@@ -141,15 +147,21 @@ const enrollAuthenticator = async ({
       message: "Enrolling device...",
     });
   } catch (error: unknown) {
-    await displayError({
-      title: "Could not enroll device",
-      message:
-        "Something went wrong when we were trying to remember this device. Could you try again?",
-      detail:
-        "Could not create credentials: " +
-        unknownToString(error, "unknown error"),
-      primaryButton: "Ok",
-    });
+    if (isDuplicateDeviceError(error)) {
+      await displayDuplicateDeviceError("Ok");
+    } else if (isCancel(error)) {
+      await displayCancelError("Ok");
+    } else {
+      await displayError({
+        title: "Could not enroll device",
+        message:
+          "Something went wrong when we were trying to remember this device. Could you try again?",
+        detail:
+          "Could not create credentials: " +
+          unknownToString(error, "unknown error"),
+        primaryButton: "Ok",
+      });
+    }
     return "error";
   }
 
