@@ -18,6 +18,7 @@ import {
   setAnchorUsed,
 } from "$src/utils/userNumber";
 import { isNonEmptyArray, NonEmptyArray, unreachable } from "$src/utils/utils";
+import { nonNullish } from "@dfinity/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
@@ -81,25 +82,37 @@ export const authenticateBox = async (
   // Retry until user has successfully authenticated
   for (;;) {
     const result = await promptAuth();
-    switch (result.tag) {
-      case "ok":
-        setAnchorUsed(result.userNumber);
-        return result;
-      case "err":
-        await displayError({
-          title: result.title,
-          message: result.message,
-          detail: result.detail !== "" ? result.detail : undefined,
-          primaryButton: "Try again",
-        });
-        break;
-      case "canceled":
-        break;
-      default:
-        unreachable(result);
-        break;
+    const loginData = await handleLoginFlowResult(result);
+
+    if (nonNullish(loginData)) {
+      return loginData;
     }
   }
+};
+
+export const handleLoginFlowResult = async (
+  result: LoginFlowResult
+): Promise<LoginData | undefined> => {
+  switch (result.tag) {
+    case "ok":
+      setAnchorUsed(result.userNumber);
+      return result;
+    case "err":
+      await displayError({
+        title: result.title,
+        message: result.message,
+        detail: result.detail !== "" ? result.detail : undefined,
+        primaryButton: "Try again",
+      });
+      break;
+    case "canceled":
+      break;
+    default:
+      unreachable(result);
+      break;
+  }
+
+  return undefined;
 };
 
 /** The templates for the authentication pages */
