@@ -7,10 +7,7 @@ import {
 import { Connection } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString } from "$src/utils/utils";
-import {
-  isCancel,
-  webAuthnCancelTemplate,
-} from "$src/utils/webAuthnErrorUtils";
+import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
 import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
@@ -51,9 +48,11 @@ export const register = async ({
     }
   } catch (e) {
     if (isCancel(e)) {
+      const copy = webAuthnErrorCopy();
       return {
         tag: "err",
-        ...webAuthnCancelTemplate(),
+        title: copy.cancel_title,
+        message: copy.cancel_message,
       };
     }
     return {

@@ -12,6 +12,7 @@ import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
 import {
   displayCancelError,
+  displayDuplicateDeviceError,
   isCancel,
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
@@ -19,16 +20,6 @@ import { WebAuthnIdentity } from "@dfinity/identity";
 import { html } from "lit-html";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
-
-const displayAlreadyRegisteredDevice = () =>
-  displayError({
-    title: "Duplicate Device",
-    message:
-      "This device has already been added to your anchor. Try signing in directly.",
-    detail:
-      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
-    primaryButton: "Ok",
-  });
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
@@ -60,9 +51,9 @@ export const registerTentativeDevice = async (
       // Given that this is a remote device where we get the result that authentication should work,
       // let's help the user and fill in their anchor number.
       setAnchorUsed(userNumber);
-      await displayAlreadyRegisteredDevice();
+      await displayDuplicateDeviceError({ primaryButton: "Ok" });
     } else if (isCancel(result)) {
-      await displayCancelError("Ok");
+      await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
         title: "Error adding new device",
