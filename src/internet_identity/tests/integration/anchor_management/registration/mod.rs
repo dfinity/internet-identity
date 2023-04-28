@@ -68,7 +68,7 @@ fn should_assign_correct_user_numbers() -> Result<(), CallError> {
     assert_eq!(user_number, 128);
 
     let challenge = api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),
@@ -90,7 +90,7 @@ fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let challenge = api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_2(),
@@ -119,7 +119,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallErro
     device1.protection = DeviceProtection::Protected;
 
     let challenge = api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),
@@ -146,7 +146,7 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
     let challenge = api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),
@@ -174,7 +174,7 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
 
     // required because register does not check captcha expiry
     api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),
@@ -227,7 +227,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
         flows::register_anchor(&env, canister_id);
     }
     let challenge = api::create_challenge(&env, canister_id)?;
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),
@@ -251,7 +251,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
 
     env.advance_time(Duration::from_secs(1));
 
-    let result = api::register(
+    let result = api::compat::register(
         &env,
         canister_id,
         principal_1(),

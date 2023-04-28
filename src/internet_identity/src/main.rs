@@ -92,12 +92,19 @@ async fn create_challenge() -> Challenge {
 
 #[update]
 #[candid_method]
+fn check_challenge(solution_attempt: ChallengeAttempt) -> Option<ChallengeCheckResult> {
+    let result = anchor_management::registration::solve_challenge(solution_attempt);
+    // result is opt to keep the variant extensible without breaking changes
+    Some(result)
+}
+
+#[update]
+#[candid_method]
 fn register(
     device_data: DeviceData,
-    challenge_result: ChallengeAttempt,
-    temp_key: Option<Principal>,
+    challenge_result: Option<ChallengeAttempt>,
 ) -> RegisterResponse {
-    anchor_management::registration::register(device_data, challenge_result, temp_key)
+    anchor_management::registration::register(device_data, challenge_result)
 }
 
 #[update]
@@ -470,7 +477,7 @@ fn trap_if_not_authenticated(anchor_number: AnchorNumber) -> (Anchor, DeviceKey)
         if caller == Principal::self_authenticating(&device.pubkey)
             || state::with_temp_keys_mut(|temp_keys| {
                 temp_keys
-                    .check_temp_key(&caller, &device.pubkey, anchor_number)
+                    .check_device_bound_temp_key(&caller, &device.pubkey, anchor_number)
                     .is_ok()
             })
         {

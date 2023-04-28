@@ -273,7 +273,7 @@ fn metrics_inflight_challenges() -> Result<(), CallError> {
     assert_eq!(challenge_count, 2f64);
 
     // solving a challenge removes it from the inflight pool
-    api::register(
+    api::compat::register(
         &env,
         canister_id,
         principal_1(),

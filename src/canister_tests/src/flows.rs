@@ -1,4 +1,4 @@
-use crate::api::internet_identity::{create_challenge, register};
+use crate::api::internet_identity::{compat::register, create_challenge};
 use crate::framework::{device_data_1, principal_1};
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;

@@ -189,15 +189,26 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     })
 }
 
+pub fn solve_challenge(solution_attempt: ChallengeAttempt) -> ChallengeCheckResult {
+    if let Err(()) = check_challenge(solution_attempt) {
+        return ChallengeCheckResult::BadChallenge;
+    }
+    if caller() == Principal::anonymous() {
+        return ChallengeCheckResult::InvalidCaller;
+    }
+    if state::with_temp_keys_mut(|temp_keys| temp_keys.add_onboarding_temp_key(caller())).is_err() {
+        return ChallengeCheckResult::RateLimitExcceeded;
+    }
+    ChallengeCheckResult::Success
+}
+
 pub fn register(
     device_data: DeviceData,
-    challenge_result: ChallengeAttempt,
-    // A temporary key than can be used in lieu of 'device_data' for a brief period of time
-    // The key is optional for backwards compatibility
-    temp_key: Option<Principal>,
+    challenge_attempt: Option<ChallengeAttempt>,
 ) -> RegisterResponse {
     rate_limit::process_rate_limit();
-    if let Err(()) = check_challenge(challenge_result) {
+    let temp_key = determine_temp_key();
+    if let Err(()) = check_challenge_if_necessary(challenge_attempt, &temp_key) {
         return RegisterResponse::BadChallenge;
     }
 
@@ -232,11 +243,10 @@ pub fn register(
         });
     });
 
-    // Save the 'temp_key' as a mean of authenticating for a short period of time, see
-    // `TempKeys`
+    // Save / promote the 'temp_key' as a mean of authenticating for the current session, see 'TempKeys'
     if let Some(temp_key) = temp_key {
         state::with_temp_keys_mut(|temp_keys| {
-            temp_keys.add_temp_key(&device.pubkey, anchor_number, temp_key)
+            temp_keys.add_device_bound_temp_key(&device.pubkey, anchor_number, temp_key)
         });
     }
 
@@ -247,6 +257,27 @@ pub fn register(
     RegisterResponse::Registered {
         user_number: anchor_number,
     }
+}
+
+/// Determines caller corresponds to a temp key. If so, returns the principal.
+fn determine_temp_key() -> Option<Principal> {
+    let caller = caller();
+    if state::with_temp_keys_mut(|temp_keys| temp_keys.check_onboarding_temp_key(&caller)).is_ok() {
+        Some(caller)
+    } else {
+        None
+    }
+}
+
+fn check_challenge_if_necessary(
+    challenge_attempt: Option<ChallengeAttempt>,
+    temp_key: &Option<Principal>,
+) -> Result<(), ()> {
+    // temp keys have the captcha already verified
+    if temp_key.is_some() {
+        return Ok(());
+    }
+    challenge_attempt.map_or(Err(()), check_challenge)
 }
 
 /// Perform a sanity check on the caller. If the caller is neither the device nor the temporary key, then we

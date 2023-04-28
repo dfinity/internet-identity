@@ -108,14 +108,15 @@ fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), CallError> {
     let device = device_data_1();
 
     let challenge = api::create_challenge(&env, canister_id).unwrap();
-    let response = api::register(
+    api::check_challenge(
         &env,
         canister_id,
         device.principal(),
-        &device,
         &challenge_solution(challenge),
-        Some(device.principal()),
-    );
+    )
+    .unwrap();
+
+    let response = api::register(&env, canister_id, device.principal(), &device, &None);
 
     expect_user_error_with_message(
         response,
@@ -177,15 +178,8 @@ fn register_with_temp_key(
     device: &DeviceData,
 ) -> AnchorNumber {
     let challenge = api::create_challenge(env, canister_id).unwrap();
-    let response = api::register(
-        env,
-        canister_id,
-        temp_key,
-        device,
-        &challenge_solution(challenge),
-        Some(temp_key),
-    )
-    .unwrap();
+    api::check_challenge(env, canister_id, temp_key, &challenge_solution(challenge)).unwrap();
+    let response = api::register(env, canister_id, temp_key, device, &None).unwrap();
 
     let RegisterResponse::Registered { user_number } = response else {
         panic!("expected RegisterResponse::Registered");

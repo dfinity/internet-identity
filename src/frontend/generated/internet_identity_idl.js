@@ -67,6 +67,16 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const ChallengeKey = IDL.Text;
+  const ChallengeResult = IDL.Record({
+    'key' : ChallengeKey,
+    'chars' : IDL.Text,
+  });
+  const ChallengeCheckResult = IDL.Variant({
+    'invalid_caller' : IDL.Null,
+    'rate_limit_exceeded' : IDL.Null,
+    'bad_challenge' : IDL.Null,
+    'success' : IDL.Null,
+  });
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
@@ -155,10 +165,6 @@ export const idlFactory = ({ IDL }) => {
     'status_code' : IDL.Nat16,
   });
   const UserKey = PublicKey;
-  const ChallengeResult = IDL.Record({
-    'key' : ChallengeKey,
-    'chars' : IDL.Text,
-  });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
@@ -227,6 +233,11 @@ export const idlFactory = ({ IDL }) => {
         [AddTentativeDeviceResponse],
         [],
       ),
+    'check_challenge' : IDL.Func(
+        [ChallengeResult],
+        [IDL.Opt(ChallengeCheckResult)],
+        [],
+      ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -258,7 +269,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'register' : IDL.Func(
-        [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
+        [DeviceData, IDL.Opt(ChallengeResult)],
         [RegisterResponse],
         [],
       ),

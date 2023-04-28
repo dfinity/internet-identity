@@ -103,6 +103,13 @@ type MetadataMap = vec record {
     variant { map : MetadataMap; string : text; bytes : vec nat8 };
 };
 
+type ChallengeCheckResult = variant {
+    success;
+    bad_challenge;
+    invalid_caller;
+    rate_limit_exceeded;
+};
+
 type RegisterResponse = variant {
     // A new user was successfully registered.
     registered: record {
@@ -339,11 +346,23 @@ type BufferedArchiveEntry = record {
     entry: blob;
 };
 
-
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
+
     create_challenge : () -> (Challenge);
-    register : (DeviceData, ChallengeResult, opt principal) -> (RegisterResponse);
+    // Submit a challenge result to check if it is valid.
+    // A valid challenge allows the caller to call the `register` endpoint within the next 10 minutes.
+    check_challenge : (ChallengeResult) -> (opt ChallengeCheckResult);
+    // Registers a new anchor (with the given device added).
+    //
+    // In order to register a new anchor the caller has to meet the prerequisites:
+    //   1. the caller must create a challenge using `create_challenge`
+    //   2. the caller must submit a valid solution to the `check_challenge` endpoint
+    //
+    // The `challenge_result` parameter is deprecated and will be removed in the future.
+    // Submit the ChallengeResult using `check_challenge` instead (using the same caller identity).
+    register : (DeviceData, challenge_result: opt ChallengeResult) -> (RegisterResponse);
+
     add : (UserNumber, DeviceData) -> ();
     update : (UserNumber, DeviceKey, DeviceData) -> ();
     // Atomically replace device matching the device key with the new device data

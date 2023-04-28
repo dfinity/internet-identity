@@ -55,6 +55,18 @@ pub enum Purpose {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
+pub enum ChallengeCheckResult {
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "bad_challenge")]
+    BadChallenge,
+    #[serde(rename = "invalid_caller")]
+    InvalidCaller,
+    #[serde(rename = "rate_limit_exceeded")]
+    RateLimitExcceeded,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum RegisterResponse {
     #[serde(rename = "registered")]
     Registered { user_number: AnchorNumber },

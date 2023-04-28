@@ -44,6 +44,10 @@ export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
 }
+export type ChallengeCheckResult = { 'invalid_caller' : null } |
+  { 'rate_limit_exceeded' : null } |
+  { 'bad_challenge' : null } |
+  { 'success' : null };
 export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
 export interface CompletedActiveAnchorStats {
@@ -203,6 +207,10 @@ export interface _SERVICE {
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
   >,
+  'check_challenge' : ActorMethod<
+    [ChallengeResult],
+    [] | [ChallengeCheckResult]
+  >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
@@ -224,7 +232,7 @@ export interface _SERVICE {
     [UserKey, Timestamp]
   >,
   'register' : ActorMethod<
-    [DeviceData, ChallengeResult, [] | [Principal]],
+    [DeviceData, [] | [ChallengeResult]],
     RegisterResponse
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,

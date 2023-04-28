@@ -5,6 +5,7 @@ import { idlFactory as internet_identity_idl } from "$generated/internet_identit
 import {
   AddTentativeDeviceResponse,
   Challenge,
+  ChallengeCheckResult,
   ChallengeResult,
   CredentialId,
   DeviceData,
@@ -24,6 +25,7 @@ import {
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
+import { asNonEmptyArray, NonEmptyArray } from "$src/utils/utils";
 import {
   Actor,
   ActorSubclass,
@@ -144,9 +146,14 @@ export class Connection {
     }
 
     const actor = await this.createActor(delegationIdentity);
+
+    const challenge_check = await this.check_challenge(challengeResult, actor);
+    if (challenge_check !== "success") {
+      return challenge_check;
+    }
+
     const credential_id = Array.from(new Uint8Array(identity.rawId));
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
-
     let registerResponse: RegisterResponse;
     try {
       registerResponse = await actor.register(
@@ -162,8 +169,7 @@ export class Connection {
           origin: readDeviceOrigin(),
           metadata: [],
         },
-        challengeResult,
-        [tempIdentity.getPrincipal()]
+        []
       );
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -198,6 +204,43 @@ export class Connection {
       console.error("unexpected register response", registerResponse);
       throw Error("unexpected register response");
     }
+  };
+
+  check_challenge = async (
+    challengeResult: ChallengeResult,
+    actor: ActorSubclass<_SERVICE>
+  ): Promise<"success" | RegisterResult> => {
+    let maybeResult: NonEmptyArray<ChallengeCheckResult> | undefined;
+    try {
+      maybeResult = asNonEmptyArray(
+        await actor.check_challenge(challengeResult)
+      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when submitting captcha result"),
+        };
+      }
+    }
+    if (maybeResult === undefined) {
+      return {
+        kind: "apiError",
+        error: new Error("Unknown error when submitting captcha result"),
+      };
+    }
+    const result = maybeResult[0];
+    if ("bad_challenge" in result) {
+      return { kind: "badChallenge" };
+    } else if (!("success" in result)) {
+      return {
+        kind: "apiError",
+        error: new Error("Error when submitting captcha result: " + result),
+      };
+    }
+    return "success";
   };
 
   login = async (userNumber: bigint): Promise<LoginResult> => {
