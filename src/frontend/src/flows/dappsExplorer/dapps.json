@@ -43,6 +43,14 @@
     "logo": "/img/showcase/openchat_logo.webp"
   },
   {
+    "id": "juno",
+    "name": "Juno",
+    "link": "https://juno.build",
+    "oneLiner": "Build Web3 Apps Like It's Web2",
+    "description": "Juno is an open-source platform that combines the power of Web3 with the ease and simplicity of Web2 development, enabling programmers to build decentralized apps faster and easier than ever before.",
+    "logo": "/img/showcase/juno_logo.webp"
+  },
+  {
     "id": "uniswapfrontendontheic",
     "name": "Uniswap Front End on the IC",
     "link": "https://uniswap-on-ic.xyz",
