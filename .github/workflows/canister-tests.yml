@@ -591,6 +591,12 @@ jobs:
           name: internet_identity_production.wasm.gz
           path: .
 
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: archive.wasm.gz
+          path: .
+
       - name: Prepare release
         uses: ./.github/actions/release
         id: prepare-release
