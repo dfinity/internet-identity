@@ -1,6 +1,7 @@
+import { VERSION } from "$src/environment";
+
 /** parse the II_VERSION, see ./scripts/version for more information */
-export const versionString = import.meta.env.II_VERSION ?? "";
-export const versionList = versionString.split(",");
+const versionList = VERSION.split(",");
 
 export type VersionInfo = {
   commit: string;
