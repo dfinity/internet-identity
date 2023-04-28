@@ -1,16 +1,9 @@
-import { II_URL } from "./constants";
-import { addVirtualAuthenticator, focusBrowser } from "./util";
 import {
-  AddDeviceSuccessView,
-  AddRemoteDeviceAliasView,
-  AddRemoteDeviceInstructionsView,
-  AddRemoteDeviceVerificationCodeView,
   AuthenticateView,
   MainView,
   RecoveryMethodSelectorView,
   RegisterView,
   SingleDeviceWarningView,
-  VerifyRemoteDeviceView,
   WelcomeView,
 } from "./views";
 
@@ -105,71 +98,4 @@ export const FLOWS = {
 
     return seedPhrase;
   },
-};
-
-export const initDeviceLink = async ({
-  browser,
-  deviceName,
-}: {
-  browser: WebdriverIO.Browser;
-  deviceName: string;
-}): Promise<{
-  mainView: MainView;
-  addDeviceLink: string;
-}> => {
-  await addVirtualAuthenticator(browser);
-  await browser.url(II_URL);
-  const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-    deviceName,
-    browser
-  );
-  const mainView = new MainView(browser);
-  await mainView.waitForDeviceDisplay(deviceName);
-  await mainView.addAdditionalDevice();
-
-  const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-    browser
-  );
-  const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
-
-  return {
-    mainView,
-    addDeviceLink,
-  };
-};
-export const registerRemoteDevice = async ({
-  browser1,
-  browser2,
-  addDeviceLink,
-  deviceName,
-}: {
-  browser1: WebdriverIO.Browser;
-  browser2: WebdriverIO.Browser;
-  addDeviceLink: string;
-  deviceName: string;
-}) => {
-  await addVirtualAuthenticator(browser2);
-  await browser2.url(addDeviceLink);
-  const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
-  await addRemoteDeviceView.waitForDisplay();
-  await addRemoteDeviceView.selectAlias(deviceName);
-  await addRemoteDeviceView.continue();
-
-  const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
-    browser2
-  );
-  await verificationCodeView.waitForDisplay();
-  const code = await verificationCodeView.getVerificationCode();
-
-  // browser 1 again
-  await focusBrowser(browser1);
-  const verificationView = new VerifyRemoteDeviceView(browser1);
-  await verificationView.waitForDisplay();
-  await verificationView.enterVerificationCode(code);
-  await verificationView.continue();
-
-  // success page
-  const addDeviceSuccessView = new AddDeviceSuccessView(browser1);
-  await addDeviceSuccessView.waitForDisplay();
-  await addDeviceSuccessView.continue();
 };
