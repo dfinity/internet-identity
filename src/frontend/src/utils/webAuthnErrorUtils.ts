@@ -1,27 +1,32 @@
 import { displayError } from "$src/components/displayError";
 import { I18n } from "../i18n";
-import cancelCopy from "./webAuthnErrorCancel.json";
-import duplicateDeviceCopy from "./webAuthnErrorDuplicate.json";
+import copyJson from "./webAuthnErrorUtils.json";
 
-export const webAuthnErrorCancelCopy = () => {
+export const webAuthnErrorCopy = () => {
   const i18n = new I18n();
-  return i18n.i18n(cancelCopy);
+  return i18n.i18n(copyJson);
 };
 
-export const displayCancelError = (primaryButton: string): Promise<void> => {
+export const displayCancelError = (options: {
+  primaryButton: string;
+}): Promise<void> => {
+  const i18n = webAuthnErrorCopy();
   return displayError({
-    ...webAuthnErrorCancelCopy(),
-    primaryButton,
+    title: i18n.cancel_title,
+    message: i18n.cancel_message,
+    primaryButton: options.primaryButton,
   });
 };
 
-export const displayDuplicateDeviceError = (
-  primaryButton: string
-): Promise<void> => {
-  const i18n = new I18n();
+export const displayDuplicateDeviceError = (options: {
+  primaryButton: string;
+}): Promise<void> => {
+  const i18n = webAuthnErrorCopy();
   return displayError({
-    ...i18n.i18n(duplicateDeviceCopy),
-    primaryButton,
+    title: i18n.duplicate_device_title,
+    message: i18n.duplicate_device_message,
+    detail: i18n.duplicate_device_detail,
+    primaryButton: options.primaryButton,
   });
 };
 

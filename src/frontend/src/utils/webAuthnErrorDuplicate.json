@@ -1,7 +1,0 @@
-{
-  "en": {
-    "title": "Duplicate Device",
-    "message": "This device has already been added to your anchor. Try signing in directly.",
-    "detail": "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor."
-  }
-}

@@ -46,9 +46,9 @@ export const addFIDODevice = async (
     });
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
-      await displayDuplicateDeviceError("Back to manage");
+      await displayDuplicateDeviceError({ primaryButton: "Back to manage" });
     } else if (isCancel(error)) {
-      await displayCancelError("Back to manage");
+      await displayCancelError({ primaryButton: "Back to manage" });
     } else {
       await displayFailedToAddDevice(
         error instanceof Error ? error : unknownError()

@@ -148,9 +148,9 @@ const enrollAuthenticator = async ({
     });
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
-      await displayDuplicateDeviceError("Ok");
+      await displayDuplicateDeviceError({ primaryButton: "Ok" });
     } else if (isCancel(error)) {
-      await displayCancelError("Ok");
+      await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
         title: "Could not enroll device",

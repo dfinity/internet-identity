@@ -51,9 +51,9 @@ export const registerTentativeDevice = async (
       // Given that this is a remote device where we get the result that authentication should work,
       // let's help the user and fill in their anchor number.
       setAnchorUsed(userNumber);
-      await displayDuplicateDeviceError("Ok");
+      await displayDuplicateDeviceError({ primaryButton: "Ok" });
     } else if (isCancel(result)) {
-      await displayCancelError("Ok");
+      await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
         title: "Error adding new device",
