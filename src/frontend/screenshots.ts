@@ -117,7 +117,29 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
     document.body.appendChild(style);
   });
 
+  /* Make sure lazy images are loaded eagerly */
+  await browser.execute(() => {
+    const imgs = Array.from(document.querySelectorAll("img"));
+    imgs.forEach((img) => {
+      if (img.getAttribute("loading") === "lazy") {
+        img.setAttribute("loading", "eager");
+      }
+    });
+  });
+
   /* Make sure everything has loaded */
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        return imgs.every((img) => img.complete);
+      }),
+    {
+      timeout: 10 * 1000,
+      timeoutMsg: "Images did not load after 10 seconds",
+    }
+  );
+
   await browser.waitUntil(
     () => browser.execute(() => document.readyState === "complete"),
     {
