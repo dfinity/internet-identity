@@ -96,13 +96,13 @@ export const registerTentativeDevice = async (
 
   // If everything went well we can now ask the user to authenticate on an existing device
   // and enter a verification code
-  await showVerificationCode(
+  (await showVerificationCode(
     userNumber,
     connection,
     device.alias,
     addResponse.added_tentatively,
     device.credential_id[0]
-  ) satisfies "ok";
+  )) satisfies "ok";
 
   return { alias };
 };
