@@ -6,6 +6,7 @@ import { html, TemplateResult } from "lit-html";
 
 import { DappDescription } from "./dapps";
 
+import { nonNullish } from "@dfinity/utils";
 import copyJson from "./copy.json";
 
 /* Template for the explorer containing all dapps */
@@ -75,7 +76,7 @@ const dappTemplate = ({
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
-        ${oneLiner !== undefined
+        ${nonNullish(oneLiner)
           ? html`<p class="t-weak">${oneLiner}</p>`
           : undefined}
       </div>

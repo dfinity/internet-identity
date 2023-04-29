@@ -1,3 +1,4 @@
+import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { logoutIcon } from "./icons";
 
@@ -9,7 +10,7 @@ export const logoutSection = (
 ): TemplateResult => html`<div id="logoutBox" class="l-stack l-stack--spacious">
   <button type="button" class="t-link" @click="${logout}" id="logoutButton">
     <i class="t-link__icon">${logoutIcon}</i>
-    ${alternativeLabel !== undefined ? alternativeLabel : "Logout"}
+    ${nonNullish(alternativeLabel) ? alternativeLabel : "Logout"}
   </button>
 </div>`;
 

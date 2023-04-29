@@ -1,3 +1,4 @@
+import { nonNullish } from "@dfinity/utils";
 import { getAnchors, MAX_SAVED_ANCHORS, setAnchorUsed } from "./userNumber";
 
 testLocalStorage("anchors default to nothing", () => {
@@ -90,11 +91,11 @@ function testLocalStorage(
 ) {
   test(name, () => {
     localStorage.clear();
-    if (opts?.before !== undefined) {
+    if (nonNullish(opts) && nonNullish(opts?.before)) {
       setLocalStorage(opts.before);
     }
     fn();
-    if (opts?.after !== undefined) {
+    if (nonNullish(opts) && nonNullish(opts?.after)) {
       const actual: LocalStorage = readLocalStorage();
       const expected: LocalStorage = opts.after;
       expect(actual).toStrictEqual(expected);

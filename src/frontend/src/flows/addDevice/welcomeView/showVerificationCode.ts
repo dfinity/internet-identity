@@ -10,6 +10,7 @@ import { Connection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { delayMillis, unknownToString } from "$src/utils/utils";
+import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
@@ -199,7 +200,7 @@ const anchorHasCredentials = async ({
       device.credential_id.length === 1 &&
       credentialIdEqual(device.credential_id[0], credential)
   );
-  return matching !== undefined;
+  return nonNullish(matching);
 };
 
 function credentialIdEqual(

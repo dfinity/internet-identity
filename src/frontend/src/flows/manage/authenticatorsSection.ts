@@ -1,5 +1,5 @@
 import { warningIcon } from "$src/components/icons";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
@@ -110,7 +110,7 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       <div class="c-action-list__label">
         ${alias}
-        ${dupCount !== undefined && dupCount > 0
+        ${nonNullish(dupCount) && dupCount > 0
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
       </div>

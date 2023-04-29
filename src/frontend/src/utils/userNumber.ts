@@ -1,4 +1,4 @@
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { unknownToRecord } from "./utils";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
@@ -69,7 +69,7 @@ const pruneAnchors = (anchors: Anchors): Anchors => {
   const filtered = { ...anchors };
   for (let i = 0; i < extras; i++) {
     const unused = mostUnused(filtered);
-    if (unused !== undefined) {
+    if (nonNullish(unused)) {
       delete filtered[unused];
     }
   }

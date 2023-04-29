@@ -29,7 +29,7 @@ import {
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
 import { unreachable } from "$src/utils/utils";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
@@ -369,14 +369,14 @@ export const devicesFromDeviceDatas = ({
   return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
       const recovery = readRecovery({ userNumber, connection, reload, device });
-      if (recovery !== undefined) {
+      if (nonNullish(recovery)) {
         if ("recoveryPhrase" in recovery) {
-          if (acc.recoveries.recoveryPhrase !== undefined) {
+          if (nonNullish(acc.recoveries.recoveryPhrase)) {
             acc.dupPhrase = true;
           }
           acc.recoveries.recoveryPhrase = recovery.recoveryPhrase;
         } else if ("recoveryKey" in recovery) {
-          if (acc.recoveries.recoveryKey !== undefined) {
+          if (nonNullish(acc.recoveries.recoveryKey)) {
             acc.dupKey = true;
           }
           acc.recoveries.recoveryKey = recovery.recoveryKey;

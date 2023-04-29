@@ -1,3 +1,5 @@
+import { nonNullish } from "@dfinity/utils";
+
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
 }
@@ -483,7 +485,7 @@ export class AddIdentityAnchorView extends View {
   }
 
   async continue(userNumber?: string): Promise<void> {
-    if (userNumber !== undefined) {
+    if (nonNullish(userNumber)) {
       await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
     }
     await this.browser.$("#userNumberContinue").click();
