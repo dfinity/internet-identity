@@ -80,13 +80,14 @@ impl TempKeys {
         // It is ok for the temp key to not exist as long as we still support
         // providing the captcha solution on `register`. Afterwards it will
         // become an error.
-        self.onboarding_keys.remove(&temp_key);
+        let onboarding_key = self.onboarding_keys.remove(&temp_key);
 
         let tmp_key = DeviceBoundTempKey {
             anchor,
             temp_key: TempKeyInfo {
                 principal: temp_key,
-                expiration: time() + TEMP_KEY_EXPIRATION_NS,
+                // carry over the expiration for existing temp keys
+                expiration: onboarding_key.unwrap_or(time() + TEMP_KEY_EXPIRATION_NS),
             },
         };
 
