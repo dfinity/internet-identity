@@ -14,6 +14,13 @@ describe("authentication", () => {
 
     await browser.$('button[type="submit"]').click();
 
+    // Construct Identity (no-op)
+    const constructIdentity = await browser.$(
+      '[data-action="construct-identity"]'
+    );
+    await constructIdentity.waitForExist();
+    await constructIdentity.click();
+
     // Pass Captcha
     const captchaInput = await browser.$("#captchaInput");
     await captchaInput.waitForExist();
