@@ -82,8 +82,8 @@ const errorMessage = (e: unknown): TemplateElement => {
   if (isCancel(e)) {
     const copy = webAuthnErrorCopy();
     return html`<p class="t-paragraph">
-      <strong class="t-strong">${copy.cancel_title}</strong
-      >:${copy.cancel_message}
+      <strong class="t-strong">${copy.cancel_title}</strong>:
+      ${copy.cancel_message}
     </p>`;
   } else {
     return html`<p class="t-paragraph">
