@@ -25,30 +25,36 @@ const savePasskeyTemplate = ({
     <hgroup>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
-        ${copy.select} <strong class="t-strong">${copy.save_passkey}</strong> ${
-    copy.and_complete_prompts
-  }</p>
+        ${copy.select}
+        <strong class="t-strong">${copy.save_passkey}</strong>
+        ${copy.and_complete_prompts}
+      </p>
     </hgroup>
-    <button @click=${() =>
-      construct()} data-action="construct-identity" class="c-button">${
-    copy.save_passkey
-  }</button>
-    <p class="t-paragraph">
-    <strong class="t-strong">${copy.what_is_passkey}</strong>
-    <ul class="c-list c-list--bulleted">
-    <li>${copy.convenient_secure_replacement}</li>
-    <li>${copy.enables_sign_by_unlocking}</li>
-    </ul>
-    </p>
+    <button
+      @click=${() => construct()}
+      data-action="construct-identity"
+      class="c-button"
+    >
+      ${copy.save_passkey}
+    </button>
+    <section class="c-marketing-block">
+      <aside class="l-stack">
+        <h3 class="t-title">${copy.what_is_passkey}</h3>
+        <ul class="c-list c-list--bulleted">
+          <li>${copy.convenient_secure_replacement}</li>
+          <li>${copy.enables_sign_by_unlocking}</li>
+        </ul>
+      </aside>
 
-    <p class="t-paragraph">
-    <strong class="t-strong">${copy.what_happens_save_passkey}</strong>
-    <ul class="c-list c-list--bulleted">
-    <li>${copy.your_device_prompt_authenticate}</li>
-    <li>${copy.no_personal_data}</li>
-    <li>${copy.no_software_downloaded}</li>
-    </ul>
-    </p>
+      <aside class="l-stack">
+        <h3 class="t-title">${copy.what_happens_save_passkey}</h3>
+        <ul class="c-list c-list--bulleted">
+          <li>${copy.your_device_prompt_authenticate}</li>
+          <li>${copy.no_personal_data}</li>
+          <li>${copy.no_software_downloaded}</li>
+        </ul>
+      </aside>
+    </section>
   `;
 
   return mainWindow({
