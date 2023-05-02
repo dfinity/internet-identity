@@ -960,7 +960,7 @@ a:hover,
 
 .c-marketing-block {
   margin-top: var(--rs-marketing-block-stack);
-  max-width: 17em;
+  max-width: 18em;
 }
 
 /**
@@ -1181,8 +1181,9 @@ a:hover,
   flex-grow: 0;
   flex-shrink: 1;
   margin-top: 0;
-  padding: calc(0.3 * var(--rs-button-bezel)) calc(0.6 * var(--rs-button-bezel))
-    calc(0.2 * var(--rs-button-bezel));
+  font-size: 0.875em;
+  padding: calc(0.5 * var(--rs-button-bezel)) var(--rs-button-bezel)
+    calc(0.4 * var(--rs-button-bezel));
 }
 
 .c-button__icon svg {
@@ -1973,13 +1974,14 @@ a:hover,
   margin-top: 1rem;
   background: var(--rc-background);
   border: var(--rs-line) solid var(--rc-line);
+  padding: var(--rs-list-parcel-bezel);
 }
 
 .c-action-list__item {
   display: flex;
   position: relative;
   gap: var(--rs-list-gutter);
-  padding: calc(var(--rs-button-bezel) * 0.7) calc(var(--rs-button-bezel) * 0.6);
+  padding: calc(1.5 * var(--rs-list-parcel-bezel)) var(--rs-list-parcel-bezel);
 }
 
 a.c-action-list__item {
@@ -2010,16 +2012,14 @@ a.c-action-list__item {
   background: var(--rc-line);
   position: absolute;
   top: 0;
-  left: calc(var(--rs-button-bezel) * 0.6);
-  right: calc(var(--rs-button-bezel) * 0.6);
+  left: var(--rs-list-parcel-bezel);
+  right: var(--rs-list-parcel-bezel);
 }
 
 .c-action-list__actions {
   display: flex;
   gap: var(--rs-list-gutter);
-  margin-top: calc(var(--rs-button-bezel) * -0.5);
-  padding: 0 calc(var(--rs-button-bezel) * 0.5)
-    calc(var(--rs-button-bezel) * 0.5);
+  padding: 0 var(--rs-list-parcel-bezel) var(--rs-list-parcel-bezel);
 }
 
 .c-action-list__label {
