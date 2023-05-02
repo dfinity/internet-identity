@@ -1,13 +1,14 @@
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
 import { promptUserNumber } from "$src/components/promptUserNumber";
-import { constructIdentity } from "$src/flows/register/construct";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowResult } from "$src/utils/flowResult";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { isRecoveryPhrase } from "$src/utils/recoveryDevice";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
+import { constructIdentity } from "$src/utils/webAuthn";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
@@ -140,12 +141,13 @@ const enrollAuthenticator = async ({
 }): Promise<"enrolled" | "error"> => {
   let newDevice;
   try {
-    newDevice = await constructIdentity({
-      devices: async () => {
-        return (await connection.getAnchorInfo()).devices;
-      },
-      message: "Enrolling device...",
-    });
+    newDevice = await withLoader(() =>
+      constructIdentity({
+        devices: async () => {
+          return (await connection.getAnchorInfo()).devices;
+        },
+      })
+    );
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Ok" });

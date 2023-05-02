@@ -1,0 +1,16 @@
+{
+  "en": {
+    "select": "Select",
+    "save_passkey": "Save Passkey",
+    "and_complete_prompts": "and complete the prompts that pop-up on your device",
+
+    "what_is_passkey": "What is a passkey?",
+    "convenient_secure_replacement": "A convenient and more secure replacement for passwords",
+    "enables_sign_by_unlocking": "Enables you to sign into dapps by unlocking your device (e.g. using FaceID or TouchID)",
+
+    "what_happens_save_passkey": "What happens when I save a Passkey?",
+    "your_device_prompt_authenticate": "Your device will prompt you to authenticate (with FaceID, TouchID or another method that unlocks your device) so that it can create and save a unique cryptographic key pair that you will use to access Internet Identity",
+    "no_personal_data": "No personal data is shared with Internet Identity nor the dapps that use Internet Identity",
+    "no_software_downloaded": "No software is downloaded to your device"
+  }
+}

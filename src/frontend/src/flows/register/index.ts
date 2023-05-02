@@ -7,10 +7,9 @@ import {
 import { Connection } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString } from "$src/utils/utils";
-import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
 import { promptCaptcha } from "./captcha";
-import { constructIdentity } from "./construct";
 import { displayUserNumber } from "./finish";
+import { savePasskey } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
 export const register = async ({
@@ -24,14 +23,14 @@ export const register = async ({
       return cancel;
     }
 
-    const [captcha, identity] = await Promise.all([
-      connection.createChallenge(),
-      constructIdentity({}),
-    ]);
+    // Kick-off the challenge request early, so that we might already
+    // have a captcha to show once we get to the CAPTCHA screen
+    const preloadedChallenge = connection.createChallenge();
+    const identity = await savePasskey();
 
     const captchaResult = await promptCaptcha({
       connection,
-      challenge: Promise.resolve(captcha),
+      challenge: preloadedChallenge,
       identity,
       alias,
     });
@@ -47,14 +46,6 @@ export const register = async ({
       return result;
     }
   } catch (e) {
-    if (isCancel(e)) {
-      const copy = webAuthnErrorCopy();
-      return {
-        tag: "err",
-        title: copy.cancel_title,
-        message: copy.cancel_message,
-      };
-    }
     return {
       tag: "err",
       title: "Failed to create anchor",
