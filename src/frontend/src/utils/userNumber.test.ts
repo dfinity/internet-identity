@@ -91,8 +91,9 @@ function testLocalStorage(
 ) {
   test(name, () => {
     localStorage.clear();
-    if (nonNullish(opts) && nonNullish(opts?.before)) {
-      setLocalStorage(opts.before);
+    const before = opts?.before;
+    if (nonNullish(before)) {
+      setLocalStorage(before);
     }
     fn();
     if (nonNullish(opts) && nonNullish(opts?.after)) {
