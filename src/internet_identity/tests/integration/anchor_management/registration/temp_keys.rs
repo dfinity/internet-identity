@@ -89,7 +89,7 @@ fn should_expire_temp_key() -> Result<(), CallError> {
 
     let anchor = register_with_temp_key(&env, canister_id, temp_key, &device);
 
-    env.advance_time(Duration::from_secs(600));
+    env.advance_time(Duration::from_secs(601)); // validity period is 10 minutes
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor);
     expect_user_error_with_message(
@@ -168,6 +168,40 @@ fn should_provide_temp_keys_metric() -> Result<(), CallError> {
         5.0,
     );
 
+    Ok(())
+}
+
+/// Tests that the captcha is required if no temp key is used.
+#[test]
+fn should_not_allow_registration_without_captcha_and_temp_key() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = device_data_1();
+
+    let result = api::register(&env, canister_id, device.principal(), &device, &None)?;
+
+    assert!(matches!(result, RegisterResponse::BadChallenge));
+    Ok(())
+}
+
+/// Tests that the behaviour of the release with temp keys on register does not cause errors.
+#[test]
+fn should_ignore_temp_key_on_register() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = device_data_1();
+
+    let challenge = api::create_challenge(&env, canister_id).unwrap();
+    let result = api::compat::register(
+        &env,
+        canister_id,
+        device.principal(),
+        &device,
+        &challenge_solution(challenge),
+        Some(test_principal(1)),
+    )?;
+
+    assert!(matches!(result, RegisterResponse::Registered { .. }));
     Ok(())
 }
 
