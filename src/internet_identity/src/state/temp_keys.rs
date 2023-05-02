@@ -42,7 +42,7 @@ pub struct TempKeys {
     device_bound_keys: HashMap<DeviceKey, DeviceBoundTempKey>,
 
     /// Deque to efficiently prune expired temp keys
-    expirations: VecDeque<TempKeyExpiration>,
+    expirations: VecDeque<TempKeyInfo>,
 }
 
 impl TempKeys {
@@ -62,7 +62,7 @@ impl TempKeys {
         }
 
         let expiration = time() + TEMP_KEY_EXPIRATION_NS;
-        self.expirations.push_back(TempKeyExpiration::Onboarding {
+        self.expirations.push_back(TempKeyInfo {
             principal: temp_key,
             expiration,
         });
@@ -76,19 +76,21 @@ impl TempKeys {
         anchor: AnchorNumber,
         temp_key: Principal,
     ) {
-        // Remove the temp key from onboarding keys if it exists
+        // Remove the temp key from onboarding keys if it exists.
+        // It is ok for the temp key to not exist as long as we still support
+        // providing the captcha solution on `register`. Afterwards it will
+        // become an error.
         self.onboarding_keys.remove(&temp_key);
 
         let tmp_key = DeviceBoundTempKey {
-            principal: temp_key,
             anchor,
-            expiration: time() + TEMP_KEY_EXPIRATION_NS,
+            temp_key: TempKeyInfo {
+                principal: temp_key,
+                expiration: time() + TEMP_KEY_EXPIRATION_NS,
+            },
         };
 
-        self.expirations.push_back(TempKeyExpiration::DeviceBound {
-            device_key: device_key.clone(),
-            expiration: tmp_key.expiration,
-        });
+        self.expirations.push_back(tmp_key.temp_key.clone());
         self.device_bound_keys.insert(device_key.clone(), tmp_key);
     }
 
@@ -130,16 +132,16 @@ impl TempKeys {
     ) -> Result<(), ()> {
         self.prune_expired_keys();
 
-        let Some(temp_key) = self.device_bound_keys.get(device_key) else {
+        let Some(device_bound_key) = self.device_bound_keys.get(device_key) else {
             return Err(());
         };
-        if temp_key.expiration < time() {
+        if device_bound_key.anchor != anchor {
             return Err(());
         }
-        if temp_key.anchor != anchor {
+        if device_bound_key.temp_key.expiration < time() {
             return Err(());
         }
-        if &temp_key.principal != caller {
+        if &device_bound_key.temp_key.principal != caller {
             return Err(());
         }
         Ok(())
@@ -150,25 +152,17 @@ impl TempKeys {
 
         let now = time();
         for _ in 0..MAX_TO_PRUNE {
-            let Some(expiration) = self.expirations.front() else {
+            let Some(temp_key) = self.expirations.front() else {
                 break;
             };
 
             // The expirations are sorted by expiration time because the expiration is constant
             // (10 minutes) and time() is monotonous
             // -> we can stop pruning once we reach a temp key that is not expired
-            if expiration.expiration() > now {
+            if temp_key.expiration > now {
                 break;
             }
 
-            match expiration {
-                TempKeyExpiration::DeviceBound { device_key, .. } => {
-                    self.device_bound_keys.remove(device_key);
-                }
-                TempKeyExpiration::Onboarding { principal, .. } => {
-                    self.onboarding_keys.remove(principal);
-                }
-            };
             self.expirations.pop_front();
         }
     }
@@ -180,35 +174,16 @@ impl TempKeys {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeviceBoundTempKey {
-    /// The temp key principal
-    principal: Principal,
     /// The anchor the temporary key is linked to
     anchor: AnchorNumber,
-    /// The expiration timestamp of the temp key
-    expiration: Timestamp,
+    /// The temp key principal & expiration
+    temp_key: TempKeyInfo,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TempKeyExpiration {
-    DeviceBound {
-        /// The device key the temp key is linked to
-        device_key: DeviceKey,
-        /// The expiration timestamp of the temp key
-        expiration: Timestamp,
-    },
-    Onboarding {
-        /// The principal of the onboarding temp key
-        principal: Principal,
-        /// The expiration timestamp of the temp key
-        expiration: Timestamp,
-    },
-}
-
-impl TempKeyExpiration {
-    pub fn expiration(&self) -> Timestamp {
-        match self {
-            TempKeyExpiration::DeviceBound { expiration, .. } => *expiration,
-            TempKeyExpiration::Onboarding { expiration, .. } => *expiration,
-        }
-    }
+pub struct TempKeyInfo {
+    /// The principal of the temp key
+    principal: Principal,
+    /// The expiration timestamp of the temp key
+    expiration: Timestamp,
 }
