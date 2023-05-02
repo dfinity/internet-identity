@@ -51,19 +51,30 @@ export const authenticateBox = async (
   connection: Connection,
   i18n: I18n,
   templates: AuthnTemplates
-): Promise<LoginData> => {
+): Promise<LoginData & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    new Promise<LoginFlowResult>((resolve) => {
+    new Promise<LoginFlowResult & { newAnchor: boolean }>((resolve) => {
       const pages = authnPages(i18n, {
         ...templates,
         addDevice: (userNumber) => asNewDevice(connection, userNumber),
-        onSubmit: (userNumber) => {
-          resolve(authenticate(connection, userNumber));
+        onSubmit: async (userNumber) => {
+          resolve({
+            newAnchor: false,
+            ...(await authenticate(connection, userNumber)),
+          });
         },
-        register: () => {
-          resolve(registerIfAllowed(connection));
+        register: async () => {
+          resolve({
+            ...(await registerIfAllowed(connection)),
+            newAnchor: true,
+          });
         },
-        recover: (userNumber) => resolve(useRecovery(connection, userNumber)),
+        recover: async (userNumber) => {
+          resolve({
+            ...(await useRecovery(connection, userNumber)),
+            newAnchor: false,
+          });
+        },
       });
 
       // If there _are_ some anchors, then we show the "pick" screen, otherwise
@@ -81,11 +92,11 @@ export const authenticateBox = async (
 
   // Retry until user has successfully authenticated
   for (;;) {
-    const result = await promptAuth();
+    const { newAnchor, ...result } = await promptAuth();
     const loginData = await handleLoginFlowResult(result);
 
     if (nonNullish(loginData)) {
-      return loginData;
+      return { ...loginData, newAnchor };
     }
   }
 };

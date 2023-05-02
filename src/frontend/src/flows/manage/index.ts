@@ -83,12 +83,17 @@ export const authnTemplateManage = (): AuthnTemplates => {
 /* the II authentication flow */
 export const authFlowManage = async (connection: Connection, i18n: I18n) => {
   // Go through the login flow, potentially creating an anchor.
-  const { userNumber, connection: authenticatedConnection } =
-    await authenticateBox(connection, i18n, authnTemplateManage());
+  const {
+    userNumber,
+    connection: authenticatedConnection,
+    newAnchor,
+  } = await authenticateBox(connection, i18n, authnTemplateManage());
 
-  // Here, if the user doesn't have any recovery device, we prompt them to add
+  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
-  await recoveryWizard(userNumber, authenticatedConnection);
+  if (!newAnchor) {
+    await recoveryWizard(userNumber, authenticatedConnection);
+  }
   // From here on, the user is authenticated to II.
   void renderManage(userNumber, authenticatedConnection);
 };
