@@ -591,6 +591,12 @@ jobs:
           name: internet_identity_production.wasm.gz
           path: .
 
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: archive.wasm.gz
+          path: .
+
       - name: Prepare release
         uses: ./.github/actions/release
         id: prepare-release
@@ -621,11 +627,14 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.ref == 'refs/heads/main' }}
     needs: docker-build-ii
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, macos-11, macos-12 ]
+        # On main, we run the checks across all platforms. On other branches, in order to speed up checks (on PRs) we skip most platforms
+        # (in particular the slow macos builds). A single ubuntu build is not long and gives us some signal.
+        # XXX: GHA does not support proper if/else so we implement a workaround: https://github.com/actions/runner/issues/409
+        # XXX: GHA fails if we return the matrix object directly, so we have to pretend it's JSON
+        os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04", "macos-11", "macos-12" ]') || fromJson('[ "ubuntu-22.04" ]') }}
     steps:
       - uses: actions/checkout@v3
       - name: 'Download wasm.gz'
