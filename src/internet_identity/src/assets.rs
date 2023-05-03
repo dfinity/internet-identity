@@ -28,6 +28,7 @@ pub enum ContentType {
     OCTETSTREAM,
     PNG,
     SVG,
+    WOFF2,
 }
 
 // The <script> tag that loads the 'index.js'
@@ -125,6 +126,7 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
             "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
             "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
             "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
+            "woff2.gz" => (file_bytes, ContentEncoding::GZip, ContentType::WOFF2),
             _ => panic!("Unknown asset type: {}", asset.path().display()),
         };
 
