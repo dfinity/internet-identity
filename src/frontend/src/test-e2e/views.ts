@@ -45,6 +45,7 @@ export class RegisterView extends View {
 
   async create(): Promise<void> {
     await this.browser.$("#pickAliasSubmit").click();
+    await this.browser.$('[data-action="construct-identity"').click();
   }
 
   // View: Register confirmation

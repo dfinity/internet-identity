@@ -98,7 +98,12 @@ export const authFlowAuthorize = async (
           i18n,
         })
       );
-      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+
+      // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
+      // one. The exact flow depends on the device they use.
+      if (!authSuccess.newAnchor) {
+        await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      }
       return authSuccess;
     },
     onInvalidOrigin: (result) =>

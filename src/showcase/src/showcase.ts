@@ -37,8 +37,8 @@ import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
-import { renderConstructing } from "$src/flows/register/construct";
 import { displayUserNumberPage } from "$src/flows/register/finish";
+import { savePasskeyPage } from "$src/flows/register/passkey";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
@@ -197,7 +197,14 @@ const iiPages: Record<string, () => void> = {
     }),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
-  constructing: () => renderConstructing({}),
+  savePasskey: () =>
+    savePasskeyPage({
+      i18n,
+      construct: () =>
+        new Promise((_) => {
+          console.log("Identity Construction");
+        }),
+    }),
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
@@ -357,7 +364,8 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  loader: () => withLoader(() => new Promise(() => renderConstructing({}))),
+  loader: () =>
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();
