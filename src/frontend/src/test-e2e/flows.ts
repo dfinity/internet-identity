@@ -21,12 +21,6 @@ export const FLOWS = {
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.remindLater();
     return userNumber;
   },
   registerNewIdentityWelcomeView: async (
