@@ -18,6 +18,8 @@ export class WelcomeView extends View {
   }
 
   async register(): Promise<void> {
+    await this.browser.$("#registerButton").waitForDisplayed();
+    await this.browser.$("#registerButton").scrollIntoView();
     await this.browser.$("#registerButton").click();
   }
 
