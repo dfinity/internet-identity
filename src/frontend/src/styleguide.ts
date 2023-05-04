@@ -45,20 +45,6 @@ const recoveryWords = [
   "tongue",
 ];
 
-// used for style switching
-type Theme = "new" | "default";
-
-const selectStyle = (themeName: Theme): void => {
-  document.documentElement.setAttribute("data-theme", themeName);
-  localStorage.setItem("theme", themeName);
-};
-
-// Check for theme preference in local storage
-const themeName = localStorage.getItem("theme");
-if (themeName !== null) {
-  document.documentElement.setAttribute("data-theme", themeName);
-}
-
 export const styleguide = html`
   <style>
     .styleguide {
@@ -114,17 +100,6 @@ export const styleguide = html`
   </style>
   <section class="styleguide">
     <h1 class="t-title t-title--main">Design Patterns</h1>
-    <aside class="l-stack demo-section">
-      <h2 class="t-title t-title--sub">Set Theme</h2>
-      <div class="c-button-group">
-        <button class="c-button" @click=${() => selectStyle("default")}>
-          Legacy (default)
-        </button>
-        <button class="c-button" @click=${() => selectStyle("new")}>
-          New Domain
-        </button>
-      </div>
-    </aside>
     <article class="l-stack c-card c-card--highlight">
       <h1 class="t-title t-title--main">Typography</h1>
       <p class="t-lead">
