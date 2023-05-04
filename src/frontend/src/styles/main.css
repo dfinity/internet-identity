@@ -1400,16 +1400,17 @@ a:hover,
   position: relative;
   z-index: 1;
   color: var(--rc-input);
-  font-weight: 600;
 }
 
 .c-input--id__caption {
   font-size: 1.2;
+  margin-top: var(--rs-stack-section--tight);
 }
 
 .c-input--id__value {
   font-size: 4rem;
   line-height: 1;
+  font-weight: 600;
 }
 
 .c-input--icon {
