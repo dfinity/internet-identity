@@ -1090,13 +1090,13 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  padding: var(--rs-logo-stack--top) calc(var(--rs-card-bezel) * 1.3) var(--rs-logo-stack--bottom);
+  padding: var(--rs-logo-stack--top) calc(var(--rs-card-bezel) * 1.3)
+    var(--rs-logo-stack--bottom);
   font-weight: 600;
   font-size: 0.6em;
   display: flex;
   align-items: center;
   gap: 1em;
-
 }
 
 .c-logo svg {
