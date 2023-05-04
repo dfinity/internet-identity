@@ -42,8 +42,14 @@ export const authnTemplateAuthorize = ({
         })
       : undefined;
 
-  const wrap = (title: DynamicKey) => html`
-    ${dappsHeader({ dapps, clickable: false })}
+  const wrap = ({
+    showDapps = false,
+    title,
+  }: {
+    showDapps?: boolean;
+    title: DynamicKey;
+  }) => html`
+    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
     <div class="t-centered" style="margin-top: 2.5em;">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
@@ -57,15 +63,15 @@ export const authnTemplateAuthorize = ({
   `;
   return {
     firstTime: {
-      slot: wrap(copy.first_time_create),
+      slot: wrap({ showDapps: true, title: copy.first_time_create }),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap(copy.use_existing_enter_anchor),
+      slot: wrap({ title: copy.use_existing_enter_anchor }),
     },
     pick: {
-      slot: wrap(copy.pick_choose_anchor),
+      slot: wrap({ title: copy.pick_choose_anchor }),
     },
   };
 };

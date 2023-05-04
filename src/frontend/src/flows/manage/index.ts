@@ -48,13 +48,15 @@ export const authnTemplateManage = ({
   dapps: DappDescription[];
 }): AuthnTemplates => {
   const wrap = ({
+    showDapps = false,
     slot,
     title,
   }: {
+    showDapps?: boolean;
     slot: string;
     title: string;
   }): TemplateResult => html`
-    ${dappsHeader({ dapps, clickable: false })}
+    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
     <header class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${slot}</p>
@@ -63,6 +65,7 @@ export const authnTemplateManage = ({
   return {
     firstTime: {
       slot: wrap({
+        showDapps: true,
         slot: `to dapps on the Internet Computer`,
         title: "Securely Connect",
       }),
