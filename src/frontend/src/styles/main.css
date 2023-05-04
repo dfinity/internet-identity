@@ -1374,6 +1374,14 @@ a:hover,
     calc(3 * var(--rs-input-bezel));
 }
 
+.c-input--id {
+  background-position: center top;
+  background-image: url(/image.png);
+  min-height: 10em;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 .c-input--icon {
   position: relative;
   padding-bottom: calc(4 * var(--rs-input-bezel));
