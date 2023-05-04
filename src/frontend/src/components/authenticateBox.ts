@@ -1,4 +1,3 @@
-import { PORTAL_II_URL } from "$src/config";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
 import { I18n } from "$src/i18n";
@@ -23,6 +22,14 @@ import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
 import { displayError } from "./displayError";
+import {
+  controlIcon,
+  githubBigIcon,
+  participateIcon,
+  privacyIcon,
+  secureIcon,
+  signInIcon,
+} from "./icons";
 import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
@@ -140,26 +147,32 @@ export const authnTemplates = (
 
   const marketingBlocks = [
     {
+      icon: secureIcon,
       title: copy.secure_and_convenient,
       body: copy.instead_of_passwords,
     },
     {
+      icon: privacyIcon,
       title: copy.no_tracking,
       body: copy.get_privacy,
     },
     {
+      icon: controlIcon,
       title: copy.control_your_identity,
       body: copy.securely_access,
     },
     {
+      icon: participateIcon,
       title: copy.own_and_participate,
       body: copy.share_and_vote,
     },
     {
+      icon: signInIcon,
       title: copy.sign_in_to_web3,
       body: copy.manages_keys,
     },
     {
+      icon: githubBigIcon,
       title: copy.opensource_and_transparent,
       body: copy.internet_identity_codebase,
     },
@@ -186,24 +199,18 @@ export const authnTemplates = (
             ${props.firstTime.useExistingText}
           </button>
         </div>
-        ${marketingBlocks.map(
-          ({ title, body }) =>
-            html`
-              <div class="c-marketing-block">
-                <h2 class="t-title t-title--main">${title}</h2>
-                <p class="t-paragraph t-weak">${body}</p>
-              </div>
-            `
-        )}
-        <p class="t-paragraph t-centered l-stack">
-          <a
-            class="t-link"
-            href=${PORTAL_II_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            >Learn More</a
-          >
-        </p>`;
+        <div class="c-marketing-section">
+          ${marketingBlocks.map(
+            ({ title, body, icon }) =>
+              html`
+                <div class="c-marketing-block">
+                  ${icon !== undefined ? icon : undefined}
+                  <h2 class="t-title t-title--main">${title}</h2>
+                  <p class="t-paragraph t-weak">${body}</p>
+                </div>
+              `
+          )}
+        </div> `;
     },
     useExisting: () => {
       const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });

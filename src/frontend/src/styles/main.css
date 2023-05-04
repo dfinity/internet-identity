@@ -853,6 +853,11 @@ a:hover,
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
+.c-marketing-section {
+  /* TODO: reference? */
+  margin-top: calc(2 * var(--rs-marketing-block-stack));
+}
+
 .c-marketing-block {
   margin-top: var(--rs-marketing-block-stack);
   max-width: 17em;
