@@ -50,13 +50,15 @@ export const authnTemplateAuthorize = ({
     title: DynamicKey;
   }) => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
-    <div class="t-centered" style="margin-top: 2.5em;">
+    <div class="l-stack">
       <h1 class="t-title t-title--main" style="text-align: left;">${title}</h1>
-      <p class="t-lead">
+      <p class="t-lead l-stack">
         ${copy.to_continue_to}
-        <strong class="t-strong" style="display: inline-block; margin-top: 1em;"
-          >${origin}</strong
-        ><br />
+        <div class="l-stack l-stack--tight">
+          <strong class="t-strong"
+            >${origin}</strong
+          >
+        </div>
       </p>
       ${chasm}
     </div>

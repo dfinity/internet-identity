@@ -246,7 +246,7 @@
   --rs-list-gutter: var(--vs-gutter);
 
   --rs-footer-stack: var(--vs-stack);
-  --rs-footer-gutter: var(--vs-gutter);
+  --rs-footer-gutter: calc(var(--vs-gutter) * 3.5);
   --rs-footer-gap: var(--vs-inline);
 
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
@@ -1473,7 +1473,6 @@ a:hover,
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
 .c-list--flex li {
