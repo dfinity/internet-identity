@@ -191,7 +191,7 @@ export const authnTemplates = (
             html`
               <div class="c-marketing-block">
                 <h2 class="t-title t-title--main">${title}</h2>
-                <p class="t-paragraph t-weak">${body}</p>
+                <p class="t-paragraph t-paragraph--weak">${body}</p>
               </div>
             `
         )}

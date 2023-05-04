@@ -131,7 +131,7 @@
   --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
   --vs-line: 1px; /* 5 */
 
-  --vs-line-height: 1.35;
+  --vs-line-height: 1.4;
 
   --vs-border-radius: 0.4rem;
 
@@ -153,6 +153,7 @@
   --rc-overlay-backdrop: var(--vc-night);
 
   --rc-text: var(--rc-dark);
+  --rc-text--weak: var(--vc-night);
   --rc-text--disabled: var(--vc-shadow);
 
   --rc-background: var(--rc-light);
@@ -560,6 +561,10 @@ body {
   margin-top: 0;
 }
 
+.t-paragraph--weak {
+  color: var(--rc-text--weak);
+}
+
 .t-vip {
   font-size: 2.4rem;
   font-weight: 600;
@@ -962,7 +967,6 @@ a:hover,
 
 .c-marketing-block {
   margin-top: var(--rs-marketing-block-stack);
-  max-width: 18em;
 }
 
 /**
