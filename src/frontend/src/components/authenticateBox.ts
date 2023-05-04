@@ -208,7 +208,7 @@ export const authnTemplates = (
                     ? html`<i class="c-icon c-icon--marketing">${icon}</i>`
                     : undefined}
                   <h2 class="t-title t-title--main">${title}</h2>
-                  <p class="t-paragraph t-weak">${body}</p>
+                  <p class="t-paragraph t-paragraph--weak">${body}</p>
                 </article>
               `
           )}
