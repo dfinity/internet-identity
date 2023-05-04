@@ -16,7 +16,7 @@ import { LEGACY_II_URL } from "$src/config";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
-import { dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
@@ -28,7 +28,7 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { unreachable } from "$src/utils/utils";
+import { shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
@@ -42,7 +42,11 @@ import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
 
 /* Template for the authbox when authenticating to II */
-export const authnTemplateManage = (): AuthnTemplates => {
+export const authnTemplateManage = ({
+  dapps,
+}: {
+  dapps: DappDescription[];
+}): AuthnTemplates => {
   const wrap = ({
     slot,
     title,
@@ -50,6 +54,7 @@ export const authnTemplateManage = (): AuthnTemplates => {
     slot: string;
     title: string;
   }): TemplateResult => html`
+    ${dappsHeader({ dapps, clickable: false })}
     <header class="t-centered">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${slot}</p>
@@ -82,12 +87,13 @@ export const authnTemplateManage = (): AuthnTemplates => {
 
 /* the II authentication flow */
 export const authFlowManage = async (connection: Connection, i18n: I18n) => {
+  const dapps = shuffleArray(await getDapps());
   // Go through the login flow, potentially creating an anchor.
   const {
     userNumber,
     connection: authenticatedConnection,
     newAnchor,
-  } = await authenticateBox(connection, i18n, authnTemplateManage());
+  } = await authenticateBox(connection, i18n, authnTemplateManage({ dapps }));
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
@@ -445,15 +451,4 @@ export const domainWarning = (
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
-};
-
-// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
-// avoid shuffling in place.
-const shuffleArray = <T>(array_: T[]): T[] => {
-  const array = [...array_];
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 };

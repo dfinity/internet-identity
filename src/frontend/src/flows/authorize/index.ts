@@ -5,11 +5,13 @@ import {
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon, spinner } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
+import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { DynamicKey, I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
-import { unreachable } from "$src/utils/utils";
+import { shuffleArray, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { authenticationProtocol } from "./postMessageInterface";
@@ -20,10 +22,12 @@ import copyJson from "./index.json";
 export const authnTemplateAuthorize = ({
   origin,
   derivationOrigin,
+  dapps,
   i18n,
 }: {
   origin: string;
   derivationOrigin?: string;
+  dapps: DappDescription[];
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
@@ -39,7 +43,8 @@ export const authnTemplateAuthorize = ({
       : undefined;
 
   const wrap = (title: DynamicKey) => html`
-    <div class="t-centered">
+    ${dappsHeader({ dapps, clickable: false })}
+    <div class="t-centered" style="margin-top: 2.5em;">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
         ${copy.to_continue_to}
@@ -89,12 +94,14 @@ export const authFlowAuthorize = async (
     );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
+      const dapps = shuffleArray(await getDapps());
       const authSuccess = await authenticateBox(
         connection,
         i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
+          dapps,
           i18n,
         })
       );
