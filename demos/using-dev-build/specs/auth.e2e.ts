@@ -40,7 +40,7 @@ describe("authentication", () => {
       async () => {
         return (
           (await title.getText()) ===
-          "You successfully created your Identity Anchor!"
+          "You’ve created an Internet Identity!"
         );
       },
       { timeout: 20_000 }
