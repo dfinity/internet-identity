@@ -45,21 +45,19 @@
 
 */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+@font-face {
+  font-family: "Circular";
+  src: url("../../assets/fonts/CircularXXWeb-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+}
 
 @font-face {
   font-family: "Circular";
   src: url("../../assets/fonts/CircularXXWeb-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Circular";
-  src: url("../../assets/fonts/CircularXXWeb-Regular.woff2") format("woff2");
-  font-style: normal;
-  font-weight: normal;
   font-display: swap;
 }
 
@@ -455,6 +453,10 @@ body {
   background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
   background-size: 100% 100%;
   min-height: 100dvh;
+
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: always;
 }
 
 /**
@@ -1168,12 +1170,16 @@ a:hover,
   background: linear-gradient(90deg, var(--rg-button));
 
   color: var(--rc-onButton);
-  padding: calc(0.8 * var(--rs-button-bezel)) var(--rs-button-bezel);
+  padding: var(--rs-button-bezel) var(--rs-button-bezel)
+    calc(0.9 * var(--rs-button-bezel));
   margin-top: var(--rs-button-stack);
   display: block;
   width: 100%;
   text-align: center;
   border-radius: var(--rs-button-radius);
+  font-size: 1.4rem;
+
+  font-weight: 600;
 }
 
 .c-button--minimal {
