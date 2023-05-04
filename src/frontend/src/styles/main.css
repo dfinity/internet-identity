@@ -146,6 +146,8 @@
   --rc-interaction-text: var(--vc-brand-blue--dark);
   --rc-loading: var(--vc-brand-purple);
 
+  --rc-marketing-icon: var(--vc-brand-purple);
+
   --rc-button: var(--vc-brand-purple);
   --rc-button--disabled: var(--vc-shadow);
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
@@ -587,6 +589,13 @@ a:hover,
   display: block;
   height: auto;
   aspect-ratio: none;
+}
+
+.c-icon--marketing {
+  height: 4.5rem;
+  width: 4.5rem;
+
+  color: var(--rc-marketing-icon);
 }
 
 .c-icon svg {
