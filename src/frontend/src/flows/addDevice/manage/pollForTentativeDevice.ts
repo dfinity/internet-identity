@@ -51,7 +51,9 @@ const pollForTentativeDeviceTemplate = ({
 
   const pageContentSlot = html`
     <hgroup>
-      <h2 class="t-paragraph">${copy.identity_anchor} ${userNumber}</h2>
+      <h2 class="t-title t-title--discrete">
+        ${copy.identity_anchor} ${userNumber}
+      </h2>
       <h1 class="t-title t-title--main l-stack--none">
         ${copy.add_trusted_device}
       </h1>

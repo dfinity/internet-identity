@@ -1375,11 +1375,41 @@ a:hover,
 }
 
 .c-input--id {
-  background-position: center top;
-  background-image: url(/image.png);
+}
+
+.c-input--id__wrap {
   min-height: 10em;
-  background-repeat: no-repeat;
-  background-size: cover;
+  position: relative;
+  margin: calc(-4 * var(--rs-input-bezel));
+  padding: calc(4 * var(--rs-input-bezel));
+  overflow: hidden;
+  border-radius: var(--rs-input-border-radius);
+}
+
+.c-input--id__art {
+  position: absolute;
+  object-fit: cover;
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  margin: calc(-4 * var(--rs-input-bezel));
+}
+
+.c-input--id__caption,
+.c-input--id__value {
+  position: relative;
+  z-index: 1;
+  color: var(--rc-input);
+  font-weight: 600;
+}
+
+.c-input--id__caption {
+  font-size: 1.2;
+}
+
+.c-input--id__value {
+  font-size: 4rem;
+  line-height: 1;
 }
 
 .c-input--icon {

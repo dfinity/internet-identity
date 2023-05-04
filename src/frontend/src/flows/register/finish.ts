@@ -1,6 +1,7 @@
 import { checkmarkIcon, copyIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
+import { BASE_URL } from "$src/environment";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -22,32 +23,35 @@ export const displayUserNumberTemplate = ({
         Save this number by taking a screenshot or writing it down.
       </p>
     </hgroup>
-    <output class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id" >
-    <h2 class="t-title" style="margin-top: 0.5em; color: white; font-size: 1.2rem;">Internet Identity:</h2>
-      <div style="color: white; text-align: left; font-size: 4rem;" class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</div>
-      <button
-        ${ref(userNumberCopy)}
-        aria-label="Copy phrase to clipboard""
-        title="Copy phrase to clipboard"
-        tabindex="0"
-        class="c-button__icon"
-        @click=${async () => {
-          try {
-            await navigator.clipboard.writeText(userNumber.toString());
-            withRef(userNumberCopy, (elem) => {
-              elem.classList.add("is-copied");
-            });
-          } catch (e: unknown) {
-            toast.error("Unable to copy Identity Anchor");
-            console.error("Unable to copy Identity Anchor", e);
-          }
-        }}
-        >
-          <span>Copy</span>
-          ${copyIcon}
-          ${checkmarkIcon}
-        </button>
-    </output>
+    <div class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id" >
+      <div class="c-input--id__wrap">
+        <img class="c-input--id__art" src="${BASE_URL}image.png" alt="" />
+        <h2 class="c-input--id__caption">Internet Identity:</h2>
+        <output class="c-input--id__value" class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</output>
+      </div>
+        <button
+          ${ref(userNumberCopy)}
+          aria-label="Copy phrase to clipboard""
+          title="Copy phrase to clipboard"
+          tabindex="0"
+          class="c-button__icon"
+          @click=${async () => {
+            try {
+              await navigator.clipboard.writeText(userNumber.toString());
+              withRef(userNumberCopy, (elem) => {
+                elem.classList.add("is-copied");
+              });
+            } catch (e: unknown) {
+              toast.error("Unable to copy Identity Anchor");
+              console.error("Unable to copy Identity Anchor", e);
+            }
+          }}
+          >
+            <span>Copy</span>
+            ${copyIcon}
+            ${checkmarkIcon}
+          </button>
+    </div>
       <button
         @click=${() => onContinue()}
         id="displayUserContinue"
