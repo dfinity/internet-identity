@@ -27,6 +27,9 @@ export const register = async ({
     // have a captcha to show once we get to the CAPTCHA screen
     const preloadedChallenge = connection.createChallenge();
     const identity = await savePasskey();
+    if (identity === "canceled") {
+      return cancel;
+    }
 
     const captchaResult = await promptCaptcha({
       connection,

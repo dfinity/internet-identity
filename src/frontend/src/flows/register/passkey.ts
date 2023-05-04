@@ -16,9 +16,11 @@ import copyJson from "./passkey.json";
 const savePasskeyTemplate = ({
   construct,
   i18n,
+  cancel,
 }: {
   construct: () => void;
   i18n: I18n;
+  cancel: () => void;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
@@ -36,6 +38,13 @@ const savePasskeyTemplate = ({
       class="c-button"
     >
       ${copy.save_passkey}
+    </button>
+    <button
+      @click=${() => cancel()}
+      data-action="cancel"
+      class="c-button c-button--secondary"
+    >
+      ${copy.cancel}
     </button>
     <section class="c-marketing-block">
       <aside class="l-stack">
@@ -67,10 +76,11 @@ const savePasskeyTemplate = ({
 export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
 // Prompt the user to create a WebAuthn identity
-export const savePasskey = (): Promise<IIWebAuthnIdentity> => {
+export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
   return new Promise((resolve) =>
     savePasskeyPage({
       i18n: new I18n(),
+      cancel: () => resolve("canceled"),
       construct: async () => {
         try {
           const identity = await withLoader(() => constructIdentity({}));

@@ -200,6 +200,7 @@ const iiPages: Record<string, () => void> = {
   savePasskey: () =>
     savePasskeyPage({
       i18n,
+      cancel: () => console.log("cancel"),
       construct: () =>
         new Promise((_) => {
           console.log("Identity Construction");
