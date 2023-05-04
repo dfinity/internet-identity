@@ -49,41 +49,30 @@ export const authnTemplateManage = ({
 }): AuthnTemplates => {
   const wrap = ({
     showDapps = false,
-    slot,
-    title,
   }: {
     showDapps?: boolean;
-    slot: string;
-    title: string;
   }): TemplateResult => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
-    <header class="t-centered">
-      <h1 class="t-title t-title--main">${title}</h1>
-      <p class="t-lead">${slot}</p>
+    <header class="t-centered" style="text-align: left;">
+      <h1 class="t-title t-title--main">
+        Securely connect to dapps on the Internet Computer
+      </h1>
     </header>
   `;
   return {
     firstTime: {
       slot: wrap({
         showDapps: true,
-        slot: `to dapps on the Internet Computer`,
-        title: "Securely Connect",
       }),
-      useExistingText: "Manage Existing",
-      createAnchorText: "Create Identity Anchor",
+      useExistingText: "Use existing",
+      createAnchorText: "Create Internet Identity",
     },
     useExisting: {
-      slot: wrap({
-        slot: `to continue to Internet Identity`,
-        title: "Enter your Anchor",
-      }),
+      slot: wrap({}),
     },
 
     pick: {
-      slot: wrap({
-        slot: "to continue to Internet Identity",
-        title: "Choose an Anchor",
-      }),
+      slot: wrap({}),
     },
   };
 };

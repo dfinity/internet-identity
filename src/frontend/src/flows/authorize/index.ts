@@ -51,11 +51,11 @@ export const authnTemplateAuthorize = ({
   }) => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
     <div class="t-centered" style="margin-top: 2.5em;">
-      <h1 class="t-title t-title--main">${title}</h1>
+      <h1 class="t-title t-title--main" style="text-align: left;">${title}</h1>
       <p class="t-lead">
         ${copy.to_continue_to}
-        <a href="${origin}" target="_blank" rel="noopener noreferrer"
-          >${origin}</a
+        <strong class="t-strong" style="display: inline-block; margin-top: 1em;"
+          >${origin}</strong
         ><br />
       </p>
       ${chasm}
