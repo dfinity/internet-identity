@@ -812,6 +812,7 @@ a:hover,
   * it goes to the edge of the card
   **/
 .c-card__teaser {
+  margin-top: calc(var(--bezel-x) * -1);
   margin-left: calc(var(--bezel-x) * -1);
   margin-right: calc(var(--bezel-x) * -1);
   margin-bottom: var(--bezel-x);
