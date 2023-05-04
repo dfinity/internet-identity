@@ -203,11 +203,11 @@ export const authnTemplates = (
           ${marketingBlocks.map(
             ({ title, body, icon }) =>
               html`
-                <div class="c-marketing-block">
+                <article class="c-marketing-block">
                   ${icon !== undefined ? icon : undefined}
                   <h2 class="t-title t-title--main">${title}</h2>
                   <p class="t-paragraph t-weak">${body}</p>
-                </div>
+                </article>
               `
           )}
         </div> `;
