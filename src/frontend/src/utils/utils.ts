@@ -173,7 +173,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
   protected parent?: unknown;
 
-  private latest: A;
+  public latest: A;
 
   // Constructor with latest which is "initial" and then latest
   constructor(initial: A) {

@@ -10,10 +10,10 @@ import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { DynamicKey, I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
-import { TemplateElement, withRef } from "$src/utils/lit-html";
-import { shuffleArray, unreachable } from "$src/utils/utils";
+import { TemplateElement } from "$src/utils/lit-html";
+import { Chan, shuffleArray, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
 import copyJson from "./index.json";
@@ -173,39 +173,24 @@ type ChasmOpts = {
 };
 
 const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
-  /* the chasm that opens to reveal details about alternative origin */
-  const chasmRef: Ref<HTMLDivElement> = createRef();
-
-  /* the (purely visual) arrow on the chasm */
-  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
-
   /* Toggle the chasm open/closed */
-  const chasmToggle = () =>
-    withRef(chasmRef, (chasm) => {
-      const expanded = chasm.getAttribute("aria-expanded") === "true";
-      if (!expanded) {
-        chasm.setAttribute("aria-expanded", "true");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.add("c-chasm__button--flipped")
-        );
-      } else {
-        chasm.setAttribute("aria-expanded", "false");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.remove("c-chasm__button--flipped")
-        );
-      }
-    });
+  const ariaExpanded = new Chan(false);
+  const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const btnFlipped = ariaExpanded.map((expanded) =>
+    expanded ? "c-chasm__button--flipped" : undefined
+  );
 
   return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
-    chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
-      <div ${ref(chasmRef)} class="c-chasm" aria-expanded="false">
-        <div class="c-chasm__arrow"></div>
-        <div class="t-weak c-chasm__content">
-            ${message}
+    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
+      chasmToggle()}>${info} <span class="t-link__icon c-chasm__button ${asyncReplace(
+    btnFlipped
+  )}">${caretDownIcon}</span></span>
+      <div class="c-chasm" aria-expanded=${asyncReplace(ariaExpanded)}>
+        <div class="c-chasm__inner">
+          <div class="c-chasm__arrow"></div>
+          <div class="t-weak c-chasm__content">
+              ${message}
+          </div>
         </div>
       </div>
     </p>

@@ -45,8 +45,8 @@ export const mainWindow = ({
       ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
       <div class="c-card c-card--background">
         <div class="c-card c-card--highlight">${slot}</div>
-        ${showFooter ? footer : ""}
       </div>
     </div>
+    ${showFooter ? footer : ""}
   `;
 };
