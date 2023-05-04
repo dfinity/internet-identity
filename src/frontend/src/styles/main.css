@@ -863,7 +863,6 @@ a:hover,
 }
 
 .c-marketing-section {
-  /* TODO: reference? */
   margin-top: calc(2 * var(--rs-marketing-block-stack));
 }
 
