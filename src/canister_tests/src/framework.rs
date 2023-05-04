@@ -436,7 +436,7 @@ base-uri 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
 style-src-elem 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
-font-src https://fonts\\.gstatic\\.com;\
+font-src 'self' https://fonts\\.gstatic\\.com;\
 upgrade-insecure-requests;\
 frame-ancestors 'none';$"
     )
