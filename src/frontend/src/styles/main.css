@@ -749,7 +749,16 @@ a:hover,
 .c-card__teaser {
   margin-left: calc(var(--bezel-x) * -1);
   margin-right: calc(var(--bezel-x) * -1);
+  margin-bottom: var(--bezel-x);
+
+  -webkit-mask-image: linear-gradient(black 70%, transparent);
+  mask-image: linear-gradient (black 70%, transparent);
+}
+
+.c-card__teaser:last-child {
   margin-bottom: calc(var(--bezel-x) * -1);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .c-card--narrow {

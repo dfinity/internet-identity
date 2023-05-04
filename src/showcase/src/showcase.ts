@@ -114,20 +114,24 @@ const authnCnfg = {
   onSubmit: (anchor: bigint) => console.log("Submitting anchor", anchor),
 };
 
+const dapps = await getDapps();
+
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
+  dapps,
   i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  dapps,
   i18n,
 });
 
 const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
 const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
 
-const manageTemplates = authnTemplateManage();
+const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
@@ -250,8 +254,7 @@ const iiPages: Record<string, () => void> = {
         return Promise.resolve();
       }
     ),
-  displayManage: async () => {
-    const dapps = await getDapps();
+  displayManage: () => {
     displayManagePage({
       userNumber,
       devices: {
@@ -293,8 +296,7 @@ const iiPages: Record<string, () => void> = {
       },
     });
   },
-  displayManageSingle: async () => {
-    const dapps = await getDapps();
+  displayManageSingle: () => {
     displayManagePage({
       userNumber,
       devices: {
@@ -410,8 +412,7 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: async () => {
-    const dapps = await getDapps();
+  dappsExplorer: () => {
     dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
   },
   showMessage: () =>

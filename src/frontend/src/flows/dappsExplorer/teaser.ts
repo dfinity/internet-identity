@@ -2,6 +2,22 @@ import { DynamicKey } from "$src/i18n";
 import { html, TemplateResult } from "lit-html";
 import { DappDescription } from "./dapps";
 
+export const dappsHeader = ({
+  dapps,
+  clickable,
+}: {
+  dapps: DappDescription[];
+  clickable: boolean;
+}): TemplateResult => html`
+  <figure
+    class="c-card__teaser c-marquee ${clickable
+      ? "c-marquee--clickable"
+      : undefined}"
+  >
+    ${marqueeList(dapps)}
+  </figure>
+`;
+
 /** A teaser for the dapps explorer, acting as a button */
 export const dappsTeaser = ({
   dapps,
@@ -22,9 +38,7 @@ export const dappsTeaser = ({
       @click="${() => click()}"
       aria-label=${sign_into_dapps}
     >
-      <figure class="c-card__teaser c-marquee c-marquee--clickable">
-        ${marqueeList(dapps)}
-      </figure>
+      ${dappsHeader({ dapps, clickable: true })}
     </button>
   </article>`;
 };

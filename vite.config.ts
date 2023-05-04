@@ -85,6 +85,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       publicDir: "../frontend/assets",
       build: {
         ...build,
+        target: "esnext" /* for top-level await in showcase */,
         outDir: "../../dist-showcase",
       },
     };

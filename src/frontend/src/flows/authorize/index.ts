@@ -5,11 +5,13 @@ import {
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon, spinner } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
+import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { DynamicKey, I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
-import { Chan, unreachable } from "$src/utils/utils";
+import { Chan, shuffleArray, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
@@ -20,10 +22,12 @@ import copyJson from "./index.json";
 export const authnTemplateAuthorize = ({
   origin,
   derivationOrigin,
+  dapps,
   i18n,
 }: {
   origin: string;
   derivationOrigin?: string;
+  dapps: DappDescription[];
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
@@ -38,8 +42,15 @@ export const authnTemplateAuthorize = ({
         })
       : undefined;
 
-  const wrap = (title: DynamicKey) => html`
-    <div class="t-centered">
+  const wrap = ({
+    showDapps = false,
+    title,
+  }: {
+    showDapps?: boolean;
+    title: DynamicKey;
+  }) => html`
+    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
+    <div class="t-centered" style="margin-top: 2.5em;">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">
         ${copy.to_continue_to}
@@ -52,15 +63,15 @@ export const authnTemplateAuthorize = ({
   `;
   return {
     firstTime: {
-      slot: wrap(copy.first_time_create),
+      slot: wrap({ showDapps: true, title: copy.first_time_create }),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap(copy.use_existing_enter_anchor),
+      slot: wrap({ title: copy.use_existing_enter_anchor }),
     },
     pick: {
-      slot: wrap(copy.pick_choose_anchor),
+      slot: wrap({ title: copy.pick_choose_anchor }),
     },
   };
 };
@@ -89,12 +100,14 @@ export const authFlowAuthorize = async (
     );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
+      const dapps = shuffleArray(await getDapps());
       const authSuccess = await authenticateBox(
         connection,
         i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
+          dapps,
           i18n,
         })
       );
