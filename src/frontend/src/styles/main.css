@@ -146,6 +146,8 @@
   --rc-interaction-text: var(--vc-brand-blue--dark);
   --rc-loading: var(--vc-brand-purple);
 
+  --rc-marketing-icon: var(--vc-brand-purple);
+
   --rc-button: var(--vc-brand-purple);
   --rc-button--disabled: var(--vc-shadow);
   --rc-button-secondary: rgba(215, 205, 235, 0.5);
@@ -589,6 +591,13 @@ a:hover,
   aspect-ratio: none;
 }
 
+.c-icon--marketing {
+  height: 4.5rem;
+  width: 4.5rem;
+
+  color: var(--rc-marketing-icon);
+}
+
 .c-icon svg {
   position: absolute;
   top: 50%;
@@ -851,6 +860,10 @@ a:hover,
   background: var(--rc-background);
   border-radius: var(--rs-card-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.c-marketing-section {
+  margin-top: calc(2 * var(--rs-marketing-block-stack));
 }
 
 .c-marketing-block {
