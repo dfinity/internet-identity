@@ -57,14 +57,16 @@ const pollForTentativeDeviceTemplate = ({
       </h1>
       <p class="t-lead">${copy.follow_steps_on_new_device}</p>
     </hgroup>
-    <div
-      class="t-centered c-qrcode l-stack"
-      ${mount((container) =>
-        container instanceof HTMLElement
-          ? displayQR({ link, container })
-          : undefined
-      )}
-    ></div>
+    <div class="c-card c-card--tight l-stack l-stack--tight">
+      <div
+        class="t-centered c-qrcode"
+        ${mount((container) =>
+          container instanceof HTMLElement
+            ? displayQR({ link, container })
+            : undefined
+        )}
+      ></div>
+    </div>
     <div class="t-wrap c-input c-input--with-button c-input--centered t-weak">
       <span data-role="add-device-link">${link}</span>
       <button
