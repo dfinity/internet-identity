@@ -252,7 +252,6 @@
   --rs-logo-stack: calc(var(--vs-gutter) * 8);
   --rs-logo-stack--top: calc(var(--vs-gutter) * 8);
   --rs-logo-stack--bottom: calc(var(--vs-gutter) * 4);
-  --rs-logo-type-stack: var(--vs-stack);
 
   --rs-card-bezel: calc(var(--vs-gutter) * 6);
   --rs-card-bezel-x: calc(var(--vs-gutter) * 8);
@@ -1090,21 +1089,29 @@ a:hover,
 .c-logo {
   display: block;
   overflow: hidden;
-  padding: var(--rs-logo-stack--top) 0 var(--rs-logo-stack--bottom);
+  padding: var(--rs-logo-stack--top) calc(var(--rs-card-bezel) * 1.3) var(--rs-logo-stack--bottom);
   font-weight: 600;
   font-size: 0.6em;
+  display: flex;
+  align-items: center;
+  gap: 1em;
+
 }
 
 .c-logo svg {
   display: block;
-  margin: 0 auto;
-  width: 4rem;
+  width: 5.5rem;
+  flex: 0 0 5.5rem;
 }
 
 .c-logo__type {
   text-align: center;
-  margin-top: var(--rs-logo-type-stack);
-  display: none;
+  flex: 1 1 auto;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  font-size: 1.1em;
 }
 
 .t-title + .c-logo {
