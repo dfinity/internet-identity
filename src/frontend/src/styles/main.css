@@ -2115,6 +2115,8 @@ a.c-action-list__item {
     width: 100%;
 
     max-width: none;
+    /* centers the container and adds a bit of space to make sure the footer does not stick to it */
+    margin: 0 0 2rem;
   }
 }
 
