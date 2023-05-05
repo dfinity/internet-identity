@@ -627,7 +627,7 @@ export class DemoAppView extends View {
 export class RecoverView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$(`//h1[string()='Recover Identity Anchor']`)
+      .$(`//h1[string()='Recover Internet Identity']`)
       .waitForDisplayed({ timeout: 5_000 });
   }
 
