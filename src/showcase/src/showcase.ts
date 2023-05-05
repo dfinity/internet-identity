@@ -262,14 +262,17 @@ const iiPages: Record<string, () => void> = {
           {
             alias: "Chrome on iPhone",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
             warn: html`Something is rotten in the state of Device`,
           },
         ],
@@ -303,6 +306,7 @@ const iiPages: Record<string, () => void> = {
         authenticators: [
           {
             alias: "Chrome on iPhone",
+            rename: () => console.log("rename"),
           },
         ],
         recoveries: {},

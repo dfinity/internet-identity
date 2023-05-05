@@ -3,6 +3,7 @@ import { TemplateResult } from "lit-html";
 // A simple authenticator (non-recovery device)
 export type Authenticator = {
   alias: string;
+  rename: () => void;
   remove?: () => void;
   warn?: TemplateResult;
 };

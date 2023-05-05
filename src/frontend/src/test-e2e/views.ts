@@ -40,6 +40,22 @@ export class WelcomeView extends View {
   }
 }
 
+export class RenameView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#pickAliasInput")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async enterAlias(alias: string): Promise<void> {
+    await this.browser.$("#pickAliasInput").setValue(alias);
+  }
+
+  async submit(): Promise<void> {
+    await this.browser.$("#pickAliasSubmit").click();
+  }
+}
+
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
@@ -229,6 +245,30 @@ export class MainView extends View {
 
   async addRecovery(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
+  }
+
+  async rename(deviceName: string, newName: string): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.browser.acceptAlert();
+
+    const renameView = new RenameView(this.browser);
+    await renameView.waitForDisplay();
+    await renameView.enterAlias(newName);
+    await renameView.submit();
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {

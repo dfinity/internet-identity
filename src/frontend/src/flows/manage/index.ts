@@ -35,6 +35,7 @@ import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
   protectDevice,
+  renameDevice,
   resetPhrase,
   unprotectDevice,
 } from "./deviceSettings";
@@ -392,6 +393,7 @@ export const devicesFromDeviceDatas = ({
       acc.authenticators.push({
         alias: device.alias,
         warn: domainWarning(device),
+        rename: () => renameDevice({ connection, device, reload }),
         remove: hasSingleDevice
           ? undefined
           : () => deleteDevice({ connection, device, reload }),
