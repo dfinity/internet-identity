@@ -43,8 +43,8 @@ export const register = async ({
     } else {
       const result = apiResultToLoginFlowResult(captchaResult);
       if (result.tag === "ok") {
-        await displayUserNumber(result.userNumber);
         setAnchorUsed(result.userNumber);
+        await displayUserNumber(result.userNumber);
       }
       return result;
     }
