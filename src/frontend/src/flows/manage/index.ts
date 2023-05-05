@@ -13,6 +13,7 @@ import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
+import { BASE_URL } from "$src/environment";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
@@ -134,12 +135,9 @@ const displayManageTemplate = ({
     isNullish(recoveries.recoveryPhrase) &&
     isNullish(recoveries.recoveryKey);
 
-  const pageContentSlot = html` <section>
+  const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
-      <h1 class="t-title t-title--main">Manage your Anchor</h1>
-      <p class="t-lead">
-        Add devices and recovery methods to make your anchor more secure.
-      </p>
+      <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
     ${anchorSection(userNumber)}
     <p class="t-paragraph">
@@ -148,7 +146,7 @@ const displayManageTemplate = ({
         click: () => exploreDapps(),
         copy: {
           dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Sign into dapps",
+          sign_into_dapps: "Connect to these dapps",
         },
       })}
     </p>
@@ -162,19 +160,29 @@ const displayManageTemplate = ({
   </section>`;
 
   return mainWindow({
+    isWideContainer: true,
     slot: pageContentSlot,
   });
 };
 
 const anchorSection = (userNumber: bigint): TemplateResult => html`
   <aside class="l-stack">
-    <h2 class="t-title">Identity Anchor</h2>
-    <output
-      class="c-input c-input--vip c-input--readonly t-vip"
-      aria-label="User Number"
-      data-usernumber
-      >${userNumber}</output
+    <div
+      class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
+      <div class="c-input--id__wrap">
+        <img class="c-input--id__art" src="${BASE_URL}image.png" alt="" />
+        <h2 class="c-input--id__caption">Internet Identity:</h2>
+        <output
+          class="c-input--id__value"
+          class="t-vip"
+          aria-label="usernumber"
+          id="userNumber"
+          data-usernumber="${userNumber}"
+          >${userNumber}</output
+        >
+      </div>
+    </div>
   </aside>
 `;
 
@@ -422,19 +430,19 @@ export const domainWarning = (
 
   // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
   if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
   if (isNullish(deviceOrigin)) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 
   // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
   if (deviceOrigin !== window.origin) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 

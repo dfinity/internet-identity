@@ -62,8 +62,8 @@ const runRecovery = async (
         userNumber,
         connection,
         device,
-        message: html`Type your recovery phrase below to access your anchor
-          <strong class="t-strong">${userNumber}</strong>`,
+        message: html`Type your recovery phrase below to access your Internet
+          Identity <strong class="t-strong">${userNumber}</strong>`,
       })
     : await deviceRecoveryPage(userNumber, connection, device);
 
@@ -186,7 +186,7 @@ const enrollAuthenticator = async ({
       message:
         "Something went wrong when we were trying to remember this device. Could you try again?",
       detail:
-        "The device could not be added to the anchor: " +
+        "The Passkey could not be added to the Internet Identity: " +
         unknownToString(error, "unknown error"),
       primaryButton: "Ok",
     });

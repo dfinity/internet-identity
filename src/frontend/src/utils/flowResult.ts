@@ -53,8 +53,8 @@ export const apiResultToLoginFlowResult = (
     case "unknownUser": {
       return {
         tag: "err",
-        title: "Unknown Identity Anchor",
-        message: `Failed to find an identity for the Identity Anchor ${result.userNumber}. Please check your Identity Anchor and try again.`,
+        title: "Unknown Internet Identity",
+        message: `Failed to find Internet Identity ${result.userNumber}. Please check your Internet Identity and try again.`,
         detail: "",
       };
     }

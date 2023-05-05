@@ -117,6 +117,7 @@
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
   --vc-brand-alt: rgba(215, 205, 235, 1);
+  --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
 
   /**
@@ -1299,6 +1300,10 @@ a:hover,
   border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
+}
+
+.c-input::placeholder {
+  color: var(--vc-grey);
 }
 
 .c-button-group {

@@ -6,6 +6,7 @@
     "and_complete_prompts": "and complete the prompts that pop-up on your device",
 
     "what_is_passkey": "What is a passkey?",
+    "unique_key_pair": "A unique public/private key pair that is stored in the secure hardware chip in your device",
     "convenient_secure_replacement": "A convenient and more secure replacement for passwords",
     "enables_sign_by_unlocking": "Enables you to sign into dapps by unlocking your device (e.g. using FaceID or TouchID)",
 

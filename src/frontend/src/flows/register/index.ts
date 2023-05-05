@@ -51,8 +51,8 @@ export const register = async ({
   } catch (e) {
     return {
       tag: "err",
-      title: "Failed to create anchor",
-      message: "An error occurred during anchor creation.",
+      title: "Failed to create Internet Identity",
+      message: "An error occurred during Internet Identity creation.",
       detail: unknownToString(e, "unknown error"),
     };
   }

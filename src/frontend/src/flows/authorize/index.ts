@@ -70,10 +70,18 @@ export const authnTemplateAuthorize = ({
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap({ title: copy.use_existing_enter_anchor }),
+      slot: wrap({
+        title: html`<div>
+          ${copy.use_existing_enter_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
     pick: {
-      slot: wrap({ title: copy.pick_choose_anchor }),
+      slot: wrap({
+        title: html`<div>
+          ${copy.pick_choose_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
   };
 };

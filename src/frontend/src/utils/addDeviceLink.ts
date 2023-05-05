@@ -8,7 +8,7 @@ export const addDeviceLink = ({
   userNumber: bigint;
   origin: string;
 }): string => {
-  return origin + "/?action=add-device&anchor=" + userNumber;
+  return origin + "/?action=add-passkey&ii=" + userNumber;
 };
 
 /** When called from an "add device" URL, returns the anchor. Otherwise returns undefined */
@@ -17,11 +17,11 @@ export const getAddDeviceAnchor = (): bigint | undefined => {
     const urlSearchParams = new URLSearchParams(window.location.search);
 
     const action = urlSearchParams.get("action");
-    if (action !== "add-device") {
+    if (action !== "add-passkey") {
       return undefined;
     }
 
-    const anchor = urlSearchParams.get("anchor");
+    const anchor = urlSearchParams.get("ii");
     if (anchor === null) {
       return undefined;
     }
