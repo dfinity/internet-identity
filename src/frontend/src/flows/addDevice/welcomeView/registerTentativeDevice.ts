@@ -3,9 +3,9 @@ import {
   CredentialId,
   DeviceData,
 } from "$generated/internet_identity_types";
-import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { inferAlias, loadUAParser } from "$src/flows/register";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { Connection, creationOptions } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
@@ -17,7 +17,6 @@ import {
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { html } from "lit-html";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
 
@@ -29,17 +28,8 @@ export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
 ): Promise<{ alias: string }> => {
-  // First, we need an alias for the device to (tentatively) add
-  const alias = await promptDeviceAlias({
-    title: "Add a Trusted Device",
-    message: html` What device do you want to add to Internet Identity
-      <strong class="t-strong">${userNumber}</strong>?`,
-  });
-
-  if (alias === null) {
-    // TODO L2-309: do this without reload
-    return window.location.reload() as never;
-  }
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
 
   // Then, we create local WebAuthn credentials for the device
   const result = await withLoader(() =>
@@ -65,6 +55,12 @@ export const registerTentativeDevice = async (
     // TODO L2-309: do this without reload
     return window.location.reload() as never;
   }
+
+  const alias = await inferAlias({
+    authenticatorType: result.getAuthenticatorAttachment(),
+    userAgent: navigator.userAgent,
+    uaParser,
+  });
 
   // Finally, we submit it to the canister
   const device: Omit<DeviceData, "origin"> & { credential_id: [CredentialId] } =
