@@ -127,14 +127,6 @@ export const inferAlias = async ({
   }
 
   const os = uaParser.getOS().name;
-  authenticatorType satisfies undefined | "platform";
-  if (nonNullish(os) && os.startsWith("Android")) {
-    // For Android devices we simply show the device name/model (android is assumed)
-    const device = uaParser.getDevice();
-    if (nonNullish(device) && nonNullish(device.model)) {
-      return device.model;
-    }
-  }
 
   // As a last resort, we try to show something like "Chrome on Linux" or just "Chrome" or just "Linux"
   const browser = uaParser.getBrowser().name;

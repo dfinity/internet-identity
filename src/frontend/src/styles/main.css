@@ -621,7 +621,7 @@ a:hover,
 .l-container {
   position: relative;
   font-size: 1.6rem;
-  min-width: 30rem;
+  min-width: 40rem;
   max-width: 40rem;
   /* centers the container and adds a bit of space to make sure the footer does not stick to it */
   margin: 0 auto 2rem;

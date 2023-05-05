@@ -67,7 +67,10 @@ export const authenticatorsSection = ({
         </div>
         ${
           warnFewDevices
-            ? html`<p class="warning-message t-paragraph t-lead">
+            ? html`<p
+                style="max-width: 30rem;"
+                class="warning-message t-paragraph t-lead"
+              >
                 Add a Passkey or recovery method to make your Internet Identity
                 more secure.
               </p>`
