@@ -1,5 +1,5 @@
 import { warningIcon } from "$src/components/icons";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
@@ -99,12 +99,20 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, dupCount, warn, remove },
+  authenticator: { alias, dupCount, warn, remove, rename },
   index,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
 }) => {
+  const settings = [
+    { action: "rename", caption: "Rename", fn: () => rename() },
+  ];
+
+  if (nonNullish(remove)) {
+    settings.push({ action: "remove", caption: "Remove", fn: () => remove() });
+  }
+
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
@@ -114,15 +122,11 @@ export const authenticatorItem = ({
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
       </div>
-      ${isNullish(remove)
-        ? undefined
-        : settingsDropdown({
-            alias,
-            id: `authenticator-${index}`,
-            settings: [
-              { action: "remove", caption: "Remove", fn: () => remove() },
-            ],
-          })}
+      ${settingsDropdown({
+        alias,
+        id: `authenticator-${index}`,
+        settings,
+      })}
     </li>
   `;
 };

@@ -8,7 +8,7 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
-import { AuthenticateView, DemoAppView } from "./views";
+import { AuthenticateView, DemoAppView, MainView } from "./views";
 
 import {
   DEVICE_NAME1,
@@ -201,5 +201,19 @@ test("Should issue the same principal to dapps on legacy & official domains", as
     const principal2 = await authenticate(TEST_APP_CANONICAL_URL_LEGACY);
 
     expect(principal1).toEqual(principal2);
+  });
+}, 300_000);
+
+test("Device can be renamed", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    const newName = DEVICE_NAME1 + "-new";
+    await mainView.rename(DEVICE_NAME1, newName);
+    await mainView.waitForDisplay();
+    await mainView.waitForDeviceDisplay(newName);
   });
 }, 300_000);
