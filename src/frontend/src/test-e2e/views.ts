@@ -14,10 +14,14 @@ export class WelcomeView extends View {
   }
 
   async login(): Promise<void> {
+    await this.browser.$("#loginButton").waitForDisplayed();
+    await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
   }
 
   async register(): Promise<void> {
+    await this.browser.$("#registerButton").waitForDisplayed();
+    await this.browser.$("#registerButton").scrollIntoView();
     await this.browser.$("#registerButton").click();
   }
 
@@ -27,7 +31,11 @@ export class WelcomeView extends View {
   }
 
   async recover(): Promise<void> {
+    await this.browser.$("#loginButton").waitForDisplayed();
+    await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
+    await this.browser.$("#recoverButton").waitForDisplayed();
+    await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
   }
 }

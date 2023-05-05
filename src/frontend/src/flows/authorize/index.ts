@@ -50,13 +50,15 @@ export const authnTemplateAuthorize = ({
     title: DynamicKey;
   }) => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
-    <div class="t-centered" style="margin-top: 2.5em;">
-      <h1 class="t-title t-title--main">${title}</h1>
-      <p class="t-lead">
+    <div class="l-stack">
+      <h1 class="t-title t-title--main" style="text-align: left;">${title}</h1>
+      <p class="t-lead l-stack">
         ${copy.to_continue_to}
-        <a href="${origin}" target="_blank" rel="noopener noreferrer"
-          >${origin}</a
-        ><br />
+        <div class="l-stack l-stack--tight">
+          <strong class="t-strong"
+            >${origin}</strong
+          >
+        </div>
       </p>
       ${chasm}
     </div>
@@ -187,7 +189,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   );
 
   return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
+    <p class="t-centered t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
       chasmToggle()}>${info} <span class="t-link__icon c-chasm__button ${asyncReplace(
     btnFlipped
   )}">${caretDownIcon}</span></span>

@@ -39,8 +39,7 @@ describe("authentication", () => {
     await browser.waitUntil(
       async () => {
         return (
-          (await title.getText()) ===
-          "You successfully created your Identity Anchor!"
+          (await title.getText()) === "You’ve created an Internet Identity!"
         );
       },
       { timeout: 20_000 }

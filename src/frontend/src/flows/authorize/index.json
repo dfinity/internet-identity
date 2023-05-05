@@ -15,13 +15,13 @@
     "auth_failed": "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
     "auth_success": "Authentication successful. You may close this page.",
 
-    "to_continue_to": "to continue to",
+    "to_continue_to": "Create an Internet Identity to connect to",
     "is_alternative_of": "is an alternative domain of",
     "auth_same_identity": "and you will be authenticated to both with the same identity.",
 
-    "first_time_create": "Create an Anchor",
-    "first_time_use": "Use Existing",
-    "first_time_create_text": "Create an Anchor",
+    "first_time_create": "Securely connect to dapps on the Internet Computer",
+    "first_time_use": "Use existing",
+    "first_time_create_text": "Create Internet Identity",
 
     "use_existing_enter_anchor": "Enter an Anchor",
     "pick_choose_anchor": "Choose an Anchor"
