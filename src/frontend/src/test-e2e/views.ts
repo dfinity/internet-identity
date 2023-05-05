@@ -59,16 +59,11 @@ export class RenameView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#pickAliasInput")
+      .$('[data-action="construct-identity"')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
-  async enterAlias(alias: string): Promise<void> {
-    await this.browser.$("#pickAliasInput").setValue(alias);
-  }
-
   async create(): Promise<void> {
-    await this.browser.$("#pickAliasSubmit").click();
     await this.browser.$('[data-action="construct-identity"').click();
   }
 
@@ -219,6 +214,13 @@ export class MainView extends View {
       .waitForDisplayed({ timeout: 10_000 });
   }
 
+  async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
+    const elems = await this.browser.$$(`//li[@data-device="${deviceName}"]`);
+    if (elems.length !== count) {
+      throw Error("Bad number of elements");
+    }
+  }
+
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//li[@data-device="${deviceName}"]`)
@@ -362,22 +364,6 @@ export class MainView extends View {
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
-  }
-}
-
-export class AddDeviceAliasView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#pickAliasSubmit")
-      .waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async addAdditionalDevice(alias: string): Promise<void> {
-    await this.browser.$("#pickAliasInput").setValue(alias);
-  }
-
-  async continue(): Promise<void> {
-    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 

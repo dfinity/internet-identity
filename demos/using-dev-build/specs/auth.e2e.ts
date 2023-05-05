@@ -7,13 +7,6 @@ describe("authentication", () => {
     // Click on "Create an Internet Identity Anchor"
     await browser.$("#registerButton").click();
 
-    // Set the name of the device and submit
-    const registerAlias = await browser.$("#pickAliasInput");
-    await registerAlias.waitForExist();
-    await registerAlias.setValue("My Device");
-
-    await browser.$('button[type="submit"]').click();
-
     // Construct Identity (no-op)
     const constructIdentity = await browser.$(
       '[data-action="construct-identity"]'
