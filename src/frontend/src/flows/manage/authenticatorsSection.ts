@@ -56,11 +56,11 @@ export const authenticatorsSection = ({
       }
       <div class=${warnFewDevices ? "c-card__content" : undefined}>
         <div class="t-title t-title--complications">
-          <h2 class="t-title">Added devices</h2>
+          <h2 class="t-title">Passkeys</h2>
           <span class="t-title__complication c-tooltip" tabindex="0">
             <span class="c-tooltip__message c-card c-card--tight">
-              You can register up to ${MAX_AUTHENTICATORS} authenticator
-              devices (recovery devices excluded)</span>
+              You can register up to ${MAX_AUTHENTICATORS} passkeys
+              (recovery devices excluded)</span>
               (${authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
           </span>
@@ -68,7 +68,8 @@ export const authenticatorsSection = ({
         ${
           warnFewDevices
             ? html`<p class="warning-message t-paragraph t-lead">
-                Add a device or recovery method to make your anchor more secure.
+                Add a Passkey or recovery method to make your Internet Identity
+                more secure.
               </p>`
             : undefined
         }
@@ -89,7 +90,7 @@ export const authenticatorsSection = ({
                 >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
               >
-              <span>Add new device</span>
+              <span>Add new Passkey</span>
             </button>
           </div>
 

@@ -27,7 +27,10 @@ const savePasskeyTemplate = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <hgroup ${scrollTo ? mount((e) => e.scrollIntoView()) : undefined}>
+    <hgroup
+      style="margin-top: 7em;"
+      ${scrollTo ? mount((e) => e.scrollIntoView()) : undefined}
+    >
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
         ${copy.select}
@@ -49,10 +52,11 @@ const savePasskeyTemplate = ({
     >
       ${copy.cancel}
     </button>
-    <section class="c-marketing-block">
+    <section style="margin-top: 7em;" class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_passkey}</h3>
         <ul class="c-list c-list--bulleted">
+          <li>${copy.unique_key_pair}</li>
           <li>${copy.convenient_secure_replacement}</li>
           <li>${copy.enables_sign_by_unlocking}</li>
         </ul>

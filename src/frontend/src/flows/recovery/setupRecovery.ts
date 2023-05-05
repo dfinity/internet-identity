@@ -51,7 +51,7 @@ export const setupRecovery = async ({
       if (res === "error") {
         await displayError({
           title: "Failed to set up recovery",
-          message: "We failed to set up recovery for this Identity Anchor.",
+          message: "We failed to set up recovery for this Internet Identity.",
           primaryButton: "Retry",
         });
         continue;

@@ -237,7 +237,7 @@ export const styleguide = html`
               type="text"
               data-role="anchor-input"
               class="c-input c-input--vip c-input--spacious c-input--anchor"
-              placeholder="Enter anchor"
+              placeholder="Enter Internet Identity"
             />
           </label>
 

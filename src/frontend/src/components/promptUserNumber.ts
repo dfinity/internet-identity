@@ -20,7 +20,7 @@ const promptUserNumberTemplate = ({
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
-  const defaultMessage = "Please provide an Identity Anchor.";
+  const defaultMessage = "Please provide an Internet Identity.";
   const promptUserNumberSlot = html` <hgroup>
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${message ?? defaultMessage}</p>

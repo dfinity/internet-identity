@@ -1,7 +1,7 @@
 {
   "en": {
-    "title": "You successfully added a new device!",
+    "title": "You successfully added a new Passkey!",
     "continue_to_home": "Continue to Internet Identity",
-    "explore": "Explore the Internet Computer from your new device."
+    "explore": "Your new Passkey:"
   }
 }

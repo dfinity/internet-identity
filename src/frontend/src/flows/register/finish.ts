@@ -42,8 +42,8 @@ export const displayUserNumberTemplate = ({
                 elem.classList.add("is-copied");
               });
             } catch (e: unknown) {
-              toast.error("Unable to copy Identity Anchor");
-              console.error("Unable to copy Identity Anchor", e);
+              toast.error("Unable to copy Internet Identity");
+              console.error("Unable to copy Internet Identity", e);
             }
           }}
           >
@@ -76,9 +76,9 @@ export const displayUserNumberTemplate = ({
       </aside>
 
       <aside class="l-stack">
-        <h3 class="t-title">Is this number a secret?</h3>
+        <h3 class="t-title">Is this number secret?</h3>
         <ul class="c-list c-list--bulleted">
-          <li>No, this number is unique to you but it is not a secret.</li>
+          <li>No, this number is unique to you but it is not secret</li>
         </ul>
       </aside>
     </section>

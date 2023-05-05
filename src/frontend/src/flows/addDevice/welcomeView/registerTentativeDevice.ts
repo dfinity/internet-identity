@@ -32,7 +32,7 @@ export const registerTentativeDevice = async (
   // First, we need an alias for the device to (tentatively) add
   const alias = await promptDeviceAlias({
     title: "Add a Trusted Device",
-    message: html` What device do you want to add to anchor
+    message: html` What device do you want to add to Internet Identity
       <strong class="t-strong">${userNumber}</strong>?`,
   });
 

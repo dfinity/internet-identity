@@ -234,7 +234,7 @@ export const authnTemplates = (
                 withUserNumber((userNumber) => props.addDevice(userNumber))}
               id="addNewDeviceButton"
               class="t-link"
-              >Add a new device?</a
+              >Add a new Passkey?</a
             >
           </li>
           <li>
@@ -337,7 +337,7 @@ const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   const askUserNumber = async () => {
     const result = await promptUserNumber({
       title: "Add a Trusted Device",
-      message: "What’s your Identity Anchor?",
+      message: "What’s your Internet Identity?",
     });
     if (result === "canceled") {
       // TODO L2-309: do this without reload
