@@ -189,7 +189,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   );
 
   return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
+    <p class="t-centered t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
       chasmToggle()}>${info} <span class="t-link__icon c-chasm__button ${asyncReplace(
     btnFlipped
   )}">${caretDownIcon}</span></span>
