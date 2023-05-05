@@ -3,7 +3,7 @@ import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
 import { IIWebAuthnIdentity } from "$src/utils/iiConnection";
-import { renderPage, TemplateElement } from "$src/utils/lit-html";
+import { mount, renderPage, TemplateElement } from "$src/utils/lit-html";
 import { unknownToString } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
@@ -17,14 +17,17 @@ const savePasskeyTemplate = ({
   construct,
   i18n,
   cancel,
+  scrollTo = false,
 }: {
   construct: () => void;
   i18n: I18n;
   cancel: () => void;
+  /* put the CTA into view */
+  scrollTo?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <hgroup>
+    <hgroup ${scrollTo ? mount((e) => e.scrollIntoView()) : undefined}>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
         ${copy.select}
@@ -81,6 +84,7 @@ export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
     savePasskeyPage({
       i18n: new I18n(),
       cancel: () => resolve("canceled"),
+      scrollTo: true,
       construct: async () => {
         try {
           const identity = await withLoader(() => constructIdentity({}));
