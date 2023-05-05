@@ -24,12 +24,11 @@ export interface _SERVICE {
 // Autofills the <input> for the II Url to point to the correct canister.
 document.body.onload = () => {
   let iiUrl;
-  if (process.env.DFX_NETWORK === "local") {
-    iiUrl = `http://localhost:4943/?canisterId=${process.env.INTERNET_IDENTITY_CANISTER_ID}`;
-  } else if (process.env.DFX_NETWORK === "ic") {
+
+  if (process.env.DFX_NETWORK === "ic") {
     iiUrl = `https://${process.env.INTERNET_IDENTITY_CANISTER_ID}.ic0.app`;
   } else {
-    iiUrl = `https://${process.env.INTERNET_IDENTITY_CANISTER_ID}.dfinity.network`;
+    iiUrl = `http://localhost:4943/?canisterId=${process.env.INTERNET_IDENTITY_CANISTER_ID}`;
   }
   document.querySelector<HTMLInputElement>("#iiUrl")!.value = iiUrl;
 };
