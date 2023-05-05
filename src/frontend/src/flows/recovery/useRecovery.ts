@@ -28,7 +28,7 @@ export const useRecovery = async (
     return runRecovery(userNumber, connection);
   } else {
     const pUserNumber = await promptUserNumber({
-      title: "Recover Identity Anchor",
+      title: "Recover Internet Identity",
     });
     if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
@@ -46,7 +46,7 @@ const runRecovery = async (
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
-      message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
+      message: `You do not have any recovery devices configured for Internet Identity ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
     return window.location.reload() as never;
