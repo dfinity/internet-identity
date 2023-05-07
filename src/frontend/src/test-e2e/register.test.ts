@@ -11,10 +11,8 @@ import {
   waitToClose,
 } from "./util";
 import {
-  AddDeviceAliasView,
   AddDeviceSuccessView,
   AddIdentityAnchorView,
-  AddRemoteDeviceAliasView,
   AddRemoteDeviceInstructionsView,
   AddRemoteDeviceVerificationCodeView,
   AuthenticateView,
@@ -30,7 +28,7 @@ import {
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
 import { readFileSync } from "fs";
-import { II_URL, REPLICA_URL } from "./constants";
+import { DEVICE_NAME1, II_URL, REPLICA_URL } from "./constants";
 export const test_app_canister_ids = JSON.parse(
   readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
 );
@@ -38,9 +36,6 @@ export const test_app_canister_ids = JSON.parse(
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
 const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
 const TEST_APP_NICE_URL = "https://nice-name.com";
-
-const DEVICE_NAME1 = "Virtual WebAuthn device";
-const DEVICE_NAME2 = "Other WebAuthn device";
 
 test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -84,21 +79,17 @@ test("Register new identity and add additional device", async () => {
     );
     await addRemoteDeviceInstructionsView.addFIDODevice();
 
-    const addDeviceAliasView = new AddDeviceAliasView(browser);
-    await addDeviceAliasView.waitForDisplay();
-    await addDeviceAliasView.addAdditionalDevice(DEVICE_NAME2);
-    await addDeviceAliasView.continue();
-
     await browser.pause(10_000);
 
     // success page
-    const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+    const addDeviceSuccessView = new AddDeviceSuccessView(browser);
     await addDeviceSuccessView.waitForDisplay();
     await addDeviceSuccessView.continue();
 
     // home
-    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-    await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+    await mainView.waitForDisplay();
+    // Expect a second device with the default name
+    await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
 
     await mainView.logout();
     await FLOWS.login(userNumber, DEVICE_NAME1, browser);
@@ -125,19 +116,16 @@ test("Register new identity and add additional remote device", async () => {
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
       await browser2.url(addDeviceLink);
-      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
-      await addRemoteDeviceView.waitForDisplay();
-      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
-      await addRemoteDeviceView.continue();
 
-      const verificationCodeView =
-        await new AddRemoteDeviceVerificationCodeView(browser2);
+      const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
+        browser2
+      );
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
 
       // browser 1 again
       await focusBrowser(browser);
-      const verificationView = await new VerifyRemoteDeviceView(browser);
+      const verificationView = new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
@@ -145,13 +133,13 @@ test("Register new identity and add additional remote device", async () => {
       // Verify success on Browser 1
 
       // success page
-      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      const addDeviceSuccessView = new AddDeviceSuccessView(browser);
       await addDeviceSuccessView.waitForDisplay();
       await addDeviceSuccessView.continue();
 
       await mainView.waitForDisplay();
-      await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-      await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+      // Expect a second device with the default name
+      await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
 
       // Verify success on Browser 2
       // browser 2 again
@@ -167,8 +155,8 @@ test("Register new identity and add additional remote device", async () => {
 
       // main page signed-in
       const mainView2 = new MainView(browser2);
-      await mainView2.waitForDeviceDisplay(DEVICE_NAME1);
-      await mainView2.waitForDeviceDisplay(DEVICE_NAME2);
+      // Expect a second device with the default name
+      await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
     });
   });
 }, 300_000);
@@ -193,10 +181,6 @@ test("Register new identity and add additional remote device starting on new dev
       const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
       await addIdentityAnchorView2.waitForDisplay();
       await addIdentityAnchorView2.continue(userNumber);
-      const addRemoteDeviceView = new AddRemoteDeviceAliasView(browser2);
-      await addRemoteDeviceView.waitForDisplay();
-      await addRemoteDeviceView.selectAlias(DEVICE_NAME2);
-      await addRemoteDeviceView.continue();
 
       const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
       await notInRegistrationModeView.waitForDisplay();
@@ -212,26 +196,28 @@ test("Register new identity and add additional remote device starting on new dev
       // browser 2 again
       await focusBrowser(browser2);
       await notInRegistrationModeView.retry();
-      const verificationCodeView =
-        await new AddRemoteDeviceVerificationCodeView(browser2);
+      const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
+        browser2
+      );
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
 
       // browser 1 again
       await focusBrowser(browser);
-      const verificationView = await new VerifyRemoteDeviceView(browser);
+      const verificationView = new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
       await verificationView.continue();
 
       // success page
-      const addDeviceSuccessView = await new AddDeviceSuccessView(browser);
+      const addDeviceSuccessView = new AddDeviceSuccessView(browser);
       await addDeviceSuccessView.waitForDisplay();
       await addDeviceSuccessView.continue();
     });
 
     await mainView.waitForDisplay();
-    await mainView.waitForDeviceDisplay(DEVICE_NAME2);
+    // Expect a second device with the default name
+    await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
   });
 }, 300_000);
 

@@ -1,13 +1,14 @@
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
 import { promptUserNumber } from "$src/components/promptUserNumber";
-import { constructIdentity } from "$src/flows/register/construct";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowResult } from "$src/utils/flowResult";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { isRecoveryPhrase } from "$src/utils/recoveryDevice";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
+import { constructIdentity } from "$src/utils/webAuthn";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
@@ -28,7 +29,7 @@ export const useRecovery = async (
     return runRecovery(userNumber, connection);
   } else {
     const pUserNumber = await promptUserNumber({
-      title: "Recover Identity Anchor",
+      title: "Recover Internet Identity",
     });
     if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
@@ -46,7 +47,7 @@ const runRecovery = async (
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
-      message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
+      message: `You do not have any recovery devices configured for Internet Identity ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
     return window.location.reload() as never;
@@ -62,8 +63,8 @@ const runRecovery = async (
         userNumber,
         connection,
         device,
-        message: html`Type your recovery phrase below to access your anchor
-          <strong class="t-strong">${userNumber}</strong>`,
+        message: html`Type your recovery phrase below to access your Internet
+          Identity <strong class="t-strong">${userNumber}</strong>`,
       })
     : await deviceRecoveryPage(userNumber, connection, device);
 
@@ -141,12 +142,13 @@ const enrollAuthenticator = async ({
 }): Promise<"enrolled" | "error"> => {
   let newDevice;
   try {
-    newDevice = await constructIdentity({
-      devices: async () => {
-        return (await connection.getAnchorInfo()).devices;
-      },
-      message: "Enrolling device...",
-    });
+    newDevice = await withLoader(() =>
+      constructIdentity({
+        devices: async () => {
+          return (await connection.getAnchorInfo()).devices;
+        },
+      })
+    );
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
@@ -185,7 +187,7 @@ const enrollAuthenticator = async ({
       message:
         "Something went wrong when we were trying to remember this device. Could you try again?",
       detail:
-        "The device could not be added to the anchor: " +
+        "The Passkey could not be added to the Internet Identity: " +
         unknownToString(error, "unknown error"),
       primaryButton: "Ok",
     });

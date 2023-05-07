@@ -31,11 +31,11 @@ const showVerificationCodeTemplate = ({
   cancel: () => void;
 }) => {
   const pageContentSlot = html` <hgroup>
-      <h1 class="t-title t-title--main">Verify New Device</h1>
-      <p class="t-paragraph">Your new device:</p>
+      <h1 class="t-title t-title--main">Verify New Passkey</h1>
+      <p class="t-paragraph">Your new Passkey:</p>
       <output
         class="c-input c-input--readonly t-vip t-vip--small"
-        aria-label="Device Alias"
+        aria-label="Passkey Alias"
         >${alias}</output
       >
       <p class="t-paragraph">

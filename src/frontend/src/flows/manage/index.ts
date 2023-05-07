@@ -13,10 +13,11 @@ import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
+import { BASE_URL } from "$src/environment";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
-import { dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
@@ -28,13 +29,14 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { unreachable } from "$src/utils/utils";
+import { shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
   protectDevice,
+  renameDevice,
   resetPhrase,
   unprotectDevice,
 } from "./deviceSettings";
@@ -42,53 +44,56 @@ import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
 
 /* Template for the authbox when authenticating to II */
-export const authnTemplateManage = (): AuthnTemplates => {
+export const authnTemplateManage = ({
+  dapps,
+}: {
+  dapps: DappDescription[];
+}): AuthnTemplates => {
   const wrap = ({
-    slot,
-    title,
+    showDapps = false,
   }: {
-    slot: string;
-    title: string;
+    showDapps?: boolean;
   }): TemplateResult => html`
-    <header class="t-centered">
-      <h1 class="t-title t-title--main">${title}</h1>
-      <p class="t-lead">${slot}</p>
+    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
+    <header class="t-centered" style="text-align: left;">
+      <h1 class="t-title t-title--main">
+        Securely connect to dapps on the Internet Computer
+      </h1>
     </header>
   `;
   return {
     firstTime: {
       slot: wrap({
-        slot: `to dapps on the Internet Computer`,
-        title: "Securely Connect",
+        showDapps: true,
       }),
-      useExistingText: "Manage Existing",
-      createAnchorText: "Create Identity Anchor",
+      useExistingText: "Use existing",
+      createAnchorText: "Create Internet Identity",
     },
     useExisting: {
-      slot: wrap({
-        slot: `to continue to Internet Identity`,
-        title: "Enter your Anchor",
-      }),
+      slot: wrap({}),
     },
 
     pick: {
-      slot: wrap({
-        slot: "to continue to Internet Identity",
-        title: "Choose an Anchor",
-      }),
+      slot: wrap({}),
     },
   };
 };
 
 /* the II authentication flow */
 export const authFlowManage = async (connection: Connection, i18n: I18n) => {
+  const dapps = shuffleArray(await getDapps());
   // Go through the login flow, potentially creating an anchor.
-  const { userNumber, connection: authenticatedConnection } =
-    await authenticateBox(connection, i18n, authnTemplateManage());
+  const {
+    userNumber,
+    connection: authenticatedConnection,
+    newAnchor,
+  } = await authenticateBox(connection, i18n, authnTemplateManage({ dapps }));
 
-  // Here, if the user doesn't have any recovery device, we prompt them to add
+  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
-  await recoveryWizard(userNumber, authenticatedConnection);
+  if (!newAnchor) {
+    await recoveryWizard(userNumber, authenticatedConnection);
+  }
   // From here on, the user is authenticated to II.
   void renderManage(userNumber, authenticatedConnection);
 };
@@ -131,12 +136,9 @@ const displayManageTemplate = ({
     isNullish(recoveries.recoveryPhrase) &&
     isNullish(recoveries.recoveryKey);
 
-  const pageContentSlot = html` <section>
+  const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
-      <h1 class="t-title t-title--main">Manage your Anchor</h1>
-      <p class="t-lead">
-        Add devices and recovery methods to make your anchor more secure.
-      </p>
+      <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
     ${anchorSection(userNumber)}
     <p class="t-paragraph">
@@ -145,7 +147,7 @@ const displayManageTemplate = ({
         click: () => exploreDapps(),
         copy: {
           dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Sign into dapps",
+          sign_into_dapps: "Connect to these dapps",
         },
       })}
     </p>
@@ -159,19 +161,29 @@ const displayManageTemplate = ({
   </section>`;
 
   return mainWindow({
+    isWideContainer: true,
     slot: pageContentSlot,
   });
 };
 
 const anchorSection = (userNumber: bigint): TemplateResult => html`
   <aside class="l-stack">
-    <h2 class="t-title">Identity Anchor</h2>
-    <output
-      class="c-input c-input--vip c-input--readonly t-vip"
-      aria-label="User Number"
-      data-usernumber
-      >${userNumber}</output
+    <div
+      class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
+      <div class="c-input--id__wrap">
+        <img class="c-input--id__art" src="${BASE_URL}image.png" alt="" />
+        <h2 class="c-input--id__caption">Internet Identity:</h2>
+        <output
+          class="c-input--id__value"
+          class="t-vip"
+          aria-label="usernumber"
+          id="userNumber"
+          data-usernumber="${userNumber}"
+          >${userNumber}</output
+        >
+      </div>
+    </div>
   </aside>
 `;
 
@@ -389,6 +401,7 @@ export const devicesFromDeviceDatas = ({
       acc.authenticators.push({
         alias: device.alias,
         warn: domainWarning(device),
+        rename: () => renameDevice({ connection, device, reload }),
         remove: hasSingleDevice
           ? undefined
           : () => deleteDevice({ connection, device, reload }),
@@ -419,19 +432,19 @@ export const domainWarning = (
 
   // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
   if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
   if (isNullish(deviceOrigin)) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 
   // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
   if (deviceOrigin !== window.origin) {
-    return html`This device may not be usable on the current URL
+    return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
 
@@ -440,15 +453,4 @@ export const domainWarning = (
 
 const unknownError = (): Error => {
   return new Error("Unknown error");
-};
-
-// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
-// avoid shuffling in place.
-const shuffleArray = <T>(array_: T[]): T[] => {
-  const array = [...array_];
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 };

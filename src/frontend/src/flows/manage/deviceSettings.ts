@@ -1,4 +1,5 @@
 import { DeviceData } from "$generated/internet_identity_types";
+import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { recoverWithPhrase } from "$src/flows/recovery/recoverWith/phrase";
@@ -16,6 +17,38 @@ import {
 import { unknownToString, unreachable } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 
+/* Rename the device and return */
+export const renameDevice = async ({
+  connection,
+  device,
+  reload,
+}: {
+  connection: AuthenticatedConnection;
+  device: DeviceData;
+  reload: () => void;
+}) => {
+  const confirmed = confirm("Choose a nickname for this passkey.");
+  if (!confirmed) {
+    return;
+  }
+
+  const alias = await promptDeviceAlias({
+    title: "Passkey Nickname",
+    message: "Choose a nickname for this Passkey",
+  });
+  if (alias === null) {
+    reload();
+    return;
+  }
+
+  device.alias = alias;
+
+  await withLoader(async () => {
+    await connection.update(device);
+  });
+  reload();
+  return;
+};
 /* Remove the device and return */
 export const deleteDevice = async ({
   connection,

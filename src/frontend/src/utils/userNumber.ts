@@ -136,7 +136,7 @@ const readAnchors = (): Anchors => {
   }
 
   if (typeof item !== "object") {
-    console.warn("bad anchors", item, "type is", typeof item);
+    console.warn("bad identity", item, "type is", typeof item);
     return {};
   }
 
@@ -149,7 +149,7 @@ const readAnchors = (): Anchors => {
   for (const ix in objects) {
     const anchor = asAnchor(objects[ix]);
     if (isNullish(anchor)) {
-      console.warn("Could not read anchor", objects[ix]);
+      console.warn("Could not read Internet Identity", objects[ix]);
       continue;
     }
 

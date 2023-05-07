@@ -14,19 +14,12 @@ export const FLOWS = {
   ): Promise<string> {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
-    await registerView.enterAlias(deviceName);
     await registerView.create();
     await registerView.waitForRegisterConfirm();
     await registerView.confirmRegisterConfirm();
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.remindLater();
     return userNumber;
   },
   registerNewIdentityWelcomeView: async (

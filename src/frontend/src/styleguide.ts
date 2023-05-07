@@ -1,5 +1,4 @@
 /** A showcase of common CSS patterns that can be reuses all all over the app */
-import { html } from "lit-html";
 import {
   checkmarkIcon,
   copyIcon,
@@ -7,11 +6,12 @@ import {
   icLogo,
   settingsIcon,
   warningIcon,
-} from "./components/icons";
-import { formModal } from "./components/modal";
-import { toast } from "./components/toast";
-import { warnBox } from "./components/warnBox";
-import "./styles/main.css";
+} from "$src/components/icons";
+import { formModal } from "$src/components/modal";
+import { toast } from "$src/components/toast";
+import { warnBox } from "$src/components/warnBox";
+import "$src/styles/main.css";
+import { html } from "lit-html";
 
 // these words are never longer than 8 characters
 // according to the bip39 spec
@@ -237,7 +237,7 @@ export const styleguide = html`
               type="text"
               data-role="anchor-input"
               class="c-input c-input--vip c-input--spacious c-input--anchor"
-              placeholder="Enter anchor"
+              placeholder="Enter Internet Identity"
             />
           </label>
 

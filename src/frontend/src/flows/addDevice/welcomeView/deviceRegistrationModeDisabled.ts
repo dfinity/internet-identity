@@ -15,24 +15,23 @@ const deviceRegistrationDisabledInfoTemplate = ({
   const pageContentSlot = html` <article>
     <hgroup>
       <h1 class="t-title t-title--main">
-        Enroll this device from a registered device
+        Use another Passkey to register this device
       </h1>
       <p class="t-lead">
-        If you want to add this device, follow the instructions below
-        <strong class="t-strong"
-          >on a device that Internet Identity already trusts:</strong
-        >
+        If you want to use this device to create a new Passkey, connect to
+        Internet Identity with an existing Passkey. Follow these instructions:
       </p>
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
         Log into
         <strong class="t-strong">${LEGACY_II_URL_NO_PROTOCOL}</strong> with your
-        Identity Anchor (<strong class="t-strong">${userNumber}</strong>)
+        Internet Identity (<strong class="t-strong">${userNumber}</strong>)
+        using an existing Passkey
       </li>
       <li>
         Once you are logged in, click “<strong class="t-string"
-          >Add new device</strong
+          >Add new Passkey</strong
         >”
       </li>
     </ol>

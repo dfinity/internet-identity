@@ -37,8 +37,8 @@ import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
-import { renderConstructing } from "$src/flows/register/construct";
 import { displayUserNumberPage } from "$src/flows/register/finish";
+import { savePasskeyPage } from "$src/flows/register/passkey";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
@@ -114,20 +114,24 @@ const authnCnfg = {
   onSubmit: (anchor: bigint) => console.log("Submitting anchor", anchor),
 };
 
+const dapps = await getDapps();
+
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
+  dapps,
   i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  dapps,
   i18n,
 });
 
 const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
 const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
 
-const manageTemplates = authnTemplateManage();
+const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
@@ -197,7 +201,15 @@ const iiPages: Record<string, () => void> = {
     }),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
-  constructing: () => renderConstructing({}),
+  savePasskey: () =>
+    savePasskeyPage({
+      i18n,
+      cancel: () => console.log("cancel"),
+      construct: () =>
+        new Promise((_) => {
+          console.log("Identity Construction");
+        }),
+    }),
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
@@ -231,7 +243,7 @@ const iiPages: Record<string, () => void> = {
       cancel: () => console.log("canceled"),
       title: html`Choose a Recovery Method`,
       message: html`We recommend that you create at least one recovery method in
-      case you lose access to your devices.`,
+      case you lose your Passkeys.`,
       cancelText: html`Skip, I understand the risks`,
     }),
   displaySingleDeviceWarning: () =>
@@ -242,8 +254,7 @@ const iiPages: Record<string, () => void> = {
         return Promise.resolve();
       }
     ),
-  displayManage: async () => {
-    const dapps = await getDapps();
+  displayManage: () => {
     displayManagePage({
       userNumber,
       devices: {
@@ -251,14 +262,17 @@ const iiPages: Record<string, () => void> = {
           {
             alias: "Chrome on iPhone",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
             warn: html`Something is rotten in the state of Device`,
           },
         ],
@@ -285,14 +299,14 @@ const iiPages: Record<string, () => void> = {
       },
     });
   },
-  displayManageSingle: async () => {
-    const dapps = await getDapps();
+  displayManageSingle: () => {
     displayManagePage({
       userNumber,
       devices: {
         authenticators: [
           {
             alias: "Chrome on iPhone",
+            rename: () => console.log("rename"),
           },
         ],
         recoveries: {},
@@ -357,7 +371,8 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  loader: () => withLoader(() => new Promise(() => renderConstructing({}))),
+  loader: () =>
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();
@@ -401,8 +416,7 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: async () => {
-    const dapps = await getDapps();
+  dappsExplorer: () => {
     dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
   },
   showMessage: () =>

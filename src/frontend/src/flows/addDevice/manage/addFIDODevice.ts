@@ -1,7 +1,7 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { inferAlias, loadUAParser } from "$src/flows/register";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
@@ -39,6 +39,8 @@ export const addFIDODevice = async (
   connection: AuthenticatedConnection,
   devices: DeviceData[]
 ): Promise<void> => {
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
   let newDevice: WebAuthnIdentity;
   try {
     newDevice = await WebAuthnIdentity.create({
@@ -56,11 +58,12 @@ export const addFIDODevice = async (
     }
     return;
   }
-  const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });
-  if (deviceName === null) {
-    // user clicked "cancel", so we return
-    return;
-  }
+
+  const deviceName = await inferAlias({
+    authenticatorType: newDevice.getAuthenticatorAttachment(),
+    userAgent: navigator.userAgent,
+    uaParser,
+  });
   try {
     await withLoader(() =>
       connection.add(

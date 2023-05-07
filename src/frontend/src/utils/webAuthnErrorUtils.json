@@ -1,8 +1,8 @@
 {
   "en": {
-    "duplicate_device_title": "Duplicate Device",
-    "duplicate_device_message": "This device has already been added to your anchor. Try signing in directly.",
-    "duplicate_device_detail": "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
+    "duplicate_device_title": "Duplicate Passkey credential",
+    "duplicate_device_message": "This Passkey has already been added to your Internet Identity. Try signing in directly.",
+    "duplicate_device_detail": "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Internet Identity.",
     "cancel_title": "Operation canceled",
     "cancel_message": "The interaction with your security device was canceled or timed out. Please try again."
   }

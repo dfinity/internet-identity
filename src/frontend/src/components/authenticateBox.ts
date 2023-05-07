@@ -1,4 +1,3 @@
-import { PORTAL_II_URL } from "$src/config";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
 import { I18n } from "$src/i18n";
@@ -23,6 +22,14 @@ import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
 import { displayError } from "./displayError";
+import {
+  controlIcon,
+  githubBigIcon,
+  participateIcon,
+  privacyIcon,
+  secureIcon,
+  signInIcon,
+} from "./icons";
 import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
@@ -51,19 +58,30 @@ export const authenticateBox = async (
   connection: Connection,
   i18n: I18n,
   templates: AuthnTemplates
-): Promise<LoginData> => {
+): Promise<LoginData & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    new Promise<LoginFlowResult>((resolve) => {
+    new Promise<LoginFlowResult & { newAnchor: boolean }>((resolve) => {
       const pages = authnPages(i18n, {
         ...templates,
         addDevice: (userNumber) => asNewDevice(connection, userNumber),
-        onSubmit: (userNumber) => {
-          resolve(authenticate(connection, userNumber));
+        onSubmit: async (userNumber) => {
+          resolve({
+            newAnchor: false,
+            ...(await authenticate(connection, userNumber)),
+          });
         },
-        register: () => {
-          resolve(registerIfAllowed(connection));
+        register: async () => {
+          resolve({
+            ...(await registerIfAllowed(connection)),
+            newAnchor: true,
+          });
         },
-        recover: (userNumber) => resolve(useRecovery(connection, userNumber)),
+        recover: async (userNumber) => {
+          resolve({
+            ...(await useRecovery(connection, userNumber)),
+            newAnchor: false,
+          });
+        },
       });
 
       // If there _are_ some anchors, then we show the "pick" screen, otherwise
@@ -81,11 +99,11 @@ export const authenticateBox = async (
 
   // Retry until user has successfully authenticated
   for (;;) {
-    const result = await promptAuth();
+    const { newAnchor, ...result } = await promptAuth();
     const loginData = await handleLoginFlowResult(result);
 
     if (nonNullish(loginData)) {
-      return loginData;
+      return { ...loginData, newAnchor };
     }
   }
 };
@@ -129,26 +147,32 @@ export const authnTemplates = (
 
   const marketingBlocks = [
     {
+      icon: secureIcon,
       title: copy.secure_and_convenient,
       body: copy.instead_of_passwords,
     },
     {
+      icon: privacyIcon,
       title: copy.no_tracking,
       body: copy.get_privacy,
     },
     {
+      icon: controlIcon,
       title: copy.control_your_identity,
       body: copy.securely_access,
     },
     {
+      icon: participateIcon,
       title: copy.own_and_participate,
       body: copy.share_and_vote,
     },
     {
+      icon: signInIcon,
       title: copy.sign_in_to_web3,
       body: copy.manages_keys,
     },
     {
+      icon: githubBigIcon,
       title: copy.opensource_and_transparent,
       body: copy.internet_identity_codebase,
     },
@@ -175,24 +199,20 @@ export const authnTemplates = (
             ${props.firstTime.useExistingText}
           </button>
         </div>
-        ${marketingBlocks.map(
-          ({ title, body }) =>
-            html`
-              <div class="c-marketing-block">
-                <h2 class="t-title t-title--main">${title}</h2>
-                <p class="t-paragraph t-weak">${body}</p>
-              </div>
-            `
-        )}
-        <p class="t-paragraph t-centered l-stack">
-          <a
-            class="t-link"
-            href=${PORTAL_II_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            >Learn More</a
-          >
-        </p>`;
+        <div class="c-marketing-section">
+          ${marketingBlocks.map(
+            ({ title, body, icon }) =>
+              html`
+                <article class="c-marketing-block">
+                  ${icon !== undefined
+                    ? html`<i class="c-icon c-icon--marketing">${icon}</i>`
+                    : undefined}
+                  <h2 class="t-title t-title--main">${title}</h2>
+                  <p class="t-paragraph t-paragraph--weak">${body}</p>
+                </article>
+              `
+          )}
+        </div> `;
     },
     useExisting: () => {
       const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
@@ -214,7 +234,7 @@ export const authnTemplates = (
                 withUserNumber((userNumber) => props.addDevice(userNumber))}
               id="addNewDeviceButton"
               class="t-link"
-              >Add a new device?</a
+              >Add a new Passkey?</a
             >
           </li>
           <li>
@@ -317,7 +337,7 @@ const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   const askUserNumber = async () => {
     const result = await promptUserNumber({
       title: "Add a Trusted Device",
-      message: "What’s your Identity Anchor?",
+      message: "What’s your Internet Identity?",
     });
     if (result === "canceled") {
       // TODO L2-309: do this without reload

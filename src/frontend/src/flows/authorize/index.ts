@@ -5,13 +5,15 @@ import {
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon, spinner } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
+import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { DynamicKey, I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
-import { TemplateElement, withRef } from "$src/utils/lit-html";
-import { unreachable } from "$src/utils/utils";
+import { TemplateElement } from "$src/utils/lit-html";
+import { Chan, shuffleArray, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
 import { nonNullish } from "@dfinity/utils";
@@ -21,10 +23,12 @@ import copyJson from "./index.json";
 export const authnTemplateAuthorize = ({
   origin,
   derivationOrigin,
+  dapps,
   i18n,
 }: {
   origin: string;
   derivationOrigin?: string;
+  dapps: DappDescription[];
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
@@ -39,29 +43,46 @@ export const authnTemplateAuthorize = ({
         })
       : undefined;
 
-  const wrap = (title: DynamicKey) => html`
-    <div class="t-centered">
-      <h1 class="t-title t-title--main">${title}</h1>
-      <p class="t-lead">
+  const wrap = ({
+    showDapps = false,
+    title,
+  }: {
+    showDapps?: boolean;
+    title: DynamicKey;
+  }) => html`
+    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
+    <div class="l-stack">
+      <h1 class="t-title t-title--main" style="text-align: left;">${title}</h1>
+      <p class="t-lead l-stack">
         ${copy.to_continue_to}
-        <a href="${origin}" target="_blank" rel="noopener noreferrer"
-          >${origin}</a
-        ><br />
+        <div class="l-stack l-stack--tight">
+          <strong class="t-strong"
+            >${origin}</strong
+          >
+        </div>
       </p>
       ${chasm}
     </div>
   `;
   return {
     firstTime: {
-      slot: wrap(copy.first_time_create),
+      slot: wrap({ showDapps: true, title: copy.first_time_create }),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap(copy.use_existing_enter_anchor),
+      slot: wrap({
+        title: html`<div>
+          ${copy.use_existing_enter_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
     pick: {
-      slot: wrap(copy.pick_choose_anchor),
+      slot: wrap({
+        title: html`<div>
+          ${copy.pick_choose_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
   };
 };
@@ -90,16 +111,23 @@ export const authFlowAuthorize = async (
     );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
+      const dapps = shuffleArray(await getDapps());
       const authSuccess = await authenticateBox(
         connection,
         i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
+          dapps,
           i18n,
         })
       );
-      await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+
+      // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
+      // one. The exact flow depends on the device they use.
+      if (!authSuccess.newAnchor) {
+        await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+      }
       return authSuccess;
     },
     onInvalidOrigin: (result) =>
@@ -162,39 +190,24 @@ type ChasmOpts = {
 };
 
 const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
-  /* the chasm that opens to reveal details about alternative origin */
-  const chasmRef: Ref<HTMLDivElement> = createRef();
-
-  /* the (purely visual) arrow on the chasm */
-  const chasmToggleRef: Ref<HTMLSpanElement> = createRef();
-
   /* Toggle the chasm open/closed */
-  const chasmToggle = () =>
-    withRef(chasmRef, (chasm) => {
-      const expanded = chasm.getAttribute("aria-expanded") === "true";
-      if (!expanded) {
-        chasm.setAttribute("aria-expanded", "true");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.add("c-chasm__button--flipped")
-        );
-      } else {
-        chasm.setAttribute("aria-expanded", "false");
-
-        withRef(chasmToggleRef, (arrow) =>
-          arrow.classList.remove("c-chasm__button--flipped")
-        );
-      }
-    });
+  const ariaExpanded = new Chan(false);
+  const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const btnFlipped = ariaExpanded.map((expanded) =>
+    expanded ? "c-chasm__button--flipped" : undefined
+  );
 
   return html`
-    <p class="t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click="${chasmToggle}" >${info} <span ${ref(
-    chasmToggleRef
-  )} class="t-link__icon c-chasm__button">${caretDownIcon}</span></span>
-      <div ${ref(chasmRef)} class="c-chasm" aria-expanded="false">
-        <div class="c-chasm__arrow"></div>
-        <div class="t-weak c-chasm__content">
-            ${message}
+    <p class="t-centered t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
+      chasmToggle()}>${info} <span class="t-link__icon c-chasm__button ${asyncReplace(
+    btnFlipped
+  )}">${caretDownIcon}</span></span>
+      <div class="c-chasm" aria-expanded=${asyncReplace(ariaExpanded)}>
+        <div class="c-chasm__inner">
+          <div class="c-chasm__arrow"></div>
+          <div class="t-weak c-chasm__content">
+              ${message}
+          </div>
         </div>
       </div>
     </p>

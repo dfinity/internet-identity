@@ -8,7 +8,7 @@ const pageContent = () => {
     ${warnBox({
       title: "Warning",
       message:
-        "You will lose access to your identity anchor if you clear your history and website data on Safari and iOS!",
+        "You will lose access to your Internet Identity if you clear your history and website data on Safari and iOS!",
       slot: html`
         <p class="t-paragraph">
           Make sure you have at least one recovery method.

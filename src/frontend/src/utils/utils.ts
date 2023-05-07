@@ -173,7 +173,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
   protected parent?: unknown;
 
-  private latest: A;
+  public latest: A;
 
   // Constructor with latest which is "initial" and then latest
   constructor(initial: A) {
@@ -314,4 +314,15 @@ export function delayMillis(millis: number) {
   return new Promise<void>((resolve) => {
     setTimeout(() => resolve(), millis);
   });
+}
+
+// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
+// avoid shuffling in place.
+export function shuffleArray<T>(array_: T[]): T[] {
+  const array = [...array_];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }

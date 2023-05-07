@@ -25,6 +25,7 @@ impl ContentType {
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
             ContentType::PNG => "image/png".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
+            ContentType::WOFF2 => "application/font-woff2".to_string(),
         }
     }
 }
@@ -402,7 +403,7 @@ pub fn content_security_policy_meta() -> String {
          form-action 'none';\
          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
          style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-         font-src https://fonts.gstatic.com;"
+         font-src 'self' https://fonts.gstatic.com;"
     );
     #[cfg(not(feature = "insecure_requests"))]
     let csp = format!("{csp}upgrade-insecure-requests;");

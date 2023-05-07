@@ -16,10 +16,14 @@ export class WelcomeView extends View {
   }
 
   async login(): Promise<void> {
+    await this.browser.$("#loginButton").waitForDisplayed();
+    await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
   }
 
   async register(): Promise<void> {
+    await this.browser.$("#registerButton").waitForDisplayed();
+    await this.browser.$("#registerButton").scrollIntoView();
     await this.browser.$("#registerButton").click();
   }
 
@@ -29,12 +33,16 @@ export class WelcomeView extends View {
   }
 
   async recover(): Promise<void> {
+    await this.browser.$("#loginButton").waitForDisplayed();
+    await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
+    await this.browser.$("#recoverButton").waitForDisplayed();
+    await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
   }
 }
 
-export class RegisterView extends View {
+export class RenameView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#pickAliasInput")
@@ -45,8 +53,20 @@ export class RegisterView extends View {
     await this.browser.$("#pickAliasInput").setValue(alias);
   }
 
-  async create(): Promise<void> {
+  async submit(): Promise<void> {
     await this.browser.$("#pickAliasSubmit").click();
+  }
+}
+
+export class RegisterView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-action="construct-identity"')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async create(): Promise<void> {
+    await this.browser.$('[data-action="construct-identity"').click();
   }
 
   // View: Register confirmation
@@ -192,8 +212,15 @@ export class RecoveryMethodSelectorView extends View {
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Manage your Anchor']")
+      .$('[data-role="identity-management"]')
       .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
+    const elems = await this.browser.$$(`//li[@data-device="${deviceName}"]`);
+    if (elems.length !== count) {
+      throw Error("Bad number of elements");
+    }
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -222,6 +249,30 @@ export class MainView extends View {
 
   async addRecovery(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
+  }
+
+  async rename(deviceName: string, newName: string): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    await this.browser
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .waitForClickable();
+    await this.browser
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.browser.acceptAlert();
+
+    const renameView = new RenameView(this.browser);
+    await renameView.waitForDisplay();
+    await renameView.enterAlias(newName);
+    await renameView.submit();
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
@@ -315,22 +366,6 @@ export class MainView extends View {
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
-  }
-}
-
-export class AddDeviceAliasView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#pickAliasSubmit")
-      .waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async addAdditionalDevice(alias: string): Promise<void> {
-    await this.browser.$("#pickAliasInput").setValue(alias);
-  }
-
-  async continue(): Promise<void> {
-    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 
@@ -620,7 +655,7 @@ export class DemoAppView extends View {
 export class RecoverView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$(`//h1[string()='Recover Identity Anchor']`)
+      .$(`//h1[string()='Recover Internet Identity']`)
       .waitForDisplayed({ timeout: 5_000 });
   }
 

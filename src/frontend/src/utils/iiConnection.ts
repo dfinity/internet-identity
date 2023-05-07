@@ -180,7 +180,7 @@ export class Connection {
       return { kind: "registerNoSpace" };
     } else if ("registered" in registerResponse) {
       const userNumber = registerResponse.registered.user_number;
-      console.log(`registered Identity Anchor ${userNumber}`);
+      console.log(`registered Internet Identity ${userNumber}`);
       return {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
