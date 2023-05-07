@@ -1,7 +1,7 @@
 /* A couple of lit-html helpers */
 
 import { toast } from "$src/components/toast";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { render, TemplateResult } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
@@ -33,7 +33,7 @@ export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
  */
 export const mount = (callback: (elem: Element) => void): DirectiveResult =>
   ref((e: Element | undefined) => {
-    if (e !== undefined) {
+    if (nonNullish(e)) {
       // This works by observing the entire document for mutations, under
       // the assumption that the first DOM mutation to happen after the element
       // was created is inserting the element (or its parent) in the DOM. This

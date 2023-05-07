@@ -122,7 +122,7 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       <div class="c-action-list__label">
         ${alias}
-        ${dupCount !== undefined && dupCount > 0
+        ${nonNullish(dupCount) && dupCount > 0
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
       </div>

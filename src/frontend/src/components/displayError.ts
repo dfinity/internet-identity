@@ -1,4 +1,5 @@
 import { TemplateElement } from "$src/utils/lit-html";
+import { nonNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";
 import { mainWindow } from "./mainWindow";
 import { warnBox } from "./warnBox";
@@ -19,15 +20,14 @@ const pageContent = (options: ErrorOptions) =>
         title: options.title,
         message: options.message,
         htmlElement: "div",
-        slot:
-          options.detail !== undefined
-            ? html`<div class="l-stack">
-                <h4>Error details:</h4>
-                <pre data-role="error-detail" class="t-paragraph">
+        slot: nonNullish(options.detail)
+          ? html`<div class="l-stack">
+              <h4>Error details:</h4>
+              <pre data-role="error-detail" class="t-paragraph">
 ${options.detail}</pre
-                >
-              </div>`
-            : undefined,
+              >
+            </div>`
+          : undefined,
       })}
 
       <div class="l-stack">

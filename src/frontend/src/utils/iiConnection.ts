@@ -38,7 +38,7 @@ import {
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
@@ -293,7 +293,7 @@ export class Connection {
     const device = findDeviceByPubkey(devices, pubkey);
 
     // only update devices without origin information
-    if (device !== undefined && device.origin.length === 0) {
+    if (nonNullish(device) && device.origin.length === 0) {
       device.origin satisfies string[];
       // we purposely do not await the promise as we just optimistically update
       // if it fails, no harm done
@@ -558,7 +558,7 @@ export class AuthenticatedConnection extends Connection {
       this.userNumber,
       hostname,
       sessionKey,
-      maxTimeToLive !== undefined ? [maxTimeToLive] : []
+      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
     );
   };
 
