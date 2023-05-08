@@ -95,7 +95,7 @@ export const displayUserNumberTemplate = ({
 };
 
 // A non-exported wrapper around HTMLImageElement, to ensure this exact image is loaded
-// (a no other image is passed as an argument to this page)
+// (and no other image is passed as an argument to this page)
 class IdentityBackground {
   public img: HTMLImageElement;
 
