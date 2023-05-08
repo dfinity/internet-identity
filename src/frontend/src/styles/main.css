@@ -117,6 +117,7 @@
   --vc-brand-blue--dark: #1f6ef4;
   --vc-brand-green: #79d11c;
   --vc-brand-alt: rgba(215, 205, 235, 1);
+  --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
 
   /**
@@ -620,7 +621,7 @@ a:hover,
 .l-container {
   position: relative;
   font-size: 1.6rem;
-  min-width: 30rem;
+  min-width: 40rem;
   max-width: 40rem;
   /* centers the container and adds a bit of space to make sure the footer does not stick to it */
   margin: 0 auto 2rem;
@@ -1299,6 +1300,10 @@ a:hover,
   border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
+}
+
+.c-input::placeholder {
+  color: var(--vc-grey);
 }
 
 .c-button-group {

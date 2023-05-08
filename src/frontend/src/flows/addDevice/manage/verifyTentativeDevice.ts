@@ -67,7 +67,7 @@ const verifyTentativeDeviceTemplate = ({
   };
 
   const pageContentSlot = html`<h1 class="t-title t-title--main">
-      Do you trust this device with your Identity Anchor?
+      Do you want to create this Passkey for your Internet Identity?
     </h1>
     <output class="c-input c-input--readonly t-vip t-vip--small"
       >${alias}</output
@@ -75,7 +75,7 @@ const verifyTentativeDeviceTemplate = ({
     <p class="t-paragraph">
       If you trust this device to use and manage your Internet Identity, enter
       the <strong class="t-strong">Verification Code</strong> displayed on your
-      new device:
+      other window:
     </p>
     <label class="l-stack" aria-label="Verification Code">
       <p class="t-paragraph ${asyncReplace(retryPromptHidden)}">
@@ -100,7 +100,7 @@ const verifyTentativeDeviceTemplate = ({
 
     <div class="l-stack">
       <button @click=${() => submit()} id="verifyDevice" class="c-button">
-        Verify Device
+        Verify Passkey
       </button>
       <button @click=${() => cancel()} class="c-button c-button--secondary">
         Cancel

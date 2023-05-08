@@ -15,6 +15,7 @@ import {
   isCancel,
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
+import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { deviceRecoveryPage } from "./recoverWith/device";
@@ -24,11 +25,11 @@ export const useRecovery = async (
   connection: Connection,
   userNumber?: bigint
 ): Promise<LoginFlowResult> => {
-  if (userNumber !== undefined) {
+  if (nonNullish(userNumber)) {
     return runRecovery(userNumber, connection);
   } else {
     const pUserNumber = await promptUserNumber({
-      title: "Recover Identity Anchor",
+      title: "Recover Internet Identity",
     });
     if (pUserNumber !== "canceled") {
       return runRecovery(pUserNumber, connection);
@@ -46,7 +47,7 @@ const runRecovery = async (
   if (recoveryDevices.length === 0) {
     await displayError({
       title: "Failed to recover",
-      message: `You do not have any recovery devices configured for anchor ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
+      message: `You do not have any recovery devices configured for Internet Identity ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
       primaryButton: "Go back",
     });
     return window.location.reload() as never;
@@ -62,8 +63,8 @@ const runRecovery = async (
         userNumber,
         connection,
         device,
-        message: html`Type your recovery phrase below to access your anchor
-          <strong class="t-strong">${userNumber}</strong>`,
+        message: html`Type your recovery phrase below to access your Internet
+          Identity <strong class="t-strong">${userNumber}</strong>`,
       })
     : await deviceRecoveryPage(userNumber, connection, device);
 
@@ -186,7 +187,7 @@ const enrollAuthenticator = async ({
       message:
         "Something went wrong when we were trying to remember this device. Could you try again?",
       detail:
-        "The device could not be added to the anchor: " +
+        "The Passkey could not be added to the Internet Identity: " +
         unknownToString(error, "unknown error"),
       primaryButton: "Ok",
     });

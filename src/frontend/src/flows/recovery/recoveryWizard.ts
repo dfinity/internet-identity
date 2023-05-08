@@ -54,6 +54,6 @@ const setupRecoveryWizard = (
     title: html`Choose a Recovery Method`,
 
     message: html`We recommend that you create at least one recovery method in
-    case you lose access to your devices.`,
+    case you lose your Passkeys.`,
     cancelText: html`Skip, I understand the risks`,
   });

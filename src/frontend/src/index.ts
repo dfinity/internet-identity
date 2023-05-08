@@ -54,7 +54,7 @@ const printDevMessage = () => {
   console.log(
     `https://github.com/dfinity/internet-identity/commit/${version.commit}`
   );
-  if (version.release !== undefined) {
+  if (nonNullish(version.release)) {
     console.log(`This is version ${version.release}`);
   }
   if (version.dirty) {
@@ -105,7 +105,7 @@ const init = async () => {
 
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
-  if (addDeviceAnchor !== undefined) {
+  if (nonNullish(addDeviceAnchor)) {
     const userNumber = addDeviceAnchor;
     // Register this device (tentatively)
     const { alias: deviceAlias } = await registerTentativeDevice(

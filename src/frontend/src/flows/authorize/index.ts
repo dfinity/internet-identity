@@ -16,6 +16,7 @@ import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
+import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
 
 /* Template for the authbox when authenticating to a dapp */
@@ -32,7 +33,7 @@ export const authnTemplateAuthorize = ({
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
   const chasm =
-    derivationOrigin !== undefined && derivationOrigin !== origin
+    nonNullish(derivationOrigin) && derivationOrigin !== origin
       ? mkChasm({
           info: "shared identity",
           message: html`<span class="t-strong">${origin}</span>
@@ -70,10 +71,18 @@ export const authnTemplateAuthorize = ({
       createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: wrap({ title: copy.use_existing_enter_anchor }),
+      slot: wrap({
+        title: html`<div>
+          ${copy.use_existing_enter_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
     pick: {
-      slot: wrap({ title: copy.pick_choose_anchor }),
+      slot: wrap({
+        title: html`<div>
+          ${copy.pick_choose_anchor}<br />${copy.internet_identity}
+        </div>`,
+      }),
     },
   };
 };

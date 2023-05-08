@@ -1,3 +1,5 @@
+import { nonNullish } from "@dfinity/utils";
+
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
 }
@@ -59,16 +61,11 @@ export class RenameView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#pickAliasInput")
+      .$('[data-action="construct-identity"')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
-  async enterAlias(alias: string): Promise<void> {
-    await this.browser.$("#pickAliasInput").setValue(alias);
-  }
-
   async create(): Promise<void> {
-    await this.browser.$("#pickAliasSubmit").click();
     await this.browser.$('[data-action="construct-identity"').click();
   }
 
@@ -215,8 +212,15 @@ export class RecoveryMethodSelectorView extends View {
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("//h1[string()='Manage your Anchor']")
+      .$('[data-role="identity-management"]')
       .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
+    const elems = await this.browser.$$(`//li[@data-device="${deviceName}"]`);
+    if (elems.length !== count) {
+      throw Error("Bad number of elements");
+    }
   }
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
@@ -362,22 +366,6 @@ export class MainView extends View {
     await this.browser
       .$("button[data-action='remove']")
       .waitForDisplayed({ reverse: true });
-  }
-}
-
-export class AddDeviceAliasView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$("#pickAliasSubmit")
-      .waitForDisplayed({ timeout: 3_000 });
-  }
-
-  async addAdditionalDevice(alias: string): Promise<void> {
-    await this.browser.$("#pickAliasInput").setValue(alias);
-  }
-
-  async continue(): Promise<void> {
-    await this.browser.$("#pickAliasSubmit").click();
   }
 }
 
@@ -532,7 +520,7 @@ export class AddIdentityAnchorView extends View {
   }
 
   async continue(userNumber?: string): Promise<void> {
-    if (userNumber !== undefined) {
+    if (nonNullish(userNumber)) {
       await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
     }
     await this.browser.$("#userNumberContinue").click();
@@ -667,7 +655,7 @@ export class DemoAppView extends View {
 export class RecoverView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$(`//h1[string()='Recover Identity Anchor']`)
+      .$(`//h1[string()='Recover Internet Identity']`)
       .waitForDisplayed({ timeout: 5_000 });
   }
 

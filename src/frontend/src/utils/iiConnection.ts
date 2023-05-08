@@ -38,7 +38,7 @@ import {
   Ed25519KeyIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
@@ -180,7 +180,7 @@ export class Connection {
       return { kind: "registerNoSpace" };
     } else if ("registered" in registerResponse) {
       const userNumber = registerResponse.registered.user_number;
-      console.log(`registered Identity Anchor ${userNumber}`);
+      console.log(`registered Internet Identity ${userNumber}`);
       return {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
@@ -293,7 +293,7 @@ export class Connection {
     const device = findDeviceByPubkey(devices, pubkey);
 
     // only update devices without origin information
-    if (device !== undefined && device.origin.length === 0) {
+    if (nonNullish(device) && device.origin.length === 0) {
       device.origin satisfies string[];
       // we purposely do not await the promise as we just optimistically update
       // if it fails, no harm done
@@ -549,17 +549,22 @@ export class AuthenticatedConnection extends Connection {
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     maxTimeToLive?: bigint
-  ): Promise<[PublicKey, bigint]> => {
-    console.log(
-      `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
-    );
-    const actor = await this.getActor();
-    return await actor.prepare_delegation(
-      this.userNumber,
-      hostname,
-      sessionKey,
-      maxTimeToLive !== undefined ? [maxTimeToLive] : []
-    );
+  ): Promise<[PublicKey, bigint] | { error: unknown }> => {
+    try {
+      console.log(
+        `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
+      );
+      const actor = await this.getActor();
+      return await actor.prepare_delegation(
+        this.userNumber,
+        hostname,
+        sessionKey,
+        nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
+      );
+    } catch (e: unknown) {
+      console.error(e);
+      return { error: e };
+    }
   };
 
   getDelegation = async (

@@ -14,7 +14,6 @@ export const FLOWS = {
   ): Promise<string> {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
-    await registerView.enterAlias(deviceName);
     await registerView.create();
     await registerView.waitForRegisterConfirm();
     await registerView.confirmRegisterConfirm();

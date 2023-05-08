@@ -1,4 +1,4 @@
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { unknownToRecord } from "./utils";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
@@ -69,7 +69,7 @@ const pruneAnchors = (anchors: Anchors): Anchors => {
   const filtered = { ...anchors };
   for (let i = 0; i < extras; i++) {
     const unused = mostUnused(filtered);
-    if (unused !== undefined) {
+    if (nonNullish(unused)) {
       delete filtered[unused];
     }
   }
@@ -136,7 +136,7 @@ const readAnchors = (): Anchors => {
   }
 
   if (typeof item !== "object") {
-    console.warn("bad anchors", item, "type is", typeof item);
+    console.warn("bad identity", item, "type is", typeof item);
     return {};
   }
 
@@ -149,7 +149,7 @@ const readAnchors = (): Anchors => {
   for (const ix in objects) {
     const anchor = asAnchor(objects[ix]);
     if (isNullish(anchor)) {
-      console.warn("Could not read anchor", objects[ix]);
+      console.warn("Could not read Internet Identity", objects[ix]);
       continue;
     }
 

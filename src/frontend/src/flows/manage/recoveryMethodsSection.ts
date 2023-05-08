@@ -26,7 +26,7 @@ export const recoveryMethodsSection = ({
   return html`
     <aside class="l-stack">
       <div class="t-title">
-        <h2>Recovery methods</h2>
+        <h2>Recovery Methods</h2>
       </div>
       <div class="c-action-list">
         <ul>

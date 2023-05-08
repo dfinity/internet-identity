@@ -6,15 +6,13 @@ test("add device link looks as expected", () => {
       userNumber: BigInt(10000),
       origin: "https://identity.ic0.app",
     })
-  ).toBe("https://identity.ic0.app/?action=add-device&anchor=10000");
+  ).toBe("https://identity.ic0.app/?action=add-passkey&ii=10000");
   expect(
     addDeviceLink({
       userNumber: BigInt(10000),
       origin: "https://identity.internetcomputer.org",
     })
-  ).toBe(
-    "https://identity.internetcomputer.org/?action=add-device&anchor=10000"
-  );
+  ).toBe("https://identity.internetcomputer.org/?action=add-passkey&ii=10000");
 });
 
 test("anchor is read from add-device link", () => {

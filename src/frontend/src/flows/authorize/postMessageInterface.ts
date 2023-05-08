@@ -154,11 +154,24 @@ export async function authenticationProtocol({
 
   onProgress("fetching delegation");
 
-  const [userKey, parsed_signed_delegation] = await fetchDelegation(
+  const result = await fetchDelegation(
     authSuccess.userNumber,
     authSuccess.connection,
     authContext
   );
+
+  if ("error" in result) {
+    window.opener.postMessage(
+      {
+        kind: "authorize-client-failure",
+        text: "Unexpected error",
+      },
+      authContext.requestOrigin
+    );
+    return "failure";
+  }
+
+  const [userKey, parsed_signed_delegation] = result;
 
   window.opener.postMessage(
     {
