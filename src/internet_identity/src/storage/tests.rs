@@ -10,6 +10,8 @@ use internet_identity_interface::internet_identity::types::{
     DeviceProtection, KeyType, OngoingActiveAnchorStats, Purpose,
 };
 use serde_bytes::ByteBuf;
+use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 const WASM_PAGE_SIZE: u64 = 1 << 16;
@@ -78,6 +80,112 @@ fn should_recover_header_from_memory_v7() {
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.anchor_count(), 5);
     assert_eq!(storage.version(), 7);
+}
+
+fn add_test_anchor_data<M: Memory + Clone>(storage: &mut Storage<M>, number_of_anchors: usize) {
+    for _ in 0..number_of_anchors {
+        let (anchor_number, mut anchor) = storage
+            .allocate_anchor()
+            .expect("Failure allocating an anchor.");
+        anchor
+            .add_device(sample_device())
+            .expect("Failure adding a device");
+        storage.write(anchor_number, anchor.clone()).unwrap();
+    }
+}
+
+fn range_as_hex(memory: &RefCell<Vec<u8>>, offset: u64, length: usize) -> String {
+    let mut buf = vec![0u8; length];
+    memory.read(offset, &mut buf);
+    let s = hex::encode(buf);
+    let mut answer = String::new();
+    for (i, c) in s.chars().enumerate() {
+        answer.push(c);
+        if i % 4 == 3 {
+            answer.push(' ');
+        }
+    }
+    answer
+}
+
+fn assert_memory_page_eq(memory_1: &VectorMemory, memory_2: &VectorMemory, page_no: u64) {
+    let d: u64 = 64;
+    for i in 0..(WASM_PAGE_SIZE / d) {
+        let offset = WASM_PAGE_SIZE * page_no + i * d;
+        assert_eq!(
+            range_as_hex(memory_1.borrow(), offset, d as usize),
+            range_as_hex(memory_2.borrow(), offset, d as usize),
+            "Storage's memory differ at page # {}, i = {}, offset = {}",
+            page_no,
+            i,
+            offset
+        );
+    }
+}
+
+fn test_migrate_memory_from_v6_to_v7(number_of_anchors: usize) {
+    let (id_range_lo, id_range_hi) = (12345, 678910);
+    let memory_v6 = VectorMemory::default();
+    let memory_v7 = VectorMemory::default();
+
+    let mut storage_v6 = Storage::new(
+        (id_range_lo, id_range_hi),
+        wrap_memory(memory_v6.clone(), SupportedVersion::V6),
+    );
+    let mut storage_v7 = Storage::new(
+        (id_range_lo, id_range_hi),
+        wrap_memory(memory_v7.clone(), SupportedVersion::V7),
+    );
+
+    add_test_anchor_data(&mut storage_v6, number_of_anchors);
+    add_test_anchor_data(&mut storage_v7, number_of_anchors);
+    assert_ne!(memory_v6, memory_v7);
+    let storage_migrated_v7 =
+        Storage::from_memory_v6_to_v7(memory_v6.clone()).expect("Failure migrating v6 to v7");
+    assert_eq!(storage_migrated_v7.header, storage_v7.header);
+    assert_eq!(
+        storage_migrated_v7.header_memory.size(),
+        storage_v7.header_memory.size()
+    );
+    assert_eq!(
+        storage_migrated_v7.anchor_memory.size(),
+        storage_v7.anchor_memory.size()
+    );
+    assert_eq!(memory_v7.size(), memory_v6.size());
+    for i in 0..memory_v7.size() {
+        assert_memory_page_eq(&memory_v7, &memory_v6, i);
+    }
+    assert_eq!(memory_v6, memory_v7);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_no_anchors() {
+    test_migrate_memory_from_v6_to_v7(0);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_1_anchor() {
+    test_migrate_memory_from_v6_to_v7(1);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_100_anchors() {
+    test_migrate_memory_from_v6_to_v7(100);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_1000_anchors() {
+    test_migrate_memory_from_v6_to_v7(1000);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_2000_anchors() {
+    test_migrate_memory_from_v6_to_v7(2000);
+}
+
+#[test]
+fn should_correctly_migrate_memory_from_v6_to_v7_4000_anchors() {
+    test_migrate_memory_from_v6_to_v7(4000);
 }
 
 enum SupportedVersion {
