@@ -3,6 +3,7 @@ import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { validateAlias } from "$src/utils/validateAlias";
 import { html, TemplateResult } from "lit-html";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 import copyJson from "./index.json";
@@ -13,6 +14,7 @@ export const promptDeviceAliasTemplate = (props: {
   title: string;
   message?: string | TemplateResult;
   cancelText?: string;
+  value?: string;
   continue: (alias: string) => void;
   cancel: () => void;
   i18n: I18n;
@@ -56,6 +58,7 @@ export const promptDeviceAliasTemplate = (props: {
           e.currentTarget.setCustomValidity(message);
         }}
         placeholder=${copy.placeholder}
+        value=${ifDefined(props.value)}
         aria-label="device name"
         type="text"
         required
@@ -91,10 +94,12 @@ export const promptDeviceAliasPage = renderPage(promptDeviceAliasTemplate);
 export const promptDeviceAlias = ({
   title,
   message,
+  value,
   cancelText,
 }: {
   title: string;
   message?: string | TemplateResult;
+  value?: string;
   cancelText?: string;
 }): Promise<string | null> =>
   new Promise((resolve) => {
@@ -102,6 +107,7 @@ export const promptDeviceAlias = ({
     promptDeviceAliasPage({
       title,
       message,
+      value,
       cancelText,
       cancel: () => resolve(null),
       continue: resolve,
