@@ -1,11 +1,12 @@
+import { closeIcon, externalLinkIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
-import { closeIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { renderPage } from "../../utils/lit-html";
 
 import { DappDescription } from "./dapps";
 
+import { nonNullish } from "@dfinity/utils";
 import copyJson from "./copy.json";
 
 /* Template for the explorer containing all dapps */
@@ -33,6 +34,16 @@ const dappsExplorerTemplate = ({
       ${closeIcon}
     </button>
     <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
+    <p class="t-paragraph t-centered">
+      ${copy.add_your_dapp}
+      <a
+        href="https://github.com/dfinity/portal#showcase-submission-guidelines"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        ${copy.get_in_touch}</a
+      >
+    </p>
   `;
 
   const wrappedPageContent = mainWindow({
@@ -65,11 +76,13 @@ const dappTemplate = ({
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
-        ${oneLiner !== undefined
+        ${nonNullish(oneLiner)
           ? html`<p class="t-weak">${oneLiner}</p>`
           : undefined}
       </div>
-      <span class="c-action-list__action"> ↗ </span>
+      <span class="c-action-list__action"
+        ><i class="c-icon c-icon--circle">${externalLinkIcon}</i></span
+      >
     </a>
   `;
 };

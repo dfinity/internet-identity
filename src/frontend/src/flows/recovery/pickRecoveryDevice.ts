@@ -1,21 +1,23 @@
-import { html, render } from "lit-html";
-import { securityKeyIcon, seedPhraseIcon } from "../../components/icons";
-import { mainWindow } from "../../components/mainWindow";
+import { securityKeyIcon, seedPhraseIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
 import {
   isRecoveryPhrase,
   RecoveryDevice,
   recoveryDeviceToLabel,
-} from "../../utils/recoveryDevice";
+} from "$src/utils/recoveryDevice";
+import { html, render } from "lit-html";
 
 const pageContent = () => {
   const pageContentSlot = html`
-    <hgroup>
-      <h1 class="t-title t-title--main">Choose Recovery Method</h1>
-      <p class="t-paragraph t-lead">
-        How do you want to recover your Internet Identity?
-      </p>
-    </hgroup>
-    <div id="deviceList"></div>
+    <article>
+      <hgroup>
+        <h1 class="t-title t-title--main">Choose Recovery Method</h1>
+        <p class="t-paragraph t-lead">
+          How do you want to recover your Internet Identity?
+        </p>
+      </hgroup>
+      <div class="l-horizontal l-stack" id="deviceList"></div>
+    </article>
   `;
 
   return mainWindow({
@@ -38,27 +40,21 @@ export const init = (devices: RecoveryDevice[]): Promise<RecoveryDevice> =>
     const deviceList = document.getElementById("deviceList") as HTMLElement;
     deviceList.innerHTML = ``;
 
-    const list = document.createElement("ul");
-    list.classList.add("l-horizontal", "l-stack--tight");
-
     devices.forEach((device) => {
-      const identityElement = document.createElement("li");
-      identityElement.className = "deviceItem";
+      const btn = document.createElement("button");
+      btn.classList.add("c-button", "c-button--secondary");
       render(
-        html`<div class="deviceItemAlias">
-          <button class="c-button c-button--secondary">
-            <span aria-hidden="true"
-              >${isRecoveryPhrase(device)
-                ? seedPhraseIcon
-                : securityKeyIcon}</span
-            >
-            <div class="t-strong">${recoveryDeviceToLabel(device)}</div>
-          </button>
-        </div>`,
-        identityElement
+        html`
+          <span aria-hidden="true"
+            >${isRecoveryPhrase(device)
+              ? seedPhraseIcon
+              : securityKeyIcon}</span
+          >
+          <div class="t-strong">${recoveryDeviceToLabel(device)}</div>
+        `,
+        btn
       );
-      identityElement.onclick = () => resolve(device);
-      list.appendChild(identityElement);
+      btn.onclick = () => resolve(device);
+      deviceList.appendChild(btn);
     });
-    deviceList.appendChild(list);
   });

@@ -1,32 +1,33 @@
+import { warningIcon } from "$src/components/icons";
+import { withLoader } from "$src/components/loader";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import {
+  dropLeadingUserNumber,
+  RECOVERYPHRASE_WORDCOUNT,
+} from "$src/crypto/mnemonic";
+import type {
+  LoginFlowCanceled,
+  LoginFlowError,
+  LoginFlowSuccess,
+} from "$src/utils/flowResult";
+import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
+import { DynamicKey } from "$src/utils/i18n";
+import { Connection } from "$src/utils/iiConnection";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { Chan } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { warningIcon } from "../../../components/icons";
-import { withLoader } from "../../../components/loader";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
-import {
-  dropLeadingUserNumber,
-  RECOVERYPHRASE_WORDCOUNT,
-} from "../../../crypto/mnemonic";
-import type {
-  LoginFlowCanceled,
-  LoginFlowError,
-  LoginFlowSuccess,
-} from "../../../utils/flowResult";
-import { apiResultToLoginFlowResult } from "../../../utils/flowResult";
-import { Connection } from "../../../utils/iiConnection";
-import { renderPage, withRef } from "../../../utils/lit-html";
-import { RecoveryDevice } from "../../../utils/recoveryDevice";
-import { Chan } from "../../../utils/utils";
 
 const recoverWithPhraseTemplate = <
   /* The successful return type on verification */
   T extends { tag: "ok" },
   /* The error return type on verification */
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 >({
   confirm,
   verify,
@@ -265,12 +266,12 @@ export const wordTemplate = ({
 
 type TemplateProps<
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 > = Parameters<typeof recoverWithPhraseTemplate<T, E>>[0];
 
 export const recoverWithPhrasePage = <
   T extends { tag: "ok" },
-  E extends { tag: "err"; message: string }
+  E extends { tag: "err"; message: string | DynamicKey }
 >(
   props: TemplateProps<T, E>
 ) => renderPage(recoverWithPhraseTemplate<T, E>)(props);

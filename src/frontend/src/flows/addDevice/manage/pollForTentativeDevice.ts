@@ -1,33 +1,32 @@
+import { DeviceData, Timestamp } from "$generated/internet_identity_types";
+import { checkmarkIcon, copyIcon } from "$src/components/icons";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { I18n } from "$src/i18n";
+import { addDeviceLink } from "$src/utils/addDeviceLink";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { mount, renderPage, withRef } from "$src/utils/lit-html";
+import { delayMillis } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import type QrCreator from "qr-creator"; // XXX: import to only import the _type_ to avoid pulling in the whole module (module itself is used as a dynamic import)
-import {
-  DeviceData,
-  Timestamp,
-} from "../../../../generated/internet_identity_types";
-import { checkmarkIcon, copyIcon } from "../../../components/icons";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
-import { I18n } from "../../../i18n";
-import { addDeviceLink } from "../../../utils/addDeviceLink";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { AuthenticatedConnection } from "../../../utils/iiConnection";
-import { mount, renderPage, withRef } from "../../../utils/lit-html";
-import { delayMillis } from "../../../utils/utils";
 
 import copyJson from "./pollForTentativeDevice.json";
 
 const pollForTentativeDeviceTemplate = ({
   userNumber,
   cancel,
+  useFIDO,
   remaining,
   origin,
   i18n,
 }: {
   userNumber: bigint;
   cancel: () => void;
+  useFIDO: () => void;
   remaining: AsyncIterable<string>;
   origin: string;
   i18n: I18n;
@@ -52,20 +51,24 @@ const pollForTentativeDeviceTemplate = ({
 
   const pageContentSlot = html`
     <hgroup>
-      <h2 class="t-paragraph">${copy.identity_anchor} ${userNumber}</h2>
+      <h2 class="t-title t-title--discrete">
+        ${copy.identity_anchor} ${userNumber}
+      </h2>
       <h1 class="t-title t-title--main l-stack--none">
         ${copy.add_trusted_device}
       </h1>
       <p class="t-lead">${copy.follow_steps_on_new_device}</p>
     </hgroup>
-    <div
-      class="t-centered c-qrcode l-stack"
-      ${mount((container) =>
-        container instanceof HTMLElement
-          ? displayQR({ link, container })
-          : undefined
-      )}
-    ></div>
+    <div class="c-card c-card--tight l-stack l-stack--tight">
+      <div
+        class="t-centered c-qrcode"
+        ${mount((container) =>
+          container instanceof HTMLElement
+            ? displayQR({ link, container })
+            : undefined
+        )}
+      ></div>
+    </div>
     <div class="t-wrap c-input c-input--with-button c-input--centered t-weak">
       <span data-role="add-device-link">${link}</span>
       <button
@@ -88,9 +91,16 @@ const pollForTentativeDeviceTemplate = ({
     </ol>
 
     <button
+      @click=${() => useFIDO()}
+      data-action="use-fido"
+      class="c-button c-button--primary l-stack"
+    >
+      ${copy.or_use_fido}
+    </button>
+    <button
       @click=${() => cancel()}
       id="cancelAddRemoteDevice"
-      class="c-button c-button--secondary l-stack"
+      class="c-button c-button--secondary"
     >
       ${copy.cancel}
     </button>
@@ -111,6 +121,8 @@ export const pollForTentativeDevicePage = renderPage(
   pollForTentativeDeviceTemplate
 );
 
+type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
+
 /**
  * Polls for a tentative device to be added and shows instructions on how to continue the device registration process on the new device.
  * @param userNumber anchor of the authenticated user
@@ -120,13 +132,14 @@ export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp
-): Promise<DeviceData | "timeout" | "canceled"> => {
+): Promise<PollReturn> => {
   const i18n = new I18n();
-  const countdown: AsyncCountdown<DeviceData | "timeout" | "canceled"> =
+  const countdown: AsyncCountdown<PollReturn> =
     AsyncCountdown.fromNanos(endTimestamp);
   // Display the page with the option to cancel
   pollForTentativeDevicePage({
     cancel: () => countdown.stop("canceled"),
+    useFIDO: () => countdown.stop("use-fido"),
     origin: window.origin,
     userNumber,
     remaining: countdown.remainingFormattedAsync(),
@@ -150,7 +163,7 @@ const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   shouldStop: () => boolean
-): Promise<DeviceData> =>
+): Promise<DeviceData | "use-fido"> =>
   // eslint-disable-next-line no-async-promise-executor
   new Promise(async (resolve) => {
     while (!shouldStop()) {
@@ -171,8 +184,7 @@ const poll = (
 // Dynamically load the QR code module
 const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
   try {
-    return (await import(/* webpackChunkName: "qr-creator" */ "qr-creator"))
-      .default;
+    return (await import("qr-creator")).default;
   } catch (e) {
     console.error(e);
     return undefined;

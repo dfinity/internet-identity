@@ -1,19 +1,35 @@
-import { extname } from "path";
+import { resolve } from "path";
 import { defineConfig, UserConfig } from "vite";
-import viteCompression from "vite-plugin-compression";
-import { injectCanisterIdPlugin, stripInjectJsScript } from "./vite.plugins";
+import {
+  compression,
+  injectCanisterIdPlugin,
+  stripInjectJsScript,
+} from "./vite.plugins";
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
+  // Expand process.env variables with default values to ensure build reproducibility
+  process.env = {
+    ...process.env,
+    II_FETCH_ROOT_KEY: `${process.env.II_FETCH_ROOT_KEY ?? "0"}`,
+    II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
+    II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
+    II_VERSION: `${process.env.II_VERSION ?? ""}`,
+  };
+
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
   // root = src/frontend
   // outDir = ../../dist
   return {
     publicDir: "assets",
+    envPrefix: "II_",
     resolve: {
       alias: {
         // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
         stream: "stream-browserify",
+        // Custom alias we are using to shorten and make absolute the imports
+        $generated: resolve(__dirname, "src/frontend/generated"),
+        $src: resolve(__dirname, "src/frontend/src"),
       },
     },
     build: {
@@ -36,13 +52,11 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     },
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
-      [...(mode === "production" ? [stripInjectJsScript()] : [])],
-      viteCompression({
-        // II canister only supports one content type per resource. That is why we remove the original file.
-        deleteOriginFile: true,
-        filter: (file: string): boolean =>
-          ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
-      }),
+      [
+        ...(mode === "production"
+          ? [stripInjectJsScript(), compression()]
+          : []),
+      ],
     ],
     optimizeDeps: {
       esbuildOptions: {
@@ -55,14 +69,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       port: 8080,
       proxy: {
         "/api": "http://127.0.0.1:4943",
-      },
-    },
-    define: {
-      "process.env": {
-        II_FETCH_ROOT_KEY: `${process.env.II_FETCH_ROOT_KEY ?? "0"}`,
-        II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
-        II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
-        II_VERSION: `${process.env.II_VERSION ?? ""}`,
       },
     },
   };
@@ -79,7 +85,8 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       publicDir: "../frontend/assets",
       build: {
         ...build,
-        outDir: "../../showcase",
+        target: "esnext" /* for top-level await in showcase */,
+        outDir: "../../dist-showcase",
       },
     };
   }

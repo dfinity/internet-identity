@@ -1,17 +1,18 @@
-import { html } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
-} from "../../../../generated/internet_identity_types";
-import { displayError } from "../../../components/displayError";
-import { mainWindow } from "../../../components/mainWindow";
-import { toast } from "../../../components/toast";
-import { AsyncCountdown } from "../../../utils/countdown";
-import { Connection } from "../../../utils/iiConnection";
-import { renderPage } from "../../../utils/lit-html";
-import { setAnchorUsed } from "../../../utils/userNumber";
-import { delayMillis, unknownToString } from "../../../utils/utils";
+} from "$generated/internet_identity_types";
+import { displayError } from "$src/components/displayError";
+import { mainWindow } from "$src/components/mainWindow";
+import { toast } from "$src/components/toast";
+import { AsyncCountdown } from "$src/utils/countdown";
+import { Connection } from "$src/utils/iiConnection";
+import { renderPage } from "$src/utils/lit-html";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { delayMillis, unknownToString } from "$src/utils/utils";
+import { nonNullish } from "@dfinity/utils";
+import { html } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 
 type TentativeRegistrationInfo = Extract<
   AddTentativeDeviceResponse,
@@ -30,11 +31,11 @@ const showVerificationCodeTemplate = ({
   cancel: () => void;
 }) => {
   const pageContentSlot = html` <hgroup>
-      <h1 class="t-title t-title--main">Verify New Device</h1>
-      <p class="t-paragraph">Your new device:</p>
+      <h1 class="t-title t-title--main">Verify New Passkey</h1>
+      <p class="t-paragraph">Your new Passkey:</p>
       <output
         class="c-input c-input--readonly t-vip t-vip--small"
-        aria-label="Device Alias"
+        aria-label="Passkey Alias"
         >${alias}</output
       >
       <p class="t-paragraph">
@@ -199,7 +200,7 @@ const anchorHasCredentials = async ({
       device.credential_id.length === 1 &&
       credentialIdEqual(device.credential_id[0], credential)
   );
-  return matching !== undefined;
+  return nonNullish(matching);
 };
 
 function credentialIdEqual(

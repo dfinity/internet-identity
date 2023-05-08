@@ -162,8 +162,8 @@ pub fn install_ii_canister_with_arg(
     arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
     let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
-    let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, byts);
+    let canister_id = env.create_canister(None);
+    env.install_canister(canister_id, wasm, byts, None);
     canister_id
 }
 
@@ -221,7 +221,7 @@ pub fn upgrade_ii_canister_with_arg(
     arg: Option<InternetIdentityInit>,
 ) -> Result<(), CallError> {
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
-    env.upgrade_canister(canister_id, wasm, byts)
+    env.upgrade_canister(canister_id, wasm, byts, None)
 }
 
 /// Utility function to create compressed stable memory backups for use in backup tests.
@@ -436,7 +436,7 @@ base-uri 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
 style-src-elem 'self' 'unsafe-inline' https://fonts\\.googleapis\\.com;\
-font-src https://fonts\\.gstatic\\.com;\
+font-src 'self' https://fonts\\.gstatic\\.com;\
 upgrade-insecure-requests;\
 frame-ancestors 'none';$"
     )
@@ -537,13 +537,13 @@ pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> Can
 }
 
 pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, encode_config(principal_1()));
+    let canister_id = env.create_canister(None);
+    env.install_canister(canister_id, wasm, encode_config(principal_1()), None);
     canister_id
 }
 
 pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
-    env.upgrade_canister(canister_id, wasm, encode_config(principal_1()))
+    env.upgrade_canister(canister_id, wasm, encode_config(principal_1()), None)
         .unwrap();
 }
 

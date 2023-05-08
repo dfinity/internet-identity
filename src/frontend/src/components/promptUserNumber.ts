@@ -1,6 +1,6 @@
+import { renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 import { createRef, Ref, ref } from "lit-html/directives/ref.js";
-import { renderPage } from "../utils/lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mainWindow } from "./mainWindow";
 
@@ -20,7 +20,7 @@ const promptUserNumberTemplate = ({
   const userNumberContinue: Ref<HTMLButtonElement> = createRef();
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
-  const defaultMessage = "Please provide an Identity Anchor.";
+  const defaultMessage = "Please provide an Internet Identity.";
   const promptUserNumberSlot = html` <hgroup>
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${message ?? defaultMessage}</p>

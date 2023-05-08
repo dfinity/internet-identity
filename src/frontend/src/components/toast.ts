@@ -1,8 +1,8 @@
+import { TemplateElement } from "$src/utils/lit-html";
+import { Chan } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { repeat } from "lit-html/directives/repeat.js";
-import { TemplateElement } from "../utils/lit-html";
-import { Chan } from "../utils/utils";
 import { closeIcon, warningIcon } from "./icons";
 
 // A toast element containing a message, and the (static) list of all toasts. The `Toast` element
@@ -48,6 +48,7 @@ const toastTemplate = (toast: Toast): TemplateResult => {
   };
 
   return html` <div
+    role="alert"
     class="c-toast ${asyncReplace(
       closing.map((closing) => (closing ? "c-toast--closing" : undefined))
     )}"

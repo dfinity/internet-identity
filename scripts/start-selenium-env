@@ -30,7 +30,7 @@ function help() {
 Launches docker based Selenium test infrastructure (selenium and nginx containers).
 Run "docker compose down" in the docker-test-env folder to stop again.
 
-NOTE: This requires docker, docker-compose, a running dfx replica with II and the test app deployed and running II dev server (npm run start).
+NOTE: This requires docker, docker-compose, a running dfx replica with II and the test app deployed and running II dev server (npm run dev).
 EOF
 
 }

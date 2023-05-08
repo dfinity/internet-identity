@@ -1,34 +1,24 @@
-import { WebAuthnIdentity } from "@dfinity/identity";
-import { html } from "lit-html";
 import {
   AddTentativeDeviceResponse,
   CredentialId,
   DeviceData,
-} from "../../../../generated/internet_identity_types";
-import { promptDeviceAlias } from "../../../components/alias";
-import { displayError } from "../../../components/displayError";
-import { withLoader } from "../../../components/loader";
-import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
-import { Connection, creationOptions } from "../../../utils/iiConnection";
-import { setAnchorUsed } from "../../../utils/userNumber";
+} from "$generated/internet_identity_types";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { inferAlias, loadUAParser } from "$src/flows/register";
+import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
+import { Connection, creationOptions } from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
 import {
-  unknownToString,
-  unreachable,
-  unreachableLax,
-} from "../../../utils/utils";
-import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
+  displayCancelError,
+  displayDuplicateDeviceError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "$src/utils/webAuthnErrorUtils";
+import { WebAuthnIdentity } from "@dfinity/identity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
-
-const displayAlreadyRegisteredDevice = () =>
-  displayError({
-    title: "Duplicate Device",
-    message:
-      "This device has already been added to your anchor. Try signing in directly.",
-    detail:
-      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
-    primaryButton: "Ok",
-  });
 
 /**
  * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
@@ -37,18 +27,9 @@ const displayAlreadyRegisteredDevice = () =>
 export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
-): Promise<"ok"> => {
-  // First, we need an alias for the device to (tentatively) add
-  const alias = await promptDeviceAlias({
-    title: "Add a Trusted Device",
-    message: html` What device do you want to add to anchor
-      <strong class="t-strong">${userNumber}</strong>?`,
-  });
-
-  if (alias === null) {
-    // TODO L2-309: do this without reload
-    return window.location.reload() as never;
-  }
+): Promise<{ alias: string }> => {
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
 
   // Then, we create local WebAuthn credentials for the device
   const result = await withLoader(() =>
@@ -60,7 +41,9 @@ export const registerTentativeDevice = async (
       // Given that this is a remote device where we get the result that authentication should work,
       // let's help the user and fill in their anchor number.
       setAnchorUsed(userNumber);
-      await displayAlreadyRegisteredDevice();
+      await displayDuplicateDeviceError({ primaryButton: "Ok" });
+    } else if (isCancel(result)) {
+      await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
         title: "Error adding new device",
@@ -72,6 +55,12 @@ export const registerTentativeDevice = async (
     // TODO L2-309: do this without reload
     return window.location.reload() as never;
   }
+
+  const alias = await inferAlias({
+    authenticatorType: result.getAuthenticatorAttachment(),
+    userAgent: navigator.userAgent,
+    uaParser,
+  });
 
   // Finally, we submit it to the canister
   const device: Omit<DeviceData, "origin"> & { credential_id: [CredentialId] } =
@@ -94,13 +83,15 @@ export const registerTentativeDevice = async (
 
   // If everything went well we can now ask the user to authenticate on an existing device
   // and enter a verification code
-  return await showVerificationCode(
+  (await showVerificationCode(
     userNumber,
     connection,
     device.alias,
     addResponse.added_tentatively,
     device.credential_id[0]
-  );
+  )) satisfies "ok";
+
+  return { alias };
 };
 
 /** Create new WebAuthn credentials */

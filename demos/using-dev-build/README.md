@@ -27,7 +27,7 @@ $ dfx deploy --no-wallet
 At this point, the replica (for all practical matters, a local version of the Internet Computer) is running and three canisters have been deployed:
 
 - `internet_identity`: The development version of Internet Identity (downloaded from the [latest release](https://github.com/dfinity/internet-identity/releases/latest), see [`dfx.json`](./dfx.json)).
-- `webapp`: A tiny webapp that calls out to the `internet_identity` canister for identity (anchor) creation and authentication, and that then calls the `whoami` canister (see below) to show that the identity is valid. You'll find the source of the webapp in [`index.html`](./webapp/index.html) and [`index.js`](./webapp/index.js).
+- `webapp`: A tiny webapp that calls out to the `internet_identity` canister for identity (anchor) creation and authentication, and that then calls the `whoami` canister (see below) to show that the identity is valid. You'll find the source of the webapp in [`index.html`](./webapp/index.html) and [`index.ts`](./webapp/index.ts).
 - `whoami`: A simple canister that checks that calls are authenticated, and that returns the "principal of the caller". The implementation is terribly simple:
   ```motoko
   actor {
@@ -98,7 +98,7 @@ const webapp = Actor.createActor(webapp_idl, {
 const principal = await webapp.whoami();
 ```
 
-See [`index.js`](./webapp/index.js) for the full working example.
+See [`index.js`](./webapp/index.ts) for the full working example.
 A detailed description of what happens behind the scenes is available in the [client auth protocol specification](https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#client-auth-protocol).
 
 ### Getting the Canister IDs
@@ -134,7 +134,7 @@ _If you actually use the webapp, make sure that the "Internet Identity URL" fiel
 
 Figuring the canister IDs, and using the `canisterId=...` query parameter is all a bit cumbersome. Here are some commands you might like:
 
-- `npm run start`: Build the app and serve it on `localhost:8080` with hot reload on code changes, ideal for hacking on the webapp.
+- `npm run dev`: Build the app and serve it on `localhost:8080` with hot reload on code changes, ideal for hacking on the webapp.
 - `npm run proxy`: Start a proxy that serves Internet Identity on `localhost:8086` and the webapp on `localhost:8087` for easy access.
 - `npm run test`: Start the proxy and run browser tests against the `internet_identity` canister.
 

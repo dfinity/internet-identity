@@ -1,18 +1,18 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { html, render } from "lit-html";
-import { mainWindow } from "../../components/mainWindow";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
 
 const pageContent = () => {
   const pageContentSlot = html`
     <article id="warningContainer">
-      <h1 class="t-title t-title--main">Add Another Device</h1>
+      <h1 class="t-title t-title--main">Add Another Passkey</h1>
       <p class="t-paragraph">
-        We recommend that you have at least two devices (for example, your
-        computer and your phone) in case you lose access to one.
+        We recommend that you have at least two Passkeys in case you lose access
+        to one.
       </p>
       <div class="l-stack">
         <button id="displayWarningAddRecovery" class="c-button">
-          Add another device
+          Add another Passkey
         </button>
         <button
           id="displayWarningRemindLater"

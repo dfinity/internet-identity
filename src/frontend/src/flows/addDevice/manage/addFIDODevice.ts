@@ -1,16 +1,21 @@
-import { WebAuthnIdentity } from "@dfinity/identity";
-import { DeviceData } from "../../../../generated/internet_identity_types";
-import { promptDeviceAlias } from "../../../components/alias";
-import { displayError } from "../../../components/displayError";
-import { withLoader } from "../../../components/loader";
-import { authenticatorAttachmentToKeyType } from "../../../utils/authenticatorAttachment";
+import { DeviceData } from "$generated/internet_identity_types";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { inferAlias, loadUAParser } from "$src/flows/register";
+import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
   creationOptions,
-} from "../../../utils/iiConnection";
-import { setAnchorUsed } from "../../../utils/userNumber";
-import { isDuplicateDeviceError } from "../../../utils/webAuthnErrorUtils";
-import { renderAddDeviceSuccess } from "./addDeviceSuccess";
+} from "$src/utils/iiConnection";
+import { setAnchorUsed } from "$src/utils/userNumber";
+import {
+  displayCancelError,
+  displayDuplicateDeviceError,
+  isCancel,
+  isDuplicateDeviceError,
+} from "$src/utils/webAuthnErrorUtils";
+import { WebAuthnIdentity } from "@dfinity/identity";
+import { addDeviceSuccess } from "./addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({
@@ -18,15 +23,6 @@ const displayFailedToAddDevice = (error: Error) =>
     message:
       "We failed to add the new device to this Identity Anchor. Please try again.",
     detail: error.message,
-    primaryButton: "Back to manage",
-  });
-
-const displayAlreadyRegisteredDevice = () =>
-  displayError({
-    title: "Duplicate Device",
-    message: "This device has already been added to your anchor.",
-    detail:
-      "Passkeys may be synchronized across devices automatically (e.g. Apple Passkeys) and do not need to be manually added to your Anchor.",
     primaryButton: "Back to manage",
   });
 
@@ -38,11 +34,13 @@ const displayAlreadyRegisteredDevice = () =>
  * @param connection authenticated II connection
  * @param devices already existing devices
  */
-export const addLocalDevice = async (
+export const addFIDODevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: DeviceData[]
 ): Promise<void> => {
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
   let newDevice: WebAuthnIdentity;
   try {
     newDevice = await WebAuthnIdentity.create({
@@ -50,7 +48,9 @@ export const addLocalDevice = async (
     });
   } catch (error: unknown) {
     if (isDuplicateDeviceError(error)) {
-      await displayAlreadyRegisteredDevice();
+      await displayDuplicateDeviceError({ primaryButton: "Back to manage" });
+    } else if (isCancel(error)) {
+      await displayCancelError({ primaryButton: "Back to manage" });
     } else {
       await displayFailedToAddDevice(
         error instanceof Error ? error : unknownError()
@@ -58,11 +58,12 @@ export const addLocalDevice = async (
     }
     return;
   }
-  const deviceName = await promptDeviceAlias({ title: "Add a Trusted Device" });
-  if (deviceName === null) {
-    // user clicked "cancel", so we return
-    return;
-  }
+
+  const deviceName = await inferAlias({
+    authenticatorType: newDevice.getAuthenticatorAttachment(),
+    userAgent: navigator.userAgent,
+    uaParser,
+  });
   try {
     await withLoader(() =>
       connection.add(
@@ -77,7 +78,7 @@ export const addLocalDevice = async (
       )
     );
 
-    await renderAddDeviceSuccess({ deviceAlias: deviceName });
+    await addDeviceSuccess({ deviceAlias: deviceName });
   } catch (error: unknown) {
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()

@@ -1,11 +1,11 @@
+import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
-import { showMessage } from "./components/message";
 import { anyFeatures, features } from "./features";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { authFlowManage } from "./flows/manage";
+import { authFlowManage, renderManage } from "./flows/manage";
 import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
@@ -13,10 +13,13 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
-import { isNullish } from "@dfinity/utils";
-import copyJson from "./index.json";
+import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
+import {
+  authenticate,
+  handleLoginFlowResult,
+} from "$src/components/authenticateBox";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -51,7 +54,7 @@ const printDevMessage = () => {
   console.log(
     `https://github.com/dfinity/internet-identity/commit/${version.commit}`
   );
-  if (version.release !== undefined) {
+  if (nonNullish(version.release)) {
     console.log(`This is version ${version.release}`);
   }
   if (version.dirty) {
@@ -102,19 +105,25 @@ const init = async () => {
 
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
-  if (addDeviceAnchor !== undefined) {
+  if (nonNullish(addDeviceAnchor)) {
+    const userNumber = addDeviceAnchor;
     // Register this device (tentatively)
-    await registerTentativeDevice(addDeviceAnchor, connection);
+    const { alias: deviceAlias } = await registerTentativeDevice(
+      addDeviceAnchor,
+      connection
+    );
 
-    const i18n = new I18n();
-    const copy = i18n.i18n(copyJson);
+    // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
+    await addDeviceSuccess({ deviceAlias });
 
-    // Show a good bye message
-    showMessage({
-      message: copy.close_page_device_added,
-      role: "notify-device-added",
-    });
-    return;
+    // If user "Click" continue in success page, proceed with authentication
+    const result = await authenticate(connection, userNumber);
+    const loginData = await handleLoginFlowResult(result);
+
+    // User have successfully signed-in we can jump to manage page
+    if (nonNullish(loginData)) {
+      return await renderManage(userNumber, loginData.connection);
+    }
   }
 
   // Simple, #-based routing
@@ -123,7 +132,7 @@ const init = async () => {
     void authFlowAuthorize(connection);
   } else {
     // The default flow
-    void authFlowManage(connection);
+    void authFlowManage(connection, new I18n());
   }
 };
 

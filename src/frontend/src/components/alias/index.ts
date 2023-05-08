@@ -1,9 +1,9 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { I18n } from "$src/i18n";
+import { renderPage, withRef } from "$src/utils/lit-html";
+import { validateAlias } from "$src/utils/validateAlias";
 import { html, TemplateResult } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { mainWindow } from "../../components/mainWindow";
-import { I18n } from "../../i18n";
-import { renderPage, withRef } from "../../utils/lit-html";
-import { validateAlias } from "../../utils/validateAlias";
 
 import copyJson from "./index.json";
 

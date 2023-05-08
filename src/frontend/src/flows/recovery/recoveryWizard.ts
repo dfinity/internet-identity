@@ -1,6 +1,6 @@
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { iOSOrSafari } from "$src/utils/utils";
 import { html } from "lit-html";
-import { AuthenticatedConnection } from "../../utils/iiConnection";
-import { iOSOrSafari } from "../../utils/utils";
 import { displaySafariWarning } from "./displaySafariWarning";
 import { displaySingleDeviceWarning } from "./displaySingleDeviceWarning";
 import { setupRecovery } from "./setupRecovery";
@@ -54,6 +54,6 @@ const setupRecoveryWizard = (
     title: html`Choose a Recovery Method`,
 
     message: html`We recommend that you create at least one recovery method in
-    case you lose access to your devices.`,
+    case you lose your Passkeys.`,
     cancelText: html`Skip, I understand the risks`,
   });

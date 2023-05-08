@@ -1,7 +1,7 @@
+import { mainWindow } from "$src/components/mainWindow";
+import { LEGACY_II_URL_NO_PROTOCOL } from "$src/config";
+import { renderPage } from "$src/utils/lit-html";
 import { html } from "lit-html";
-import { mainWindow } from "../../../components/mainWindow";
-import { LEGACY_II_URL_NO_PROTOCOL } from "../../../config";
-import { renderPage } from "../../../utils/lit-html";
 
 const deviceRegistrationDisabledInfoTemplate = ({
   userNumber,
@@ -15,27 +15,25 @@ const deviceRegistrationDisabledInfoTemplate = ({
   const pageContentSlot = html` <article>
     <hgroup>
       <h1 class="t-title t-title--main">
-        Enroll this device from a registered device
+        Use another Passkey to register this device
       </h1>
       <p class="t-lead">
-        If you want to add this device, follow the instructions below
-        <strong class="t-strong"
-          >on a device that Internet Identity already trusts:</strong
-        >
+        If you want to use this device to create a new Passkey, connect to
+        Internet Identity with an existing Passkey. Follow these instructions:
       </p>
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
         Log into
         <strong class="t-strong">${LEGACY_II_URL_NO_PROTOCOL}</strong> with your
-        Identity Anchor (<strong class="t-strong">${userNumber}</strong>)
+        Internet Identity (<strong class="t-strong">${userNumber}</strong>)
+        using an existing Passkey
       </li>
       <li>
         Once you are logged in, click “<strong class="t-string"
-          >Add new device</strong
+          >Add new Passkey</strong
         >”
       </li>
-      <li>Select “<strong class="t-string">Browser</strong>”</li>
     </ol>
     <p class="t-paragraph t-strong">Then, press Retry below.</p>
     <div class="l-stack">

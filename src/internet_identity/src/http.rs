@@ -25,6 +25,7 @@ impl ContentType {
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
             ContentType::PNG => "image/png".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
+            ContentType::WOFF2 => "application/font-woff2".to_string(),
         }
     }
 }
@@ -174,7 +175,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "The number of anchor operations since last upgrade",
         )
     })?;
-    if let ArchiveState::Created { ref data, .. } = state::archive_state() {
+    if let ArchiveState::Created { ref data, config } = state::archive_state() {
         w.encode_gauge(
             "internet_identity_archive_sequence_number",
             data.sequence_number as f64,
@@ -185,6 +186,21 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             data.entries_buffer.len() as f64,
             "The number of buffered archive entries.",
         )?;
+        w.encode_gauge(
+            "internet_identity_archive_config_entries_buffer_limit",
+            config.entries_buffer_limit as f64,
+            "Max number of buffered archive entries.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_archive_config_fetch_limit",
+            config.entries_fetch_limit as f64,
+            "Max number of entries fetched by the archive per call.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_archive_config_polling_interval",
+            config.entries_fetch_limit as f64,
+            "Polling interval (in ns) of the archive.",
+        )?;
     }
     state::persistent_state(|persistent_state| {
         if let Some(ref register_rate_limit_config) = persistent_state.registration_rate_limit {
@@ -192,6 +208,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                 "internet_identity_register_rate_limit_max_tokens",
                 register_rate_limit_config.max_tokens as f64,
                 "The maximum number of `register` calls that are allowed in any time window.",
+            )?;
+            w.encode_gauge(
+                "internet_identity_register_rate_limit_time_per_tokens_seconds",
+                Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
+                "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
             )?;
         }
         if let Some(ref stats) = persistent_state.active_anchor_stats {
@@ -241,6 +262,13 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                     .value(&[("domain", BOTH_DOMAINS )], daily_stats.both_ii_domains_counter as f64)?;
             }
         };
+        if let Some(delegation_origins_limit) = persistent_state.max_num_latest_delegation_origins {
+            w.encode_gauge(
+                "internet_identity_max_num_latest_delegation_origins",
+                delegation_origins_limit as f64,
+                "The maximum number of latest delegation origins that were used with II bound devices.",
+            )?;
+        }
 
         Ok::<(), std::io::Error>(())
     })?;
@@ -375,7 +403,7 @@ pub fn content_security_policy_meta() -> String {
          form-action 'none';\
          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;\
          style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com;\
-         font-src https://fonts.gstatic.com;"
+         font-src 'self' https://fonts.gstatic.com;"
     );
     #[cfg(not(feature = "insecure_requests"))]
     let csp = format!("{csp}upgrade-insecure-requests;");

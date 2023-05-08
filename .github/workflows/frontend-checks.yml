@@ -150,8 +150,30 @@ jobs:
 
   # Deploy the showcase to GitHub Pages
   showcase:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+
+      # Build the showcase with a special base URL (used in links and esp. routing)
+      # to match the deploy URL: https://dfinity.github.io/internet-identity/
+      - run: npm run build:showcase -- --base '/internet-identity/'
+      # the showcase needs the same index.html served on all routes; on GH pages we just show a fake 404 page
+      # that is actually the index.
+      - run: cp dist-showcase/index.html dist-showcase/404.html
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: 'dist-showcase'
+
+  # Deploy the showcase to GitHub Pages
+  showcase-deploy:
+    runs-on: ubuntu-latest
+    needs: showcase
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -160,24 +182,8 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-node
-      - run: npm ci
 
-      # Build the showcase with a special base URL (used in links and esp. routing)
-      # to match the deploy URL: https://dfinity.github.io/internet-identity/
-      - run: BASE_URL='/internet-identity' npm run build:showcase
-      # the showcase needs the same index.html served on all routes. In the devServer this is
-      # done by using `historyApiFallback`; on GH pages we just show a fake 404 page that is
-      # actually the index.
-      - run: cp dist/index.html dist/404.html
-      - name: Setup Pages
-        uses: actions/configure-pages@v2
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: 'dist'
+    steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v1
         id: deployment

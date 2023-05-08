@@ -1,6 +1,6 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
@@ -173,7 +173,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
   protected parent?: unknown;
 
-  private latest: A;
+  public latest: A;
 
   // Constructor with latest which is "initial" and then latest
   constructor(initial: A) {
@@ -181,7 +181,7 @@ export class Chan<A> implements AsyncIterable<A> {
   }
 
   send(a: A): void {
-    if (this.snd !== undefined) {
+    if (nonNullish(this.snd)) {
       this.snd(a);
       // After the promise was resolved, set as undefined so that
       // future `send`s go to the buffer.
@@ -194,7 +194,7 @@ export class Chan<A> implements AsyncIterable<A> {
     this.listeners = this.listeners.reduce<typeof this.listeners>(
       (acc, ref) => {
         const listener = ref.deref();
-        if (listener !== undefined) {
+        if (nonNullish(listener)) {
           listener.notify(a);
           acc.push(ref);
         }
@@ -211,7 +211,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // consumes the values: if you need to read the value from different
   // places use `.values()` instead.
   protected async *recv(): AsyncIterable<A> {
-    if (this.latest !== undefined) {
+    if (nonNullish(this.latest)) {
       yield this.latest;
     }
 
@@ -314,4 +314,15 @@ export function delayMillis(millis: number) {
   return new Promise<void>((resolve) => {
     setTimeout(() => resolve(), millis);
   });
+}
+
+// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
+// avoid shuffling in place.
+export function shuffleArray<T>(array_: T[]): T[] {
+  const array = [...array_];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }

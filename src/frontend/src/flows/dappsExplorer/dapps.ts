@@ -1,5 +1,6 @@
+import { toast } from "$src/components/toast";
+import { BASE_URL } from "$src/environment";
 import { isNullish } from "@dfinity/utils";
-import { toast } from "../../components/toast";
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used
@@ -17,8 +18,7 @@ export type DappDescription = ElementOf<typeof dappsJson>;
 // Dynamically load the dapps list
 const loadDapps = async (): Promise<DappDescription[] | undefined> => {
   try {
-    return (await import(/* webpackChunkName: "dapps" */ "./dapps.json"))
-      .default;
+    return (await import("./dapps.json")).default;
   } catch (e) {
     console.error(e);
     return undefined;
@@ -38,6 +38,6 @@ export const getDapps = async (): Promise<DappDescription[]> => {
   return dapps.map((dapp) => ({
     ...dapp,
     /* fix up logo path (inherited from dfinity/portal) to match our assets */
-    logo: dapp.logo.replace("/img/showcase/", "/icons/"),
+    logo: dapp.logo.replace("/img/showcase/", BASE_URL + "icons/"),
   }));
 };

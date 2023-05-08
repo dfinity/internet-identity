@@ -1,6 +1,15 @@
 import crypto from "@trust/webcrypto";
 import { TextEncoder } from "util";
 
+// We mock the environment variable because jest is not able to load import.meta.env
+jest.mock("./src/environment.ts", () => ({
+  BASE_URL: "/",
+  FETCH_ROOT_KEY: false,
+  DUMMY_AUTH: false,
+  DUMMY_CAPTCHA: false,
+  VERSION: ",,clean",
+}));
+
 export type WebAuthnCredential = {
   credentialId: string;
   isResidentCredential: boolean;

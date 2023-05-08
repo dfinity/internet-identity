@@ -1,69 +1,55 @@
 /** A showcase for static pages. II pages are given a fake connection and loaded from here
  * just to give an idea of what they look like, and to speed up the development cycle when
  * working on HTML and CSS. */
-import { html, render, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import {
   Challenge,
   DeviceData,
   Timestamp,
-} from "../../frontend/generated/internet_identity_types";
-import { showWarning } from "../../frontend/src/banner";
-import { promptDeviceAliasPage } from "../../frontend/src/components/alias";
-import { mkAnchorPicker } from "../../frontend/src/components/anchorPicker";
-import { authnPages } from "../../frontend/src/components/authenticateBox";
-import { displayError } from "../../frontend/src/components/displayError";
-import { withLoader } from "../../frontend/src/components/loader";
-import {
-  showMessage,
-  showMessagePage,
-} from "../../frontend/src/components/message";
-import { promptUserNumber } from "../../frontend/src/components/promptUserNumber";
-import { toast } from "../../frontend/src/components/toast";
-import { chooseDeviceAddFlow } from "../../frontend/src/flows/addDevice/manage";
-import { addDeviceSuccessPage } from "../../frontend/src/flows/addDevice/manage/addDeviceSuccess";
-import { pollForTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/pollForTentativeDevice";
-import { verifyTentativeDevicePage } from "../../frontend/src/flows/addDevice/manage/verifyTentativeDevice";
-import { deviceRegistrationDisabledInfoPage } from "../../frontend/src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
-import { showVerificationCodePage } from "../../frontend/src/flows/addDevice/welcomeView/showVerificationCode";
-import { authnTemplateAuthorize } from "../../frontend/src/flows/authorize";
-import { compatibilityNotice } from "../../frontend/src/flows/compatibilityNotice";
-import { dappsExplorerPage } from "../../frontend/src/flows/dappsExplorer";
-import { getDapps } from "../../frontend/src/flows/dappsExplorer/dapps";
-import {
-  authnTemplateManage,
-  displayManagePage,
-} from "../../frontend/src/flows/manage";
-import { chooseRecoveryMechanismPage } from "../../frontend/src/flows/recovery/chooseRecoveryMechanism";
+} from "$generated/internet_identity_types";
+import { showWarning } from "$src/banner";
+import { promptDeviceAliasPage } from "$src/components/alias";
+import { mkAnchorPicker } from "$src/components/anchorPicker";
+import { authnPages } from "$src/components/authenticateBox";
+import { displayError } from "$src/components/displayError";
+import { withLoader } from "$src/components/loader";
+import { showMessage, showMessagePage } from "$src/components/message";
+import { promptUserNumber } from "$src/components/promptUserNumber";
+import { toast } from "$src/components/toast";
+import { addDeviceSuccessPage } from "$src/flows/addDevice/manage/addDeviceSuccess";
+import { pollForTentativeDevicePage } from "$src/flows/addDevice/manage/pollForTentativeDevice";
+import { verifyTentativeDevicePage } from "$src/flows/addDevice/manage/verifyTentativeDevice";
+import { deviceRegistrationDisabledInfoPage } from "$src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showVerificationCode";
+import { authnTemplateAuthorize } from "$src/flows/authorize";
+import { compatibilityNotice } from "$src/flows/compatibilityNotice";
+import { dappsExplorerPage } from "$src/flows/dappsExplorer";
+import { getDapps } from "$src/flows/dappsExplorer/dapps";
+import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
+import { chooseRecoveryMechanismPage } from "$src/flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
   confirmSeedPhrasePage,
-} from "../../frontend/src/flows/recovery/confirmSeedPhrase";
-import { displaySafariWarning } from "../../frontend/src/flows/recovery/displaySafariWarning";
-import { displaySeedPhrasePage } from "../../frontend/src/flows/recovery/displaySeedPhrase";
-import { displaySingleDeviceWarning } from "../../frontend/src/flows/recovery/displaySingleDeviceWarning";
-import { pickRecoveryDevice } from "../../frontend/src/flows/recovery/pickRecoveryDevice";
-import { deviceRecoveryPage } from "../../frontend/src/flows/recovery/recoverWith/device";
-import { recoverWithPhrasePage } from "../../frontend/src/flows/recovery/recoverWith/phrase";
-import {
-  badChallenge,
-  promptCaptchaPage,
-} from "../../frontend/src/flows/register/captcha";
-import { renderConstructing } from "../../frontend/src/flows/register/construct";
-import { displayUserNumberPage } from "../../frontend/src/flows/register/finish";
-import { registerDisabled } from "../../frontend/src/flows/registerDisabled";
-import { styleguide } from "../../frontend/src/styleguide";
-import "../../frontend/src/styles/main.css";
-import { I18n } from "../../frontend/src/utils/i18n";
-import { AuthenticatedConnection } from "../../frontend/src/utils/iiConnection";
-import { mount, withRef } from "../../frontend/src/utils/lit-html";
-import { RecoveryDevice } from "../../frontend/src/utils/recoveryDevice";
-import {
-  asNonEmptyArray,
-  Chan,
-  NonEmptyArray,
-} from "../../frontend/src/utils/utils";
+} from "$src/flows/recovery/confirmSeedPhrase";
+import { displaySafariWarning } from "$src/flows/recovery/displaySafariWarning";
+import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
+import { displaySingleDeviceWarning } from "$src/flows/recovery/displaySingleDeviceWarning";
+import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
+import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
+import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
+import { displayUserNumberPage } from "$src/flows/register/finish";
+import { savePasskeyPage } from "$src/flows/register/passkey";
+import { registerDisabled } from "$src/flows/registerDisabled";
+import { styleguide } from "$src/styleguide";
+import "$src/styles/main.css";
+import { I18n } from "$src/utils/i18n";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { mount, withRef } from "$src/utils/lit-html";
+import { RecoveryDevice } from "$src/utils/recoveryDevice";
+import { asNonEmptyArray, Chan, NonEmptyArray } from "$src/utils/utils";
+import { html, render, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -128,21 +114,25 @@ const authnCnfg = {
   onSubmit: (anchor: bigint) => console.log("Submitting anchor", anchor),
 };
 
+const dapps = await getDapps();
+
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
+  dapps,
   i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  dapps,
   i18n,
 });
 
-const authz = authnPages({ ...authnCnfg, ...authzTemplates });
-const authzAlt = authnPages({ ...authnCnfg, ...authzTemplatesAlt });
+const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
+const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
 
-const manageTemplates = authnTemplateManage();
-const manage = authnPages({ ...authnCnfg, ...manageTemplates });
+const manageTemplates = authnTemplateManage({ dapps });
+const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 const iiPages: Record<string, () => void> = {
   displayUserNumber: () =>
@@ -211,7 +201,15 @@ const iiPages: Record<string, () => void> = {
     }),
   recoverWithDevice: () =>
     deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
-  constructing: () => renderConstructing({}),
+  savePasskey: () =>
+    savePasskeyPage({
+      i18n,
+      cancel: () => console.log("cancel"),
+      construct: () =>
+        new Promise((_) => {
+          console.log("Identity Construction");
+        }),
+    }),
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
@@ -245,7 +243,7 @@ const iiPages: Record<string, () => void> = {
       cancel: () => console.log("canceled"),
       title: html`Choose a Recovery Method`,
       message: html`We recommend that you create at least one recovery method in
-      case you lose access to your devices.`,
+      case you lose your Passkeys.`,
       cancelText: html`Skip, I understand the risks`,
     }),
   displaySingleDeviceWarning: () =>
@@ -256,8 +254,7 @@ const iiPages: Record<string, () => void> = {
         return Promise.resolve();
       }
     ),
-  displayManage: async () => {
-    const dapps = await getDapps();
+  displayManage: () => {
     displayManagePage({
       userNumber,
       devices: {
@@ -265,14 +262,17 @@ const iiPages: Record<string, () => void> = {
           {
             alias: "Chrome on iPhone",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
           },
           {
             alias: "Yubikey Blue",
             remove: () => console.log("remove"),
+            rename: () => console.log("rename"),
             warn: html`Something is rotten in the state of Device`,
           },
         ],
@@ -299,14 +299,14 @@ const iiPages: Record<string, () => void> = {
       },
     });
   },
-  displayManageSingle: async () => {
-    const dapps = await getDapps();
+  displayManageSingle: () => {
     displayManagePage({
       userNumber,
       devices: {
         authenticators: [
           {
             alias: "Chrome on iPhone",
+            rename: () => console.log("rename"),
           },
         ],
         recoveries: {},
@@ -326,10 +326,10 @@ const iiPages: Record<string, () => void> = {
       },
     });
   },
-  chooseDeviceAddFlow: () => chooseDeviceAddFlow(),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
+      useFIDO: () => console.log("use FIDO"),
       origin: "https://identity.internetcomputer.org",
       userNumber: BigInt(1234),
       remaining: {
@@ -371,7 +371,8 @@ const iiPages: Record<string, () => void> = {
         },
       },
     }),
-  loader: () => withLoader(() => new Promise(() => renderConstructing({}))),
+  loader: () =>
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
   displaySafariWarning: () =>
     displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
       return Promise.resolve();
@@ -415,8 +416,7 @@ const iiPages: Record<string, () => void> = {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
   },
-  dappsExplorer: async () => {
-    const dapps = await getDapps();
+  dappsExplorer: () => {
     dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
   },
   showMessage: () =>
@@ -434,11 +434,15 @@ const iiPages: Record<string, () => void> = {
 const showcase: TemplateResult = html`
   <h1 class="t-title t-title--main">showcase</h1>
   <div class="showcase-grid l-stack">
-    ${Object.entries(iiPages).map(([key, _]) => {
+    ${Object.entries(iiPages).map(([pageName, _]) => {
+      // '/' or '/internet-identity/'
+      const baseUrl = import.meta.env.BASE_URL ?? "/";
+      // '/myPage' or '/internet-identity/myPage'
+      const pageLink = baseUrl + pageName;
       return html`<aside>
-        <a data-page-name="${key}" href="${key}">
-          <iframe src="${key}" title="${key}"></iframe>
-          <h2>${key}</h2>
+        <a data-page-name=${pageName} href=${pageLink}>
+          <iframe src=${pageLink} title=${pageName}></iframe>
+          <h2>${pageName}</h2>
         </a>
       </aside>`;
     })}
@@ -458,7 +462,7 @@ const components = (): TemplateResult => {
           div.innerText = anchor.toString();
         }),
       moreOptions: () => console.log("More options requested"),
-          focus: false,
+      focus: false,
     }).template;
 
   const chan = new Chan<TemplateResult>(html`loading...`);
@@ -615,17 +619,37 @@ const pageContent = html`
   ${showcase} ${i18nExample()} ${components()} ${styleguide}
 `;
 
+// The 404 page
+const notFound = ({
+  baseUrl,
+  pageName,
+}: {
+  baseUrl: string;
+  pageName: string;
+}) => {
+  showMessagePage({
+    message: html`<h1>404 not found</h1>
+      <p class="t-paragraph">
+        Page '${pageName}' was not found on '${baseUrl}${pageName}'
+      </p> `,
+  });
+};
+
 const init = () => {
   // We use the URL's path to route to the correct page.
   // If we can't find a page to route to, we just show the default page.
   // This is not very user friendly (in particular we don't show anything like a
   // 404) but this is an dev page anyway.
-  const route = window.location.pathname
-    .replace(process.env.BASE_URL ?? "", "")
-    .substring(1);
-  const page = iiPages[route] ?? defaultPage;
-
-  page();
+  // '/myPage' -> 'myPage'
+  // '/internet-identity/myPage' -> 'myPage'
+  const baseUrl = import.meta.env.BASE_URL;
+  const pageName = window.location.pathname.replace(baseUrl, "");
+  if (pageName === "") {
+    defaultPage();
+  } else {
+    const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
+    page();
+  }
 };
 
 init();

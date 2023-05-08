@@ -1,4 +1,6 @@
+import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
+import { webAuthnErrorCopy } from "./webAuthnErrorUtils";
 
 export type LoginFlowResult =
   | LoginFlowSuccess
@@ -19,9 +21,9 @@ export type LoginFlowError = {
 } & LoginError;
 
 export type LoginError = {
-  title: string;
-  message: string;
-  detail?: string;
+  title: string | DynamicKey;
+  message: string | DynamicKey;
+  detail?: string | DynamicKey;
 };
 
 /** The result of a login flow that was canceled */
@@ -51,8 +53,8 @@ export const apiResultToLoginFlowResult = (
     case "unknownUser": {
       return {
         tag: "err",
-        title: "Unknown Identity Anchor",
-        message: `Failed to find an identity for the Identity Anchor ${result.userNumber}. Please check your Identity Anchor and try again.`,
+        title: "Unknown Internet Identity",
+        message: `Failed to find Internet Identity ${result.userNumber}. Please check your Internet Identity and try again.`,
         detail: "",
       };
     }
@@ -87,6 +89,14 @@ export const apiResultToLoginFlowResult = (
         title: "Invalid Seed Phrase",
         message:
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
+      };
+    }
+    case "cancelOrTimeout": {
+      const copy = webAuthnErrorCopy();
+      return {
+        tag: "err",
+        title: copy.cancel_title,
+        message: copy.cancel_message,
       };
     }
   }

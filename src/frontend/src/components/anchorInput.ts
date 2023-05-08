@@ -1,9 +1,9 @@
+import { mount, withRef } from "$src/utils/lit-html";
+import { parseUserNumber } from "$src/utils/userNumber";
 import { isNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
-import { mount, withRef } from "../utils/lit-html";
-import { parseUserNumber } from "../utils/userNumber";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({
@@ -42,17 +42,17 @@ export const mkAnchorInput = ({
   const submit = () => {
     const result = readAndParseValue();
     if (result === "invalid") {
-      return showHint("Invalid Anchor");
+      return showHint("Invalid Internet Identity");
     }
     if (isNullish(result)) {
-      return showHint("Please enter an Anchor");
+      return showHint("Please enter an Internet Identity");
     }
     onSubmit(result);
   };
 
   // How we react on unexpected (i.e. non-digit) input
   const onBadInput = () => {
-    showHint("Anchors only consist of digits");
+    showHint("An Internet Identity only consists of digits");
   };
 
   // When enter is pressed, submit
@@ -102,7 +102,7 @@ export const mkAnchorInput = ({
         type="text"
         data-role="anchor-input"
         class="c-input c-input--vip c-input--centered c-input--spacious"
-        placeholder="Enter anchor"
+        placeholder="Internet Identity"
         value="${ifDefined(userNumber?.toString())}"
         @input=${inputFilter(isDigits, onBadInput)}
         @keydown=${inputFilter(isDigits, onBadInput)}

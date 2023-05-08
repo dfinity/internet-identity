@@ -1,29 +1,40 @@
-import { html, render, TemplateResult } from "lit-html";
-import { PORTAL_II_URL } from "../config";
-import { registerTentativeDevice } from "../flows/addDevice/welcomeView/registerTentativeDevice";
-import { useRecovery } from "../flows/recovery/useRecovery";
+import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
+import { useRecovery } from "$src/flows/recovery/useRecovery";
+import { I18n } from "$src/i18n";
 import {
   apiResultToLoginFlowResult,
   LoginData,
   LoginFlowError,
   LoginFlowResult,
   LoginFlowSuccess,
-} from "../utils/flowResult";
-import { Connection } from "../utils/iiConnection";
-import { TemplateElement, withRef } from "../utils/lit-html";
-import { registerIfAllowed } from "../utils/registerAllowedCheck";
+} from "$src/utils/flowResult";
+import { Connection } from "$src/utils/iiConnection";
+import { TemplateElement, withRef } from "$src/utils/lit-html";
+import { registerIfAllowed } from "$src/utils/registerAllowedCheck";
 import {
   getAnchors,
   parseUserNumber,
   setAnchorUsed,
-} from "../utils/userNumber";
-import { isNonEmptyArray, NonEmptyArray, unreachable } from "../utils/utils";
+} from "$src/utils/userNumber";
+import { isNonEmptyArray, NonEmptyArray, unreachable } from "$src/utils/utils";
+import { nonNullish } from "@dfinity/utils";
+import { html, render, TemplateResult } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
 import { displayError } from "./displayError";
+import {
+  controlIcon,
+  githubBigIcon,
+  participateIcon,
+  privacyIcon,
+  secureIcon,
+  signInIcon,
+} from "./icons";
 import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
+
+import copyJson from "./authenticateBox.json";
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -45,20 +56,32 @@ export type AuthnTemplates = {
  * to II or to another dapp */
 export const authenticateBox = async (
   connection: Connection,
+  i18n: I18n,
   templates: AuthnTemplates
-): Promise<LoginData> => {
+): Promise<LoginData & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    new Promise<LoginFlowResult>((resolve) => {
-      const pages = authnPages({
+    new Promise<LoginFlowResult & { newAnchor: boolean }>((resolve) => {
+      const pages = authnPages(i18n, {
         ...templates,
-        addDevice: (userNumber) => addRemoteDevice(connection, userNumber),
-        onSubmit: (userNumber) => {
-          resolve(authenticate(connection, userNumber));
+        addDevice: (userNumber) => asNewDevice(connection, userNumber),
+        onSubmit: async (userNumber) => {
+          resolve({
+            newAnchor: false,
+            ...(await authenticate(connection, userNumber)),
+          });
         },
-        register: () => {
-          resolve(registerIfAllowed(connection));
+        register: async () => {
+          resolve({
+            ...(await registerIfAllowed(connection)),
+            newAnchor: true,
+          });
         },
-        recover: (userNumber) => resolve(useRecovery(connection, userNumber)),
+        recover: async (userNumber) => {
+          resolve({
+            ...(await useRecovery(connection, userNumber)),
+            newAnchor: false,
+          });
+        },
       });
 
       // If there _are_ some anchors, then we show the "pick" screen, otherwise
@@ -76,135 +99,43 @@ export const authenticateBox = async (
 
   // Retry until user has successfully authenticated
   for (;;) {
-    const result = await promptAuth();
-    switch (result.tag) {
-      case "ok":
-        setAnchorUsed(result.userNumber);
-        return result;
-      case "err":
-        await displayError({
-          title: result.title,
-          message: result.message,
-          detail: result.detail !== "" ? result.detail : undefined,
-          primaryButton: "Try again",
-        });
-        break;
-      case "canceled":
-        break;
-      default:
-        unreachable(result);
-        break;
+    const { newAnchor, ...result } = await promptAuth();
+    const loginData = await handleLoginFlowResult(result);
+
+    if (nonNullish(loginData)) {
+      return { ...loginData, newAnchor };
     }
   }
 };
 
+export const handleLoginFlowResult = async (
+  result: LoginFlowResult
+): Promise<LoginData | undefined> => {
+  switch (result.tag) {
+    case "ok":
+      setAnchorUsed(result.userNumber);
+      return result;
+    case "err":
+      await displayError({
+        title: result.title,
+        message: result.message,
+        detail: result.detail !== "" ? result.detail : undefined,
+        primaryButton: "Try again",
+      });
+      break;
+    case "canceled":
+      break;
+    default:
+      unreachable(result);
+      break;
+  }
+
+  return undefined;
+};
+
 /** The templates for the authentication pages */
 export const authnTemplates = (
-  props: {
-    register: () => void;
-    onSubmit: (anchor: bigint) => void;
-    addDevice: (anchor?: bigint) => void;
-    recover: (anchor?: bigint) => void;
-  } & AuthnTemplates
-) => ({
-  firstTime: (firstTimeProps: { useExisting: () => void }) => {
-    return html`${props.firstTime.slot}
-      <div class="l-stack">
-        <button
-          type="button"
-          @click=${() => props.register()}
-          id="registerButton"
-          class="c-button"
-        >
-          ${props.firstTime.createAnchorText}
-        </button>
-        <button
-          type="button"
-          @click=${() => firstTimeProps.useExisting()}
-          id="loginButton"
-          class="c-button c-button--secondary"
-        >
-          ${props.firstTime.useExistingText}
-        </button>
-      </div>
-      <p class="t-paragraph t-centered l-stack">
-        <a
-          class="t-link"
-          href=${PORTAL_II_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          >Learn More</a
-        >
-      </p>`;
-  },
-  useExisting: () => {
-    const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
-    const withUserNumber = (f: (arg: bigint | undefined) => void) => {
-      const value = withRef(
-        anchorInput.userNumberInput,
-        (input) => input.value
-      );
-
-      // XXX: we work around parseUserNumber returning "null" by defaulting to "undefined"
-      const userNumber = parseUserNumber(value ?? "") ?? undefined;
-      f(userNumber);
-    };
-    return html` ${props.useExisting.slot} ${anchorInput.template}
-      <ul class="c-list--flex l-stack--tight">
-        <li>
-          <a
-            @click=${() =>
-              withUserNumber((userNumber) => props.addDevice(userNumber))}
-            id="addNewDeviceButton"
-            class="t-link"
-            >Add a new device?</a
-          >
-        </li>
-        <li>
-          <a
-            @click="${() =>
-              withUserNumber((userNumber) => props.recover(userNumber))}"
-            id="recoverButton"
-            class="t-link"
-            >Lost Access?</a
-          >
-        </li>
-      </ul>
-      <div class="l-stack c-button-group">
-        <button
-          @click=${() => props.register()}
-          class="c-button c-button--secondary"
-        >
-          Create New
-        </button>
-        <button
-          data-action="continue"
-          @click=${() => anchorInput.submit()}
-          class="c-button"
-        >
-          Continue
-        </button>
-      </div>`;
-  },
-  pick: (pickProps: {
-    anchors: NonEmptyArray<bigint>;
-    moreOptions: () => void;
-  }) => {
-    return html`
-      ${props.pick.slot}
-      ${mkAnchorPicker({
-        savedAnchors: pickProps.anchors,
-        pick: props.onSubmit,
-        moreOptions: pickProps.moreOptions,
-      }).template}
-    `;
-  },
-});
-
-/** The authentication pages, namely "firstTime" (for new users), "useExisting" (for users who
- * don't have saved anchors or who wish to use non-saved anchors) and "pick" (for users
- * picking a saved anchor) */
-export const authnPages = (
+  i18n: I18n,
   props: {
     register: () => void;
     onSubmit: (anchor: bigint) => void;
@@ -212,7 +143,155 @@ export const authnPages = (
     recover: (anchor?: bigint) => void;
   } & AuthnTemplates
 ) => {
-  const tpls = authnTemplates(props);
+  const copy = i18n.i18n(copyJson);
+
+  const marketingBlocks = [
+    {
+      icon: secureIcon,
+      title: copy.secure_and_convenient,
+      body: copy.instead_of_passwords,
+    },
+    {
+      icon: privacyIcon,
+      title: copy.no_tracking,
+      body: copy.get_privacy,
+    },
+    {
+      icon: controlIcon,
+      title: copy.control_your_identity,
+      body: copy.securely_access,
+    },
+    {
+      icon: participateIcon,
+      title: copy.own_and_participate,
+      body: copy.share_and_vote,
+    },
+    {
+      icon: signInIcon,
+      title: copy.sign_in_to_web3,
+      body: copy.manages_keys,
+    },
+    {
+      icon: githubBigIcon,
+      title: copy.opensource_and_transparent,
+      body: copy.internet_identity_codebase,
+    },
+  ];
+
+  return {
+    firstTime: (firstTimeProps: { useExisting: () => void }) => {
+      return html`${props.firstTime.slot}
+        <div class="l-stack">
+          <button
+            type="button"
+            @click=${() => props.register()}
+            id="registerButton"
+            class="c-button"
+          >
+            ${props.firstTime.createAnchorText}
+          </button>
+          <button
+            type="button"
+            @click=${() => firstTimeProps.useExisting()}
+            id="loginButton"
+            class="c-button c-button--secondary"
+          >
+            ${props.firstTime.useExistingText}
+          </button>
+        </div>
+        <div class="c-marketing-section">
+          ${marketingBlocks.map(
+            ({ title, body, icon }) =>
+              html`
+                <article class="c-marketing-block">
+                  ${icon !== undefined
+                    ? html`<i class="c-icon c-icon--marketing">${icon}</i>`
+                    : undefined}
+                  <h2 class="t-title t-title--main">${title}</h2>
+                  <p class="t-paragraph t-paragraph--weak">${body}</p>
+                </article>
+              `
+          )}
+        </div> `;
+    },
+    useExisting: () => {
+      const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
+      const withUserNumber = (f: (arg: bigint | undefined) => void) => {
+        const value = withRef(
+          anchorInput.userNumberInput,
+          (input) => input.value
+        );
+
+        // XXX: we work around parseUserNumber returning "null" by defaulting to "undefined"
+        const userNumber = parseUserNumber(value ?? "") ?? undefined;
+        f(userNumber);
+      };
+      return html` ${props.useExisting.slot} ${anchorInput.template}
+        <ul class="c-list--flex l-stack--tight">
+          <li>
+            <a
+              @click=${() =>
+                withUserNumber((userNumber) => props.addDevice(userNumber))}
+              id="addNewDeviceButton"
+              class="t-link"
+              >Add a new Passkey?</a
+            >
+          </li>
+          <li>
+            <a
+              @click="${() =>
+                withUserNumber((userNumber) => props.recover(userNumber))}"
+              id="recoverButton"
+              class="t-link"
+              >Lost Access?</a
+            >
+          </li>
+        </ul>
+        <div class="l-stack c-button-group">
+          <button
+            @click=${() => props.register()}
+            class="c-button c-button--secondary"
+          >
+            Create New
+          </button>
+          <button
+            data-action="continue"
+            @click=${() => anchorInput.submit()}
+            class="c-button"
+          >
+            Continue
+          </button>
+        </div>`;
+    },
+    pick: (pickProps: {
+      anchors: NonEmptyArray<bigint>;
+      moreOptions: () => void;
+    }) => {
+      return html`
+        ${props.pick.slot}
+        ${mkAnchorPicker({
+          savedAnchors: pickProps.anchors,
+          pick: props.onSubmit,
+          moreOptions: pickProps.moreOptions,
+        }).template}
+      `;
+    },
+  };
+};
+
+/** The authentication pages, namely "firstTime" (for new users), "useExisting" (for users who
+ * don't have saved anchors or who wish to use non-saved anchors) and "pick" (for users
+ * picking a saved anchor) */
+export const authnPages = (
+  i18n: I18n,
+  props: {
+    register: () => void;
+    onSubmit: (anchor: bigint) => void;
+    addDevice: (anchor?: bigint) => void;
+    recover: (anchor?: bigint) => void;
+  } & AuthnTemplates
+) => {
+  const tpls = authnTemplates(i18n, props);
   return {
     firstTime: (firstTimeProps: { useExisting: () => void }) =>
       page(tpls.firstTime(firstTimeProps)),
@@ -252,14 +331,13 @@ const page = (slot: TemplateResult) => {
   render(template, container);
 };
 
-// Start the "remote device" add flow by prompting for an anchor, and then
-// adding a device to that anchor.
-const addRemoteDevice = async (connection: Connection, userNumber?: bigint) => {
+// Register this device as a new device with the anchor
+const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
   const askUserNumber = async () => {
     const result = await promptUserNumber({
       title: "Add a Trusted Device",
-      message: "What’s your Identity Anchor?",
+      message: "What’s your Internet Identity?",
     });
     if (result === "canceled") {
       // TODO L2-309: do this without reload

@@ -8,6 +8,11 @@
 
 import { ChildProcess, execSync, spawn } from "child_process";
 import * as fs from "fs";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // In order to proxy the calls Node v18 requires 127.0.0.1 instead of localhost as string for the proxy
 const LOCALHOST = "127.0.0.1";
@@ -17,7 +22,6 @@ const II_DAPP_PORT = 8086;
 const II_DAPP_URL = `http://localhost:${II_DAPP_PORT}`;
 
 const WEBAPP_PORT = 8087;
-const WEBAPP_URL = `http://localhost:${WEBAPP_PORT}`;
 
 type Arguments = { noRun: boolean };
 
@@ -102,7 +106,7 @@ function main() {
   let testsStarted = false;
   let proxyOutput = "";
 
-  proxy.stdout.on("data", (data) => {
+  proxy.stdout!.on("data", (data) => {
     console.log(`proxy: ${data}`);
 
     if (!testsStarted) {
@@ -135,7 +139,7 @@ function main() {
           wdio.on("exit", (code, signal) => {
             console.log("Killing proxy");
             proxy.kill();
-            if (code > 0) {
+            if (code !== null && code > 0) {
               // if code is set and non-zero, bubble up error from wdio tests
               throw new Error(`End-to-end tests returned with ${code}`);
             } else if (signal) {
@@ -150,7 +154,7 @@ function main() {
     }
   });
 
-  proxy.stderr.on("data", (data) => {
+  proxy.stderr!.on("data", (data) => {
     console.log(`proxy: ${data}`);
   });
 
