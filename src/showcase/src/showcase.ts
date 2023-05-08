@@ -118,13 +118,11 @@ const dapps = await getDapps();
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
-  dapps,
   i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
-  dapps,
   i18n,
 });
 
@@ -155,6 +153,8 @@ const iiPages: Record<string, () => void> = {
 
   authorizeNew: () =>
     authz.firstTime({ useExisting: () => console.log("Use existing") }),
+  authorizeNewAlt: () =>
+    authzAlt.firstTime({ useExisting: () => console.log("Use existing") }),
   authorizeUseExisting: () => authz.useExisting(),
   authorizePick: () =>
     authz.pick({
