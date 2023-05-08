@@ -126,10 +126,17 @@ export const inferAlias = async ({
     return FIDO;
   }
 
-  const os = uaParser.getOS().name;
-
-  // As a last resort, we try to show something like "Chrome on Linux" or just "Chrome" or just "Linux"
   const browser = uaParser.getBrowser().name;
+  if (browser === "Chrome") {
+    // Chrome has a concept of shared "Passkeys". If the user is signed in (to Chrome), then Chrome will create a
+    // Passkey shared across all the users' Chromes; if the user is _not_ signed in, then it will be local. We haven't
+    // found a way to figure out if the generated Passkey is shared or not, so to be safe we just say "Chrome" as a tradeoff
+    // between "Chrome on [OS]" (local) and "Chrome Passkey" (shared).
+    return "Chrome";
+  }
+
+  // As a last resort, we try to show something like "Opera on Linux" or just "Opera" or just "Linux"
+  const os = uaParser.getOS().name;
   const browserOn = [
     ...(nonNullish(browser) ? [browser] : []),
     ...(nonNullish(os) ? [os] : []),
