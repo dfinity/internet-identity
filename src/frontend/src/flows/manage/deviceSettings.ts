@@ -35,6 +35,7 @@ export const renameDevice = async ({
   const alias = await promptDeviceAlias({
     title: "Passkey Nickname",
     message: "Choose a nickname for this Passkey",
+    value: device.alias,
   });
   if (alias === null) {
     reload();
