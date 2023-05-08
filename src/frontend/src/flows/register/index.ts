@@ -9,7 +9,7 @@ import { unknownToString } from "$src/utils/utils";
 import { nonNullish } from "@dfinity/utils";
 import type { UAParser } from "ua-parser-js";
 import { promptCaptcha } from "./captcha";
-import { displayUserNumber } from "./finish";
+import { displayUserNumberWarmup } from "./finish";
 import { savePasskey } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
@@ -36,6 +36,7 @@ export const register = async ({
       uaParser,
     });
 
+    const displayUserNumber = displayUserNumberWarmup();
     const captchaResult = await promptCaptcha({
       connection,
       challenge: preloadedChallenge,
@@ -48,8 +49,9 @@ export const register = async ({
     } else {
       const result = apiResultToLoginFlowResult(captchaResult);
       if (result.tag === "ok") {
-        setAnchorUsed(result.userNumber);
-        await displayUserNumber(result.userNumber);
+        const { userNumber } = result;
+        setAnchorUsed(userNumber);
+        await displayUserNumber({ userNumber });
       }
       return result;
     }

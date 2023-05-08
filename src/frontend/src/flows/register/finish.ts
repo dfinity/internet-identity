@@ -9,12 +9,14 @@ import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 export const displayUserNumberTemplate = ({
   onContinue,
   userNumber,
+  identityBackground: identityBackground_,
 }: {
   onContinue: () => void;
   userNumber: bigint;
+  identityBackground?: IdentityBackground;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
-
+  const identityBackground = identityBackground_ ?? new IdentityBackground();
   const displayUserNumberSlot = html`<hgroup>
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
@@ -25,7 +27,7 @@ export const displayUserNumberTemplate = ({
     </hgroup>
     <div class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id" >
       <div class="c-input--id__wrap">
-        <img class="c-input--id__art" src="${BASE_URL}image.png" alt="" />
+      ${identityBackground.img}
         <h2 class="c-input--id__caption">Internet Identity:</h2>
         <output class="c-input--id__value" class="t-vip" aria-label="usernumber" id="userNumber" data-usernumber="${userNumber}">${userNumber}</output>
       </div>
@@ -92,10 +94,56 @@ export const displayUserNumberTemplate = ({
   });
 };
 
+// A non-exported wrapper around HTMLImageElement, to ensure this exact image is loaded
+// (and no other image is passed as an argument to this page)
+class IdentityBackground {
+  public img: HTMLImageElement;
+
+  constructor() {
+    const img = new Image();
+    img.src = `${BASE_URL}image.png`; // Setting the src kicks off the fetching
+    img.classList.add("c-input--id__art");
+    img.alt = "";
+    this.img = img;
+  }
+}
+
 export const displayUserNumberPage = renderPage(displayUserNumberTemplate);
 
-export const displayUserNumber = (userNumber: bigint): Promise<void> => {
+// Omit specified functions parameters, for instance OmitParams<..., "foo" | "bar">
+// will transform
+//  f: (a: { foo, bar, baz }) => void
+// into
+//  f: (a: { baz }) => void
+//
+// eslint-disable-next-line
+type OmitParams<T extends (arg: any) => any, A extends string> = (
+  a: Omit<Parameters<T>[0], A>
+) => ReturnType<T>;
+
+// A variant of `displayUserNumber` where the `identityBackground` is preloaded
+export const displayUserNumberWarmup = (): OmitParams<
+  typeof displayUserNumber,
+  "identityBackground"
+> => {
+  const identityBackground = new IdentityBackground();
+  return async (opts) => {
+    await displayUserNumber({ ...opts, identityBackground });
+  };
+};
+
+export const displayUserNumber = ({
+  userNumber,
+  identityBackground,
+}: {
+  userNumber: bigint;
+  identityBackground?: IdentityBackground;
+}): Promise<void> => {
   return new Promise((resolve) =>
-    displayUserNumberPage({ onContinue: () => resolve(), userNumber })
+    displayUserNumberPage({
+      onContinue: () => resolve(),
+      userNumber,
+      identityBackground,
+    })
   );
 };
