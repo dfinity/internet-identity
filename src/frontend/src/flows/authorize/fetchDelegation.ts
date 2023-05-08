@@ -18,7 +18,7 @@ export const fetchDelegation = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   authContext: AuthContext
-): Promise<[PublicKey, Delegation]> => {
+): Promise<[PublicKey, Delegation] | { error: unknown }> => {
   const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
 
   // at this point, derivationOrigin is either validated or undefined
@@ -36,11 +36,17 @@ export const fetchDelegation = async (
     derivationOrigin = `https://${subdomain}.ic0.app`;
   }
 
-  const [userKey, timestamp] = await connection.prepareDelegation(
+  const result = await connection.prepareDelegation(
     derivationOrigin,
     sessionKey,
     authContext.authRequest.maxTimeToLive
   );
+
+  if ("error" in result) {
+    return result;
+  }
+
+  const [userKey, timestamp] = result;
 
   const signed_delegation = await retryGetDelegation(
     connection,
