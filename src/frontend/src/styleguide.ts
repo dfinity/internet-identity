@@ -103,9 +103,9 @@ export const styleguide = html`
     <article class="l-stack c-card c-card--highlight">
       <h1 class="t-title t-title--main">Typography</h1>
       <p class="t-lead">
-        The font used all over the app is called "Montserrat" and is loaded from
-        <a href="https://fonts.google.com/specimen/Montserrat">Google Fonts</a>.
-        It is a sans-serif font that is easy to read.
+        The font used all over the app is called "Circular" and is loaded
+        directly from the canister. It is a sans-serif font that is easy to
+        read.
       </p>
       <p class="t-paragrapgh">
         The base font size is dependent on the browser's window size. But 1rem
