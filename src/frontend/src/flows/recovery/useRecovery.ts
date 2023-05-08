@@ -15,6 +15,7 @@ import {
   isCancel,
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
+import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { pickRecoveryDevice } from "./pickRecoveryDevice";
 import { deviceRecoveryPage } from "./recoverWith/device";
@@ -24,7 +25,7 @@ export const useRecovery = async (
   connection: Connection,
   userNumber?: bigint
 ): Promise<LoginFlowResult> => {
-  if (userNumber !== undefined) {
+  if (nonNullish(userNumber)) {
     return runRecovery(userNumber, connection);
   } else {
     const pUserNumber = await promptUserNumber({
