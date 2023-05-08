@@ -64,7 +64,6 @@
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
 
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::io::{Error, Read, Write};
@@ -266,6 +265,7 @@ struct Header {
 
 // A copy of MemoryManager's internal structures.
 // Used for migration only, will be deleted after migration is complete.
+#[allow(dead_code)]
 mod mm {
     pub const HEADER_RESERVED_BYTES: usize = 32;
     pub const MAX_NUM_MEMORIES: u8 = 255;
@@ -425,24 +425,23 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_memory_v6_to_v7(memory: M) -> Option<Self> {
         let maybe_storage_v6 = Self::from_memory(memory.clone());
-        if maybe_storage_v6.is_none() {
-            return None;
-        }
+        maybe_storage_v6.as_ref()?;
         let storage_v6 = maybe_storage_v6.unwrap();
         if storage_v6.header.version == 7 {
             // Already at v7, no migration needed.
             return Some(storage_v6);
         }
         if storage_v6.header.version != 6 {
-            trap(&*format!(
+            trap(&format!(
                 "Expected storage version 6, got {}",
                 storage_v6.header.version
             ));
         }
         // Update the header to v7.
-        let mut storage_v7_header: Header = storage_v6.header.clone();
+        let mut storage_v7_header: Header = storage_v6.header;
         storage_v7_header.version = 7;
         let header_bytes = unsafe {
             std::slice::from_raw_parts(
@@ -496,7 +495,7 @@ impl<M: Memory + Clone> Storage<M> {
             .write_all(&bucket_to_memory)
             .expect("bug: failed writing bucket assignments");
 
-        return Self::from_memory(memory);
+        Self::from_memory(memory)
     }
 
     /// Allocates a fresh Identity Anchor.
