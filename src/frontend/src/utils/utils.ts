@@ -326,3 +326,14 @@ export function shuffleArray<T>(array_: T[]): T[] {
   }
   return array;
 }
+
+// Omit specified functions parameters, for instance OmitParams<..., "foo" | "bar">
+// will transform
+//  f: (a: { foo, bar, baz }) => void
+// into
+//  f: (a: { baz }) => void
+//
+// eslint-disable-next-line
+export type OmitParams<T extends (arg: any) => any, A extends string> = (
+  a: Omit<Parameters<T>[0], A>
+) => ReturnType<T>;
