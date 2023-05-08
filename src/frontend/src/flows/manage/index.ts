@@ -22,7 +22,7 @@ import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { renderPage } from "$src/utils/lit-html";
+import { renderPage, TemplateElement } from "$src/utils/lit-html";
 import {
   hasRecoveryPhrase,
   isProtected,
@@ -50,31 +50,43 @@ export const authnTemplateManage = ({
   dapps: DappDescription[];
 }): AuthnTemplates => {
   const wrap = ({
+    title,
+    subtitle,
     showDapps = false,
   }: {
+    title: TemplateElement;
+    subtitle?: string;
     showDapps?: boolean;
   }): TemplateResult => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
     <header class="t-centered" style="text-align: left;">
-      <h1 class="t-title t-title--main">
-        Securely connect to dapps on the Internet Computer
-      </h1>
+      <h1 class="t-title t-title--main">${title}</h1>
+      ${nonNullish(subtitle)
+        ? html` <p class="t-lead l-stack">${subtitle}</p>`
+        : undefined}
     </header>
   `;
   return {
     firstTime: {
       slot: wrap({
+        title: "Securely connect to dapps on the Internet Computer",
         showDapps: true,
       }),
       useExistingText: "Use existing",
       createAnchorText: "Create Internet Identity",
     },
     useExisting: {
-      slot: wrap({}),
+      slot: wrap({
+        title: html`Enter your <br />Internet Identity`,
+        subtitle: "to continue",
+      }),
     },
 
     pick: {
-      slot: wrap({}),
+      slot: wrap({
+        title: html`Choose your <br />Internet Identity`,
+        subtitle: "to continue",
+      }),
     },
   };
 };
