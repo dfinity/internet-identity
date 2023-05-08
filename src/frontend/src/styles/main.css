@@ -1385,7 +1385,7 @@ a:hover,
 .c-input--id__wrap {
   min-height: 10em;
   position: relative;
-  margin: calc(-4 * var(--rs-input-bezel));
+  margin: calc(-4 * var(--rs-input-bezel)) calc(-3 * var(--rs-input-bezel));
   padding: calc(4 * var(--rs-input-bezel));
   overflow: hidden;
   border-radius: var(--rs-input-border-radius);
