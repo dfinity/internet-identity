@@ -485,7 +485,28 @@ impl<M: Memory + Clone> Storage<M> {
             .write_all(mm_header_bytes)
             .expect("bug: failed to grow memory");
         // Update bucket-to-memory assignments.
-        let buckets_offset: u64 = 8 + 32 + 255 * 8;
+        // The assignments begin after right after the header, which has the following layout
+        // -------------------------------------------------- <- Address 0
+        // Magic "MGR"                           ↕ 3 bytes
+        // --------------------------------------------------
+        // Layout version                        ↕ 1 byte
+        // --------------------------------------------------
+        // Number of allocated buckets           ↕ 2 bytes
+        // --------------------------------------------------
+        // Bucket size (in pages) = N            ↕ 2 bytes
+        // --------------------------------------------------
+        // Reserved space                        ↕ 32 bytes
+        // --------------------------------------------------
+        // Size of memory 0 (in pages)           ↕ 8 bytes
+        // --------------------------------------------------
+        // Size of memory 1 (in pages)           ↕ 8 bytes
+        // --------------------------------------------------
+        // ...
+        // --------------------------------------------------
+        // Size of memory 254 (in pages)         ↕ 8 bytes
+        // -------------------------------------------------- <- Bucket allocations
+        // ...
+        let buckets_offset: u64 = (3 + 1 + 2 + 2) + 32 + (255 * 8);
         let mut writer = Writer::new(&mut mm_header_memory, buckets_offset);
         let mut bucket_to_memory = [mm::UNALLOCATED_BUCKET_MARKER; mm::MAX_NUM_BUCKETS as usize];
         for i in 0..num_allocated_buckets {
