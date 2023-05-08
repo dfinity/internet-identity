@@ -578,8 +578,15 @@ fn should_read_previously_stored_persistent_state_v6() {
 
 fn sample_unique_device(id: usize) -> Device {
     Device {
+        alias: format!(" #{}", id),
+        ..sample_device()
+    }
+}
+
+fn sample_device() -> Device {
+    Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
-        alias: format!("my test device #{}", id),
+        alias: "my test device".to_string(),
         credential_id: Some(ByteBuf::from("this is the credential id")),
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
@@ -588,10 +595,6 @@ fn sample_unique_device(id: usize) -> Device {
         last_usage_timestamp: Some(1234),
         metadata: None,
     }
-}
-
-fn sample_device() -> Device {
-    sample_unique_device(0)
 }
 
 fn sample_persistent_state() -> PersistentState {
