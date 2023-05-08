@@ -7,6 +7,9 @@ import { AuthClient } from "@dfinity/auth-client";
 import type { Principal } from "@dfinity/principal";
 
 const webapp_id = process.env.WHOAMI_CANISTER_ID;
+// The <canisterId>.localhost URL is used as opposed to setting the canister id as a parameter
+// since the latter is brittle with regards to transitively loaded resources.
+const local_ii_url = `http://${process.env.INTERNET_IDENTITY_CANISTER_ID}.localhost:4943`;
 
 // @ts-ignore - The interface of the whoami canister
 const webapp_idl = ({ IDL }) => {
@@ -24,12 +27,14 @@ export interface _SERVICE {
 // Autofills the <input> for the II Url to point to the correct canister.
 document.body.onload = () => {
   let iiUrl;
+
   if (process.env.DFX_NETWORK === "local") {
-    iiUrl = `http://localhost:4943/?canisterId=${process.env.INTERNET_IDENTITY_CANISTER_ID}`;
+    iiUrl = local_ii_url;
   } else if (process.env.DFX_NETWORK === "ic") {
     iiUrl = `https://${process.env.INTERNET_IDENTITY_CANISTER_ID}.ic0.app`;
   } else {
-    iiUrl = `https://${process.env.INTERNET_IDENTITY_CANISTER_ID}.dfinity.network`;
+    // fall back to local
+    iiUrl = local_ii_url;
   }
   document.querySelector<HTMLInputElement>("#iiUrl")!.value = iiUrl;
 };
