@@ -83,22 +83,25 @@ fn should_recover_header_from_memory_v7() {
 }
 
 fn add_test_anchor_data<M: Memory + Clone>(storage: &mut Storage<M>, number_of_anchors: usize) {
-    for _ in 0..number_of_anchors {
+    for i in 0..number_of_anchors {
         let (anchor_number, mut anchor) = storage
             .allocate_anchor()
             .expect("Failure allocating an anchor.");
         anchor
-            .add_device(sample_device())
+            .add_device(sample_unique_device(i))
             .expect("Failure adding a device");
         storage.write(anchor_number, anchor.clone()).unwrap();
     }
 }
 
+// Returns a hex-representation of the specified range from `memory`.
+// The output is grouped into pairs of bytes, for easier visual parsing.
 fn range_as_hex(memory: &RefCell<Vec<u8>>, offset: u64, length: usize) -> String {
     let mut buf = vec![0u8; length];
     memory.read(offset, &mut buf);
     let s = hex::encode(buf);
     let mut answer = String::new();
+    // Add spaces after every 2 bytes, for easier visual parsing of the hex output.
     for (i, c) in s.chars().enumerate() {
         answer.push(c);
         if i % 4 == 3 {
@@ -186,6 +189,13 @@ fn should_correctly_migrate_memory_from_v6_to_v7_2000_anchors() {
 #[test]
 fn should_correctly_migrate_memory_from_v6_to_v7_4000_anchors() {
     test_migrate_memory_from_v6_to_v7(4000);
+}
+
+#[test]
+fn should_not_migrate_if_wrong_memory() {
+    let memory = VectorMemory::default();
+    assert_eq!(memory.size(), 0);
+    assert!(Storage::from_memory_v6_to_v7(memory).is_none());
 }
 
 enum SupportedVersion {
@@ -566,10 +576,10 @@ fn should_read_previously_stored_persistent_state_v6() {
     );
 }
 
-fn sample_device() -> Device {
+fn sample_unique_device(id: usize) -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
-        alias: "my test device".to_string(),
+        alias: format!("my test device #{}", id),
         credential_id: Some(ByteBuf::from("this is the credential id")),
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
@@ -578,6 +588,10 @@ fn sample_device() -> Device {
         last_usage_timestamp: Some(1234),
         metadata: None,
     }
+}
+
+fn sample_device() -> Device {
+    sample_unique_device(0)
 }
 
 fn sample_persistent_state() -> PersistentState {

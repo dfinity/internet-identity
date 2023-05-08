@@ -428,8 +428,7 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn from_memory_v6_to_v7(memory: M) -> Option<Self> {
         let maybe_storage_v6 = Self::from_memory(memory.clone());
-        maybe_storage_v6.as_ref()?;
-        let storage_v6 = maybe_storage_v6.unwrap();
+        let storage_v6 = maybe_storage_v6?;
         if storage_v6.header.version == 7 {
             // Already at v7, no migration needed.
             return Some(storage_v6);
