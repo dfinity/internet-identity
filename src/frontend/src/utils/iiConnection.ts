@@ -549,17 +549,22 @@ export class AuthenticatedConnection extends Connection {
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     maxTimeToLive?: bigint
-  ): Promise<[PublicKey, bigint]> => {
-    console.log(
-      `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
-    );
-    const actor = await this.getActor();
-    return await actor.prepare_delegation(
-      this.userNumber,
-      hostname,
-      sessionKey,
-      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
-    );
+  ): Promise<[PublicKey, bigint] | { error: unknown }> => {
+    try {
+      console.log(
+        `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
+      );
+      const actor = await this.getActor();
+      return await actor.prepare_delegation(
+        this.userNumber,
+        hostname,
+        sessionKey,
+        nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
+      );
+    } catch (e: unknown) {
+      console.error(e);
+      return { error: e };
+    }
   };
 
   getDelegation = async (
