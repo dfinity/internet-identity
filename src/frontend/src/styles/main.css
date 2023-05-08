@@ -1990,7 +1990,7 @@ a:hover,
 }
 
 .c-chasm__arrow {
-  margin: auto;
+  margin-left: calc(1.25 * var(--rs-card-bezel));
   width: 0;
   height: 0;
   background: var(--rc-input);
