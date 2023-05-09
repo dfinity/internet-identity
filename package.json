@@ -16,7 +16,7 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build:showcase": "tsc --noEmit && vite build --mode showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
-    "test": "jest --maxWorkers 1 --roots ./src/frontend --verbose --testPathIgnorePatterns=\"src/frontend/src/test-e2e\"",
+    "test": "vitest --config ./vitest.config.ts",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=./jest.e2e.config.ts --roots ./src/frontend --verbose --testPathPattern=\"src/frontend/src/test-e2e\"",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
@@ -48,6 +48,7 @@
     "typescript": "4.9",
     "vite": "^4.2.1",
     "vite-plugin-compression": "^0.5.1",
+    "vitest": "^0.31.0",
     "webdriverio": "^8.6.9"
   },
   "dependencies": {
