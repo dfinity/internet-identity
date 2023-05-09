@@ -100,6 +100,9 @@ fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
         api::get_anchor_info(&env, canister_id, device5.principal(), 10_030)?.into_device_data();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, vec![device5, device6]);
+
+    let stats = api::stats(&env, canister_id)?;
+    assert_eq!(6, stats.storage_layout_version);
     Ok(())
 }
 
@@ -142,6 +145,9 @@ fn should_load_genesis_migrated_to_v6_backup_and_migrate_to_v7() -> Result<(), C
         api::get_anchor_info(&env, canister_id, device5.principal(), 10_030)?.into_device_data();
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     assert_eq!(devices, vec![device5, device6]);
+
+    let stats = api::stats(&env, canister_id)?;
+    assert_eq!(7, stats.storage_layout_version);
     Ok(())
 }
 
@@ -322,6 +328,7 @@ fn should_read_persistent_state_v6() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
+    assert_eq!(6, stats.storage_layout_version);
     Ok(())
 }
 
@@ -350,6 +357,7 @@ fn should_migrate_persistent_state_v6_to_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
+    assert_eq!(7, stats.storage_layout_version);
     Ok(())
 }
 
@@ -371,6 +379,9 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
+
+    let stats = api::stats(&env, canister_id)?;
+    assert_eq!(7, stats.storage_layout_version);
     Ok(())
 }
 
