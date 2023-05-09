@@ -134,7 +134,7 @@ _If you actually use the webapp, make sure that the "Internet Identity URL" fiel
 
 Figuring the canister IDs, and using the `canisterId=...` query parameter is all a bit cumbersome. Here are some commands you might like:
 
-- `npm run dev`: Build the app and serve it on `localhost:8080` with hot reload on code changes, ideal for hacking on the webapp.
+- `npm run dev`: Build the app and serve it on `localhost:5173` with hot reload on code changes, ideal for hacking on the webapp.
 - `npm run proxy`: Start a proxy that serves Internet Identity on `localhost:8086` and the webapp on `localhost:8087` for easy access.
 - `npm run test`: Start the proxy and run browser tests against the `internet_identity` canister.
 
