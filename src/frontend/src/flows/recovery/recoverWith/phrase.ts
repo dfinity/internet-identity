@@ -227,7 +227,6 @@ export const wordTemplate = ({
           if (rest.length <= 0) {
             return;
           }
-
           const newData = new DataTransfer();
           newData.setData("text", rest.join(" "));
 
