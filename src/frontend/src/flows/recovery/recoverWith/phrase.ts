@@ -199,14 +199,14 @@ export const wordTemplate = ({
     ${asyncReplace(icon)}
     <input
       @paste=${(e: ClipboardEvent) =>
-        withElement(e, (event, element) => {
+        withElement(e, ($event, element) => {
           e.preventDefault();
 
           // Get the text pasted
-          if (event.clipboardData === null) {
+          if ($event.clipboardData === null) {
             return;
           }
-          const text = event.clipboardData.getData("text");
+          const text = $event.clipboardData.getData("text");
 
           // Split the text into words, dropping (leading) white spaces, empty strings (from e.g. double spaces), etc
           const [word = undefined, ...rest] = text
@@ -227,11 +227,16 @@ export const wordTemplate = ({
           if (rest.length <= 0) {
             return;
           }
+
           const newData = new DataTransfer();
           newData.setData("text", rest.join(" "));
+
           const newEvent = new ClipboardEvent("paste", {
             clipboardData: newData,
           });
+
+          // Firefox does not set the clipboardData accuratly with the ClipboardEvent constructor. Empirical workaround.
+          newEvent.clipboardData?.setData("text", rest.join(" "));
 
           // Go up until we find a list item, then to the next sibling, and finally back down until we find an input
           const next = element
