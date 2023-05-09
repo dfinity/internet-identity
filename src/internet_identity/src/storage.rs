@@ -16,11 +16,11 @@
 //! -------------------------------------------
 //! Number of anchors           ↕ 4 bytes
 //! -------------------------------------------
-//! anchor_range_lower (A_0)    ↕ 8 bytes
+//! id_range_lo (A_0)           ↕ 8 bytes
 //! -------------------------------------------
-//! anchor_range_upper (A_MAX)  ↕ 8 bytes
+//! id_range_hi (A_MAX)         ↕ 8 bytes
 //! -------------------------------------------
-//! max_entry_size (SIZE_MAX)   ↕ 2 bytes
+//! entry_size (SIZE_MAX)       ↕ 2 bytes
 //! -------------------------------------------
 //! Salt                        ↕ 32 bytes
 //! -------------------------------------------
@@ -114,7 +114,8 @@ const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// MemoryManager parameters.
-const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(0);
+const ANCHOR_MEMORY_INDEX: u8 = 0u8;
+const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -245,6 +246,7 @@ pub struct Storage<M: Memory> {
 }
 
 #[repr(packed)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Header {
     magic: [u8; 3],
     // version   0: invalid
@@ -259,6 +261,31 @@ struct Header {
     entry_size: u16,
     salt: [u8; 32],
     first_entry_offset: u64,
+}
+
+// A copy of MemoryManager's internal structures.
+// Used for migration only, will be deleted after migration is complete.
+#[allow(dead_code)]
+mod mm {
+    pub const HEADER_RESERVED_BYTES: usize = 32;
+    pub const MAX_NUM_MEMORIES: u8 = 255;
+    pub const MAX_NUM_BUCKETS: u64 = 32768;
+    pub const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
+    pub const MAGIC: &[u8; 3] = b"MGR";
+
+    #[repr(C, packed)]
+    pub struct Header {
+        pub magic: [u8; 3],
+        pub version: u8,
+        // The number of buckets allocated by the memory manager.
+        pub num_allocated_buckets: u16,
+        // The size of a bucket in Wasm pages.
+        pub bucket_size_in_pages: u16,
+        // Reserved bytes for future extensions
+        pub _reserved: [u8; HEADER_RESERVED_BYTES],
+        // The size of each individual memory that can be created by the memory manager.
+        pub memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+    }
 }
 
 impl<M: Memory + Clone> Storage<M> {
@@ -297,7 +324,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         };
 
-        Self {
+        let mut storage = Self {
             header: Header {
                 magic: *b"IIC",
                 version,
@@ -311,7 +338,9 @@ impl<M: Memory + Clone> Storage<M> {
             header_memory,
             anchor_memory,
             maybe_memory_manager,
-        }
+        };
+        storage.flush();
+        storage
     }
 
     pub fn salt(&self) -> Option<&Salt> {
@@ -394,6 +423,99 @@ impl<M: Memory + Clone> Storage<M> {
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn from_memory_v6_to_v7(memory: M) -> Option<Self> {
+        let maybe_storage_v6 = Self::from_memory(memory.clone());
+        let storage_v6 = maybe_storage_v6?;
+        if storage_v6.header.version == 7 {
+            // Already at v7, no migration needed.
+            return Some(storage_v6);
+        }
+        if storage_v6.header.version != 6 {
+            trap(&format!(
+                "Expected storage version 6, got {}",
+                storage_v6.header.version
+            ));
+        }
+        // Update the header to v7.
+        let mut storage_v7_header: Header = storage_v6.header;
+        storage_v7_header.version = 7;
+        let header_bytes = unsafe {
+            std::slice::from_raw_parts(
+                &storage_v7_header as *const _ as *const u8,
+                std::mem::size_of::<Header>(),
+            )
+        };
+        let mut header_memory = RestrictedMemory::new(memory.clone(), 0..1);
+        let mut writer = Writer::new(&mut header_memory, 0);
+        // this should never fail as this write only requires a memory of size 1
+        writer
+            .write_all(header_bytes)
+            .expect("bug: failed to grow memory");
+
+        // Initialize 2nd page (i.e. page #1) with MemoryManager metadata.
+        let num_allocated_buckets: u16 =
+            ((storage_v6.anchor_memory.size() + (BUCKET_SIZE_IN_PAGES as u64) - 1)
+                / BUCKET_SIZE_IN_PAGES as u64) as u16;
+        let mut memory_sizes_in_pages: [u64; mm::MAX_NUM_MEMORIES as usize] =
+            [0u64; mm::MAX_NUM_MEMORIES as usize];
+        memory_sizes_in_pages[ANCHOR_MEMORY_INDEX as usize] = storage_v6.anchor_memory.size();
+        let mm_header = mm::Header {
+            magic: *mm::MAGIC,
+            version: 1u8,
+            num_allocated_buckets,
+            bucket_size_in_pages: BUCKET_SIZE_IN_PAGES,
+            _reserved: [0u8; 32],
+            memory_sizes_in_pages,
+        };
+        let pages_in_allocated_buckets = (BUCKET_SIZE_IN_PAGES * num_allocated_buckets) as u64;
+        memory.grow(pages_in_allocated_buckets - storage_v6.anchor_memory.size());
+        let mm_header_bytes = unsafe {
+            std::slice::from_raw_parts(
+                &mm_header as *const _ as *const u8,
+                std::mem::size_of::<mm::Header>(),
+            )
+        };
+        let mut mm_header_memory = RestrictedMemory::new(memory.clone(), 1..2);
+        let mut writer = Writer::new(&mut mm_header_memory, 0);
+        writer
+            .write_all(mm_header_bytes)
+            .expect("bug: failed to grow memory");
+        // Update bucket-to-memory assignments.
+        // The assignments begin after right after the header, which has the following layout
+        // -------------------------------------------------- <- Address 0
+        // Magic "MGR"                           ↕ 3 bytes
+        // --------------------------------------------------
+        // Layout version                        ↕ 1 byte
+        // --------------------------------------------------
+        // Number of allocated buckets           ↕ 2 bytes
+        // --------------------------------------------------
+        // Bucket size (in pages) = N            ↕ 2 bytes
+        // --------------------------------------------------
+        // Reserved space                        ↕ 32 bytes
+        // --------------------------------------------------
+        // Size of memory 0 (in pages)           ↕ 8 bytes
+        // --------------------------------------------------
+        // Size of memory 1 (in pages)           ↕ 8 bytes
+        // --------------------------------------------------
+        // ...
+        // --------------------------------------------------
+        // Size of memory 254 (in pages)         ↕ 8 bytes
+        // -------------------------------------------------- <- Bucket allocations
+        // ...
+        let buckets_offset: u64 = (3 + 1 + 2 + 2) + 32 + (255 * 8);
+        let mut writer = Writer::new(&mut mm_header_memory, buckets_offset);
+        let mut bucket_to_memory = [mm::UNALLOCATED_BUCKET_MARKER; mm::MAX_NUM_BUCKETS as usize];
+        for i in 0..num_allocated_buckets {
+            bucket_to_memory[i as usize] = 0u8;
+        }
+        writer
+            .write_all(&bucket_to_memory)
+            .expect("bug: failed writing bucket assignments");
+
+        Self::from_memory(memory)
     }
 
     /// Allocates a fresh Identity Anchor.
