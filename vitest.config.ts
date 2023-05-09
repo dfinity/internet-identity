@@ -2,8 +2,8 @@ import { UserConfig } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
 import { aliasConfig } from "./vite.config";
 
-export default defineConfig(({ mode }: UserConfig): UserConfig => {
-  return {
+export default defineConfig(
+  ({ mode }: UserConfig): UserConfig => ({
     resolve: {
       alias: aliasConfig,
     },
@@ -21,5 +21,5 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       watch: false,
       setupFiles: "./src/frontend/test-setup.ts",
     },
-  };
-});
+  })
+);
