@@ -1,17 +1,11 @@
-import { resolve } from "path";
 import { UserConfig } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
+import { aliasConfig } from "./vite.config";
 
 export default defineConfig(({ mode }: UserConfig): UserConfig => {
   return {
     resolve: {
-      alias: {
-        // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
-        stream: "stream-browserify",
-        // Custom alias we are using to shorten and make absolute the imports
-        $generated: resolve(__dirname, "src/frontend/generated"),
-        $src: resolve(__dirname, "src/frontend/src"),
-      },
+      alias: aliasConfig,
     },
     test: {
       environment: "jsdom",
