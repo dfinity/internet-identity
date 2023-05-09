@@ -1,5 +1,6 @@
 import { assertNonNullish } from "@dfinity/utils";
 import { readFileSync } from "fs";
+import { minify } from "html-minifier-terser";
 import { extname } from "path";
 import { Plugin } from "vite";
 import viteCompression from "vite-plugin-compression";
@@ -72,3 +73,16 @@ export const compression = (): Plugin =>
     filter: (file: string): boolean =>
       ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
   });
+
+/**
+ * Minify HTML
+ */
+export const minifyHTML = (): {
+  name: "html-transform";
+  transformIndexHtml(html: string): Promise<string>;
+} => ({
+  name: "html-transform",
+  async transformIndexHtml(html): Promise<string> {
+    return minify(html, { collapseWhitespace: true });
+  },
+});
