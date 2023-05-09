@@ -29,4 +29,4 @@ Note: These steps are intended to do development on the test-app. To simply run 
 2. Run the local replica `dfx start --clean`
 3. Deploy the canister to the local replica `dfx deploy`
 4. Visit the running site at http://localhost:4943?<canister_id>
-   1. alternatively the dev server can be started by running `npm run dev` which can be accessed on http://localhost:8080
+   1. alternatively the dev server can be started by running `npm run dev` which can be accessed on http://localhost:5173

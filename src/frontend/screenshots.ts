@@ -6,7 +6,7 @@ import { remote } from "webdriverio";
 import { downloadChrome } from "./download-chrome";
 
 /** This executable takes screenshots of every page in the showcase.
- * This function expects the showcase to be running on 'http://localhost:8080'. Everything
+ * This function expects the showcase to be running on 'http://localhost:5174'. Everything
  * else is automated. */
 async function main() {
   await withChrome(takeShowcaseScreenshots);
@@ -14,7 +14,7 @@ async function main() {
 
 /** Open each showcase page one after the other and screenshot it */
 async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
-  await visit(browser, "http://localhost:8080/");
+  await visit(browser, "http://localhost:5174/");
 
   // The landing page has a link for every page. The link tags have `data-page-name`
   // attributes, which we gather as the list of page names.
@@ -40,7 +40,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
       continue;
     }
 
-    await visit(browser, `http://localhost:8080/${pageName}`);
+    await visit(browser, `http://localhost:5174/${pageName}`);
 
     // When authenticating with alternative origins, toggle the chasm
     if (pageName === "authorizePickAltOpen") {
