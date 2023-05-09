@@ -5,13 +5,11 @@ import {
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon, spinner } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
-import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
-import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { DynamicKey, I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
-import { Chan, shuffleArray, unreachable } from "$src/utils/utils";
+import { Chan, unreachable } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
@@ -21,52 +19,45 @@ import copyJson from "./index.json";
 
 /* Template for the authbox when authenticating to a dapp */
 export const authnTemplateAuthorize = ({
-  origin,
+  origin: origin_,
   derivationOrigin,
-  dapps,
   i18n,
 }: {
   origin: string;
   derivationOrigin?: string;
-  dapps: DappDescription[];
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
-  const chasm =
-    nonNullish(derivationOrigin) && derivationOrigin !== origin
+  const origin = html` <strong class="t-strong">${origin_}</strong>`;
+  const originInfo =
+    nonNullish(derivationOrigin) && derivationOrigin !== origin_
       ? mkChasm({
-          info: "shared identity",
+          info: origin,
           message: html`<span class="t-strong">${origin}</span>
             ${copy.is_alternative_of} <br /><span class="t-strong"
               >${derivationOrigin}</span
             ><br />${copy.auth_same_identity}`,
         })
-      : undefined;
+      : origin;
 
   const wrap = ({
-    showDapps = false,
+    firstTime = false,
     title,
   }: {
-    showDapps?: boolean;
+    firstTime?: boolean;
     title: DynamicKey;
   }) => html`
-    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
     <div class="l-stack">
       <h1 class="t-title t-title--main" style="text-align: left;">${title}</h1>
       <p class="t-lead l-stack">
-        ${copy.to_continue_to}
-        <div class="l-stack l-stack--tight">
-          <strong class="t-strong"
-            >${origin}</strong
-          >
-        </div>
+        ${firstTime ? copy.create_to_continue_to : copy.to_continue_to}
       </p>
-      ${chasm}
+      ${originInfo}
     </div>
   `;
   return {
     firstTime: {
-      slot: wrap({ showDapps: true, title: copy.first_time_create }),
+      slot: wrap({ firstTime: true, title: copy.first_time_create }),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
     },
@@ -111,14 +102,12 @@ export const authFlowAuthorize = async (
     );
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
-      const dapps = shuffleArray(await getDapps());
       const authSuccess = await authenticateBox(
         connection,
         i18n,
         authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
-          dapps,
           i18n,
         })
       );
@@ -185,7 +174,7 @@ export const authFlowAuthorize = async (
 
 /** Options to display a "chasm" in the authbox */
 type ChasmOpts = {
-  info: string;
+  info: TemplateElement;
   message: TemplateResult;
 };
 
@@ -198,18 +187,20 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   );
 
   return html`
-    <p class="t-centered t-paragraph t-weak"><span id="alternative-origin-chasm-toggle" class="t-action" @click=${() =>
-      chasmToggle()}>${info} <span class="t-link__icon c-chasm__button ${asyncReplace(
-    btnFlipped
-  )}">${caretDownIcon}</span></span>
-      <div class="c-chasm" aria-expanded=${asyncReplace(ariaExpanded)}>
-        <div class="c-chasm__inner">
-          <div class="c-chasm__arrow"></div>
-          <div class="t-weak c-chasm__content">
-              ${message}
-          </div>
-        </div>
+    <span
+      id="alternative-origin-chasm-toggle"
+      class="t-action"
+      @click=${() => chasmToggle()}
+      >${info}
+      <span class="t-link__icon c-chasm__button ${asyncReplace(btnFlipped)}"
+        >${caretDownIcon}</span
+      ></span
+    >
+    <div class="c-chasm" aria-expanded=${asyncReplace(ariaExpanded)}>
+      <div class="c-chasm__inner">
+        <div class="c-chasm__arrow"></div>
+        <div class="t-weak c-chasm__content">${message}</div>
       </div>
-    </p>
-`;
+    </div>
+  `;
 };

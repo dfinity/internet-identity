@@ -11,6 +11,7 @@ import { promptDeviceAliasPage } from "$src/components/alias";
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { authnPages } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
+import { loadIdentityBackground } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { showMessage, showMessagePage } from "$src/components/message";
 import { promptUserNumber } from "$src/components/promptUserNumber";
@@ -50,6 +51,8 @@ import { asNonEmptyArray, Chan, NonEmptyArray } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+
+const identityBackground = loadIdentityBackground();
 
 // A "dummy" connection which actually is just undefined, hoping pages won't call it
 const dummyConnection = undefined as unknown as AuthenticatedConnection;
@@ -118,13 +121,11 @@ const dapps = await getDapps();
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
-  dapps,
   i18n,
 });
 const authzTemplatesAlt = authnTemplateAuthorize({
   origin: "https://nowhere.com",
   derivationOrigin: "http://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
-  dapps,
   i18n,
 });
 
@@ -137,6 +138,7 @@ const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 const iiPages: Record<string, () => void> = {
   displayUserNumber: () =>
     displayUserNumberPage({
+      identityBackground,
       userNumber,
       onContinue: () => console.log("done"),
     }),
@@ -155,6 +157,8 @@ const iiPages: Record<string, () => void> = {
 
   authorizeNew: () =>
     authz.firstTime({ useExisting: () => console.log("Use existing") }),
+  authorizeNewAlt: () =>
+    authzAlt.firstTime({ useExisting: () => console.log("Use existing") }),
   authorizeUseExisting: () => authz.useExisting(),
   authorizePick: () =>
     authz.pick({
@@ -256,6 +260,7 @@ const iiPages: Record<string, () => void> = {
     ),
   displayManage: () => {
     displayManagePage({
+      identityBackground,
       userNumber,
       devices: {
         authenticators: [
@@ -301,6 +306,7 @@ const iiPages: Record<string, () => void> = {
   },
   displayManageSingle: () => {
     displayManagePage({
+      identityBackground,
       userNumber,
       devices: {
         authenticators: [
