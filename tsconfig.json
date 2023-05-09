@@ -15,7 +15,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["node", "jest", "@wdio/globals/types", "vite/client"],
+    "types": ["node", "@wdio/globals/types", "vite/client"],
     "paths": {
       "$generated": ["./src/frontend/generated"],
       "$generated/*": ["./src/frontend/generated/*"],
@@ -25,6 +25,7 @@
   },
   "exclude": [
     "src/**/*.test.ts",
+    "src/**/test.ts",
     "src/frontend/src/test-e2e/*.ts",
     "src/frontend/generated/*",
     "src/frontend/jest-custom-sequencer.ts"
