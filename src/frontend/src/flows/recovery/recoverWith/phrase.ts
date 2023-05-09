@@ -229,7 +229,6 @@ export const wordTemplate = ({
           }
           const newData = new DataTransfer();
           newData.setData("text", rest.join(" "));
-
           const newEvent = new ClipboardEvent("paste", {
             clipboardData: newData,
           });
