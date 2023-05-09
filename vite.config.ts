@@ -3,6 +3,7 @@ import { defineConfig, UserConfig } from "vite";
 import {
   compression,
   injectCanisterIdPlugin,
+  minifyHTML,
   stripInjectJsScript,
 } from "./vite.plugins";
 
@@ -54,7 +55,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [
         ...(mode === "production"
-          ? [stripInjectJsScript(), compression()]
+          ? [stripInjectJsScript(), minifyHTML(), compression()]
           : []),
       ],
     ],

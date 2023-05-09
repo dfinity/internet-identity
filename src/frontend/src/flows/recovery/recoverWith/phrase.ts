@@ -233,6 +233,10 @@ export const wordTemplate = ({
             clipboardData: newData,
           });
 
+          // Firefox does not set the clipboardData accuratly with the ClipboardEvent constructor. Empirical workaround.
+          // Note: this cannot replace providing the clipboardData as initial value of the ClipboardEvent. Removing such value when using the contructor would not comply with specification and make the feature fails in Chrome and Safari.
+          newEvent.clipboardData?.setData("text", rest.join(" "));
+
           // Go up until we find a list item, then to the next sibling, and finally back down until we find an input
           const next = element
             .closest("li")
