@@ -1,5 +1,5 @@
 export const config: WebdriverIO.Config = {
-  baseUrl: process.env.II_DAPP_URL || "http://localhost:8080",
+  baseUrl: process.env.II_DAPP_URL || "http://localhost:5173",
 
   waitforTimeout: 10_000,
 
