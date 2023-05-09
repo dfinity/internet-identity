@@ -5,7 +5,7 @@ import { anyFeatures, features } from "./features";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
-import { authFlowManage, renderManage } from "./flows/manage";
+import { authFlowManage, renderManageWarmup } from "./flows/manage";
 import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
@@ -116,13 +116,18 @@ const init = async () => {
     // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
     await addDeviceSuccess({ deviceAlias });
 
+    const renderManage = renderManageWarmup();
+
     // If user "Click" continue in success page, proceed with authentication
     const result = await authenticate(connection, userNumber);
     const loginData = await handleLoginFlowResult(result);
 
     // User have successfully signed-in we can jump to manage page
     if (nonNullish(loginData)) {
-      return await renderManage(userNumber, loginData.connection);
+      return await renderManage({
+        userNumber,
+        connection: loginData.connection,
+      });
     }
   }
 

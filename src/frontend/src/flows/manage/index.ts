@@ -8,12 +8,16 @@ import {
   AuthnTemplates,
 } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
+import {
+  IdentityBackground,
+  identityCard,
+  loadIdentityBackground,
+} from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
-import { BASE_URL } from "$src/environment";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
@@ -22,14 +26,14 @@ import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { renderPage } from "$src/utils/lit-html";
+import { renderPage, TemplateElement } from "$src/utils/lit-html";
 import {
   hasRecoveryPhrase,
   isProtected,
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { shuffleArray, unreachable } from "$src/utils/utils";
+import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
@@ -82,6 +86,7 @@ export const authnTemplateManage = ({
 /* the II authentication flow */
 export const authFlowManage = async (connection: Connection, i18n: I18n) => {
   const dapps = shuffleArray(await getDapps());
+  const identityBackground = loadIdentityBackground();
   // Go through the login flow, potentially creating an anchor.
   const {
     userNumber,
@@ -95,7 +100,11 @@ export const authFlowManage = async (connection: Connection, i18n: I18n) => {
     await recoveryWizard(userNumber, authenticatedConnection);
   }
   // From here on, the user is authenticated to II.
-  void renderManage(userNumber, authenticatedConnection);
+  void renderManage({
+    userNumber,
+    connection: authenticatedConnection,
+    identityBackground,
+  });
 };
 
 const displayFailedToListDevices = (error: Error) =>
@@ -121,6 +130,7 @@ const displayManageTemplate = ({
   addRecoveryKey,
   dapps,
   exploreDapps,
+  identityBackground,
 }: {
   userNumber: bigint;
   devices: Devices;
@@ -129,6 +139,7 @@ const displayManageTemplate = ({
   addRecoveryKey: () => void;
   dapps: DappDescription[];
   exploreDapps: () => void;
+  identityBackground: IdentityBackground;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
@@ -140,7 +151,7 @@ const displayManageTemplate = ({
     <hgroup>
       <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
-    ${anchorSection(userNumber)}
+    ${anchorSection({ userNumber, identityBackground })}
     <p class="t-paragraph">
       ${dappsTeaser({
         dapps,
@@ -166,32 +177,45 @@ const displayManageTemplate = ({
   });
 };
 
-const anchorSection = (userNumber: bigint): TemplateResult => html`
+const anchorSection = ({
+  userNumber,
+  identityBackground,
+}: {
+  userNumber: bigint;
+  identityBackground: IdentityBackground;
+}): TemplateResult => html`
   <aside class="l-stack">
     <div
       class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
-      <div class="c-input--id__wrap">
-        <img class="c-input--id__art" src="${BASE_URL}image.png" alt="" />
-        <h2 class="c-input--id__caption">Internet Identity:</h2>
-        <output
-          class="c-input--id__value"
-          class="t-vip"
-          aria-label="usernumber"
-          id="userNumber"
-          data-usernumber="${userNumber}"
-          >${userNumber}</output
-        >
-      </div>
+      ${identityCard({
+        userNumber,
+        identityBackground,
+      }) satisfies TemplateElement}
     </div>
   </aside>
 `;
 
+export const renderManageWarmup = (): OmitParams<
+  typeof renderManage,
+  "identityBackground"
+> => {
+  const identityBackground = loadIdentityBackground();
+  return async (opts) => {
+    return await renderManage({ ...opts, identityBackground });
+  };
+};
+
 // Get the list of devices from canister and actually display the page
-export const renderManage = async (
-  userNumber: bigint,
-  origConnection: AuthenticatedConnection
-): Promise<never> => {
+export const renderManage = async ({
+  userNumber,
+  connection: origConnection,
+  identityBackground,
+}: {
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  identityBackground: IdentityBackground;
+}): Promise<never> => {
   let connection = origConnection;
 
   // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
@@ -216,7 +240,8 @@ export const renderManage = async (
     const newConnection = await displayManage(
       userNumber,
       connection,
-      anchorInfo.devices
+      anchorInfo.devices,
+      identityBackground
     );
     connection = newConnection ?? connection;
   }
@@ -227,7 +252,8 @@ export const displayManagePage = renderPage(displayManageTemplate);
 export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices_: DeviceData[]
+  devices_: DeviceData[],
+  identityBackground: IdentityBackground
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
@@ -280,6 +306,7 @@ export const displayManage = async (
           // the page without
           display();
         },
+        identityBackground,
       });
 
     display();
