@@ -769,13 +769,8 @@ a:hover,
 }
 
 :is(button, a, link, .c-dropdown):hover .c-icon--outlined {
-  box-shadow: 0 0 0 1px var(--rc-line), 0 0 0.3em var(--rc-line);
   background-color: var(--rc-button);
   --bgc: var(--rc-onButton);
-}
-
-:is(.c-dropdown):hover .c-icon--outlined {
-  box-shadow: 0 0 0 1px var(--rc-button), 0 0 1em var(--rc-line);
 }
 
 /**
@@ -2246,7 +2241,7 @@ a.c-action-list__item {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
   transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
     0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
-  cursor: auto;
+  cursor: default;
 }
 
 .c-dropdown:hover .c-dropdown__menu,
@@ -2264,7 +2259,7 @@ a.c-action-list__item {
   padding: calc(var(--rs-dropdown-bezel) * 0.75) 0;
   color: var(--rc-text);
   text-decoration: none;
-  cursor: auto;
+  cursor: default;
 }
 
 .c-dropdown__link {
