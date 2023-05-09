@@ -774,6 +774,10 @@ a:hover,
   --bgc: var(--rc-onButton);
 }
 
+:is(.c-dropdown):hover .c-icon--outlined {
+  box-shadow: 0 0 0 1px var(--rc-button), 0 0 1em var(--rc-line);
+}
+
 /**
  * Card components
  */
@@ -2196,7 +2200,6 @@ a.c-action-list__item {
 .c-action-list__item:has(.c-dropdown):hover,
 .c-action-list__item:has(.c-dropdown:hover) {
   position: relative;
-  z-index: calc(var(--z-tooltip) + 3);
 }
 
 .c-dropdown {
@@ -2204,7 +2207,6 @@ a.c-action-list__item {
 }
 
 .c-dropdown__trigger {
-  z-index: calc(var(--z-tooltip) + 2);
   transition: 100ms color linear;
 }
 
@@ -2215,23 +2217,6 @@ a.c-action-list__item {
 .c-dropdown:hover .c-dropdown__trigger,
 .c-dropdown:focus-within .c-dropdown__trigger {
   color: var(--rc-interaction);
-}
-
-.c-dropdown::after {
-  opacity: 0;
-  content: "";
-  position: absolute;
-  top: calc(var(--rs-dropdown-bezel) * -1);
-  bottom: 0;
-  height: calc(100% - var(--rs-dropdown-bezel));
-  width: 100%;
-  padding: var(--rs-dropdown-bezel);
-  right: calc(var(--rs-dropdown-bezel) * -1);
-  background: var(--rc-background);
-  border-bottom-color: var(--rc-background);
-  z-index: calc(var(--z-tooltip) + 1);
-  box-sizing: content-box;
-  pointer-events: none;
 }
 
 .c-dropdown__menu {
@@ -2261,12 +2246,11 @@ a.c-action-list__item {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
   transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
     0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
+  cursor: auto;
 }
 
 .c-dropdown:hover .c-dropdown__menu,
-.c-dropdown:focus-within .c-dropdown__menu,
-.c-dropdown:hover::after,
-.c-dropdown:focus-within::after {
+.c-dropdown:focus-within .c-dropdown__menu {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -2280,6 +2264,7 @@ a.c-action-list__item {
   padding: calc(var(--rs-dropdown-bezel) * 0.75) 0;
   color: var(--rc-text);
   text-decoration: none;
+  cursor: auto;
 }
 
 .c-dropdown__link {
