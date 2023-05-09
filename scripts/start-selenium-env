@@ -34,7 +34,7 @@ NOTE: This requires docker, docker-compose, a running dfx replica with II and th
 EOF
 
 }
-II_PORT=8080
+II_PORT=5173
 while [[ $# -gt 0  ]]
 do
     case "$1" in

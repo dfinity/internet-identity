@@ -67,7 +67,6 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
       },
     },
     server: {
-      port: 8080,
       proxy: {
         "/api": "http://127.0.0.1:4943",
       },
@@ -77,7 +76,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: UserConfig): UserConfig => {
-  const { build, ...rest } = defaultConfig(mode);
+  const { build, server, ...rest } = defaultConfig(mode);
 
   if (mode === "showcase") {
     return {
@@ -89,6 +88,10 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
         target: "esnext" /* for top-level await in showcase */,
         outDir: "../../dist-showcase",
       },
+      server: {
+        ...server,
+        port: 5174,
+      },
     };
   }
 
@@ -96,5 +99,6 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     ...rest,
     root: "src/frontend",
     build,
+    server,
   };
 });

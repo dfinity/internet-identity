@@ -67,7 +67,7 @@ the following:
 npm run dev
 ```
 
-Then open `http://localhost:8080` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
+Then open `http://localhost:5173` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
 
 ```bash
 npm run format && npm run lint
@@ -83,7 +83,7 @@ npm run dev
 
 Then open `http://localhost:8081` in your browser.
 
-Make sure that the "Identity Provider" is set to "http://localhost:8080" if you
+Make sure that the "Identity Provider" is set to "http://localhost:5173" if you
 serve the Internet Identity frontend locally.
 
 **NOTE on testing on LAN:**

@@ -46,8 +46,8 @@ jobs:
           npm run showcase&
           showcase_pid=$!
 
-          # every 100ms, check if localhost:8080 is reachable (i.e. devserver is up)
-          while ! nc -z localhost 8080; do
+          # every 100ms, check if localhost:5174 is reachable (i.e. devserver is up)
+          while ! nc -z localhost 5174; do
             sleep 0.1
           done
           SCREENSHOTS_DIR="./screenshots/${{ matrix.device }}" \
