@@ -31,7 +31,7 @@ export const footer = html`<footer class="l-footer c-footer">
       icon: questionIcon,
       labelText: "Support",
       id: "support-link",
-      url: "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity",
+      url: "https://internetidentity.zendesk.com/hc/en-us",
       rel: "noopener noreferrer",
       classes: "t-link--discreet c-footer__link",
     })}
