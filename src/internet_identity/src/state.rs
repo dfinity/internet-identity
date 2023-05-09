@@ -209,23 +209,33 @@ pub fn salt() -> [u8; 32] {
     })
 }
 
-pub fn init_new() {
+pub fn init_new(migrate_to_memory_manager: bool) {
+    let memory = if migrate_to_memory_manager {
+        StableMemory::Managed(DefaultMemoryImpl::default())
+    } else {
+        StableMemory::Single(DefaultMemoryImpl::default())
+    };
     const FIRST_ANCHOR_NUMBER: AnchorNumber = 10_000;
     let storage = Storage::new(
         (
             FIRST_ANCHOR_NUMBER,
             FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
         ),
-        StableMemory::Single(DefaultMemoryImpl::default()),
+        memory,
     );
     storage_replace(storage);
 }
 
-pub fn init_from_stable_memory() {
+pub fn init_from_stable_memory(migrate_to_memory_manager: bool) {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
     });
-    match Storage::from_memory(DefaultMemoryImpl::default()) {
+    let maybe_new_storage = if migrate_to_memory_manager {
+        Storage::from_memory_v6_to_v7(DefaultMemoryImpl::default())
+    } else {
+        Storage::from_memory(DefaultMemoryImpl::default())
+    };
+    match maybe_new_storage {
         Some(new_storage) => {
             storage_replace(new_storage);
         }

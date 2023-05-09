@@ -187,6 +187,7 @@ pub struct InternetIdentityInit {
     pub canister_creation_cycles_cost: Option<u64>,
     pub register_rate_limit: Option<RateLimitConfig>,
     pub max_num_latest_delegation_origins: Option<u64>,
+    pub migrate_storage_to_memory_manager: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
