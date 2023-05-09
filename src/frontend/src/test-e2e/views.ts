@@ -349,10 +349,14 @@ export class MainView extends View {
   }
 
   async reset(deviceName: string): Promise<void> {
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
+    // Ensure the dropdown is open by focusing it
+    await this.browser.execute(() =>
+      document
+        .querySelector<HTMLButtonElement>(
+          `button.c-dropdown__trigger[data-device="${deviceName}"]`
+        )
+        ?.focus()
+    );
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='reset']`)
       .waitForClickable();
