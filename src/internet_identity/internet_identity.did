@@ -1,8 +1,6 @@
-type UserNumber = nat64;
+type IdentityNumber = nat64;
 type PublicKey = blob;
 type CredentialId = blob;
-type DeviceKey = PublicKey;
-type UserKey = PublicKey;
 type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
@@ -41,22 +39,10 @@ type StreamingStrategy = variant {
     };
 };
 
-type Purpose = variant {
-    recovery;
-    authentication;
-};
-
-type KeyType = variant {
-    unknown;
-    platform;
-    cross_platform;
-    seed_phrase;
-};
-
-// This describes whether a device is "protected" or not.
-// When protected, a device can only be updated or removed if the
-// user is authenticated with that very device.
-type DeviceProtection = variant {
+// This describes whether a key is "protected" or not.
+// When protected, a key can only be updated or removed if the
+// user is authenticated with that very key.
+type KeyProtection = variant {
     protected;
     unprotected;
 };
@@ -66,35 +52,6 @@ type Challenge = record {
     challenge_key: ChallengeKey;
 };
 
-type DeviceData = record {
-    pubkey : DeviceKey;
-    alias : text;
-    credential_id : opt CredentialId;
-    purpose: Purpose;
-    key_type: KeyType;
-    protection: DeviceProtection;
-    origin: opt text;
-    // Metadata map for additional device information.
-    //
-    // Note: some fields above will be moved to the metadata map in the future.
-    // All field names of `DeviceData` (such as 'alias', 'origin, etc.) are
-    // reserved and cannot be written.
-    metadata: opt MetadataMap;
-};
-
-// The same as `DeviceData` but with the `last_usage` field.
-// This field cannot be written, hence the separate type.
-type DeviceWithUsage = record {
-    pubkey : DeviceKey;
-    alias : text;
-    credential_id : opt CredentialId;
-    purpose: Purpose;
-    key_type: KeyType;
-    protection: DeviceProtection;
-    origin: opt text;
-    last_usage: opt Timestamp;
-    metadata: opt MetadataMap;
-};
 
 // Map with some variants for the value type.
 // Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
@@ -104,9 +61,9 @@ type MetadataMap = vec record {
 };
 
 type RegisterResponse = variant {
-    // A new user was successfully registered.
+    // A new identity was successfully registered.
     registered: record {
-        user_number: UserNumber;
+        identity_number: IdentityNumber;
     };
     // No more registrations are possible in this instance of the II service canister.
     canister_full;
@@ -114,7 +71,7 @@ type RegisterResponse = variant {
     bad_challenge;
 };
 
-type AddTentativeDeviceResponse = variant {
+type AddTentativeKeyResponse = variant {
     // The device was tentatively added.
     added_tentatively: record {
         verification_code: text;
@@ -127,7 +84,7 @@ type AddTentativeDeviceResponse = variant {
     another_device_tentatively_added;
 };
 
-type VerifyTentativeDeviceResponse = variant {
+type VerifyTentativeKeyResponse = variant {
     // The device was successfully verified.
     verified;
     // Wrong verification code entered. Retry with correct code.
@@ -292,35 +249,17 @@ type ChallengeResult = record {
     chars : text;
 };
 
-// Extra information about registration status for new devices
-type DeviceRegistrationInfo = record {
+    // Extra information about registration status for new devices
+type KeyRegistrationInfo = record {
     // If present, the user has tentatively added a new device. This
     // new device needs to be verified (see relevant endpoint) before
     // 'expiration'.
-    tentative_device : opt DeviceData;
-    // The timestamp at which the anchor will turn off registration mode
+    tentative_key : opt KeyRecord;
+    // The timestamp at which the registration mode will expire for this identity
     // (and the tentative device will be forgotten, if any, and if not verified)
     expiration: Timestamp;
 };
 
-// Information about the anchor
-type IdentityAnchorInfo = record {
-    // All devices that can authenticate to this anchor
-    devices : vec DeviceWithUsage;
-    // Device registration status used when adding devices, see DeviceRegistrationInfo
-    device_registration: opt DeviceRegistrationInfo;
-};
-
-type AnchorCredentials = record {
-    credentials : vec WebAuthnCredential;
-    recovery_credentials : vec WebAuthnCredential;
-    recovery_phrases: vec PublicKey;
-};
-
-type WebAuthnCredential = record {
-    credential_id : CredentialId;
-    pubkey: PublicKey;
-};
 
 type DeployArchiveResult = variant {
     // The archive was deployed successfully and the supplied wasm module has been installed. The principal of the archive
@@ -333,42 +272,112 @@ type DeployArchiveResult = variant {
 };
 
 type BufferedArchiveEntry = record {
-    anchor_number: UserNumber;
+    anchor_number: IdentityNumber;
     timestamp: Timestamp;
     sequence_number: nat64;
     entry: blob;
 };
 
+// This is a placeholder result that will be replaced by the real result type
+// once we introduce actual errors. This is possible, because the result is
+// always used in an opt position.
+type result = variant {
+    ok;
+};
+
+type WebAuthnDirectSigMode = variant {
+    mandatory;
+    optional;
+};
+
+type key = variant {
+    webauthn_key: record {
+        credential_id: CredentialId;
+        pubkey: PublicKey;
+        // whether sensitive actions require a direct signature
+        direct_signature: WebAuthnDirectSigMode;
+    };
+    generic_key: record {
+        pubkey: PublicKey;
+    };
+};
+
+type KeyRecord = record {
+    key: key;
+    // contains now the following fields
+    // - alias
+    // - key_type: platform,
+    // - origin
+    // - key_type: reduced to "platform", "cross_platform" on migration
+    metadata: MetadataMap;
+    protection: KeyProtection;
+    // If a timestamp is present on write, the write will be rejected if it does
+    // not match the canister side timestamp. This can be used to detect stale
+    // writes.
+    last_usage: opt Timestamp;
+};
+
+// Information about the identity
+type IdentityInfo = record {
+    // All keys that can authenticate to this identity
+    keys : vec KeyRecord;
+    // All keys that can recover this identity
+    recovery_keys: vec KeyRecord;
+    // Key registration status used when adding devices, see KeyRegistrationInfo
+    key_registration: opt KeyRegistrationInfo;
+};
+
+// Public information about the keys attached to the identity
+type IdentityKeys = record {
+    keys : vec key;
+    recovery_keys : vec key;
+};
+
+type KeySettings = record {
+    protection: KeyProtection;
+    direct_signature: WebAuthnDirectSigMode;
+}
 
 service : (opt InternetIdentityInit) -> {
+    // registration flow
+    create_captcha : () -> (opt variant { ok:Challenge});
+    register_identity : (KeyRecord, ChallengeResult, opt principal) -> (opt RegisterResponse);
+
+    // key management
+    add_key : (IdentityNumber, KeyRecord, webauthn_sig: opt blob) -> (opt result);
+    add_recovery_key : (IdentityNumber, KeyRecord, webauthn_sig: opt blob) -> (opt result);
+    // opt timestamp to detect stale writes, if desired
+    update_key_metadata : (IdentityNumber, PublicKey, MetadataMap, opt Timestamp) -> (opt result);
+    // Atomically replace a key record matching the public key with a new one.
+    replace_key : (IdentityNumber, PublicKey, KeyRecord, webauthn_sig: opt blob) -> (opt result);
+    remove_key : (IdentityNumber, PublicKey, webauthn_sig: opt blob) -> (opt result);
+    update_key_settings : (IdentityNumber, PublicKey, KeySettings, webauthn_sig: opt blob) -> (opt result);
+
+    // information about the identity
+    // public
+    identity_keys : (IdentityNumber) -> (opt variant { ok: IdentityKeys }) query;
+    // requires authentication
+    identity_info : (IdentityNumber) -> (opt variant { ok: IdentityInfo });
+
+    // remote key registration
+    enter_key_registration_mode : (IdentityNumber) -> (opt variant { ok: Timestamp });
+    exit_key_registration_mode : (IdentityNumber) -> (opt result);
+    add_tentative_key : (IdentityNumber, key, MetadataMap) -> (opt variant { ok: AddTentativeKeyResponse });
+    verify_tentative_key : (IdentityNumber, verification_code: text, webauthn_sig: opt blob) -> (opt variant { ok: VerifyTentativeKeyResponse });
+
+    // delegation related endpoints
+    // no changes
+    get_principal : (IdentityNumber, FrontendHostname) -> (principal) query;
+    prepare_delegation : (IdentityNumber, FrontendHostname, SessionKey, maxTimeToLive: opt nat64) -> (PublicKey, Timestamp);
+    get_delegation: (IdentityNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
+
+    // technical endpoints, no changes
     init_salt: () -> ();
-    create_challenge : () -> (Challenge);
-    register : (DeviceData, ChallengeResult, opt principal) -> (RegisterResponse);
-    add : (UserNumber, DeviceData) -> ();
-    update : (UserNumber, DeviceKey, DeviceData) -> ();
-    // Atomically replace device matching the device key with the new device data
-    replace : (UserNumber, DeviceKey, DeviceData) -> ();
-    remove : (UserNumber, DeviceKey) -> ();
-    // Returns all devices of the user (authentication and recovery) but no information about device registrations.
-    // Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
-    // Deprecated: Use 'get_anchor_credentials' instead.
-    lookup : (UserNumber) -> (vec DeviceData) query;
-    get_anchor_credentials : (UserNumber) -> (AnchorCredentials) query;
-    get_anchor_info : (UserNumber) -> (IdentityAnchorInfo);
-    get_principal : (UserNumber, FrontendHostname) -> (principal) query;
-    stats : () -> (InternetIdentityStats) query;
-
-    enter_device_registration_mode : (UserNumber) -> (Timestamp);
-    exit_device_registration_mode : (UserNumber) -> ();
-    add_tentative_device : (UserNumber, DeviceData) -> (AddTentativeDeviceResponse);
-    verify_tentative_device : (UserNumber, verification_code: text) -> (VerifyTentativeDeviceResponse);
-
-    prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
-    get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
-
+    stats: () -> (InternetIdentityStats) query;
     http_request: (request: HttpRequest) -> (HttpResponse) query;
     http_request_update: (request: HttpRequest) -> (HttpResponse);
 
+    // archive related endpoints, no changes
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
     /// Returns a batch of entries _sorted by sequence number_ to be archived.
     /// This is an update call because the archive information _must_ be certified.
