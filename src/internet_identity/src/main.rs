@@ -328,10 +328,18 @@ fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
+fn migrate_to_memory_manager(maybe_arg: &Option<InternetIdentityInit>) -> bool {
+    if maybe_arg.is_none() {
+        return false;
+    }
+    let arg = maybe_arg.as_ref().unwrap();
+    arg.migrate_storage_to_memory_manager.unwrap_or(false)
+}
+
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::init_new();
+    state::init_new(migrate_to_memory_manager(&maybe_arg));
 
     apply_install_arg(maybe_arg);
 
@@ -343,7 +351,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::init_from_stable_memory();
+    state::init_from_stable_memory(migrate_to_memory_manager(&maybe_arg));
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
