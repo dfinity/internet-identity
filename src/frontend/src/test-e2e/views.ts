@@ -7,8 +7,8 @@ class View {
 export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#registerButton")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#registerButton")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
@@ -45,8 +45,8 @@ export class WelcomeView extends View {
 export class RenameView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#pickAliasInput")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#pickAliasInput")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async enterAlias(alias: string): Promise<void> {
@@ -61,8 +61,8 @@ export class RenameView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$('[data-action="construct-identity"')
-        .waitForDisplayed({ timeout: 10_000 });
+      .$('[data-action="construct-identity"')
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async create(): Promise<void> {
@@ -72,8 +72,8 @@ export class RegisterView extends View {
   // View: Register confirmation
   async waitForRegisterConfirm(): Promise<void> {
     await this.browser
-        .$("#confirmRegisterButton")
-        .waitForDisplayed({ timeout: 25_000 });
+      .$("#confirmRegisterButton")
+      .waitForDisplayed({ timeout: 25_000 });
     await this.browser.$("#captchaInput").waitForDisplayed({ timeout: 25_000 });
   }
 
@@ -82,18 +82,18 @@ export class RegisterView extends View {
     // In tests, the captchas are hard-coded to the following string: "a"
     await this.browser.$("#captchaInput").setValue("a");
     await this.browser
-        .$("#confirmRegisterButton")
-        // this is a huge timeout because generating the captcha takes a while on
-        // the emulator
-        .waitForEnabled({ timeout: 30_000 });
+      .$("#confirmRegisterButton")
+      // this is a huge timeout because generating the captcha takes a while on
+      // the emulator
+      .waitForEnabled({ timeout: 30_000 });
     await this.browser.$("#confirmRegisterButton").click();
   }
 
   // View: Register Show Number
   async waitForIdentity(): Promise<void> {
     await this.browser
-        .$("#displayUserContinue")
-        .waitForDisplayed({ timeout: 15_000 });
+      .$("#displayUserContinue")
+      .waitForDisplayed({ timeout: 15_000 });
   }
 
   async registerGetIdentity(): Promise<string> {
@@ -108,17 +108,17 @@ export class RegisterView extends View {
 export class SingleDeviceWarningView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#displayWarningAddRecovery")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#displayWarningAddRecovery")
+      .waitForDisplayed({ timeout: 10_000 });
     await this.browser
-        .$("#displayWarningRemindLater")
-        .waitForDisplayed({ timeout: 1_000 });
+      .$("#displayWarningRemindLater")
+      .waitForDisplayed({ timeout: 1_000 });
   }
 
   async addRecovery(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     await this.browser.$("#displayWarningAddRecovery").click();
   }
@@ -126,7 +126,7 @@ export class SingleDeviceWarningView extends View {
   async remindLater(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     await this.browser.$("#displayWarningRemindLater").click();
   }
@@ -143,8 +143,8 @@ export class RecoveryMethodSelectorView extends View {
 
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
-        .$('[data-role="recovery-words"]')
-        .waitForDisplayed({ timeout: 15_000 });
+      .$('[data-role="recovery-words"]')
+      .waitForDisplayed({ timeout: 15_000 });
   }
 
   async getSeedPhrase(): Promise<string> {
@@ -170,7 +170,7 @@ export class RecoveryMethodSelectorView extends View {
     // Read the element's value and clean up
     const seedPhrase = await this.browser.execute(() => {
       const elem = document.querySelector(
-          "#my-paste-area"
+        "#my-paste-area"
       ) as HTMLTextAreaElement;
       // NOTE: we could also query the value with wdio's $(..).getValue(), but since we have
       // the element here might as well.
@@ -212,8 +212,8 @@ export class RecoveryMethodSelectorView extends View {
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$('[data-role="identity-management"]')
-        .waitForDisplayed({ timeout: 10_000 });
+      .$('[data-role="identity-management"]')
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
@@ -225,14 +225,14 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-        .$(`//li[@data-device="${deviceName}"]`)
-        .waitForDisplayed({ timeout: 10_000 });
+      .$(`//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
     await this.browser
-        .$(`//li[@data-device="${deviceName}"]`)
-        .waitForDisplayed({ timeout: 10_000, reverse: true });
+      .$(`//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
   async addAdditionalDevice(): Promise<void> {
@@ -242,7 +242,7 @@ export class MainView extends View {
   async logout(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     await this.browser.$("#logoutButton").click();
   }
@@ -254,18 +254,18 @@ export class MainView extends View {
   async rename(deviceName: string, newName: string): Promise<void> {
     // Ensure the settings dropdown is in view
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-        .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-        .click();
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='rename']`)
-        .waitForClickable();
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .waitForClickable();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='rename']`)
-        .click();
+      .$(`button[data-device="${deviceName}"][data-action='rename']`)
+      .click();
     await this.browser.waitUntil(this.browser.isAlertOpen);
     await this.browser.acceptAlert();
 
@@ -278,18 +278,18 @@ export class MainView extends View {
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
     // Ensure the settings dropdown is in view
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-        .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-        .click();
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='protect']`)
-        .waitForClickable();
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .waitForClickable();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='protect']`)
-        .click();
+      .$(`button[data-device="${deviceName}"][data-action='protect']`)
+      .click();
     await this.browser.waitUntil(this.browser.isAlertOpen);
     await this.browser.acceptAlert();
 
@@ -301,25 +301,25 @@ export class MainView extends View {
 
   async assertDeviceProtected(deviceName: string): Promise<void> {
     await this.browser
-        .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
-        .waitForDisplayed({ timeout: 10_000 });
+      .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
     // Ensure the settings dropdown is in view
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-        .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-        .click();
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
-        .waitForClickable();
+      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
+      .waitForClickable();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
-        .click();
+      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
+      .click();
     await this.browser.waitUntil(this.browser.isAlertOpen);
     await this.browser.acceptAlert();
 
@@ -331,49 +331,49 @@ export class MainView extends View {
 
   async assertDeviceUnprotected(deviceName: string): Promise<void> {
     await this.browser
-        .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
-        .waitForDisplayed({ timeout: 10_000, reverse: true });
+      .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
+      .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
   async remove(deviceName: string): Promise<void> {
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-        .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-        .click();
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='remove']`)
-        .waitForClickable();
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .waitForClickable();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='remove']`)
-        .click();
+      .$(`button[data-device="${deviceName}"][data-action='remove']`)
+      .click();
   }
 
   async reset(deviceName: string): Promise<void> {
     // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
     await this.browser
-        .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-        .click();
+      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
+      .click();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='reset']`)
-        .waitForClickable();
+      .$(`button[data-device="${deviceName}"][data-action='reset']`)
+      .waitForClickable();
     await this.browser
-        .$(`button[data-device="${deviceName}"][data-action='reset']`)
-        .click();
+      .$(`button[data-device="${deviceName}"][data-action='reset']`)
+      .click();
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {
     await this.browser.$(`button[data-device="${deviceName}"]`).click();
     await this.browser
-        .$("button[data-action='remove']")
-        .waitForDisplayed({ reverse: true });
+      .$("button[data-action='remove']")
+      .waitForDisplayed({ reverse: true });
   }
 }
 
 export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#pickAliasSubmit")
-        .waitForDisplayed({ timeout: 5_000 });
+      .$("#pickAliasSubmit")
+      .waitForDisplayed({ timeout: 5_000 });
 
     // Make sure the loader is gone
     await this.browser.$("#loader").waitForExist({ reverse: true });
@@ -386,7 +386,7 @@ export class AddRemoteDeviceAliasView extends View {
   async continue(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)"
     );
     await this.browser.$("#pickAliasSubmit").click();
   }
@@ -395,8 +395,8 @@ export class AddRemoteDeviceAliasView extends View {
 export class NotInRegistrationModeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#deviceRegModeDisabledRetry")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#deviceRegModeDisabledRetry")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async retry(): Promise<void> {
@@ -407,8 +407,8 @@ export class NotInRegistrationModeView extends View {
 export class AddRemoteDeviceInstructionsView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#cancelAddRemoteDevice")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#cancelAddRemoteDevice")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async cancel(): Promise<void> {
@@ -427,8 +427,8 @@ export class AddRemoteDeviceInstructionsView extends View {
 export class AddRemoteDeviceVerificationCodeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#verificationCode")
-        .waitForDisplayed({ timeout: 10_000 });
+      .$("#verificationCode")
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async getVerificationCode(): Promise<string> {
@@ -465,8 +465,8 @@ export class AddDeviceSuccessView extends View {
 export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$('[data-page="authenticate"]')
-        .waitForExist({ timeout: 5_000 });
+      .$('[data-page="authenticate"]')
+      .waitForExist({ timeout: 5_000 });
   }
 
   async pickAnchor(anchor: string): Promise<void> {
@@ -475,8 +475,8 @@ export class AuthenticateView extends View {
 
   async expectAnchorInputField(): Promise<void> {
     await this.browser
-        .$('[data-role="anchor-input"]')
-        .waitForDisplayed({ timeout: 5_000 });
+      .$('[data-role="anchor-input"]')
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async authenticate(): Promise<void> {
@@ -499,8 +499,8 @@ export class AuthenticateView extends View {
 export class WelcomeBackView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#loginDifferent")
-        .waitForDisplayed({ timeout: 15_000 });
+      .$("#loginDifferent")
+      .waitForDisplayed({ timeout: 15_000 });
   }
 
   async getIdentityAnchor(): Promise<string> {
@@ -515,8 +515,8 @@ export class WelcomeBackView extends View {
 export class AddIdentityAnchorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$('[data-role="anchor-input"]')
-        .waitForDisplayed({ timeout: 3_000 });
+      .$('[data-role="anchor-input"]')
+      .waitForDisplayed({ timeout: 3_000 });
   }
 
   async continue(userNumber?: string): Promise<void> {
@@ -530,8 +530,8 @@ export class AddIdentityAnchorView extends View {
 export class AboutView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("//h1[string()='About']")
-        .waitForDisplayed({ timeout: 5_000 });
+      .$("//h1[string()='About']")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 }
 
@@ -545,9 +545,9 @@ export class DemoAppView extends View {
     await this.browser.$("#principal").waitForDisplayed({ timeout: 10_000 });
     // wait for the slowest element to appear
     await this.browser.waitUntil(
-        async () =>
-            (await this.browser.$("#alternativeOrigins").getText()) !== "",
-        { timeoutMsg: "alternativeOrigins were not displayed" }
+      async () =>
+        (await this.browser.$("#alternativeOrigins").getText()) !== "",
+      { timeoutMsg: "alternativeOrigins were not displayed" }
     );
   }
 
@@ -576,22 +576,22 @@ export class DemoAppView extends View {
     await this.browser.$("#whoamiBtn").click();
     const whoamiResponseElem = await this.browser.$("#whoamiResponse");
     await whoamiResponseElem.waitUntil(
-        async () => {
-          return (await whoamiResponseElem.getText()).indexOf("-") !== -1;
-        },
-        {
-          timeout: 6_000,
-          timeoutMsg: 'expected whoami response to contain "-" for 6s',
-        }
+      async () => {
+        return (await whoamiResponseElem.getText()).indexOf("-") !== -1;
+      },
+      {
+        timeout: 6_000,
+        timeoutMsg: 'expected whoami response to contain "-" for 6s',
+      }
     );
     return await whoamiResponseElem.getText();
   }
 
   async updateAlternativeOrigins(
-      replicaUrl: string,
-      testCanister: string,
-      alternativeOrigins: string,
-      mode: "certified" | "uncertified" | "redirect"
+    replicaUrl: string,
+    testCanister: string,
+    alternativeOrigins: string,
+    mode: "certified" | "uncertified" | "redirect"
   ): Promise<string> {
     await fillText(this.browser, "hostUrl", replicaUrl);
     await fillText(this.browser, "canisterId", testCanister);
@@ -600,39 +600,39 @@ export class DemoAppView extends View {
     await this.browser.$("#updateNewAlternativeOrigins").click();
     const alternativeOriginsElem = await this.browser.$("#alternativeOrigins");
     await alternativeOriginsElem.waitUntil(
-        async () => {
-          return (await alternativeOriginsElem.getText()) === alternativeOrigins;
-        },
-        {
-          timeout: 6_000,
-          timeoutMsg: "expected alternativeOrigins to update within 6s",
-        }
+      async () => {
+        return (await alternativeOriginsElem.getText()) === alternativeOrigins;
+      },
+      {
+        timeout: 6_000,
+        timeoutMsg: "expected alternativeOrigins to update within 6s",
+      }
     );
     return await alternativeOriginsElem.getText();
   }
 
   async resetAlternativeOrigins(
-      replicaUrl: string,
-      testCanister: string
+    replicaUrl: string,
+    testCanister: string
   ): Promise<string> {
     return this.updateAlternativeOrigins(
-        replicaUrl,
-        testCanister,
-        '{"alternativeOrigins":[]}',
-        "certified"
+      replicaUrl,
+      testCanister,
+      '{"alternativeOrigins":[]}',
+      "certified"
     );
   }
 
   async getMessageText(messageNo: number): Promise<string> {
     return await this.browser
-        .$(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
-        .getText();
+      .$(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
+      .getText();
   }
 
   async waitForNthMessage(messageNo: number): Promise<void> {
     await this.browser
-        .$(`div.postMessage:nth-child(${messageNo})`)
-        .waitForDisplayed();
+      .$(`div.postMessage:nth-child(${messageNo})`)
+      .waitForDisplayed();
   }
 
   async openIiTab(): Promise<void> {
@@ -655,8 +655,8 @@ export class DemoAppView extends View {
 export class RecoverView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$(`//h1[string()='Recover Internet Identity']`)
-        .waitForDisplayed({ timeout: 5_000 });
+      .$(`//h1[string()='Recover Internet Identity']`)
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async enterIdentityAnchor(identityAnchor: string): Promise<void> {
@@ -670,14 +670,14 @@ export class RecoverView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
-        .$(`//h1[string()='Enter recovery phrase']`)
-        .waitForDisplayed({ timeout: 5_000 });
+      .$(`//h1[string()='Enter recovery phrase']`)
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
     const words = seedPhrase.split(" ").filter(Boolean);
     const inputs = await this.browser.$$(
-        'input[data-role="recovery-word-input"]'
+      'input[data-role="recovery-word-input"]'
     );
     for (let i = 0; i < words.length; i++) {
       await inputs[i].setValue(words[i]);
@@ -700,8 +700,8 @@ export class RecoverView extends View {
 export class ErrorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-        .$("#errorContainer")
-        .waitForDisplayed({ timeout: 5_000 });
+      .$("#errorContainer")
+      .waitForDisplayed({ timeout: 5_000 });
   }
 
   async getErrorMessage(): Promise<string> {
@@ -718,9 +718,9 @@ export class ErrorView extends View {
 }
 
 async function fillText(
-    browser: WebdriverIO.Browser,
-    id: string,
-    text: string
+  browser: WebdriverIO.Browser,
+  id: string,
+  text: string
 ): Promise<void> {
   const elem = await browser.$(`#${id}`);
   await elem.clearValue();
