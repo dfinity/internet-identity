@@ -232,7 +232,6 @@ impl<M: Memory> AnchorMemory<M> {
 
 pub enum StableMemory<M: Memory> {
     Single(M),
-    #[allow(dead_code)]
     Managed(M),
 }
 
@@ -265,7 +264,6 @@ struct Header {
 
 // A copy of MemoryManager's internal structures.
 // Used for migration only, will be deleted after migration is complete.
-#[allow(dead_code)]
 mod mm {
     pub const HEADER_RESERVED_BYTES: usize = 32;
     pub const MAX_NUM_MEMORIES: u8 = 255;
@@ -425,7 +423,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     pub fn from_memory_v6_to_v7(memory: M) -> Option<Self> {
         let maybe_storage_v6 = Self::from_memory(memory.clone());
         let storage_v6 = maybe_storage_v6?;
