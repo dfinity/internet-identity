@@ -80,9 +80,9 @@
      * technical implementation than design.
     **/
 
-  --z-backdrop: -1;
   --z-background: 1;
   --z-foreground: 2;
+  --z-backdrop: 5;
   --z-tooltip: 10;
   --z-loader: 30;
   --z-toasts: 50;
@@ -728,9 +728,10 @@ a:hover,
   color: rgba(0, 0, 0, 0.5);
 }
 
-:is(button, a, link, .c-dropdown):hover .c-icon--more {
+:is(button, a, link, .c-dropdown)[aria-expanded="true"] .c-icon--more {
   --rotate: -90deg;
-  --bgc: var(--rc-interaction-text);
+  background-color: var(--rc-button);
+  --bgc: var(--rc-onButton);
 }
 
 .c-icon--more__dot {
@@ -757,20 +758,17 @@ a:hover,
   transition-delay: 100ms, 100ms;
 }
 
-.c-icon--outlined {
-  box-shadow: 0 0 0 1px var(--rc-line);
-  border-radius: 1px;
-  transition: box-shadow 200ms cubic-bezier(0.3, 0.7, 0, 1);
-}
-
 :is(button, a, link, .c-dropdown) .c-icon--outlined,
 .c-icon--outlined:is(button, a, link, .c-dropdown) {
-  box-shadow: 0 0 0 1px var(--rc-button), 0 0 1em var(--rc-line);
+  border: 1px solid var(--rc-button);
+  border-radius: 1px;
 }
 
 :is(button, a, link, .c-dropdown):hover .c-icon--outlined {
-  background-color: var(--rc-button);
-  --bgc: var(--rc-onButton);
+  opacity: 0.9;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 2px 4px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
 }
 
 /**
@@ -2192,11 +2190,6 @@ a.c-action-list__item {
 
 /* dropdown menus */
 
-.c-action-list__item:has(.c-dropdown):hover,
-.c-action-list__item:has(.c-dropdown:hover) {
-  position: relative;
-}
-
 .c-dropdown {
   position: relative;
 }
@@ -2205,13 +2198,8 @@ a.c-action-list__item {
   transition: 100ms color linear;
 }
 
-.c-dropdown:hover {
-  z-index: var(--z-tooltip);
-}
-
-.c-dropdown:hover .c-dropdown__trigger,
-.c-dropdown:focus-within .c-dropdown__trigger {
-  color: var(--rc-interaction);
+.c-action-list__action.c-dropdown__trigger:hover {
+  color: var(--rc-text);
 }
 
 .c-dropdown__menu {
@@ -2225,7 +2213,6 @@ a.c-action-list__item {
   width: max-content;
   background-color: var(--rc-background);
   border-radius: var(--border-radius);
-  padding: 0 var(--rs-dropdown-bezel);
   margin-top: calc(-1 * var(--rs-line));
   text-align: right;
   pointer-events: none;
@@ -2244,8 +2231,7 @@ a.c-action-list__item {
   cursor: default;
 }
 
-.c-dropdown:hover .c-dropdown__menu,
-.c-dropdown:focus-within .c-dropdown__menu {
+.c-dropdown__trigger[aria-expanded="true"] + .c-dropdown__menu {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -2256,10 +2242,13 @@ a.c-action-list__item {
 
 .c-dropdown__item {
   display: block;
-  padding: calc(var(--rs-dropdown-bezel) * 0.75) 0;
   color: var(--rc-text);
   text-decoration: none;
   cursor: default;
+}
+
+.c-dropdown__item + .c-dropdown__item {
+  border-top: var(--rs-line) solid var(--rc-line);
 }
 
 .c-dropdown__link {
@@ -2269,29 +2258,19 @@ a.c-action-list__item {
   text-decoration: none;
   cursor: pointer;
   transition: 100ms color linear;
+  padding: calc(var(--rs-dropdown-bezel) * 0.75) var(--rs-dropdown-bezel);
 }
 
-.c-dropdown__link:hover,
-.c-dropdown__link:focus {
+.c-dropdown__trigger[aria-expanded="true"]
+  + .c-dropdown__menu
+  .c-dropdown__link:hover {
   color: var(--rc-interaction);
 }
 
-.c-dropdown__item + .c-dropdown__item {
-  border-top: var(--rs-line) solid var(--rc-line);
-}
-
-.c-dropdown__button {
-  display: block;
-  color: var(--rc-text);
-  padding: 0.1em calc(var(--rs-dropdown-bezel) * 0.5) 0;
-  text-align: left;
-  width: 100%;
-  font-size: 0.75em;
-  transition: color 100ms linear;
-}
-
-.c-dropdown__button:hover {
-  color: var(--rc-interaction);
+.c-dropdown__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
 }
 
 /* Needed to override the "reset" rules */
