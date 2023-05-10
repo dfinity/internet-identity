@@ -2228,7 +2228,6 @@ a.c-action-list__item {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
   transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
     0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
-  cursor: default;
 }
 
 .c-dropdown__trigger[aria-expanded="true"] + .c-dropdown__menu {
@@ -2244,7 +2243,6 @@ a.c-action-list__item {
   display: block;
   color: var(--rc-text);
   text-decoration: none;
-  cursor: default;
 }
 
 .c-dropdown__item + .c-dropdown__item {
