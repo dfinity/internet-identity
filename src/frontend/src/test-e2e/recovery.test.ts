@@ -219,7 +219,6 @@ test("Reset protected recovery phrase", async () => {
     await mainView.waitForDisplay();
     await mainView.reset(RECOVERY_PHRASE_NAME);
 
-
     await browser.waitUntil(browser.isAlertOpen);
     await browser.acceptAlert();
 
