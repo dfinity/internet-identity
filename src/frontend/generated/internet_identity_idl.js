@@ -17,7 +17,8 @@ export const idlFactory = ({ IDL }) => {
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
-  const UserNumber = IDL.Nat64;
+  const IdentityNumber = IDL.Nat64;
+  const Timestamp = IDL.Nat64;
   MetadataMap.fill(
     IDL.Vec(
       IDL.Tuple(
@@ -30,41 +31,38 @@ export const idlFactory = ({ IDL }) => {
       )
     )
   );
-  const DeviceProtection = IDL.Variant({
+  const WebAuthnDirectSigMode = IDL.Variant({
+    'optional' : IDL.Null,
+    'mandatory' : IDL.Null,
+  });
+  const PublicKey = IDL.Vec(IDL.Nat8);
+  const CredentialId = IDL.Vec(IDL.Nat8);
+  const Auth = IDL.Variant({
+    'webauthn_key' : IDL.Record({
+      'direct_signature' : WebAuthnDirectSigMode,
+      'pubkey' : PublicKey,
+      'credential_id' : CredentialId,
+    }),
+    'generic_key' : IDL.Record({ 'pubkey' : PublicKey }),
+  });
+  const AuthProtection = IDL.Variant({
     'unprotected' : IDL.Null,
     'protected' : IDL.Null,
   });
-  const PublicKey = IDL.Vec(IDL.Nat8);
-  const DeviceKey = PublicKey;
-  const KeyType = IDL.Variant({
-    'platform' : IDL.Null,
-    'seed_phrase' : IDL.Null,
-    'cross_platform' : IDL.Null,
-    'unknown' : IDL.Null,
+  const AuthRecord = IDL.Record({
+    'last_usage' : IDL.Opt(Timestamp),
+    'metadata' : MetadataMap,
+    'auth' : Auth,
+    'protection' : AuthProtection,
   });
-  const Purpose = IDL.Variant({
-    'authentication' : IDL.Null,
-    'recovery' : IDL.Null,
-  });
-  const CredentialId = IDL.Vec(IDL.Nat8);
-  const DeviceData = IDL.Record({
-    'alias' : IDL.Text,
-    'metadata' : IDL.Opt(MetadataMap),
-    'origin' : IDL.Opt(IDL.Text),
-    'protection' : DeviceProtection,
-    'pubkey' : DeviceKey,
-    'key_type' : KeyType,
-    'purpose' : Purpose,
-    'credential_id' : IDL.Opt(CredentialId),
-  });
-  const Timestamp = IDL.Nat64;
-  const AddTentativeDeviceResponse = IDL.Variant({
-    'device_registration_mode_off' : IDL.Null,
-    'another_device_tentatively_added' : IDL.Null,
+  const result = IDL.Variant({ 'ok' : IDL.Null });
+  const AddTentativeAuthResponse = IDL.Variant({
+    'another_auth_tentatively_added' : IDL.Null,
     'added_tentatively' : IDL.Record({
       'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
     }),
+    'auth_registration_mode_off' : IDL.Null,
   });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
@@ -79,36 +77,8 @@ export const idlFactory = ({ IDL }) => {
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
     'entry' : IDL.Vec(IDL.Nat8),
-    'anchor_number' : UserNumber,
+    'anchor_number' : IdentityNumber,
     'timestamp' : Timestamp,
-  });
-  const WebAuthnCredential = IDL.Record({
-    'pubkey' : PublicKey,
-    'credential_id' : CredentialId,
-  });
-  const AnchorCredentials = IDL.Record({
-    'recovery_phrases' : IDL.Vec(PublicKey),
-    'credentials' : IDL.Vec(WebAuthnCredential),
-    'recovery_credentials' : IDL.Vec(WebAuthnCredential),
-  });
-  const DeviceWithUsage = IDL.Record({
-    'alias' : IDL.Text,
-    'last_usage' : IDL.Opt(Timestamp),
-    'metadata' : IDL.Opt(MetadataMap),
-    'origin' : IDL.Opt(IDL.Text),
-    'protection' : DeviceProtection,
-    'pubkey' : DeviceKey,
-    'key_type' : KeyType,
-    'purpose' : Purpose,
-    'credential_id' : IDL.Opt(CredentialId),
-  });
-  const DeviceRegistrationInfo = IDL.Record({
-    'tentative_device' : IDL.Opt(DeviceData),
-    'expiration' : Timestamp,
-  });
-  const IdentityAnchorInfo = IDL.Record({
-    'devices' : IDL.Vec(DeviceWithUsage),
-    'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;
   const SessionKey = PublicKey;
@@ -154,7 +124,19 @@ export const idlFactory = ({ IDL }) => {
     'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
-  const UserKey = PublicKey;
+  const IdentityAuthInfo = IDL.Record({
+    'auth' : IDL.Vec(Auth),
+    'recovery' : IDL.Vec(Auth),
+  });
+  const AuthRegistrationInfo = IDL.Record({
+    'expiration' : Timestamp,
+    'tentative_auth' : IDL.Opt(AuthRecord),
+  });
+  const IdentityInfo = IDL.Record({
+    'auth_records' : IDL.Vec(AuthRecord),
+    'auth_registration' : IDL.Opt(AuthRegistrationInfo),
+    'recovery_records' : IDL.Vec(AuthRecord),
+  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -162,7 +144,7 @@ export const idlFactory = ({ IDL }) => {
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
-    'registered' : IDL.Record({ 'user_number' : UserNumber }),
+    'registered' : IDL.Record({ 'identity_number' : IdentityNumber }),
   });
   const DomainActiveAnchorCounter = IDL.Record({
     'start_timestamp' : Timestamp,
@@ -213,7 +195,11 @@ export const idlFactory = ({ IDL }) => {
     'canister_creation_cycles_cost' : IDL.Nat64,
     'active_anchor_stats' : IDL.Opt(ActiveAnchorStatistics),
   });
-  const VerifyTentativeDeviceResponse = IDL.Variant({
+  const AuthSettings = IDL.Record({
+    'direct_signature' : WebAuthnDirectSigMode,
+    'protection' : AuthProtection,
+  });
+  const VerifyTentativeAuthResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
@@ -221,54 +207,95 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
-    'add' : IDL.Func([UserNumber, DeviceData], [], []),
-    'add_tentative_device' : IDL.Func(
-        [UserNumber, DeviceData],
-        [AddTentativeDeviceResponse],
+    'add_auth' : IDL.Func(
+        [IdentityNumber, AuthRecord, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(result)],
         [],
       ),
-    'create_challenge' : IDL.Func([], [Challenge], []),
-    'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
-    'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
-    'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
-    'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
-    'get_anchor_credentials' : IDL.Func(
-        [UserNumber],
-        [AnchorCredentials],
-        ['query'],
+    'add_recovery' : IDL.Func(
+        [IdentityNumber, AuthRecord, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(result)],
+        [],
       ),
-    'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
+    'add_tentative_auth' : IDL.Func(
+        [IdentityNumber, Auth, MetadataMap],
+        [IDL.Opt(IDL.Variant({ 'ok' : AddTentativeAuthResponse }))],
+        [],
+      ),
+    'create_captcha' : IDL.Func(
+        [],
+        [IDL.Opt(IDL.Variant({ 'ok' : Challenge }))],
+        [],
+      ),
+    'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
+    'enter_auth_registration_mode' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(IDL.Variant({ 'ok' : Timestamp }))],
+        [],
+      ),
+    'exit_auth_registration_mode' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(result)],
+        [],
+      ),
+    'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
     'get_delegation' : IDL.Func(
-        [UserNumber, FrontendHostname, SessionKey, Timestamp],
+        [IdentityNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
         ['query'],
       ),
     'get_principal' : IDL.Func(
-        [UserNumber, FrontendHostname],
+        [IdentityNumber, FrontendHostname],
         [IDL.Principal],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
+    'identity_auth_info' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(IDL.Variant({ 'ok' : IdentityAuthInfo }))],
+        ['query'],
+      ),
+    'identity_info' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(IDL.Variant({ 'ok' : IdentityInfo }))],
+        [],
+      ),
     'init_salt' : IDL.Func([], [], []),
-    'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
-        [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
-        [UserKey, Timestamp],
+        [IdentityNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
+        [PublicKey, Timestamp],
         [],
       ),
-    'register' : IDL.Func(
-        [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
-        [RegisterResponse],
+    'register_identity' : IDL.Func(
+        [AuthRecord, ChallengeResult, IDL.Opt(IDL.Principal)],
+        [IDL.Opt(RegisterResponse)],
         [],
       ),
-    'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
-    'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'remove_auth' : IDL.Func(
+        [IdentityNumber, PublicKey, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(result)],
+        [],
+      ),
+    'replace_auth' : IDL.Func(
+        [IdentityNumber, PublicKey, AuthRecord, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(result)],
+        [],
+      ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
-    'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
-    'verify_tentative_device' : IDL.Func(
-        [UserNumber, IDL.Text],
-        [VerifyTentativeDeviceResponse],
+    'update_auth_metadata' : IDL.Func(
+        [IdentityNumber, PublicKey, MetadataMap, IDL.Opt(Timestamp)],
+        [IDL.Opt(result)],
+        [],
+      ),
+    'update_auth_settings' : IDL.Func(
+        [IdentityNumber, PublicKey, AuthSettings, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(result)],
+        [],
+      ),
+    'verify_tentative_auth' : IDL.Func(
+        [IdentityNumber, IDL.Text, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [IDL.Opt(IDL.Variant({ 'ok' : VerifyTentativeAuthResponse }))],
         [],
       ),
   });

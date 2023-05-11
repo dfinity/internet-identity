@@ -9,21 +9,16 @@ export interface ActiveAnchorStatistics {
   'completed' : CompletedActiveAnchorStats,
   'ongoing' : OngoingActiveAnchorStats,
 }
-export type AddTentativeDeviceResponse = {
-    'device_registration_mode_off' : null
+export type AddTentativeAuthResponse = {
+    'another_auth_tentatively_added' : null
   } |
-  { 'another_device_tentatively_added' : null } |
   {
     'added_tentatively' : {
       'verification_code' : string,
       'device_registration_timeout' : Timestamp,
     }
-  };
-export interface AnchorCredentials {
-  'recovery_phrases' : Array<PublicKey>,
-  'credentials' : Array<WebAuthnCredential>,
-  'recovery_credentials' : Array<WebAuthnCredential>,
-}
+  } |
+  { 'auth_registration_mode_off' : null };
 export interface ArchiveConfig {
   'polling_interval_ns' : bigint,
   'entries_buffer_limit' : bigint,
@@ -34,10 +29,34 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
+export type Auth = {
+    'webauthn_key' : {
+      'direct_signature' : WebAuthnDirectSigMode,
+      'pubkey' : PublicKey,
+      'credential_id' : CredentialId,
+    }
+  } |
+  { 'generic_key' : { 'pubkey' : PublicKey } };
+export type AuthProtection = { 'unprotected' : null } |
+  { 'protected' : null };
+export interface AuthRecord {
+  'last_usage' : [] | [Timestamp],
+  'metadata' : MetadataMap,
+  'auth' : Auth,
+  'protection' : AuthProtection,
+}
+export interface AuthRegistrationInfo {
+  'expiration' : Timestamp,
+  'tentative_auth' : [] | [AuthRecord],
+}
+export interface AuthSettings {
+  'direct_signature' : WebAuthnDirectSigMode,
+  'protection' : AuthProtection,
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
-  'anchor_number' : UserNumber,
+  'anchor_number' : IdentityNumber,
   'timestamp' : Timestamp,
 }
 export interface Challenge {
@@ -59,34 +78,6 @@ export interface Delegation {
 export type DeployArchiveResult = { 'creation_in_progress' : null } |
   { 'success' : Principal } |
   { 'failed' : string };
-export interface DeviceData {
-  'alias' : string,
-  'metadata' : [] | [MetadataMap],
-  'origin' : [] | [string],
-  'protection' : DeviceProtection,
-  'pubkey' : DeviceKey,
-  'key_type' : KeyType,
-  'purpose' : Purpose,
-  'credential_id' : [] | [CredentialId],
-}
-export type DeviceKey = PublicKey;
-export type DeviceProtection = { 'unprotected' : null } |
-  { 'protected' : null };
-export interface DeviceRegistrationInfo {
-  'tentative_device' : [] | [DeviceData],
-  'expiration' : Timestamp,
-}
-export interface DeviceWithUsage {
-  'alias' : string,
-  'last_usage' : [] | [Timestamp],
-  'metadata' : [] | [MetadataMap],
-  'origin' : [] | [string],
-  'protection' : DeviceProtection,
-  'pubkey' : DeviceKey,
-  'key_type' : KeyType,
-  'purpose' : Purpose,
-  'credential_id' : [] | [CredentialId],
-}
 export interface DomainActiveAnchorCounter {
   'start_timestamp' : Timestamp,
   'internetcomputer_org_counter' : bigint,
@@ -122,10 +113,16 @@ export interface HttpResponse {
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
-export interface IdentityAnchorInfo {
-  'devices' : Array<DeviceWithUsage>,
-  'device_registration' : [] | [DeviceRegistrationInfo],
+export interface IdentityAuthInfo {
+  'auth' : Array<Auth>,
+  'recovery' : Array<Auth>,
 }
+export interface IdentityInfo {
+  'auth_records' : Array<AuthRecord>,
+  'auth_registration' : [] | [AuthRegistrationInfo],
+  'recovery_records' : Array<AuthRecord>,
+}
+export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
@@ -144,10 +141,6 @@ export interface InternetIdentityStats {
   'canister_creation_cycles_cost' : bigint,
   'active_anchor_stats' : [] | [ActiveAnchorStatistics],
 }
-export type KeyType = { 'platform' : null } |
-  { 'seed_phrase' : null } |
-  { 'cross_platform' : null } |
-  { 'unknown' : null };
 export type MetadataMap = Array<
   [
     string,
@@ -161,15 +154,13 @@ export interface OngoingActiveAnchorStats {
   'daily_active_anchors' : ActiveAnchorCounter,
 }
 export type PublicKey = Uint8Array | number[];
-export type Purpose = { 'authentication' : null } |
-  { 'recovery' : null };
 export interface RateLimitConfig {
   'max_tokens' : bigint,
   'time_per_token_ns' : bigint,
 }
 export type RegisterResponse = { 'bad_challenge' : null } |
   { 'canister_full' : null } |
-  { 'registered' : { 'user_number' : UserNumber } };
+  { 'registered' : { 'identity_number' : IdentityNumber } };
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
@@ -184,55 +175,80 @@ export type StreamingStrategy = {
   };
 export type Timestamp = bigint;
 export type Token = {};
-export type UserKey = PublicKey;
-export type UserNumber = bigint;
-export type VerifyTentativeDeviceResponse = {
+export type VerifyTentativeAuthResponse = {
     'device_registration_mode_off' : null
   } |
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
-export interface WebAuthnCredential {
-  'pubkey' : PublicKey,
-  'credential_id' : CredentialId,
-}
+export type WebAuthnDirectSigMode = { 'optional' : null } |
+  { 'mandatory' : null };
+export type result = { 'ok' : null };
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
-  'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
-  'add_tentative_device' : ActorMethod<
-    [UserNumber, DeviceData],
-    AddTentativeDeviceResponse
+  'add_auth' : ActorMethod<
+    [IdentityNumber, AuthRecord, [] | [Uint8Array | number[]]],
+    [] | [result]
   >,
-  'create_challenge' : ActorMethod<[], Challenge>,
+  'add_recovery' : ActorMethod<
+    [IdentityNumber, AuthRecord, [] | [Uint8Array | number[]]],
+    [] | [result]
+  >,
+  'add_tentative_auth' : ActorMethod<
+    [IdentityNumber, Auth, MetadataMap],
+    [] | [{ 'ok' : AddTentativeAuthResponse }]
+  >,
+  'create_captcha' : ActorMethod<[], [] | [{ 'ok' : Challenge }]>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
-  'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
-  'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
+  'enter_auth_registration_mode' : ActorMethod<
+    [IdentityNumber],
+    [] | [{ 'ok' : Timestamp }]
+  >,
+  'exit_auth_registration_mode' : ActorMethod<[IdentityNumber], [] | [result]>,
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
-  'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
-  'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
   'get_delegation' : ActorMethod<
-    [UserNumber, FrontendHostname, SessionKey, Timestamp],
+    [IdentityNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'get_principal' : ActorMethod<[IdentityNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
+  'identity_auth_info' : ActorMethod<
+    [IdentityNumber],
+    [] | [{ 'ok' : IdentityAuthInfo }]
+  >,
+  'identity_info' : ActorMethod<
+    [IdentityNumber],
+    [] | [{ 'ok' : IdentityInfo }]
+  >,
   'init_salt' : ActorMethod<[], undefined>,
-  'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'prepare_delegation' : ActorMethod<
-    [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
-    [UserKey, Timestamp]
+    [IdentityNumber, FrontendHostname, SessionKey, [] | [bigint]],
+    [PublicKey, Timestamp]
   >,
-  'register' : ActorMethod<
-    [DeviceData, ChallengeResult, [] | [Principal]],
-    RegisterResponse
+  'register_identity' : ActorMethod<
+    [AuthRecord, ChallengeResult, [] | [Principal]],
+    [] | [RegisterResponse]
   >,
-  'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
-  'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'remove_auth' : ActorMethod<
+    [IdentityNumber, PublicKey, [] | [Uint8Array | number[]]],
+    [] | [result]
+  >,
+  'replace_auth' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthRecord, [] | [Uint8Array | number[]]],
+    [] | [result]
+  >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
-  'verify_tentative_device' : ActorMethod<
-    [UserNumber, string],
-    VerifyTentativeDeviceResponse
+  'update_auth_metadata' : ActorMethod<
+    [IdentityNumber, PublicKey, MetadataMap, [] | [Timestamp]],
+    [] | [result]
+  >,
+  'update_auth_settings' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthSettings, [] | [Uint8Array | number[]]],
+    [] | [result]
+  >,
+  'verify_tentative_auth' : ActorMethod<
+    [IdentityNumber, string, [] | [Uint8Array | number[]]],
+    [] | [{ 'ok' : VerifyTentativeAuthResponse }]
   >,
 }
