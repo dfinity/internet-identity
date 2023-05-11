@@ -13,9 +13,10 @@ export const settingsDropdown = ({
   id: string;
   settings: { fn: () => void; caption: string; action: string }[];
 }): TemplateResult => {
-  /* Toggle the chasm open/closed */
+  /* Toggle and close the chasm for the attribute aria-expanded */
   const ariaExpanded = new Chan(false);
-  const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const toggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const close = () => ariaExpanded.send(false);
 
   const backdrop = ariaExpanded.map((expanded) =>
     expanded
@@ -23,9 +24,9 @@ export const settingsDropdown = ({
           class="c-dropdown__backdrop"
           role="button"
           tabindex="-1"
-          @click=${() => chasmToggle()}
+          @click=${() => close()}
           @keypress=${(e: KeyboardEvent) =>
-            handleKeyPress({ e, callback: chasmToggle })}
+            handleKeyPress({ e, callback: close })}
         />`
       : undefined
   );
@@ -38,7 +39,7 @@ export const settingsDropdown = ({
       aria-controls="dropdown-${id}"
       aria-label="Open settings"
       data-device=${alias}
-      @click=${() => chasmToggle()}
+      @click=${() => toggle()}
     >
       ${dropdownIcon}
     </button>
