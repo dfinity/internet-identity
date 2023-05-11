@@ -145,7 +145,7 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
       browser
     );
     const mainView = new MainView(browser);
-    await mainView.waitForDeviceDisplay("Test");
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
     await mainView.logout();
