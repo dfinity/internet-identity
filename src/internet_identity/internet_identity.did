@@ -306,7 +306,6 @@ type KeyRecord = record {
     key: key;
     // contains now the following fields
     // - alias
-    // - key_type: platform,
     // - origin
     // - key_type: reduced to "platform", "cross_platform" on migration
     metadata: MetadataMap;
