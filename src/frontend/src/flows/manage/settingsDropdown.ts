@@ -32,7 +32,7 @@ const mkChasm = ({ alias, id, settings }: SettingsDropdown): TemplateResult => {
     ${asyncReplace(backdrop)}
     <button
       class="c-dropdown__trigger c-action-list__action"
-      aria-expanded="${asyncReplace(ariaExpanded)}"
+      aria-expanded=${asyncReplace(ariaExpanded)}
       aria-controls="dropdown-${id}"
       aria-label="Open settings"
       data-device=${alias}
