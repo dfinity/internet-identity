@@ -218,6 +218,8 @@ test("Reset protected recovery phrase", async () => {
 
     await mainView.waitForDisplay();
     await mainView.reset(RECOVERY_PHRASE_NAME);
+
+    await browser.waitUntil(browser.isAlertOpen);
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
@@ -245,6 +247,7 @@ test("Reset protected recovery phrase, confirm with empty seed phrase", async ()
     await mainView.waitForDisplay();
     await mainView.reset(RECOVERY_PHRASE_NAME);
 
+    await browser.waitUntil(browser.isAlertOpen);
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
