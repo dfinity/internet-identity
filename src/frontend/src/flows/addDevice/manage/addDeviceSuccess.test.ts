@@ -1,9 +1,10 @@
 import { I18n } from "$src/i18n";
+import { vi } from "vitest";
 import { addDeviceSuccessPage } from "./addDeviceSuccess";
 
 describe("addDeviceSuccess", () => {
   it("should resolve promise on click to continue", () => {
-    const onContinue = jest.fn();
+    const onContinue = vi.fn();
 
     addDeviceSuccessPage(
       {
