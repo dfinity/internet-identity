@@ -97,7 +97,7 @@ export const authnTemplateManage = ({
 
 /* the II authentication flow */
 export const authFlowManage = async (connection: Connection, i18n: I18n) => {
-  const dapps = shuffleArray(await getDapps());
+  const dapps = shuffleArray(getDapps());
   const identityBackground = loadIdentityBackground();
   // Go through the login flow, potentially creating an anchor.
   const {
@@ -261,7 +261,7 @@ export const renderManage = async ({
 
 export const displayManagePage = renderPage(displayManageTemplate);
 
-export const displayManage = async (
+export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceData[],
@@ -269,7 +269,7 @@ export const displayManage = async (
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
-  const dapps = shuffleArray(await getDapps());
+  const dapps = shuffleArray(getDapps());
   return new Promise((resolve) => {
     const devices = devicesFromDeviceDatas({
       devices: devices_,

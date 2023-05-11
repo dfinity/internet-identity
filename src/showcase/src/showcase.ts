@@ -117,7 +117,7 @@ const authnCnfg = {
   onSubmit: (anchor: bigint) => console.log("Submitting anchor", anchor),
 };
 
-const dapps = await getDapps();
+const dapps = getDapps();
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",
