@@ -388,10 +388,10 @@ export const styleguide = html`
                 </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Delete Anchor</button>
+                    <button class="c-dropdown__link">Delete Anchor</button>
                   </li>
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Lock Anchor</button>
+                    <button class="c-dropdown__link">Lock Anchor</button>
                   </li>
                 </ul>
               </span>
@@ -411,10 +411,10 @@ export const styleguide = html`
                 </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Delete Anchor</button>
+                    <button class="c-dropdown__link">Delete Anchor</button>
                   </li>
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Lock Anchor</button>
+                    <button class="c-dropdown__link">Lock Anchor</button>
                   </li>
                 </ul>
               </span>
@@ -431,10 +431,10 @@ export const styleguide = html`
                 </button>
                 <ul class="c-dropdown__menu" id="dropdown-i">
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Delete Anchor</button>
+                    <button class="c-dropdown__link">Delete Anchor</button>
                   </li>
                   <li class="c-dropdown__item">
-                    <button class="c-dropdown__button">Lock Anchor</button>
+                    <button class="c-dropdown__link">Lock Anchor</button>
                   </li>
                 </ul>
               </span>
