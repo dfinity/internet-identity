@@ -1,8 +1,8 @@
 export const handleKeyPress = ({
-  $event: { code },
+  e: { code },
   callback,
 }: {
-  $event: KeyboardEvent;
+  e: KeyboardEvent;
   callback: () => void;
 }) => {
   if (!["Enter", "Space"].includes(code)) {
