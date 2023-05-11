@@ -39,7 +39,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
       TEST_APP_CANISTER_ID
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae-test");
+    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
     await niceDemoAppView.signin();
 
     const authenticatorId3 = await switchToPopup(browser);
