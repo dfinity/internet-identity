@@ -23,7 +23,7 @@ test("word changes state", async () => {
   const elem = document.querySelector(
     '[data-state="pending"]'
   ) as HTMLInputElement;
-  expect(elem.dataset.expected).toBe("hello-test");
+  expect(elem.dataset.expected).toBe("hello");
 
   // On input, make sure the state is still pending
   elem.value = "hell";
