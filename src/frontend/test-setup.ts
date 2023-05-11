@@ -1,8 +1,9 @@
 import crypto from "@trust/webcrypto";
 import { TextEncoder } from "util";
+import { vi } from "vitest";
 
 // We mock the environment variable because jest is not able to load import.meta.env
-jest.mock("./src/environment.ts", () => ({
+vi.mock("./src/environment.ts", () => ({
   BASE_URL: "/",
   FETCH_ROOT_KEY: false,
   DUMMY_AUTH: false,

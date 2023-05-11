@@ -1,11 +1,19 @@
 import { resolve } from "path";
-import { defineConfig, UserConfig } from "vite";
+import { AliasOptions, defineConfig, UserConfig } from "vite";
 import {
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
   stripInjectJsScript,
 } from "./vite.plugins";
+
+export const aliasConfig: AliasOptions = {
+  // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
+  stream: "stream-browserify",
+  // Custom alias we are using to shorten and make absolute the imports
+  $generated: resolve(__dirname, "src/frontend/generated"),
+  $src: resolve(__dirname, "src/frontend/src"),
+};
 
 const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // Expand process.env variables with default values to ensure build reproducibility
@@ -25,13 +33,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
     publicDir: "assets",
     envPrefix: "II_",
     resolve: {
-      alias: {
-        // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
-        stream: "stream-browserify",
-        // Custom alias we are using to shorten and make absolute the imports
-        $generated: resolve(__dirname, "src/frontend/generated"),
-        $src: resolve(__dirname, "src/frontend/src"),
-      },
+      alias: aliasConfig,
     },
     build: {
       outDir: "../../dist",

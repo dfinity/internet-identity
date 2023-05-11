@@ -1,4 +1,5 @@
 import { nonNullish } from "@dfinity/utils";
+import { vi } from "vitest";
 import { getAnchors, MAX_SAVED_ANCHORS, setAnchorUsed } from "./userNumber";
 
 testLocalStorage("anchors default to nothing", () => {
@@ -44,25 +45,25 @@ testLocalStorage("only N anchors are stored", () => {
 });
 
 testLocalStorage("old anchors are dropped", () => {
-  jest.useFakeTimers().setSystemTime(new Date(0));
+  vi.useFakeTimers().setSystemTime(new Date(0));
   setAnchorUsed(BigInt(10000));
-  jest.useFakeTimers().setSystemTime(new Date(1));
+  vi.useFakeTimers().setSystemTime(new Date(1));
   setAnchorUsed(BigInt(203000));
-  jest.useFakeTimers().setSystemTime(new Date(2));
+  vi.useFakeTimers().setSystemTime(new Date(2));
   for (let i = 0; i < MAX_SAVED_ANCHORS; i++) {
     setAnchorUsed(BigInt(i));
   }
   expect(getAnchors()).not.toContain(BigInt(10000));
   expect(getAnchors()).not.toContain(BigInt(203000));
-  jest.useRealTimers();
+  vi.useRealTimers();
 });
 
 testLocalStorage(
   "unknown fields are not dropped",
   () => {
-    jest.useFakeTimers().setSystemTime(new Date(20));
+    vi.useFakeTimers().setSystemTime(new Date(20));
     setAnchorUsed(BigInt(10000));
-    jest.useRealTimers();
+    vi.useRealTimers();
   },
   {
     before: {

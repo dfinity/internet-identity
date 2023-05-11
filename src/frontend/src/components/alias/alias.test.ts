@@ -1,9 +1,10 @@
 import { promptDeviceAliasPage } from "$src/components/alias/index";
 import { I18n } from "$src/i18n";
+import { vi } from "vitest";
 
 test("can be canceled", () => {
-  const cancel = jest.fn();
-  const ctn = jest.fn((_str) => {
+  const cancel = vi.fn();
+  const ctn = vi.fn((_str) => {
     /* */
   });
   promptDeviceAliasPage(
@@ -23,8 +24,8 @@ test("can be canceled", () => {
 });
 
 test("can be picked", () => {
-  const cancel = jest.fn();
-  const ctn = jest.fn((_str) => {
+  const cancel = vi.fn();
+  const ctn = vi.fn((_str) => {
     /* */
   });
   promptDeviceAliasPage(

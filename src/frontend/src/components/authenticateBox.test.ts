@@ -1,10 +1,11 @@
 import { I18n } from "$src/utils/i18n";
 import { html, render } from "lit-html";
+import { vi } from "vitest";
 import { authnTemplates } from "./authenticateBox";
 
 test("anchors are forwarded", async () => {
-  const addDevice: (anchor?: bigint) => void = jest.fn();
-  const recover: (anchor?: bigint) => void = jest.fn();
+  const addDevice: (anchor?: bigint) => void = vi.fn();
+  const recover: (anchor?: bigint) => void = vi.fn();
   const pages = authnTemplates(new I18n("en"), {
     register: () => {},
     onSubmit: () => {},
