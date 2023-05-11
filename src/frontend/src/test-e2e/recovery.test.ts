@@ -217,6 +217,9 @@ test("Reset protected recovery phrase", async () => {
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
 
     await mainView.waitForDisplay();
+
+    // Ensure the settings dropdown is in view
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
     await browser.acceptAlert();
 
@@ -243,8 +246,10 @@ test("Reset protected recovery phrase, confirm with empty seed phrase", async ()
 
     await mainView.protect(RECOVERY_PHRASE_NAME, seedPhrase);
     await mainView.waitForDisplay();
-    await mainView.reset(RECOVERY_PHRASE_NAME);
 
+    // Ensure the settings dropdown is in view
+    await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
+    await mainView.reset(RECOVERY_PHRASE_NAME);
     await browser.acceptAlert();
 
     const recoveryView = new RecoverView(browser);
