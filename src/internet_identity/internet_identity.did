@@ -39,10 +39,10 @@ type StreamingStrategy = variant {
     };
 };
 
-// This describes whether a key is "protected" or not.
-// When protected, a key can only be updated or removed if the
-// user is authenticated with that very key.
-type KeyProtection = variant {
+// This describes whether an auth method is "protected" or not.
+// When protected, an auth method can only be updated or removed if the
+// user is authenticated with that very auth method.
+type AuthProtection = variant {
     protected;
     unprotected;
 };
@@ -71,21 +71,21 @@ type RegisterResponse = variant {
     bad_challenge;
 };
 
-type AddTentativeKeyResponse = variant {
-    // The device was tentatively added.
+type AddTentativeAuthResponse = variant {
+    // The auth method was tentatively added.
     added_tentatively: record {
         verification_code: text;
         // Expiration date, in nanos since the epoch
         device_registration_timeout: Timestamp;
     };
-    // Device registration mode is off, either due to timeout or because it was never enabled.
-    device_registration_mode_off;
-    // There is another device already added tentatively
-    another_device_tentatively_added;
+    // Authentication method registration mode is off, either due to timeout or because it was never enabled.
+    auth_registration_mode_off;
+    // There is another auth method already added tentatively
+    another_auth_tentatively_added;
 };
 
-type VerifyTentativeKeyResponse = variant {
-    // The device was successfully verified.
+type VerifyTentativeAuthResponse = variant {
+    // The auth method was successfully verified.
     verified;
     // Wrong verification code entered. Retry with correct code.
     wrong_code: record {
@@ -249,14 +249,14 @@ type ChallengeResult = record {
     chars : text;
 };
 
-    // Extra information about registration status for new devices
-type KeyRegistrationInfo = record {
-    // If present, the user has tentatively added a new device. This
-    // new device needs to be verified (see relevant endpoint) before
+// Extra information about registration status for new auth methods
+type AuthRegistrationInfo = record {
+    // If present, the user has tentatively added a new auth method. This
+    // new auth method needs to be verified (see relevant endpoint) before
     // 'expiration'.
-    tentative_key : opt KeyRecord;
+    tentative_auth : opt AuthRecord;
     // The timestamp at which the registration mode will expire for this identity
-    // (and the tentative device will be forgotten, if any, and if not verified)
+    // (and the tentative auth method will be forgotten, if any, and if not verified)
     expiration: Timestamp;
 };
 
@@ -290,7 +290,8 @@ type WebAuthnDirectSigMode = variant {
     optional;
 };
 
-type key = variant {
+// Authentication method
+type Auth = variant {
     webauthn_key: record {
         credential_id: CredentialId;
         pubkey: PublicKey;
@@ -302,14 +303,14 @@ type key = variant {
     };
 };
 
-type KeyRecord = record {
-    key: key;
+type AuthRecord = record {
+    auth: Auth;
     // contains now the following fields
     // - alias
     // - origin
     // - key_type: reduced to "platform", "cross_platform" on migration
     metadata: MetadataMap;
-    protection: KeyProtection;
+    protection: AuthProtection;
     // If a timestamp is present on write, the write will be rejected if it does
     // not match the canister side timestamp. This can be used to detect stale
     // writes.
@@ -318,51 +319,53 @@ type KeyRecord = record {
 
 // Information about the identity
 type IdentityInfo = record {
-    // All keys that can authenticate to this identity
-    keys : vec KeyRecord;
-    // All keys that can recover this identity
-    recovery_keys: vec KeyRecord;
-    // Key registration status used when adding devices, see KeyRegistrationInfo
-    key_registration: opt KeyRegistrationInfo;
+    // All auth methods that can authenticate to this identity
+    auth_records: vec AuthRecord;
+    // All auth methods that can recover this identity
+    recovery_records: vec AuthRecord;
+    // Auth registration status used when adding devices, see AuthRegistrationInfo
+    auth_registration: opt AuthRegistrationInfo;
 };
 
 // Public information about the keys attached to the identity
-type IdentityKeys = record {
-    keys : vec key;
-    recovery_keys : vec key;
+type IdentityAuthInfo = record {
+    auth : vec Auth;
+    recovery : vec Auth;
 };
 
-type KeySettings = record {
-    protection: KeyProtection;
+type AuthSettings = record {
+    protection: AuthProtection;
     direct_signature: WebAuthnDirectSigMode;
 }
 
 service : (opt InternetIdentityInit) -> {
     // registration flow
     create_captcha : () -> (opt variant { ok:Challenge});
-    register_identity : (KeyRecord, ChallengeResult, opt principal) -> (opt RegisterResponse);
+    register_identity : (AuthRecord, ChallengeResult, opt principal) -> (opt RegisterResponse);
 
-    // key management
-    add_key : (IdentityNumber, KeyRecord, webauthn_sig: opt blob) -> (opt result);
-    add_recovery_key : (IdentityNumber, KeyRecord, webauthn_sig: opt blob) -> (opt result);
+    // auth management
+    add_auth : (IdentityNumber, AuthRecord, webauthn_sig: opt blob) -> (opt result);
+    add_recovery : (IdentityNumber, AuthRecord, webauthn_sig: opt blob) -> (opt result);
     // opt timestamp to detect stale writes, if desired
-    update_key_metadata : (IdentityNumber, PublicKey, MetadataMap, opt Timestamp) -> (opt result);
-    // Atomically replace a key record matching the public key with a new one.
-    replace_key : (IdentityNumber, PublicKey, KeyRecord, webauthn_sig: opt blob) -> (opt result);
-    remove_key : (IdentityNumber, PublicKey, webauthn_sig: opt blob) -> (opt result);
-    update_key_settings : (IdentityNumber, PublicKey, KeySettings, webauthn_sig: opt blob) -> (opt result);
+    update_auth_metadata : (IdentityNumber, PublicKey, MetadataMap, opt Timestamp) -> (opt result);
+    // Atomically replace a auth record matching the public key with a new one.
+    replace_auth : (IdentityNumber, PublicKey, AuthRecord, webauthn_sig: opt blob) -> (opt result);
+    remove_auth : (IdentityNumber, PublicKey, webauthn_sig: opt blob) -> (opt result);
+    update_auth_settings : (IdentityNumber, PublicKey, AuthSettings, webauthn_sig: opt blob) -> (opt result);
 
     // information about the identity
     // public
-    identity_keys : (IdentityNumber) -> (opt variant { ok: IdentityKeys }) query;
+    identity_auth_info : (IdentityNumber) -> (opt variant { ok: IdentityAuthInfo }) query;
     // requires authentication
     identity_info : (IdentityNumber) -> (opt variant { ok: IdentityInfo });
 
-    // remote key registration
-    enter_key_registration_mode : (IdentityNumber) -> (opt variant { ok: Timestamp });
-    exit_key_registration_mode : (IdentityNumber) -> (opt result);
-    add_tentative_key : (IdentityNumber, key, MetadataMap) -> (opt variant { ok: AddTentativeKeyResponse });
-    verify_tentative_key : (IdentityNumber, verification_code: text, webauthn_sig: opt blob) -> (opt variant { ok: VerifyTentativeKeyResponse });
+    // remote auth registration
+    enter_auth_registration_mode : (IdentityNumber) -> (opt variant { ok: Timestamp });
+    exit_auth_registration_mode : (IdentityNumber) -> (opt result);
+    add_tentative_auth : (IdentityNumber, Auth, MetadataMap) -> (opt variant { ok: AddTentativeAuthResponse
+    });
+    verify_tentative_auth : (IdentityNumber, verification_code: text, webauthn_sig: opt blob) -> (opt variant { ok: VerifyTentativeAuthResponse
+    });
 
     // delegation related endpoints
     // no changes
