@@ -7,9 +7,7 @@ export const recoveryWizard = async (
   connection: AuthenticatedConnection
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
-  // one. If after returning from the prompt they still haven't added one, then
-  // we display a big warning with full explanation about the risks of having a
-  // single authentication device and not having a recovery device.
+  // one.
   if ((await connection.lookupRecovery(userNumber)).length === 0) {
     await setupRecoveryWizard(userNumber, connection);
   }
