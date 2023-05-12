@@ -88,6 +88,9 @@ export const promptCaptchaTemplate = <T>({
   // The text input where the chars can be typed
   const input: Ref<HTMLInputElement> = createRef();
 
+  // The CAPTCHA container
+  const captchaContainer: Ref<HTMLElement> = createRef();
+
   // The error shown on bad input
   const errorText = state.map(({ status }) =>
     status === "bad" ? copy.incorrect : undefined
@@ -146,11 +149,34 @@ export const promptCaptchaTemplate = <T>({
   // Kickstart everything
   void doRetry();
 
+  // A "resize" handler than ensures that the captcha is centered when after
+  // the page is resized. This is particularly useful on mobile devices, where
+  // the virtual keyboard shifts the content up or down.
+  //
+  // The handler automatically deregisters itself the first time it is called when
+  // the captcha doesn't exist anymore.
+  //
+  // Should not be registerd before the template is rendered.
+  const setResizeHandler = () => {
+    const value = captchaContainer.value;
+    if (isNullish(value)) {
+      window.visualViewport?.removeEventListener("resize", setResizeHandler);
+    } else {
+      value.scrollIntoView();
+    }
+  };
+
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
-        <div class="c-input c-input--icon">
+        <div
+          ${ref(captchaContainer)}
+          ${mount(() => {
+            window.visualViewport?.addEventListener("resize", setResizeHandler);
+          })}
+          class="c-input c-input--icon"
+        >
           ${asyncReplace(img)}
           <i
             tabindex="0"
