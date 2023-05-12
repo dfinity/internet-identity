@@ -27,11 +27,6 @@ export const renameDevice = async ({
   device: DeviceData;
   reload: () => void;
 }) => {
-  const confirmed = confirm("Choose a nickname for this passkey.");
-  if (!confirmed) {
-    return;
-  }
-
   const alias = await promptDeviceAlias({
     title: "Passkey Nickname",
     message: "Choose a nickname for this Passkey",
