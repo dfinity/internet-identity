@@ -15,17 +15,28 @@
     "auth_failed": "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
     "auth_success": "Authentication successful. You may close this page.",
 
-    "create_to_continue_to": "Create an Internet Identity to connect to",
-    "to_continue_to": "to connect to",
-    "is_alternative_of": "is an alternative domain of",
-    "auth_same_identity": "and you will be authenticated to both with the same identity.",
-
+    "first_time_title_1": "Securely connect",
+    "first_time_title_join": "to",
+    "first_time_subtitle": "Internet Identity uses the secure hardware on your device to connect to hundreds of dapps on the Internet Computer",
+    "first_time_unknown_subtitle": "Create an Internet Identity to connect to",
     "first_time_create": "Securely connect with Internet Identity",
-    "first_time_use": "Use existing",
     "first_time_create_text": "Create Internet Identity",
+    "first_time_use": "Use existing",
+    "first_time_alternative_of": "You are creating an Internet Identity with",
+    "first_time_alternative_of_join": "and",
 
-    "use_existing_enter_anchor": "Enter an",
-    "pick_choose_anchor": "Choose an",
-    "internet_identity": "Internet Identity"
+    "use_existing_title_1": "Enter your",
+    "use_existing_title_2": "Internet Identity",
+    "use_existing_subtitle": "to connect",
+    "use_existing_subtitle_join": "to",
+    "use_existing_alternative_of": "Enter the Internet Identity that connects to",
+    "use_existing_alternative_of_join": "and",
+
+    "pick_title_1": "Choose your",
+    "pick_title_2": "Internet Identity",
+    "pick_subtitle": "to connect",
+    "pick_subtitle_join": "to",
+    "pick_alternative_of": "Choose the Internet Identity that connects to",
+    "pick_alternative_of_join": "and"
   }
 }

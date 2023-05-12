@@ -1397,6 +1397,12 @@ a:hover,
   margin: calc(-4 * var(--rs-input-bezel));
 }
 
+.c-dapp-logo {
+  width: 30%;
+  margin: auto;
+  display: block;
+}
+
 .c-input--id__caption,
 .c-input--id__value {
   position: relative;
@@ -1972,6 +1978,12 @@ a:hover,
   grid-template-rows: 0fr;
 }
 
+/* Work around to copy behavior of first t-lead paragraph after title,
+ * since in this case the chasm is inserted inbetween. */
+.c-chasm--title + .t-lead {
+  margin-top: 0.75em;
+}
+
 .c-chasm[aria-expanded="true"] {
   grid-template-rows: 1fr;
   transition: grid-template-rows 400ms cubic-bezier(0.3, 0.7, 0, 1);
@@ -1987,7 +1999,7 @@ a:hover,
 }
 
 .c-chasm__arrow {
-  margin-left: calc(1.25 * var(--rs-card-bezel));
+  margin: auto;
   width: 0;
   height: 0;
   background: var(--rc-input);
@@ -1999,6 +2011,7 @@ a:hover,
 
 .c-chasm__button {
   transition: transform 300ms cubic-bezier(0.3, 0.7, 0, 1);
+  vertical-align: text-bottom;
 }
 .c-chasm__button svg {
   transform: translate(-50%, -50%);

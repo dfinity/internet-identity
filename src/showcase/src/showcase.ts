@@ -127,8 +127,30 @@ const authzTemplatesAlt = authnTemplateAuthorize({
   i18n,
 });
 
+const authzTemplatesKnownAlt = authnTemplateAuthorize({
+  origin: "https://nns.ic0.app",
+  derivationOrigin: "http://fgte8-ciaaa-aaaad-aaatq-cai.ic0.app",
+  i18n,
+
+  knownDapp: {
+    name: "NNS Front-End Dapp",
+    logo: "icons/nnsfront-enddapp_logo.webp",
+  },
+});
+
+const authzTemplatesKnown = authnTemplateAuthorize({
+  origin: "https://oc.app",
+  i18n,
+  knownDapp: { name: "OpenChat", logo: "icons/openchat_logo.webp" },
+});
+
 const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
 const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
+const authzKnown = authnPages(i18n, { ...authnCnfg, ...authzTemplatesKnown });
+const authzKnownAlt = authnPages(i18n, {
+  ...authnCnfg,
+  ...authzTemplatesKnownAlt,
+});
 
 const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
@@ -155,21 +177,17 @@ const iiPages: Record<string, () => void> = {
 
   authorizeNew: () =>
     authz.firstTime({ useExisting: () => console.log("Use existing") }),
+  authorizeNewKnown: () =>
+    authzKnown.firstTime({ useExisting: () => console.log("Use existing") }),
   authorizeNewAlt: () =>
     authzAlt.firstTime({ useExisting: () => console.log("Use existing") }),
+  authorizeNewKnownAlt: () =>
+    authzKnownAlt.firstTime({ useExisting: () => console.log("Use existing") }),
   authorizeUseExisting: () => authz.useExisting(),
+  authorizeUseExistingKnown: () => authzKnown.useExisting(),
+  authorizeUseExistingKnownAlt: () => authzKnownAlt.useExisting(),
   authorizePick: () =>
     authz.pick({
-      anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
-    }),
-  authorizePickAlt: () =>
-    authzAlt.pick({
-      anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
-    }),
-  authorizePickAltOpen: () =>
-    authzAlt.pick({
       anchors: [BigInt(10000), BigInt(243099)],
       moreOptions: () => console.log("More options requested"),
     }),
