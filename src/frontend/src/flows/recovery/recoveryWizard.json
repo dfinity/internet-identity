@@ -1,0 +1,23 @@
+{
+  "en": {
+    "title": "Create your recovery phrase",
+    "paragraph": "This will take a few minutes. Make sure no one is watching your screen, and that you have a pen and paper or password manager ready. ",
+
+    "ok": "Create Recovery Phrase",
+    "skip": "Remind me later",
+
+    "what_is_phrase_q": "What is a recovery phrase?",
+    "what_is_phrase_a": "Your recovery phrase contains your Internet Identity number and a secret 24-word phrase",
+
+    "how_save_phrase_q": "How do I save my recovery phrase?",
+    "how_save_phrase_a_1": "Save in a password manager",
+    "how_save_phrase_a_2": "Store in a safe deposit box",
+    "how_save_phrase_a_3": "Write down and store in multiple secure places",
+
+    "when_use_phrase_q": "When should I use my recovery phrase?",
+    "when_use_phrase_a_1": "If you lose access to all your devices and have no other method for accessing your Internet Identity",
+
+    "share_phrase_q": "Should I share my recovery phrase?",
+    "share_phrase_a_1": "Never! If someone asks for your recovery phrase, they are likely trying to steal access to your accounts"
+  }
+}

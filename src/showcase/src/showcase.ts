@@ -35,6 +35,7 @@ import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
 import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { displayUserNumberPage } from "$src/flows/register/finish";
 import { savePasskeyPage } from "$src/flows/register/passkey";
@@ -387,6 +388,12 @@ const iiPages: Record<string, () => void> = {
     }),
   loader: () =>
     withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
+  addPhrase: () =>
+    addPhrasePage({
+      ok: () => console.log("ok"),
+      skip: () => console.log("skip"),
+      i18n,
+    }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
       operation: "create",

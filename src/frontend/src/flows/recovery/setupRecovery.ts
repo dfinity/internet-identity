@@ -8,86 +8,33 @@ import {
   creationOptions,
   IC_DERIVATION_PATH,
 } from "$src/utils/iiConnection";
-import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
+import { unreachable, unreachableLax } from "$src/utils/utils";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import type { ChooseRecoveryProps } from "./chooseRecoveryMechanism";
-import { chooseRecoveryMechanism } from "./chooseRecoveryMechanism";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
 export const setupRecovery = async ({
   userNumber,
   connection,
-  title,
-  message,
-  cancelText,
 }: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
-} & ChooseRecoveryProps): Promise<void> => {
-  // Retry until user explicitly cancels or until a device is added successfully
+}): Promise<void> => {
+  // Retry until user explicitly cancels or until a phrase is added successfully
   for (;;) {
-    // Fetch all devices, which are used when offering recovery options & when setting up
-    // a recovery device
-    const devices = await withLoader(() => connection.lookupAll(userNumber));
-    const recoveryMechanism = await chooseRecoveryMechanism({
-      devices,
-      title,
-      message,
-      cancelText,
-    });
-    if (recoveryMechanism === "canceled") {
+    const res = await setupPhrase(userNumber, connection);
+    if (res === "ok" || res === "canceled") {
       return;
     }
 
-    // For phrases, we kick start the phrase setup wizard
-    if (recoveryMechanism === "seedPhrase") {
-      const res = await setupPhrase(userNumber, connection);
-      if (res === "ok" || res === "canceled") {
-        return;
-      }
-
-      if (res === "error") {
-        await displayError({
-          title: "Failed to set up recovery",
-          message: "We failed to set up recovery for this Internet Identity.",
-          primaryButton: "Retry",
-        });
-        continue;
-      }
-
-      return unreachable(res, "Unexpected return value when creating phrase");
-    }
-
-    // For recovery keys, we retry until a key was successfully added (or the user explicitely cancels
-    // when choosing a recovery mechanism upon retry)
-    if (recoveryMechanism === "securityKey") {
-      const res = await setupKey({ connection, devices });
-
-      if (res === "ok") {
-        return;
-      }
-
-      if ("error" in res) {
-        await displayError({
-          title: "Authentication failure",
-          message:
-            "Failed to set up a security key as your recovery method. If you don't have an additional security key you can use a recovery phrase instead.",
-          detail: unknownToString(res.error, "Unknown error"),
-          primaryButton: "Continue",
-        });
-        continue;
-      }
-
-      // exhaust return values
-      return unreachable(res, "Unexpected return value when adding recovery");
-    }
-
-    return unreachable(
-      recoveryMechanism,
-      "Unexpected return value when choosing recovery"
-    );
+    res satisfies "error";
+    await displayError({
+      title: "Failed to set up recovery",
+      message: "We failed to set up recovery for this Internet Identity.",
+      primaryButton: "Retry",
+    });
+    continue;
   }
 };
 
