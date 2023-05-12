@@ -29,10 +29,22 @@ export const displayUserNumberTemplate = ({
   scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
-  const displayUserNumberSlot = html`<hgroup
+  const displayUserNumberSlot = html`
+
+    <div class="c-progress-container">
+    <div class="c-progress-stepper">
+    <div class="c-progress-step"><span>1</span></div>
+    <div class="c-progress-divider"></div>
+    <div class="c-progress-step"><span>2</span></div>
+    <div class="c-progress-divider"></div>
+    <div class="c-progress-step" aria-current><span><i class="c-progress-checkmark-icon">${checkmarkIcon}</i></span></div>
+    </div>
+    </div>
+<hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
   >
+
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
       </h1>
