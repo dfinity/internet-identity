@@ -1,7 +1,7 @@
 {
   "en": {
     "title": "Create your recovery phrase",
-    "paragraph": "This will take a few minutes. Make sure no one is watching your screen, and that you have a pen and paper or password manager ready.",
+    "paragraph": "This will take a few minutes. Make sure no one is watching your screen and that you have a pen and paper or password manager ready.",
 
     "ok": "Create Recovery Phrase",
     "skip": "Remind me later",
@@ -10,7 +10,7 @@
     "what_is_phrase_a": "Your recovery phrase contains your Internet Identity number and a secret 24-word phrase",
 
     "how_save_phrase_q": "How do I save my recovery phrase?",
-    "how_save_phrase_a_1": "Save in a password manager",
+    "how_save_phrase_a_1": "Save it in a password manager",
     "how_save_phrase_a_2": "Store in a safe deposit box",
     "how_save_phrase_a_3": "Write down and store in multiple secure places",
 
