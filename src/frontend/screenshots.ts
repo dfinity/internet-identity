@@ -42,17 +42,18 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
 
     await visit(browser, `http://localhost:5174/${pageName}`);
 
-    // When authenticating with alternative origins, toggle the chasm
-    if (pageName === "authorizePickAltOpen") {
-      await browser.$("#alternative-origin-chasm-toggle").click();
-      // Ensure the button is not hovered anymore for screenshot stability
-      await browser
-        .$("#alternative-origin-chasm-toggle")
-        .moveTo({ xOffset: -10, yOffset: -10 });
-    }
-
     await browser.execute('document.body.style.caretColor = "transparent"');
     await browser.saveScreenshot(`${screenshotsDir}/${pageName}.png`);
+
+    // When a chasm is present, toggle it
+    if (await browser.$('[data-action="toggle-chasm"]').isExisting()) {
+      await browser.$('[data-action="toggle-chasm"]').click();
+      // Ensure the button is not hovered anymore for screenshot stability
+      await browser
+        .$('[data-action="toggle-chasm"]')
+        .moveTo({ xOffset: -10, yOffset: -10 });
+      await browser.saveScreenshot(`${screenshotsDir}/${pageName}_open.png`);
+    }
   }
 }
 
