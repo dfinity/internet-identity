@@ -8,6 +8,7 @@ import { unknownToString } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
 import { html, TemplateResult } from "lit-html";
+import { registerStepper } from "./stepper";
 
 import copyJson from "./passkey.json";
 
@@ -27,10 +28,8 @@ const savePasskeyTemplate = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <hgroup
-      style="margin-top: 7em;"
-      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-    >
+    ${registerStepper({ current: "create" })}
+    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
         ${copy.select}

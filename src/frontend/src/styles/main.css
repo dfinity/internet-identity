@@ -2147,6 +2147,69 @@ a.c-action-list__item {
   display: block;
 }
 
+.c-progress-container {
+  text-align: center;
+  margin-bottom: 6em;
+}
+
+.c-progress-stepper {
+  margin: auto;
+  display: inline-flex;
+}
+
+.c-progress-step {
+  border: 2px solid var(--rc-button);
+  color: var(--rc-button);
+  background-color: white;
+  aspect-ratio: 1;
+  width: 2em;
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  position: relative;
+}
+
+.haha {
+  position: absolute;
+  top: 3em;
+  left: -40%;
+  width: 2em;
+  z-index: 2;
+  text-align: center;
+
+  color: var(--rc-button);
+  font-weight: bold;
+}
+
+.c-progress-step:not([aria-current="true"] ~ *) {
+  background-color: var(--rc-button);
+  color: white;
+}
+
+.c-progress-checkmark-icon {
+  position: absolute;
+  display: inline-flex;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  justify-content: center;
+  align-items: center;
+}
+
+.c-progress-divider {
+  width: 4em;
+  background-color: var(--rc-button);
+  height: 3px;
+  margin: auto -5px;
+  z-index: 0;
+}
+
+.c-progress-step span {
+}
+
 /** responsiveness */
 
 @media (max-width: 512px) {
