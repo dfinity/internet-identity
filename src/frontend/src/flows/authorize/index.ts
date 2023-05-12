@@ -53,7 +53,10 @@ export const authnTemplateAuthorize = ({
         `
       : undefined;
 
-  // There are a few variations of this screen that share some common elements
+  // There are a few big variations of this screen that share some common elements:
+  //  * "first time users" on a known dapp, where the dapp logo is shown
+  //  * "first time users" on an UNKNOWN dapp, where a generic title is shown
+  //  * "returning users" which includes some small variations depending on alternative origins, if the dapp is known, etc.
 
   // Variation: the dapp is known and user is using II for the first time
   const firstTimeKnown = ({
@@ -165,7 +168,7 @@ export const authFlowAuthorize = async (
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
           knownDapp: dapps.find(
-            (dapp) => dapp.link === authContext.requestOrigin
+            (dapp) => new URL(dapp.link).origin === authContext.requestOrigin
           ),
         })
       );
