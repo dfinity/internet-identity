@@ -339,6 +339,72 @@ type BufferedArchiveEntry = record {
     entry: blob;
 };
 
+// V2 specific types
+// These type are experimental and may change in the future.
+
+type IdentityNumber = nat64;
+
+// Authentication method using WebAuthn signatures
+// See https://www.w3.org/TR/webauthn-2/
+// This is a separate type because WebAuthn requires to also store
+// the credential id (in addition to the public key).
+type WebAuthn = record {
+    credential_id: CredentialId;
+    pubkey: PublicKey;
+};
+
+// Authentication method using generic signatures
+// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#signatures for
+// supported signature schemes.
+type PublicKeyAuthn = record {
+    pubkey: PublicKey;
+};
+
+// The authentication methods currently supported by II.
+type AuthnMethod = variant {
+    webauthn: WebAuthn;
+    pubkey: PublicKeyAuthn;
+};
+
+// This describes whether an authentication method is "protected" or not.
+// When protected, a authentication method can only be updated or removed if the
+// user is authenticated with that very authentication method.
+type AuthnMethodProtection = variant {
+    protected;
+    unprotected;
+};
+
+type AuthnMethodData = record {
+    authn_method: AuthnMethod;
+    protection: AuthnMethodProtection;
+    // contains the following fields of the DeviceWithUsage type:
+    // - alias
+    // - origin
+    // - key_type: reduced to "platform", "cross_platform" on migration
+    metadata: MetadataMap;
+    last_authentication: opt Timestamp;
+};
+
+// Extra information about registration status for new authentication methods
+type AuthnMethodRegistrationInfo = record {
+    // If present, the user has registered a new authentication method. This
+    // new authentication needs to be verified before 'expiration' in order to
+    // be added to the identity.
+    authn_method : opt AuthnMethodData;
+    // The timestamp at which the identity will turn off registration mode
+    // (and the authentication method will be forgotten, if any, and if not verified)
+    expiration: Timestamp;
+};
+
+type IdentityInfo = record {
+    authn_methods: vec AuthnMethodData;
+    recovery_authn_methods: vec  AuthnMethodData;
+    authn_data_registration: opt AuthnMethodRegistrationInfo;
+};
+
+type IdentityInfoResponse = variant {
+    ok: IdentityInfo;
+};
 
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
@@ -375,4 +441,15 @@ service : (opt InternetIdentityInit) -> {
     /// Only callable by this IIs archive canister.
     fetch_entries: () -> (vec BufferedArchiveEntry);
     acknowledge_entries: (sequence_number: nat64) -> ();
+
+    // V2 API
+    // The following methods are experimental and may change in the future.
+    // Note: the responses of v2 API calls are `opt` for compatibility reasons
+    // with future variant extensions.
+    // A client decoding a response as `null` indicates outdated type information
+    // and should be treated as an error.
+
+    // Returns information about the identity with the given number.
+    // Requires authentication.
+    identity_info: (IdentityNumber) -> (opt IdentityInfoResponse);
 }

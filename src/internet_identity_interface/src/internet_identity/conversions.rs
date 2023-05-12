@@ -1,6 +1,4 @@
-use crate::internet_identity::types::{
-    DeviceData, DeviceWithUsage, IdentityAnchorInfo, WebAuthnCredential,
-};
+use crate::internet_identity::types::*;
 
 #[cfg(test)]
 mod test;
@@ -51,5 +49,78 @@ impl TryFrom<DeviceData> for WebAuthnCredential {
             pubkey: device.pubkey,
             credential_id,
         })
+    }
+}
+
+impl From<DeviceProtection> for AuthnMethodProtection {
+    fn from(value: DeviceProtection) -> Self {
+        match value {
+            DeviceProtection::Protected => AuthnMethodProtection::Protected,
+            DeviceProtection::Unprotected => AuthnMethodProtection::Unprotected,
+        }
+    }
+}
+
+impl From<DeviceWithUsage> for AuthnMethodData {
+    fn from(device_data: DeviceWithUsage) -> Self {
+        let authn_method = if let Some(credential_id) = device_data.credential_id.clone() {
+            AuthnMethod::WebAuthn(WebAuthn {
+                credential_id,
+                pubkey: device_data.pubkey.clone(),
+            })
+        } else {
+            AuthnMethod::PubKey(PublicKeyAuthn {
+                pubkey: device_data.pubkey.clone(),
+            })
+        };
+        let mut metadata = device_data.metadata.unwrap_or_default();
+        metadata.insert(
+            "alias".to_string(),
+            MetadataEntry::String(device_data.alias),
+        );
+        device_data
+            .origin
+            .map(|origin| metadata.insert("origin".to_string(), MetadataEntry::String(origin)));
+
+        match device_data.key_type {
+            KeyType::Platform => {
+                metadata.insert(
+                    "key_type".to_string(),
+                    MetadataEntry::String("platform".to_string()),
+                );
+            }
+            KeyType::CrossPlatform => {
+                metadata.insert(
+                    "key_type".to_string(),
+                    MetadataEntry::String("cross_platform".to_string()),
+                );
+            }
+            KeyType::SeedPhrase | KeyType::Unknown => {
+                // nothing to do
+            }
+        };
+
+        Self {
+            authn_method,
+            metadata,
+            protection: AuthnMethodProtection::from(device_data.protection),
+            last_authentication: device_data.last_usage,
+        }
+    }
+}
+
+impl From<DeviceRegistrationInfo> for AuthnMethodRegistration {
+    fn from(value: DeviceRegistrationInfo) -> Self {
+        AuthnMethodRegistration {
+            expiration: value.expiration,
+            authn_method: value.tentative_device.map(AuthnMethodData::from),
+        }
+    }
+}
+
+impl From<DeviceData> for AuthnMethodData {
+    fn from(device_data: DeviceData) -> Self {
+        let device_with_usage = DeviceWithUsage::from(device_data);
+        AuthnMethodData::from(device_with_usage)
     }
 }
