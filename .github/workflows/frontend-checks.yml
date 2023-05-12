@@ -13,6 +13,8 @@ jobs:
           token: ${{ secrets.GIX_BOT_PAT }}
       - uses: ./.github/actions/setup-node
       - run: npm ci
+      - name: Run tsc
+        run: npm run check
       - name: Run ESLint
         run: npm run lint
       - name: Check formatting

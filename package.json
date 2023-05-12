@@ -9,6 +9,7 @@
     "host": "II_FETCH_ROOT_KEY=1 vite --host",
     "showcase": "II_FETCH_ROOT_KEY=1 vite --mode showcase",
     "build": "tsc --noEmit && vite build",
+    "check": "tsc --project ./tsconfig.all.json --noEmit",
     "watch": "tsc --project ./tsconfig.all.json --noEmit --watch",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "generate": "npm run generate:types && npm run generate:js",
