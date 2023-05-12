@@ -4,9 +4,9 @@
     "invalid_derivation_origin": "Invalid Derivation Origin",
     "is_not_valid_origin_for": "is not a valid derivation origin for",
     "continue": "Continue",
-    "waiting_for_auth_data": "Waiting for authentication data...",
-    "validating_auth_data": "validating authentication data...",
-    "finalizing_auth": "Finalizing authentication...",
+    "waiting_for_auth_data": "Hang tight, connecting to the dapp",
+    "validating_auth_data": "Hang tight, validating the dapp's information",
+    "finalizing_auth": "Hang tight, starting your session",
 
     "invalid_data": "Invalid Data",
     "no_auth_data": "It looks like you were sent here for authentication, but no service requested authentication.",
