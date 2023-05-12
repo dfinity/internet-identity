@@ -2118,55 +2118,67 @@ a.c-action-list__item {
 }
 
 .c-progress-container {
-    text-align: center;
+  text-align: center;
+  margin-bottom: 6em;
 }
 
 .c-progress-stepper {
-    margin: auto;
-    display: inline-flex;
+  margin: auto;
+  display: inline-flex;
 }
 
 .c-progress-step {
-    border: 1px solid blue;
-    background-color: white;
-    aspect-ratio: 1;
-    width: 2em;
-    border-radius: 50%;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1;
-    position: relative;
+  border: 2px solid var(--rc-button);
+  color: var(--rc-button);
+  background-color: white;
+  aspect-ratio: 1;
+  width: 2em;
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  position: relative;
 }
 
-.c-progress-step:not([aria-current] ~ * ):not([aria-current]) {
-    background-color: blue;
-    color: white;
+.haha {
+  position: absolute;
+  top: 3em;
+  left: -40%;
+  width: 2em;
+  z-index: 2;
+  text-align: center;
+
+  color: var(--rc-button);
+  font-weight: bold;
 }
 
-.c-progress-step[aria-current] {
-    border: 3px solid blue;
+.c-progress-step:not([aria-current="true"] ~ *) {
+  background-color: var(--rc-button);
+  color: white;
 }
 
 .c-progress-checkmark-icon {
   position: absolute;
   display: inline-flex;
-  top: 0; left: 0; right: 0; bottom: 0;
-    justify-content: center;
-    align-items: center;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  justify-content: center;
+  align-items: center;
 }
 
 .c-progress-divider {
-    width: 2em;
-    background-color: blue;
-    height: 3px;
-    margin: auto -5px;
-    z-index: 0;
+  width: 4em;
+  background-color: var(--rc-button);
+  height: 3px;
+  margin: auto -5px;
+  z-index: 0;
 }
 
 .c-progress-step span {
 }
-
 
 /** responsiveness */
 

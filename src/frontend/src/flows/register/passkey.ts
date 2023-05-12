@@ -3,12 +3,12 @@ import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
 import { IIWebAuthnIdentity } from "$src/utils/iiConnection";
-import { checkmarkIcon } from "$src/components/icons";
 import { mount, renderPage, TemplateElement } from "$src/utils/lit-html";
 import { unknownToString } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
 import { html, TemplateResult } from "lit-html";
+import { registerStepper } from "./stepper";
 
 import copyJson from "./passkey.json";
 
@@ -28,19 +28,8 @@ const savePasskeyTemplate = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <div class="c-progress-container">
-    <div class="c-progress-stepper">
-    <div class="c-progress-step" aria-current><span>1</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step"><span>2</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step"><span><i class="c-progress-checkmark-icon">${checkmarkIcon}</i></span></div>
-    </div>
-    </div>
-    <hgroup
-      style="margin-top: 7em;"
-      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-    >
+    ${registerStepper({ current: "create" })}
+    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
         ${copy.select}

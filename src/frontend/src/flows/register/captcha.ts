@@ -2,7 +2,6 @@ import { Challenge } from "$generated/internet_identity_types";
 import { spinner } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
-import { checkmarkIcon } from "$src/components/icons";
 import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
 import {
   Connection,
@@ -15,6 +14,7 @@ import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { registerStepper } from "./stepper";
 
 import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
@@ -169,16 +169,7 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-
-    <div class="c-progress-container">
-    <div class="c-progress-stepper">
-    <div class="c-progress-step"><span>1</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step" aria-current><span>2</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step"><span><i class="c-progress-checkmark-icon">${checkmarkIcon}</i></span></div>
-    </div>
-    </div>
+      ${registerStepper({ current: "captcha" })}
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div

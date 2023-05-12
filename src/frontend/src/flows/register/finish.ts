@@ -15,6 +15,7 @@ import {
 import { OmitParams } from "$src/utils/utils";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { registerStepper } from "./stepper";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -31,15 +32,7 @@ export const displayUserNumberTemplate = ({
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
 
-    <div class="c-progress-container">
-    <div class="c-progress-stepper">
-    <div class="c-progress-step"><span>1</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step"><span>2</span></div>
-    <div class="c-progress-divider"></div>
-    <div class="c-progress-step" aria-current><span><i class="c-progress-checkmark-icon">${checkmarkIcon}</i></span></div>
-    </div>
-    </div>
+  ${registerStepper({ current: "finish" })}
 <hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
