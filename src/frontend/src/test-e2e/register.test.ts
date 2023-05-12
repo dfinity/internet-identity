@@ -20,7 +20,6 @@ import {
   MainView,
   NotInRegistrationModeView,
   RecoveryMethodSelectorView,
-  SingleDeviceWarningView,
   VerifyRemoteDeviceView,
   WelcomeView,
 } from "./views";
@@ -279,9 +278,6 @@ test("Register first then log into client application", async () => {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.remindLater();
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
