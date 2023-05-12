@@ -256,7 +256,7 @@ export class MainView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    // Open the dropdown by clicking on the trigger button
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
@@ -280,7 +280,7 @@ export class MainView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    // Open the dropdown by clicking on the trigger button
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
@@ -310,7 +310,7 @@ export class MainView extends View {
     await this.browser.execute(
       "window.scrollTo(0, document.body.scrollHeight)"
     );
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    // Open the dropdown by clicking on the trigger button
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
@@ -336,7 +336,7 @@ export class MainView extends View {
   }
 
   async remove(deviceName: string): Promise<void> {
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    // Open the dropdown by clicking on the trigger button
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
@@ -349,7 +349,7 @@ export class MainView extends View {
   }
 
   async reset(deviceName: string): Promise<void> {
-    // Ensure the dropdown is open by hovering/clicking (clicking is needed for mobile)
+    // Open the dropdown by clicking on the trigger button
     await this.browser
       .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
       .click();
