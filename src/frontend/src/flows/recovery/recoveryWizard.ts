@@ -80,7 +80,7 @@ const addPhraseTemplate = ({
 
 export const addPhrasePage = renderPage(addPhraseTemplate);
 
-// Prompt the user to create a WebAuthn identity
+// Prompt the user to create a recovery phrase
 export const addPhrase = (): Promise<"ok" | "skip"> => {
   return new Promise((resolve) =>
     addPhrasePage({

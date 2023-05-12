@@ -107,7 +107,9 @@ export class RegisterView extends View {
 
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser.$('[data-action="skip"]').waitForDisplayed({ timeout: 10_000 });
+    await this.browser
+      .$('[data-action="skip"]')
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForSeedPhrase(): Promise<void> {
