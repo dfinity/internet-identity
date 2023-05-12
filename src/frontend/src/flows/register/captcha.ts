@@ -8,7 +8,7 @@ import {
   IIWebAuthnIdentity,
   RegisterResult,
 } from "$src/utils/iiConnection";
-import { autofocus, renderPage, withRef } from "$src/utils/lit-html";
+import { autofocus, mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
@@ -29,6 +29,7 @@ export const promptCaptchaTemplate = <T>({
   onContinue,
   i18n,
   focus: focus_,
+  scrollToTop = false,
 }: {
   cancel: () => void;
   requestChallenge: () => Promise<Challenge>;
@@ -39,6 +40,8 @@ export const promptCaptchaTemplate = <T>({
   onContinue: (result: T) => void;
   i18n: I18n;
   focus?: boolean;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }) => {
   const focus = focus_ ?? true;
   const copy = i18n.i18n(copyJson);
@@ -144,7 +147,7 @@ export const promptCaptchaTemplate = <T>({
   void doRetry();
 
   const promptCaptchaSlot = html`
-    <article>
+    <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div class="c-input c-input--icon">
@@ -255,6 +258,7 @@ export const promptCaptcha = ({
 
       onContinue: resolve,
       i18n,
+      scrollToTop: true,
     });
   });
 };

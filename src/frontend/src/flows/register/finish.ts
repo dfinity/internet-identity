@@ -6,7 +6,12 @@ import {
 } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
-import { renderPage, TemplateElement, withRef } from "$src/utils/lit-html";
+import {
+  mount,
+  renderPage,
+  TemplateElement,
+  withRef,
+} from "$src/utils/lit-html";
 import { OmitParams } from "$src/utils/utils";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
@@ -15,13 +20,19 @@ export const displayUserNumberTemplate = ({
   onContinue,
   userNumber,
   identityBackground,
+  scrollToTop = false,
 }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: IdentityBackground;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
-  const displayUserNumberSlot = html`<hgroup>
+  const displayUserNumberSlot = html`<hgroup
+
+      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
+  >
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
       </h1>
@@ -124,6 +135,7 @@ export const displayUserNumber = ({
       onContinue: () => resolve(),
       userNumber,
       identityBackground,
+      scrollToTop: true,
     })
   );
 };
