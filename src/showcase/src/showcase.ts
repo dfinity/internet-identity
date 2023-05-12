@@ -31,9 +31,7 @@ import {
   checkIndices,
   confirmSeedPhrasePage,
 } from "$src/flows/recovery/confirmSeedPhrase";
-import { displaySafariWarning } from "$src/flows/recovery/displaySafariWarning";
 import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
-import { displaySingleDeviceWarning } from "$src/flows/recovery/displaySingleDeviceWarning";
 import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
@@ -250,14 +248,6 @@ const iiPages: Record<string, () => void> = {
       case you lose your Passkeys.`,
       cancelText: html`Skip, I understand the risks`,
     }),
-  displaySingleDeviceWarning: () =>
-    displaySingleDeviceWarning(
-      userNumber,
-      dummyConnection,
-      (_anchor, _conn) => {
-        return Promise.resolve();
-      }
-    ),
   displayManage: () => {
     displayManagePage({
       identityBackground,
@@ -379,10 +369,6 @@ const iiPages: Record<string, () => void> = {
     }),
   loader: () =>
     withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
-  displaySafariWarning: () =>
-    displaySafariWarning(userNumber, dummyConnection, (_anchor, _conn) => {
-      return Promise.resolve();
-    }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
       operation: "create",

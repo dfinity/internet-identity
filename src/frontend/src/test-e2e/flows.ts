@@ -3,7 +3,6 @@ import {
   MainView,
   RecoveryMethodSelectorView,
   RegisterView,
-  SingleDeviceWarningView,
   WelcomeView,
 } from "./views";
 
@@ -56,9 +55,6 @@ export const FLOWS = {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
-    const singleDeviceWarningView = new SingleDeviceWarningView(browser);
-    await singleDeviceWarningView.waitForDisplay();
-    await singleDeviceWarningView.remindLater();
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
