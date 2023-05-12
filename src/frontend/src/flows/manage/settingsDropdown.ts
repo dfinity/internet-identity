@@ -4,16 +4,19 @@ import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
-interface SettingsDropdown {
+export const settingsDropdown = ({
+  alias,
+  id,
+  settings,
+}: {
   alias: string;
   id: string;
   settings: { fn: () => void; caption: string; action: string }[];
-}
-
-const mkChasm = ({ alias, id, settings }: SettingsDropdown): TemplateResult => {
-  /* Toggle the chasm open/closed */
+}): TemplateResult => {
+  /* Toggle and close the chasm for the attribute aria-expanded */
   const ariaExpanded = new Chan(false);
-  const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const toggle = () => ariaExpanded.send(!ariaExpanded.latest);
+  const close = () => ariaExpanded.send(false);
 
   const backdrop = ariaExpanded.map((expanded) =>
     expanded
@@ -21,9 +24,9 @@ const mkChasm = ({ alias, id, settings }: SettingsDropdown): TemplateResult => {
           class="c-dropdown__backdrop"
           role="button"
           tabindex="-1"
-          @click=${() => chasmToggle()}
-          @keypress=${($event: KeyboardEvent) =>
-            handleKeyPress({ $event, callback: chasmToggle })}
+          @click=${() => close()}
+          @keypress=${(e: KeyboardEvent) =>
+            handleKeyPress({ e, callback: close })}
         />`
       : undefined
   );
@@ -36,7 +39,7 @@ const mkChasm = ({ alias, id, settings }: SettingsDropdown): TemplateResult => {
       aria-controls="dropdown-${id}"
       aria-label="Open settings"
       data-device=${alias}
-      @click=${() => chasmToggle()}
+      @click=${() => toggle()}
     >
       ${dropdownIcon}
     </button>
@@ -58,6 +61,3 @@ const mkChasm = ({ alias, id, settings }: SettingsDropdown): TemplateResult => {
     </ul>
   </div>`;
 };
-
-export const settingsDropdown = (params: SettingsDropdown): TemplateResult =>
-  mkChasm(params);
