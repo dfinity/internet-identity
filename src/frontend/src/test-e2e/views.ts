@@ -239,8 +239,6 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='rename']`)
       .click();
-    await this.browser.waitUntil(this.browser.isAlertOpen);
-    await this.browser.acceptAlert();
 
     const renameView = new RenameView(this.browser);
     await renameView.waitForDisplay();
