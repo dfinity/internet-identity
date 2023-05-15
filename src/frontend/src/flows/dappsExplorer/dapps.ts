@@ -29,7 +29,7 @@ export const getDapps = (): DappDescription[] => {
     dapps.push({
       name: "Test Dapp",
       link: "https://nice-name.com",
-      logo: "icons/nnsfront-enddapp_logo.webp",
+      logo: BASE_URL + "icons/nnsfront-enddapp_logo.webp",
     });
   }
 
