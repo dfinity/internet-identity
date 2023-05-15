@@ -2,7 +2,9 @@ import {
   PublicKey,
   SignedDelegation,
 } from "$generated/internet_identity_types";
+import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { unknownToString } from "$src/utils/utils";
 import { nonNullish } from "@dfinity/utils";
 import { AuthContext, Delegation } from "./postMessageInterface";
 
@@ -84,9 +86,19 @@ const retryGetDelegation = async (
       setInterval(resolve, 1000 * i);
     });
     const res = await connection.getDelegation(hostname, sessionKey, timestamp);
-    if ("signed_delegation" in res) {
-      return res.signed_delegation;
+    if ("no_such_delegation" in res) {
+      continue;
     }
+
+    if ("error" in res) {
+      toast.error(
+        "Error while fetching delegation: " +
+          unknownToString(res.error, "unknown error")
+      );
+      continue;
+    }
+
+    return res.signed_delegation;
   }
   throw new Error(
     `Failed to retrieve a delegation after ${maxRetries} retries.`
