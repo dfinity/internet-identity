@@ -8,7 +8,7 @@ import { setupRecovery } from "./setupRecovery";
 
 import copyJson from "./recoveryWizard.json";
 
-/* Anchor construction component (for creating WebAuthn credentials) */
+/* Phrase creation kick-off screen */
 
 const addPhraseTemplate = ({
   ok,
