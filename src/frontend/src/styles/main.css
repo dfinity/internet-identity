@@ -2147,67 +2147,95 @@ a.c-action-list__item {
   display: block;
 }
 
-.c-progress-container {
-  text-align: center;
-  margin-bottom: 6em;
-}
-
 .c-progress-stepper {
-  margin: auto;
-  display: inline-flex;
+  --bullet-size: 1.5em;
+
+  position: relative;
+  display: flex;
+  counter-reset: progress-step;
+  font-weight: bold;
+  text-align: center;
 }
 
-.c-progress-step {
-  border: 2px solid var(--rc-button);
-  color: var(--rc-button);
-  background-color: white;
-  aspect-ratio: 1;
-  width: 2em;
-  border-radius: 50%;
-  display: inline-flex;
-  justify-content: center;
+.c-progress-stepper__step {
+  counter-increment: progress-step;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  z-index: 1;
+  flex: 1 1 0;
   position: relative;
 }
 
-.haha {
-  position: absolute;
-  top: 3em;
-  left: -40%;
-  width: 2em;
+.c-progress-stepper__step::before {
+  content: counter(progress-step);
+}
+
+.c-progress-stepper__step::before,
+.c-progress-stepper__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   z-index: 2;
-  text-align: center;
 
-  color: var(--rc-button);
-  font-weight: bold;
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  border: calc(2 * var(--rs-line)) solid var(--rc-line-interaction);
+
+  width: var(--bullet-size);
+  height: var(--bullet-size);
+
+  border-radius: 50%;
+  line-height: 1;
 }
 
-.c-progress-step:not([aria-current="true"] ~ *) {
-  background-color: var(--rc-button);
-  color: white;
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step::before,
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step
+  .c-progress-stepper__icon {
+  background: var(--rc-button-secondary);
+  color: var(--rc-onButton-secondary);
 }
 
-.c-progress-checkmark-icon {
+.c-progress-stepper__icon path {
+  /* 
+    this is a bit of a hack, the check-mark should not be a filled path
+    but a stroke.
+  */
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-width: var(--rs-line);
+}
+
+.c-progress-stepper__step--final::before {
+  display: none;
+}
+
+/* the line between the steps */
+.c-progress-stepper__step::after {
+  content: "";
+  z-index: 1;
   position: absolute;
-  display: inline-flex;
-  top: 0;
+  top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
   left: 0;
   right: 0;
-  bottom: 0;
-  justify-content: center;
-  align-items: center;
+  border: var(--rs-line) solid var(--rc-line-interaction);
 }
 
-.c-progress-divider {
-  width: 4em;
-  background-color: var(--rc-button);
-  height: 3px;
-  margin: auto -5px;
-  z-index: 0;
+.c-progress-stepper__step:first-child::after {
+  left: 50%;
 }
 
-.c-progress-step span {
+.c-progress-stepper__step:last-child::after {
+  right: 50%;
+}
+
+.c-progress-stepper__label {
+  margin-top: 0.6em;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--rc-text-secondary);
 }
 
 /** responsiveness */

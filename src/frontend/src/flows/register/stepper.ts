@@ -7,19 +7,23 @@ export const registerStepper = ({
   current: "create" | "captcha" | "finish";
 }) => html`
   <div class="c-progress-container">
-    <div class="c-progress-stepper">
-      <div class="c-progress-step" aria-current=${current === "create"}>
-        <span>1</span><span class="haha t-weak">Create Passkey</span>
-      </div>
-      <div class="c-progress-divider"></div>
-      <div class="c-progress-step" aria-current=${current === "captcha"}>
-        <span>2</span><span class="haha t-weak">Complete CAPTCHA</span>
-      </div>
-      <div class="c-progress-divider"></div>
-      <div class="c-progress-step" aria-current=${current === "finish"}>
-        <span><i class="c-progress-checkmark-icon">${checkmarkIcon}</i></span
-        ><span class="haha t-weak">Get Internet Identity</span>
-      </div>
-    </div>
+    <ol class="c-progress-stepper">
+      <li class="c-progress-stepper__step" aria-current=${current === "create"}>
+        <span class="c-progress-stepper__label">Create Passkey</span>
+      </li>
+      <li
+        class="c-progress-stepper__step"
+        aria-current=${current === "captcha"}
+      >
+        <span class="c-progress-stepper__label">Complete CAPTCHA</span>
+      </li>
+      <li
+        class="c-progress-stepper__step c-progress-stepper__step--final"
+        aria-current=${current === "finish"}
+      >
+        <i class="c-progress-stepper__icon">${checkmarkIcon}</i>
+        <span class="c-progress-stepper__label">Get Internet Identity</span>
+      </li>
+    </ol>
   </div>
 `;
