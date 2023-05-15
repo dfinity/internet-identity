@@ -27,10 +27,7 @@ const savePasskeyTemplate = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <hgroup
-      style="margin-top: 7em;"
-      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-    >
+    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
         ${copy.select}
