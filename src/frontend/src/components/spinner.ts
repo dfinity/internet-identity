@@ -8,7 +8,9 @@ const showSpinnerTemplate = ({
   message: TemplateElement;
 }): TemplateResult => {
   return html`
-    <div class="l-container c-card c-card--highlight t-centered">
+    <div
+      class="l-container c-card c-card--highlight t-centered c-card--vertically-centered"
+    >
       <div class="c-spinner-wrapper">
         <div class="c-spinner">${spinner}</div>
       </div>
