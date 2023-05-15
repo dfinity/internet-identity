@@ -241,7 +241,9 @@
   --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
   --rs-stack-section--tight: var(--vs-stack);
 
-  --rs-list-counter-space: calc(var(--vs-inline) * 2);
+  --rs-list-counter-space: calc(var(--vs-inline) * 4);
+  --rs-list-bullet-space: calc(var(--vs-inline) * 2.2);
+
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
   --rs-list-parcel-bezel: var(--vs-bezel);
   --rs-list-gutter: var(--vs-gutter);
@@ -1518,13 +1520,20 @@ a:hover,
   margin: 0.5rem;
 }
 
+.c-list--numbered {
+  padding-left: var(--rs-list-counter-space);
+}
+
+.c-list--bulleted {
+  padding-left: var(--rs-list-bullet-space);
+}
+
 .c-list--bulleted {
   list-style-type: disc;
 }
 
 .c-list--bulleted li,
 .c-list--numbered li {
-  margin-left: var(--rs-list-counter-space);
   margin-top: var(--rs-list-item-stack);
 }
 
