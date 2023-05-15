@@ -133,7 +133,7 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
   i18n,
 
   knownDapp: {
-    name: "NNS Front-End Dapp",
+    name: "NNS Dapp",
     logo: "icons/nnsfront-enddapp_logo.webp",
   },
 });
