@@ -2153,7 +2153,7 @@ a.c-action-list__item {
   position: relative;
   display: flex;
   counter-reset: progress-step;
-  font-weight: bold;
+  font-weight: 500;
   text-align: center;
 }
 
@@ -2164,6 +2164,11 @@ a.c-action-list__item {
   align-items: center;
   flex: 1 1 0;
   position: relative;
+  color: var(--rc-button);
+}
+
+.c-progress-stepper__step[aria-current="true"] ~ .c-progress-stepper__step {
+  color: var(--rc-text);
 }
 
 .c-progress-stepper__step::before {
@@ -2180,7 +2185,7 @@ a.c-action-list__item {
 
   background: var(--rc-button);
   color: var(--rc-onButton);
-  border: calc(2 * var(--rs-line)) solid var(--rc-line-interaction);
+  border: var(--rs-line) solid var(--rc-line-interaction);
 
   width: var(--bullet-size);
   height: var(--bullet-size);
@@ -2220,7 +2225,7 @@ a.c-action-list__item {
   top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
   left: 0;
   right: 0;
-  border: var(--rs-line) solid var(--rc-line-interaction);
+  border-bottom: var(--rs-line) solid var(--rc-line-interaction);
 }
 
 .c-progress-stepper__step:first-child::after {
