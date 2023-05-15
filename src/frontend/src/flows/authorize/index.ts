@@ -5,7 +5,6 @@ import {
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon, spinner } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
-import { BASE_URL } from "$src/environment";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
@@ -68,9 +67,7 @@ export const authnTemplateAuthorize = ({
     name: string;
     logo: string;
   }) => html`
-    <img data-role="known-dapp-image" class="c-dapp-logo" src=${
-      BASE_URL + logo
-    }></img>
+    <img data-role="known-dapp-image" class="c-dapp-logo" src=${logo}></img>
     <div class="l-stack">
       ${h1(
         html`${copy.first_time_title_1}<br />${copy.first_time_title_join}
