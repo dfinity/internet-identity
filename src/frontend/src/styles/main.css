@@ -2153,7 +2153,15 @@ a.c-action-list__item {
   position: relative;
   z-index: 2;
 
-  background: var(--rc-button);
+  background: linear-gradient(
+    90deg,
+    var(--rc-button) 50%,
+    var(--rc-button-secondary) 50%
+  );
+
+  background-size: 200% 100%;
+  background-position: 0 0;
+
   color: var(--rc-onButton);
   border: var(--rs-line) solid var(--rc-line-interaction);
 
@@ -2162,6 +2170,9 @@ a.c-action-list__item {
 
   border-radius: 50%;
   line-height: 1;
+
+  transition: 400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
+    200ms color linear 200ms;
 }
 
 .c-progress-stepper__step[aria-current="true"]
@@ -2169,8 +2180,8 @@ a.c-action-list__item {
 .c-progress-stepper__step[aria-current="true"]
   ~ .c-progress-stepper__step
   .c-progress-stepper__icon {
-  background: var(--rc-button-secondary);
   color: var(--rc-onButton-secondary);
+  background-position: 100% 0;
 }
 
 .c-progress-stepper__icon path {
