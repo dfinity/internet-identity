@@ -2184,6 +2184,11 @@ a.c-action-list__item {
   background-position: 100% 0;
 }
 
+.c-progress-stepper__icon svg {
+  width: 0.65em;
+  height: 0.65em;
+}
+
 .c-progress-stepper__icon path {
   /* 
     this is a bit of a hack, the check-mark should not be a filled path
