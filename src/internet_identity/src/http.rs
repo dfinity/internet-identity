@@ -197,9 +197,9 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Max number of entries fetched by the archive per call.",
         )?;
         w.encode_gauge(
-            "internet_identity_archive_config_polling_interval",
-            config.entries_fetch_limit as f64,
-            "Polling interval (in ns) of the archive.",
+            "internet_identity_archive_config_polling_interval_seconds",
+            Duration::from_nanos(config.polling_interval_ns).as_secs() as f64,
+            "Polling interval of the archive to fetch new entries from II.",
         )?;
     }
     state::persistent_state(|persistent_state| {
