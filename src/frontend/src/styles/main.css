@@ -791,6 +791,14 @@ a:hover,
   border-radius: var(--rs-card-border-radius);
 }
 
+.c-card--vertically-centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+}
+
 /* c-cards pretty much fill up the screen on small devices so we disable rounding */
 @media (max-width: 512px) {
   .c-card {

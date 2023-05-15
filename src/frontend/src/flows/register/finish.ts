@@ -82,7 +82,7 @@ export const displayUserNumberTemplate = ({
         <h3 class="t-title">What is this number?</h3>
         <ul class="c-list c-list--bulleted">
           <li>Your Internet Identity</li>
-          <li>With your Internet Identity and your passkey, you will be able to create and sign into private accounts on IC dapps</li>
+          <li>With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</li>
         </ul>
       </aside>
 

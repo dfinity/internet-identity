@@ -15,6 +15,7 @@ import { loadIdentityBackground } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { showMessage, showMessagePage } from "$src/components/message";
 import { promptUserNumber } from "$src/components/promptUserNumber";
+import { showSpinnerPage } from "$src/components/spinner";
 import { toast } from "$src/components/toast";
 import { addDeviceSuccessPage } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { pollForTentativeDevicePage } from "$src/flows/addDevice/manage/pollForTentativeDevice";
@@ -439,6 +440,10 @@ const iiPages: Record<string, () => void> = {
   showMessage: () =>
     showMessagePage({
       message: "You may close this page.",
+    }),
+  showSpinner: () =>
+    showSpinnerPage({
+      message: "Good things come to those who wait.",
     }),
   addDeviceSuccess: () =>
     addDeviceSuccessPage({
