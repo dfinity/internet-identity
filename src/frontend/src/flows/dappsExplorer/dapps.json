@@ -195,5 +195,11 @@
     "oneLiner": "Web3's answer to TikTok with speculation on short video content",
     "link": "https://hotornot.wtf",
     "logo": "/img/showcase/hot_or_not_logo.webp"
+  },
+  {
+    "name": "Canistergeek",
+    "oneLiner": "IC canister management tool",
+    "link": "https://canistergeek.app",
+    "logo": "/img/showcase/canistergeek_logo.webp"
   }
 ]
