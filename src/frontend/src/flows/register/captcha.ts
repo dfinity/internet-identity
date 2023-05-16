@@ -1,5 +1,4 @@
 import { Challenge } from "$generated/internet_identity_types";
-import { spinner } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
 import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
@@ -51,7 +50,9 @@ export const promptCaptchaTemplate = <T>({
       class="c-captcha-placeholder c-spinner-wrapper"
       aria-label="Loading image"
     >
-      <div class="c-spinner">${spinner}</div>
+      <div class="c-spinner">
+        <i class="c-spinner__inner"></i>
+      </div>
     </div>
   `;
   const captchaImg = (base64: string): TemplateResult =>
