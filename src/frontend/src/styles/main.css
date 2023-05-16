@@ -2147,6 +2147,10 @@ a.c-action-list__item {
   display: block;
 }
 
+.c-progress-container {
+  margin-bottom: 5rem;
+}
+
 .c-progress-stepper {
   --bullet-size: 1.5em;
 
@@ -2257,6 +2261,8 @@ a.c-action-list__item {
   font-size: 1.2rem;
   line-height: 1.2;
   color: var(--rc-text-secondary);
+  width: min-content;
+  min-width: 8rem;
 }
 
 /** responsiveness */
