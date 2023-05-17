@@ -237,14 +237,12 @@ pub fn exit_device_registration_mode(
 pub fn add_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: Principal,
     anchor_number: types::AnchorNumber,
     device_data: &types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
-    call_candid_as(
+    call_candid(
         env,
         canister_id,
-        sender,
         "add_tentative_device",
         (anchor_number, device_data),
     )

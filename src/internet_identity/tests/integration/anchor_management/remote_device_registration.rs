@@ -63,13 +63,7 @@ fn can_register_remote_device() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-    let add_response = api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        &device_data_2(),
-    )?;
+    let add_response = api::add_tentative_device(&env, canister_id, user_number, &device_data_2())?;
     let verification_code = match add_response {
         AddTentativeDeviceResponse::AddedTentatively {
             verification_code, ..
@@ -99,13 +93,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-    let add_response = api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        &device_data_2(),
-    )?;
+    let add_response = api::add_tentative_device(&env, canister_id, user_number, &device_data_2())?;
     let verification_code = match add_response {
         AddTentativeDeviceResponse::AddedTentatively {
             verification_code, ..
@@ -149,7 +137,7 @@ fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
     let new_device = device_data_2();
-    api::add_tentative_device(&env, canister_id, principal_2(), user_number, &new_device)?;
+    api::add_tentative_device(&env, canister_id, user_number, &new_device)?;
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
 
     assert!(matches!(
@@ -171,13 +159,7 @@ fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
     api::exit_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-    let result = api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        &device_data_2(),
-    )?;
+    let result = api::add_tentative_device(&env, canister_id, user_number, &device_data_2())?;
 
     assert!(matches!(
         result,
@@ -196,13 +178,7 @@ fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallE
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
     env.advance_time(REGISTRATION_MODE_EXPIRATION + Duration::from_secs(1));
-    let result = api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        &device_data_2(),
-    )?;
+    let result = api::add_tentative_device(&env, canister_id, user_number, &device_data_2())?;
 
     assert!(matches!(
         result,
@@ -239,13 +215,7 @@ fn reject_verification_with_wrong_code() -> Result<(), CallError> {
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
-    api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number,
-        &device_data_2(),
-    )?;
+    api::add_tentative_device(&env, canister_id, user_number, &device_data_2())?;
     for expected_retries in (0..MAX_RETRIES).rev() {
         assert!(matches!(
             api::verify_tentative_device(
