@@ -12,8 +12,7 @@ runs:
       with:
         path: |
           /usr/local/bin/dfx
-          ~/.cache/dfinity
-        key: dfx-cache-${{ inputs.dfx-version }}-4
+        key: dfx-cache-${{ inputs.dfx-version }}-5
     - name: Install DFX
       shell: bash
       run: |
