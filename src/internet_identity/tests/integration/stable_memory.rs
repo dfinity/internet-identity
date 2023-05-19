@@ -413,7 +413,7 @@ fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
     let device = &devices[0];
     assert_eq!(format!("device #{}", random_anchor_offset), device.alias);
 
-    // Add a new anchor.
+    // Add a new anchor (this triggers an allocation of a new managed memory bucket).
     let anchor_offset = anchor_count;
     let next_anchor: AnchorNumber = first_anchor_number + anchor_offset;
     let new_anchor_number = flows::register_anchor_with(
@@ -431,6 +431,17 @@ fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
     assert_eq!(devices.len(), 1);
     let device = &devices[0];
     assert_eq!(format!("device #{}", anchor_offset), device.alias);
+
+    // Verify another random existing anchor (after addition of a new one).
+    let random_anchor_offset = rand::thread_rng().gen_range(0..anchor_count);
+    let random_anchor = first_anchor_number + random_anchor_offset;
+    let principal = test_setup_helpers::principal(random_anchor_offset as usize);
+    let devices =
+        api::get_anchor_info(&env, canister_id, principal, random_anchor)?.into_device_data();
+    assert_eq!(devices.len(), 2);
+    let device = &devices[0];
+    assert_eq!(format!("device #{}", random_anchor_offset), device.alias);
+
     Ok(())
 }
 
