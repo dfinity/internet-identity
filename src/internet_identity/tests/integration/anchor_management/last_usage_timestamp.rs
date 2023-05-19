@@ -280,18 +280,14 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
     assert_device_last_used(&anchor_info, &device_data_1().pubkey, expected_timestamp);
 
-    let verification_code = match api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_recovery_1(),
-        user_number,
-        &recovery_device_data_1(),
-    )? {
-        AddTentativeDeviceResponse::AddedTentatively {
-            verification_code, ..
-        } => verification_code,
-        _ => panic!("unexpected response"),
-    };
+    let verification_code =
+        match api::add_tentative_device(&env, canister_id, user_number, &recovery_device_data_1())?
+        {
+            AddTentativeDeviceResponse::AddedTentatively {
+                verification_code, ..
+            } => verification_code,
+            _ => panic!("unexpected response"),
+        };
 
     env.advance_time(Duration::from_secs(1));
     let expected_timestamp = time(&env);

@@ -13,3 +13,4 @@ mod latest_delegation_origins;
 mod rollback;
 mod stable_memory;
 mod upgrade;
+mod v2_api;
