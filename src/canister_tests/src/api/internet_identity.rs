@@ -6,6 +6,9 @@ use ic_test_state_machine_client::{
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types;
 
+/// The experimental v2 API
+pub mod api_v2;
+
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
