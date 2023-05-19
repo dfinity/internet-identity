@@ -23,19 +23,8 @@ use std::time::Duration;
 fn should_get_identity_info() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-
     let devices = sample_devices();
-    let recovery_devices = sample_recovery_devices();
-
-    let identity_number = create_identity_with_devices(
-        &env,
-        canister_id,
-        &devices
-            .iter()
-            .chain(recovery_devices.iter())
-            .cloned()
-            .collect::<Vec<_>>(),
-    );
+    let identity_number = create_identity_with_devices(&env, canister_id, &devices);
 
     let Some(IdentityInfoResponse::Ok(identity_info)) =
         api_v2::get_identity_info(&env, canister_id, devices[0].principal(), identity_number)? else {
@@ -43,10 +32,6 @@ fn should_get_identity_info() -> Result<(), CallError> {
     };
 
     assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &devices);
-    assert_eq_ignoring_last_authentication(
-        &identity_info.recovery_authn_methods,
-        &recovery_devices,
-    );
     assert_eq!(identity_info.authn_method_registration, None);
 
     // check that the last authentication timestamp is set correctly
@@ -178,12 +163,7 @@ fn sample_devices() -> Vec<DeviceData> {
         )])),
         ..DeviceData::auth_test_device()
     };
-
-    vec![device1, device2]
-}
-
-fn sample_recovery_devices() -> Vec<DeviceData> {
-    let device1 = DeviceData {
+    let device3 = DeviceData {
         pubkey: ByteBuf::from([2; 32]),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
@@ -193,8 +173,7 @@ fn sample_recovery_devices() -> Vec<DeviceData> {
         )])),
         ..DeviceData::auth_test_device()
     };
-
-    let device2 = DeviceData {
+    let device4 = DeviceData {
         pubkey: ByteBuf::from([3; 32]),
         purpose: Purpose::Recovery,
         credential_id: Some(ByteBuf::from("credential id 1")),
@@ -202,5 +181,5 @@ fn sample_recovery_devices() -> Vec<DeviceData> {
         ..DeviceData::auth_test_device()
     };
 
-    vec![device1, device2]
+    vec![device1, device2, device3, device4]
 }

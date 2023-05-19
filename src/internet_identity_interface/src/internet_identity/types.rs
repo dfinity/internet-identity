@@ -14,10 +14,10 @@ pub type Signature = ByteBuf;
 pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
 
-mod v2;
+mod api_v2;
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
-pub use v2::*;
+pub use api_v2::*;
 
 pub struct Base64(pub String);
 

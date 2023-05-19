@@ -1,4 +1,4 @@
-use crate::internet_identity::types::{CredentialId, MetadataEntry, PublicKey, Timestamp};
+use crate::internet_identity::types::{CredentialId, MetadataEntry, PublicKey, Purpose, Timestamp};
 use candid::{CandidType, Deserialize};
 use std::collections::HashMap;
 
@@ -41,6 +41,7 @@ pub struct AuthnMethodData {
     // - key_type: reduced to "platform", "cross_platform" on migration
     pub metadata: HashMap<String, MetadataEntry>,
     pub protection: AuthnMethodProtection,
+    pub purpose: Purpose,
     // last usage timestamp cannot be written and will always be ignored on write
     pub last_authentication: Option<Timestamp>,
 }
@@ -54,7 +55,6 @@ pub struct AuthnMethodRegistration {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
-    pub recovery_authn_methods: Vec<AuthnMethodData>,
     pub authn_method_registration: Option<AuthnMethodRegistration>,
 }
 

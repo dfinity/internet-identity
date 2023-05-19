@@ -104,6 +104,7 @@ impl From<DeviceWithUsage> for AuthnMethodData {
             authn_method,
             metadata,
             protection: AuthnMethodProtection::from(device_data.protection),
+            purpose: device_data.purpose,
             last_authentication: device_data.last_usage,
         }
     }

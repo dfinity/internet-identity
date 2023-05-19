@@ -504,16 +504,7 @@ mod v2_api {
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
-                .iter()
-                .filter(|device| device.purpose == Purpose::Authentication)
-                .cloned()
-                .map(AuthnMethodData::from)
-                .collect(),
-            recovery_authn_methods: anchor_info
-                .devices
-                .iter()
-                .filter(|device| device.purpose == Purpose::Recovery)
-                .cloned()
+                .into_iter()
                 .map(AuthnMethodData::from)
                 .collect(),
             authn_method_registration: anchor_info

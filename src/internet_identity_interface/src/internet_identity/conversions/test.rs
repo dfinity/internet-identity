@@ -77,6 +77,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
                 MetadataEntry::String("some data".to_string()),
             ),
         ]),
+        purpose: Purpose::Recovery,
         protection: AuthnMethodProtection::Protected,
         last_authentication: Some(123456789),
     };
@@ -99,6 +100,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey: pubkey.clone(),
             credential_id: credential_id.clone(),
         }),
+        purpose: Purpose::Authentication,
         metadata: HashMap::from([
             ("alias".to_string(), MetadataEntry::String(alias.clone())),
             (
@@ -126,6 +128,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey,
             credential_id,
         }),
+        purpose: Purpose::Authentication,
         metadata: HashMap::from([
             ("alias".to_string(), MetadataEntry::String(alias)),
             (

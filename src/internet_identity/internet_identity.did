@@ -339,8 +339,8 @@ type BufferedArchiveEntry = record {
     entry: blob;
 };
 
-// V2 specific types
-// These type are experimental and may change in the future.
+// API V2 specific types
+// WARNING: These type are experimental and may change in the future.
 
 type IdentityNumber = nat64;
 
@@ -377,6 +377,7 @@ type AuthnMethodProtection = variant {
 type AuthnMethodData = record {
     authn_method: AuthnMethod;
     protection: AuthnMethodProtection;
+    purpose: Purpose;
     // contains the following fields of the DeviceWithUsage type:
     // - alias
     // - origin
@@ -398,7 +399,6 @@ type AuthnMethodRegistrationInfo = record {
 
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
-    recovery_authn_methods: vec  AuthnMethodData;
     authn_data_registration: opt AuthnMethodRegistrationInfo;
 };
 
@@ -443,7 +443,8 @@ service : (opt InternetIdentityInit) -> {
     acknowledge_entries: (sequence_number: nat64) -> ();
 
     // V2 API
-    // The following methods are experimental and may change in the future.
+    // WARNING: The following methods are experimental and may change in the future.
+    //
     // Note: the responses of v2 API calls are `opt` for compatibility reasons
     // with future variant extensions.
     // A client decoding a response as `null` indicates outdated type information
