@@ -79,13 +79,7 @@ fn should_provide_authn_registration() -> Result<(), CallError> {
     };
 
     api::enter_device_registration_mode(&env, canister_id, device1.principal(), identity_number)?;
-    api::add_tentative_device(
-        &env,
-        canister_id,
-        Principal::anonymous(),
-        identity_number,
-        &device2,
-    )?;
+    api::add_tentative_device(&env, canister_id, identity_number, &device2)?;
 
     let Some(IdentityInfoResponse::Ok(identity_info)) =
         api_v2::get_identity_info(&env, canister_id, device1.principal(), identity_number)? else {
