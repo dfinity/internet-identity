@@ -41,6 +41,7 @@ export interface AuthnMethodData {
   'protection' : AuthnMethodProtection,
   'last_authentication' : [] | [Timestamp],
   'authn_method' : AuthnMethod,
+  'purpose' : Purpose,
 }
 export type AuthnMethodProtection = { 'unprotected' : null } |
   { 'protected' : null };
@@ -142,7 +143,6 @@ export interface IdentityAnchorInfo {
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
-  'recovery_authn_methods' : Array<AuthnMethodData>,
   'authn_data_registration' : [] | [AuthnMethodRegistrationInfo],
 }
 export type IdentityInfoResponse = { 'ok' : IdentityInfo };

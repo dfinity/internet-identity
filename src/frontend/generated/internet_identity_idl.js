@@ -173,6 +173,7 @@ export const idlFactory = ({ IDL }) => {
     'protection' : AuthnMethodProtection,
     'last_authentication' : IDL.Opt(Timestamp),
     'authn_method' : AuthnMethod,
+    'purpose' : Purpose,
   });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
@@ -180,7 +181,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
-    'recovery_authn_methods' : IDL.Vec(AuthnMethodData),
     'authn_data_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
