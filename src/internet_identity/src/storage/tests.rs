@@ -203,10 +203,12 @@ fn should_allocate_new_bucket_after_2048_anchors_v7() {
     // The 1st anchor allocates 1st bucket.
     add_test_anchor_data(&mut storage_v7, 1);
     assert_eq!(130, memory_v7.size()); // 2 header pages plus 1st bucket of 128 pages.
-                                       // With a total of 2048 anchors, we still have only one bucket.
+
+    // With a total of 2048 anchors, we still have only one bucket.
     add_test_anchor_data(&mut storage_v7, 2047);
     assert_eq!(130, memory_v7.size()); // 2 header pages plus 1st bucket of 128 pages.
-                                       // For the next anchor a new bucket of 128 pages will be allocated.
+
+    // For the next anchor a new bucket of 128 pages will be allocated.
     add_test_anchor_data(&mut storage_v7, 1);
     assert_eq!(258, memory_v7.size()); // 2 header pages plus two buckets of 128 pages each.
 }
