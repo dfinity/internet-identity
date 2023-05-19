@@ -8,6 +8,7 @@ use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
+use rand::Rng;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
@@ -379,9 +380,57 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
+    assert_eq!(7, stats.storage_layout_version);
+    Ok(())
+}
 
+#[test]
+fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+
+    // A memory bucket has 128 pages, each 64kB.  A single anchor occupies 4kB, hence we have
+    // 16 anchors per page, and 2048 per bucket.
+    // The stored persistent state has 2048 anchors starting from anchor_number = 1000.
+    let first_anchor_number: AnchorNumber = 1000;
+    let anchor_count = 2048;
+    restore_compressed_stable_memory(
+        &env,
+        canister_id,
+        "stable_memory/persistent_state_full_bucket_v7_2048_ids.bin.gz",
+    );
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     let stats = api::stats(&env, canister_id)?;
     assert_eq!(7, stats.storage_layout_version);
+
+    // Verify a random existing anchor.
+    let random_anchor_offset = rand::thread_rng().gen_range(0..anchor_count);
+    let random_anchor = first_anchor_number + random_anchor_offset;
+    let principal = test_setup_helpers::principal(random_anchor_offset as usize);
+    let devices =
+        api::get_anchor_info(&env, canister_id, principal, random_anchor)?.into_device_data();
+    assert_eq!(devices.len(), 2);
+    let device = &devices[0];
+    assert_eq!(format!("device #{}", random_anchor_offset), device.alias);
+
+    // Add a new anchor.
+    let anchor_offset = anchor_count;
+    let next_anchor: AnchorNumber = first_anchor_number + anchor_offset;
+    let new_anchor_number = flows::register_anchor_with(
+        &env,
+        canister_id,
+        test_setup_helpers::principal(anchor_offset as usize),
+        &test_setup_helpers::sample_unique_device(anchor_offset as usize),
+    );
+    assert_eq!(next_anchor, new_anchor_number);
+
+    // Verify the newly added anchor.
+    let principal = test_setup_helpers::principal(anchor_offset as usize);
+    let devices =
+        api::get_anchor_info(&env, canister_id, principal, next_anchor)?.into_device_data();
+    assert_eq!(devices.len(), 1);
+    let device = &devices[0];
+    assert_eq!(format!("device #{}", anchor_offset), device.alias);
     Ok(())
 }
 
