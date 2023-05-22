@@ -521,6 +521,24 @@ mod v2_api {
         };
         Some(IdentityInfoResponse::Ok(identity_info))
     }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_add(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Option<AuthnMethodAddResponse> {
+        let result = match DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| AuthnMethodAddResponse::InvalidMetadata(err.to_string()))
+        {
+            Ok(device) => {
+                add(identity_number, DeviceData::from(device));
+                AuthnMethodAddResponse::Ok
+            }
+            Err(err) => err,
+        };
+        Some(result)
+    }
 }
 
 fn main() {}
