@@ -66,6 +66,31 @@ export const idlFactory = ({ IDL }) => {
       'device_registration_timeout' : Timestamp,
     }),
   });
+  const IdentityNumber = IDL.Nat64;
+  const AuthnMethodProtection = IDL.Variant({
+    'unprotected' : IDL.Null,
+    'protected' : IDL.Null,
+  });
+  const WebAuthn = IDL.Record({
+    'pubkey' : PublicKey,
+    'credential_id' : CredentialId,
+  });
+  const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
+  const AuthnMethod = IDL.Variant({
+    'webauthn' : WebAuthn,
+    'pubkey' : PublicKeyAuthn,
+  });
+  const AuthnMethodData = IDL.Record({
+    'metadata' : MetadataMap,
+    'protection' : AuthnMethodProtection,
+    'last_authentication' : IDL.Opt(Timestamp),
+    'authn_method' : AuthnMethod,
+    'purpose' : Purpose,
+  });
+  const AuthnMethodAddResponse = IDL.Variant({
+    'ok' : IDL.Null,
+    'invalid_metadata' : IDL.Text,
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -154,27 +179,6 @@ export const idlFactory = ({ IDL }) => {
     'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
-  const IdentityNumber = IDL.Nat64;
-  const AuthnMethodProtection = IDL.Variant({
-    'unprotected' : IDL.Null,
-    'protected' : IDL.Null,
-  });
-  const WebAuthn = IDL.Record({
-    'pubkey' : PublicKey,
-    'credential_id' : CredentialId,
-  });
-  const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
-  const AuthnMethod = IDL.Variant({
-    'webauthn' : WebAuthn,
-    'pubkey' : PublicKeyAuthn,
-  });
-  const AuthnMethodData = IDL.Record({
-    'metadata' : MetadataMap,
-    'protection' : AuthnMethodProtection,
-    'last_authentication' : IDL.Opt(Timestamp),
-    'authn_method' : AuthnMethod,
-    'purpose' : Purpose,
-  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'authn_method' : IDL.Opt(AuthnMethodData),
@@ -255,6 +259,11 @@ export const idlFactory = ({ IDL }) => {
     'add_tentative_device' : IDL.Func(
         [UserNumber, DeviceData],
         [AddTentativeDeviceResponse],
+        [],
+      ),
+    'authn_method_add' : IDL.Func(
+        [IdentityNumber, AuthnMethodData],
+        [IDL.Opt(AuthnMethodAddResponse)],
         [],
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
