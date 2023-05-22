@@ -34,6 +34,23 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
+export type AuthnMethod = { 'webauthn' : WebAuthn } |
+  { 'pubkey' : PublicKeyAuthn };
+export type AuthnMethodAddResponse = { 'ok' : null } |
+  { 'invalid_metadata' : string };
+export interface AuthnMethodData {
+  'metadata' : MetadataMap,
+  'protection' : AuthnMethodProtection,
+  'last_authentication' : [] | [Timestamp],
+  'authn_method' : AuthnMethod,
+  'purpose' : Purpose,
+}
+export type AuthnMethodProtection = { 'unprotected' : null } |
+  { 'protected' : null };
+export interface AuthnMethodRegistrationInfo {
+  'expiration' : Timestamp,
+  'authn_method' : [] | [AuthnMethodData],
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -126,6 +143,12 @@ export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
+export interface IdentityInfo {
+  'authn_methods' : Array<AuthnMethodData>,
+  'authn_data_registration' : [] | [AuthnMethodRegistrationInfo],
+}
+export type IdentityInfoResponse = { 'ok' : IdentityInfo };
+export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
@@ -161,6 +184,7 @@ export interface OngoingActiveAnchorStats {
   'daily_active_anchors' : ActiveAnchorCounter,
 }
 export type PublicKey = Uint8Array | number[];
+export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
 export interface RateLimitConfig {
@@ -192,6 +216,10 @@ export type VerifyTentativeDeviceResponse = {
   { 'verified' : null } |
   { 'wrong_code' : { 'retries_left' : number } } |
   { 'no_device_to_verify' : null };
+export interface WebAuthn {
+  'pubkey' : PublicKey,
+  'credential_id' : CredentialId,
+}
 export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credential_id' : CredentialId,
@@ -202,6 +230,10 @@ export interface _SERVICE {
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
+  >,
+  'authn_method_add' : ActorMethod<
+    [IdentityNumber, AuthnMethodData],
+    [] | [AuthnMethodAddResponse]
   >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
@@ -217,6 +249,7 @@ export interface _SERVICE {
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
+  'identity_info' : ActorMethod<[IdentityNumber], [] | [IdentityInfoResponse]>,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'prepare_delegation' : ActorMethod<

@@ -10,5 +10,7 @@ pub mod conversions;
 /// Anchor activity counter trait and implementations thereof.
 pub mod anchor_activity_counter;
 
+/// Helpful implementations on the authentication method data type.
+pub mod authn_method;
 /// Helpful implementations on the device data type.
 pub mod device_data;

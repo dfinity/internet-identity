@@ -13,6 +13,7 @@ import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { registerStepper } from "./stepper";
 
 import { isNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
@@ -169,6 +170,7 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+      ${registerStepper({ current: "captcha" })}
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div

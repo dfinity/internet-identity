@@ -328,6 +328,8 @@ export class MainView extends View {
     await this.browser
       .$(`button[data-device="${deviceName}"][data-action='reset']`)
       .click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.browser.acceptAlert();
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {

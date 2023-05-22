@@ -66,6 +66,31 @@ export const idlFactory = ({ IDL }) => {
       'device_registration_timeout' : Timestamp,
     }),
   });
+  const IdentityNumber = IDL.Nat64;
+  const AuthnMethodProtection = IDL.Variant({
+    'unprotected' : IDL.Null,
+    'protected' : IDL.Null,
+  });
+  const WebAuthn = IDL.Record({
+    'pubkey' : PublicKey,
+    'credential_id' : CredentialId,
+  });
+  const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
+  const AuthnMethod = IDL.Variant({
+    'webauthn' : WebAuthn,
+    'pubkey' : PublicKeyAuthn,
+  });
+  const AuthnMethodData = IDL.Record({
+    'metadata' : MetadataMap,
+    'protection' : AuthnMethodProtection,
+    'last_authentication' : IDL.Opt(Timestamp),
+    'authn_method' : AuthnMethod,
+    'purpose' : Purpose,
+  });
+  const AuthnMethodAddResponse = IDL.Variant({
+    'ok' : IDL.Null,
+    'invalid_metadata' : IDL.Text,
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -154,6 +179,15 @@ export const idlFactory = ({ IDL }) => {
     'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
+  const AuthnMethodRegistrationInfo = IDL.Record({
+    'expiration' : Timestamp,
+    'authn_method' : IDL.Opt(AuthnMethodData),
+  });
+  const IdentityInfo = IDL.Record({
+    'authn_methods' : IDL.Vec(AuthnMethodData),
+    'authn_data_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
+  });
+  const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
   const UserKey = PublicKey;
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -227,6 +261,11 @@ export const idlFactory = ({ IDL }) => {
         [AddTentativeDeviceResponse],
         [],
       ),
+    'authn_method_add' : IDL.Func(
+        [IdentityNumber, AuthnMethodData],
+        [IDL.Opt(AuthnMethodAddResponse)],
+        [],
+      ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -250,6 +289,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
+    'identity_info' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(IdentityInfoResponse)],
+        [],
+      ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
