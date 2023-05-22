@@ -39,12 +39,10 @@ export async function runInBrowser(
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
     // the browser window prompts the user to allow or block clipboard access).
     // https://stackoverflow.com/questions/53669639/enable-clipboard-in-automated-tests-with-protractor-and-webdriver
-    // XXX: the "any" cast is needed because our webdriverio version only expects numbers, strings
-    // or bools: https://github.com/webdriverio/webdriverio/issues/9924
     prefs: {
       "profile.content_settings.exceptions.clipboard": {
         "*": { last_modified: Date.now(), setting: 1 },
-      } as any,
+      },
     },
   };
 
