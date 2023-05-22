@@ -230,15 +230,9 @@ jobs:
           echo "now: $commit_now"
 
       - uses: ./.github/actions/bootstrap
-      - name: Install nextest (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
+      - name: Install nextest
         run: |
-          curl -LsSf https://get.nexte.st/latest/mac | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-
-      - name: Install nextest (ubuntu)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+          curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
       # Rustup only installs cargo on the first call, so we use a dedicated step to get a good idea of how
       # time is spent in each step separately
@@ -358,15 +352,9 @@ jobs:
         run: |
           brew install openssl@3
 
-      - name: Download nextest (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
+      - name: Download nextest
         run: |
-          curl -LsSf https://get.nexte.st/latest/mac | tar zxf -
-
-      - name: Download nextest (ubuntu)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          curl -LsSf https://get.nexte.st/latest/linux | tar zxf -
+          curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
       - name: 'Download nextest test archive'
         uses: actions/download-artifact@v3
