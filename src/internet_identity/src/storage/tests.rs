@@ -83,12 +83,12 @@ fn should_recover_header_from_memory_v7() {
 }
 
 fn add_test_anchor_data<M: Memory + Clone>(storage: &mut Storage<M>, number_of_anchors: usize) {
-    for i in 0..number_of_anchors {
+    for _ in 0..number_of_anchors {
         let (anchor_number, mut anchor) = storage
             .allocate_anchor()
             .expect("Failure allocating an anchor.");
         anchor
-            .add_device(sample_unique_device(i))
+            .add_device(sample_unique_device(anchor_number as usize))
             .expect("Failure adding a device");
         storage.write(anchor_number, anchor.clone()).unwrap();
     }
@@ -189,6 +189,28 @@ fn should_correctly_migrate_memory_from_v6_to_v7_2000_anchors() {
 #[test]
 fn should_correctly_migrate_memory_from_v6_to_v7_4000_anchors() {
     test_migrate_memory_from_v6_to_v7(4000);
+}
+
+#[test]
+fn should_allocate_new_bucket_after_2048_anchors_v7() {
+    let (id_range_lo, id_range_hi) = (12345, 678910);
+    let memory_v7 = VectorMemory::default();
+    let mut storage_v7 = Storage::new(
+        (id_range_lo, id_range_hi),
+        wrap_memory(memory_v7.clone(), SupportedVersion::V7),
+    );
+
+    // The 1st anchor allocates 1st bucket.
+    add_test_anchor_data(&mut storage_v7, 1);
+    assert_eq!(130, memory_v7.size()); // 2 header pages plus 1st bucket of 128 pages.
+
+    // With a total of 2048 anchors, we still have only one bucket.
+    add_test_anchor_data(&mut storage_v7, 2047);
+    assert_eq!(130, memory_v7.size()); // 2 header pages plus 1st bucket of 128 pages.
+
+    // For the next anchor a new bucket of 128 pages will be allocated.
+    add_test_anchor_data(&mut storage_v7, 1);
+    assert_eq!(258, memory_v7.size()); // 2 header pages plus two buckets of 128 pages each.
 }
 
 #[test]
