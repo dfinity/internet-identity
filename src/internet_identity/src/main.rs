@@ -202,7 +202,9 @@ fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 #[query]
 #[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    trap_if_not_authenticated(anchor_number);
+    let Ok(_) = check_authentication(anchor_number) else {
+        trap(&format!("{} could not be authenticated.", caller()));
+    };
     delegation::get_principal(anchor_number, frontend)
 }
 
@@ -233,7 +235,9 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    trap_if_not_authenticated(anchor_number);
+    let Ok(_) = check_authentication(anchor_number) else {
+        trap(&format!("{} could not be authenticated.", caller()));
+    };
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
 }
 
@@ -426,7 +430,9 @@ fn update_root_hash() {
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
 fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
-    let (mut anchor, device_key) = trap_if_not_authenticated(anchor_number);
+    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
+        trap(&format!("{} could not be authenticated.", caller()));
+    };
     let domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
@@ -449,7 +455,9 @@ fn authenticated_anchor_operation<R>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
 ) -> R {
-    let (mut anchor, device_key) = trap_if_not_authenticated(anchor_number);
+    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
+        trap(&format!("{} could not be authenticated.", caller()));
+    };
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
@@ -469,8 +477,8 @@ fn authenticated_anchor_operation<R>(
 }
 
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
-/// Traps if the caller is not authenticated.
-fn trap_if_not_authenticated(anchor_number: AnchorNumber) -> (Anchor, DeviceKey) {
+/// Returns an error if the caller cannot be authenticated.
+fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKey), ()> {
     let anchor = state::anchor(anchor_number);
     let caller = caller();
 
@@ -482,10 +490,55 @@ fn trap_if_not_authenticated(anchor_number: AnchorNumber) -> (Anchor, DeviceKey)
                     .is_ok()
             })
         {
-            return (anchor.clone(), device.pubkey.clone());
+            return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
-    trap(&format!("{} could not be authenticated.", caller))
+    Err(())
+}
+
+/// New v2 API that aims to eventually replace the current API.
+/// The v2 API:
+/// * uses terminology more aligned with the front-end and is more consistent in its naming.
+/// * uses opt variant return types consistently in order to by able to extend / change return types
+///   in the future without breaking changes.
+mod v2_api {
+    use super::*;
+
+    #[update]
+    #[candid_method]
+    fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
+        authenticate_and_record_activity(identity_number);
+        let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let identity_info = IdentityInfo {
+            authn_methods: anchor_info
+                .devices
+                .into_iter()
+                .map(AuthnMethodData::from)
+                .collect(),
+            authn_method_registration: anchor_info
+                .device_registration
+                .map(AuthnMethodRegistration::from),
+        };
+        Some(IdentityInfoResponse::Ok(identity_info))
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_add(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Option<AuthnMethodAddResponse> {
+        let result = match DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| AuthnMethodAddResponse::InvalidMetadata(err.to_string()))
+        {
+            Ok(device) => {
+                add(identity_number, DeviceData::from(device));
+                AuthnMethodAddResponse::Ok
+            }
+            Err(err) => err,
+        };
+        Some(result)
+    }
 }
 
 fn main() {}

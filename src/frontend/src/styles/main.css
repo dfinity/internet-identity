@@ -2164,6 +2164,124 @@ a.c-action-list__item {
   display: block;
 }
 
+.c-progress-container {
+  margin-bottom: 5rem;
+}
+
+.c-progress-stepper {
+  --bullet-size: 1.5em;
+
+  position: relative;
+  display: flex;
+  counter-reset: progress-step;
+  font-weight: 500;
+  text-align: center;
+}
+
+.c-progress-stepper__step {
+  counter-increment: progress-step;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  position: relative;
+  color: var(--rc-button);
+}
+
+.c-progress-stepper__step[aria-current="true"] ~ .c-progress-stepper__step {
+  color: var(--rc-text);
+}
+
+.c-progress-stepper__step::before {
+  content: counter(progress-step);
+}
+
+.c-progress-stepper__step::before,
+.c-progress-stepper__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+
+  background: linear-gradient(
+    90deg,
+    var(--rc-button) 50%,
+    var(--rc-button-secondary) 50%
+  );
+
+  background-size: 200% 100%;
+  background-position: 0 0;
+
+  color: var(--rc-onButton);
+  border: var(--rs-line) solid var(--rc-line-interaction);
+
+  width: var(--bullet-size);
+  height: var(--bullet-size);
+
+  border-radius: 50%;
+  line-height: 1;
+
+  transition: 400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
+    200ms color linear 200ms;
+}
+
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step::before,
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step
+  .c-progress-stepper__icon {
+  color: var(--rc-onButton-secondary);
+  background-position: 100% 0;
+}
+
+.c-progress-stepper__icon svg {
+  width: 0.65em;
+  height: 0.65em;
+}
+
+.c-progress-stepper__icon path {
+  /* 
+    this is a bit of a hack, the check-mark should not be a filled path
+    but a stroke.
+  */
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-width: var(--rs-line);
+}
+
+.c-progress-stepper__step--final::before {
+  display: none;
+}
+
+/* the line between the steps */
+.c-progress-stepper__step::after {
+  content: "";
+  z-index: 1;
+  position: absolute;
+  top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
+  left: 0;
+  right: 0;
+  border-bottom: var(--rs-line) solid var(--rc-line-interaction);
+}
+
+.c-progress-stepper__step:first-child::after {
+  left: 50%;
+}
+
+.c-progress-stepper__step:last-child::after {
+  right: 50%;
+}
+
+.c-progress-stepper__label {
+  margin-top: 0.6em;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--rc-text-secondary);
+  width: min-content;
+  min-width: 8rem;
+}
+
 /** responsiveness */
 
 @media (max-width: 512px) {

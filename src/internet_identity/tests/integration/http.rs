@@ -332,13 +332,7 @@ fn metrics_device_registration_mode() -> Result<(), CallError> {
     // long after expiry (we don't want this test to break, if we change the registration mode expiration)
     env.advance_time(Duration::from_secs(365 * 24 * 60 * 60));
     // make an update call related to tentative devices so that registration mode expiry gets checked
-    api::add_tentative_device(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number_2,
-        &device_data_2(),
-    )?;
+    api::add_tentative_device(&env, canister_id, user_number_2, &device_data_2())?;
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) =
