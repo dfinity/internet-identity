@@ -143,7 +143,7 @@ pub enum AuthnMethodConversionError {
     InvalidMetadataType {
         key: String,
         expected_type: String,
-        actual_type: String,
+        actual_value: String,
     },
 }
 
@@ -153,10 +153,10 @@ impl Display for AuthnMethodConversionError {
             AuthnMethodConversionError::InvalidMetadataType {
                 key,
                 expected_type,
-                actual_type,
+                actual_value: actual_type,
             } => write!(
                 f,
-                "Invalid metadata type for key '{}': expected {}, got {}",
+                "Invalid metadata type for key '{}': expected {}, got value {}",
                 key, expected_type, actual_type
             ),
         }
@@ -183,18 +183,13 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
                 .remove(key)
                 .map(|entry| match entry {
                     MetadataEntry::String(value) => Ok(value),
-                    MetadataEntry::Bytes(_) => {
+                    value @ MetadataEntry::Bytes(_) | value @ MetadataEntry::Map(_) => {
                         Err(AuthnMethodConversionError::InvalidMetadataType {
                             key: key.to_string(),
                             expected_type: "string".to_string(),
-                            actual_type: "bytes".to_string(),
+                            actual_value: format!("{:?}", value),
                         })
                     }
-                    MetadataEntry::Map(_) => Err(AuthnMethodConversionError::InvalidMetadataType {
-                        key: key.to_string(),
-                        expected_type: "string".to_string(),
-                        actual_type: "map".to_string(),
-                    }),
                 })
                 .transpose()
         }

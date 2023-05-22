@@ -64,7 +64,7 @@ fn should_fail_to_convert_to_device_on_bad_metadata_types() {
             AuthnMethodConversionError::InvalidMetadataType {
                 key: key.to_string(),
                 expected_type: "string".to_string(),
-                actual_type: "bytes".to_string(),
+                actual_value: "Bytes([1, 2, 3])".to_string(),
             }
         );
     }
