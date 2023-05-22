@@ -114,6 +114,7 @@ export const mkAnchorInput = ({
         @drop=${inputFilter(isDigits, onBadInput)}
         @focusout=${inputFilter(isDigits, onBadInput)}
         @keypress=${onKeyPress}
+        inputmode="numeric"
       />
       <div ${ref(divRef)} class="c-card c-input__error is-hidden"></div>
     </label>
