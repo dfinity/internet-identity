@@ -1437,7 +1437,7 @@ a:hover,
   height: 70%;
 }
 
-.c-origin-preview__logo--backgorund {
+.c-origin-preview__logo--background {
   filter: blur(20px);
   opacity: 0.5;
 }
