@@ -688,16 +688,38 @@ a:hover,
   width: 100%;
 }
 
-.c-icon--ok [fill] {
-  fill: var(--rc-positive);
+.c-icon--ok,
+.c-icon--warning,
+.c-icon--error {
+  background: var(--bgc);
+  border-radius: 50%;
 }
 
-.c-icon--warning [fill] {
-  fill: var(--rc-warning);
+.c-icon--ok svg,
+.c-icon--warning svg,
+.c-icon--error svg {
+  transform: translate(-50%, -50%) scale(0.6);
 }
 
+.c-icon--ok [fill],
+.c-icon--warning [fill],
 .c-icon--error [fill] {
-  fill: var(--rc-error);
+  fill: var(--onBgc);
+}
+
+.c-icon--ok {
+  --bgc: var(--rc-positive);
+  --onBgc: var(--rc-onPositive);
+}
+
+.c-icon--warning {
+  --bgc: var(--rc-warning);
+  --onBgc: var(--rc-onWarning);
+}
+
+.c-icon--error {
+  --bgc: var(--rc-error);
+  --onBgc: var(--rc-onError);
 }
 
 .c-icon--lock svg {
@@ -861,30 +883,32 @@ a:hover,
   }
 }
 
+.c-card__label {
+  font-size: 1rem;
+  /* opacity only on text color not the full element */
+  color: color-mix(in srgb-linear, var(--rc-text), var(--rc-card) 30%);
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.c-card__label + .t-title {
+  margin-top: 0.2em;
+}
+
+/** can be replaced with :has(.c-card__icon) as soon as it's supported
+by all browsers (FF is missing) */
+.c-card__label--hasIcon {
+  border-bottom: var(--rs-line) solid var(--rc-line);
+  padding-bottom: calc(0.5 * var(--rs-card-bezel));
+  margin-bottom: calc(0.5 * var(--rs-card-bezel));
+}
+
 .c-card__icon {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 10%;
+  width: 1.8em;
   aspect-ratio: 1;
-  z-index: var(--z-foreground);
-  transform: translate(40%, -40%);
-}
-
-.c-card__icon svg {
-  position: absolute;
-  display: block;
-  width: 100%;
-  height: 100%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.c-card__icon svg * {
-  fill: var(--rc-background);
-  stroke-width: 3px;
-  stroke: var(--rc-error);
+  height: auto;
+  vertical-align: middle;
 }
 
 .c-card__close {
