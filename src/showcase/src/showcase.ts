@@ -15,6 +15,7 @@ import { loadIdentityBackground } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { showMessage, showMessagePage } from "$src/components/message";
 import { promptUserNumber } from "$src/components/promptUserNumber";
+import { showSpinnerPage } from "$src/components/spinner";
 import { toast } from "$src/components/toast";
 import { addDeviceSuccessPage } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { pollForTentativeDevicePage } from "$src/flows/addDevice/manage/pollForTentativeDevice";
@@ -35,6 +36,7 @@ import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
 import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
 import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { displayUserNumberPage } from "$src/flows/register/finish";
 import { savePasskeyPage } from "$src/flows/register/passkey";
@@ -133,7 +135,7 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
   i18n,
 
   knownDapp: {
-    name: "NNS Front-End Dapp",
+    name: "NNS Dapp",
     logo: "icons/nnsfront-enddapp_logo.webp",
   },
 });
@@ -387,6 +389,12 @@ const iiPages: Record<string, () => void> = {
     }),
   loader: () =>
     withLoader(() => new Promise(() => showMessage({ message: "Loading..." }))),
+  addPhrase: () =>
+    addPhrasePage({
+      ok: () => console.log("ok"),
+      skip: () => console.log("skip"),
+      i18n,
+    }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
       operation: "create",
@@ -432,6 +440,10 @@ const iiPages: Record<string, () => void> = {
   showMessage: () =>
     showMessagePage({
       message: "You may close this page.",
+    }),
+  showSpinner: () =>
+    showSpinnerPage({
+      message: "Good things come to those who wait.",
     }),
   addDeviceSuccess: () =>
     addDeviceSuccessPage({

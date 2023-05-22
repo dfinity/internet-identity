@@ -488,6 +488,51 @@ fn trap_if_not_authenticated(anchor_number: AnchorNumber) -> (Anchor, DeviceKey)
     trap(&format!("{} could not be authenticated.", caller))
 }
 
+/// New v2 API that aims to eventually replace the current API.
+/// The v2 API:
+/// * uses terminology more aligned with the front-end and is more consistent in its naming.
+/// * uses opt variant return types consistently in order to by able to extend / change return types
+///   in the future without breaking changes.
+mod v2_api {
+    use super::*;
+
+    #[update]
+    #[candid_method]
+    fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
+        authenticate_and_record_activity(identity_number);
+        let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let identity_info = IdentityInfo {
+            authn_methods: anchor_info
+                .devices
+                .into_iter()
+                .map(AuthnMethodData::from)
+                .collect(),
+            authn_method_registration: anchor_info
+                .device_registration
+                .map(AuthnMethodRegistration::from),
+        };
+        Some(IdentityInfoResponse::Ok(identity_info))
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_add(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Option<AuthnMethodAddResponse> {
+        let result = match DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| AuthnMethodAddResponse::InvalidMetadata(err.to_string()))
+        {
+            Ok(device) => {
+                add(identity_number, DeviceData::from(device));
+                AuthnMethodAddResponse::Ok
+            }
+            Err(err) => err,
+        };
+        Some(result)
+    }
+}
+
 fn main() {}
 
 // Order dependent: do not move above any function annotated with #[candid_method]!

@@ -571,17 +571,22 @@ export class AuthenticatedConnection extends Connection {
     hostname: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
-  ): Promise<GetDelegationResponse> => {
-    console.log(
-      `get_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
-    );
-    const actor = await this.getActor();
-    return await actor.get_delegation(
-      this.userNumber,
-      hostname,
-      sessionKey,
-      timestamp
-    );
+  ): Promise<GetDelegationResponse | { error: unknown }> => {
+    try {
+      console.log(
+        `get_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+      );
+      const actor = await this.getActor();
+      return await actor.get_delegation(
+        this.userNumber,
+        hostname,
+        sessionKey,
+        timestamp
+      );
+    } catch (e: unknown) {
+      console.error(e);
+      return { error: e };
+    }
   };
 }
 

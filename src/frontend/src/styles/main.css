@@ -241,7 +241,9 @@
   --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
   --rs-stack-section--tight: var(--vs-stack);
 
-  --rs-list-counter-space: calc(var(--vs-inline) * 2);
+  --rs-list-counter-space: calc(var(--vs-inline) * 4);
+  --rs-list-bullet-space: calc(var(--vs-inline) * 2.2);
+
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
   --rs-list-parcel-bezel: var(--vs-bezel);
   --rs-list-gutter: var(--vs-gutter);
@@ -789,6 +791,14 @@ a:hover,
   border-radius: var(--rs-card-border-radius);
 }
 
+.c-card--vertically-centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+}
+
 /* c-cards pretty much fill up the screen on small devices so we disable rounding */
 @media (max-width: 512px) {
   .c-card {
@@ -1287,10 +1297,18 @@ a:hover,
 }
 
 .c-input {
+  --bezel-top: var(--rs-input-bezel-narrow);
+  --bezel-bottom: var(--rs-input-bezel-narrow);
+  --bezel-left: calc(3 * var(--rs-input-bezel));
+  --bezel-right: calc(3 * var(--rs-input-bezel));
+
+  --bezel: var(--bezel-top) var(--bezel-right) var(--bezel-bottom)
+    var(--bezel-left);
+
   position: relative;
   display: block;
   width: 100%;
-  padding: var(--rs-input-bezel-narrow) calc(3 * var(--rs-input-bezel));
+  padding: var(--bezel);
   margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
@@ -1338,14 +1356,14 @@ a:hover,
 }
 
 .c-input--spacious {
-  padding: calc(2 * var(--rs-input-bezel)) calc(3 * var(--rs-input-bezel))
-    calc(1.8 * var(--rs-input-bezel));
+  --bezel-top: calc(2 * var(--rs-input-bezel));
+  --bezel-bottom: calc(1.8 * var(--rs-input-bezel));
 }
 
 .c-input--vip {
+  --bezel-top: calc(1.2 * var(--rs-input-bezel));
+  --bezel-bottom: var(--rs-input-bezel);
   font-size: 1.4em;
-  padding: calc(1.2 * var(--rs-input-bezel)) calc(3 * var(--rs-input-bezel))
-    var(--rs-input-bezel);
 }
 
 .c-input--vip::placeholder {
@@ -1359,21 +1377,24 @@ a:hover,
 }
 
 .c-input--textarea {
-  padding: calc(3 * var(--rs-input-bezel));
+  --bezel: calc(3 * var(--rs-input-bezel));
 }
 
 .c-input--textarea-narrow {
-  padding: calc(1.5 * var(--rs-input-bezel));
+  --bezel: calc(1.5 * var(--rs-input-bezel));
 }
 
 .c-input--recovery {
-  padding: calc(1.5 * var(--rs-input-bezel));
+  --bezel: calc(1.5 * var(--rs-input-bezel));
+
   background-color: var(--rc-line);
 }
 
 .c-input--with-button {
-  padding: calc(1.5 * var(--rs-input-bezel)) calc(1.5 * var(--rs-input-bezel))
-    calc(3 * var(--rs-input-bezel));
+  --bezel-top: calc(1.5 * var(--rs-input-bezel));
+  --bezel-bottom: calc(3 * var(--rs-input-bezel));
+  --bezel-left: calc(1.5 * var(--rs-input-bezel));
+  --bezel-right: calc(1.5 * var(--rs-input-bezel));
 }
 
 .c-input--id {
@@ -1382,8 +1403,8 @@ a:hover,
 .c-input--id__wrap {
   min-height: 10em;
   position: relative;
-  margin: calc(-4 * var(--rs-input-bezel)) calc(-3 * var(--rs-input-bezel));
-  padding: calc(4 * var(--rs-input-bezel));
+  margin: calc(-1 * var(--bezel));
+  padding: var(--bezel);
   overflow: hidden;
   border-radius: var(--rs-input-border-radius);
 }
@@ -1394,7 +1415,8 @@ a:hover,
   height: 100%;
   width: 100%;
   z-index: 0;
-  margin: calc(-4 * var(--rs-input-bezel));
+  top: 0;
+  left: 0;
 }
 
 .c-dapp-logo {
@@ -1423,7 +1445,8 @@ a:hover,
 
 .c-input--icon {
   position: relative;
-  padding-bottom: calc(4 * var(--rs-input-bezel));
+  --bezel-top: calc(4 * var(--rs-input-bezel));
+
   margin-bottom: calc(var(--rs-input-stack) * 2);
 }
 
@@ -1518,13 +1541,20 @@ a:hover,
   margin: 0.5rem;
 }
 
+.c-list--numbered {
+  padding-left: var(--rs-list-counter-space);
+}
+
+.c-list--bulleted {
+  padding-left: var(--rs-list-bullet-space);
+}
+
 .c-list--bulleted {
   list-style-type: disc;
 }
 
 .c-list--bulleted li,
 .c-list--numbered li {
-  margin-left: var(--rs-list-counter-space);
   margin-top: var(--rs-list-item-stack);
 }
 
@@ -2117,6 +2147,124 @@ a.c-action-list__item {
   display: block;
 }
 
+.c-progress-container {
+  margin-bottom: 5rem;
+}
+
+.c-progress-stepper {
+  --bullet-size: 1.5em;
+
+  position: relative;
+  display: flex;
+  counter-reset: progress-step;
+  font-weight: 500;
+  text-align: center;
+}
+
+.c-progress-stepper__step {
+  counter-increment: progress-step;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  position: relative;
+  color: var(--rc-button);
+}
+
+.c-progress-stepper__step[aria-current="true"] ~ .c-progress-stepper__step {
+  color: var(--rc-text);
+}
+
+.c-progress-stepper__step::before {
+  content: counter(progress-step);
+}
+
+.c-progress-stepper__step::before,
+.c-progress-stepper__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+
+  background: linear-gradient(
+    90deg,
+    var(--rc-button) 50%,
+    var(--rc-button-secondary) 50%
+  );
+
+  background-size: 200% 100%;
+  background-position: 0 0;
+
+  color: var(--rc-onButton);
+  border: var(--rs-line) solid var(--rc-line-interaction);
+
+  width: var(--bullet-size);
+  height: var(--bullet-size);
+
+  border-radius: 50%;
+  line-height: 1;
+
+  transition: 400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
+    200ms color linear 200ms;
+}
+
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step::before,
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step
+  .c-progress-stepper__icon {
+  color: var(--rc-onButton-secondary);
+  background-position: 100% 0;
+}
+
+.c-progress-stepper__icon svg {
+  width: 0.65em;
+  height: 0.65em;
+}
+
+.c-progress-stepper__icon path {
+  /* 
+    this is a bit of a hack, the check-mark should not be a filled path
+    but a stroke.
+  */
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-width: var(--rs-line);
+}
+
+.c-progress-stepper__step--final::before {
+  display: none;
+}
+
+/* the line between the steps */
+.c-progress-stepper__step::after {
+  content: "";
+  z-index: 1;
+  position: absolute;
+  top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
+  left: 0;
+  right: 0;
+  border-bottom: var(--rs-line) solid var(--rc-line-interaction);
+}
+
+.c-progress-stepper__step:first-child::after {
+  left: 50%;
+}
+
+.c-progress-stepper__step:last-child::after {
+  right: 50%;
+}
+
+.c-progress-stepper__label {
+  margin-top: 0.6em;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--rc-text-secondary);
+  width: min-content;
+  min-width: 8rem;
+}
+
 /** responsiveness */
 
 @media (max-width: 512px) {
@@ -2126,12 +2274,11 @@ a.c-action-list__item {
     padding: 0;
   }
   .l-container {
-    margin: 0;
     width: 100%;
 
     max-width: none;
     /* centers the container and adds a bit of space to make sure the footer does not stick to it */
-    margin: 0 0 2rem;
+    margin: 0 0 4rem;
   }
 }
 

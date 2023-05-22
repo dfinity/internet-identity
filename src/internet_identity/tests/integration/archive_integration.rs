@@ -595,8 +595,8 @@ mod pull_entries_tests {
             assigned_user_number_range: None,
             archive_config: Some(ArchiveConfig {
                 module_hash: archive_wasm_hash(&ARCHIVE_WASM),
-                entries_buffer_limit: 10_000,
-                polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+                entries_buffer_limit: 20_000,
+                polling_interval_ns: Duration::from_secs(3).as_nanos() as u64,
                 entries_fetch_limit: 10,
             }),
             canister_creation_cycles_cost: Some(0),
@@ -611,7 +611,7 @@ mod pull_entries_tests {
         assert_metric(
             &get_metrics(&env, ii_canister),
             "internet_identity_archive_config_entries_buffer_limit",
-            10_000f64,
+            20_000f64,
         );
         assert_metric(
             &get_metrics(&env, ii_canister),
@@ -620,8 +620,8 @@ mod pull_entries_tests {
         );
         assert_metric(
             &get_metrics(&env, ii_canister),
-            "internet_identity_archive_config_polling_interval",
-            10f64,
+            "internet_identity_archive_config_polling_interval_seconds",
+            3f64,
         );
         Ok(())
     }

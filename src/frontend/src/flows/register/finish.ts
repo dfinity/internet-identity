@@ -15,6 +15,7 @@ import {
 import { OmitParams } from "$src/utils/utils";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { registerStepper } from "./stepper";
 
 export const displayUserNumberTemplate = ({
   onContinue,
@@ -29,10 +30,14 @@ export const displayUserNumberTemplate = ({
   scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
-  const displayUserNumberSlot = html`<hgroup
+  const displayUserNumberSlot = html`
+
+  ${registerStepper({ current: "finish" })}
+<hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
   >
+
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
       </h1>
@@ -82,7 +87,7 @@ export const displayUserNumberTemplate = ({
         <h3 class="t-title">What is this number?</h3>
         <ul class="c-list c-list--bulleted">
           <li>Your Internet Identity</li>
-          <li>With your Internet Identity and your passkey, you will be able to create and sign into private accounts on IC dapps</li>
+          <li>With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</li>
         </ul>
       </aside>
 
