@@ -11,7 +11,7 @@ import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
-import { Chan, shuffleArray } from "$src/utils/utils";
+import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
@@ -140,7 +140,6 @@ export const authFlowAuthorize = async (
   connection: Connection
 ): Promise<never> => {
   const i18n = new I18n();
-  const dapps = shuffleArray(getDapps());
   const copy = i18n.i18n(copyJson);
 
   showSpinner({ message: copy.starting_authentication });
@@ -153,7 +152,7 @@ export const authFlowAuthorize = async (
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
-          knownDapp: dapps.find(
+          knownDapp: getDapps().find(
             (dapp) => new URL(dapp.link).origin === authContext.requestOrigin
           ),
         })
