@@ -1146,7 +1146,7 @@ a:hover,
   width: min(12rem, 25%);
   aspect-ratio: 1;
   color: var(--rc-loading);
-  
+
   top: 50%;
   left: 50%;
 
