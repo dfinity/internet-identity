@@ -11,8 +11,8 @@ import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
-import { Chan, unreachable } from "$src/utils/utils";
-import { html, render, TemplateResult } from "lit-html";
+import { Chan } from "$src/utils/utils";
+import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { authenticationProtocol } from "./postMessageInterface";
 
@@ -138,14 +138,11 @@ export const authnTemplateAuthorize = ({
  */
 export const authFlowAuthorize = async (
   connection: Connection
-): Promise<void> => {
+): Promise<never> => {
   const i18n = new I18n();
-  const container = document.getElementById("pageContent") as HTMLElement;
   const copy = i18n.i18n(copyJson);
-  const dapps = getDapps();
-  render(html`<h1>${copy.starting_authentication}</h1>`, container);
-  const loadingMessage = (msg: TemplateElement) =>
-    showSpinner({ message: msg });
+
+  showSpinner({ message: copy.starting_authentication });
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
       const authSuccess = await authenticateBox(
@@ -155,7 +152,7 @@ export const authFlowAuthorize = async (
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
-          knownDapp: dapps.find(
+          knownDapp: getDapps().find(
             (dapp) => new URL(dapp.link).origin === authContext.requestOrigin
           ),
         })
@@ -163,6 +160,8 @@ export const authFlowAuthorize = async (
 
       // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
       // one. The exact flow depends on the device they use.
+      // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
+      // may have already closed the II window
       if (!authSuccess.newAnchor) {
         await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
       }
@@ -177,48 +176,42 @@ export const authFlowAuthorize = async (
         primaryButton: copy.continue,
       }),
 
-    onProgress: (status) => {
-      switch (status) {
-        case "waiting":
-          loadingMessage(copy.waiting_for_auth_data);
-          break;
-        case "validating":
-          loadingMessage(copy.validating_auth_data);
-          break;
-        case "fetching delegation":
-          loadingMessage(copy.finalizing_auth);
-          break;
-        default:
-          unreachable(status);
-          break;
-      }
-    },
+    onProgress: (status) =>
+      showSpinner({
+        message: {
+          waiting: copy.waiting_for_auth_data,
+          validating: copy.validating_auth_data,
+          "fetching delegation": copy.finalizing_auth,
+        }[status],
+      }),
   });
 
-  switch (result) {
-    case "orphan":
-      await displayError({
-        title: copy.invalid_data,
-        message: copy.no_auth_data,
-        primaryButton: copy.go_home,
-      });
+  if (result === "orphan") {
+    await displayError({
+      title: copy.invalid_data,
+      message: copy.no_auth_data,
+      primaryButton: copy.go_home,
+    });
 
-      location.hash = "";
-      window.location.reload();
-      break;
-    case "failure":
-      render(html`<h1>${copy.auth_failed}</h1>`, container);
-      break;
-    case "success":
-      showMessage({
-        role: "notify-auth-success",
-        message: copy.auth_success,
-      });
-      break;
-    default:
-      unreachable(result);
-      break;
+    location.hash = "";
+    return window.location.reload() as never;
   }
+
+  if (result === "failure") {
+    showMessage({
+      message: copy.auth_failed,
+    });
+    throw new Error("Authentication failure");
+  }
+
+  result satisfies "success";
+  showMessage({
+    role: "notify-auth-success",
+    message: copy.auth_success,
+  });
+  return await new Promise((_) => {
+    /* halt */
+  });
 };
 
 /** Options to display a "chasm" in the authbox */
