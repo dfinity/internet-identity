@@ -96,8 +96,10 @@ export const authnTemplateManage = ({
 };
 
 /* the II authentication flow */
-export const authFlowManage = async (connection: Connection, i18n: I18n) => {
+export const authFlowManage = async (connection: Connection) => {
+  const i18n = new I18n();
   const dapps = shuffleArray(getDapps());
+
   const identityBackground = loadIdentityBackground();
   // Go through the login flow, potentially creating an anchor.
   const {

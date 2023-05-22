@@ -6,7 +6,6 @@ import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerT
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage, renderManageWarmup } from "./flows/manage";
-import { I18n } from "./i18n";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -137,7 +136,7 @@ const init = async () => {
     void authFlowAuthorize(connection);
   } else {
     // The default flow
-    void authFlowManage(connection, new I18n());
+    void authFlowManage(connection);
   }
 };
 
