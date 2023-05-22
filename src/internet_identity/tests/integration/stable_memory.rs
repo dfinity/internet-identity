@@ -391,17 +391,25 @@ fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
 
     // A memory bucket has 128 pages, each 64kB.  A single anchor occupies 4kB, hence we have
     // 16 anchors per page, and 2048 per bucket.
-    // The stored persistent state has 2048 anchors starting from anchor_number = 1000.
+    // The stored persistent state has 2047 anchors starting from anchor_number = 1000.
+    // It has only 2047 (and not 2048) anchors to leave space for storing `PersistentState`
+    // structure during the pre-upgrade hook (otherwise a second bucket gets allocated
+    // for `PersistentState` although all the 2048 anchors fit into the first bucket).
     let first_anchor_number: AnchorNumber = 1000;
-    let anchor_count = 2048;
+    let anchor_count = 2047;
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/persistent_state_full_bucket_v7_2048_ids.bin.gz",
+        "stable_memory/persistent_state_full_bucket_v7_2047_ids.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     let stats = api::stats(&env, canister_id)?;
     assert_eq!(7, stats.storage_layout_version);
+
+    // Check the number of allocated memory pages before expansion.
+    let metrics = get_metrics(&env, canister_id);
+    let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+    assert_eq!(stable_memory_pages, 130f64);
 
     // Verify a random existing anchor.
     let random_anchor_offset = rand::thread_rng().gen_range(0..anchor_count);
@@ -413,7 +421,8 @@ fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
     let device = &devices[0];
     assert_eq!(format!("device #{}", random_anchor_offset), device.alias);
 
-    // Add a new anchor (this triggers an allocation of a new managed memory bucket).
+    // Add a new anchor -- this DOES NOT trigger an allocation of a new managed memory bucket.
+    // as we're filling up the first bucket to 2048 anchors.
     let anchor_offset = anchor_count;
     let next_anchor: AnchorNumber = first_anchor_number + anchor_offset;
     let new_anchor_number = flows::register_anchor_with(
@@ -431,6 +440,36 @@ fn should_grow_persistent_state_v7_by_bucket_size() -> Result<(), CallError> {
     assert_eq!(devices.len(), 1);
     let device = &devices[0];
     assert_eq!(format!("device #{}", anchor_offset), device.alias);
+
+    // Verify the number of allocated memory pages didn't grow yet.
+    let metrics = get_metrics(&env, canister_id);
+    let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+    assert_eq!(stable_memory_pages, 130f64);
+
+    // Add another anchor -- this DOES trigger an allocation of a new managed memory bucket.
+    let anchor_offset = anchor_count + 1;
+    let next_anchor: AnchorNumber = first_anchor_number + anchor_offset;
+    let new_anchor_number = flows::register_anchor_with(
+        &env,
+        canister_id,
+        test_setup_helpers::principal(anchor_offset as usize),
+        &test_setup_helpers::sample_unique_device(anchor_offset as usize),
+    );
+    assert_eq!(next_anchor, new_anchor_number);
+
+    // Verify the newly added anchor.
+    let principal = test_setup_helpers::principal(anchor_offset as usize);
+    let devices =
+        api::get_anchor_info(&env, canister_id, principal, next_anchor)?.into_device_data();
+    assert_eq!(devices.len(), 1);
+    let device = &devices[0];
+    assert_eq!(format!("device #{}", anchor_offset), device.alias);
+
+    // Verify the number of allocated memory pages grew as expected (i.e. by 128 pages).
+    assert_eq!(next_anchor, new_anchor_number);
+    let metrics = get_metrics(&env, canister_id);
+    let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+    assert_eq!(stable_memory_pages, 258f64);
 
     // Verify another random existing anchor (after addition of a new one).
     let random_anchor_offset = rand::thread_rng().gen_range(0..anchor_count);
