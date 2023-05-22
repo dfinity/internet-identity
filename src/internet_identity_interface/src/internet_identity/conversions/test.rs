@@ -1,3 +1,4 @@
+use crate::internet_identity::conversions::AuthnMethodConversionError;
 use crate::internet_identity::types as ii_types;
 use crate::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, DeviceProtection, DeviceWithUsage,
@@ -35,12 +36,35 @@ fn should_convert_device_data_to_authn_method_data() {
         let converted = AuthnMethodData::from(device_with_usage.clone());
         assert_eq!(converted, expected_authn_method_data);
 
-        let converted = AuthnMethodData::from(DeviceData::from(device_with_usage));
         assert_eq!(
-            converted,
+            AuthnMethodData::from(DeviceData::from(device_with_usage.clone())),
             AuthnMethodData {
                 last_authentication: None,
                 ..expected_authn_method_data
+            }
+        );
+
+        let converted_back = DeviceWithUsage::try_from(converted).unwrap();
+        assert_eq!(converted_back, device_with_usage);
+    }
+}
+
+#[test]
+fn should_fail_to_convert_to_device_on_bad_metadata_types() {
+    const KEYS: &[&str] = &["alias", "origin", "key_type"];
+
+    for key in KEYS {
+        let (_, mut authn_method) = test_conversion_pairs().pop().unwrap();
+        authn_method.metadata.insert(
+            key.to_string(),
+            MetadataEntry::Bytes(ByteBuf::from([1, 2, 3])),
+        );
+        assert_eq!(
+            DeviceWithUsage::try_from(authn_method).unwrap_err(),
+            AuthnMethodConversionError::InvalidMetadataType {
+                key: key.to_string(),
+                expected_type: "string".to_string(),
+                actual_value: "Bytes([1, 2, 3])".to_string(),
             }
         );
     }
@@ -102,7 +126,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         }),
         purpose: Purpose::Authentication,
         metadata: HashMap::from([
-            ("alias".to_string(), MetadataEntry::String(alias.clone())),
+            ("alias".to_string(), MetadataEntry::String(alias)),
             (
                 "key_type".to_string(),
                 MetadataEntry::String("cross_platform".to_string()),
@@ -117,6 +141,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
     };
 
     let device3 = DeviceWithUsage {
+        alias: "".to_string(),
         metadata: Some(HashMap::from([(
             "some_key2".to_string(),
             MetadataEntry::String("some data".to_string()),
@@ -130,7 +155,6 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         }),
         purpose: Purpose::Authentication,
         metadata: HashMap::from([
-            ("alias".to_string(), MetadataEntry::String(alias)),
             (
                 "key_type".to_string(),
                 MetadataEntry::String("cross_platform".to_string()),

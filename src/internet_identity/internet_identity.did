@@ -382,6 +382,8 @@ type AuthnMethodData = record {
     // - alias
     // - origin
     // - key_type: reduced to "platform", "cross_platform" on migration
+    // Note: for compatibility reasons with the v1 API, the entries above (if present)
+    // must be of the `string` variant. This restriction may be lifted in the future.
     metadata: MetadataMap;
     last_authentication: opt Timestamp;
 };
@@ -404,6 +406,11 @@ type IdentityInfo = record {
 
 type IdentityInfoResponse = variant {
     ok: IdentityInfo;
+};
+
+type AuthnMethodAddResponse = variant {
+    ok;
+    invalid_metadata: text;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -453,4 +460,8 @@ service : (opt InternetIdentityInit) -> {
     // Returns information about the identity with the given number.
     // Requires authentication.
     identity_info: (IdentityNumber) -> (opt IdentityInfoResponse);
+
+    // Adds a new authentication method to the identity.
+    // Requires authentication.
+    authn_method_add: (IdentityNumber, AuthnMethodData) -> (opt AuthnMethodAddResponse);
 }

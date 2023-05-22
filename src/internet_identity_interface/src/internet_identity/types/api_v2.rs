@@ -63,3 +63,11 @@ pub enum IdentityInfoResponse {
     #[serde(rename = "ok")]
     Ok(IdentityInfo),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AuthnMethodAddResponse {
+    #[serde(rename = "ok")]
+    Ok,
+    #[serde(rename = "invalid_metadata")]
+    InvalidMetadata(String),
+}
