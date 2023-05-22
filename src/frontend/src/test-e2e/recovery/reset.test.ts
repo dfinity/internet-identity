@@ -19,7 +19,7 @@ test("Reset recovery phrase", async () => {
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
-    await browser.acceptAlert();
+
     const _seedPhrase = await FLOWS.readSeedPhrase(browser);
     await mainView.waitForDisplay();
   });
@@ -44,7 +44,7 @@ test("Recover access, after reset", async () => {
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
-    await browser.acceptAlert();
+
     const seedPhrase = await FLOWS.readSeedPhrase(browser);
     await mainView.waitForDisplay();
 
@@ -85,7 +85,7 @@ test("Canceling reset keeps old phrase", async () => {
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
-    await browser.acceptAlert();
+
     // Instead of reading the new seed phrase, cancel the flow
     await browser.$(`button[data-action='cancel']`).click();
     await mainView.waitForDisplay();
@@ -137,7 +137,7 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
-    await browser.acceptAlert();
+
     const _seedPhrase = await FLOWS.readSeedPhrase(browser);
     await mainView.waitForDisplay();
   });
