@@ -36,6 +36,8 @@ export interface ArchiveInfo {
 }
 export type AuthnMethod = { 'webauthn' : WebAuthn } |
   { 'pubkey' : PublicKeyAuthn };
+export type AuthnMethodAddResponse = { 'ok' : null } |
+  { 'invalid_metadata' : string };
 export interface AuthnMethodData {
   'metadata' : MetadataMap,
   'protection' : AuthnMethodProtection,
@@ -228,6 +230,10 @@ export interface _SERVICE {
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
+  >,
+  'authn_method_add' : ActorMethod<
+    [IdentityNumber, AuthnMethodData],
+    [] | [AuthnMethodAddResponse]
   >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
