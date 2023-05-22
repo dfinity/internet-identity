@@ -161,7 +161,12 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
  */
 function readScreenshotsConfig(): {
   mobileEmulation?: {
-    deviceName: string;
+    deviceMetrics: {
+      width: number;
+      height: number;
+      pixelRatio: number;
+      touch: boolean;
+    };
   };
 } {
   const screenshotsType = process.env["SCREENSHOTS_TYPE"];
@@ -169,7 +174,13 @@ function readScreenshotsConfig(): {
     case "mobile":
       return {
         mobileEmulation: {
-          deviceName: "iPhone SE",
+          // Emulate a small modern device
+          deviceMetrics: {
+            width: 360,
+            height: 640,
+            pixelRatio: 4,
+            touch: true,
+          },
         },
       };
       break;
