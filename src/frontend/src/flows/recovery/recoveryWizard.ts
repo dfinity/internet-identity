@@ -1,3 +1,4 @@
+import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
@@ -98,7 +99,10 @@ export const recoveryWizard = async (
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  if ((await connection.lookupRecovery(userNumber)).length === 0) {
+  const recoveries = await withLoader(() =>
+    connection.lookupRecovery(userNumber)
+  );
+  if (recoveries.length === 0) {
     const doAdd = await addPhrase();
     if (doAdd !== "skip") {
       doAdd satisfies "ok";

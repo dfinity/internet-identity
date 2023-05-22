@@ -6,6 +6,9 @@ use ic_test_state_machine_client::{
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types;
 
+/// The experimental v2 API
+pub mod api_v2;
+
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
@@ -237,14 +240,12 @@ pub fn exit_device_registration_mode(
 pub fn add_tentative_device(
     env: &StateMachine,
     canister_id: CanisterId,
-    sender: Principal,
     anchor_number: types::AnchorNumber,
     device_data: &types::DeviceData,
 ) -> Result<types::AddTentativeDeviceResponse, CallError> {
-    call_candid_as(
+    call_candid(
         env,
         canister_id,
-        sender,
         "add_tentative_device",
         (anchor_number, device_data),
     )
