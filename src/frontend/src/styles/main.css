@@ -1143,16 +1143,14 @@ a:hover,
 
 .c-spinner {
   position: absolute;
-  width: 25%;
+  width: min(12rem, 25%);
   aspect-ratio: 1;
   color: var(--rc-loading);
+  
   top: 50%;
   left: 50%;
+
   transform: translate(-50%, -50%);
-
-  width: 12rem;
-  height: 12rem;
-
   animation: rotate 3s linear infinite;
 }
 
