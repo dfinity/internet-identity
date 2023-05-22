@@ -70,7 +70,7 @@ export const authnTemplateAuthorize = ({
   }) => html`
     <div class="c-origin-preview c-origin-preview--header">
       <img
-        class="c-origin-preview__logo c-origin-preview__logo--backgorund"
+        class="c-origin-preview__logo c-origin-preview__logo--background"
         src=${logo}
         alt=""
       />
