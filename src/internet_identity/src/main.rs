@@ -536,6 +536,16 @@ mod v2_api {
 
     #[update]
     #[candid_method]
+    fn authn_method_remove(
+        identity_number: IdentityNumber,
+        public_key: PublicKey,
+    ) -> Option<AuthnMethodRemoveResponse> {
+        remove(identity_number, public_key);
+        Some(AuthnMethodRemoveResponse::Ok)
+    }
+
+    #[update]
+    #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntry>,

@@ -2,8 +2,8 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{call_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodAddResponse, AuthnMethodData, IdentityInfoResponse, IdentityMetadataReplaceResponse,
-    IdentityNumber, MetadataEntry,
+    AuthnMethodAddResponse, AuthnMethodData, AuthnMethodRemoveResponse, IdentityInfoResponse,
+    IdentityMetadataReplaceResponse, IdentityNumber, MetadataEntry, PublicKey,
 };
 use std::collections::HashMap;
 
@@ -19,6 +19,23 @@ pub fn identity_info(
         sender,
         "identity_info",
         (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn identity_metadata_replace(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    metadata: &HashMap<String, MetadataEntry>,
+) -> Result<Option<IdentityMetadataReplaceResponse>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "identity_metadata_replace",
+        (identity_number, metadata),
     )
     .map(|(x,)| x)
 }
@@ -40,19 +57,19 @@ pub fn authn_method_add(
     .map(|(x,)| x)
 }
 
-pub fn identity_metadata_replace(
+pub fn authn_method_remove(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    metadata: &HashMap<String, MetadataEntry>,
-) -> Result<Option<IdentityMetadataReplaceResponse>, CallError> {
+    public_key: &PublicKey,
+) -> Result<Option<AuthnMethodRemoveResponse>, CallError> {
     call_candid_as(
         env,
         canister_id,
         sender,
-        "identity_metadata_replace",
-        (identity_number, metadata),
+        "authn_method_remove",
+        (identity_number, public_key),
     )
     .map(|(x,)| x)
 }
