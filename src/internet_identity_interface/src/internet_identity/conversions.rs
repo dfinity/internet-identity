@@ -166,6 +166,14 @@ impl Display for AuthnMethodConversionError {
 impl TryFrom<AuthnMethodData> for DeviceWithUsage {
     type Error = AuthnMethodConversionError;
 
+    /// Conversion from `AuthnMethodData` to `DeviceWithUsage`
+    /// This conversion can fail because `AuthnMethodData` stores some explicit fields of `DeviceWithUsage`
+    /// in metadata which is more permissive with regards to the type of the values.
+    /// In particular the following metadata entries must be of the `string` variant for the conversion to succeed:
+    ///  - alias
+    ///  - origin
+    ///  - key_type
+    /// This restriction may be lifted in the future.
     fn try_from(mut data: AuthnMethodData) -> Result<Self, Self::Error> {
         fn remove_metadata_string(
             data: &mut AuthnMethodData,

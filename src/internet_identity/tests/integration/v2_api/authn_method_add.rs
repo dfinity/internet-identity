@@ -1,3 +1,6 @@
+use crate::v2_api::authn_method_test_helpers::{
+    eq_ignoring_last_authentication, test_authn_method,
+};
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
@@ -39,7 +42,10 @@ fn should_add_authn_method() -> Result<(), CallError> {
         api_v2::identity_info(&env, canister_id, principal, identity_number)? else {
         panic!("Expected identity info to be returned");
     };
-    assert!(&identity_info.authn_methods[1].eq_ignoring_last_authentication(&authn_method_2));
+    assert!(eq_ignoring_last_authentication(
+        &identity_info.authn_methods[1],
+        &authn_method_2
+    ));
     Ok(())
 }
 
@@ -99,7 +105,7 @@ fn sample_authn_method(i: u8) -> AuthnMethodData {
         authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
             pubkey: ByteBuf::from(vec![i; 32]),
         }),
-        ..AuthnMethodData::test_authn_method()
+        ..test_authn_method()
     }
 }
 
