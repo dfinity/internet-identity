@@ -1422,10 +1422,27 @@ a:hover,
   left: 0;
 }
 
-.c-dapp-logo {
-  width: 30%;
-  margin: auto;
-  display: block;
+.c-origin-preview {
+  position: relative;
+  height: 15rem;
+}
+
+.c-origin-preview--header {
+  margin-top: -1.5rem;
+}
+
+.c-origin-preview__logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  height: 70%;
+}
+
+.c-origin-preview__logo--background {
+  filter: blur(20px);
+  opacity: 0.5;
 }
 
 .c-input--id__caption,
