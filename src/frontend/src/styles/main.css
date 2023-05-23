@@ -289,6 +289,8 @@
 
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
+
+  --rs-footer-height: 4rem;
 }
 
 /* II) Optional Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -1052,6 +1054,7 @@ a:hover,
   left: 0;
   right: 0;
   z-index: var(--z-toasts);
+  margin: 0 auto calc(var(--rs-footer-height) + 0.5rem);
 }
 
 .c-toast + .c-toast {
@@ -1457,10 +1460,27 @@ a:hover,
   left: 0;
 }
 
-.c-dapp-logo {
-  width: 30%;
-  margin: auto;
-  display: block;
+.c-origin-preview {
+  position: relative;
+  height: 15rem;
+}
+
+.c-origin-preview--header {
+  margin-top: -1.5rem;
+}
+
+.c-origin-preview__logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  height: 70%;
+}
+
+.c-origin-preview__logo--background {
+  filter: blur(20px);
+  opacity: 0.5;
 }
 
 .c-input--id__caption,
@@ -2316,7 +2336,7 @@ a.c-action-list__item {
 
     max-width: none;
     /* centers the container and adds a bit of space to make sure the footer does not stick to it */
-    margin: 0 0 4rem;
+    margin: 0 0 var(--rs-footer-height);
   }
 }
 

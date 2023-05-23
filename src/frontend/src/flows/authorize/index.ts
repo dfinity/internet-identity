@@ -68,7 +68,19 @@ export const authnTemplateAuthorize = ({
     name: string;
     logo: string;
   }) => html`
-    <img data-role="known-dapp-image" class="c-dapp-logo" src=${logo}></img>
+    <div class="c-origin-preview c-origin-preview--header">
+      <img
+        class="c-origin-preview__logo c-origin-preview__logo--background"
+        src=${logo}
+        alt=""
+      />
+      <img
+        data-role="known-dapp-image"
+        class="c-origin-preview__logo"
+        src=${logo}
+        alt=""
+      />
+    </div>
     <div class="l-stack">
       ${h1(
         html`${copy.first_time_title_1}<br />${copy.first_time_title_join}
@@ -76,7 +88,7 @@ export const authnTemplateAuthorize = ({
       )}
       ${mkChasm({ message: isAltOriginOf(action) ?? strong(origin) })}
       <p class="t-lead l-stack">${copy.first_time_subtitle}</p>
-   </div>
+    </div>
   `;
 
   // Variation: the dapp is NOT known and user is using II for the first time

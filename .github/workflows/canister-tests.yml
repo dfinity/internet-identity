@@ -195,19 +195,12 @@ jobs:
 
   # Run the tests, user the output of the docker build as Wasm module
   # (note: this runs _all_ cargo tests)
-  canister-tests:
+  canister-tests-build:
     runs-on: ${{ matrix.os }}
-    needs: [docker-build-ii, docker-build-archive]
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
-      # Required by the ic-test-state-machine
-      - name: Install openssl (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew install openssl@3
-
       - uses: actions/checkout@v3
         with:
           # Pull a deep copy so that we can set meaningful timestamps across builds, based on the commit history
@@ -237,6 +230,9 @@ jobs:
           echo "now: $commit_now"
 
       - uses: ./.github/actions/bootstrap
+      - name: Install nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
       # Rustup only installs cargo on the first call, so we use a dedicated step to get a good idea of how
       # time is spent in each step separately
@@ -264,8 +260,10 @@ jobs:
       - name: Cargo cache (recovery)
         if: steps.cache-dot-cargo.outputs.cache-hit == 'true'
         run: |
+          mtime=$(date +%Y%m%d%H%M.%S)
+          echo "timestamp of restored .cargo: $mtime"
           rsync -av "/tmp/dot-cargo/" "$HOME/.cargo/"
-          find "$HOME/.cargo/" -exec touch -t "$(date +%Y%m%d%H%M.%S)" {} +
+          find "$HOME/.cargo/" -exec touch -t "$mtime" {} +
 
       - name: Cargo cache (build)
         run: cargo fetch --locked
@@ -285,8 +283,10 @@ jobs:
       - name: Dependencies (recovery)
         if: steps.cache-deps.outputs.cache-hit == 'true'
         run: |
+          # add a second to offset rounding errors in fractional seconds
+          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+1S' || '--date=+1seconds' }} +%Y%m%d%H%M.%S)
+          echo "timestamp of restored target (deps): $mtime"
           rsync -av "/tmp/target-deps/" "$PWD/target/"
-          mtime=$(date +%Y%m%d%H%M.%S)
           find ./target -exec touch -t "$mtime" {} +
           # Here we touch the cache itself so that when diffing (with --compare-dest)
           # rsync knows what is _newer_ than what we've restored here
@@ -312,8 +312,10 @@ jobs:
       - name: Canister code (recover)
         if: steps.cache-canister.outputs.cache-hit == 'true'
         run: |
-          # Set timestamps so that --compare-dest below knows what (not) to save
-          find /tmp/target-canister -exec touch -t "$(date +%Y%m%d%H%M.%S)" {} +
+          # add 2 seconds to offset rounding errors in fractional seconds (compared to the above fiddling of mtime)
+          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+2S' || '--date=+2seconds' }} +%Y%m%d%H%M.%S)
+          echo "timestamp of restored target (canister): $mtime"
+          find /tmp/target-canister -exec touch -t "$mtime" {} +
           rsync -av /tmp/target-canister/ "$PWD/target/"
 
       - name: Canister code (build)
@@ -326,11 +328,45 @@ jobs:
         run: rsync -av --compare-dest="/tmp/target-deps/" "$PWD/target/" "/tmp/target-canister/"
 
       # Build the tests
-      - name: Build
+      - name: Build test archive
         run: |
           git checkout ${{ steps.git_info.outputs.commit_now }}
-          cargo build --tests --release --frozen
+          cargo nextest archive --archive-file canister-tests-${{ matrix.os }}.tar.zst --release
 
+      - name: 'Upload canister test archive'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: canister-tests-${{ matrix.os }}.tar.zst
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ./canister-tests-${{ matrix.os }}.tar.zst
+
+  canister-tests-run:
+    runs-on: ${{ matrix.os }}
+    needs: [canister-tests-build, docker-build-ii, docker-build-archive]
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        partition: ['1/3', '2/3', '3/3']
+    steps:
+      - uses: actions/checkout@v3
+
+      # Required by the ic-test-state-machine
+      - name: Install openssl (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew install openssl@3
+
+      - name: Download nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
+
+      - name: 'Download nextest test archive'
+        uses: actions/download-artifact@v3
+        with:
+          name: canister-tests-${{ matrix.os }}.tar.zst
+          path: .
       - name: Download ic-test-state-machine binary
         run: |
           uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -362,7 +398,11 @@ jobs:
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
-          cargo test --release
+          
+          # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
+          # even if tests are added or removed. The tradeoff is that the balancing might be slightly worse, but we have enough
+          # tests that it should not be a big issue.
+          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
 

@@ -1,7 +1,7 @@
 import { closeIcon, externalLinkIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
-import { renderPage } from "$src/utils/lit-html";
+import { mount, renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
 import { DappDescription } from "./dapps";
@@ -14,15 +14,18 @@ const dappsExplorerTemplate = ({
   dapps,
   i18n,
   back,
+  scrollToTop = false,
 }: {
   dapps: DappDescription[];
   i18n: I18n;
   back: () => void;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }) => {
   const copy = i18n.i18n(copyJson);
 
   const pageContent = html`
-    <hgroup>
+    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
       <h1 class="t-title">${copy.try_these_dapps}</h1>
     </hgroup>
@@ -95,6 +98,6 @@ export const dappsExplorer = ({
 }): Promise<void> => {
   const i18n = new I18n();
   return new Promise((resolve) =>
-    dappsExplorerPage({ dapps, i18n, back: () => resolve() })
+    dappsExplorerPage({ dapps, i18n, back: () => resolve(), scrollToTop: true })
   );
 };
