@@ -1,4 +1,3 @@
-import { spinner } from "$src/components/icons";
 import { renderPage, TemplateElement } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
@@ -12,9 +11,11 @@ const showSpinnerTemplate = ({
       class="l-container c-card c-card--highlight t-centered c-card--vertically-centered"
     >
       <div class="c-spinner-wrapper">
-        <div class="c-spinner">${spinner}</div>
+        <div class="c-spinner">
+          <i class="c-spinner__inner"></i>
+        </div>
       </div>
-      <p class="t-lead t-paragraph l-stack">${message}</p>
+      <p class="t-lead t-paragraph" style="margin-top: 6rem">${message}</p>
     </div>
   `;
 };
