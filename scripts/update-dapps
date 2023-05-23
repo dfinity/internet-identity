@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+## Figure out the latest commit on the portal
+
+latest_portal_commit=$(curl -L \
+  --silent \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/dfinity/portal/commits?per_page=1 \
+  | jq -cMr '.[0].sha')
+if [ -z "$latest_portal_commit" ]
+then
+    echo "Could not get latest portal commit"
+    exit 1
+fi
+echo "Latest portal commit: $latest_portal_commit"
+
+portal_url="https://raw.githubusercontent.com/dfinity/portal/$latest_portal_commit"
+echo using portal url "$portal_url"
+
+## Download the dapps list
+# A prefix used in the portal's dapps logo list
+portal_logo_prefix="img/showcase"
+# The actual path prefix where logos are stored
+portal_filepath_prefix="static/img/showcase"
+# The path where we save logos in II
+ii_logo_prefix="src/frontend/assets/icons"
+
+# The path where we save the list of dapps in II
+dapps_json="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
+
+# Here we fetch the list of dapps, select the ones that use II, exclude II itself, fix up the
+# logo name, and then only keep attributes that we care about.
+curl \
+    --location \
+    --show-error \
+    --silent \
+    "$portal_url/showcase.json" \
+    | jq \
+        --arg portal_logo_prefix "$portal_logo_prefix" \
+    '[ .[]
+        | select(.usesInternetIdentity == true)
+        | select(.name != "Internet Identity")
+        | .logo |= sub("^/" + $portal_logo_prefix + "/"; "")
+        | with_entries(
+            select(
+                [.key]
+                | inside(["name", "website", "oneLiner", "logo"])
+            )
+        )
+    ]' \
+    > "$dapps_json"
+
+## Download the logos
+# First, wipe existing logos, if any
+if find "$ii_logo_prefix" -mindepth 1 -delete
+then
+    echo "wiped logos in $ii_logo_prefix"
+else
+    echo "no logos to wipe in $ii_logo_prefix"
+fi
+
+while read -r logo
+do
+    # For each dapp in the dapp list, download its logo
+    portal_logo_path="$portal_filepath_prefix/$logo"
+    ii_logo_path="$ii_logo_prefix/$logo"
+    echo "downloading '$logo'"
+    echo " 'dfinity/portal:$portal_logo_path' -> '$ii_logo_path'"
+    echo "$portal_url/$portal_logo_path"
+    curl \
+        --fail \
+        --location \
+        --show-error \
+        --silent \
+        "$portal_url/$portal_logo_path" \
+        --output "src/frontend/assets/icons/$logo"
+
+done < <(jq -cMr <"$dapps_json" '.[] | .logo')
