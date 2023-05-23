@@ -260,8 +260,10 @@ jobs:
       - name: Cargo cache (recovery)
         if: steps.cache-dot-cargo.outputs.cache-hit == 'true'
         run: |
+          mtime=$(date +%Y%m%d%H%M.%S)
+          echo "timestamp of restored .cargo: $mtime"
           rsync -av "/tmp/dot-cargo/" "$HOME/.cargo/"
-          find "$HOME/.cargo/" -exec touch -t "$(date +%Y%m%d%H%M.%S)" {} +
+          find "$HOME/.cargo/" -exec touch -t "$mtime" {} +
 
       - name: Cargo cache (build)
         run: cargo fetch --locked
@@ -281,8 +283,10 @@ jobs:
       - name: Dependencies (recovery)
         if: steps.cache-deps.outputs.cache-hit == 'true'
         run: |
+          # add a second to offset rounding errors in fractional seconds
+          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+1S' || '--date=+1seconds' }} +%Y%m%d%H%M.%S)
+          echo "timestamp of restored target (deps): $mtime"
           rsync -av "/tmp/target-deps/" "$PWD/target/"
-          mtime=$(date +%Y%m%d%H%M.%S)
           find ./target -exec touch -t "$mtime" {} +
           # Here we touch the cache itself so that when diffing (with --compare-dest)
           # rsync knows what is _newer_ than what we've restored here
@@ -308,8 +312,10 @@ jobs:
       - name: Canister code (recover)
         if: steps.cache-canister.outputs.cache-hit == 'true'
         run: |
-          # Set timestamps so that --compare-dest below knows what (not) to save
-          find /tmp/target-canister -exec touch -t "$(date +%Y%m%d%H%M.%S)" {} +
+          # add 2 seconds to offset rounding errors in fractional seconds (compared to the above fiddling of mtime)
+          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+2S' || '--date=+2seconds' }} +%Y%m%d%H%M.%S)
+          echo "timestamp of restored target (canister): $mtime"
+          find /tmp/target-canister -exec touch -t "$mtime" {} +
           rsync -av /tmp/target-canister/ "$PWD/target/"
 
       - name: Canister code (build)
