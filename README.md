@@ -12,6 +12,11 @@
 </p>
 
 ---
+<p style="text-align: center;color:red">#######################################################</p>
+
+**WARNING**: this is a feature branch for Verifiable Credentials MVP (cf. [Working Group](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/attribute-sharing.md)).  The code in this branch is experimental and can change at any time.
+For the current implementation of the Internet Identity please see the `main` branch
+<p style="text-align: center;color:red">#######################################################</p>
 
 Internet Identity is an authentication service for the [Internet Computer][ic]. It is the authentication system that allows hundreds of thousands of users to log in to Dapps like [Distrikt], [DSCVR] and more.
 
