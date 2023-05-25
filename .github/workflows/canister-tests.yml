@@ -202,136 +202,58 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v3
+
+      # Attempt to restore the pre-built test binaries from cache.
+      # The test binaries are only dependent on rust code, because the front-end code is bundled in the `wasm` file
+      # that is loaded by the test binaries.
+      # If the binary can be restored from cache, we skip the build step, including even setting up the toolchain etc.
+      - uses: actions/cache@v3
+        id: cache-test-archive
         with:
-          # Pull a deep copy so that we can set meaningful timestamps across builds, based on the commit history
-          fetch-depth: '0'
-
-      # Figure out which commit modified what. Each commit defined here is used as a cache layer.
-      # We use those commit shas as cache keys. Since cargo uses timestamp-based comparison,
-      # each cache layer is retrieved and timestamped when the particular commit is checked out,
-      # so that checking out a later commit tells cargo which files are newer (since git will
-      # update the mtime of newer files)
-      - name: Retrieve commit information
-        id: git_info
-        run: |
-          # Last time dependencies or toolchain were updated; used for ~/.cargo and dependencies
-          commit_deps=$(git log -1 --pretty=format:%H -- Cargo.* src/*/Cargo.toml rust-toolchain.toml)
-          echo "commit_deps=$commit_deps" >> "$GITHUB_OUTPUT"
-          echo "deps: $commit_deps"
-
-          # Last time dependencies or toolchain or the canister code was modified
-          commit_canister=$(git log -1 --pretty=format:%H -- 'Cargo.*' 'rust-toolchain.toml' 'src/**' ':^src/frontend')
-          echo "commit_canister=$commit_canister" >> "$GITHUB_OUTPUT"
-          echo "canister: $commit_canister"
-
-          # This commit
-          commit_now=$(git log -1 --pretty=format:%H)
-          echo "commit_now=$commit_now" >> $GITHUB_OUTPUT
-          echo "now: $commit_now"
+          path: /tmp/test-archive
+          key: ${{ runner.os }}-rust-test-archive-${{ hashFiles('src/**/*.rs', 'Cargo.*', 'src/*/*.toml', 'rust-toolchain.toml') }}
 
       - uses: ./.github/actions/bootstrap
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+
+      - uses: actions/cache@v3
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-rust-test-cache-${{ hashFiles('Cargo.toml', 'rust-toolchain.toml', 'Cargo.lock') }}
+
       - name: Install nextest
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
         run: |
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
       # Rustup only installs cargo on the first call, so we use a dedicated step to get a good idea of how
       # time is spent in each step separately
-      - run: cargo check --help
+      - if: steps.cache-test-archive.outputs.cache-hit != 'true'
+        run: cargo check --help
 
       - name: Create dummy assets
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
         run: |
           mkdir dist
           touch dist/index.html
           touch dist/index.js.gz
 
-      # Caching ~/.cargo
-
-      # At every step (cargo cache, deps, etc) we store the cache content to a temporary
-      # directory so that the cache is kept as it was right after the layer build until
-      # the actions/cache post step is run (which only then uploads the cache)
-      - uses: actions/cache@v3
-        id: cache-dot-cargo
-        with:
-          path: /tmp/dot-cargo
-          key: ${{ runner.os }}-${{ steps.git_info.outputs.commit_deps }}-dot-cargo
-
-      - run: git checkout ${{ steps.git_info.outputs.commit_deps }}
-
-      - name: Cargo cache (recovery)
-        if: steps.cache-dot-cargo.outputs.cache-hit == 'true'
-        run: |
-          mtime=$(date +%Y%m%d%H%M.%S)
-          echo "timestamp of restored .cargo: $mtime"
-          rsync -av "/tmp/dot-cargo/" "$HOME/.cargo/"
-          find "$HOME/.cargo/" -exec touch -t "$mtime" {} +
-
-      - name: Cargo cache (build)
-        run: cargo fetch --locked
-
-      - name: Cargo cache (save to cache)
-        if: steps.cache-dot-cargo.outputs.cache-hit != 'true'
-        run: rsync -av "$HOME/.cargo/" "/tmp/dot-cargo/"
-
-      # Caching external dependencies
-
-      - uses: actions/cache@v3
-        id: cache-deps
-        with:
-          path: /tmp/target-deps
-          key: ${{ runner.os }}-${{ steps.git_info.outputs.commit_deps }}-deps
-
-      - name: Dependencies (recovery)
-        if: steps.cache-deps.outputs.cache-hit == 'true'
-        run: |
-          # add a second to offset rounding errors in fractional seconds
-          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+1S' || '--date=+1seconds' }} +%Y%m%d%H%M.%S)
-          echo "timestamp of restored target (deps): $mtime"
-          rsync -av "/tmp/target-deps/" "$PWD/target/"
-          find ./target -exec touch -t "$mtime" {} +
-          # Here we touch the cache itself so that when diffing (with --compare-dest)
-          # rsync knows what is _newer_ than what we've restored here
-          find "/tmp/target-deps/" -exec touch -t "$mtime" {} +
-
-      - name: Dependencies (build)
-        run: cargo build --tests --release --frozen
-
-      - name: Dependencies (save to cache)
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: rsync -av "$PWD/target/" "/tmp/target-deps/"
-
-      # Caching canister code and tests
-
-      - uses: actions/cache@v3
-        id: cache-canister
-        with:
-          path: /tmp/target-canister
-          key: ${{ runner.os }}-${{ steps.git_info.outputs.commit_canister }}-canister
-
-      - run: git checkout ${{ steps.git_info.outputs.commit_canister }}
-
-      - name: Canister code (recover)
-        if: steps.cache-canister.outputs.cache-hit == 'true'
-        run: |
-          # add 2 seconds to offset rounding errors in fractional seconds (compared to the above fiddling of mtime)
-          mtime=$(date ${{ matrix.os == 'macos-latest' && '-v+2S' || '--date=+2seconds' }} +%Y%m%d%H%M.%S)
-          echo "timestamp of restored target (canister): $mtime"
-          find /tmp/target-canister -exec touch -t "$mtime" {} +
-          rsync -av /tmp/target-canister/ "$PWD/target/"
-
-      - name: Canister code (build)
-        run: cargo build --tests --release --frozen
-
-      - name: Canister code (save to cache)
-        if: steps.cache-canister.outputs.cache-hit != 'true'
-        # Here we only store what's been built since the dependency cache restore. Saving the whole
-        # ./target again would take another ~800MB (compressed) whereas the diff only takes ~20MB.
-        run: rsync -av --compare-dest="/tmp/target-deps/" "$PWD/target/" "/tmp/target-canister/"
-
       # Build the tests
       - name: Build test archive
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
         run: |
           git checkout ${{ steps.git_info.outputs.commit_now }}
           cargo nextest archive --archive-file canister-tests-${{ matrix.os }}.tar.zst --release
+          mkdir -p /tmp/test-archive/
+          cp canister-tests-${{ matrix.os }}.tar.zst /tmp/test-archive
+
+      - name: Restore test archive
+        if: steps.cache-test-archive.outputs.cache-hit == 'true'
+        run: |
+          mv /tmp/test-archive/canister-tests-${{ matrix.os }}.tar.zst .
 
       - name: 'Upload canister test archive'
         uses: actions/upload-artifact@v3
