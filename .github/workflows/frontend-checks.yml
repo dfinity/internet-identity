@@ -22,6 +22,16 @@ jobs:
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate
+      - name: Check for dapp logos
+        run: |
+          while read -r logo
+          do
+            if [ ! -f src/frontend/assets/icons/"$logo" ]
+            then
+              echo "Logo not found: $logo"
+              exit 1
+            fi
+          done < <(jq <src/frontend/src/flows/dappsExplorer/dapps.json -cMr '.[] | .logo' )
       - name: Commit type interfaces
         uses: EndBug/add-and-commit@v9
         # We don't want to commit automatic changes to main
