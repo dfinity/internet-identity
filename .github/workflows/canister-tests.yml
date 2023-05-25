@@ -203,6 +203,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Attempt to restore the pre-built test binaries from cache.
+      # The test binaries are only dependent on rust code, because the front-end code is bundled in the `wasm` file
+      # that is loaded by the test binaries.
+      # If the binary can be restored from cache, we skip the build step, including even setting up the toolchain etc.
       - uses: actions/cache@v3
         id: cache-test-archive
         with:
