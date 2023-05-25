@@ -6,6 +6,7 @@ import { displayError } from "$src/components/displayError";
 import { caretDownIcon } from "$src/components/icons";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
+import { BASE_URL } from "$src/environment";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
@@ -71,13 +72,13 @@ export const authnTemplateAuthorize = ({
     <div class="c-origin-preview c-origin-preview--header">
       <img
         class="c-origin-preview__logo c-origin-preview__logo--background"
-        src=${logo}
+        src=${BASE_URL + "icons/" + logo}
         alt=""
       />
       <img
         data-role="known-dapp-image"
         class="c-origin-preview__logo"
-        src=${logo}
+        src=${BASE_URL + "icons/" + logo}
         alt=""
       />
     </div>
@@ -165,7 +166,7 @@ export const authFlowAuthorize = async (
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
           knownDapp: getDapps().find(
-            (dapp) => new URL(dapp.link).origin === authContext.requestOrigin
+            (dapp) => new URL(dapp.website).origin === authContext.requestOrigin
           ),
         })
       );

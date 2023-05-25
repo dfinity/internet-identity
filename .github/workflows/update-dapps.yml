@@ -1,0 +1,45 @@
+# A GitHub Actions workflow that regularly creates a pull request to update dapps list & logos
+name: Dapps Update
+
+on:
+  schedule:
+    # Check for updates daily
+    - cron:  '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  dapps-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Run the update
+      - name: Check new dapps file
+        id: update
+        run: ./scripts/update-dapps
+
+      # If the dapps changed, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: |
+            src/frontend/src/flows/dappsExplorer/dapps.json
+            src/frontend/assets/icons
+          commit-message: Update dapps
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-dapps-update
+          delete-branch: true
+          title: 'Update dapps list'
+
+            # Since the this is a scheduled job, a failure won't be shown on any
+            # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Dapps update failed"

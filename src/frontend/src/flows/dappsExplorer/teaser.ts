@@ -1,3 +1,4 @@
+import { BASE_URL } from "$src/environment";
 import { DynamicKey } from "$src/i18n";
 import { html, TemplateResult } from "lit-html";
 import { DappDescription } from "./dapps";
@@ -75,7 +76,11 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
         // shows an empty space where the image suddenly pops seconds
         // later.
         ({ logo, name }) => html`<div class="c-marquee__item">
-          <img src=${logo} alt="${name}" class="c-marquee__image" />
+          <img
+            src=${BASE_URL + "icons/" + logo}
+            alt="${name}"
+            class="c-marquee__image"
+          />
         </div>`
       );
 
