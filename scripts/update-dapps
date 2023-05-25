@@ -1,84 +1,182 @@
 #!/usr/bin/env bash
+# vim: ft=bash
+# Update the list of dapps, pulling the definitions from dfinity/portal
 set -euo pipefail
 
 # Make sure we always run from the root
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPTS_DIR/.."
 
-## Figure out the latest commit on the portal
-
-latest_portal_commit=$(curl -L \
-  --silent \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/dfinity/portal/commits?per_page=1 \
-  | jq -cMr '.[0].sha')
-if [ -z "$latest_portal_commit" ]
-then
-    echo "Could not get latest portal commit"
-    exit 1
-fi
-echo "Latest portal commit: $latest_portal_commit"
-
-portal_url="https://raw.githubusercontent.com/dfinity/portal/$latest_portal_commit"
-echo using portal url "$portal_url"
-
-## Download the dapps list
-# A prefix used in the portal's dapps logo list
-portal_logo_prefix="img/showcase"
-# The actual path prefix where logos are stored
-portal_filepath_prefix="static/img/showcase"
-# The path where we save logos in II
-ii_logo_prefix="src/frontend/assets/icons"
-
 # The path where we save the list of dapps in II
-dapps_json="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
+DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
+# The path where we save logos in II
+II_LOGO_PREFIX="src/frontend/assets/icons"
 
-# Here we fetch the list of dapps, select the ones that use II, exclude II itself, fix up the
-# logo name, and then only keep attributes that we care about.
-curl \
-    --location \
-    --show-error \
-    --silent \
-    "$portal_url/showcase.json" \
-    | jq \
-        --arg portal_logo_prefix "$portal_logo_prefix" \
-    '[ .[]
-        | select(.usesInternetIdentity == true)
-        | select(.name != "Internet Identity")
-        | .logo |= sub("^/" + $portal_logo_prefix + "/"; "")
-        | with_entries(
-            select(
-                [.key]
-                | inside(["name", "website", "oneLiner", "logo"])
-            )
-        )
-    ]' \
-    > "$dapps_json"
+function title() {
+    echo "Update dapps descriptions & logos from dfinity/portal"
+}
 
-## Download the logos
-# First, wipe existing logos, if any
-if find "$ii_logo_prefix" -mindepth 1 -delete
-then
-    echo "wiped logos in $ii_logo_prefix"
-else
-    echo "no logos to wipe in $ii_logo_prefix"
-fi
+function usage() {
+    cat << EOF
 
-while read -r logo
-do
-    # For each dapp in the dapp list, download its logo
-    portal_logo_path="$portal_filepath_prefix/$logo"
-    ii_logo_path="$ii_logo_prefix/$logo"
-    echo "downloading '$logo'"
-    echo " 'dfinity/portal:$portal_logo_path' -> '$ii_logo_path'"
-    echo "$portal_url/$portal_logo_path"
+Usage:
+  $0
+EOF
+}
+
+function help() {
+    cat << EOF
+
+This will update the dapps list ($DAPPS_JSON) & logos ($II_LOGO_PREFIX).
+EOF
+}
+
+# Check that the command "$1" is installed
+function need_cmd() {
+    if ! command -v "$1" >/dev/null
+    then
+        echo "please install $1"
+        exit 1
+    fi
+}
+
+need_cmd "convert"
+
+function update() {
+    latest_portal_commit=$(curl -L \
+      --silent \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      https://api.github.com/repos/dfinity/portal/commits?per_page=1 \
+      | jq -cMr '.[0].sha')
+    if [ -z "$latest_portal_commit" ]
+    then
+        echo "Could not get latest portal commit"
+        exit 1
+    fi
+    echo "Latest portal commit: $latest_portal_commit"
+
+    portal_url="https://raw.githubusercontent.com/dfinity/portal/$latest_portal_commit"
+    echo using portal url "$portal_url"
+
+    ## Download the dapps list
+    # A prefix used in the portal's dapps logo list
+    portal_logo_prefix="img/showcase"
+    # The actual path prefix where logos are stored
+    portal_filepath_prefix="static/img/showcase"
+    # The path where we save logos in II
+    II_LOGO_PREFIX="src/frontend/assets/icons"
+
+    # The path where we save the list of dapps in II
+    DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
+
+    if true
+    then
+
+    # Here we fetch the list of dapps, select the ones that use II, exclude II itself, fix up the
+    # logo name, and then only keep attributes that we care about.
     curl \
-        --fail \
         --location \
         --show-error \
         --silent \
-        "$portal_url/$portal_logo_path" \
-        --output "src/frontend/assets/icons/$logo"
+        "$portal_url/showcase.json" \
+        | jq \
+            --arg portal_logo_prefix "$portal_logo_prefix" \
+        '[ .[]
+            | select(.usesInternetIdentity == true)
+            | select(.name != "Internet Identity")
+            | .logo |= sub("^/" + $portal_logo_prefix + "/"; "")
+            | with_entries(
+                select(
+                    [.key]
+                    | inside(["name", "website", "oneLiner", "logo"])
+                )
+            )
+        ]' \
+        > "$DAPPS_JSON"
 
-done < <(jq -cMr <"$dapps_json" '.[] | .logo')
+    ## Download the logos
+    # First, wipe existing logos, if any
+    if find "$II_LOGO_PREFIX" -mindepth 1 -delete
+    then
+        echo "wiped logos in $II_LOGO_PREFIX"
+    else
+        echo "no logos to wipe in $II_LOGO_PREFIX"
+    fi
+
+    while read -r logo
+    do
+        # For each dapp in the dapp list, download its logo
+        portal_logo_path="$portal_filepath_prefix/$logo"
+        ii_logo_path="$II_LOGO_PREFIX/$logo"
+        echo "downloading '$logo'"
+        echo " 'dfinity/portal:$portal_logo_path' -> '$ii_logo_path'"
+        echo "$portal_url/$portal_logo_path"
+        curl \
+            --fail \
+            --location \
+            --show-error \
+            --silent \
+            "$portal_url/$portal_logo_path" \
+            --output "src/frontend/assets/icons/$logo"
+
+    done < <(jq -cMr <"$DAPPS_JSON" '.[] | .logo')
+    fi
+
+    ## Optimize logos
+    # This goes through all logos bigger than a certain size and tries to optimize them
+    while read -r big_logo
+    do
+        echo "found big logo '$big_logo'"
+        if [[ $big_logo == *.svg ]]
+        then
+            old="$big_logo"
+            new="${big_logo%.svg}.webp"
+
+            echo "converting '$old' -> '$new'"
+            # if the file is a huge SVG (surprising, but why not)
+            # then convert it to a raster webp (with transparency)
+            convert -background none -size 256x256 "$old" "$new"
+            dapps_json_tmp=$(mktemp)
+            jq <"$DAPPS_JSON" \
+                --arg old "$(basename "$old")" --arg new "$(basename "$new")" \
+                '[ .[] | .logo |= sub("^" + $old + "$"; $new) ]' > "$dapps_json_tmp"
+            mv "$dapps_json_tmp" "$DAPPS_JSON"
+            rm "$old"
+        fi
+    done < <(find "$II_LOGO_PREFIX" -mindepth 1 -type f -size +20k)
+
+    # Remove logos that are still too big
+    # This goes through all logos bigger than a certain size and removes them
+    while read -r big_logo
+    do
+        echo "found logo still too big '$big_logo', removing"
+        # Remove the file
+        rm "$big_logo"
+        # Only keep entries that do not reference the logo
+        jq <"$DAPPS_JSON" \
+            --arg big_logo "$(basename "$big_logo")" \
+            '[ .[] | select(.logo != $big_logo) ]' > "$dapps_json_tmp"
+    done < <(find "$II_LOGO_PREFIX" -mindepth 1 -type f -size +20k)
+}
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+update
