@@ -280,8 +280,6 @@ dependencies = [
  "flate2",
  "hex",
  "ic-cdk",
- "ic-certification 0.23.2",
- "ic-certification 0.8.0",
  "ic-crypto-iccsa",
  "ic-crypto-utils-threshold-sig-der",
  "ic-test-state-machine-client",
@@ -1074,8 +1072,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "beb68e0ea2fe6b533ddab6ae2142274f9669acacbacd83ac64bb1cd268d33104"
 dependencies = [
  "hex",
- "serde",
- "serde_bytes",
  "sha2 0.10.6",
 ]
 
@@ -1339,6 +1335,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-representation-independent-hash"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f5790ff4b3752ce648d83554b3b0df1039a94bea24119d29a0f9874d796075e"
+dependencies = [
+ "leb128",
+ "sha2 0.10.6",
+]
+
+[[package]]
+name = "ic-response-verification"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "736044d69c526fa8a2a5e54d3debd878bbd4ec10c259fd21d9e6804aef67687b"
+dependencies = [
+ "base64 0.13.1",
+ "candid",
+ "flate2",
+ "http",
+ "ic-certification 0.23.2",
+ "ic-representation-independent-hash",
+ "leb128",
+ "log",
+ "miracl_core_bls12381",
+ "nom",
+ "sha2 0.10.6",
+ "thiserror",
+]
+
+[[package]]
 name = "ic-stable-structures"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1534,6 +1560,7 @@ dependencies = [
  "ic-cdk-macros",
  "ic-certified-map",
  "ic-metrics-encoder",
+ "ic-response-verification",
  "ic-stable-structures",
  "ic-test-state-machine-client",
  "include_dir",
@@ -1740,6 +1767,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1748,6 +1781,12 @@ dependencies = [
  "adler",
  "simd-adler32",
 ]
+
+[[package]]
+name = "miracl_core_bls12381"
+version = "4.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d07cbe42e2a8dd41df582fb8e00fc24d920b5561cc301fcb6d14e2e0434b500f"
 
 [[package]]
 name = "new_debug_unreachable"
@@ -1766,6 +1805,16 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nom"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
 ]
 
 [[package]]
