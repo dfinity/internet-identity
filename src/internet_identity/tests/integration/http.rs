@@ -5,7 +5,7 @@ use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_response_verification::types::{Request, Response};
-use ic_response_verification::verify_request_response_pair;
+use ic_response_verification::{verify_request_response_pair, MIN_VERIFICATION_VERSION};
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::http_gateway::HttpRequest;
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
@@ -64,7 +64,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
             time(&env) as u128,
             Duration::from_secs(300).as_nanos(),
             &env.root_key(),
-            1,
+            MIN_VERIFICATION_VERSION,
         )
         .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
     }
