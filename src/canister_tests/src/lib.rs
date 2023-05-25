@@ -1,6 +1,5 @@
 //! Here you'll find modules related to testing the canisters:
 //!  * `api`: Rust-bindings for the II and archive canisters
-//!  * `certificate_validation`: Validation logic for asset certification
 //!  * `flows`: Reusable flows consisting of multiple canister interactions
 //!  * `framework`: Helpers of various kinds for writing tests.
 //!
@@ -8,6 +7,5 @@
 //! as possible to make tests easy to read and write.
 //!
 pub mod api;
-pub mod certificate_validation;
 pub mod flows;
 pub mod framework;

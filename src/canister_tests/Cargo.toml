@@ -21,7 +21,5 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 candid = "0.8"
 ic-cdk = "0.7"
 ic-types = { git = "https://github.com/dfinity/ic" }
-ic-sdk-certification = { package="ic-certification", version="0.23" }
-ic-certification = { git = "https://github.com/dfinity/ic" }
 ic-crypto-iccsa = { git = "https://github.com/dfinity/ic" }
 ic-crypto-utils-threshold-sig-der = { git = "https://github.com/dfinity/ic" }

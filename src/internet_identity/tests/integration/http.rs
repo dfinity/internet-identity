@@ -2,9 +2,10 @@
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
 use canister_tests::api::{http_request, internet_identity as api};
-use canister_tests::certificate_validation::validate_certification;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use ic_response_verification::types::{Request, Response};
+use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::http_gateway::HttpRequest;
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
@@ -24,16 +25,13 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
 
     // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
     for (asset, encoding) in assets {
-        let http_response = http_request(
-            &env,
-            canister_id,
-            &HttpRequest {
-                method: "GET".to_string(),
-                url: asset.to_string(),
-                headers: vec![],
-                body: ByteBuf::new(),
-            },
-        )?;
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: asset.to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
 
         assert_eq!(http_response.status_code, 200);
 
@@ -49,25 +47,26 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
                 "unexpected Content-Encoding header value"
             );
         }
-
-        // 1. It searches for a response header called Ic-Certificate (case-insensitive).
-        let (_, ic_certificate) = http_response
-            .headers
-            .iter()
-            .find(|(name, _)| name.to_lowercase() == "ic-certificate")
-            .expect("IC-Certificate header not found");
-
-        validate_certification(
-            ic_certificate,
-            canister_id,
-            asset,
-            &http_response.body,
-            None, // should really be `encoding`, but cannot use it because II certifies encoded response bodies, see L2-722 for details
-            &env.root_key(),
-            env.time(),
-        )
-        .unwrap_or_else(|_| panic!("validation for asset \"{asset}\" failed"));
         verify_security_headers(&http_response.headers);
+
+        verify_request_response_pair(
+            Request {
+                method: request.method,
+                url: request.url,
+                headers: request.headers,
+            },
+            Response {
+                status_code: http_response.status_code,
+                headers: http_response.headers,
+                body: http_response.body.into_vec(),
+            },
+            canister_id.as_slice(),
+            time(&env) as u128,
+            Duration::from_secs(300).as_nanos(),
+            &env.root_key(),
+            1,
+        )
+        .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
     }
     Ok(())
 }
