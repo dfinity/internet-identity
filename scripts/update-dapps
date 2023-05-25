@@ -154,9 +154,11 @@ function update() {
         # Remove the file
         rm "$big_logo"
         # Only keep entries that do not reference the logo
+        dapps_json_tmp=$(mktemp)
         jq <"$DAPPS_JSON" \
             --arg big_logo "$(basename "$big_logo")" \
             '[ .[] | select(.logo != $big_logo) ]' > "$dapps_json_tmp"
+        mv "$dapps_json_tmp" "$DAPPS_JSON"
     done < <(find "$II_LOGO_PREFIX" -mindepth 1 -type f -size +20k)
 }
 
