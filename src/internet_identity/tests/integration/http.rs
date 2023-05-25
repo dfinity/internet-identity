@@ -49,7 +49,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         }
         verify_security_headers(&http_response.headers);
 
-        verify_request_response_pair(
+        let result = verify_request_response_pair(
             Request {
                 method: request.method,
                 url: request.url,
@@ -67,6 +67,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
             MIN_VERIFICATION_VERSION,
         )
         .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
+        assert!(result.passed);
     }
     Ok(())
 }
