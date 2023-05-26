@@ -5,11 +5,46 @@ import { existsSync, mkdirSync } from "fs";
 import { remote } from "webdriverio";
 import { downloadChrome } from "./download-chrome";
 
+const SCREENSHOTS_DIR =
+  process.env["SCREENSHOTS_DIR"] ?? "./screenshots/custom";
+
 /** This executable takes screenshots of every page in the showcase.
  * This function expects the showcase to be running on 'http://localhost:5174'. Everything
  * else is automated. */
 async function main() {
-  await withChrome(takeShowcaseScreenshots);
+  // Set up the directory where we'll save the screenshots
+  if (!existsSync(SCREENSHOTS_DIR)) {
+    mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+  }
+
+  await withChrome(async (browser) => {
+    await takeLandingScreenshots(browser);
+    await takeShowcaseScreenshots(browser);
+  });
+}
+
+/** Take multiple screenshots spanning the entire landing page */
+async function takeLandingScreenshots(browser: WebdriverIO.Browser) {
+  // Use "authorizeNewKnown" as a good variation of the landing page
+  await visit(browser, "http://localhost:5174/authorizeNewKnown");
+
+  // There is no support for full page screenshots, so we take N screenshots
+  // of the viewport, and scroll to the viewport height in between each screenshot
+  const [screenshotHeight, totalHeight] = await browser.execute(() => {
+    return [window.innerHeight, document.body.scrollHeight];
+  });
+  const nScreenshots = Math.ceil(totalHeight / screenshotHeight);
+
+  for (let i = 0; i < nScreenshots; i++) {
+    await browser.execute(
+      (i, screenshotHeight) => {
+        window.scrollTo(0, i * screenshotHeight);
+      },
+      i,
+      screenshotHeight
+    );
+    await browser.saveScreenshot(`${SCREENSHOTS_DIR}/landing_${i + 1}.png`);
+  }
 }
 
 /** Open each showcase page one after the other and screenshot it */
@@ -26,13 +61,6 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
     })
   );
 
-  // Set up the directory where we'll save the screenshots
-  const screenshotsDir =
-    process.env["SCREENSHOTS_DIR"] ?? "./screenshots/custom";
-  if (!existsSync(screenshotsDir)) {
-    mkdirSync(screenshotsDir, { recursive: true });
-  }
-
   // Iterate the pages and screenshot them
   for (const pageName of pageNames) {
     // Skip the loader, because it's animated
@@ -43,7 +71,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
     await visit(browser, `http://localhost:5174/${pageName}`);
 
     await browser.execute('document.body.style.caretColor = "transparent"');
-    await browser.saveScreenshot(`${screenshotsDir}/${pageName}.png`);
+    await browser.saveScreenshot(`${SCREENSHOTS_DIR}/${pageName}.png`);
 
     // When a chasm is present, toggle it
     if (await browser.$('[data-action="toggle-chasm"]').isExisting()) {
@@ -52,7 +80,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
       await browser
         .$('[data-action="toggle-chasm"]')
         .moveTo({ xOffset: -10, yOffset: -10 });
-      await browser.saveScreenshot(`${screenshotsDir}/${pageName}_open.png`);
+      await browser.saveScreenshot(`${SCREENSHOTS_DIR}/${pageName}_open.png`);
     }
   }
 }
@@ -161,7 +189,12 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
  */
 function readScreenshotsConfig(): {
   mobileEmulation?: {
-    deviceName: string;
+    deviceMetrics: {
+      width: number;
+      height: number;
+      pixelRatio: number;
+      touch: boolean;
+    };
   };
 } {
   const screenshotsType = process.env["SCREENSHOTS_TYPE"];
@@ -169,7 +202,13 @@ function readScreenshotsConfig(): {
     case "mobile":
       return {
         mobileEmulation: {
-          deviceName: "iPhone SE",
+          // Emulate a small modern device
+          deviceMetrics: {
+            width: 360,
+            height: 640,
+            pixelRatio: 4,
+            touch: true,
+          },
         },
       };
       break;

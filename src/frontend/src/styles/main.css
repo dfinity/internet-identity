@@ -227,6 +227,9 @@
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
+  --rg-brand-full: var(--vc-brand-yellow), var(--vc-brand-orange),
+    var(--vc-brand-pink), var(--vc-brand-purple), var(--vc-brand-blue);
+
   --rg-brand-alt: var(--vc-light-grey), white;
   --rg-button: var(--rc-button), var(--rc-button-pair);
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
@@ -1153,23 +1156,58 @@ by all browsers (FF is missing) */
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 7rem;
+  min-height: 10rem;
 }
 
 .c-spinner {
   position: absolute;
-  width: 25%;
+  width: min(12rem, 25%);
   aspect-ratio: 1;
   color: var(--rc-loading);
+
   top: 50%;
   left: 50%;
+
   transform: translate(-50%, -50%);
+  animation: rotate 3s linear infinite;
 }
 
-.c-spinner svg {
-  display: block;
-  overflow: visible;
-  animation: rotate 4s linear infinite;
+.c-spinner::after,
+.c-spinner::before,
+.c-spinner__inner,
+.c-spinner__inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.c-spinner::after,
+.c-spinner::before {
+  background-image: conic-gradient(var(--rg-brand-full));
+}
+
+.c-spinner::before {
+  opacity: 0.75;
+  filter: blur(20px);
+}
+
+.c-spinner::after {
+  transform: scale(1.02);
+}
+
+.c-spinner__inner {
+  z-index: 1;
+  background: var(--rc-background);
+  box-shadow: inset 0 0 0 var(--rs-line) var(--vc-vapour);
+}
+
+.c-spinner__inner::before {
+  filter: blur(20px);
+  opacity: 0.5;
+
+  background-image: conic-gradient(var(--rg-brand-full));
 }
 
 /**
@@ -2259,7 +2297,7 @@ a.c-action-list__item {
 }
 
 .c-progress-stepper__icon path {
-  /* 
+  /*
     this is a bit of a hack, the check-mark should not be a filled path
     but a stroke.
   */
@@ -2477,8 +2515,11 @@ input[type="checkbox"] {
 }
 
 @keyframes rotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
   100% {
-    transform: rotate(360deg);
+    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 

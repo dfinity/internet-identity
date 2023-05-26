@@ -71,7 +71,9 @@ export const compression = (): Plugin =>
     // II canister only supports one content type per resource. That is why we remove the original file.
     deleteOriginFile: true,
     filter: (file: string): boolean =>
-      ![".html", ".css", ".webp", ".png", ".ico"].includes(extname(file)),
+      ![".html", ".css", ".webp", ".png", ".ico", ".svg"].includes(
+        extname(file)
+      ),
   });
 
 /**

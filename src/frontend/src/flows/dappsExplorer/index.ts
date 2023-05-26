@@ -1,5 +1,6 @@
 import { closeIcon, externalLinkIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
+import { BASE_URL } from "$src/environment";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
@@ -62,20 +63,20 @@ export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
 /* Template for a single dapp */
 const dappTemplate = ({
-  link,
+  website,
   logo,
   name,
   oneLiner,
 }: DappDescription): TemplateResult => {
   return html`
     <a
-      href=${link}
+      href=${website}
       target="_blank"
       class="c-action-list__item"
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
-        <img src=${logo} alt=${name} loading="lazy" />
+        <img src=${BASE_URL + "icons/" + logo} alt=${name} loading="lazy" />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>

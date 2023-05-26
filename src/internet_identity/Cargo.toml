@@ -38,6 +38,8 @@ ic-test-state-machine-client = "2"
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.5"
+ic-response-verification = "0.3.0"
+
 
 [features]
 # the dummy_captcha feature which ensures the captcha string is always "a"
