@@ -413,6 +413,23 @@ type AuthnMethodAddResponse = variant {
     invalid_metadata: text;
 };
 
+type PreparePrincipalLinkResponse = variant {
+    ok;
+    authentication_failed: text;
+};
+
+type GetPrincipalLinkResponse = variant {
+    ok: record {
+        // Verifiable credential intended for the RP linking P_new <-> P_rp
+        rp_link_credential: text;
+        // Verifiable credential intended for the issuer linking P_new <-> P_issuer
+        issuer_link_credential: text;
+    };
+    authentication_failed: text;
+    // The signature is not ready. Maybe retry by calling `prepare_principal_link`
+    no_such_credentials: text;
+};
+
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
     create_challenge : () -> (Challenge);
@@ -464,4 +481,8 @@ service : (opt InternetIdentityInit) -> {
     // Adds a new authentication method to the identity.
     // Requires authentication.
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (opt AuthnMethodAddResponse);
+
+    // Attribute sharing MVP
+    prepare_principal_link : (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt PreparePrincipalLinkResponse);
+    get_principal_link: (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt GetPrincipalLinkResponse) query;
 }

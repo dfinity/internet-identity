@@ -9,6 +9,9 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
+    GetPrincipalLinkResponse, PreparePrincipalLinkResponse,
+};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use storage::{Salt, Storage};
@@ -538,6 +541,31 @@ mod v2_api {
             Err(err) => err,
         };
         Some(result)
+    }
+}
+
+/// API for the attribute sharing mvp
+mod attribute_sharing_mvp {
+    use super::*;
+
+    #[update]
+    #[candid_method]
+    fn prepare_principal_link(
+        _identity_number: IdentityNumber,
+        _relying_party: FrontendHostname,
+        _issuer: FrontendHostname,
+    ) -> Option<PreparePrincipalLinkResponse> {
+        todo!("implement prepare_principal_link")
+    }
+
+    #[query]
+    #[candid_method(query)]
+    fn get_principal_link(
+        _identity_number: IdentityNumber,
+        _relying_party: FrontendHostname,
+        _issuer: FrontendHostname,
+    ) -> Option<GetPrincipalLinkResponse> {
+        todo!("implement get_principal_link")
     }
 }
 
