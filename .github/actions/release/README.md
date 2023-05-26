@@ -8,7 +8,7 @@ To try the action locally, run the following:
 
 ``` bash
 $ # first, you need a GitHub Access token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
-$ # Make sure the command is prefixed with a space so that bash does not store in in its 
+$ # Make sure the command is prefixed with a space so that bash does not store in in its
 $ # history file.
 $  export GITHUB_TOKEN="..."
 $ # The list of files for which we compute the sha256
