@@ -7,6 +7,7 @@ import { html, TemplateResult } from "lit-html";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 
+import { warningIcon } from "$src/components/icons";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -26,19 +27,27 @@ const addPhraseTemplate = ({
   const copy = i18n.i18n(copyJson);
   const slot = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+      <h2 class="c-card__label c-card__label--hasIcon">
+        <i class="c-card__icon c-icon c-icon--error c-icon--inline"
+          >${warningIcon}</i
+        >
+        ${copy.label}
+      </h2>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <p class="t-paragraph">${copy.paragraph}</p>
     </hgroup>
-    <button @click=${() => ok()} data-action="next" class="c-button">
-      ${copy.ok}
-    </button>
-    <button
-      @click=${() => skip()}
-      data-action="skip"
-      class="c-button c-button--secondary"
-    >
-      ${copy.skip}
-    </button>
+    <div class="l-stack">
+      <button @click=${() => ok()} data-action="next" class="c-button">
+        ${copy.ok}
+      </button>
+      <button
+        @click=${() => skip()}
+        data-action="skip"
+        class="c-button c-button--secondary"
+      >
+        ${copy.skip}
+      </button>
+    </div>
     <section style="margin-top: 7em;" class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_phrase_q}</h3>
