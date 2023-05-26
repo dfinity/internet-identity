@@ -38,6 +38,7 @@ export const settingsDropdown = ({
       aria-expanded=${asyncReplace(ariaExpanded)}
       aria-controls="dropdown-${id}"
       aria-label="Open settings"
+      data-action="open-settings"
       data-device=${alias}
       @click=${() => toggle()}
     >
