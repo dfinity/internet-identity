@@ -2282,7 +2282,7 @@ a.c-action-list__item {
 }
 
 .c-progress-stepper__icon path {
-  /* 
+  /*
     this is a bit of a hack, the check-mark should not be a filled path
     but a stroke.
   */

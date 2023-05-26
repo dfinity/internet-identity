@@ -320,7 +320,7 @@ jobs:
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
-          
+
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
           # even if tests are added or removed. The tradeoff is that the balancing might be slightly worse, but we have enough
           # tests that it should not be a big issue.
