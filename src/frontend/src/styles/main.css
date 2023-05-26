@@ -698,7 +698,7 @@ a:hover,
 .c-icon--ok svg,
 .c-icon--warning svg,
 .c-icon--error svg {
-  transform: translate(-50%, -50%) scale(0.6);
+  transform: translate(-50%, -50%) scale(0.65);
 }
 
 .c-icon--ok [fill],
@@ -901,14 +901,12 @@ by all browsers (FF is missing) */
 .c-card__label--hasIcon {
   border-bottom: var(--rs-line) solid var(--rc-line);
   padding-bottom: calc(0.5 * var(--rs-card-bezel));
-  margin-bottom: calc(0.5 * var(--rs-card-bezel));
+  margin-bottom: calc(0.75 * var(--rs-card-bezel));
+  margin-top: calc(-0.15 * var(--rs-card-bezel));
 }
 
 .c-card__icon {
-  width: 1.8em;
-  aspect-ratio: 1;
-  height: auto;
-  vertical-align: middle;
+  height: 2rem;
 }
 
 .c-card__close {
