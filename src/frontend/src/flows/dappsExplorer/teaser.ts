@@ -29,9 +29,7 @@ export const dappsTeaser = ({
   copy: { dapps_explorer: DynamicKey; sign_into_dapps: DynamicKey };
 }): TemplateResult => {
   return html`<article class="c-card c-card--narrow">
-    <h3 class="t-title t-title--discrete" role="presentation">
-      ${dapps_explorer}
-    </h3>
+    <h3 class="c-card__label" role="presentation">${dapps_explorer}</h3>
     <h2 class="t-title">${sign_into_dapps}</h2>
     <button
       class="c-click-area"

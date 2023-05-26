@@ -26,7 +26,7 @@ const dappsExplorerTemplate = ({
 
   const pageContent = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
+      <h2 class="c-card__label">${copy.dapps_explorer}</h2>
       <h1 class="t-title">${copy.try_these_dapps}</h1>
     </hgroup>
     <button
