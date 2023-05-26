@@ -204,13 +204,13 @@ export const protectDevice = async ({
     "Please input your recovery phrase to lock it."
   );
 
-  await withLoader(async () => {
-    // if null then user canceled so we just redraw the manage page
-    if (newConnection == null) {
-      await reload();
-      return;
-    }
+  // if null then user canceled so we just redraw the manage page
+  if (newConnection == null) {
+    await reload();
+    return;
+  }
 
+  await withLoader(async () => {
     await newConnection.update(device);
   });
   reload();
