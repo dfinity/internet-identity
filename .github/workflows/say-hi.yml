@@ -41,9 +41,14 @@ jobs:
               repo: context.repo.repo,
               name: "github-pages",
             });
+            const artifactsByBranch = {};
             const artifactsByBranch = result.data.artifacts
               .filter(artifact => !artifact.expired)
-              .group(artifact => artifact.workflow_run.head_branch);
+              .forEach(artifact => {
+                const branch = artifact.workflow_run.head_branch;
+                artifactsByBranch[branch] = artifactsByBranch[branch] || [];
+                artifactsByBranch[branch].push(artifact);
+              });
 
             const artifacts = [];
 
