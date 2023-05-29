@@ -32,4 +32,4 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            console.log(result.data.artifacts.map(artifact => artifacts.name));
+            console.log(result.data.artifacts.map(artifact => artifact.name));
