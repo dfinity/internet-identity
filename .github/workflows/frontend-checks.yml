@@ -41,24 +41,6 @@ jobs:
           default_author: github_actions
           message: "🤖 npm run generate auto-update"
 
-  say-hi:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/github-script@v5
-        with:
-          script: |
-
-            console.log(context.issue.number);
-            console.log(context.ref);
-            if(context.issue.number) {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: 'Well, hello!'
-              })
-            }
-
   # Job that starts the showcase and takes a screenshot of every page
   screenshots:
     runs-on: ubuntu-latest
