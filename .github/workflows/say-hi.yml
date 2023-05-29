@@ -12,16 +12,19 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
+            const DIVIDER = "\n<!-- DIVIDER " + context.issue.number + "-->\n";
             const pr = await github.rest.issues.get({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-            })
-            console.log(pr)
-            console.log(pr.data.body)
+            });
+
+            const [ descr, _outdated ] = pr.data.body.split(DIVIDER);
+            const newSection = "Hello, world";
+            const newBody = [descr, newSection].join(DIVIDER);
             github.rest.issues.update({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: pr.data.body + "\n" + "And a new line",
-            })
+              body: newBody,
+            });
