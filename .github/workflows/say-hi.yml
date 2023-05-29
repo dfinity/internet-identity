@@ -30,12 +30,32 @@ jobs:
               repo: context.repo.repo,
               body: newBody,
             });
+
+
+
+
+
+
             const result = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               name: "github-pages",
             });
-            result.data.artifacts.filter(artifact => !artifact.expired).forEach( async (artifact) => {
+            const artifactsByBranch = result.data.artifacts
+              .filter(artifact => !artifact.expired)
+              .group(artifact => artifact.workflow_run.head_branch);
+
+            const artifacts = [];
+
+            for(const branch in artifactsByBranch) {
+              const branchArtifacts = [...artifactsByBranch[branch]];
+              branchArtifacts.sort((a,b) => new Date(a.updated_at) - new Date(b.updated_at));
+              const latestBranchArtifact = branchArtifacts[0];
+              console("latest artifact in ", branch, latestBranchArtifact);
+              artifacts.push(latestBranchArtifact);
+            }
+
+            artifacts.forEach( async (artifact) => {
               const name = artifact.name;
               const artifactId = artifact.id;
               const br = artifact.workflow_run.head_branch;
@@ -48,7 +68,4 @@ jobs:
                 artifact_id: artifactId,
                 archive_format: "zip",
               });
-
-              console.log(url);
-              fs.mkdirSync(br, { recursive: true })
             });
