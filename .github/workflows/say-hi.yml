@@ -74,7 +74,6 @@ jobs:
                 artifact_id: artifactId,
                 archive_format: "zip",
               });
-              console.log(url);
               await exec.exec('curl', ['-sSL', url, '-o', "out.zip"]);
               await io.mkdirP('out/' + br);
               await exec.exec('unzip', ["out.zip", '-d', 'out/' + br]);
