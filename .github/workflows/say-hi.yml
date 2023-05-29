@@ -33,5 +33,6 @@ jobs:
             const result = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
+              name: "github-pages",
             });
             console.log(result.data.artifacts.map(artifact => ({name: artifact.name, run: artifact.workflow_run})));
