@@ -36,7 +36,7 @@ jobs:
 
 
 
-            const result = await github.rest.actions.listArtifactsForRepo({
+            const result = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               name: "github-pages",
@@ -44,6 +44,7 @@ jobs:
             const artifactsByBranch = {};
             result.data.artifacts
               .filter(artifact => !artifact.expired)
+              .filter(artifact => !artifact.workflow_run.head_branch.startsWith("gh-readonly-queue"))
               .forEach(artifact => {
                 const branch = artifact.workflow_run.head_branch;
                 artifactsByBranch[branch] = artifactsByBranch[branch] || [];
