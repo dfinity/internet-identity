@@ -49,6 +49,7 @@ jobs:
           script: |
 
             console.log(context.issue.number);
+            console.log(context.ref);
             if(context.issue.number) {
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
