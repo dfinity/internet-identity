@@ -1,3 +1,5 @@
+name: Say Hi
+
 on:
   pull_request:
 
@@ -32,4 +34,4 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            console.log(result.data.artifacts.map(artifact => artifact.name));
+            console.log(result.data.artifacts.map(artifact => ({name: artifact.name, run: artifact.workflow_run})));
