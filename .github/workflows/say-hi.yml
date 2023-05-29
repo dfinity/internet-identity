@@ -28,3 +28,8 @@ jobs:
               repo: context.repo.repo,
               body: newBody,
             });
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            console.log(artifacts);
