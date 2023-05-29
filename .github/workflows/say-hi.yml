@@ -20,7 +20,7 @@ jobs:
             });
 
             const [ descr, _outdated ] = pr.data.body.split(DIVIDER);
-            const newSection = "Hello, world";
+            const newSection = "Hello, world!";
             const newBody = [descr, newSection].join(DIVIDER);
             github.rest.issues.update({
               issue_number: context.issue.number,
