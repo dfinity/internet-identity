@@ -42,7 +42,7 @@ jobs:
               name: "github-pages",
             });
             const artifactsByBranch = {};
-            result.data.artifacts
+            result.artifacts
               .filter(artifact => !artifact.expired)
               .filter(artifact => !artifact.workflow_run.head_branch.startsWith("gh-readonly-queue"))
               .forEach(artifact => {
