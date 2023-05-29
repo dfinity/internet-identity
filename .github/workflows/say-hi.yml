@@ -56,7 +56,7 @@ jobs:
               const branchArtifacts = [...artifactsByBranch[branch]];
               branchArtifacts.sort((a,b) => new Date(a.updated_at) - new Date(b.updated_at));
               const latestBranchArtifact = branchArtifacts[0];
-              console("latest artifact in ", branch, latestBranchArtifact);
+              console.log("latest artifact in ", branch, latestBranchArtifact);
               artifacts.push(latestBranchArtifact);
             }
 
