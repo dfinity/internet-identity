@@ -39,7 +39,7 @@ jobs:
             const allArtifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              name: "github-pages",
+              name: "showcase-build",
             });
             const artifactsByBranch = {};
             allArtifacts
