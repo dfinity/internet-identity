@@ -27,12 +27,12 @@ const addPhraseTemplate = ({
   const copy = i18n.i18n(copyJson);
   const slot = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      <h2 class="c-card__label c-card__label--hasIcon">
-        <i class="c-card__icon c-icon c-icon--error c-icon--inline"
+      <div class="c-card__label c-card__label--hasIcon">
+        <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
           >${warningIcon}</i
         >
-        ${copy.label}
-      </h2>
+        <h2>${copy.label}</h2>
+      </div>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <p class="t-paragraph">${copy.paragraph}</p>
     </hgroup>

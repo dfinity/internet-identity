@@ -51,7 +51,9 @@ const pollForTentativeDeviceTemplate = ({
 
   const pageContentSlot = html`
     <hgroup>
-      <h2 class="c-card__label">${copy.identity_anchor} ${userNumber}</h2>
+      <div class="c-card__label">
+        <h2>${copy.identity_anchor} ${userNumber}</h2>
+      </div>
       <h1 class="t-title t-title--main l-stack--none">
         ${copy.add_trusted_device}
       </h1>

@@ -656,21 +656,13 @@ a:hover,
   vertical-align: middle;
 }
 
+.c-icon [fill] {
+  fill: var(--onBgc);
+}
+
+/* Icons that have e.g. text to the right */
 .c-icon--inline {
   margin-right: var(--rs-inline-icon-gap);
-}
-
-.c-icon--block {
-  display: block;
-  height: auto;
-  aspect-ratio: none;
-}
-
-.c-icon--marketing {
-  height: 4.5rem;
-  width: 4.5rem;
-
-  color: var(--rc-marketing-icon);
 }
 
 .c-icon svg {
@@ -681,44 +673,56 @@ a:hover,
   width: 100%;
 }
 
+/* Big marketing icons (section title) */
+.c-icon--marketing {
+  height: 4.5rem;
+  width: 4.5rem;
+
+  color: var(--rc-marketing-icon);
+  --onBgc: transparent;
+}
+.c-icon--marketing {
+  fill: auto;
+}
+
+/* Small icons used to display status */
 .c-icon--ok,
 .c-icon--warning,
-.c-icon--error {
+.c-icon--error,
+.c-icon--error__flipped {
   background: var(--bgc);
-  border-radius: 50%;
-}
-
-.c-icon--ok svg,
-.c-icon--warning svg,
-.c-icon--error svg {
-  transform: translate(-50%, -50%) scale(0.65);
-}
-
-.c-icon--ok [fill],
-.c-icon--warning [fill],
-.c-icon--error [fill] {
-  fill: var(--onBgc);
 }
 
 .c-icon--ok {
-  --bgc: var(--rc-positive);
-  --onBgc: var(--rc-onPositive);
+  --onBgc: var(--rc-positive);
 }
-
 .c-icon--warning {
-  --bgc: var(--rc-warning);
-  --onBgc: var(--rc-onWarning);
+  --onBgc: var(--rc-warning);
 }
 
 .c-icon--error {
+  --onBgc: var(--rc-error);
+  border-radius: 50%;
+}
+
+/* "Flipped" version where the background pops (instead
+ * of the icon itself) */
+.c-icon--error__flipped {
   --bgc: var(--rc-error);
   --onBgc: var(--rc-onError);
+  border-radius: 50%;
+}
+.c-icon--error__flipped svg {
+  /* Y value is a bit bigger to compensate visually: the triangle's center of mass
+   * should be centered, not the triangle's bounding box's center of mass. */
+  transform: translate(-50%, -53.5%) scale(0.65);
 }
 
 .c-icon--lock svg {
   transform: translate(-50%, -50%) scale(0.8);
 }
 
+/* Dot menu */
 .c-icon--more {
   position: relative;
   width: 2rem;
@@ -728,25 +732,6 @@ a:hover,
   --offsetY: 0;
   --bgc: currentColor;
 }
-
-.c-icon--circle {
-  display: inline-block;
-  position: relative;
-  border-radius: 50%;
-  padding: 0.2rem;
-  width: 1.2em;
-  height: 1.2em;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.c-icon--circle svg {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.6);
-  color: rgba(0, 0, 0, 0.5);
-}
-
 :is(button, a, link, .c-dropdown)[aria-expanded="true"] .c-icon--more {
   --rotate: -90deg;
   background-color: var(--rc-button);
@@ -788,6 +773,26 @@ a:hover,
   box-shadow: 0 0 0 2px #ffffff, 0 0 2px 4px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+/* Circle icons */
+.c-icon--circle {
+  display: inline-block;
+  position: relative;
+  border-radius: 50%;
+  padding: 0.2rem;
+  width: 1.2em;
+  height: 1.2em;
+  background: rgba(0, 0, 0, 0.08);
+  --onBgc: transparent; /* reset primary color bc we don't want any fill */
+}
+
+.c-icon--circle svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  color: rgba(0, 0, 0, 0.5);
 }
 
 /**
@@ -876,8 +881,12 @@ a:hover,
   }
 }
 
+/* Card label/titles */
 .c-card__label {
-  display: block;
+  /* some labels have icons, so we center everything vertically */
+  display: flex;
+  align-items: center;
+
   font-size: 1rem;
   /* opacity only on text color not the full element */
   color: color-mix(in srgb-linear, var(--rc-text), var(--rc-card) 30%);
