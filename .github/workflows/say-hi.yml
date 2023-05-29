@@ -35,4 +35,19 @@ jobs:
               repo: context.repo.repo,
               name: "github-pages",
             });
-            console.log(result.data.artifacts.map(artifact => ({name: artifact.name, run: artifact.workflow_run})));
+            result.data.artifacts.forEach( async (artifact) => {
+              const name = artifact.name;
+              const artifactId = artifact.id;
+              const br = artifact.workflow_run.head_branch;
+              console.log(artifact.name, artifactId);
+              console.log(br);
+              const { url } = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifactId,
+                archive_format: "zip",
+              });
+
+              console.log(url);
+              fs.mkdirSync(br, { recursive: true })
+            });
