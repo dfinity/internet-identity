@@ -12,17 +12,16 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            console.log(github.rest.issues)
             const pr = await github.rest.issues.get({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
             console.log(pr)
-            console.log(pr.body)
+            console.log(pr.data.body)
             github.rest.issues.update({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: pr.body + "\n" + "And now something else",
+              body: pr.data.body + "\n" + "And a new line",
             })
