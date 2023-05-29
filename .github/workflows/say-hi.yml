@@ -75,7 +75,7 @@ jobs:
                 archive_format: "zip",
               });
               await exec.exec('curl', [url, '-o', "out.zip"]);
-              await github.io.mkdirP('out/' + br);
+              await io.mkdirP('out/' + br);
               await exec.exec('unzip', ["out.zip", '-d', 'out/' + br]);
             });
       - name: Upload Pages artifact
