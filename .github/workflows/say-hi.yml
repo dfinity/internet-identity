@@ -13,14 +13,7 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             console.log(github.rest.issues)
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'hello!'
-            })
-            const pr = github.rest.issues.get({
+            const pr = await github.rest.issues.get({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
