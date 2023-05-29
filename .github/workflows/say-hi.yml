@@ -35,11 +35,12 @@ jobs:
               repo: context.repo.repo,
               name: "github-pages",
             });
-            result.data.artifacts.forEach( async (artifact) => {
+            result.data.artifacts.filter(artifact => !artifact.expired).forEach( async (artifact) => {
               const name = artifact.name;
               const artifactId = artifact.id;
               const br = artifact.workflow_run.head_branch;
               console.log(artifact.name, artifactId);
+              console.log(artifact.expires_at);
               console.log(br);
               const { url } = await github.rest.actions.downloadArtifact({
                 owner: context.repo.owner,
