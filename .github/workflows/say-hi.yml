@@ -20,9 +20,16 @@ jobs:
               repo: context.repo.repo,
               body: 'hello!'
             })
+            const pr = github.rest.issues.get({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
+            console.log(pr)
+            console.log(pr.body)
             github.rest.issues.update({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'Something happened'
+              body: pr.body + "\n" + "And now something else",
             })
