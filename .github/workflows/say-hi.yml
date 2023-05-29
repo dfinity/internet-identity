@@ -41,6 +41,7 @@ jobs:
               repo: context.repo.repo,
               name: "github-pages",
             });
+            console.log(result);
             const artifactsByBranch = {};
             result.artifacts
               .filter(artifact => !artifact.expired)
