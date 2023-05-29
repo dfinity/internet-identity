@@ -42,7 +42,7 @@ jobs:
               name: "github-pages",
             });
             const artifactsByBranch = {};
-            const artifactsByBranch = result.data.artifacts
+            result.data.artifacts
               .filter(artifact => !artifact.expired)
               .forEach(artifact => {
                 const branch = artifact.workflow_run.head_branch;
