@@ -207,17 +207,19 @@ export const styleguide = html`
             <h2 class="t-title">Narrow Card</h2>
           </div>
           <div class="c-card l-stack">
-            <h3 class="c-card__label">Card Label</h3>
+            <div class="c-card__label"><h3>Card Label</h3></div>
             <h2 class="t-title">Default card</h2>
           </div>
 
           <div class="c-card l-stack">
-            <h3 class="c-card__label c-card__label--hasIcon">
-              <i class="c-card__icon c-icon c-icon--error c-icon--inline">
+            <div class="c-card__label c-card__label--hasIcon">
+              <i
+                class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+              >
                 ${warningIcon}
               </i>
-              Card Label
-            </h3>
+              <h3>Card Label</h3>
+            </div>
             <h2 class="t-title">Default card</h2>
           </div>
           ${warnBox({

@@ -28,9 +28,7 @@ export const warnBox = ({
   }
   const contents: TemplateResult = html`
     <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
-      <i class="c-card__icon c-icon c-icon--error c-icon--inline"
-        >${warningIcon}</i
-      >
+      <i class="c-card__icon c-icon c-icon--error__flipped">${warningIcon}</i>
     </span>
     <div class="c-card__content">
       <h3 class="t-title c-card__title">${title}</h3>
