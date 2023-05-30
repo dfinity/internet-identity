@@ -885,6 +885,7 @@ dependencies = [
  "candid",
  "canister_tests",
  "captcha",
+ "getrandom",
  "hex",
  "hex-literal",
  "ic-cdk",

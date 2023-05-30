@@ -21,8 +21,7 @@ lodepng = "*"
 base64 = "*"
 
 rand = { version ="*", default-features = false }
-# Add wasm32-unknown-unknown support as explained here: https://docs.rs/getrandom/latest/getrandom/#webassembly-support
-getrandom = { version = "0.2", features = ["js"] }
+
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = "0.0.9"
@@ -34,6 +33,9 @@ ic-cdk-macros = "0.6"
 ic-certified-map = "0.3"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
+
+[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
 ic-test-state-machine-client = "2"
