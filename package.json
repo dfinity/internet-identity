@@ -7,15 +7,17 @@
   "scripts": {
     "dev": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite",
     "host": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite --host",
-    "showcase": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite --mode showcase",
+    "showcase": "astro dev --root ./src/showcase",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --project ./tsconfig.all.json --noEmit",
+    "check:showcase": "astro check --root ./src/showcase --watch",
     "watch": "npm run check -- --watch",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "generate": "npm run generate:types && npm run generate:js",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "build:showcase": "tsc --noEmit && vite build --mode showcase",
+    "build:showcase": "tsc --noEmit && astro check --root ./src/showcase && astro build --root ./src/showcase",
+    "preview:showcase": "astro preview --root ./src/showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "vitest --config ./vitest.config.ts",
     "test:e2e": "vitest --mode e2e --config ./vitest.config.ts",
@@ -58,7 +60,8 @@
     "process": "^0.11.10",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
-    "ua-parser-js": "^1.0.35"
+    "ua-parser-js": "^1.0.35",
+    "astro": "^2.4.1"
   },
   "engines": {
     "npm": ">=9.0.0 <10.0.0",

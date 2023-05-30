@@ -16,6 +16,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": ["node", "vite/client", "vitest/globals"],
+    "baseUrl": ".",
     "paths": {
       "$generated": ["./src/frontend/generated"],
       "$generated/*": ["./src/frontend/generated/*"],
