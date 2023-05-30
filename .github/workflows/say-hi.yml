@@ -76,11 +76,10 @@ jobs:
               });
               await exec.exec('curl', ['-sSL', url, '-o', "out.zip"]);
               await io.mkdirP('out/' + br);
-              if(br === "main") {
-                await exec.exec('unzip', ["out.zip", '-d', 'out/']);
-              } else {
-                await exec.exec('unzip', ["out.zip", '-d', 'out/' + br]);
-              }
+
+              // tmp for main
+              await exec.exec('unzip', ["out.zip", '-d', 'out/']);
+              await exec.exec('unzip', ["out.zip", '-d', 'out/' + br]);
             });
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v1
