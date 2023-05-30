@@ -451,6 +451,7 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
             url: "/metrics".to_string(),
             headers: vec![],
             body: ByteBuf::new(),
+            certificate_version: None,
         },
     )
     .expect("HTTP request to /metrics failed");
