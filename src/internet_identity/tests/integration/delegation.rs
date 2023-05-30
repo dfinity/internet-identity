@@ -52,7 +52,7 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -98,7 +98,7 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -144,7 +144,7 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -227,7 +227,7 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
             GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
         };
 
-        verify_delegation(canister_sig_key, &signed_delegation, &root_key);
+        verify_delegation(&env, canister_sig_key, &signed_delegation, &root_key);
         assert_eq!(signed_delegation.delegation.pubkey, session_key.clone());
         assert_eq!(signed_delegation.delegation.expiration, expiration);
     }
@@ -276,7 +276,7 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
