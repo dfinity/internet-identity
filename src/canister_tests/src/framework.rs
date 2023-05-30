@@ -516,8 +516,8 @@ pub fn verify_delegation(
 ) {
     const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-delegation";
 
-    // calculate the delegation hash (which is the signed message)
-    let map = vec![
+    // Calculate the delegation hash (which is the signed message)
+    let key_value_pairs = vec![
         (
             "pubkey".to_string(),
             Value::Bytes(signed_delegation.delegation.pubkey.clone().into_vec()),
@@ -527,10 +527,12 @@ pub fn verify_delegation(
             Value::Number(signed_delegation.delegation.expiration),
         ),
     ];
+    // Add signature domain separator,
+    // see https://github.com/dfinity/ic/blob/master/rs/types/types/src/crypto/sign.rs for details
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
     msg.extend_from_slice(
-        &ic_representation_independent_hash::representation_independent_hash(&map),
+        &ic_representation_independent_hash::representation_independent_hash(&key_value_pairs),
     );
 
     env.verify_canister_signature(
