@@ -528,7 +528,7 @@ pub fn verify_delegation(
         ),
     ];
     // Add signature domain separator,
-    // see https://github.com/dfinity/ic/blob/master/rs/types/types/src/crypto/sign.rs for details
+    // see https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
     msg.extend_from_slice(
