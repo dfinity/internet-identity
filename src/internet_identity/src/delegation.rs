@@ -1,10 +1,10 @@
 use crate::active_anchor_stats::IIDomain;
-use crate::state::{persistent_state_mut, AssetHashes};
-use crate::{hash, state, update_root_hash, DAY_NS, LABEL_ASSETS, LABEL_SIG, MINUTE_NS};
+use crate::assets::CertifiedAssets;
+use crate::state::persistent_state_mut;
+use crate::{hash, state, update_root_hash, DAY_NS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
-use ic_certified_map::AsHashTree;
 use ic_certified_map::{Hash, HashTree};
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::internet_identity::types::*;
@@ -127,7 +127,7 @@ pub fn get_delegation(
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
 
-    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
+    state::assets_and_signatures(|asset_hashes, sigs| {
         match get_signature(
             asset_hashes,
             sigs,
@@ -217,7 +217,7 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
 }
 
 fn get_signature(
-    asset_hashes: &AssetHashes,
+    assets: &CertifiedAssets,
     sigs: &SignatureMap,
     pk: PublicKey,
     seed: Hash,
@@ -244,10 +244,7 @@ fn get_signature(
     }
 
     let tree = ic_certified_map::fork(
-        HashTree::Pruned(ic_certified_map::labeled_hash(
-            LABEL_ASSETS,
-            &asset_hashes.root_hash(),
-        )),
+        HashTree::Pruned(assets.root_hash()),
         ic_certified_map::labeled(LABEL_SIG, witness),
     );
 

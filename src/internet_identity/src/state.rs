@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::assets::CertifiedAssets;
 use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
 use crate::storage::{StableMemory, DEFAULT_RANGE_SIZE};
@@ -6,18 +7,13 @@ use crate::{Salt, Storage};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
-use ic_certified_map::{Hash, RbTree};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity::signature_map::SignatureMap;
-use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::internet_identity::types::*;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
-
-pub type Assets = HashMap<String, (Vec<HeaderField>, Vec<u8>)>;
-pub type AssetHashes = RbTree<String, Hash>;
 
 mod temp_keys;
 
@@ -26,7 +22,7 @@ const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
 
 thread_local! {
     static STATE: State = State::default();
-    static ASSETS: RefCell<Assets> = RefCell::new(HashMap::default());
+    static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
 }
 
 pub struct TentativeDeviceRegistration {
@@ -126,7 +122,6 @@ struct State {
     sigs: RefCell<SignatureMap>,
     // Temporary keys that can be used in lieu of a particular device
     temp_keys: RefCell<TempKeys>,
-    asset_hashes: RefCell<AssetHashes>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
     // through upgrades
@@ -153,7 +148,6 @@ impl Default for State {
             storage_state: RefCell::new(StorageState::Uninitialised),
             sigs: RefCell::new(SignatureMap::default()),
             temp_keys: RefCell::new(TempKeys::default()),
-            asset_hashes: RefCell::new(AssetHashes::default()),
             last_upgrade_timestamp: Cell::new(0),
             inflight_challenges: RefCell::new(HashMap::new()),
             tentative_device_registrations: RefCell::new(HashMap::new()),
@@ -309,18 +303,16 @@ pub fn tentative_device_registrations_mut<R>(
     STATE.with(|s| f(&mut s.tentative_device_registrations.borrow_mut()))
 }
 
-pub fn assets<R>(f: impl FnOnce(&Assets) -> R) -> R {
+pub fn assets<R>(f: impl FnOnce(&CertifiedAssets) -> R) -> R {
     ASSETS.with(|assets| f(&assets.borrow()))
 }
 
-pub fn assets_and_hashes_mut<R>(f: impl FnOnce(&mut Assets, &mut AssetHashes) -> R) -> R {
-    ASSETS.with(|assets| {
-        STATE.with(|s| f(&mut assets.borrow_mut(), &mut s.asset_hashes.borrow_mut()))
-    })
+pub fn assets_mut<R>(f: impl FnOnce(&mut CertifiedAssets) -> R) -> R {
+    ASSETS.with(|assets| f(&mut assets.borrow_mut()))
 }
 
-pub fn asset_hashes_and_sigs<R>(f: impl FnOnce(&AssetHashes, &SignatureMap) -> R) -> R {
-    STATE.with(|s| f(&s.asset_hashes.borrow(), &s.sigs.borrow()))
+pub fn assets_and_signatures<R>(f: impl FnOnce(&CertifiedAssets, &SignatureMap) -> R) -> R {
+    ASSETS.with(|assets| STATE.with(|s| f(&assets.borrow(), &s.sigs.borrow())))
 }
 
 pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {

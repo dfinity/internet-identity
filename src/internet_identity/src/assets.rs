@@ -6,9 +6,33 @@ use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
+use ic_certified_map::{AsHashTree, Hash, HashTree, RbTree};
 use include_dir::{include_dir, Dir, File};
+use internet_identity_interface::http_gateway::HeaderField;
 use lazy_static::lazy_static;
 use sha2::Digest;
+use std::collections::HashMap;
+
+const LABEL_ASSETS: &[u8] = b"http_assets";
+
+#[derive(Debug, Default, Clone)]
+pub struct CertifiedAssets {
+    pub assets: HashMap<String, (Vec<HeaderField>, Vec<u8>)>,
+    pub certification_v1: RbTree<String, Hash>,
+}
+
+impl CertifiedAssets {
+    /// Returns the root_hash of the asset certification tree.
+    /// In the future, this will include both certification v1 and v2.
+    pub fn root_hash(&self) -> Hash {
+        ic_certified_map::labeled_hash(LABEL_ASSETS, &self.certification_v1.root_hash())
+    }
+
+    pub fn witness(&self, path: &str) -> HashTree {
+        let witness = self.certification_v1.witness(path.as_bytes());
+        ic_certified_map::labeled(LABEL_ASSETS, witness)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ContentEncoding {
@@ -63,9 +87,11 @@ lazy_static! {
 
 // used both in init and post_upgrade
 pub fn init_assets() {
-    state::assets_and_hashes_mut(|assets, asset_hashes| {
+    state::assets_mut(|certified_assets| {
         for (path, content, content_encoding, content_type) in get_static_assets() {
-            asset_hashes.insert(path.clone(), sha2::Sha256::digest(&content).into());
+            certified_assets
+                .certification_v1
+                .insert(path.clone(), sha2::Sha256::digest(&content).into());
             let mut headers = match content_encoding {
                 ContentEncoding::Identity => vec![],
                 ContentEncoding::GZip => {
@@ -76,7 +102,7 @@ pub fn init_assets() {
                 "Content-Type".to_string(),
                 content_type.to_mime_type_string(),
             ));
-            assets.insert(path, (headers, content));
+            certified_assets.assets.insert(path, (headers, content));
         }
     });
 }
