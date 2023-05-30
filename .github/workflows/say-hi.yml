@@ -77,8 +77,8 @@ jobs:
               await io.mkdirP('out/' + br);
 
               // tmp for main
-              await exec.exec('unzip', ["out.zip", '-d', 'out/']);
               await exec.exec('unzip', ["out.zip", '-d', 'out/' + br + "/"]);
+              await exec.exec('unzip', ["out.zip", '-d', 'out/']);
             });
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v1
