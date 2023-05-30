@@ -21,6 +21,8 @@ lodepng = "*"
 base64 = "*"
 
 rand = { version ="*", default-features = false }
+# Add wasm32-unknown-unknown support as explained here: https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+getrandom = { version = "0.2", features = ["js"] }
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = "0.0.9"
