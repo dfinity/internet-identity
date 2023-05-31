@@ -1,6 +1,6 @@
 use crate::archive::ArchiveState;
 use crate::assets::ContentType;
-use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_ASSETS, LABEL_SIG};
+use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_SIG};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api::stable::stable64_size;
@@ -84,26 +84,28 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             let mut headers = security_headers();
             headers.push(certificate_header);
 
-            state::assets(|a| match a.get(probably_an_asset) {
-                Some((asset_headers, value)) => {
-                    headers.append(&mut asset_headers.clone());
+            state::assets(
+                |certified_assets| match certified_assets.assets.get(probably_an_asset) {
+                    Some((asset_headers, data)) => {
+                        headers.append(&mut asset_headers.clone());
 
-                    HttpResponse {
-                        status_code: 200,
+                        HttpResponse {
+                            status_code: 200,
+                            headers,
+                            body: ByteBuf::from(data.clone()),
+                            upgrade: None,
+                            streaming_strategy: None,
+                        }
+                    }
+                    None => HttpResponse {
+                        status_code: 404,
                         headers,
-                        body: ByteBuf::from(value.clone()),
+                        body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                         upgrade: None,
                         streaming_strategy: None,
-                    }
-                }
-                None => HttpResponse {
-                    status_code: 404,
-                    headers,
-                    body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
-                    upgrade: None,
-                    streaming_strategy: None,
+                    },
                 },
-            })
+            )
         }
     }
 }
@@ -414,10 +416,9 @@ fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
-    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
-        let witness = asset_hashes.witness(asset_name.as_bytes());
+    state::assets_and_signatures(|assets, sigs| {
         let tree = ic_certified_map::fork(
-            ic_certified_map::labeled(LABEL_ASSETS, witness),
+            assets.witness(asset_name),
             HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
         );
         let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
