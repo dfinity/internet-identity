@@ -21,6 +21,7 @@ lodepng = "*"
 base64 = "*"
 
 rand = { version ="*", default-features = false }
+
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = "0.0.9"
@@ -33,12 +34,15 @@ ic-certified-map = "0.3"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
 
+[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
 [dev-dependencies]
 ic-test-state-machine-client = "2"
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.5"
-ic-response-verification = "0.3.0"
+ic-response-verification = "0.3"
 
 
 [features]
