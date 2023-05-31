@@ -442,19 +442,21 @@ fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
     })
 }
 
-fn asset_certificate_headers_v2(asset_name: &str) -> Vec<(String, String)> {
+fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
+    assert!(absolute_path.starts_with("/"));
+
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
 
-    let mut path: Vec<String> = asset_name.split('/').map(str::to_string).collect();
+    let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
     // replace the first empty split segment (due to absolute path) with "http_expr"
     *path.get_mut(0).unwrap() = "http_expr".to_string();
     path.push("<$>".to_string());
 
     state::assets_and_signatures(|assets, sigs| {
         let tree = ic_certified_map::fork(
-            assets.witness_v2(asset_name),
+            assets.witness_v2(absolute_path),
             HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
         );
 

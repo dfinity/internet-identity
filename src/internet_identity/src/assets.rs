@@ -52,8 +52,10 @@ impl CertifiedAssets {
         )
     }
 
-    pub fn witness_v2(&self, path: &str) -> HashTree {
-        let mut path: Vec<String> = path.split('/').map(str::to_string).collect();
+    pub fn witness_v2(&self, absolute_path: &str) -> HashTree {
+        assert!(absolute_path.starts_with("/"));
+
+        let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
         path.remove(0); // remove leading empty string due to absolute path
         path.push("<$>".to_string());
         let path_bytes: Vec<Vec<u8>> = path.iter().map(String::as_bytes).map(Vec::from).collect();
@@ -164,11 +166,17 @@ fn add_certification_v1(certified_assets: &mut CertifiedAssets, path: &str, body
 
 fn add_certification_v2(
     certified_assets: &mut CertifiedAssets,
-    path: &str,
+    absolute_path: &str,
     headers: &[HeaderField],
     body_hash: Hash,
 ) {
-    let mut segments: Vec<Vec<u8>> = path.split('/').map(str::as_bytes).map(Vec::from).collect();
+    assert!(absolute_path.starts_with("/"));
+
+    let mut segments: Vec<Vec<u8>> = absolute_path
+        .split('/')
+        .map(str::as_bytes)
+        .map(Vec::from)
+        .collect();
     segments.remove(0); // remove leading empty string due to absolute path
     segments.push("<$>".as_bytes().to_vec());
     segments.push(Vec::from(EXPR_HASH.as_slice()));
