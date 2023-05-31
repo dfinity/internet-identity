@@ -20,6 +20,8 @@ use std::collections::HashMap;
 
 const LABEL_ASSETS_V1: &[u8] = b"http_assets";
 const LABEL_ASSETS_V2: &[u8] = b"http_expr";
+const STATUS_CODE_PSEUDO_HEADER: &str = ":ic-cert-status";
+pub const EXACT_MATCH_TERMINATOR: &str = "<$>";
 pub const IC_CERTIFICATE_EXPRESSION: &str =
     "default_certification(ValidationArgs{certification:Certification{no_request_certification: Empty{},\
     response_certification:ResponseCertification{response_header_exclusions:ResponseHeaderList{headers:[]}}}})";
@@ -57,7 +59,7 @@ impl CertifiedAssets {
 
         let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
         path.remove(0); // remove leading empty string due to absolute path
-        path.push("<$>".to_string());
+        path.push(EXACT_MATCH_TERMINATOR.to_string());
         let path_bytes: Vec<Vec<u8>> = path.iter().map(String::as_bytes).map(Vec::from).collect();
         let witness = self.certification_v2.witness(&path_bytes);
 
@@ -178,7 +180,7 @@ fn add_certification_v2(
         .map(Vec::from)
         .collect();
     segments.remove(0); // remove leading empty string due to absolute path
-    segments.push("<$>".as_bytes().to_vec());
+    segments.push(EXACT_MATCH_TERMINATOR.as_bytes().to_vec());
     segments.push(Vec::from(EXPR_HASH.as_slice()));
     segments.push(vec![]);
     segments.push(Vec::from(response_hash(headers, &body_hash)));
@@ -197,7 +199,7 @@ fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
         IC_CERTIFICATE_EXPRESSION_HEADER.to_ascii_lowercase(),
         Value::String(IC_CERTIFICATE_EXPRESSION),
     );
-    response_metadata.insert(":ic-cert-status".to_string(), Value::U64(200));
+    response_metadata.insert(STATUS_CODE_PSEUDO_HEADER.to_string(), Value::U64(200));
     let mut response_metadata_hash: Vec<u8> = hash_of_map(response_metadata).into();
     response_metadata_hash.extend_from_slice(body_hash);
     let response_hash: Hash = sha2::Sha256::digest(&response_metadata_hash).into();

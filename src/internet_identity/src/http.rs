@@ -1,5 +1,5 @@
 use crate::archive::ArchiveState;
-use crate::assets::{ContentType, IC_CERTIFICATE_EXPRESSION};
+use crate::assets::{ContentType, EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
 use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_SIG};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
@@ -15,6 +15,7 @@ use std::time::Duration;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
+const LABEL_HTTP_EXPR: &str = "http_expr";
 
 impl ContentType {
     pub fn to_mime_type_string(self) -> String {
@@ -451,8 +452,8 @@ fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
 
     let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
     // replace the first empty split segment (due to absolute path) with "http_expr"
-    *path.get_mut(0).unwrap() = "http_expr".to_string();
-    path.push("<$>".to_string());
+    *path.get_mut(0).unwrap() = LABEL_HTTP_EXPR.to_string();
+    path.push(EXACT_MATCH_TERMINATOR.to_string());
 
     state::assets_and_signatures(|assets, sigs| {
         let tree = ic_certified_map::fork(
