@@ -516,7 +516,10 @@ pub fn verify_delegation(
 ) {
     const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-delegation";
 
-    // Calculate the delegation hash (which is the signed message)
+    // The signed message is a signature domain separator
+    // followed by the representation independent hash of a map with entries
+    // pubkey, expiration and targets (if any), using the respective values from the delegation.
+    // See https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
     let key_value_pairs = vec![
         (
             "pubkey".to_string(),
@@ -527,8 +530,6 @@ pub fn verify_delegation(
             Value::Number(signed_delegation.delegation.expiration),
         ),
     ];
-    // Add signature domain separator,
-    // see https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
     msg.extend_from_slice(
@@ -541,7 +542,7 @@ pub fn verify_delegation(
         user_key.into_vec(),
         root_key.to_vec(),
     )
-    .expect("canister signature invalid");
+    .expect("delegation signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
