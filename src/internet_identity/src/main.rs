@@ -415,7 +415,7 @@ fn update_root_hash() {
     state::assets_and_signatures(|assets, sigs| {
         let prefixed_root_hash = fork_hash(
             &assets.root_hash(),
-            // NB: sigs have to be added last due to lexical ordering of labels
+            // NB: sigs have to be added last due to lexicographic order of labels
             &labeled_hash(LABEL_SIG, &sigs.root_hash()),
         );
         set_certified_data(&prefixed_root_hash[..]);

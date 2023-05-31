@@ -23,7 +23,6 @@ pub struct CertifiedAssets {
 
 impl CertifiedAssets {
     /// Returns the root_hash of the asset certification tree.
-    /// In the future, this will include both certification v1 and v2.
     pub fn root_hash(&self) -> Hash {
         ic_certified_map::labeled_hash(LABEL_ASSETS, &self.certification_v1.root_hash())
     }
