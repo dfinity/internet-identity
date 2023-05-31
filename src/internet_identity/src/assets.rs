@@ -55,7 +55,7 @@ impl CertifiedAssets {
     }
 
     pub fn witness_v2(&self, absolute_path: &str) -> HashTree {
-        assert!(absolute_path.starts_with("/"));
+        assert!(absolute_path.starts_with('/'));
 
         let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
         path.remove(0); // remove leading empty string due to absolute path
@@ -172,7 +172,7 @@ fn add_certification_v2(
     headers: &[HeaderField],
     body_hash: Hash,
 ) {
-    assert!(absolute_path.starts_with("/"));
+    assert!(absolute_path.starts_with('/'));
 
     let mut segments: Vec<Vec<u8>> = absolute_path
         .split('/')

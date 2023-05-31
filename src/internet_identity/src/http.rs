@@ -444,7 +444,7 @@ fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
 }
 
 fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
-    assert!(absolute_path.starts_with("/"));
+    assert!(absolute_path.starts_with('/'));
 
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
