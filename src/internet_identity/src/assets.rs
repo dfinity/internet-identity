@@ -4,6 +4,7 @@
 
 use crate::hash::{hash_of_map, Value};
 use crate::http::{security_headers, IC_CERTIFICATE_EXPRESSION_HEADER};
+use crate::nested_tree::NestedTree;
 use crate::{http, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
@@ -12,7 +13,6 @@ use ic_certified_map::{
     fork, fork_hash, labeled, labeled_hash, AsHashTree, Hash, HashTree, RbTree,
 };
 use include_dir::{include_dir, Dir, File};
-use internet_identity::nested_tree::NestedTree;
 use internet_identity_interface::http_gateway::HeaderField;
 use lazy_static::lazy_static;
 use sha2::Digest;

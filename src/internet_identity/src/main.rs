@@ -19,6 +19,8 @@ mod assets;
 mod delegation;
 mod hash;
 mod http;
+/// Infrastructure to help building nested certification trees.
+mod nested_tree;
 mod state;
 mod storage;
 

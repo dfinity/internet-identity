@@ -1,5 +1,6 @@
 //! This module has been copied from https://github.com/dfinity/sdk/blob/master/src/canisters/frontend/ic-certified-assets/src/asset_certification/tree.rs
 //! XXX: Replace with library, once the trust team has extracted a reusable certification library.
+#![allow(dead_code)] // we don't need all the features provided here
 
 use ic_certified_map::{AsHashTree, HashTree, RbTree};
 
@@ -37,7 +38,6 @@ impl<K: NestedTreeKeyRequirements, V: NestedTreeValueRequirements> AsHashTree fo
 }
 
 impl<K: NestedTreeKeyRequirements, V: NestedTreeValueRequirements> NestedTree<K, V> {
-    #[allow(dead_code)]
     pub fn get(&self, path: &[K]) -> Option<&V> {
         if let Some(key) = path.get(0) {
             match self {
