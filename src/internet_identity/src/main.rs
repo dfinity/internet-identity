@@ -8,6 +8,9 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
+    GetIdAliasResponse, PrepareIdAliasResponse,
+};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -552,6 +555,31 @@ mod v2_api {
             ))
         });
         Some(result)
+    }
+}
+
+/// API for the attribute sharing mvp
+mod attribute_sharing_mvp {
+    use super::*;
+
+    #[update]
+    #[candid_method]
+    fn prepare_id_alias(
+        _identity_number: IdentityNumber,
+        _relying_party: FrontendHostname,
+        _issuer: FrontendHostname,
+    ) -> Option<PrepareIdAliasResponse> {
+        todo!("implement prepare_id_alias")
+    }
+
+    #[query]
+    #[candid_method(query)]
+    fn get_id_alias(
+        _identity_number: IdentityNumber,
+        _relying_party: FrontendHostname,
+        _issuer: FrontendHostname,
+    ) -> Option<GetIdAliasResponse> {
+        todo!("implement get_id_alias")
     }
 }
 
