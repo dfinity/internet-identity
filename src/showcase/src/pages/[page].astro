@@ -1,0 +1,21 @@
+---
+import "$src/styles/main.css";
+import { iiPages } from "$showcase/showcase";
+
+export function getStaticPaths() {
+  return Object.keys(iiPages).map((key) => ({ params: { page: key } }));
+}
+
+const { page } = Astro.params;
+---
+
+<div id="pageContent" data-page-name={page}></div>
+<script>
+  import { iiPages } from "$showcase/showcase";
+
+  const page = (document.querySelector("[data-page-name]") as HTMLDivElement)
+    .dataset?.pageName as string;
+
+  const f = iiPages[page];
+  f();
+</script>

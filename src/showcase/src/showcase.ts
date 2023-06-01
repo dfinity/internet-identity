@@ -95,7 +95,7 @@ const chromeDevice: DeviceData = {
   origin: [],
   metadata: [],
 };
-const defaultPage = () => {
+export const defaultPage = () => {
   document.title = "Showcase";
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
@@ -154,7 +154,7 @@ const authzKnownAlt = authnPages(i18n, {
 const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
-const iiPages: Record<string, () => void> = {
+export const iiPages: Record<string, () => void> = {
   displayUserNumber: () =>
     displayUserNumberPage({
       identityBackground,
@@ -639,36 +639,9 @@ const pageContent = html`
 `;
 
 // The 404 page
-const notFound = ({
-  baseUrl,
-  pageName,
-}: {
-  baseUrl: string;
-  pageName: string;
-}) => {
+export const notFound = () => {
   showMessagePage({
     message: html`<h1>404 not found</h1>
-      <p class="t-paragraph">
-        Page '${pageName}' was not found on '${baseUrl}${pageName}'
-      </p> `,
+      <p class="t-paragraph">Page was not found</p> `,
   });
 };
-
-const init = () => {
-  // We use the URL's path to route to the correct page.
-  // If we can't find a page to route to, we just show the default page.
-  // This is not very user friendly (in particular we don't show anything like a
-  // 404) but this is an dev page anyway.
-  // '/myPage' -> 'myPage'
-  // '/internet-identity/myPage' -> 'myPage'
-  const baseUrl = import.meta.env.BASE_URL;
-  const pageName = window.location.pathname.replace(baseUrl, "");
-  if (pageName === "") {
-    defaultPage();
-  } else {
-    const page = iiPages[pageName] ?? (() => notFound({ baseUrl, pageName }));
-    page();
-  }
-};
-
-init();
