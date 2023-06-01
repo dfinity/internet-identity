@@ -1,5 +1,5 @@
-import { BASE_URL } from "$src/environment";
 import { html, TemplateResult } from "lit-html";
+import identityCardImage from "./identityCard.png";
 
 export const identityCard = ({
   userNumber,
@@ -37,7 +37,7 @@ export class IdentityBackground {
 
   constructor() {
     const img = new Image();
-    img.src = `${BASE_URL}image.png`; // Setting the src kicks off the fetching
+    img.src = identityCardImage; // Setting the src kicks off the fetching
     this.img = img;
   }
 }
