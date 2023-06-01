@@ -1,5 +1,6 @@
 //! This module has been copied from https://github.com/dfinity/sdk/blob/master/src/canisters/frontend/ic-certified-assets/src/asset_certification/tree.rs
-//! XXX: Replace with library, once the trust team has extracted a reusable certification library.
+//! (commit d6a3cb89dc3bfb2c07500e1fc781667e3b0cda5a).
+//! TODO: Replace with library, once the trust team has extracted a reusable certification library.
 #![allow(dead_code)] // we don't need all the features provided here
 
 use ic_certified_map::{AsHashTree, HashTree, RbTree};
