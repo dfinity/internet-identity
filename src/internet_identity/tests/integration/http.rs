@@ -5,7 +5,7 @@ use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_response_verification::types::{Request, Response};
-use ic_response_verification::{verify_request_response_pair, MIN_VERIFICATION_VERSION};
+use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::http_gateway::HttpRequest;
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
@@ -23,52 +23,98 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    // for each asset, fetch the asset, check the HTTP status code, headers and certificate.
+    // for each asset and certification version, fetch the asset, check the HTTP status code, headers and certificate.
     for (asset, encoding) in assets {
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            url: asset.to_string(),
-            headers: vec![],
-            body: ByteBuf::new(),
-        };
-        let http_response = http_request(&env, canister_id, &request)?;
+        for certification_version in 1..=2 {
+            let request = HttpRequest {
+                method: "GET".to_string(),
+                url: asset.to_string(),
+                headers: vec![],
+                body: ByteBuf::new(),
+                certificate_version: Some(certification_version),
+            };
+            let http_response = http_request(&env, canister_id, &request)?;
 
-        assert_eq!(http_response.status_code, 200);
+            assert_eq!(http_response.status_code, 200);
 
-        // check the appropriate Content-Encoding header is set
-        if let Some(enc) = encoding {
-            let (_, content_encoding) = http_response
-                .headers
-                .iter()
-                .find(|(name, _)| name.to_lowercase() == "content-encoding")
-                .expect("Content-Encoding header not found");
-            assert_eq!(
-                content_encoding, enc,
-                "unexpected Content-Encoding header value"
-            );
+            // check the appropriate Content-Encoding header is set
+            if let Some(enc) = encoding {
+                let (_, content_encoding) = http_response
+                    .headers
+                    .iter()
+                    .find(|(name, _)| name.to_lowercase() == "content-encoding")
+                    .expect("Content-Encoding header not found");
+                assert_eq!(
+                    content_encoding, enc,
+                    "unexpected Content-Encoding header value"
+                );
+            }
+            verify_security_headers(&http_response.headers);
+
+            let result = verify_request_response_pair(
+                Request {
+                    method: request.method,
+                    url: request.url,
+                    headers: request.headers,
+                },
+                Response {
+                    status_code: http_response.status_code,
+                    headers: http_response.headers,
+                    body: http_response.body.into_vec(),
+                },
+                canister_id.as_slice(),
+                time(&env) as u128,
+                Duration::from_secs(300).as_nanos(),
+                &env.root_key(),
+                certification_version as u8,
+            )
+            .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
+            assert!(result.passed);
+            assert_eq!(result.verification_version, certification_version);
         }
-        verify_security_headers(&http_response.headers);
-
-        let result = verify_request_response_pair(
-            Request {
-                method: request.method,
-                url: request.url,
-                headers: request.headers,
-            },
-            Response {
-                status_code: http_response.status_code,
-                headers: http_response.headers,
-                body: http_response.body.into_vec(),
-            },
-            canister_id.as_slice(),
-            time(&env) as u128,
-            Duration::from_secs(300).as_nanos(),
-            &env.root_key(),
-            MIN_VERIFICATION_VERSION,
-        )
-        .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
-        assert!(result.passed);
     }
+    Ok(())
+}
+
+/// Verifies that clients that do not indicate any certification version will get a v1 certificate.
+#[test]
+fn should_fallback_to_v1_certification() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u8 = 1;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(http_response.status_code, 200);
+
+    let result = verify_request_response_pair(
+        Request {
+            method: request.method,
+            url: request.url,
+            headers: request.headers,
+        },
+        Response {
+            status_code: http_response.status_code,
+            headers: http_response.headers,
+            body: http_response.body.into_vec(),
+        },
+        canister_id.as_slice(),
+        time(&env) as u128,
+        Duration::from_secs(300).as_nanos(),
+        &env.root_key(),
+        CERTIFICATION_VERSION,
+    )
+    .unwrap_or_else(|e| panic!("validation failed: {e}"));
+    assert!(result.passed);
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION as u16);
+
     Ok(())
 }
 
