@@ -1,0 +1,86 @@
+# A workflow run regularly to deploy the scheduled release candidate
+name: Deploy Release Candidate
+
+on:
+  schedule:
+    # Run every Tuesday:
+    #   summer: 5pm Zurich time
+    #   winter: 6pm Zurich time
+    - cron:  '0 16 * * 2'
+  workflow_dispatch:
+
+jobs:
+  deploy-rc:
+    runs-on: ubuntu-latest
+    env:
+      ii_canister_id: jqajs-xiaaa-aaaad-aab5q-cai
+      testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai
+      wallet_canister_id: cvthj-wyaaa-aaaad-aaaaq-cai
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: "Download build for Release Candidate"
+        uses: actions/github-script@v5
+        with:
+          script: |
+            // Find all artifacts for the production build, and filter for non-expired main artifacts
+            const allArtifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: "internet_identity_production.wasm.gz",
+            });
+            const artifactsByBranch = {};
+            const mainArtifacts = allArtifacts
+              .filter(artifact => !artifact.expired)
+              .filter(artifact => artifact.workflow_run.head_branch === "main");
+
+            // Grab the latest artifact
+            mainArtifacts.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+            const latestMainArtifact = mainArtifacts[0];
+            if(!latestMainArtifact) {
+              const message = "Could not find an artifact to deploy from branch main, are artifacts expired?";
+              console.error(message);
+              throw new Error(message);
+            }
+            console.log("found artifact for commit", latestMainArtifact.workflow_run.head_sha);
+
+            // Download and unzip artifact
+            const { url } = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: latestMainArtifact.id,
+              archive_format: "zip",
+            });
+            await exec.exec('curl', ['-sSL', url, '-o', "artifact.zip"]);
+            await exec.exec('unzip', ["artifact.zip" ]);
+            await exec.exec('rm', ["artifact.zip" ]);
+
+      - name: "Print shasum of found build"
+        run: shasum -a 256 ./internet_identity_production.wasm.gz
+
+      - uses: ./.github/actions/setup-dfx
+
+      - name: 'Install key'
+        env:
+          DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
+        run: |
+          key_pem=$(mktemp)
+          printenv "DFX_DEPLOY_KEY" > "$key_pem"
+          dfx identity import --disable-encryption --force default "$key_pem"
+          rm "$key_pem"
+
+      - name: "Deploy Release Candidate"
+        run: |
+          wallet="${{ env.wallet_canister_id }}"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --wasm internet_identity_production.wasm.gz \
+            ${{ env.ii_canister_id }}
+
+      - name: Send RC link to slack
+        uses: ./.github/actions/slack
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: |
+            Internet Identity release candidate
+            RC link: https://${{ env.ii_canister_id }}.ic0.app
+            test app: https://${{ env.testnet_app_canister_id }}.ic0.app
