@@ -1,4 +1,7 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["../frontend/src", "src"]
+  "include": ["../frontend/src", "src"],
+  "compilerOptions": {
+    "baseUrl": "../.."
+  }
 }

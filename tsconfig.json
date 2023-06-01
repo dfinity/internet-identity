@@ -20,7 +20,9 @@
       "$generated": ["./src/frontend/generated"],
       "$generated/*": ["./src/frontend/generated/*"],
       "$src": ["./src/frontend/src"],
-      "$src/*": ["./src/frontend/src/*"]
+      "$src/*": ["./src/frontend/src/*"],
+      "$showcase": ["./src/showcase/src"],
+      "$showcase/*": ["./src/showcase/src/*"]
     }
   },
   "exclude": [

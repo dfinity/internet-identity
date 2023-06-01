@@ -13,9 +13,10 @@ export const aliasConfig: AliasOptions = {
   // Custom alias we are using to shorten and make absolute the imports
   $generated: resolve(__dirname, "src/frontend/generated"),
   $src: resolve(__dirname, "src/frontend/src"),
+  $showcase: resolve(__dirname, "src/showcase/src"),
 };
 
-const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
+export default defineConfig(({ mode }: UserConfig): UserConfig => {
   // Expand process.env variables with default values to ensure build reproducibility
   process.env = {
     ...process.env,
@@ -30,6 +31,7 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
   // root = src/frontend
   // outDir = ../../dist
   return {
+    root: "src/frontend",
     publicDir: "assets",
     envPrefix: "II_",
     resolve: {
@@ -73,34 +75,5 @@ const defaultConfig = (mode?: string): Omit<UserConfig, "root"> => {
         "/api": "http://127.0.0.1:4943",
       },
     },
-  };
-};
-
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }: UserConfig): UserConfig => {
-  const { build, server, ...rest } = defaultConfig(mode);
-
-  if (mode === "showcase") {
-    return {
-      ...rest,
-      root: "src/showcase",
-      publicDir: "../frontend/assets",
-      build: {
-        ...build,
-        target: "esnext" /* for top-level await in showcase */,
-        outDir: "../../dist-showcase",
-      },
-      server: {
-        ...server,
-        port: 5174,
-      },
-    };
-  }
-
-  return {
-    ...rest,
-    root: "src/frontend",
-    build,
-    server,
   };
 });
