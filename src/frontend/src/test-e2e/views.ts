@@ -223,10 +223,6 @@ export class MainView extends View {
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "rename" }).click();
 
@@ -237,10 +233,6 @@ export class MainView extends View {
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "protect" }).click();
     await this.browser.waitUntil(() => this.browser.isAlertOpen());
@@ -259,10 +251,6 @@ export class MainView extends View {
   }
 
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "unprotect" }).click();
     await this.browser.waitUntil(() => this.browser.isAlertOpen());
@@ -300,6 +288,10 @@ export class MainView extends View {
   }: {
     deviceName: string;
   }): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
     // Grab the trigger (button) and figure out the id of the element it opens
     const dropdownTrigger = await this.browser.$(
       `[data-action="open-settings"][data-device="${deviceName}"]`
