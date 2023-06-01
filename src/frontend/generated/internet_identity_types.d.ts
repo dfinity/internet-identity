@@ -125,6 +125,14 @@ export interface DomainOngoingActiveAnchorStats {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export type GetIdAliasResponse = {
+    'ok' : {
+      'rp_id_alias_credential' : string,
+      'issuer_id_alias_credential' : string,
+    }
+  } |
+  { 'authentication_failed' : string } |
+  { 'no_such_credentials' : string };
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -186,6 +194,8 @@ export interface OngoingActiveAnchorStats {
   'monthly_active_anchors' : Array<ActiveAnchorCounter>,
   'daily_active_anchors' : ActiveAnchorCounter,
 }
+export type PrepareIdAliasResponse = { 'ok' : null } |
+  { 'authentication_failed' : string };
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
@@ -249,6 +259,10 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
+  'get_id_alias' : ActorMethod<
+    [UserNumber, FrontendHostname, FrontendHostname],
+    [] | [GetIdAliasResponse]
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -262,6 +276,10 @@ export interface _SERVICE {
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
+  >,
+  'prepare_id_alias' : ActorMethod<
+    [UserNumber, FrontendHostname, FrontendHostname],
+    [] | [PrepareIdAliasResponse]
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

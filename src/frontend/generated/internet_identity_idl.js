@@ -150,6 +150,14 @@ export const idlFactory = ({ IDL }) => {
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
   });
+  const GetIdAliasResponse = IDL.Variant({
+    'ok' : IDL.Record({
+      'rp_id_alias_credential' : IDL.Text,
+      'issuer_id_alias_credential' : IDL.Text,
+    }),
+    'authentication_failed' : IDL.Text,
+    'no_such_credentials' : IDL.Text,
+  });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -192,6 +200,10 @@ export const idlFactory = ({ IDL }) => {
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
   const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
   const UserKey = PublicKey;
+  const PrepareIdAliasResponse = IDL.Variant({
+    'ok' : IDL.Null,
+    'authentication_failed' : IDL.Text,
+  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -285,6 +297,11 @@ export const idlFactory = ({ IDL }) => {
         [GetDelegationResponse],
         ['query'],
       ),
+    'get_id_alias' : IDL.Func(
+        [UserNumber, FrontendHostname, FrontendHostname],
+        [IDL.Opt(GetIdAliasResponse)],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -307,6 +324,11 @@ export const idlFactory = ({ IDL }) => {
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
+        [],
+      ),
+    'prepare_id_alias' : IDL.Func(
+        [UserNumber, FrontendHostname, FrontendHostname],
+        [IDL.Opt(PrepareIdAliasResponse)],
         [],
       ),
     'register' : IDL.Func(
