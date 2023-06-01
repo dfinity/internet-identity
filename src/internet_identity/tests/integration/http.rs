@@ -4,10 +4,11 @@
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_response_verification::types::{Request, Response};
+use ic_cdk::api::management_canister::main::CanisterId;
+use ic_response_verification::types::{CertificationResult, Request, Response};
 use ic_response_verification::verify_request_response_pair;
-use ic_test_state_machine_client::CallError;
-use internet_identity_interface::http_gateway::HttpRequest;
+use ic_test_state_machine_client::{CallError, StateMachine};
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
 use serde_bytes::ByteBuf;
 use std::time::{Duration, UNIX_EPOCH};
@@ -51,24 +52,13 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
             }
             verify_security_headers(&http_response.headers);
 
-            let result = verify_request_response_pair(
-                Request {
-                    method: request.method,
-                    url: request.url,
-                    headers: request.headers,
-                },
-                Response {
-                    status_code: http_response.status_code,
-                    headers: http_response.headers,
-                    body: http_response.body.into_vec(),
-                },
-                canister_id.as_slice(),
-                time(&env) as u128,
-                Duration::from_secs(300).as_nanos(),
-                &env.root_key(),
-                certification_version as u8,
-            )
-            .unwrap_or_else(|e| panic!("validation for asset \"{asset}\" failed: {e}"));
+            let result = verify_response_certification(
+                &env,
+                canister_id,
+                request,
+                http_response,
+                certification_version,
+            );
             assert!(result.passed);
             assert_eq!(result.verification_version, certification_version);
         }
@@ -79,7 +69,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
 /// Verifies that clients that do not indicate any certification version will get a v1 certificate.
 #[test]
 fn should_fallback_to_v1_certification() -> Result<(), CallError> {
-    const CERTIFICATION_VERSION: u8 = 1;
+    const CERTIFICATION_VERSION: u16 = 1;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -94,26 +84,50 @@ fn should_fallback_to_v1_certification() -> Result<(), CallError> {
 
     assert_eq!(http_response.status_code, 200);
 
-    let result = verify_request_response_pair(
-        Request {
-            method: request.method,
-            url: request.url,
-            headers: request.headers,
-        },
-        Response {
-            status_code: http_response.status_code,
-            headers: http_response.headers,
-            body: http_response.body.into_vec(),
-        },
-        canister_id.as_slice(),
-        time(&env) as u128,
-        Duration::from_secs(300).as_nanos(),
-        &env.root_key(),
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        request,
+        http_response,
         CERTIFICATION_VERSION,
-    )
-    .unwrap_or_else(|e| panic!("validation failed: {e}"));
+    );
     assert!(result.passed);
-    assert_eq!(result.verification_version, CERTIFICATION_VERSION as u16);
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
+/// Verifies that the cache-control header is set for fonts.
+#[test]
+fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/CircularXXWeb-Regular.woff2".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(http_response.status_code, 200);
+    assert!(http_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=604800".to_string()
+    )));
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        request,
+        http_response,
+        CERTIFICATION_VERSION,
+    );
+    assert!(result.passed);
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
 
     Ok(())
 }
@@ -450,4 +464,31 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
     );
 
     Ok(())
+}
+
+fn verify_response_certification(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    request: HttpRequest,
+    http_response: HttpResponse,
+    min_certification_version: u16,
+) -> CertificationResult {
+    verify_request_response_pair(
+        Request {
+            method: request.method,
+            url: request.url,
+            headers: request.headers,
+        },
+        Response {
+            status_code: http_response.status_code,
+            headers: http_response.headers,
+            body: http_response.body.into_vec(),
+        },
+        canister_id.as_slice(),
+        time(&env) as u128,
+        Duration::from_secs(300).as_nanos(),
+        &env.root_key(),
+        min_certification_version as u8,
+    )
+    .unwrap_or_else(|e| panic!("validation failed: {e}"))
 }
