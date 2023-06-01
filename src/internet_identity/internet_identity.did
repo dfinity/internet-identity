@@ -413,20 +413,22 @@ type AuthnMethodAddResponse = variant {
     invalid_metadata: text;
 };
 
-type PreparePrincipalLinkResponse = variant {
+type PrepareIdAliasResponse = variant {
     ok;
     authentication_failed: text;
 };
 
-type GetPrincipalLinkResponse = variant {
+type GetIdAliasResponse = variant {
     ok: record {
-        // Verifiable credential intended for the RP linking P_new <-> P_rp
-        rp_link_credential: text;
-        // Verifiable credential intended for the issuer linking P_new <-> P_issuer
-        issuer_link_credential: text;
+        // Verifiable credential that provides an alias for the relying party identity.
+        // The alias identity is identitcal to the alias provided to the issuer (see below).
+        rp_id_alias_credential: text;
+        // Verifiable credential that provides an alias for the issuer identity.
+        // The alias identity is identitcal to the alias provided to the relying party (see above).
+        issuer_id_alias_credential: text;
     };
     authentication_failed: text;
-    // The signature is not ready. Maybe retry by calling `prepare_principal_link`
+    // The credentials are not ready. Maybe retry by calling `prepare_id_alias`.
     no_such_credentials: text;
 };
 
@@ -483,6 +485,21 @@ service : (opt InternetIdentityInit) -> {
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (opt AuthnMethodAddResponse);
 
     // Attribute sharing MVP
-    prepare_principal_link : (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt PreparePrincipalLinkResponse);
-    get_principal_link: (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt GetPrincipalLinkResponse) query;
+    //
+    // Note: the responses of attribute sharing MVP API calls are `opt` for compatibility reasons
+    // with future variant extensions.
+    // A client decoding a response as `null` indicates outdated type information
+    // and should be treated as an error.
+
+    // Prepares verifiable credentials that provide a common alias to the issuer and the relying party.
+    // The alias credentials are issued by Internet Identity.
+    // This call is used in the attribute sharing flow where the common identity alias is used to issue
+    // a verifiable credential that is understood in both the relying party and the issuer context.
+    // This call can be called multiple times. Only the latest credentials are returned by `get_id_alias`.
+    // Requires authentication.
+    prepare_id_alias : (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt PrepareIdAliasResponse);
+
+    // Returns the verifiable credentials that were prepared by `prepare_id_alias`, if any.
+    // Requires authentication.
+    get_id_alias: (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt GetIdAliasResponse) query;
 }

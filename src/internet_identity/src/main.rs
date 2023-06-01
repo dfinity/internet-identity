@@ -10,7 +10,7 @@ use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
-    GetPrincipalLinkResponse, PreparePrincipalLinkResponse,
+    GetIdAliasResponse, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
@@ -550,22 +550,22 @@ mod attribute_sharing_mvp {
 
     #[update]
     #[candid_method]
-    fn prepare_principal_link(
+    fn prepare_id_alias(
         _identity_number: IdentityNumber,
         _relying_party: FrontendHostname,
         _issuer: FrontendHostname,
-    ) -> Option<PreparePrincipalLinkResponse> {
-        todo!("implement prepare_principal_link")
+    ) -> Option<PrepareIdAliasResponse> {
+        todo!("implement prepare_id_alias")
     }
 
     #[query]
     #[candid_method(query)]
-    fn get_principal_link(
+    fn get_id_alias(
         _identity_number: IdentityNumber,
         _relying_party: FrontendHostname,
         _issuer: FrontendHostname,
-    ) -> Option<GetPrincipalLinkResponse> {
-        todo!("implement get_principal_link")
+    ) -> Option<GetIdAliasResponse> {
+        todo!("implement get_id_alias")
     }
 }
 

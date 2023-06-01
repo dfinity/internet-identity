@@ -1,7 +1,7 @@
 use candid::{CandidType, Deserialize};
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum PreparePrincipalLinkResponse {
+pub enum PrepareIdAliasResponse {
     #[serde(rename = "ok")]
     Ok,
     #[serde(rename = "authentication_failed")]
@@ -9,15 +9,15 @@ pub enum PreparePrincipalLinkResponse {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct PrincipalLinkCredentials {
-    pub rp_link_credential: String,
-    pub issuer_link_credential: String,
+pub struct IdAliasCredentials {
+    pub rp_id_alias_credential: String,
+    pub issuer_id_alias_credential: String,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetPrincipalLinkResponse {
+pub enum GetIdAliasResponse {
     #[serde(rename = "ok")]
-    Ok(PrincipalLinkCredentials),
+    Ok(IdAliasCredentials),
     #[serde(rename = "authentication_failed")]
     AuthenticationFailed(String),
     #[serde(rename = "no_such_credentials")]
