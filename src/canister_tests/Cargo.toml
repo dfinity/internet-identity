@@ -19,5 +19,5 @@ internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
 candid = "0.8"
-ic-cdk = "0.7"
+ic-cdk = "0.8"
 ic-representation-independent-hash = "0.3"

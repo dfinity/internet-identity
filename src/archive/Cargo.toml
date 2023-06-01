@@ -11,8 +11,8 @@ edition = "2021"
 internet_identity_interface = { path = "../internet_identity_interface" }
 # ic dependencies
 candid = "0.8"
-ic-cdk = "0.7"
-ic-cdk-timers = "0.1"
+ic-cdk = "0.8"
+ic-cdk-timers = "0.2"
 ic-cdk-macros = "0.6"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
