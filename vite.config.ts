@@ -13,6 +13,7 @@ export const aliasConfig: AliasOptions = {
   // Custom alias we are using to shorten and make absolute the imports
   $generated: resolve(__dirname, "src/frontend/generated"),
   $src: resolve(__dirname, "src/frontend/src"),
+  $showcase: resolve(__dirname, "src/showcase/src"),
 };
 
 export default defineConfig(({ mode }: UserConfig): UserConfig => {

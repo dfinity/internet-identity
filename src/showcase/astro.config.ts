@@ -1,11 +1,12 @@
 import { defineConfig } from "astro/config";
+import path from "path";
 
-const ROOT = "../../";
+const ROOT = "../..";
 
 // https://astro.build/config
 export default defineConfig({
-  publicDir: ROOT + "src/frontend/assets",
-  outDir: ROOT + "dist-showcase",
+  publicDir: path.join(ROOT, "src/frontend/assets"),
+  outDir: path.join(ROOT, "dist-showcase"),
   server: {
     port: 5174,
   },
