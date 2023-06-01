@@ -485,7 +485,7 @@ fn verify_response_certification(
             body: http_response.body.into_vec(),
         },
         canister_id.as_slice(),
-        time(&env) as u128,
+        time(env) as u128,
         Duration::from_secs(300).as_nanos(),
         &env.root_key(),
         min_certification_version as u8,
