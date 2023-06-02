@@ -152,7 +152,7 @@ jobs:
             let delimStart = body.indexOf(DELIM_START);
             delimStart = delimStart !== -1 ? delimStart : body.length;
             let delimStop = body.indexOf(DELIM_STOP);
-            delimStop = delimEdn !== -1 ? delimStop + DELIM_STOP.length : body.length;
+            delimStop = delimStop !== -1 ? delimStop + DELIM_STOP.length : body.length;
             const before = body.slice(0, delimStart);
             const after = body.slice(delimStop, body.length);
 
