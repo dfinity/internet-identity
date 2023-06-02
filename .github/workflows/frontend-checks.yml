@@ -1,7 +1,6 @@
 name: Frontend checks and lints
 
 on:
-  push:
 
 jobs:
   frontend-checks:
