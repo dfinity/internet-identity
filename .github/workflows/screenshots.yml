@@ -1,0 +1,78 @@
+
+name: Frontend checks and lints
+
+on:
+  push:
+
+jobs:
+  # Job that starts the showcase and takes a screenshot of every page
+  screenshots:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: [ 'desktop', 'mobile' ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-node
+      - run: rm -v -f screenshots/${{ matrix.device }}*.png
+      - run: npm ci
+      - run: |
+          npm run showcase&
+          showcase_pid=$!
+
+          # every 100ms, check if localhost:5174 is reachable
+          # (i.e. devserver is up)
+          while ! nc -z localhost 5174; do
+            sleep 1
+            echo devserver unreachable, retrying
+          done
+
+          SCREENSHOTS_DIR="./screenshots/${{ matrix.device }}" \
+            SCREENSHOTS_TYPE=${{ matrix.device }} \
+            npm run screenshots
+          kill "$showcase_pid"
+
+      - run: |
+          echo "The following screenshots were created:"
+          shasum -a 256 screenshots/${{ matrix.device }}/*.png | sort -k2 # sort by 2nd column (filename)
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v3
+        with:
+          name: screenshots-${{ matrix.device }}
+          path: screenshots/${{ matrix.device }}/*.png
+
+  # This uploads the screenshots from both 'desktop' and 'mobile'
+  upload-screenshots:
+    runs-on: ubuntu-latest
+
+    needs: screenshots
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          git checkout --orphan "screenshots/${{ github.ref_name }}"
+          git reset --hard
+
+      # Download the desktop screenshots artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: screenshots-desktop
+          path: screenshots/desktop
+
+      # Download the mobile screenshots artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: screenshots-mobile
+          path: screenshots/mobile
+
+      - run: |
+          echo "The following screenshots were recovered:"
+          shasum -a 256 screenshots/*/*.png | sort -k2 # sort by 2nd column (filename)
+      - run: |
+          git add screenshots
+          git commit -am "Screenshots for ${{ github.ref_name }}"
+          git config --add --bool push.autoSetupRemote true
+          git push --force
