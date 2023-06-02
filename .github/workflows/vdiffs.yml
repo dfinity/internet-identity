@@ -110,7 +110,6 @@ jobs:
 
             newSection += "</details>";
 
-            const newSection = "Let's go! :rocket:";
             const pr = await github.rest.issues.get({
               issue_number: process.env.PR,
               owner: context.repo.owner,
