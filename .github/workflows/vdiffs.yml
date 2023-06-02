@@ -64,5 +64,21 @@ jobs:
           for modified in $(git diff --name-only "screenshots/${{ env.base }}" "screenshots/${{ env.head }}" -- '*.png')
           do
             echo "updated screenshot: $modified"
+            base_screenshot=$(mktemp)
+            head_screenshot=$(mktemp)
+
+            git show "screenshots/${{ env.base }}":"$modified" > "$base_screenshot"
+            git show "screenshots/${{ env.head }}":"$modified" > "$head_screenshot"
+
+            compare -verbose "$base_screenshot" "$head_screenshot" "$modified"
+
+            rm "$base_screenshot"
+            rm "$head_screenshot"
           done
 
+          git add screenshots
+          git config user.name "vdiffer"
+          git config user.email "<>"
+          git commit -am "Vdiffs for ${{ env.base }} -> ${{ env.head }}"
+          git config --add --bool push.autoSetupRemote true
+          git push --force
