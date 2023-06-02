@@ -118,7 +118,7 @@ jobs:
 
             const newBody = [before, DELIM_START, newSection, DELIM_STOP, after].join("");
             github.rest.issues.update({
-              issue_number: context.issue.number,
+              issue_number: process.env.PR,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: newBody,
