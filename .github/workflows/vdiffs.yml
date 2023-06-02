@@ -18,7 +18,7 @@ jobs:
         with:
           result-encoding: string
           script: |
-            const refName = "nm-say-hi"; // process.env.GITHUB_REF_NAME;
+            const refName = "nm-say-ho"; // process.env.GITHUB_REF_NAME;
             if(!refName) {
               const msg = "No ref for run, aborting";
               console.error(msg);
@@ -38,7 +38,7 @@ jobs:
               throw new Error(msg);
             }
 
-            return pulls[0].number;
+            return pulls[0]?.number;
 
       - name: "Output"
         run: |
