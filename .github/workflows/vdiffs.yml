@@ -144,10 +144,17 @@ jobs:
 
             const body = pr.data.body;
 
-            const delimStart = Math.max(body.indexOf(DELIM_START), body.length);
-            const delimEnd = Math.max(body.indexOf(DELIM_STOP) + DELIM_STOP.length, delimStart + DELIM_START.length);
+            function ixOf(str) {
+              const res = body.indexOf(str);
+              return res === -1 ? undefined : res;
+            }
+
+            let delimStart = body.indexOf(DELIM_START);
+            delimStart = delimStart !== -1 ? delimStart : body.length;
+            let delimStop = body.indexOf(DELIM_STOP);
+            delimStop = delimEdn !== -1 ? delimStop + DELIM_STOP.length : body.length;
             const before = body.slice(0, delimStart);
-            const after = body.slice(delimEnd, body.length);
+            const after = body.slice(delimStop, body.length);
 
             const newBody = [before, DELIM_START, newSection, DELIM_STOP, after].join("");
             github.rest.issues.update({
