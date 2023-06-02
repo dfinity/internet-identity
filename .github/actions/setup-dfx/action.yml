@@ -2,7 +2,7 @@ name: 'Setup DFX'
 description: Setup DFX
 inputs:
   dfx-version:
-    default: 0.12.0
+    default: 0.14.0
     description: The dfx version to be installed or loaded from cache.
     required: true
 runs:
