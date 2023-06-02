@@ -45,13 +45,15 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Output"
         if: ${{fromJSON(steps.pr.outputs.result) != null}}
+        env:
+          pr: ${{fromJSON(steps.pr.outputs.result).pr}}
+          base: ${{fromJSON(steps.pr.outputs.result).base}}
+          head: ${{fromJSON(steps.pr.outputs.result).head}}
         run: |
-          echo "${{ steps.pr.outputs.result }}"
-          echo "${{ steps.pr.outputs.result }}" | jq
-          echo "PR is ${{ steps.pr.outputs.result.pr }}"
-          echo "head is ${{ steps.pr.outputs.result.head }}"
-          echo "base is ${{ steps.pr.outputs.result.base }}"
-          git checkout --orphan "vdiffs/${{ steps.pr.outputs.result.head }}"
+          echo "PR is ${{ env.pr }}"
+          echo "head is ${{ env.head }}"
+          echo "base is ${{ env.base }}"
+          git checkout --orphan "vdiffs/${{ env.head }}"
           git reset --hard
-          git fetch orign "screenshots/${{ steps.pr.outputs.result.head }}":"screenshots/${{ steps.pr.outputs.result.head }}"
-          git fetch orign "screenshots/${{ steps.pr.outputs.result.base }}":"screenshots/${{ steps.pr.outputs.result.base }}"
+          git fetch orign "screenshots/${{ env.head }}":"screenshots/${{ env.head }}"
+          git fetch orign "screenshots/${{ env.base }}":"screenshots/${{ env.base }}"
