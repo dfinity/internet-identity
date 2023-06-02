@@ -95,7 +95,7 @@ jobs:
         env:
           FILES: ${{ steps.files.outputs.FILES }}
           PR: ${{fromJSON(steps.pr.outputs.result).pr}}
-          BASE: ${{fromJSON(steps.pr.outputs.result).base}}
+          HEAD: ${{fromJSON(steps.pr.outputs.result).head}}
         with:
           script: |
             const files = process.env.FILES;
@@ -104,7 +104,7 @@ jobs:
             newSection += "<summary>Some screenshots were modified</summary>";
 
             files.split("\n").forEach(file => {
-              const imgUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/vdiffs/${ process.env.BASE }/${file}`;
+              const imgUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/vdiffs/${ process.env.HEAD }/${file}`;
               newSection += `<img src="${imgUrl}" width="250">`;
             });
 
