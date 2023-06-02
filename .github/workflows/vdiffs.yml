@@ -70,6 +70,7 @@ jobs:
             git show "screenshots/${{ env.base }}":"$modified" > "$base_screenshot"
             git show "screenshots/${{ env.head }}":"$modified" > "$head_screenshot"
 
+            mkdir -p $(dirname "$modified")
             compare -verbose "$base_screenshot" "$head_screenshot" "$modified"
 
             rm "$base_screenshot"
