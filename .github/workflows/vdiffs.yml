@@ -13,8 +13,10 @@ jobs:
     steps:
       - run: echo hello world
       - name: "Find PR"
+        id: "pr"
         uses: actions/github-script@v5
         with:
+          result-encoding: string
           script: |
             const refName = "nm-say-hi"; // process.env.GITHUB_REF_NAME;
             if(!refName) {
@@ -23,10 +25,20 @@ jobs:
               throw new Error(msg);
             }
             console.log("Looking for PR for", refName);
-            const res = await github.rest.pulls.list({
+            const pulls = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              head: refName,
+              head: "dfinity:" + refName,
             })
-            console.log(res);
+            console.log(pulls);
+            if(pulls.length !== 1) {
+              const msg = "Expecting one PR, got " + pulls.length;
+              console.error(msg);
+              throw new Error(msg);
+            }
 
+            return pulls[0].number;
+
+      - name: "Output"
+        run: |
+          echo "branch is ${{github.ref_name}} with PR ${{steps.pr.outputs.result}}"
