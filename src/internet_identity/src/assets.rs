@@ -144,6 +144,14 @@ pub fn init_assets() {
                 content_type.to_mime_type_string(),
             ));
 
+            // Add caching header for fonts only
+            if content_type == ContentType::WOFF2 {
+                headers.push((
+                    "Cache-Control".to_string(),
+                    "public, max-age=604800".to_string(), // cache for 1 week
+                ));
+            }
+
             add_certification_v2(
                 certified_assets,
                 &path,
