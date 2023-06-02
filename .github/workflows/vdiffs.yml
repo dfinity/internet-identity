@@ -96,3 +96,24 @@ jobs:
           script: |
             const files = process.env.FILES;
             console.log(files);
+
+            const newSection = "Let's go! :rocket:";
+
+            const start = "<!-- DIVIDER_start " + context.issue.number + "-->";
+            const stop = "<!-- DIVIDER_stop " + context.issue.number + "-->";
+            const pr = await github.rest.issues.get({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const [ before, rest ] = pr.data.body.split(start);
+            const [ _outdate, after ] = rest.split(stop);
+
+            const newBody = [[before, newSection].join(start), after].join(stop);
+            github.rest.issues.update({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: newBody,
+            });
