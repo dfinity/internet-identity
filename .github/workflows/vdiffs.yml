@@ -46,4 +46,5 @@ jobs:
         if: ${{steps.pr.outputs.result != ''}}
         run: |
           echo "branch is ${{github.ref_name}} with PR ${{steps.pr.outputs.result}}"
-          # TODO; git fetch orign BASE
+          # TODO; git fetch orign screenshots/REF_NAME:screenshots/REF_NAME
+          # TODO; git fetch orign screenshots/BASE:screenshots/BASE
