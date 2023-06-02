@@ -104,7 +104,7 @@ jobs:
             newSection += "<summary>Some screenshots were modified</summary>";
 
             files.split("\n").forEach(file => {
-              const imgUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${ process.env.BASE }/${file}`;
+              const imgUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/vdiffs/${ process.env.BASE }/${file}`;
               newSection += `<img src="${imgUrl}" width="250">`;
             });
 
