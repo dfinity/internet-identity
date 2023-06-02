@@ -18,7 +18,7 @@ jobs:
         with:
           result-encoding: string
           script: |
-            const refName = "nm-say-ho"; // process.env.GITHUB_REF_NAME;
+            const refName = "nm-say-hi"; // process.env.GITHUB_REF_NAME;
             if(!refName) {
               const msg = "No ref for run, aborting";
               console.error(msg);
@@ -43,5 +43,7 @@ jobs:
             return pulls[0].number;
 
       - name: "Output"
+        if: ${{steps.pr.outputs.result != ''}}
         run: |
           echo "branch is ${{github.ref_name}} with PR ${{steps.pr.outputs.result}}"
+          # TODO; git fetch orign BASE
