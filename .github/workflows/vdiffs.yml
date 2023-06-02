@@ -93,6 +93,7 @@ jobs:
         uses: actions/github-script@v5
         env:
           FILES: ${{ steps.files.outputs.FILES }}
+          PR: ${{fromJSON(steps.pr.outputs.result).pr}}
         with:
           script: |
             const files = process.env.FILES;
@@ -100,7 +101,7 @@ jobs:
 
             const newSection = "Let's go! :rocket:";
             const pr = await github.rest.issues.get({
-              issue_number: context.issue.number,
+              issue_number: process.env.PR,
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
