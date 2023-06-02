@@ -5,6 +5,10 @@ on:
   push:
 
 jobs:
+  concurrency:
+    group: ${{ github.ref_name || github.run_id }}
+    cancel-in-progress: true
+
   # Job that starts the showcase and takes a screenshot of every page
   screenshots:
     runs-on: ubuntu-latest
@@ -46,6 +50,7 @@ jobs:
 
   # This uploads the screenshots from both 'desktop' and 'mobile'
   upload-screenshots:
+
     runs-on: ubuntu-latest
 
     needs: screenshots

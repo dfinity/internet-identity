@@ -1,0 +1,32 @@
+name: TODO
+
+on:
+  push:
+    # TODO: pull_request & workflow_run
+
+jobs:
+  concurrency:
+    group: ${{ github.ref_name || github.run_id }}
+    cancel-in-progress: true
+
+  vdiffs:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello world
+      - name: "Find PR"
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const refName = process.env.GITHUB_REF_NAME;
+            if(!refName) {
+              const msg = "No ref for run, aborting";
+              console.error(msg);
+              throw new Error(msg);
+            }
+            const res = github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: refName,
+            })
+            console.log(res);
+
