@@ -16,7 +16,6 @@ jobs:
         id: "pr"
         uses: actions/github-script@v5
         with:
-          result-encoding: string
           script: |
             const refName = "nm-say-hi"; // process.env.GITHUB_REF_NAME;
             if(!refName) {
@@ -33,18 +32,26 @@ jobs:
             console.log(res);
             const pulls = res.data;
             if(pulls.length === 0) {
-              return "";
+              return null;
             } else if (pulls.length !== 1) {
               const msg = "Expecting one PR, got " + pulls.length;
               console.error(msg);
               throw new Error(msg);
             }
 
-            return pulls[0].number;
+            const pull = pulls[0];
+            return { pr: pull.number, head: pull.head.ref, base: pull.base.ref }
 
+      - uses: actions/checkout@v3
       - name: "Output"
-        if: ${{steps.pr.outputs.result != ''}}
+        if: ${{fromJSON(steps.pr.outputs.result) != null}}
         run: |
-          echo "branch is ${{github.ref_name}} with PR ${{steps.pr.outputs.result}}"
-          # TODO; git fetch orign screenshots/REF_NAME:screenshots/REF_NAME
-          # TODO; git fetch orign screenshots/BASE:screenshots/BASE
+          echo "${{ github.pr.outputs.result }}"
+          echo "${{ github.pr.outputs.result }}" | jq
+          echo "PR is ${{ github.pr.outputs.result.pr }}"
+          echo "head is ${{ github.pr.outputs.result.head }}"
+          echo "base is ${{ github.pr.outputs.result.base }}"
+          git checkout --orphan "vdiffs/${{ github.pr.outputs.result.head }}"
+          git reset --hard
+          git fetch orign "screenshots/${{ github.pr.outputs.result.head }}":"screenshots/${{ github.pr.outputs.result.head }}"
+          git fetch orign "screenshots/${{ github.pr.outputs.result.base }}":"screenshots/${{ github.pr.outputs.result.base }}"
