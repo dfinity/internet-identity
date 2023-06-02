@@ -53,9 +53,9 @@ jobs:
           echo "PR is ${{ env.pr }}"
           echo "head is ${{ env.head }}"
           echo "base is ${{ env.base }}"
-          # basically fetches
-          git checkout "screenshots/${{ env.head }}"
-          git checkout "screenshots/${{ env.base }}"
+
+          git fetch origin "screenshots/${{ env.head }}":"screenshots/${{ env.head }}"
+          git fetch origin "screenshots/${{ env.base }}":"screenshots/${{ env.base }}"
 
           # actual checkout
           git checkout --orphan "vdiffs/${{ env.head }}"
