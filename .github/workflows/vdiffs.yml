@@ -3,6 +3,7 @@ name: TODO
 on:
   push:
     # TODO: pull_request & workflow_run
+    # TODO: delete branches on PR close
 
 jobs:
   vdiffs:
@@ -30,7 +31,7 @@ jobs:
               head: "dfinity:" + refName,
             })
             console.log(res);
-            const pulls = res.data;
+            const pulls = res.data; // TODO: filter out closed PRs
             if(pulls.length === 0) {
               return null;
             } else if (pulls.length !== 1) {
@@ -98,19 +99,23 @@ jobs:
             console.log(files);
 
             const newSection = "Let's go! :rocket:";
-
-            const start = "<!-- DIVIDER_start " + context.issue.number + "-->";
-            const stop = "<!-- DIVIDER_stop " + context.issue.number + "-->";
             const pr = await github.rest.issues.get({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
 
-            const [ before, rest ] = pr.data.body.split(start);
-            const [ _outdate, after ] = rest.split(stop);
+            const DELIM_START = "<!-- DIVIDER_start " + context.issue.number + "-->";
+            const DELIM_STOP = "<!-- DIVIDER_stop " + context.issue.number + "-->";
 
-            const newBody = [[before, newSection].join(start), after].join(stop);
+            const body = pr.data.body;
+
+            const delimStart = Math.max(body.indexOf(DELIM_START), body.length);
+            const delimEnd = Math.max(body.indexOf(DELIM_STOP) + DELIM_STOP.length, delimStart + DELIM_START.length);
+            const before = body.slice(0, delimStart);
+            const after = body.slice(delimEnd, body.length);
+
+            const newBody = [before, DELIM_START, newSection, DELIM_STOP, after].join("");
             github.rest.issues.update({
               issue_number: context.issue.number,
               owner: context.repo.owner,
