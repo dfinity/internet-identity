@@ -17,7 +17,7 @@ jobs:
         uses: actions/github-script@v5
         with:
           script: |
-            const refName = "nm-say-hi"; // process.env.GITHUB_REF_NAME;
+            const refName = process.env.GITHUB_REF_NAME;
             if(!refName) {
               const msg = "No ref for run, aborting";
               console.error(msg);
@@ -53,7 +53,17 @@ jobs:
           echo "PR is ${{ env.pr }}"
           echo "head is ${{ env.head }}"
           echo "base is ${{ env.base }}"
+          # basically fetches
+          git checkout "screenshots/${{ env.head }}"
+          git checkout "screenshots/${{ env.base }}"
+
+          # actual checkout
           git checkout --orphan "vdiffs/${{ env.head }}"
           git reset --hard
-          git fetch orign "screenshots/${{ env.head }}":"screenshots/${{ env.head }}"
-          git fetch orign "screenshots/${{ env.base }}":"screenshots/${{ env.base }}"
+
+          for modified in $(git diff --name-only "screenshots/${{ env.base }}" "screenshots/${{ env.head }}" -- '*.png')
+          do
+            echo "updated screenshot: $modified"
+
+          end
+
