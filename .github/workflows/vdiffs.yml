@@ -64,6 +64,5 @@ jobs:
           for modified in $(git diff --name-only "screenshots/${{ env.base }}" "screenshots/${{ env.head }}" -- '*.png')
           do
             echo "updated screenshot: $modified"
-
-          end
+          done
 
