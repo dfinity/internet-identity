@@ -25,12 +25,13 @@ jobs:
               throw new Error(msg);
             }
             console.log("Looking for PR for", refName);
-            const pulls = await github.rest.pulls.list({
+            const res = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               head: "dfinity:" + refName,
             })
-            console.log(pulls);
+            console.log(res);
+            const pulls = res.data;
             if(pulls.length !== 1) {
               const msg = "Expecting one PR, got " + pulls.length;
               console.error(msg);
