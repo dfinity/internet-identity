@@ -73,6 +73,8 @@ jobs:
           shasum -a 256 screenshots/*/*.png | sort -k2 # sort by 2nd column (filename)
       - run: |
           git add screenshots
+          git config user.name "screenshotter"
+          git config user.email "<>"
           git commit -am "Screenshots for ${{ github.ref_name }}"
           git config --add --bool push.autoSetupRemote true
           git push --force
