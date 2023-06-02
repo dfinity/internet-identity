@@ -7,7 +7,7 @@ on:
 jobs:
   vdiffs:
     concurrency:
-      group: ${{ github.ref_name || github.run_id }}
+      group: vdiffs-${{ github.ref_name || github.run_id }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
