@@ -46,12 +46,12 @@ jobs:
       - name: "Output"
         if: ${{fromJSON(steps.pr.outputs.result) != null}}
         run: |
-          echo "${{ github.pr.outputs.result }}"
-          echo "${{ github.pr.outputs.result }}" | jq
-          echo "PR is ${{ github.pr.outputs.result.pr }}"
-          echo "head is ${{ github.pr.outputs.result.head }}"
-          echo "base is ${{ github.pr.outputs.result.base }}"
-          git checkout --orphan "vdiffs/${{ github.pr.outputs.result.head }}"
+          echo "${{ steps.pr.outputs.result }}"
+          echo "${{ steps.pr.outputs.result }}" | jq
+          echo "PR is ${{ steps.pr.outputs.result.pr }}"
+          echo "head is ${{ steps.pr.outputs.result.head }}"
+          echo "base is ${{ steps.pr.outputs.result.base }}"
+          git checkout --orphan "vdiffs/${{ steps.pr.outputs.result.head }}"
           git reset --hard
-          git fetch orign "screenshots/${{ github.pr.outputs.result.head }}":"screenshots/${{ github.pr.outputs.result.head }}"
-          git fetch orign "screenshots/${{ github.pr.outputs.result.base }}":"screenshots/${{ github.pr.outputs.result.base }}"
+          git fetch orign "screenshots/${{ steps.pr.outputs.result.head }}":"screenshots/${{ steps.pr.outputs.result.head }}"
+          git fetch orign "screenshots/${{ steps.pr.outputs.result.base }}":"screenshots/${{ steps.pr.outputs.result.base }}"
