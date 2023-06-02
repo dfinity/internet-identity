@@ -32,13 +32,15 @@ jobs:
             })
             console.log(res);
             const pulls = res.data;
-            if(pulls.length !== 1) {
+            if(pulls.length === 0) {
+              return "";
+            } else if (pulls.length !== 1) {
               const msg = "Expecting one PR, got " + pulls.length;
               console.error(msg);
               throw new Error(msg);
             }
 
-            return pulls[0]?.number;
+            return pulls[0].number;
 
       - name: "Output"
         run: |
