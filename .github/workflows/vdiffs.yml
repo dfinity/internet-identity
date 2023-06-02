@@ -66,18 +66,43 @@ jobs:
           for modified in $(git diff --name-only "screenshots/${{ env.base }}" "screenshots/${{ env.head }}" -- '*.png')
           do
             echo "updated screenshot: $modified"
-            echo "$modified" >> "$GITHUB_OUTPUT"
             base_screenshot=$(mktemp)
             head_screenshot=$(mktemp)
+            magick_out=$(mktemp)
 
             git show "screenshots/${{ env.base }}":"$modified" > "$base_screenshot"
             git show "screenshots/${{ env.head }}":"$modified" > "$head_screenshot"
 
             mkdir -p $(dirname "$modified")
-            compare -verbose "$base_screenshot" "$head_screenshot" "$modified" || true
+            compare \
+              -metric AE "$base_screenshot" "$head_screenshot" "$modified" \
+              2> "$magick_out" || true
+
+            metric=$(<"$magick_out")
+            printf -v metric "%.f" "$metric"
+            echo "Magick AE is: '$metric'"
+
+            # Ensure that we got a meaningful output
+            if ! [[ $metric =~ ^[0-9]+$ ]]
+            then
+              echo "Magick didn't return a number: $metric"
+              exit 1
+            fi
+
+            if (( metric <= 100 ))
+            then
+              echo "Pixel difference ($metric) is too small, reverting"
+              rm "$modified"
+            else
+              echo "Pixel difference ($metric) is large, listing"
+              echo "$modified" >> "$GITHUB_OUTPUT"
+            fi
+
+            compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
 
             rm "$base_screenshot"
             rm "$head_screenshot"
+            rm "$magick_out"
           done
 
           echo "EOF" >> "$GITHUB_OUTPUT"
