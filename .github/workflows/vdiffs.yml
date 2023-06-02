@@ -98,8 +98,6 @@ jobs:
               echo "$modified" >> "$GITHUB_OUTPUT"
             fi
 
-            compare -metric AE "$modified" "$old" /dev/null 2> "$magick_out"
-
             rm "$base_screenshot"
             rm "$head_screenshot"
             rm "$magick_out"
