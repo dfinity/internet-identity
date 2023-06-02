@@ -5,12 +5,12 @@ on:
   push:
 
 jobs:
-  concurrency:
-    group: ${{ github.ref_name || github.run_id }}
-    cancel-in-progress: true
 
   # Job that starts the showcase and takes a screenshot of every page
   screenshots:
+    concurrency:
+      group: ${{ github.ref_name || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       matrix:
