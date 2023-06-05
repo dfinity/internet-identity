@@ -70,9 +70,6 @@ function update() {
     # The path where we save the list of dapps in II
     DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
 
-    if true
-    then
-
     # Here we fetch the list of dapps, select the ones that use II, exclude II itself, fix up the
     # logo name, and then only keep attributes that we care about.
     curl \
@@ -121,7 +118,6 @@ function update() {
             --output "src/frontend/assets/icons/$logo"
 
     done < <(jq -cMr <"$DAPPS_JSON" '.[] | .logo')
-    fi
 
     ## Optimize logos
     # This goes through all logos bigger than a certain size and tries to optimize them
