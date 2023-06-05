@@ -1402,9 +1402,12 @@ by all browsers (FF is missing) */
   cursor: pointer;
 }
 
+/** An error state for an input
+ * We leave the text color as default to show the text is still
+ * interactable
+ */
 .c-input.has-error,
 .c-input.has-error:focus {
-  color: var(--rc-error);
   box-shadow: inset 0 0 0 calc(var(--rs-line) * 2) var(--rc-error);
   border-image: none;
 }
