@@ -9,10 +9,12 @@ use ic_cdk::{call, caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::*;
 use rand_core::{RngCore, SeedableRng};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[cfg(not(feature = "dummy_captcha"))]
 use captcha::filters::Wave;
+use captcha::fonts::Default as DefaultFont;
+use captcha::fonts::Font;
 use lazy_static::lazy_static;
 
 mod rate_limit;
@@ -110,8 +112,8 @@ fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
 
 #[cfg(feature = "dummy_captcha")]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
-    let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let captcha = captcha.set_chars(&vec!['a']).add_chars(1).view(96, 48);
+    let mut captcha = captcha::new_captcha_with(rng, CAPTCHA_FONT.clone());
+    let captcha = captcha.set_charset(&vec!['a']).add_chars(1).view(96, 48);
 
     let resp = match captcha.as_base64() {
         Some(png_base64) => Base64(png_base64),
@@ -122,32 +124,55 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 }
 
 lazy_static! {
-    /// Map of problematic characters that are easily mixed up by humans to the "normalized" replacement.
-    /// I.e. the captcha will never contain any of the characters in the key set and any input provided
-    /// will be mapped to the matching value.
+    /// Problematic characters that are easily mixed up by humans to the "normalized" replacement.
+    /// I.e. the captcha will only contain a "replaced" character (values below in map) if the
+    /// character also appears as a "replacement" (keys below in map). All occurrences of
+    /// "replaced" characters in the user's challenge result will be replaced with the
+    /// "replacements".
     /// Note: the captcha library already excludes the characters o, O and 0.
-    static ref CHAR_REPLACEMENTS: HashMap<char, char> = vec![
-        ('C', 'c'),
-        ('l', '1'),
-        ('S', 's'),
-        ('X', 'x'),
-        ('Y', 'y'),
-        ('Z', 'z'),
-        ('P', 'p'),
-        ('W', 'w'),
-        ('J', 'j'),
+    static ref CHAR_REPLACEMENTS: HashMap<char, Vec<char>> = vec![
+        ('c', vec!['c', 'C']),
+        ('i', vec!['1', 'i', 'l', 'I', 'j']),
+        ('s', vec!['s', 'S']),
+        ('x', vec!['x', 'X']),
+        ('y', vec!['y', 'Y']),
+        ('z', vec!['z', 'Z']),
+        ('p', vec!['p', 'P']),
+        ('w', vec!['w', 'W']),
     ].into_iter().collect();
+
+    /// The font (glyphs) used when creating captchas
+    static ref CAPTCHA_FONT: DefaultFont = DefaultFont::new();
+
+    /// The character set used in CAPTCHA challenges (font charset with replacements)
+    static ref CHALLENGE_CHARSET: Vec<char> = {
+        // To get the final charset:
+        // * Start with all chars supported by the font by default
+        // * Remove all the chars that will be "replaced"
+        // * Add (potentially re-add) replacement chars
+        let mut chars = CAPTCHA_FONT.chars();
+        {
+          let dropped: HashSet<char> = CHAR_REPLACEMENTS.values().flat_map(|x| x.clone()).collect();
+          chars.retain(|c| !dropped.contains(c));
+        }
+
+        {
+          chars.append(&mut CHAR_REPLACEMENTS.keys().copied().collect());
+        }
+
+        chars
+    };
 }
 
 const CAPTCHA_LENGTH: usize = 5;
 #[cfg(not(feature = "dummy_captcha"))]
 fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
-    let mut captcha = captcha::RngCaptcha::from_rng(rng);
-    let mut chars = captcha.supported_chars();
-    chars.retain(|c| !CHAR_REPLACEMENTS.contains_key(c));
+    let mut captcha = captcha::new_captcha_with(rng, CAPTCHA_FONT.clone());
 
     let captcha = captcha
-        .set_chars(&chars)
+        // Replace the default charset with our more readable charset
+        .set_charset(&CHALLENGE_CHARSET)
+        // add some characters
         .add_chars(CAPTCHA_LENGTH as u32)
         .apply_filter(Wave::new(2.0, 20.0).horizontal())
         .apply_filter(Wave::new(2.0, 20.0).vertical())
@@ -174,7 +199,13 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
     let normalized_challenge_res: String = res
         .chars
         .chars()
-        .map(|c| *CHAR_REPLACEMENTS.get(&c).unwrap_or(&c))
+        .map(|c| {
+            // Apply all replacements
+            *CHAR_REPLACEMENTS
+                .iter()
+                .find_map(|(k, v)| if v.contains(&c) { Some(k) } else { None })
+                .unwrap_or(&c)
+        })
         .collect();
 
     state::inflight_challenges_mut(|inflight_challenges| {

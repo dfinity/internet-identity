@@ -23,7 +23,7 @@ rand = { version ="*", default-features = false }
 
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
-captcha = "0.0.9"
+captcha = { git = "https://github.com/nmattia/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 
 # All IC deps
 candid = "0.8"

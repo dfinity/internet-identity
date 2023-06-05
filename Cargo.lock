@@ -227,8 +227,7 @@ dependencies = [
 [[package]]
 name = "captcha"
 version = "0.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db21780337b425f968a2c3efa842eeaa4fe53d2bcb1eb27d2877460a862fb0ab"
+source = "git+https://github.com/nmattia/captcha?rev=9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391#9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391"
 dependencies = [
  "base64 0.13.1",
  "hound",
