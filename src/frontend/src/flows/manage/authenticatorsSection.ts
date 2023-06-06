@@ -47,14 +47,21 @@ export const authenticatorsSection = ({
 
   return html`
     <aside class=${wrapClasses.join(" ")}>
+      <div class="c-card__content">
       ${
         warnFewDevices
-          ? html`<span class="c-card__icon" aria-hidden="true"
-              >${warningIcon}</span
-            >`
+          ? html`
+              <span
+                class="c-card__label c-card__label--hasIcon"
+                aria-hidden="true"
+              >
+                <i class="c-card__icon c-icon c-icon--error__flipped"
+                  >${warningIcon}</i
+                >
+              </span>
+            `
           : undefined
       }
-      <div class=${warnFewDevices ? "c-card__content" : undefined}>
         <div class="t-title t-title--complications">
           <h2 class="t-title">Passkeys</h2>
           <span class="t-title__complication c-tooltip" tabindex="0">
