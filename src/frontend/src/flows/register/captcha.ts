@@ -153,10 +153,11 @@ export const promptCaptchaTemplate = <T>({
         challenge,
       });
       if (res === badChallenge) {
-        // on a bad challenge, show some error, clear the input
+        // on a bad challenge, show some error, clear the input & focus
         // and retry
         state.send({ status: "bad" });
         input.value = "";
+        input.focus();
         void doRetry();
       } else {
         onContinue(res);
