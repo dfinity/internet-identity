@@ -86,7 +86,7 @@ function update() {
             | with_entries(
                 select(
                     [.key]
-                    | inside(["name", "website", "oneLiner", "logo"])
+                    | inside(["name", "website", "oneLiner", "logo", "authOrigins"])
                 )
             )
         ]' \
