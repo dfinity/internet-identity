@@ -203,6 +203,8 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
             // Apply all replacements
             *CHAR_REPLACEMENTS
                 .iter()
+                // For each key, see if the char matches any of the values (replaced chars) and if
+                // so replace with the key itself (replacement char)
                 .find_map(|(k, v)| if v.contains(&c) { Some(k) } else { None })
                 .unwrap_or(&c)
         })
