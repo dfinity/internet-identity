@@ -893,8 +893,6 @@ a:hover,
   text-transform: uppercase;
   font-weight: 600;
   line-height: 1.1;
-  position: relative;
-  z-index: 2;
 }
 
 .c-card__label + .t-title {
@@ -942,6 +940,12 @@ by all browsers (FF is missing) */
 .c-card__content {
   position: relative;
   z-index: var(--z-foreground);
+  /* The card content is insed the c-card, so is padded. But since it
+   * should fit the card itself (and contain all the card' contents) we
+   * enlarge it to counteract the effect of the card's content.
+   */
+  margin: calc(-1 * var(--rs-card-bezel)) calc(-1 * var(--rs-card-bezel-x));
+  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
 }
 
 .c-card__title {
