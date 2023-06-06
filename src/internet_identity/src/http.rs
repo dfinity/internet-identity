@@ -43,8 +43,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 301,
             headers: vec![(
                 "location".to_string(),
-                "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
-                    .to_string(),
+                "https://identitysupport.dfinity.org/hc/en-us".to_string(),
             )],
             body: ByteBuf::new(),
             // Redirects are not allowed as query because certification V1 does not cover headers.

@@ -89,8 +89,7 @@ const init = async () => {
   // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
   // measure.
   if (window.location.pathname === "/faq") {
-    const faqUrl =
-      "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity";
+    const faqUrl = "https://identitysupport.dfinity.org/hc/en-us";
     window.location.replace(faqUrl);
   }
 
