@@ -166,7 +166,15 @@ export const authFlowAuthorize = async (
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
           knownDapp: getDapps().find(
-            (dapp) => new URL(dapp.website).origin === authContext.requestOrigin
+            // It's a known dapp if, for any known dapp, the request origin matches
+            // * the website
+            // * any (some) of the authOrigins
+            (dapp) =>
+              authContext.requestOrigin === new URL(dapp.website).origin ||
+              (dapp.authOrigins ?? []).some(
+                (authOrigin) =>
+                  authContext.requestOrigin === new URL(authOrigin).origin
+              )
           ),
         })
       );
