@@ -215,6 +215,7 @@ export const promptCaptchaTemplate = <T>({
             ${ref(input)}
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"
+            autocapitalize="none"
           />
           <strong class="c-input__message">${asyncReplace(errorText)}</strong>
         </label>
