@@ -198,6 +198,7 @@ export const wordTemplate = ({
   >
     ${asyncReplace(icon)}
     <input
+      ?autofocus=${i === 0 /* autofocus the first word */}
       @paste=${(e: ClipboardEvent) =>
         withElement(e, (event, element) => {
           e.preventDefault();
