@@ -124,7 +124,7 @@ fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 }
 
 lazy_static! {
-    /// Problematic characters that are easily mixed up by humans to the "normalized" replacement.
+    /// Problematic characters that are easily mixed up by humans to "normalized" replacement.
     /// I.e. the captcha will only contain a "replaced" character (values below in map) if the
     /// character also appears as a "replacement" (keys below in map). All occurrences of
     /// "replaced" characters in the user's challenge result will be replaced with the
