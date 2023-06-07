@@ -937,17 +937,6 @@ by all browsers (FF is missing) */
   fill: var(--rc-onButton);
 }
 
-.c-card__content {
-  position: relative;
-  z-index: var(--z-foreground);
-  /* The card content is insed the c-card, so is padded. But since it
-   * should fit the card itself (and contain all the card' contents) we
-   * enlarge it to counteract the effect of the card's content.
-   */
-  margin: calc(-1 * var(--rs-card-bezel)) calc(-1 * var(--rs-card-bezel-x));
-  padding: var(--rs-card-bezel) var(--rs-card-bezel-x);
-}
-
 .c-card__title {
   /*
     approximation: to make sure the title
@@ -964,6 +953,9 @@ by all browsers (FF is missing) */
 .c-card--modal {
   position: relative;
   border: none;
+  /* The before/after are used for the effects & background so we push
+   * them back with arbitrarily large neg. z-index */
+  isolation: isolate;
   border-radius: var(--rs-card-border-radius);
 }
 
@@ -971,7 +963,7 @@ by all browsers (FF is missing) */
 .c-card--modal::before {
   position: absolute;
   content: "";
-  z-index: 0;
+  z-index: -10;
   inset: 0;
   background-image: linear-gradient(170deg, var(--rg-brand));
   filter: blur(30px);
@@ -984,7 +976,7 @@ by all browsers (FF is missing) */
   content: "";
   position: absolute;
   inset: 0;
-  z-index: var(--z-background);
+  z-index: -9;
   background: var(--rc-background);
   border-radius: var(--rs-card-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
