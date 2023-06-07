@@ -47,7 +47,6 @@ export const authenticatorsSection = ({
 
   return html`
     <aside class=${wrapClasses.join(" ")}>
-      <div class="c-card__content">
       ${
         warnFewDevices
           ? html`
@@ -105,7 +104,6 @@ export const authenticatorsSection = ({
           </div>
 
         </div>
-      </div>
     </aside>`;
 };
 

@@ -27,16 +27,14 @@ export const warnBox = ({
     cssClasses.push(...additionalClasses);
   }
   const contents: TemplateResult = html`
-    <div class="c-card__content">
-      <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
-        <i class="c-card__icon c-icon c-icon--error__flipped">${warningIcon}</i>
-      </span>
-      <h3 class="t-title c-card__title">${title}</h3>
-      <div data-role="warning-message" class="t-paragraph c-card__paragraph">
-        ${message}
-      </div>
-      ${slot}
+    <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
+      <i class="c-card__icon c-icon c-icon--error__flipped">${warningIcon}</i>
+    </span>
+    <h3 class="t-title c-card__title">${title}</h3>
+    <div data-role="warning-message" class="t-paragraph c-card__paragraph">
+      ${message}
     </div>
+    ${slot}
   `;
 
   return html`${htmlElement === "aside"
