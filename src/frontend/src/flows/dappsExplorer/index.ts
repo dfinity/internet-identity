@@ -1,11 +1,10 @@
 import { closeIcon, externalLinkIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
-import { BASE_URL } from "$src/environment";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
-import { DappDescription } from "./dapps";
+import { KnownDapp } from "./dapps";
 
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./copy.json";
@@ -17,7 +16,7 @@ const dappsExplorerTemplate = ({
   back,
   scrollToTop = false,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
   i18n: I18n;
   back: () => void;
   /* put the page into view */
@@ -64,10 +63,10 @@ export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 /* Template for a single dapp */
 const dappTemplate = ({
   website,
-  logo,
+  logoSrc,
   name,
   oneLiner,
-}: DappDescription): TemplateResult => {
+}: KnownDapp): TemplateResult => {
   return html`
     <a
       href=${website}
@@ -76,7 +75,7 @@ const dappTemplate = ({
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
-        <img src=${BASE_URL + "icons/" + logo} alt=${name} loading="lazy" />
+        <img src=${logoSrc} alt=${name} loading="lazy" />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
@@ -95,7 +94,7 @@ const dappTemplate = ({
 export const dappsExplorer = ({
   dapps,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
 }): Promise<void> => {
   const i18n = new I18n();
   return new Promise((resolve) =>

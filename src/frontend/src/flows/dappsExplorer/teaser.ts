@@ -1,13 +1,12 @@
-import { BASE_URL } from "$src/environment";
 import { DynamicKey } from "$src/i18n";
 import { html, TemplateResult } from "lit-html";
-import { DappDescription } from "./dapps";
+import { KnownDapp } from "./dapps";
 
 export const dappsHeader = ({
   dapps,
   clickable,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
   clickable: boolean;
 }): TemplateResult => html`
   <figure
@@ -25,7 +24,7 @@ export const dappsTeaser = ({
   click,
   copy: { dapps_explorer, sign_into_dapps },
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
   click: () => void;
   copy: { dapps_explorer: DynamicKey; sign_into_dapps: DynamicKey };
 }): TemplateResult => {
@@ -44,7 +43,7 @@ export const dappsTeaser = ({
   </article>`;
 };
 
-const marqueeList = (dapps: DappDescription[]): TemplateResult => {
+const marqueeList = (dapps: KnownDapp[]): TemplateResult => {
   const itemsPerRow = 5;
   const totalRows = 4;
 
@@ -75,12 +74,8 @@ const marqueeList = (dapps: DappDescription[]): TemplateResult => {
         // images start appearing before they're loaded. This then
         // shows an empty space where the image suddenly pops seconds
         // later.
-        ({ logo, name }) => html`<div class="c-marquee__item">
-          <img
-            src=${BASE_URL + "icons/" + logo}
-            alt="${name}"
-            class="c-marquee__image"
-          />
+        ({ logoSrc, name }) => html`<div class="c-marquee__item">
+          <img src=${logoSrc} alt="${name}" class="c-marquee__image" />
         </div>`
       );
 
