@@ -18,6 +18,8 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     steps:
+      - run: echo "${{ github.base_ref }}"
+      - run: exit 1
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
       - run: rm -v -f screenshots/${{ matrix.device }}*.png
