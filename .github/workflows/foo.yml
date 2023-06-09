@@ -28,8 +28,8 @@ jobs:
                 });
 
               for (const job of jobs.filter(job => job.name.startsWith("report-"))) {
-                console.log("Restarting reporting job", job);
-                await github.paginate(github.rest.actions.reRunJobForWorkflowRun, {
+                console.log("Restarting reporting job" + job.name );
+                await github.rest.actions.reRunJobForWorkflowRun({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   job_id: job.id,
