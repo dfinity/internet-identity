@@ -170,9 +170,9 @@ jobs:
   report-size:
     if: ${{ github.ref != 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    needs: wasm-size
+      # needs: wasm-size
     steps:
-      - run: echo "${{ needs.wasm-size.outputs.size }}"
+      # - run: echo "${{ needs.wasm-size.outputs.size }}"
       - uses: actions/checkout@v3
       - uses: ./.github/actions/pr-info
         id: pr-info
