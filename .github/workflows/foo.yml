@@ -6,7 +6,7 @@ jobs:
   nudge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v5
+      - uses: actions/github-script@v6
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -20,7 +20,6 @@ jobs:
               });
 
             for (const workflowRun of workflowRuns) {
-              console.log("Looking for report- jobs for workflow run", workflowRun);
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
