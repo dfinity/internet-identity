@@ -1,4 +1,4 @@
-name: Get PR
+name: PR Info
 description: Get Pull Request associated with branch
 outputs:
   pr-info:

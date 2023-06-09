@@ -1,0 +1,16 @@
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v5
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        with:
+          script: |
+            console.log(process.env.PR_HEAD_SHA);
+            console.log(process.env.PR_HEAD_REF);
