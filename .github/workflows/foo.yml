@@ -24,9 +24,9 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   run_id: workflow.run_id,
-                }).filter(job => job.name.startsWith("report-"));
+                });
 
-              for (const job of jobs) {
+              for (const job of jobs.filter(job => job.name.startsWith("report-"))) {
                 console.log("Restarting reporting job", job);
                 await github.paginate(github.rest.actions.reRunJobForWorkflowRun, {
                   owner: context.repo.owner,
