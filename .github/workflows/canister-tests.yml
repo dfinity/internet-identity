@@ -172,6 +172,10 @@ jobs:
     needs: wasm-size
     steps:
       - run: echo "${{ needs.wasm-size.outputs.size }}"
+      - uses: ./.github/actions/bootstrap
+        id: pr-info
+      - run: |
+          echo "${{ steps.pr-info.outputs.pr-info }}"
 
   test-app-build:
     if: false

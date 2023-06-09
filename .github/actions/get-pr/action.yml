@@ -1,0 +1,35 @@
+name: Get PR
+description: Get Pull Request associated with branch
+outputs:
+  pr-info:
+    description: "Pull Request information"
+    value: ${{ steps.pr-info.outputs.result }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/github-script@v5
+      id: pr-info
+      with:
+        script: |
+          const refName = process.env.GITHUB_REF_NAME;
+          if(!refName) {
+            const msg = "No ref for run, aborting";
+            console.error(msg);
+            throw new Error(msg);
+          }
+          console.log("Looking for PR for", refName);
+          const res = await github.rest.pulls.list({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            head: context.repo.owner + ":" + refName,
+          })
+          const pulls = res.data.filter(pr => pr.state === "open");
+          if(pulls.length === 0) {
+            return null;
+          } else if (pulls.length !== 1) {
+            const msg = "Expecting one PR, got " + pulls.length;
+            console.error(msg);
+            throw new Error(msg);
+          }
+          const pull = pulls[0];
+          return { pr: pull.number, head: pull.head.ref, base: pull.base.ref }
