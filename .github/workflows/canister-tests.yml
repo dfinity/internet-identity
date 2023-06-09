@@ -172,7 +172,8 @@ jobs:
     needs: wasm-size
     steps:
       - run: echo "${{ needs.wasm-size.outputs.size }}"
-      - uses: ./.github/actions/bootstrap
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/get-pr
         id: pr-info
       - run: |
           echo "${{ steps.pr-info.outputs.pr-info }}"
