@@ -12,5 +12,26 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         with:
           script: |
-            console.log(process.env.PR_HEAD_SHA);
-            console.log(process.env.PR_HEAD_REF);
+            const workflows = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: process.env.PR_HEAD_REF,
+                head_sha: process.env.PR_HEAD_SHA,
+              });
+
+            for (const workflow of workflows) {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: workflow.run_id,
+                }).filter(job => job.name.startsWith("report-"));
+
+              for (const job of jobs) {
+                console.log("Restarting reporting job", job);
+                await github.paginate(github.rest.actions.reRunJobForWorkflowRun, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  job_id: job.id,
+                });
+              }
+            }
