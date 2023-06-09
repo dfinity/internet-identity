@@ -12,18 +12,19 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         with:
           script: |
-            const workflows = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+            const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 branch: process.env.PR_HEAD_REF,
                 head_sha: process.env.PR_HEAD_SHA,
               });
 
-            for (const workflow of workflows) {
+            for (const workflowRun of workflowRuns) {
+              console.log("Looking for report- jobs for workflow run", workflowRun);
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  run_id: workflow.run_id,
+                  run_id: workflowRun.id,
                 });
 
               for (const job of jobs.filter(job => job.name.startsWith("report-"))) {
