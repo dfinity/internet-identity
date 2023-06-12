@@ -6,7 +6,9 @@ use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::GetDelegationResponse;
+use internet_identity_interface::internet_identity::types::{
+    GetDelegationResponse, InternetIdentityInit,
+};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::ops::Add;
@@ -238,7 +240,14 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 #[test]
 fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM_PREVIOUS.clone(),
+        Some(InternetIdentityInit {
+            migrate_storage_to_memory_manager: Some(true),
+            ..Default::default()
+        }),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
