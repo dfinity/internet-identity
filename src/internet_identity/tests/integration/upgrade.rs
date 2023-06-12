@@ -29,7 +29,7 @@ fn ii_upgrade_works() -> Result<(), CallError> {
 
 fn install_previous_ii_canister_with_memory_manager(env: &StateMachine) -> CanisterId {
     install_ii_canister_with_arg(
-        &env,
+        env,
         II_WASM_PREVIOUS.clone(),
         Some(InternetIdentityInit {
             migrate_storage_to_memory_manager: Some(true),
