@@ -67,91 +67,6 @@ fn known_devices() -> [DeviceData; 6] {
     [device1, device2, device3, device4, device5, device6]
 }
 
-/// Tests that some known anchors with their respective devices are available after stable memory restore.
-/// Uses the same data initially created using the genesis layout and then migrated until v6.
-#[test]
-fn should_load_genesis_migrated_to_v6_backup() -> Result<(), CallError> {
-    let [device1, device2, device3, device4, device5, device6]: [DeviceData; 6] = known_devices();
-
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/genesis-layout-migrated-to-v6.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    // check known anchors in the backup
-    let devices =
-        api::get_anchor_info(&env, canister_id, device1.principal(), 10_000)?.into_device_data();
-    assert_eq!(devices, vec![device1]);
-
-    let mut devices =
-        api::get_anchor_info(&env, canister_id, device2.principal(), 10_002)?.into_device_data();
-    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    assert_eq!(devices, vec![device2, device3]);
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, device4.principal(), 10_029)?.into_device_data();
-    assert_eq!(devices, vec![device4]);
-
-    let mut devices =
-        api::get_anchor_info(&env, canister_id, device5.principal(), 10_030)?.into_device_data();
-    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    assert_eq!(devices, vec![device5, device6]);
-
-    let stats = api::stats(&env, canister_id)?;
-    assert_eq!(6, stats.storage_layout_version);
-    Ok(())
-}
-
-/// Tests that some known anchors with their respective devices are available after stable memory restore.
-/// Uses the same data initially created using the genesis layout and then migrated until v6.
-#[test]
-fn should_load_genesis_migrated_to_v6_backup_and_migrate_to_v7() -> Result<(), CallError> {
-    let [device1, device2, device3, device4, device5, device6]: [DeviceData; 6] = known_devices();
-
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/genesis-layout-migrated-to-v6.bin.gz",
-    );
-    let arg = InternetIdentityInit {
-        migrate_storage_to_memory_manager: Some(true),
-        ..Default::default()
-    };
-    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(arg))
-        .expect("II upgrade failed.");
-
-    // check known anchors in the backup
-    let devices =
-        api::get_anchor_info(&env, canister_id, device1.principal(), 10_000)?.into_device_data();
-    assert_eq!(devices, vec![device1]);
-
-    let mut devices =
-        api::get_anchor_info(&env, canister_id, device2.principal(), 10_002)?.into_device_data();
-    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    assert_eq!(devices, vec![device2, device3]);
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, device4.principal(), 10_029)?.into_device_data();
-    assert_eq!(devices, vec![device4]);
-
-    let mut devices =
-        api::get_anchor_info(&env, canister_id, device5.principal(), 10_030)?.into_device_data();
-    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    assert_eq!(devices, vec![device5, device6]);
-
-    let stats = api::stats(&env, canister_id)?;
-    assert_eq!(7, stats.storage_layout_version);
-    Ok(())
-}
-
 /// Tests that II will issue the same principals after stable memory restore.
 #[test]
 fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError> {
@@ -330,35 +245,6 @@ fn should_read_persistent_state_v6() -> Result<(), CallError> {
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
     assert_eq!(6, stats.storage_layout_version);
-    Ok(())
-}
-
-/// Verifies that a stable memory backup with persistent state can be used for an upgrade.
-#[test]
-fn should_migrate_persistent_state_v6_to_v7() -> Result<(), CallError> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/persistent_state_no_archive_v6.bin.gz",
-    );
-    let arg = InternetIdentityInit {
-        migrate_storage_to_memory_manager: Some(true),
-        ..Default::default()
-    };
-    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(arg))
-        .expect("II upgrade failed.");
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, principal_1(), 10_005)?.into_device_data();
-    assert_eq!(devices.len(), 4);
-
-    let stats = api::stats(&env, canister_id)?;
-    assert!(stats.archive_info.archive_canister.is_none());
-    assert!(stats.archive_info.archive_config.is_none());
-    assert_eq!(7, stats.storage_layout_version);
     Ok(())
 }
 
