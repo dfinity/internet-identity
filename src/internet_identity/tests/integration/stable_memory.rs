@@ -224,30 +224,6 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     Ok(())
 }
 
-/// Verifies that a stable memory backup with persistent state can be used for an upgrade.
-#[test]
-fn should_read_persistent_state_v6() -> Result<(), CallError> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/persistent_state_no_archive_v6.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, principal_1(), 10_005)?.into_device_data();
-    assert_eq!(devices.len(), 4);
-
-    let stats = api::stats(&env, canister_id)?;
-    assert!(stats.archive_info.archive_canister.is_none());
-    assert!(stats.archive_info.archive_config.is_none());
-    assert_eq!(6, stats.storage_layout_version);
-    Ok(())
-}
-
 #[test]
 fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let env = env();
