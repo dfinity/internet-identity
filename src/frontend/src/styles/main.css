@@ -1631,6 +1631,7 @@ by all browsers (FF is missing) */
 
 .c-list--bulleted {
   padding-left: var(--rs-list-bullet-space);
+  margin-top: 1em; /* match paragraph margin */
 }
 
 .c-list--bulleted {
