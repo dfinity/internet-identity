@@ -211,9 +211,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // consumes the values: if you need to read the value from different
   // places use `.values()` instead.
   protected async *recv(): AsyncIterable<A> {
-    if (nonNullish(this.latest)) {
-      yield this.latest;
-    }
+    yield this.latest;
 
     // Forever loop, yielding entire buffers and then blocking
     // on `snd` (which prevents hot looping)
