@@ -6,6 +6,7 @@ import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { phraseStepper } from "./stepper";
 
 import copyJson from "./confirmSeedPhrase.json";
 
@@ -63,6 +64,7 @@ const confirmSeedPhraseTemplate = ({
 
   const pageContentSlot = html`
     <article>
+      ${phraseStepper({ current: "confirm" })}
       <hgroup>
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
