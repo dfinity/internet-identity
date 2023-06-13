@@ -5,6 +5,7 @@ import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { phraseStepper } from "./stepper";
 
 import copyJson from "./displaySeedPhrase.json";
 
@@ -49,6 +50,7 @@ const displaySeedPhraseTemplate = ({
 
   const pageContentSlot = html`
     <article>
+      ${phraseStepper({ current: "store" })}
       <hgroup>
         <h1 class="t-title t-title--main">
           ${operation === "create" ? copy.title : copy.title_reset}
