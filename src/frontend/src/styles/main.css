@@ -208,6 +208,8 @@
   --rc-warning: var(--vc-brand-yellow);
   --rc-onWarning: var(--rc-snow);
 
+  --rc-info: var(--vc-brand-purple);
+  --rc-onInfo: var(--vc-snow);
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
@@ -687,6 +689,7 @@ a:hover,
 
 /* Small icons used to display status */
 .c-icon--ok,
+.c-icon--info__flipped,
 .c-icon--warning,
 .c-icon--error,
 .c-icon--error__flipped {
@@ -696,6 +699,12 @@ a:hover,
 .c-icon--ok {
   --onBgc: var(--rc-positive);
 }
+.c-icon--info__flipped {
+  --bgc: var(--rc-info);
+  --onBgc: var(--rc-onInfo);
+  border-radius: 50%;
+}
+
 .c-icon--warning {
   --onBgc: var(--rc-warning);
 }
