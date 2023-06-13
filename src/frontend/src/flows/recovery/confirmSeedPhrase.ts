@@ -76,7 +76,7 @@ const confirmSeedPhraseTemplate = ({
   const anchorInput = mkAnchorInput({
     onInput: (a) => {
       // When inputting a value, we don't report incorrect values as the
-      // user type; we only react if the value is actually correct to let
+      // user types; we only react if the value is actually correct to let
       // the user know they can move on to the next field
       const actual = BigInt(a);
       const expected = BigInt(userNumberWord);
