@@ -277,7 +277,7 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
 
     let metrics = get_metrics(&env, canister_id);
     let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    // empty II has some metadata in stable memory which requires at two pages:
+    // empty II has some metadata in stable memory which requires two pages:
     // one page for the header, and one for the memory manager.
     assert_eq!(stable_memory_pages, 2f64);
 
