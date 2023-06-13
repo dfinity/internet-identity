@@ -1,3 +1,4 @@
+import { mkAnchorInput } from "$src/components/anchorInput";
 import { warningIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
@@ -40,15 +41,30 @@ const recoverWithPhraseTemplate = <
   message: TemplateResult | string;
 }) => {
   // All word input elements
-  const numWords = RECOVERYPHRASE_WORDCOUNT + 1;
+  const numWords = RECOVERYPHRASE_WORDCOUNT;
   const wordRefs: Ref<HTMLInputElement>[] = Array.from(
     { length: numWords },
     () => createRef()
   );
 
+  const anchorInput = mkAnchorInput({
+    onSubmit: () => {
+      // If the user hits enter for some reason, focus the next word
+      // to fill in
+      wordRefs[0]?.value?.focus();
+    },
+  });
+
   // Read the phrase from the input elements
   const readPhrase = (): string | undefined => {
-    const strings = [];
+    const userNumberWord = withRef(
+      anchorInput.userNumberInput,
+      (input) => input.value
+    );
+    if (isNullish(userNumberWord) || userNumberWord === "") {
+      return undefined;
+    }
+    const strings = [userNumberWord];
     for (const wordRef of wordRefs) {
       const value = withRef(wordRef, (input) => input.value);
       if (isNullish(value)) {
@@ -84,6 +100,7 @@ const recoverWithPhraseTemplate = <
         <h1 class="t-title t-title--main">Enter recovery phrase</h1>
         <p class="t-lead">${message}</p>
       </hgroup>
+      ${anchorInput.template}
       <div class="c-input c-input--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${wordRefs.map((wordRef, i) => wordTemplate({ wordRef, i }))}
