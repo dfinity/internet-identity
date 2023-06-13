@@ -235,6 +235,18 @@ export class Chan<A> implements AsyncIterable<A> {
     return input;
   }
 
+  zip<B>(chanB: Chan<B>): Chan<[A, B]> {
+    // eslint-disable-next-line
+    const chanA = this; // for clarify/symmetry below
+
+    const zipped = new Chan<[A, B]>([chanA.latest, chanB.latest]);
+
+    chanA.listeners.push((value: A) => zipped.send([value, chanB.latest]));
+    chanB.listeners.push((value: B) => zipped.send([chanA.latest, value]));
+
+    return zipped;
+  }
+
   // How the mapped chan should handle the value
   protected __handleMapOpts<B>(
     opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }

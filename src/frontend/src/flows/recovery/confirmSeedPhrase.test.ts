@@ -53,6 +53,7 @@ test("words can be completed", async () => {
 
   await confirmSeedPhrasePage(
     {
+      userNumberWord: "12345",
       words,
       confirm: () => {
         /* */

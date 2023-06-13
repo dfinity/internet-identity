@@ -1,17 +1,29 @@
 import { mount, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
-import { isNullish } from "@dfinity/utils";
+import { Chan } from "$src/utils/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
+// TODO: onInput
 export const mkAnchorInput = ({
   userNumber,
   onSubmit,
+  onInput,
+  onChange,
+  classes: classes_,
+  dataExpected,
 }: {
   userNumber?: bigint;
+} & {
   onSubmit: (userNumber: bigint) => void;
+  onInput?: (content: string) => void;
+  onChange?: (content: string) => void;
+  classes?: Chan<string[]>;
+  dataExpected?: string;
 }): {
   template: TemplateResult;
   userNumberInput: Ref<HTMLInputElement>;
@@ -94,8 +106,14 @@ export const mkAnchorInput = ({
     }
   };
 
+  const defClass = "c-input--anchor__wrap";
+
+  const classes = isNullish(classes_)
+    ? new Chan(defClass)
+    : classes_.map((clzs) => [defClass, ...clzs].join(" "));
+
   const template = html` <div class="c-input--anchor l-stack">
-    <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
+    <label class=${asyncReplace(classes)} aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}
         ${mount(selectInput)}
@@ -104,7 +122,11 @@ export const mkAnchorInput = ({
         class="c-input c-input--vip c-input--centered c-input--spacious"
         placeholder="Internet Identity"
         value="${ifDefined(userNumber?.toString())}"
-        @input=${inputFilter(isDigits, onBadInput)}
+        data-expected="${ifDefined(dataExpected)}"
+        @input=${inputFilter(isDigits, onBadInput, onInput)}
+        @change=${nonNullish(onChange)
+          ? () => withRef(userNumberInput, (input) => onChange(input.value))
+          : undefined}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
         @mousedown=${inputFilter(isDigits, onBadInput)}
@@ -128,7 +150,11 @@ const isDigits = (c: string) => /^\d*\.?\d*$/.test(c);
 /* Adds a filter to the input that only allows the given regex.
  * For more info see https://stackoverflow.com/questions/469357/html-text-input-allow-only-numeric-input
  */
-const inputFilter = (inputFilter: (c: string) => boolean, onBad: () => void) =>
+const inputFilter = (
+  inputFilter: (c: string) => boolean,
+  onBad: () => void,
+  onInput?: (content: string) => void
+) =>
   function (
     this: (HTMLInputElement | HTMLTextAreaElement) & {
       oldValue: string;
@@ -140,6 +166,7 @@ const inputFilter = (inputFilter: (c: string) => boolean, onBad: () => void) =>
       this.oldValue = this.value;
       this.oldSelectionStart = this.selectionStart;
       this.oldSelectionEnd = this.selectionEnd;
+      onInput?.(this.value);
     } else {
       onBad();
 
