@@ -74,6 +74,14 @@ test("words can be completed", async () => {
 
   expect(nextButton.disabled).toBe(true);
 
+  const inputNumber = document.querySelector(
+    '[data-expected="12345"]'
+  ) as HTMLInputElement;
+  inputNumber.value = "12345";
+  inputNumber.dispatchEvent(new Event("input"));
+  await tick();
+  expect(nextButton.disabled).toBe(true);
+
   const inputTwo = document.querySelector(
     '[data-expected="two"]'
   ) as HTMLInputElement;
@@ -92,6 +100,7 @@ test("words can be completed", async () => {
 
   inputFour.value = "four";
   inputFour.dispatchEvent(new Event("input"));
+  await tick();
   await tick();
   expect(nextButton.disabled).toBe(false);
 });
