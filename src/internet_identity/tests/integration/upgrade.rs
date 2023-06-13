@@ -5,8 +5,9 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
+use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
+use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::*;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -26,11 +27,22 @@ fn ii_upgrade_works() -> Result<(), CallError> {
     Ok(())
 }
 
+fn install_previous_ii_canister_with_memory_manager(env: &StateMachine) -> CanisterId {
+    install_ii_canister_with_arg(
+        env,
+        II_WASM_PREVIOUS.clone(),
+        Some(InternetIdentityInit {
+            migrate_storage_to_memory_manager: Some(true),
+            ..Default::default()
+        }),
+    )
+}
+
 /// Test to verify that anchors are kept across upgrades.
 #[test]
 fn ii_upgrade_retains_anchors() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -43,7 +55,7 @@ fn ii_upgrade_retains_anchors() {
 #[test]
 fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
     let user_number = flows::register_anchor(&env, canister_id);
 
     upgrade_ii_canister_with_arg(
@@ -150,7 +162,7 @@ fn should_not_allow_user_range_exceeding_capacity() {
 #[test]
 fn ii_upgrade_should_allow_same_user_range() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
 
     let stats = api::compat::stats(&env, canister_id)?;
 
@@ -169,7 +181,7 @@ fn ii_upgrade_should_allow_same_user_range() -> Result<(), CallError> {
 #[test]
 fn ii_canister_can_be_upgraded_and_rolled_back() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     api::health_check(&env, canister_id);
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
@@ -180,7 +192,7 @@ fn ii_canister_can_be_upgraded_and_rolled_back() {
 #[test]
 fn upgrade_and_rollback_keeps_anchor_intact() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let mut devices_before = api::get_anchor_info(&env, canister_id, principal_1(), user_number)
         .unwrap()
@@ -207,7 +219,7 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
     let env = env();
 
     // start with the previous release to initialize v1 layout
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_previous_ii_canister_with_memory_manager(&env);
     api::init_salt(&env, canister_id)?;
 
     // use the new version to register an anchor
