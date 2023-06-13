@@ -108,7 +108,7 @@ export class RegisterView extends View {
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-action="skip"]')
+      .$('[data-action="cancel"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
@@ -154,7 +154,7 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async skipRecovery(): Promise<void> {
-    await this.browser.$('[data-action="skip"]').click();
+    await this.browser.$('[data-action="cancel"]').click();
   }
 
   async copySeedPhrase(): Promise<void> {
@@ -220,6 +220,8 @@ export class MainView extends View {
 
   async addRecovery(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
+    await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
