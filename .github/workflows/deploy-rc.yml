@@ -4,9 +4,9 @@ name: Deploy Release Candidate
 on:
   schedule:
     # Run every Tuesday:
-    #   summer: 5pm Zurich time
-    #   winter: 6pm Zurich time
-    - cron:  '0 16 * * 2'
+    #   summer: 7pm Zurich time
+    #   winter: 8pm Zurich time
+    - cron:  '0 18 * * 2'
   workflow_dispatch:
 
 jobs:

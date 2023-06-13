@@ -8,7 +8,7 @@
     "skip": "Remind me later",
 
     "what_is_phrase_q": "What is a recovery phrase?",
-    "what_is_phrase_a": "Your recovery phrase contains your Internet Identity number and a secret 24-word phrase",
+    "what_is_phrase_a": "A secret phrase that includes your Internet Identity number and a unique combination of 24 words that represent your private key",
 
     "how_save_phrase_q": "How do I save my recovery phrase?",
     "how_save_phrase_a_1": "Save it in a password manager",

@@ -84,25 +84,18 @@ export const displayUserNumberTemplate = ({
       </button>
     <section class="c-marketing-block">
       <aside class="l-stack">
-        <h3 class="t-title">What is this number?</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>Your Internet Identity</li>
-          <li>With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</li>
-        </ul>
+        <h3 class="t-title">This number is you Internet Identity</h3>
+        <p class="t-paragraph">With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</p>
       </aside>
 
       <aside class="l-stack">
         <h3 class="t-title">Why is it important to save this number?</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>If you lose this number, you will lose access to all of the accounts that you created with it</li>
-        </ul>
+        <p class="t-paragraph">If you lose this number, you will lose access to all of the accounts that you created with it</paragraph>
       </aside>
 
       <aside class="l-stack">
         <h3 class="t-title">Is this number secret?</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>No, this number is unique to you but it is not secret</li>
-        </ul>
+        <p class="t-paragraph"> No, this number is unique to you but it is not secret</p>
       </aside>
     </section>
 

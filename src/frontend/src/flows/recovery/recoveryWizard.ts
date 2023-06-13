@@ -51,9 +51,7 @@ const addPhraseTemplate = ({
     <section style="margin-top: 7em;" class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.what_is_phrase_a}</li>
-        </ul>
+        <p class="t-paragraph">${copy.what_is_phrase_a}</p>
       </aside>
 
       <aside class="l-stack">
@@ -67,16 +65,12 @@ const addPhraseTemplate = ({
 
       <aside class="l-stack">
         <h3 class="t-title">${copy.when_use_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.when_use_phrase_a_1}</li>
-        </ul>
+        <p class="t-paragraph">${copy.when_use_phrase_a_1}</p>
       </aside>
 
       <aside class="l-stack">
         <h3 class="t-title">${copy.share_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.share_phrase_a_1}</li>
-        </ul>
+        <p class="t-paragraph">${copy.share_phrase_a_1}</p>
       </aside>
     </section>
   `;
