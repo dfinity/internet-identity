@@ -27,7 +27,6 @@ import { compatibilityNotice } from "$src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "$src/flows/dappsExplorer";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
-import { chooseRecoveryMechanismPage } from "$src/flows/recovery/chooseRecoveryMechanism";
 import {
   checkIndices,
   confirmSeedPhrasePage,
@@ -253,17 +252,6 @@ export const iiPages: Record<string, () => void> = {
         }),
       onContinue: () => console.log("Done"),
       i18n,
-    }),
-  chooseRecoveryMechanism: () =>
-    chooseRecoveryMechanismPage({
-      disablePhrase: true,
-      disableKey: false,
-      pick: (recovery) => console.log("picked:", recovery),
-      cancel: () => console.log("canceled"),
-      title: html`Choose a Recovery Method`,
-      message: html`We recommend that you create at least one recovery method in
-      case you lose your Passkeys.`,
-      cancelText: html`Skip, I understand the risks`,
     }),
   displayManage: () => {
     displayManagePage({
