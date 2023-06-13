@@ -52,7 +52,7 @@ test("Reset protected recovery phrase, confirm with empty seed phrase", async ()
 
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase("");
+    // Here we don't input anything and simply continue
     await recoveryView.enterSeedPhraseContinue();
     await recoveryView.waitForInvalidSeedPhraseDisplay();
   });

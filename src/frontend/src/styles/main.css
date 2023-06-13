@@ -110,6 +110,7 @@
   --vc-brand-orange: #f15a24;
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
+  --vc-brand-red: red;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
   --vc-brand-purple: #4b19d6;
   --vc-brand-purple-light: #890eed;
@@ -2383,6 +2384,16 @@ a.c-action-list__item {
 .c-input--anchor__wrap {
   position: relative;
   display: block;
+  /* The halo around the input, used for style & feedback */
+  --halo: linear-gradient(270deg, var(--rg-brand));
+}
+
+.c-input--anchor__wrap--error {
+  --halo: var(--vc-brand-red);
+}
+
+.c-input--anchor__wrap--valid {
+  --halo: var(--vc-brand-green);
 }
 
 .c-input--anchor__wrap::before {
@@ -2391,14 +2402,16 @@ a.c-action-list__item {
   pointer-events: none;
   inset: 0;
   border-radius: 999999px;
-  background-image: linear-gradient(270deg, var(--rg-brand));
+  background: var(--halo);
   filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
-.c-input--anchor__wrap:focus-within::before {
+.c-input--anchor__wrap:focus-within::before,
+.c-input--anchor__wrap--error::before,
+.c-input--anchor__wrap--valid::before {
   opacity: 0.8;
   transform: scale(1) translateZ(0);
 }

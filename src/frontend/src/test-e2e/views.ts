@@ -628,6 +628,13 @@ export class RecoverView extends View {
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
     const words = seedPhrase.split(" ").filter(Boolean);
+    // eslint-disable-next-line
+    const userNumberWord = words.shift()!;
+    const userNumberInput = await this.browser.$(
+      'input[data-role="anchor-input"]'
+    );
+    await userNumberInput.setValue(userNumberWord);
+
     const inputs = await this.browser.$$(
       'input[data-role="recovery-word-input"]'
     );

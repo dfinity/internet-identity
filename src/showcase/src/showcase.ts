@@ -73,6 +73,9 @@ const recoveryPhrase: RecoveryDevice & DeviceData = {
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
+const recoveryAnchorWord = recoveryPhraseText.split(" ")[0];
+const recoveryWords = recoveryPhraseText.split(" ").slice(1);
+
 const recoveryDevice: RecoveryDevice & DeviceData = {
   alias: "Recovery Device",
   protection: { unprotected: null },
@@ -383,7 +386,8 @@ export const iiPages: Record<string, () => void> = {
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
       operation: "create",
-      seedPhrase: recoveryPhraseText,
+      userNumberWord: recoveryAnchorWord,
+      words: recoveryWords,
       cancel: () => console.log("cancel"),
       onContinue: () => console.log("continue with:"),
       copyPhrase: () => Promise.resolve(console.log("copied")),
@@ -393,7 +397,8 @@ export const iiPages: Record<string, () => void> = {
     confirmSeedPhrasePage({
       confirm: () => console.log("confirmed"),
       back: () => console.log("back"),
-      words: recoveryPhraseText.split(" ").map((word, i) => ({
+      userNumberWord: recoveryAnchorWord,
+      words: recoveryWords.map((word, i) => ({
         word,
         check: checkIndices.includes(i),
       })),
