@@ -386,7 +386,8 @@ export const iiPages: Record<string, () => void> = {
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
       operation: "create",
-      seedPhrase: recoveryPhraseText,
+      userNumberWord: recoveryAnchorWord,
+      words: recoveryWords,
       cancel: () => console.log("cancel"),
       onContinue: () => console.log("continue with:"),
       copyPhrase: () => Promise.resolve(console.log("copied")),

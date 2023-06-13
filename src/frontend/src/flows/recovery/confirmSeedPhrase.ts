@@ -73,7 +73,7 @@ const confirmSeedPhraseTemplate = ({
   // TODO: test this
   const anchorInput = mkAnchorInput({
     onSubmit: (userNumber: bigint) => {
-      const actual = BigInt(userNumber);
+      const actual = userNumber;
       const expected = BigInt(userNumberWord);
       if (actual === expected) {
         identityOk.send("correct");
