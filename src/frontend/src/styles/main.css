@@ -105,6 +105,7 @@
   --vc-shadow: rgba(32, 33, 36, 0.6);
   --vc-night: rgba(32, 33, 36, 0.8);
 
+  --vc-red: #ff0000;
   --vc-silver: #d9d9d9;
 
   --vc-brand-orange: #f15a24;
@@ -204,6 +205,7 @@
 
   --rc-errorLight: var(--vc-brand-pink--transparent);
   --rc-error: var(--vc-brand-pink);
+  --rc-error-strong: var(--vc-red);
   --rc-onError: var(--vc-snow);
 
   --rc-warning: var(--vc-brand-yellow);
@@ -2389,11 +2391,11 @@ a.c-action-list__item {
 }
 
 .c-input--anchor__wrap--error {
-  --halo: var(--vc-brand-red);
+  --halo: var(--rc-error-strong);
 }
 
 .c-input--anchor__wrap--valid {
-  --halo: var(--vc-brand-green);
+  --halo: var(--rc-positive);
 }
 
 .c-input--anchor__wrap::before {
