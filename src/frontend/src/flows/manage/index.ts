@@ -188,6 +188,9 @@ const displayManageTemplate = ({
   return mainWindow({
     isWideContainer: true,
     slot: pageContentSlot,
+    slotSidebar: html`<h1 class="t-title t-title--main">
+      Securely connect to dapps on the Internet Computer
+    </h1>`,
   });
 };
 

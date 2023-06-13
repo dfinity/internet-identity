@@ -16,6 +16,7 @@ import { icLogo } from "./icons";
  */
 export const mainWindow = ({
   slot,
+  slotSidebar,
   id,
   showFooter = true,
   showLogo = true,
@@ -23,6 +24,7 @@ export const mainWindow = ({
   additionalContainerClasses = [],
 }: {
   slot: TemplateResult;
+  slotSidebar?: TemplateResult;
   id?: string;
   showFooter?: boolean;
   showLogo?: boolean;
@@ -37,16 +39,34 @@ export const mainWindow = ({
   if (additionalContainerClasses.length > 0) {
     containerClasses.push(...additionalContainerClasses);
   }
+
+  const wrapClasses = ["l-wrap"];
+
+  if (slotSidebar !== undefined) {
+    wrapClasses.push("l-wrap--sidebar");
+  }
+
   return html`
-    <div
-      id="${ifDefined(id !== null ? id : undefined)}"
-      class="${containerClasses.join(" ")}"
-    >
-      ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-      <div class="c-card c-card--background">
-        <div class="c-card c-card--highlight">${slot}</div>
+    <div class="${wrapClasses.join(" ")}">
+      ${slotSidebar !== undefined
+        ? html`<div class="l-sidebar">
+            ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
+            ${slotSidebar}
+          </div>`
+        : ""}
+      <div
+        id="${ifDefined(id !== null ? id : undefined)}"
+        class="${containerClasses.join(" ")}"
+      >
+        ${showLogo && slotSidebar === undefined
+          ? html`<div class="c-logo">${icLogo}</div>`
+          : ""}
+        <div class="c-card c-card--background">
+          <div class="c-card c-card--highlight">${slot}</div>
+        </div>
       </div>
+      ${showFooter ? footer : ""}
     </div>
-    ${showFooter ? footer : ""}
+    <!-- /.l-wrap -->
   `;
 };
