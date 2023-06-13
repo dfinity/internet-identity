@@ -225,10 +225,6 @@
   --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
-  --rg-wrong: var(--vc-brand-red) 10%, var(--vc-brand-red) 40%,
-    var(--vc-brand-red) 50%, var(--vc-brand-red) 90%;
-  --rg-good: var(--vc-brand-green) 10%, var(--vc-brand-green) 40%,
-    var(--vc-brand-green) 50%, var(--vc-brand-green) 90%;
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
@@ -2388,15 +2384,15 @@ a.c-action-list__item {
 .c-input--anchor__wrap {
   position: relative;
   display: block;
-  --foo: var(--rg-brand);
+  --foo: linear-gradient(270deg, var(--rg-brand)); /* set actual color; instead of gradient */
 }
 
 .c-input--anchor__wrap--error {
-  --foo: var(--rg-wrong);
+  --foo: var(--vc-brand-red);
 }
 
-.c-input--anchor__wrap--good {
-  --foo: var(--rg-good);
+.c-input--anchor__wrap--valid {
+  --foo: var(--vc-brand-green);
 }
 
 .c-input--anchor__wrap::before {
@@ -2405,7 +2401,7 @@ a.c-action-list__item {
   pointer-events: none;
   inset: 0;
   border-radius: 999999px;
-  background-image: linear-gradient(270deg, var(--foo));
+  background: var(--foo);
   filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
@@ -2414,7 +2410,7 @@ a.c-action-list__item {
 
 .c-input--anchor__wrap:focus-within::before,
 .c-input--anchor__wrap--error::before,
-.c-input--anchor__wrap--good::before {
+.c-input--anchor__wrap--valid::before {
   opacity: 0.8;
   transform: scale(1) translateZ(0);
 }

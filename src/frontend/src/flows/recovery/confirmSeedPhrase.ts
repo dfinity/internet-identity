@@ -7,6 +7,7 @@ import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { phraseStepper } from "./stepper";
 
 import copyJson from "./confirmSeedPhrase.json";
 
@@ -16,7 +17,7 @@ type Word = { word: string } & (
   | { check: true; elem: Ref<HTMLInputElement>; shouldFocus: boolean }
 );
 
-// A list of indices nicely spread over the 24 BIP 39 words (anchor + 24 BIP39)
+// A list of indices nicely spread over the 24 BIP 39 words (anchor is separate)
 export const checkIndices = [0, 1, 23];
 
 // Check that a word has been input correctly
@@ -45,7 +46,7 @@ const confirmSeedPhraseTemplate = ({
   const words: Word[] = words_.map((word) => {
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
-      // NOTE: typescript can't follow if word is destructured with {...word}
+      // NOTE: typescript can't follow if word is deconstructed with {...word}
       return { word: word.word, check: word.check, elem, shouldFocus: false };
     } else {
       return { word: word.word, check: word.check };
@@ -61,50 +62,60 @@ const confirmSeedPhraseTemplate = ({
   }
 
   // if the identity number has been re-input correctly
-  const identityOk = new Chan<"pending" | "wrong" | "correct">("pending");
+  const identityInputState = new Chan<"pending" | "wrong" | "correct">(
+    "pending"
+  );
   // if all "check" words have been re-input correctly
   const wordsOk = new Chan<boolean>(false);
   // if the confirmation button is disabled
-  const zipped = identityOk.zip(wordsOk);
+  const zipped = identityInputState.zip(wordsOk);
   const disabled = zipped.map(
     ([idOk, wdsOk]) => !(idOk === "correct" && wdsOk)
   );
 
-  // TODO: test this
+  // The anchor input element/component
   const anchorInput = mkAnchorInput({
-    onSubmit: (userNumber: bigint) => {
-      const actual = userNumber;
-      const expected = BigInt(userNumberWord);
-      if (actual === expected) {
-        identityOk.send("correct");
-      } else {
-        identityOk.send("wrong");
-      }
-    },
     onInput: (a) => {
+      // When inputting a value, we don't report incorrect values as the user type; we only react if the value is actually correct to let the user know
+      // they can move on to the next field
       const actual = BigInt(a);
       const expected = BigInt(userNumberWord);
       if (actual === expected) {
-        identityOk.send("correct");
+        identityInputState.send("correct");
       } else {
-        identityOk.send("pending");
+        identityInputState.send("pending");
       }
     },
     onChange: (a) => {
+      // When the user leaves the field, we do warn them if the value
+      // is not correct. As a fallback we do set it to 'correct' if
+      // the value is correct, although in practice this will already
+      // have been set by onInput.
       const actual = BigInt(a);
       const expected = BigInt(userNumberWord);
 
       if (actual === expected) {
-        identityOk.send("correct");
+        identityInputState.send("correct");
       } else {
-        identityOk.send("wrong");
+        identityInputState.send("wrong");
       }
     },
-    classes: identityOk.map(
+    onSubmit: (userNumber: bigint) => {
+      // Similar to onChange, although we don't really expect the user
+      // to "submit" (i.e. hit "enter")
+      const actual = userNumber;
+      const expected = BigInt(userNumberWord);
+      if (actual === expected) {
+        identityInputState.send("correct");
+      } else {
+        identityInputState.send("wrong");
+      }
+    },
+    classes: identityInputState.map(
       (state) =>
         ({
           pending: [],
-          correct: ["c-input--anchor__wrap--good"],
+          correct: ["c-input--anchor__wrap--valid"],
           wrong: ["c-input--anchor__wrap--error"],
         }[state])
     ),
@@ -113,6 +124,7 @@ const confirmSeedPhraseTemplate = ({
 
   const pageContentSlot = html`
     <article>
+      ${phraseStepper({ current: "confirm" })}
       <hgroup>
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>

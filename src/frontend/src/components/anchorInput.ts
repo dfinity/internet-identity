@@ -8,7 +8,6 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
-// TODO: onInput
 export const mkAnchorInput = ({
   userNumber,
   onSubmit,
@@ -22,7 +21,9 @@ export const mkAnchorInput = ({
   onSubmit: (userNumber: bigint) => void;
   onInput?: (content: string) => void;
   onChange?: (content: string) => void;
+  /* classes set on the wrapper element */
   classes?: Chan<string[]>;
+  /* value for a data-expected attribute, used in some contexts */
   dataExpected?: string;
 }): {
   template: TemplateResult;
@@ -106,11 +107,12 @@ export const mkAnchorInput = ({
     }
   };
 
-  const defClass = "c-input--anchor__wrap";
-
+  // All classes (user specified + default) on the wrapping element,
+  // set dynamically
+  const defaultClass = "c-input--anchor__wrap";
   const classes = isNullish(classes_)
-    ? new Chan(defClass)
-    : classes_.map((clzs) => [defClass, ...clzs].join(" "));
+    ? new Chan(defaultClass)
+    : classes_.map((clzs) => [defaultClass, ...clzs].join(" "));
 
   const template = html` <div class="c-input--anchor l-stack">
     <label class=${asyncReplace(classes)} aria-label="Identity Anchor">
@@ -122,7 +124,7 @@ export const mkAnchorInput = ({
         class="c-input c-input--vip c-input--centered c-input--spacious"
         placeholder="Internet Identity"
         value="${ifDefined(userNumber?.toString())}"
-        data-expected="${ifDefined(dataExpected)}"
+        data-expected=${ifDefined(dataExpected)}
         @input=${inputFilter(isDigits, onBadInput, onInput)}
         @change=${nonNullish(onChange)
           ? () => withRef(userNumberInput, (input) => onChange(input.value))
@@ -153,6 +155,7 @@ const isDigits = (c: string) => /^\d*\.?\d*$/.test(c);
 const inputFilter = (
   inputFilter: (c: string) => boolean,
   onBad: () => void,
+  /* callback called on valid input */
   onInput?: (content: string) => void
 ) =>
   function (

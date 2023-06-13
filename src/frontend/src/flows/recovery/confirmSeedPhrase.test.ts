@@ -101,7 +101,6 @@ test("words can be completed", async () => {
   inputFour.value = "four";
   inputFour.dispatchEvent(new Event("input"));
   await tick();
-  await tick();
   expect(nextButton.disabled).toBe(false);
 });
 

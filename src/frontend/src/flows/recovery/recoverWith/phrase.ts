@@ -59,7 +59,7 @@ const recoverWithPhraseTemplate = <
       anchorInput.userNumberInput,
       (input) => input.value
     );
-    if (isNullish(userNumberWord)) {
+    if (isNullish(userNumberWord) && userNumberWord === "") {
       return undefined;
     }
     const strings = [userNumberWord];

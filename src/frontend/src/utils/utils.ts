@@ -235,6 +235,8 @@ export class Chan<A> implements AsyncIterable<A> {
     return input;
   }
 
+  // Zip two Chans together, where the resulting Chan includes updates
+  // from both Chans.
   zip<B>(chanB: Chan<B>): Chan<[A, B]> {
     // eslint-disable-next-line
     const chanA = this; // for clarify/symmetry below
