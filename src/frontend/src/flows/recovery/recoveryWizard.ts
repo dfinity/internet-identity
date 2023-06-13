@@ -7,7 +7,7 @@ import { html, TemplateResult } from "lit-html";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 
-import { warningIcon } from "$src/components/icons";
+import { infoIconNaked } from "$src/components/icons";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -33,8 +33,8 @@ const addPhraseTemplate = ({
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
     >
       <div class="c-card__label c-card__label--hasIcon">
-        <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
-          >${warningIcon}</i
+        <i class="c-card__icon c-icon c-icon--info__flipped c-icon--inline"
+          >${infoIconNaked}</i
         >
         <h2>${copy.label}</h2>
       </div>
