@@ -110,6 +110,7 @@
   --vc-brand-orange: #f15a24;
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
+  --vc-brand-red: red;
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
   --vc-brand-purple: #4b19d6;
   --vc-brand-purple-light: #890eed;
@@ -224,8 +225,8 @@
   --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
-  --rg-wrong: var(--vc-brand-pink) 10%, var(--vc-brand-pink) 40%,
-    var(--vc-brand-pink) 50%, var(--vc-brand-pink) 90%;
+  --rg-wrong: var(--vc-brand-red) 10%, var(--vc-brand-red) 40%,
+    var(--vc-brand-red) 50%, var(--vc-brand-red) 90%;
   --rg-good: var(--vc-brand-green) 10%, var(--vc-brand-green) 40%,
     var(--vc-brand-green) 50%, var(--vc-brand-green) 90%;
   --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
