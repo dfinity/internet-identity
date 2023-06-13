@@ -377,7 +377,8 @@ export const iiPages: Record<string, () => void> = {
   addPhrase: () =>
     addPhrasePage({
       ok: () => console.log("ok"),
-      skip: () => console.log("skip"),
+      cancel: () => console.log("cancel"),
+      cancelText: "Cancel",
       i18n,
     }),
   displaySeedPhrase: () =>

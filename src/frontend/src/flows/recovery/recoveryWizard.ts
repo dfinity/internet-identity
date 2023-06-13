@@ -14,19 +14,24 @@ import copyJson from "./recoveryWizard.json";
 
 const addPhraseTemplate = ({
   ok,
-  skip,
+  cancel,
+  cancelText,
   i18n,
   scrollToTop = false,
 }: {
   ok: () => void;
-  skip: () => void;
+  cancel: () => void;
+  cancelText: string;
   i18n: I18n;
   /* put the page into view */
   scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
   const slot = html`
-    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+    <hgroup
+      data-page="add-recovery-phrase"
+      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
+    >
       <div class="c-card__label c-card__label--hasIcon">
         <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
           >${warningIcon}</i
@@ -41,11 +46,11 @@ const addPhraseTemplate = ({
         ${copy.ok}
       </button>
       <button
-        @click=${() => skip()}
-        data-action="skip"
+        @click=${() => cancel()}
+        data-action="cancel"
         class="c-button c-button--secondary"
       >
-        ${copy.skip}
+        ${cancelText}
       </button>
     </div>
     <section style="margin-top: 7em;" class="c-marketing-block">
@@ -85,12 +90,17 @@ const addPhraseTemplate = ({
 export const addPhrasePage = renderPage(addPhraseTemplate);
 
 // Prompt the user to create a recovery phrase
-export const addPhrase = (): Promise<"ok" | "skip"> => {
+export const addPhrase = ({
+  cancelText,
+}: {
+  cancelText: string;
+}): Promise<"ok" | "cancel"> => {
   return new Promise((resolve) =>
     addPhrasePage({
       i18n: new I18n(),
       ok: () => resolve("ok"),
-      skip: () => resolve("skip"),
+      cancel: () => resolve("cancel"),
+      cancelText,
       scrollToTop: true,
     })
   );
@@ -106,8 +116,8 @@ export const recoveryWizard = async (
     connection.lookupRecovery(userNumber)
   );
   if (recoveries.length === 0) {
-    const doAdd = await addPhrase();
-    if (doAdd !== "skip") {
+    const doAdd = await addPhrase({ cancelText: "Remind me later" });
+    if (doAdd !== "cancel") {
       doAdd satisfies "ok";
 
       await setupRecovery({ userNumber, connection });
