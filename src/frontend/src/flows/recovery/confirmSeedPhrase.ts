@@ -14,7 +14,7 @@ import copyJson from "./confirmSeedPhrase.json";
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement>; shouldFocus: boolean }
+  | { check: true; elem: Ref<HTMLInputElement> }
 );
 
 // A list of indices nicely spread over the 24 BIP39 words (anchor is separate)
@@ -47,19 +47,11 @@ const confirmSeedPhraseTemplate = ({
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
       // NOTE: typescript can't follow if word is deconstructed with {...word}
-      return { word: word.word, check: word.check, elem, shouldFocus: false };
+      return { word: word.word, check: word.check, elem };
     } else {
       return { word: word.word, check: word.check };
     }
   });
-
-  // Focus the first word (that needs to be checked)
-  for (const word of words) {
-    if (word.check) {
-      word.shouldFocus = true;
-      break;
-    }
-  }
 
   // if the identity number has been re-input correctly
   const identityInputState = new Chan<"pending" | "wrong" | "correct">(
@@ -227,7 +219,6 @@ export const wordTemplate = ({
       class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
-      ?autofocus=${word.shouldFocus}
       data-state=${asyncReplace(state)}
       @input=${() => {
         /* On input, immediately show word as correct when correct, but don't show if a
