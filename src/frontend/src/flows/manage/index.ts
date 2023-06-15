@@ -298,7 +298,7 @@ export const displayManage = (
           resolve();
         },
         addRecoveryPhrase: async () => {
-          const doAdd = await addPhrase({ cancelText: "Cancel" });
+          const doAdd = await addPhrase({ intent: "userInitiated" });
           if (doAdd === "cancel") {
             resolve();
             return;
