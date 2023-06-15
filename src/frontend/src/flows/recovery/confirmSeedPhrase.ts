@@ -47,7 +47,7 @@ const confirmSeedPhraseTemplate = ({
     if (word.check) {
       const elem: Ref<HTMLInputElement> = createRef();
       // NOTE: typescript can't follow if word is deconstructed with {...word}
-      return { word: word.word, check: word.check, elem };
+      return { word: word.word, check: word.check, elem, shouldFocus: false };
     } else {
       return { word: word.word, check: word.check };
     }
