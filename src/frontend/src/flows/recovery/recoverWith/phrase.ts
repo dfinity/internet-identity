@@ -266,6 +266,7 @@ export const wordTemplate = ({
         })}
       type="text"
       autocapitalize="none"
+      spellcheck="false"
       class="c-recoveryInput"
       ${ref(wordRef)}
       data-role="recovery-word-input"

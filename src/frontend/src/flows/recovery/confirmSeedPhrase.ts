@@ -217,6 +217,7 @@ export const wordTemplate = ({
     <input
       type="text"
       autocapitalize="none"
+      spellcheck="false"
       class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
