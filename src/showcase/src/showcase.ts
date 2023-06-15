@@ -381,8 +381,15 @@ export const iiPages: Record<string, () => void> = {
     addPhrasePage({
       ok: () => console.log("ok"),
       cancel: () => console.log("cancel"),
-      cancelText: "Cancel",
       i18n,
+      intent: "userInitiated",
+    }),
+  addPhraseWarning: () =>
+    addPhrasePage({
+      ok: () => console.log("ok"),
+      cancel: () => console.log("cancel"),
+      i18n,
+      intent: "securityReminder",
     }),
   displaySeedPhrase: () =>
     displaySeedPhrasePage({
