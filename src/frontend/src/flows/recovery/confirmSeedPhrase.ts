@@ -216,6 +216,7 @@ export const wordTemplate = ({
     ${asyncReplace(icon)}
     <input
       type="text"
+      autocapitalize="none"
       class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
