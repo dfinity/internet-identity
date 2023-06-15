@@ -265,6 +265,7 @@ export const wordTemplate = ({
           next.dispatchEvent(newEvent);
         })}
       type="text"
+      autocapitalize="none"
       class="c-recoveryInput"
       ${ref(wordRef)}
       data-role="recovery-word-input"
