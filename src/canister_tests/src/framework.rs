@@ -174,7 +174,6 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
         canister_creation_cycles_cost: Some(0),
         register_rate_limit: None,
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
@@ -185,7 +184,6 @@ pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdenti
         canister_creation_cycles_cost: None,
         register_rate_limit: Some(rate_limit),
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
@@ -198,7 +196,6 @@ pub fn arg_with_anchor_range(
         canister_creation_cycles_cost: None,
         register_rate_limit: None,
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
