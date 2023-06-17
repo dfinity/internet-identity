@@ -7,7 +7,7 @@ const i18n = new I18n("en");
 
 test("word changes state", async () => {
   const template = wordTemplate({
-    word: { check: true, elem: createRef(), word: "hello", shouldFocus: true },
+    word: { check: true, elem: createRef(), word: "hello" },
     update: () => {
       /* */
     },
@@ -53,6 +53,7 @@ test("words can be completed", async () => {
 
   await confirmSeedPhrasePage(
     {
+      userNumberWord: "12345",
       words,
       confirm: () => {
         /* */
@@ -71,6 +72,14 @@ test("words can be completed", async () => {
     '[data-action="next"]'
   ) as HTMLButtonElement;
 
+  expect(nextButton.disabled).toBe(true);
+
+  const inputNumber = document.querySelector(
+    '[data-expected="12345"]'
+  ) as HTMLInputElement;
+  inputNumber.value = "12345";
+  inputNumber.dispatchEvent(new Event("input"));
+  await tick();
   expect(nextButton.disabled).toBe(true);
 
   const inputTwo = document.querySelector(

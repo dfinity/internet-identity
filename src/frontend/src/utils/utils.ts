@@ -165,13 +165,7 @@ export class Chan<A> implements AsyncIterable<A> {
 
   // A list of other channels to which we forward (`send()`) the values
   // sent to us
-  // We use weak references to the channels so that they do not need to deregister explicitely,
-  // but instead we simply drop them when they're gone.
-  private listeners: WeakRef<{ notify: (a: A) => void }>[] = [];
-
-  // Reference to a parent (whose listeners we've added ourselves to) to prevent garbage collection of parent (necessary if parent itself is a listener, to prevent dropping the listener).
-  // This is a bit of a hack, but much cleaner and way less error prone than deregistering listeners by hand.
-  protected parent?: unknown;
+  private listeners: ((a: A) => void)[] = [];
 
   public latest: A;
 
@@ -190,18 +184,8 @@ export class Chan<A> implements AsyncIterable<A> {
       this.buffer.push(a);
     }
 
-    // Finally, broadcast and prune listeners if they're gone
-    this.listeners = this.listeners.reduce<typeof this.listeners>(
-      (acc, ref) => {
-        const listener = ref.deref();
-        if (nonNullish(listener)) {
-          listener.notify(a);
-          acc.push(ref);
-        }
-        return acc;
-      },
-      []
-    );
+    // Finally, broadcast to all listeners
+    this.listeners.forEach((listener) => listener(a));
 
     // and set as latest
     this.latest = a;
@@ -211,9 +195,7 @@ export class Chan<A> implements AsyncIterable<A> {
   // consumes the values: if you need to read the value from different
   // places use `.values()` instead.
   protected async *recv(): AsyncIterable<A> {
-    if (nonNullish(this.latest)) {
-      yield this.latest;
-    }
+    yield this.latest;
 
     // Forever loop, yielding entire buffers and then blocking
     // on `snd` (which prevents hot looping)
@@ -244,17 +226,27 @@ export class Chan<A> implements AsyncIterable<A> {
   ): Chan<B> {
     const { handleValue, latest } = this.__handleMapOpts(opts);
 
-    // Create a chan that the WeakRef can hang on to, but that automatically
-    // translates As into Bs
-    class MappedChan extends Chan<B> {
-      notify(value: A) {
-        handleValue({ send: (a: B) => this.send(a), value });
-      }
-    }
-    const input = new MappedChan(latest);
-    this.listeners.push(new WeakRef(input));
-    this.parent = input; // keep a ref to prevent parent being garbage collected
+    // Create a chan that automatically maps the value
+    const input = new Chan<B>(latest);
+    this.listeners.push((value: A) =>
+      handleValue({ send: (a: B) => input.send(a), value })
+    );
+
     return input;
+  }
+
+  // Zip two Chans together, where the resulting Chan includes updates
+  // from both Chans.
+  zip<B>(chanB: Chan<B>): Chan<[A, B]> {
+    // eslint-disable-next-line
+    const chanA = this; // for clarity/symmetry below
+
+    const zipped = new Chan<[A, B]>([chanA.latest, chanB.latest]);
+
+    chanA.listeners.push((value: A) => zipped.send([value, chanB.latest]));
+    chanB.listeners.push((value: B) => zipped.send([chanA.latest, value]));
+
+    return zipped;
   }
 
   // How the mapped chan should handle the value

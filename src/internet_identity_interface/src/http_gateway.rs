@@ -26,6 +26,7 @@ pub struct HttpRequest {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: ByteBuf,
+    pub certificate_version: Option<u16>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

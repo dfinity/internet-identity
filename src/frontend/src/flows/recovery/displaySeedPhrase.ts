@@ -5,12 +5,14 @@ import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { phraseStepper } from "./stepper";
 
 import copyJson from "./displaySeedPhrase.json";
 
 const displaySeedPhraseTemplate = ({
   operation,
-  seedPhrase,
+  userNumberWord,
+  words,
   onContinue,
   cancel,
   copyPhrase: copyPhrase_,
@@ -18,7 +20,8 @@ const displaySeedPhraseTemplate = ({
 }: {
   /* whether the phrase is created for the first time or just reset */
   operation: "create" | "reset";
-  seedPhrase: string;
+  userNumberWord: string;
+  words: string[];
   copyPhrase: () => Promise<void>;
   onContinue: () => void;
   cancel: () => void;
@@ -32,7 +35,7 @@ const displaySeedPhraseTemplate = ({
   const checkbox: Ref<HTMLInputElement> = createRef();
 
   // Assume the phrase is a list of space-separated words
-  const recoveryWords = seedPhrase.split(" ");
+  const recoveryWords = words;
 
   // Copy the phrase and give visual feedback on success
   const copyPhrase = async () => {
@@ -49,6 +52,7 @@ const displaySeedPhraseTemplate = ({
 
   const pageContentSlot = html`
     <article>
+      ${phraseStepper({ current: "store" })}
       <hgroup>
         <h1 class="t-title t-title--main">
           ${operation === "create" ? copy.title : copy.title_reset}
@@ -57,6 +61,16 @@ const displaySeedPhraseTemplate = ({
           ${operation === "create" ? copy.header : copy.header_reset}
         </p>
       </hgroup>
+      <div class="c-input--anchor l-stack">
+        <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
+          <div
+            class="c-input c-input--vip c-input--readonly c-input--centered c-input--spacious"
+          >
+            ${userNumberWord}
+          </div>
+        </label>
+      </div>
+
       <div class="l-stack">
         <output class="c-input c-input--recovery"
           ><ol
@@ -147,10 +161,14 @@ export const displaySeedPhrase = ({
   seedPhrase: string;
 }): Promise<"ok" | "canceled"> => {
   const i18n = new I18n();
+  const words = seedPhrase.split(" ");
+  // eslint-disable-next-line
+  const userNumberWord = words.shift()!; // Extract first word (anchor) to show independently
   return new Promise((resolve) =>
     displaySeedPhrasePage({
       operation,
-      seedPhrase,
+      userNumberWord,
+      words,
       onContinue: () => resolve("ok"),
       cancel: () => resolve("canceled"),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),

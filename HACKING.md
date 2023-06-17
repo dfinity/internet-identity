@@ -16,7 +16,7 @@ The build requires the following dependencies:
 * [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 * Node.js v16+
 
-> NOTE! If you're only going to hack on the HTML and CSS code, just run `npm run showcase`. This will start a minimal web server which serves a showcase of the pages used in the app.
+> NOTE! If you're only going to hack on the HTML and CSS code, see the [showcase](#showcase) section.
 
 ## Running Locally
 
@@ -142,6 +142,22 @@ dfx build internet_identity
 ```
 
 This will produce `./internet_identity.wasm.gz`.
+
+## Showcase
+
+The simplest way to make visual changes (HTML & CSS, and non-flow JS) is to start the showcase:
+
+``` bash
+npm run showcase
+```
+
+This will start a webserver showcasing most II pages & components. The showcase can also be built:
+
+``` bash
+npm run build:showcase [--base 'some-base/']
+npm run preview:showcase [--base 'some-base/']
+```
+
 
 [releases]: https://github.com/dfinity/internet-identity/releases
 [docker-build]: ./README.md#building-with-docker

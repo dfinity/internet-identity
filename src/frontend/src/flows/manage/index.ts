@@ -20,9 +20,9 @@ import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
-import { DappDescription, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { getDapps, KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
-import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
@@ -51,7 +51,7 @@ import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
 export const authnTemplateManage = ({
   dapps,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
 }): AuthnTemplates => {
   const wrap = ({
     title,
@@ -151,7 +151,7 @@ const displayManageTemplate = ({
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: IdentityBackground;
 }): TemplateResult => {
@@ -298,6 +298,12 @@ export const displayManage = (
           resolve();
         },
         addRecoveryPhrase: async () => {
+          const doAdd = await addPhrase({ intent: "userInitiated" });
+          if (doAdd === "cancel") {
+            resolve();
+            return;
+          }
+          doAdd satisfies "ok";
           await setupPhrase(userNumber, connection);
           resolve();
         },

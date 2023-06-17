@@ -105,6 +105,7 @@
   --vc-shadow: rgba(32, 33, 36, 0.6);
   --vc-night: rgba(32, 33, 36, 0.8);
 
+  --vc-red: #ff0000;
   --vc-silver: #d9d9d9;
 
   --vc-brand-orange: #f15a24;
@@ -203,11 +204,14 @@
 
   --rc-errorLight: var(--vc-brand-pink--transparent);
   --rc-error: var(--vc-brand-pink);
+  --rc-error-strong: var(--vc-red);
   --rc-onError: var(--vc-snow);
 
   --rc-warning: var(--vc-brand-yellow);
   --rc-onWarning: var(--rc-snow);
 
+  --rc-info: var(--vc-brand-purple);
+  --rc-onInfo: var(--vc-snow);
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
@@ -498,16 +502,6 @@ body {
   margin-top: 0.5em;
 }
 
-.t-title--discrete {
-  font-size: 1rem;
-  opacity: 0.6;
-  text-transform: uppercase;
-}
-
-.t-title--discrete + .t-title {
-  margin-top: 0.2em;
-}
-
 .t-title--list {
   font-size: 1.4rem;
   font-weight: 600;
@@ -666,21 +660,13 @@ a:hover,
   vertical-align: middle;
 }
 
+.c-icon [fill] {
+  fill: var(--onBgc);
+}
+
+/* Icons that have e.g. text to the right */
 .c-icon--inline {
   margin-right: var(--rs-inline-icon-gap);
-}
-
-.c-icon--block {
-  display: block;
-  height: auto;
-  aspect-ratio: none;
-}
-
-.c-icon--marketing {
-  height: 4.5rem;
-  width: 4.5rem;
-
-  color: var(--rc-marketing-icon);
 }
 
 .c-icon svg {
@@ -691,22 +677,63 @@ a:hover,
   width: 100%;
 }
 
-.c-icon--ok [fill] {
-  fill: var(--rc-positive);
+/* Big marketing icons (section title) */
+.c-icon--marketing {
+  height: 4.5rem;
+  width: 4.5rem;
+
+  color: var(--rc-marketing-icon);
+  --onBgc: transparent;
+}
+.c-icon--marketing {
+  fill: auto;
 }
 
-.c-icon--warning [fill] {
-  fill: var(--rc-warning);
+/* Small icons used to display status */
+.c-icon--ok,
+.c-icon--info__flipped,
+.c-icon--warning,
+.c-icon--error,
+.c-icon--error__flipped {
+  background: var(--bgc);
 }
 
-.c-icon--error [fill] {
-  fill: var(--rc-error);
+.c-icon--ok {
+  --onBgc: var(--rc-positive);
+}
+.c-icon--info__flipped {
+  --bgc: var(--rc-info);
+  --onBgc: var(--rc-onInfo);
+  border-radius: 50%;
+}
+
+.c-icon--warning {
+  --onBgc: var(--rc-warning);
+}
+
+.c-icon--error {
+  --onBgc: var(--rc-error);
+  border-radius: 50%;
+}
+
+/* "Flipped" version where the background pops (instead
+ * of the icon itself) */
+.c-icon--error__flipped {
+  --bgc: var(--rc-error);
+  --onBgc: var(--rc-onError);
+  border-radius: 50%;
+}
+.c-icon--error__flipped svg {
+  /* Y value is a bit bigger to compensate visually: the triangle's center of mass
+   * should be centered, not the triangle's bounding box's center of mass. */
+  transform: translate(-50%, -53.5%) scale(0.65);
 }
 
 .c-icon--lock svg {
   transform: translate(-50%, -50%) scale(0.8);
 }
 
+/* Dot menu */
 .c-icon--more {
   position: relative;
   width: 2rem;
@@ -716,25 +743,6 @@ a:hover,
   --offsetY: 0;
   --bgc: currentColor;
 }
-
-.c-icon--circle {
-  display: inline-block;
-  position: relative;
-  border-radius: 50%;
-  padding: 0.2rem;
-  width: 1.2em;
-  height: 1.2em;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.c-icon--circle svg {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.6);
-  color: rgba(0, 0, 0, 0.5);
-}
-
 :is(button, a, link, .c-dropdown)[aria-expanded="true"] .c-icon--more {
   --rotate: -90deg;
   background-color: var(--rc-button);
@@ -776,6 +784,26 @@ a:hover,
   box-shadow: 0 0 0 2px #ffffff, 0 0 2px 4px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+}
+
+/* Circle icons */
+.c-icon--circle {
+  display: inline-block;
+  position: relative;
+  border-radius: 50%;
+  padding: 0.2rem;
+  width: 1.2em;
+  height: 1.2em;
+  background: rgba(0, 0, 0, 0.08);
+  --onBgc: transparent; /* reset primary color bc we don't want any fill */
+}
+
+.c-icon--circle svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  color: rgba(0, 0, 0, 0.5);
 }
 
 /**
@@ -864,30 +892,35 @@ a:hover,
   }
 }
 
+/* Card label/titles */
+.c-card__label {
+  /* some labels have icons, so we center everything vertically */
+  display: flex;
+  align-items: center;
+
+  font-size: 1rem;
+  /* opacity only on text color not the full element */
+  color: color-mix(in srgb-linear, var(--rc-text), var(--rc-card) 30%);
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.c-card__label + .t-title {
+  margin-top: 0.2em;
+}
+
+/** can be replaced with :has(.c-card__icon) as soon as it's supported
+by all browsers (FF is missing) */
+.c-card__label--hasIcon {
+  border-bottom: var(--rs-line) solid var(--rc-line);
+  padding-bottom: calc(0.5 * var(--rs-card-bezel));
+  margin-bottom: calc(0.75 * var(--rs-card-bezel));
+  margin-top: calc(-0.15 * var(--rs-card-bezel));
+}
+
 .c-card__icon {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 10%;
-  aspect-ratio: 1;
-  z-index: var(--z-foreground);
-  transform: translate(40%, -40%);
-}
-
-.c-card__icon svg {
-  position: absolute;
-  display: block;
-  width: 100%;
-  height: 100%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.c-card__icon svg * {
-  fill: var(--rc-background);
-  stroke-width: 3px;
-  stroke: var(--rc-error);
+  height: 2rem;
 }
 
 .c-card__close {
@@ -915,11 +948,6 @@ a:hover,
   fill: var(--rc-onButton);
 }
 
-.c-card__content {
-  position: relative;
-  z-index: var(--z-foreground);
-}
-
 .c-card__title {
   /*
     approximation: to make sure the title
@@ -936,15 +964,25 @@ a:hover,
 .c-card--modal {
   position: relative;
   border: none;
+  /* The before/after are used for the effects & background so we push
+   * them back with a negative z-index. This prevents them going behind
+   * the rest of the page. */
+  isolation: isolate;
   border-radius: var(--rs-card-border-radius);
 }
 
 .c-card--warning::before,
-.c-card--modal::before {
+.c-card--modal::before,
+.c-card--warning::after,
+.c-card--modal::after {
   position: absolute;
   content: "";
-  z-index: 0;
+  z-index: -1;
   inset: 0;
+}
+
+.c-card--warning::before,
+.c-card--modal::before {
   background-image: linear-gradient(170deg, var(--rg-brand));
   filter: blur(30px);
   opacity: 0.75;
@@ -953,10 +991,6 @@ a:hover,
 
 .c-card--warning::after,
 .c-card--modal::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-background);
   background: var(--rc-background);
   border-radius: var(--rs-card-border-radius);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
@@ -1378,9 +1412,12 @@ a:hover,
   cursor: pointer;
 }
 
+/** An error state for an input
+ * We leave the text color as default to show the text is still
+ * interactable
+ */
 .c-input.has-error,
 .c-input.has-error:focus {
-  color: var(--rc-error);
   box-shadow: inset 0 0 0 calc(var(--rs-line) * 2) var(--rc-error);
   border-image: none;
 }
@@ -1605,6 +1642,7 @@ a:hover,
 
 .c-list--bulleted {
   padding-left: var(--rs-list-bullet-space);
+  margin-top: 1em; /* match paragraph margin */
 }
 
 .c-list--bulleted {
@@ -2282,7 +2320,7 @@ a.c-action-list__item {
 }
 
 .c-progress-stepper__icon path {
-  /* 
+  /*
     this is a bit of a hack, the check-mark should not be a filled path
     but a stroke.
   */
@@ -2356,6 +2394,16 @@ a.c-action-list__item {
 .c-input--anchor__wrap {
   position: relative;
   display: block;
+  /* The halo around the input, used for style & feedback */
+  --halo: linear-gradient(270deg, var(--rg-brand));
+}
+
+.c-input--anchor__wrap--error {
+  --halo: var(--rc-error-strong);
+}
+
+.c-input--anchor__wrap--valid {
+  --halo: var(--rc-positive);
 }
 
 .c-input--anchor__wrap::before {
@@ -2364,14 +2412,16 @@ a.c-action-list__item {
   pointer-events: none;
   inset: 0;
   border-radius: 999999px;
-  background-image: linear-gradient(270deg, var(--rg-brand));
+  background: var(--halo);
   filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
-.c-input--anchor__wrap:focus-within::before {
+.c-input--anchor__wrap:focus-within::before,
+.c-input--anchor__wrap--error::before,
+.c-input--anchor__wrap--valid::before {
   opacity: 0.8;
   transform: scale(1) translateZ(0);
 }

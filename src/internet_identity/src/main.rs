@@ -6,7 +6,6 @@ use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_certified_map::AsHashTree;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
@@ -23,6 +22,8 @@ mod assets;
 mod delegation;
 mod hash;
 mod http;
+/// Infrastructure to help building nested certification trees.
+mod nested_tree;
 mod state;
 mod storage;
 
@@ -34,7 +35,6 @@ const MINUTE_NS: u64 = secs_to_nanos(60);
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 const DAY_NS: u64 = 24 * HOUR_NS;
 
-const LABEL_ASSETS: &[u8] = b"http_assets";
 const LABEL_SIG: &[u8] = b"sig";
 
 // Note: concatenating const &str is a hassle in rust. It seemed easiest to just repeat.
@@ -335,18 +335,10 @@ fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
-fn migrate_to_memory_manager(maybe_arg: &Option<InternetIdentityInit>) -> bool {
-    if maybe_arg.is_none() {
-        return false;
-    }
-    let arg = maybe_arg.as_ref().unwrap();
-    arg.migrate_storage_to_memory_manager.unwrap_or(false)
-}
-
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::init_new(migrate_to_memory_manager(&maybe_arg));
+    state::init_new();
 
     apply_install_arg(maybe_arg);
 
@@ -358,7 +350,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
-    state::init_from_stable_memory(migrate_to_memory_manager(&maybe_arg));
+    state::init_from_stable_memory();
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
@@ -417,10 +409,10 @@ fn save_persistent_state() {
 
 fn update_root_hash() {
     use ic_certified_map::{fork_hash, labeled_hash};
-    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
+    state::assets_and_signatures(|assets, sigs| {
         let prefixed_root_hash = fork_hash(
-            // NB: Labels added in lexicographic order
-            &labeled_hash(LABEL_ASSETS, &asset_hashes.root_hash()),
+            &assets.root_hash(),
+            // NB: sigs have to be added last due to lexicographic order of labels
             &labeled_hash(LABEL_SIG, &sigs.root_hash()),
         );
         set_certified_data(&prefixed_root_hash[..]);

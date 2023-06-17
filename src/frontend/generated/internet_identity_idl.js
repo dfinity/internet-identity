@@ -164,6 +164,7 @@ export const idlFactory = ({ IDL }) => {
     'method' : IDL.Text,
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HeaderField),
+    'certificate_version' : IDL.Opt(IDL.Nat16),
   });
   const Token = IDL.Record({});
   const StreamingCallbackHttpResponse = IDL.Record({

@@ -108,7 +108,7 @@ export class RegisterView extends View {
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-action="skip"]')
+      .$('[data-action="cancel"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
@@ -154,7 +154,7 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async skipRecovery(): Promise<void> {
-    await this.browser.$('[data-action="skip"]').click();
+    await this.browser.$('[data-action="cancel"]').click();
   }
 
   async copySeedPhrase(): Promise<void> {
@@ -220,23 +220,13 @@ export class MainView extends View {
 
   async addRecovery(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
+    await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
-    // Open the dropdown by clicking on the trigger button
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='rename']`)
-      .waitForClickable();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='rename']`)
-      .click();
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "rename" }).click();
 
     const renameView = new RenameView(this.browser);
     await renameView.waitForDisplay();
@@ -245,21 +235,9 @@ export class MainView extends View {
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
-    // Open the dropdown by clicking on the trigger button
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='protect']`)
-      .waitForClickable();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='protect']`)
-      .click();
-    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "protect" }).click();
+    await this.browser.waitUntil(() => this.browser.isAlertOpen());
     await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
@@ -275,21 +253,9 @@ export class MainView extends View {
   }
 
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
-    // Ensure the settings dropdown is in view
-    await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
-    );
-    // Open the dropdown by clicking on the trigger button
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
-      .waitForClickable();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='unprotect']`)
-      .click();
-    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "unprotect" }).click();
+    await this.browser.waitUntil(() => this.browser.isAlertOpen());
     await this.browser.acceptAlert();
 
     const recoveryView = new RecoverView(this.browser);
@@ -304,39 +270,56 @@ export class MainView extends View {
       .waitForDisplayed({ timeout: 10_000, reverse: true });
   }
 
-  async remove(deviceName: string): Promise<void> {
-    // Open the dropdown by clicking on the trigger button
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='remove']`)
-      .waitForClickable();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='remove']`)
-      .click();
-  }
-
   async reset(deviceName: string): Promise<void> {
-    // Open the dropdown by clicking on the trigger button
-    await this.browser
-      .$(`button.c-dropdown__trigger[data-device="${deviceName}"]`)
-      .click();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='reset']`)
-      .waitForClickable();
-    await this.browser
-      .$(`button[data-device="${deviceName}"][data-action='reset']`)
-      .click();
-    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "reset" }).click();
+    await this.browser.waitUntil(() => this.browser.isAlertOpen());
     await this.browser.acceptAlert();
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {
-    await this.browser.$(`button[data-device="${deviceName}"]`).click();
-    await this.browser
-      .$("button[data-action='remove']")
-      .waitForDisplayed({ reverse: true });
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "remove" }).waitForDisplayed({
+      reverse: true,
+    });
+  }
+
+  // Open the device settings/actions dropdown
+  async openDeviceActions({
+    deviceName,
+  }: {
+    deviceName: string;
+  }): Promise<void> {
+    // Ensure the settings dropdown is in view
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    // Grab the trigger (button) and figure out the id of the element it opens
+    const dropdownTrigger = await this.browser.$(
+      `[data-action="open-settings"][data-device="${deviceName}"]`
+    );
+    const dropdownId = await dropdownTrigger.getAttribute("aria-controls");
+    await dropdownTrigger.click();
+
+    // The menu element has an animation, so we wait until all animations are finished so
+    // that we can reliably click on its elements
+    await this.browser.waitUntil(
+      () =>
+        this.browser.execute(
+          (dropdownId) =>
+            document.getElementById(dropdownId)?.getAnimations().length === 0,
+          dropdownId
+        ),
+      { timeoutMsg: "Animation didn't end" }
+    );
+  }
+
+  // Get a device action element from the device settings menu (menu must be opened
+  // separately)
+  deviceAction({ deviceName, action }: { deviceName: string; action: string }) {
+    return this.browser.$(
+      `[data-action="${action}"][data-device="${deviceName}"]`
+    );
   }
 }
 
@@ -647,6 +630,13 @@ export class RecoverView extends View {
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
     const words = seedPhrase.split(" ").filter(Boolean);
+    // eslint-disable-next-line
+    const userNumberWord = words.shift()!;
+    const userNumberInput = await this.browser.$(
+      'input[data-role="anchor-input"]'
+    );
+    await userNumberInput.setValue(userNumberWord);
+
     const inputs = await this.browser.$$(
       'input[data-role="recovery-word-input"]'
     );

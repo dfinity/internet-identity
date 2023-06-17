@@ -139,6 +139,7 @@ export interface HttpRequest {
   'method' : string,
   'body' : Uint8Array | number[],
   'headers' : Array<HeaderField>,
+  'certificate_version' : [] | [number],
 }
 export interface HttpResponse {
   'body' : Uint8Array | number[],

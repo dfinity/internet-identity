@@ -4,13 +4,8 @@ use candid::Principal;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_crypto_iccsa::types::SignatureBytes;
-use ic_crypto_iccsa::{public_key_bytes_from_der, verify};
-use ic_crypto_utils_threshold_sig_der::parse_threshold_sig_key_from_der;
+use ic_representation_independent_hash::Value;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
-use ic_types::crypto::Signable;
-use ic_types::messages::Delegation;
-use ic_types::Time;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
 use internet_identity_interface::internet_identity::types::*;
@@ -179,7 +174,6 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
         canister_creation_cycles_cost: Some(0),
         register_rate_limit: None,
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
@@ -190,7 +184,6 @@ pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdenti
         canister_creation_cycles_cost: None,
         register_rate_limit: Some(rate_limit),
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
@@ -203,7 +196,6 @@ pub fn arg_with_anchor_range(
         canister_creation_cycles_cost: None,
         register_rate_limit: None,
         max_num_latest_delegation_origins: None,
-        migrate_storage_to_memory_manager: None,
     })
 }
 
@@ -456,6 +448,7 @@ pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
             url: "/metrics".to_string(),
             headers: vec![],
             body: ByteBuf::new(),
+            certificate_version: None,
         },
     )
     .expect("HTTP request to /metrics failed");
@@ -513,23 +506,41 @@ pub fn time(env: &StateMachine) -> u64 {
         .as_nanos() as u64
 }
 
-pub fn verify_delegation(user_key: UserKey, signed_delegation: &SignedDelegation, root_key: &[u8]) {
-    // transform delegation into ic typed delegation so that we have access to the signature domain separator
-    // (via as_signed_bytes)
-    let delegation = Delegation::new(
-        signed_delegation.delegation.pubkey.clone().into_vec(),
-        Time::from_nanos_since_unix_epoch(signed_delegation.delegation.expiration),
+pub fn verify_delegation(
+    env: &StateMachine,
+    user_key: UserKey,
+    signed_delegation: &SignedDelegation,
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-delegation";
+
+    // The signed message is a signature domain separator
+    // followed by the representation independent hash of a map with entries
+    // pubkey, expiration and targets (if any), using the respective values from the delegation.
+    // See https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
+    let key_value_pairs = vec![
+        (
+            "pubkey".to_string(),
+            Value::Bytes(signed_delegation.delegation.pubkey.clone().into_vec()),
+        ),
+        (
+            "expiration".to_string(),
+            Value::Number(signed_delegation.delegation.expiration),
+        ),
+    ];
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(
+        &ic_representation_independent_hash::representation_independent_hash(&key_value_pairs),
     );
 
-    // this requires imports of internal crypto infrastructure
-    // -> extend state-machine-tests to offer the functionality instead (see L2-739)
-    verify(
-        &delegation.as_signed_bytes(),
-        SignatureBytes(signed_delegation.signature.clone().into_vec()),
-        public_key_bytes_from_der(user_key.as_ref()).unwrap(),
-        &parse_threshold_sig_key_from_der(root_key).unwrap(),
+    env.verify_canister_signature(
+        msg,
+        signed_delegation.signature.clone().into_vec(),
+        user_key.into_vec(),
+        root_key.to_vec(),
     )
-    .expect("signature invalid");
+    .expect("delegation signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {

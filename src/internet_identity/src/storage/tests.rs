@@ -1,7 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::{Header, PersistentStateError, StableMemory, StorageError};
+use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -10,8 +10,6 @@ use internet_identity_interface::internet_identity::types::{
     DeviceProtection, KeyType, OngoingActiveAnchorStats, Purpose,
 };
 use serde_bytes::ByteBuf;
-use std::borrow::Borrow;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 const WASM_PAGE_SIZE: u64 = 1 << 16;
@@ -28,45 +26,20 @@ fn should_match_actual_header_size() {
 #[test]
 fn should_report_max_number_of_entries_for_32gb() {
     let memory = VectorMemory::default();
-    let storage = Storage::new((1, 2), StableMemory::Single(memory));
+    let storage = Storage::new((1, 2), memory);
     assert_eq!(storage.max_entries(), 8_178_860);
-}
-
-#[test]
-fn should_serialize_header_v6() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((1, 2), StableMemory::Single(memory.clone()));
-    storage.update_salt([5u8; 32]);
-    storage.flush();
-
-    let mut buf = vec![0; HEADER_SIZE];
-    memory.read(0, &mut buf);
-    assert_eq!(buf, hex::decode("494943060000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
 }
 
 #[test]
 fn should_serialize_header_v7() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((1, 2), StableMemory::Managed(memory.clone()));
+    let mut storage = Storage::new((1, 2), memory.clone());
     storage.update_salt([5u8; 32]);
     storage.flush();
 
     let mut buf = vec![0; HEADER_SIZE];
     memory.read(0, &mut buf);
     assert_eq!(buf, hex::decode("494943070000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
-}
-
-#[test]
-fn should_recover_header_from_memory_v6() {
-    let memory = VectorMemory::default();
-    memory.grow(1);
-    memory.write(0, &hex::decode("494943060500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
-
-    let storage = Storage::from_memory(memory).unwrap();
-    assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
-    assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
-    assert_eq!(storage.anchor_count(), 5);
-    assert_eq!(storage.version(), 6);
 }
 
 #[test]
@@ -94,111 +67,11 @@ fn add_test_anchor_data<M: Memory + Clone>(storage: &mut Storage<M>, number_of_a
     }
 }
 
-// Returns a hex-representation of the specified range from `memory`.
-// The output is grouped into pairs of bytes, for easier visual parsing.
-fn range_as_hex(memory: &RefCell<Vec<u8>>, offset: u64, length: usize) -> String {
-    let mut buf = vec![0u8; length];
-    memory.read(offset, &mut buf);
-    let s = hex::encode(buf);
-    let mut answer = String::new();
-    // Add spaces after every 2 bytes, for easier visual parsing of the hex output.
-    for (i, c) in s.chars().enumerate() {
-        answer.push(c);
-        if i % 4 == 3 {
-            answer.push(' ');
-        }
-    }
-    answer
-}
-
-fn assert_memory_page_eq(memory_1: &VectorMemory, memory_2: &VectorMemory, page_no: u64) {
-    let d: u64 = 64;
-    for i in 0..(WASM_PAGE_SIZE / d) {
-        let offset = WASM_PAGE_SIZE * page_no + i * d;
-        assert_eq!(
-            range_as_hex(memory_1.borrow(), offset, d as usize),
-            range_as_hex(memory_2.borrow(), offset, d as usize),
-            "Storage's memory differ at page # {}, i = {}, offset = {}",
-            page_no,
-            i,
-            offset
-        );
-    }
-}
-
-fn test_migrate_memory_from_v6_to_v7(number_of_anchors: usize) {
-    let (id_range_lo, id_range_hi) = (12345, 678910);
-    let memory_v6 = VectorMemory::default();
-    let memory_v7 = VectorMemory::default();
-
-    let mut storage_v6 = Storage::new(
-        (id_range_lo, id_range_hi),
-        wrap_memory(memory_v6.clone(), SupportedVersion::V6),
-    );
-    let mut storage_v7 = Storage::new(
-        (id_range_lo, id_range_hi),
-        wrap_memory(memory_v7.clone(), SupportedVersion::V7),
-    );
-
-    add_test_anchor_data(&mut storage_v6, number_of_anchors);
-    add_test_anchor_data(&mut storage_v7, number_of_anchors);
-    assert_ne!(memory_v6, memory_v7);
-    let storage_migrated_v7 =
-        Storage::from_memory_v6_to_v7(memory_v6.clone()).expect("Failure migrating v6 to v7");
-    assert_eq!(storage_migrated_v7.header, storage_v7.header);
-    assert_eq!(
-        storage_migrated_v7.header_memory.size(),
-        storage_v7.header_memory.size()
-    );
-    assert_eq!(
-        storage_migrated_v7.anchor_memory.size(),
-        storage_v7.anchor_memory.size()
-    );
-    assert_eq!(memory_v7.size(), memory_v6.size());
-    for i in 0..memory_v7.size() {
-        assert_memory_page_eq(&memory_v7, &memory_v6, i);
-    }
-    assert_eq!(memory_v6, memory_v7);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_no_anchors() {
-    test_migrate_memory_from_v6_to_v7(0);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_1_anchor() {
-    test_migrate_memory_from_v6_to_v7(1);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_100_anchors() {
-    test_migrate_memory_from_v6_to_v7(100);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_1000_anchors() {
-    test_migrate_memory_from_v6_to_v7(1000);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_2000_anchors() {
-    test_migrate_memory_from_v6_to_v7(2000);
-}
-
-#[test]
-fn should_correctly_migrate_memory_from_v6_to_v7_4000_anchors() {
-    test_migrate_memory_from_v6_to_v7(4000);
-}
-
 #[test]
 fn should_allocate_new_bucket_after_2048_anchors_v7() {
     let (id_range_lo, id_range_hi) = (12345, 678910);
     let memory_v7 = VectorMemory::default();
-    let mut storage_v7 = Storage::new(
-        (id_range_lo, id_range_hi),
-        wrap_memory(memory_v7.clone(), SupportedVersion::V7),
-    );
+    let mut storage_v7 = Storage::new((id_range_lo, id_range_hi), memory_v7.clone());
 
     // The 1st anchor allocates 1st bucket.
     add_test_anchor_data(&mut storage_v7, 1);
@@ -214,27 +87,9 @@ fn should_allocate_new_bucket_after_2048_anchors_v7() {
 }
 
 #[test]
-fn should_not_migrate_if_wrong_memory() {
+fn should_read_previous_write() {
     let memory = VectorMemory::default();
-    assert_eq!(memory.size(), 0);
-    assert!(Storage::from_memory_v6_to_v7(memory).is_none());
-}
-
-enum SupportedVersion {
-    V6,
-    V7,
-}
-
-fn wrap_memory<M: Memory>(memory: M, version: SupportedVersion) -> StableMemory<M> {
-    match version {
-        SupportedVersion::V6 => StableMemory::Single(memory),
-        SupportedVersion::V7 => StableMemory::Managed(memory),
-    }
-}
-
-fn test_should_read_previous_write(version: SupportedVersion) {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((12345, 678910), wrap_memory(memory, version));
+    let mut storage = Storage::new((12345, 678910), memory);
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
 
     anchor.add_device(sample_device()).unwrap();
@@ -245,19 +100,10 @@ fn test_should_read_previous_write(version: SupportedVersion) {
 }
 
 #[test]
-fn should_read_previous_write_v6() {
-    test_should_read_previous_write(SupportedVersion::V6);
-}
-
-#[test]
-fn should_read_previous_write_v7() {
-    test_should_read_previous_write(SupportedVersion::V7);
-}
-
-fn test_should_serialize_first_record(version: SupportedVersion) {
+fn should_serialize_first_record() {
     const EXPECTED_LENGTH: usize = 253;
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), wrap_memory(memory.clone(), version));
+    let mut storage = Storage::new((123, 456), memory.clone());
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
     assert_eq!(anchor_number, 123u64);
 
@@ -271,20 +117,11 @@ fn test_should_serialize_first_record(version: SupportedVersion) {
 }
 
 #[test]
-fn should_serialize_first_record_v6() {
-    test_should_serialize_first_record(SupportedVersion::V6);
-}
-
-#[test]
-fn should_serialize_first_record_v7() {
-    test_should_serialize_first_record(SupportedVersion::V7);
-}
-
-fn test_should_serialize_subsequent_record_to_expected_memory_location(version: SupportedVersion) {
+fn should_serialize_subsequent_record_to_expected_memory_location() {
     const EXPECTED_LENGTH: usize = 253;
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), wrap_memory(memory.clone(), version));
+    let mut storage = Storage::new((123, 456), memory.clone());
     for _ in 0..100 {
         storage.allocate_anchor().unwrap();
     }
@@ -301,18 +138,9 @@ fn test_should_serialize_subsequent_record_to_expected_memory_location(version: 
 }
 
 #[test]
-fn should_serialize_subsequent_record_to_expected_memory_location_v6() {
-    test_should_serialize_subsequent_record_to_expected_memory_location(SupportedVersion::V6);
-}
-
-#[test]
-fn should_serialize_subsequent_record_to_expected_memory_location_v7() {
-    test_should_serialize_subsequent_record_to_expected_memory_location(SupportedVersion::V7);
-}
-
-fn test_should_not_write_using_anchor_number_outside_allocated_range(version: SupportedVersion) {
+fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), wrap_memory(memory, version));
+    let mut storage = Storage::new((123, 456), memory);
     let (_, anchor) = storage.allocate_anchor().unwrap();
 
     let result = storage.write(222, anchor);
@@ -320,21 +148,16 @@ fn test_should_not_write_using_anchor_number_outside_allocated_range(version: Su
 }
 
 #[test]
-fn should_not_write_using_anchor_number_outside_allocated_range_v6() {
-    test_should_not_write_using_anchor_number_outside_allocated_range(SupportedVersion::V6);
-}
-
-#[test]
-fn should_not_write_using_anchor_number_outside_allocated_range_v7() {
-    test_should_not_write_using_anchor_number_outside_allocated_range(SupportedVersion::V7);
-}
-
-#[test]
-fn should_deserialize_first_record_v6() {
+fn should_deserialize_first_record() {
     let memory = VectorMemory::default();
     memory.grow(3);
-    let mut storage = Storage::new((123, 456), StableMemory::Single(memory.clone()));
-    let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
+    let mut storage = Storage::new((123, 456), memory.clone());
+    let (anchor_number, mut anchor) = storage
+        .allocate_anchor()
+        .expect("Failed to allocate an anchor");
+    storage
+        .write(anchor_number, anchor.clone())
+        .expect("Failed to write anchor");
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
@@ -347,13 +170,18 @@ fn should_deserialize_first_record_v6() {
 }
 
 #[test]
-fn should_deserialize_subsequent_record_at_expected_memory_location_v6() {
+fn should_deserialize_subsequent_record_at_expected_memory_location() {
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
     memory.grow(9); // grow memory to accommodate a write to record 100
-    let mut storage = Storage::new((123, 456), StableMemory::Single(memory.clone()));
+    let mut storage = Storage::new((123, 456), memory.clone());
     for _ in 0..100 {
-        storage.allocate_anchor().unwrap();
+        let (anchor_number, anchor) = storage
+            .allocate_anchor()
+            .expect("Failed to allocate an anchor");
+        storage
+            .write(anchor_number, anchor)
+            .expect("Failed to write anchor");
     }
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
     assert_eq!(anchor_number, 223u64);
@@ -370,9 +198,10 @@ fn should_deserialize_subsequent_record_at_expected_memory_location_v6() {
     assert_eq!(read_from_storage, anchor);
 }
 
-fn test_should_not_read_using_anchor_number_outside_allocated_range(version: SupportedVersion) {
+#[test]
+fn should_not_read_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), wrap_memory(memory, version));
+    let mut storage = Storage::new((123, 456), memory);
     storage.allocate_anchor().unwrap();
 
     let result = storage.read(222);
@@ -380,18 +209,9 @@ fn test_should_not_read_using_anchor_number_outside_allocated_range(version: Sup
 }
 
 #[test]
-fn should_not_read_using_anchor_number_outside_allocated_range_v6() {
-    test_should_not_read_using_anchor_number_outside_allocated_range(SupportedVersion::V6);
-}
-
-#[test]
-fn should_not_read_using_anchor_number_outside_allocated_range_v7() {
-    test_should_not_read_using_anchor_number_outside_allocated_range(SupportedVersion::V7);
-}
-
-fn test_should_save_and_restore_persistent_state(version: SupportedVersion) {
+fn should_save_and_restore_persistent_state() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((123, 456), wrap_memory(memory, version));
+    let mut storage = Storage::new((123, 456), memory);
     storage.flush();
     storage.allocate_anchor().unwrap();
 
@@ -402,18 +222,9 @@ fn test_should_save_and_restore_persistent_state(version: SupportedVersion) {
 }
 
 #[test]
-fn should_save_and_restore_persistent_state_v6() {
-    test_should_save_and_restore_persistent_state(SupportedVersion::V6);
-}
-
-#[test]
-fn should_save_and_restore_persistent_state_v7() {
-    test_should_save_and_restore_persistent_state(SupportedVersion::V7);
-}
-
-fn test_should_save_persistent_state_at_expected_memory_address(version: SupportedVersion) {
+fn should_save_persistent_state_at_expected_memory_address() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), wrap_memory(memory.clone(), version));
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     storage.write_persistent_state(&sample_persistent_state());
@@ -424,18 +235,9 @@ fn test_should_save_persistent_state_at_expected_memory_address(version: Support
 }
 
 #[test]
-fn should_save_persistent_state_at_expected_memory_address_v6() {
-    test_should_save_persistent_state_at_expected_memory_address(SupportedVersion::V6);
-}
-
-#[test]
-fn should_save_persistent_state_at_expected_memory_address_v7() {
-    test_should_save_persistent_state_at_expected_memory_address(SupportedVersion::V7);
-}
-
-fn test_should_not_find_persistent_state(version: SupportedVersion) {
+fn should_not_find_persistent_state() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), wrap_memory(memory, version));
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
     storage.flush();
 
     let result = storage.read_persistent_state();
@@ -443,21 +245,11 @@ fn test_should_not_find_persistent_state(version: SupportedVersion) {
 }
 
 #[test]
-fn should_not_find_persistent_state_v6() {
-    test_should_not_find_persistent_state(SupportedVersion::V6);
-}
-
-#[test]
-fn should_not_find_persistent_state_v7() {
-    test_should_not_find_persistent_state(SupportedVersion::V7);
-}
-
-#[test]
-fn should_not_find_persistent_state_on_magic_bytes_mismatch_v6() {
+fn should_not_find_persistent_state_on_magic_bytes_mismatch() {
     let memory = VectorMemory::default();
     memory.grow(3);
 
-    let mut storage = Storage::new((10_000, 3_784_873), StableMemory::Single(memory.clone()));
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     memory.write(RESERVED_HEADER_BYTES, b"IIPX"); // correct magic bytes are IIPS
@@ -466,13 +258,12 @@ fn should_not_find_persistent_state_on_magic_bytes_mismatch_v6() {
     assert!(matches!(result, Err(PersistentStateError::NotFound)))
 }
 
-fn test_should_save_persistent_state_at_expected_memory_address_with_anchors(
-    version: SupportedVersion,
-) {
+#[test]
+fn should_save_persistent_state_at_expected_memory_address_with_anchors() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 100 * 4096; // number of anchors is 100
 
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), wrap_memory(memory.clone(), version));
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     for _ in 0..100 {
@@ -486,23 +277,13 @@ fn test_should_save_persistent_state_at_expected_memory_address_with_anchors(
     assert_eq!(buf, PERSISTENT_STATE_MAGIC);
 }
 
-#[test]
-fn should_save_persistent_state_at_expected_memory_address_with_anchors_v6() {
-    test_should_save_persistent_state_at_expected_memory_address_with_anchors(SupportedVersion::V6);
-}
-
-#[test]
-fn should_save_persistent_state_at_expected_memory_address_with_anchors_v7() {
-    test_should_save_persistent_state_at_expected_memory_address_with_anchors(SupportedVersion::V7);
-}
-
 /// This tests verifies that address calculation is correct for 64bit addresses.
 /// Note: this test takes about 8GB of memory.
 #[test]
-fn should_save_persistent_state_at_expected_memory_address_with_many_anchors_v6() {
+fn should_save_persistent_state_at_expected_memory_address_with_many_anchors() {
     let memory = VectorMemory::default();
     memory.grow(1);
-    memory.write(0, &hex::decode("4949430660E316001027000000000000a9c03900000000000010434343434343434343434343434343434343434343434343434343434343434300000200").unwrap());
+    memory.write(0, &hex::decode("4949430760E316001027000000000000a9c03900000000000010434343434343434343434343434343434343434343434343434343434343434300000200").unwrap());
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 1_500_000 * 4096; // number of anchors is 1_500_000
 
     let mut storage = Storage::from_memory(memory.clone()).unwrap();
@@ -516,9 +297,10 @@ fn should_save_persistent_state_at_expected_memory_address_with_many_anchors_v6(
 /// This test verifies that storage correctly reports `NotFound` if the persistent state address
 /// lies outside of the allocated stable memory range. This can happen on upgrade from a version
 /// that did not serialize a persistent state into stable memory.
-fn test_should_not_panic_on_unallocated_persistent_state_mem_address(version: SupportedVersion) {
+#[test]
+fn should_not_panic_on_unallocated_persistent_state_mem_address() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), wrap_memory(memory, version));
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
     storage.flush();
     for _ in 0..32 {
         storage.allocate_anchor();
@@ -531,20 +313,11 @@ fn test_should_not_panic_on_unallocated_persistent_state_mem_address(version: Su
 }
 
 #[test]
-fn should_not_panic_on_unallocated_persistent_state_mem_address_v6() {
-    test_should_not_panic_on_unallocated_persistent_state_mem_address(SupportedVersion::V6);
-}
-
-#[test]
-fn should_not_panic_on_unallocated_persistent_state_mem_address_v7() {
-    test_should_not_panic_on_unallocated_persistent_state_mem_address(SupportedVersion::V7);
-}
-
-fn test_should_overwrite_persistent_state_with_next_anchor(version: SupportedVersion) {
+fn should_overwrite_persistent_state_with_next_anchor() {
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 4096; // only one anchor exists
 
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), wrap_memory(memory.clone(), version));
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
     storage.allocate_anchor().unwrap();
@@ -566,34 +339,32 @@ fn test_should_overwrite_persistent_state_with_next_anchor(version: SupportedVer
 }
 
 #[test]
-fn should_overwrite_persistent_state_with_next_anchor_v6() {
-    test_should_overwrite_persistent_state_with_next_anchor(SupportedVersion::V6);
-}
-
-#[test]
-fn should_overwrite_persistent_state_with_next_anchor_v7() {
-    test_should_overwrite_persistent_state_with_next_anchor(SupportedVersion::V7);
-}
-
-#[test]
-fn should_read_previously_stored_persistent_state_v6() {
-    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + 3 * 2048; // 3 anchors
+fn should_read_previously_stored_persistent_state() {
+    const NUM_ANCHORS: u64 = 3;
+    const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + NUM_ANCHORS * 4096;
     const PERSISTENT_STATE_BYTES: &str = "4949505368010000000000004449444c116c03949d879d0701f7f5cbfb0778eed5f3af090a6b04dee7beb6080291a5fcf10a7fd1d3dab70b05c8bbeff50d066c01c2adc9be0c036c04c3f9fca002788beea8c5047881cfaef40a0487eb979d0d7a6d7b6c02d6a9bbae0a78c2adc9be0c036c02aaac8d930407c2adc9be0c036c03c7e8ccee037884fbf0820968cfd6ffea0f086d096c04c7e8ccee0378f2f099840704938da78c0a78d6a9bbae0a786e0b6c028bc3e2f9040cbbd492d8090f6c0297beb4cb080d8b858cea090d6e0e6c02fcdde6ea0178f9a6ebf703786c0297beb4cb08108b858cea090e6d0e0100032700000000000000010a00000000006000b0010100005847f80d0000001027000000000000206363636363636363636363636363636363636363636363636363636363636363e8038002e1df0200000001000163000000000000006dbb0e000000000001420000000000000030f1c520000000002c00000000000000d133b45001000000";
     let memory = VectorMemory::default();
     // allocate space for the writes
     memory.grow(3);
 
-    // write header so the number of users is set
-    memory.write(0, &hex::decode("494943060300000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430000020000000000").unwrap());
+    // Create storage, and add anchors (so that MemoryManager allocates a memory block for anchors).
+    let mut storage = Storage::new((1, 100), memory.clone());
+    for _ in 0..NUM_ANCHORS {
+        let (anchor_number, anchor) = storage.allocate_anchor().expect("Failed allocating anchor");
+        storage
+            .write(anchor_number, anchor)
+            .expect("Failed writing anchor");
+    }
+
     memory.write(
         EXPECTED_ADDRESS,
         &hex::decode(PERSISTENT_STATE_BYTES).unwrap(),
     );
 
-    let storage = Storage::from_memory(memory).unwrap();
-
     assert_eq!(
-        storage.read_persistent_state().unwrap(),
+        storage
+            .read_persistent_state()
+            .expect("Failed to read persistent state"),
         sample_persistent_state()
     );
 }

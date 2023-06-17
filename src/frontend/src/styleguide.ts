@@ -206,6 +206,22 @@ export const styleguide = html`
           <div class="c-card c-card--narrow l-stack">
             <h2 class="t-title">Narrow Card</h2>
           </div>
+          <div class="c-card l-stack">
+            <div class="c-card__label"><h3>Card Label</h3></div>
+            <h2 class="t-title">Default card</h2>
+          </div>
+
+          <div class="c-card l-stack">
+            <div class="c-card__label c-card__label--hasIcon">
+              <i
+                class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+              >
+                ${warningIcon}
+              </i>
+              <h3>Card Label</h3>
+            </div>
+            <h2 class="t-title">Default card</h2>
+          </div>
           ${warnBox({
             title: "Warning Card with Icon",
             message: "This is a card with a warning icon",

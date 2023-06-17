@@ -4,7 +4,7 @@ import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
-import { DappDescription } from "./dapps";
+import { KnownDapp } from "./dapps";
 
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./copy.json";
@@ -16,7 +16,7 @@ const dappsExplorerTemplate = ({
   back,
   scrollToTop = false,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
   i18n: I18n;
   back: () => void;
   /* put the page into view */
@@ -26,7 +26,7 @@ const dappsExplorerTemplate = ({
 
   const pageContent = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      <h2 class="t-title t-title--discrete">${copy.dapps_explorer}</h2>
+      <div class="c-card__label"><h2>${copy.dapps_explorer}</h2></div>
       <h1 class="t-title">${copy.try_these_dapps}</h1>
     </hgroup>
     <button
@@ -40,7 +40,7 @@ const dappsExplorerTemplate = ({
     <p class="t-paragraph t-centered">
       ${copy.add_your_dapp}
       <a
-        href="https://github.com/dfinity/portal#showcase-submission-guidelines"
+        href="https://identitysupport.dfinity.org/hc/en-us/articles/16195954040724"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -62,20 +62,20 @@ export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
 /* Template for a single dapp */
 const dappTemplate = ({
-  link,
-  logo,
+  website,
+  logoSrc,
   name,
   oneLiner,
-}: DappDescription): TemplateResult => {
+}: KnownDapp): TemplateResult => {
   return html`
     <a
-      href=${link}
+      href=${website}
       target="_blank"
       class="c-action-list__item"
       rel="noopener noreferrer"
     >
       <div class="c-action-list__icon" aria-hidden="true">
-        <img src=${logo} alt=${name} loading="lazy" />
+        <img src=${logoSrc} alt=${name} loading="lazy" />
       </div>
       <div class="c-action-list__label c-action-list__label--stacked">
         <h3 class="t-title t-title--list">${name}</h3>
@@ -94,7 +94,7 @@ const dappTemplate = ({
 export const dappsExplorer = ({
   dapps,
 }: {
-  dapps: DappDescription[];
+  dapps: KnownDapp[];
 }): Promise<void> => {
   const i18n = new I18n();
   return new Promise((resolve) =>

@@ -1,6 +1,6 @@
 use crate::archive::ArchiveState;
-use crate::assets::ContentType;
-use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_ASSETS, LABEL_SIG};
+use crate::assets::{ContentType, EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
+use crate::{assets, state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN, LABEL_SIG};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api::stable::stable64_size;
@@ -12,6 +12,10 @@ use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpRe
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
+
+pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
+pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
+const LABEL_HTTP_EXPR: &str = "http_expr";
 
 impl ContentType {
     pub fn to_mime_type_string(self) -> String {
@@ -39,8 +43,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             status_code: 301,
             headers: vec![(
                 "location".to_string(),
-                "https://support.dfinity.org/hc/en-us/sections/8730568843412-Internet-Identity"
-                    .to_string(),
+                "https://identitysupport.dfinity.org/hc/en-us".to_string(),
             )],
             body: ByteBuf::new(),
             // Redirects are not allowed as query because certification V1 does not cover headers.
@@ -80,30 +83,35 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             }
         }
         probably_an_asset => {
-            let certificate_header = make_asset_certificate_header(probably_an_asset);
-            let mut headers = security_headers();
-            headers.push(certificate_header);
+            state::assets(
+                |certified_assets| match certified_assets.assets.get(probably_an_asset) {
+                    Some((asset_headers, data)) => {
+                        let mut headers = security_headers();
+                        let mut certificate_headers = match req.certificate_version {
+                            None | Some(1) => asset_certificate_headers_v1(probably_an_asset),
+                            Some(2) => asset_certificate_headers_v2(probably_an_asset),
+                            _ => trap("Unsupported certificate version."),
+                        };
+                        headers.append(&mut certificate_headers);
+                        headers.append(&mut asset_headers.clone());
 
-            state::assets(|a| match a.get(probably_an_asset) {
-                Some((asset_headers, value)) => {
-                    headers.append(&mut asset_headers.clone());
-
-                    HttpResponse {
-                        status_code: 200,
-                        headers,
-                        body: ByteBuf::from(value.clone()),
+                        HttpResponse {
+                            status_code: 200,
+                            headers,
+                            body: ByteBuf::from(data.clone()),
+                            upgrade: None,
+                            streaming_strategy: None,
+                        }
+                    }
+                    None => HttpResponse {
+                        status_code: 404,
+                        headers: security_headers(),
+                        body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                         upgrade: None,
                         streaming_strategy: None,
-                    }
-                }
-                None => HttpResponse {
-                    status_code: 404,
-                    headers,
-                    body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
-                    upgrade: None,
-                    streaming_strategy: None,
+                    },
                 },
-            })
+            )
         }
     }
 }
@@ -288,7 +296,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 /// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
-fn security_headers() -> Vec<HeaderField> {
+pub fn security_headers() -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
@@ -410,27 +418,72 @@ pub fn content_security_policy_meta() -> String {
     csp
 }
 
-fn make_asset_certificate_header(asset_name: &str) -> (String, String) {
+fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
-    state::asset_hashes_and_sigs(|asset_hashes, sigs| {
-        let witness = asset_hashes.witness(asset_name.as_bytes());
+    state::assets_and_signatures(|assets, sigs| {
         let tree = ic_certified_map::fork(
-            ic_certified_map::labeled(LABEL_ASSETS, witness),
+            assets.witness_v1(asset_name),
             HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
         );
         let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
         serializer.self_describe().unwrap();
         tree.serialize(&mut serializer)
             .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
-        (
-            "IC-Certificate".to_string(),
+        vec![(
+            IC_CERTIFICATE_HEADER.to_string(),
             format!(
                 "certificate=:{}:, tree=:{}:",
                 BASE64.encode(&certificate),
                 BASE64.encode(serializer.into_inner())
             ),
-        )
+        )]
+    })
+}
+
+fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
+    assert!(absolute_path.starts_with('/'));
+
+    let certificate = data_certificate().unwrap_or_else(|| {
+        trap("data certificate is only available in query calls");
+    });
+
+    let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
+    // replace the first empty split segment (due to absolute path) with "http_expr"
+    *path.get_mut(0).unwrap() = LABEL_HTTP_EXPR.to_string();
+    path.push(EXACT_MATCH_TERMINATOR.to_string());
+
+    state::assets_and_signatures(|assets, sigs| {
+        let tree = ic_certified_map::fork(
+            assets.witness_v2(absolute_path),
+            HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+        );
+
+        let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);
+        tree_serializer.self_describe().unwrap();
+        tree.serialize(&mut tree_serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
+
+        let mut expr_path_serializer = serde_cbor::ser::Serializer::new(vec![]);
+        expr_path_serializer.self_describe().unwrap();
+        path.serialize(&mut expr_path_serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a expr_path: {e}")));
+
+        vec![
+            (
+                IC_CERTIFICATE_HEADER.to_string(),
+                format!(
+                    "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
+                    BASE64.encode(&certificate),
+                    BASE64.encode(tree_serializer.into_inner()),
+                    BASE64.encode(expr_path_serializer.into_inner())
+                ),
+            ),
+            (
+                IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
+                IC_CERTIFICATE_EXPRESSION.to_string(),
+            ),
+        ]
     })
 }

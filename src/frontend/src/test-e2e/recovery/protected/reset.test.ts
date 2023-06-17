@@ -33,7 +33,7 @@ test("Reset protected recovery phrase", async () => {
   });
 }, 300_000);
 
-test("Reset protected recovery phrase, confirm with empty seed phrase", async () => {
+test("Reset protected recovery phrase, confirm with incorrect seed phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -52,7 +52,7 @@ test("Reset protected recovery phrase, confirm with empty seed phrase", async ()
 
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase("");
+    await recoveryView.enterSeedPhrase("10000 definitely incorrect");
     await recoveryView.enterSeedPhraseContinue();
     await recoveryView.waitForInvalidSeedPhraseDisplay();
   });

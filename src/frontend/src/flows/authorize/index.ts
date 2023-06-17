@@ -28,7 +28,7 @@ export const authnTemplateAuthorize = ({
 }: {
   origin: string;
   derivationOrigin?: string;
-  knownDapp?: { name: string; logo: string };
+  knownDapp?: { name: string; logoSrc: string };
   i18n: I18n;
 }): AuthnTemplates => {
   const copy = i18n.i18n(copyJson);
@@ -62,22 +62,22 @@ export const authnTemplateAuthorize = ({
   const firstTimeKnown = ({
     action,
     name,
-    logo,
+    logoSrc,
   }: {
     action: "pick" | "use_existing" | "first_time";
     name: string;
-    logo: string;
+    logoSrc: string;
   }) => html`
     <div class="c-origin-preview c-origin-preview--header">
       <img
         class="c-origin-preview__logo c-origin-preview__logo--background"
-        src=${logo}
+        src=${logoSrc}
         alt=""
       />
       <img
         data-role="known-dapp-image"
         class="c-origin-preview__logo"
-        src=${logo}
+        src=${logoSrc}
         alt=""
       />
     </div>
@@ -131,7 +131,12 @@ export const authnTemplateAuthorize = ({
   return {
     firstTime: {
       slot: nonNullish(knownDapp)
-        ? firstTimeKnown({ ...knownDapp, action: "first_time" })
+        ? firstTimeKnown({
+            // XXX: cannot destructure, because getter values get lost
+            logoSrc: knownDapp.logoSrc,
+            name: knownDapp.name,
+            action: "first_time",
+          })
         : firstTimeUnknown("first_time"),
       useExistingText: copy.first_time_use,
       createAnchorText: copy.first_time_create_text,
@@ -164,8 +169,8 @@ export const authFlowAuthorize = async (
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
-          knownDapp: getDapps().find(
-            (dapp) => new URL(dapp.link).origin === authContext.requestOrigin
+          knownDapp: getDapps().find((dapp) =>
+            dapp.hasOrigin(authContext.requestOrigin)
           ),
         })
       );

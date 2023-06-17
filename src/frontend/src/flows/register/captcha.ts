@@ -15,7 +15,7 @@ import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 import { registerStepper } from "./stepper";
 
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
 
 // A symbol that we can differentiate from generic `T` types
@@ -94,11 +94,19 @@ export const promptCaptchaTemplate = <T>({
   const captchaContainer: Ref<HTMLElement> = createRef();
 
   // The error shown on bad input
-  const errorText = state.map(({ status }) =>
-    status === "bad" ? copy.incorrect : undefined
-  );
-  const hasError = state.map(({ status }) =>
-    status === "bad" ? "has-error" : ""
+  const errorText: Chan<DynamicKey | undefined> = state.map({
+    f: ({ status }) =>
+      ({
+        requesting: Chan.unchanged,
+        prompting: Chan.unchanged,
+        bad: copy.incorrect,
+        verifying: undefined,
+      }[status]),
+    def: undefined,
+  });
+
+  const hasError = errorText.map((errorText) =>
+    nonNullish(errorText) ? "has-error" : ""
   );
 
   // The "next" button behavior
@@ -144,7 +152,16 @@ export const promptCaptchaTemplate = <T>({
         chars: input.value,
         challenge,
       });
-      res === badChallenge ? state.send({ status: "bad" }) : onContinue(res);
+      if (res === badChallenge) {
+        // on a bad challenge, show some error, clear the input & focus
+        // and retry
+        state.send({ status: "bad" });
+        input.value = "";
+        input.focus();
+        void doRetry();
+      } else {
+        onContinue(res);
+      }
     });
   };
 
@@ -198,6 +215,8 @@ export const promptCaptchaTemplate = <T>({
             ${ref(input)}
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"
+            autocapitalize="none"
+            spellcheck="false"
           />
           <strong class="c-input__message">${asyncReplace(errorText)}</strong>
         </label>

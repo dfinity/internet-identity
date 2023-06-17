@@ -7,6 +7,6 @@
     "generating": "Generating...",
     "verifying": "Verifying...",
     "next": "Next",
-    "incorrect": "The value you entered is incorrect. Click \"retry\" to generate a new value."
+    "incorrect": "Try one more time."
   }
 }

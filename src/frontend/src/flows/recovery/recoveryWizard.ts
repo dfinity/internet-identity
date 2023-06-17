@@ -7,44 +7,73 @@ import { html, TemplateResult } from "lit-html";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 
+import { infoIconNaked, warningIcon } from "$src/components/icons";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
 
+const infoLabelIcon = html`
+  <i class="c-card__icon c-icon c-icon--info__flipped c-icon--inline"
+    >${infoIconNaked}</i
+  >
+`;
+
+const warningLabelIcon = html`
+  <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+    >${warningIcon}</i
+  `;
+
 const addPhraseTemplate = ({
   ok,
-  skip,
+  cancel,
   i18n,
   scrollToTop = false,
+  intent,
 }: {
   ok: () => void;
-  skip: () => void;
+  cancel: () => void;
   i18n: I18n;
   /* put the page into view */
   scrollToTop?: boolean;
+  /* Whether shown after the user initiated a phrase creation (info) or as a security reminder
+   * (more like a warning) */
+  intent: "userInitiated" | "securityReminder";
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
+
+  const [cancelText, icon, label] = {
+    userInitiated: [copy.cancel, infoLabelIcon, copy.label_info],
+    securityReminder: [copy.skip, warningLabelIcon, copy.label_warning],
+  }[intent];
+
   const slot = html`
-    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+    <hgroup
+      data-page="add-recovery-phrase"
+      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
+    >
+      <div class="c-card__label c-card__label--hasIcon">
+        ${icon}
+        <h2>${label}</h2>
+      </div>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <p class="t-paragraph">${copy.paragraph}</p>
     </hgroup>
-    <button @click=${() => ok()} data-action="next" class="c-button">
-      ${copy.ok}
-    </button>
-    <button
-      @click=${() => skip()}
-      data-action="skip"
-      class="c-button c-button--secondary"
-    >
-      ${copy.skip}
-    </button>
+    <div class="l-stack">
+      <button @click=${() => ok()} data-action="next" class="c-button">
+        ${copy.ok}
+      </button>
+      <button
+        @click=${() => cancel()}
+        data-action="cancel"
+        class="c-button c-button--secondary"
+      >
+        ${cancelText}
+      </button>
+    </div>
     <section style="margin-top: 7em;" class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.what_is_phrase_a}</li>
-        </ul>
+        <p class="t-paragraph">${copy.what_is_phrase_a}</p>
       </aside>
 
       <aside class="l-stack">
@@ -58,16 +87,12 @@ const addPhraseTemplate = ({
 
       <aside class="l-stack">
         <h3 class="t-title">${copy.when_use_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.when_use_phrase_a_1}</li>
-        </ul>
+        <p class="t-paragraph">${copy.when_use_phrase_a_1}</p>
       </aside>
 
       <aside class="l-stack">
         <h3 class="t-title">${copy.share_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.share_phrase_a_1}</li>
-        </ul>
+        <p class="t-paragraph">${copy.share_phrase_a_1}</p>
       </aside>
     </section>
   `;
@@ -82,13 +107,18 @@ const addPhraseTemplate = ({
 export const addPhrasePage = renderPage(addPhraseTemplate);
 
 // Prompt the user to create a recovery phrase
-export const addPhrase = (): Promise<"ok" | "skip"> => {
+export const addPhrase = ({
+  intent,
+}: {
+  intent: Parameters<typeof addPhrasePage>[0]["intent"];
+}): Promise<"ok" | "cancel"> => {
   return new Promise((resolve) =>
     addPhrasePage({
       i18n: new I18n(),
       ok: () => resolve("ok"),
-      skip: () => resolve("skip"),
+      cancel: () => resolve("cancel"),
       scrollToTop: true,
+      intent,
     })
   );
 };
@@ -103,8 +133,8 @@ export const recoveryWizard = async (
     connection.lookupRecovery(userNumber)
   );
   if (recoveries.length === 0) {
-    const doAdd = await addPhrase();
-    if (doAdd !== "skip") {
+    const doAdd = await addPhrase({ intent: "securityReminder" });
+    if (doAdd !== "cancel") {
       doAdd satisfies "ok";
 
       await setupRecovery({ userNumber, connection });

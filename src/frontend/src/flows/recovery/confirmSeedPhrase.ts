@@ -1,3 +1,4 @@
+import { mkAnchorInput } from "$src/components/anchorInput";
 import { checkmarkIcon, warningIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
@@ -6,17 +7,18 @@ import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { phraseStepper } from "./stepper";
 
 import copyJson from "./confirmSeedPhrase.json";
 
 // A list of words, where "check" indicates if the user needs to double check (re-input) a word
 type Word = { word: string } & (
   | { check: false }
-  | { check: true; elem: Ref<HTMLInputElement>; shouldFocus: boolean }
+  | { check: true; elem: Ref<HTMLInputElement> }
 );
 
-// A list of indices nicely spread over the 25 words (anchor + 24 BIP39)
-export const checkIndices = [0, 1, 24];
+// A list of indices nicely spread over the 24 BIP39 words (anchor is separate)
+export const checkIndices = [0, 1, 23];
 
 // Check that a word has been input correctly
 const checkWord = (word: Word): boolean =>
@@ -26,11 +28,13 @@ const checkWord = (word: Word): boolean =>
   withRef(word.elem, (elem) => elem.value === elem.dataset.expected) === true;
 
 const confirmSeedPhraseTemplate = ({
+  userNumberWord,
   words: words_,
   confirm,
   back,
   i18n,
 }: {
+  userNumberWord: string;
   words: Pick<Word, "word" | "check">[];
   confirm: () => void;
   back: () => void;
@@ -49,24 +53,75 @@ const confirmSeedPhraseTemplate = ({
     }
   });
 
-  for (const word of words) {
-    if (word.check) {
-      word.shouldFocus = true;
-      break;
-    }
-  }
-
+  // if the identity number has been re-input correctly
+  const identityInputState = new Chan<"pending" | "wrong" | "correct">(
+    "pending"
+  );
   // if all "check" words have been re-input correctly
   const wordsOk = new Chan<boolean>(false);
   // if the confirmation button is disabled
-  const disabled = wordsOk.map((ok) => !ok);
+  const disabled = identityInputState
+    .zip(wordsOk)
+    .map(([idOk, wdsOk]) => !(idOk === "correct" && wdsOk));
+
+  // The anchor input element/component
+  const anchorInput = mkAnchorInput({
+    onInput: (a) => {
+      // When inputting a value, we don't report incorrect values as the
+      // user types; we only react if the value is actually correct to let
+      // the user know they can move on to the next field
+      const actual = BigInt(a);
+      const expected = BigInt(userNumberWord);
+      if (actual === expected) {
+        identityInputState.send("correct");
+      } else {
+        identityInputState.send("pending");
+      }
+    },
+    onChange: (a) => {
+      // When the user leaves the field, we do warn them if the value
+      // is not correct. As a fallback we do set it to 'correct' if
+      // the value is correct, although in practice this will already
+      // have been set by onInput.
+      const actual = BigInt(a);
+      const expected = BigInt(userNumberWord);
+
+      if (actual === expected) {
+        identityInputState.send("correct");
+      } else {
+        identityInputState.send("wrong");
+      }
+    },
+    onSubmit: (userNumber: bigint) => {
+      // Similar to onChange, although we don't really expect the user
+      // to "submit" (i.e. hit "enter")
+      const actual = userNumber;
+      const expected = BigInt(userNumberWord);
+      if (actual === expected) {
+        identityInputState.send("correct");
+      } else {
+        identityInputState.send("wrong");
+      }
+    },
+    classes: identityInputState.map(
+      (state) =>
+        ({
+          pending: [],
+          correct: ["c-input--anchor__wrap--valid"],
+          wrong: ["c-input--anchor__wrap--error"],
+        }[state])
+    ),
+    dataExpected: userNumberWord,
+  });
 
   const pageContentSlot = html`
     <article>
+      ${phraseStepper({ current: "confirm" })}
       <hgroup>
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
+      ${anchorInput.template}
       <div class="c-input c-input--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${words.map((word, i) =>
@@ -161,10 +216,11 @@ export const wordTemplate = ({
     ${asyncReplace(icon)}
     <input
       type="text"
+      autocapitalize="none"
+      spellcheck="false"
       class="c-recoveryInput"
       ${ref(word.elem)}
       data-expected=${word.word}
-      ?autofocus=${word.shouldFocus}
       data-state=${asyncReplace(state)}
       @input=${() => {
         /* On input, immediately show word as correct when correct, but don't show if a
@@ -190,8 +246,12 @@ export const confirmSeedPhrase = ({
 }): Promise<"confirmed" | "back"> => {
   return new Promise((resolve) => {
     const i18n = new I18n();
+    const words = phrase.split(" ");
+    // eslint-disable-next-line
+    const userNumberWord = words.shift()!; // Extract first word (anchor) to show independently
     confirmSeedPhrasePage({
-      words: phrase.split(" ").map((word, i) => ({
+      userNumberWord,
+      words: words.map((word, i) => ({
         word,
         check: checkIndices.includes(i),
       })),
