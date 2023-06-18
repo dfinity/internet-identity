@@ -9,6 +9,9 @@ use internet_identity_interface::internet_identity::types;
 /// The experimental v2 API
 pub mod api_v2;
 
+// API of verifiable credentials MVP.
+pub mod vc_mvp;
+
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
