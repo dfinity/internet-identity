@@ -1,27 +1,15 @@
 import { withLoader } from "$src/components/loader";
-import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
-import { mount, renderPage } from "$src/utils/lit-html";
-import { html, TemplateResult } from "lit-html";
+import { renderPage } from "$src/utils/lit-html";
+import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 
-import { infoIconNaked, warningIcon } from "$src/components/icons";
+import { infoScreenTemplate } from "$src/components/infoScreen";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
-
-const infoLabelIcon = html`
-  <i class="c-card__icon c-icon c-icon--info__flipped c-icon--inline"
-    >${infoIconNaked}</i
-  >
-`;
-
-const warningLabelIcon = html`
-  <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
-    >${warningIcon}</i
-  `;
 
 const addPhraseTemplate = ({
   ok,
@@ -42,65 +30,34 @@ const addPhraseTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   const [cancelText, icon, label] = {
-    userInitiated: [copy.cancel, infoLabelIcon, copy.label_info],
-    securityReminder: [copy.skip, warningLabelIcon, copy.label_warning],
+    userInitiated: [copy.cancel, "info", copy.label_info] as const,
+    securityReminder: [copy.skip, "warning", copy.label_warning] as const,
   }[intent];
 
-  const slot = html`
-    <hgroup
-      data-page="add-recovery-phrase"
-      ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-    >
-      <div class="c-card__label c-card__label--hasIcon">
-        ${icon}
-        <h2>${label}</h2>
-      </div>
-      <h1 class="t-title t-title--main">${copy.title}</h1>
-      <p class="t-paragraph">${copy.paragraph}</p>
-    </hgroup>
-    <div class="l-stack">
-      <button @click=${() => ok()} data-action="next" class="c-button">
-        ${copy.ok}
-      </button>
-      <button
-        @click=${() => cancel()}
-        data-action="cancel"
-        class="c-button c-button--secondary"
-      >
-        ${cancelText}
-      </button>
-    </div>
-    <section style="margin-top: 7em;" class="c-marketing-block">
-      <aside class="l-stack">
-        <h3 class="t-title">${copy.what_is_phrase_q}</h3>
-        <p class="t-paragraph">${copy.what_is_phrase_a}</p>
-      </aside>
-
-      <aside class="l-stack">
-        <h3 class="t-title">${copy.how_save_phrase_q}</h3>
-        <ul class="c-list c-list--bulleted">
-          <li>${copy.how_save_phrase_a_1}</li>
-          <li>${copy.how_save_phrase_a_2}</li>
-          <li>${copy.how_save_phrase_a_3}</li>
-        </ul>
-      </aside>
-
-      <aside class="l-stack">
-        <h3 class="t-title">${copy.when_use_phrase_q}</h3>
-        <p class="t-paragraph">${copy.when_use_phrase_a_1}</p>
-      </aside>
-
-      <aside class="l-stack">
-        <h3 class="t-title">${copy.share_phrase_q}</h3>
-        <p class="t-paragraph">${copy.share_phrase_a_1}</p>
-      </aside>
-    </section>
-  `;
-
-  return mainWindow({
-    showFooter: false,
-    showLogo: false,
-    slot,
+  return infoScreenTemplate({
+    cancel,
+    cancelText,
+    next: ok,
+    nextText: copy.ok,
+    title: copy.title,
+    paragraph: copy.paragraph,
+    scrollToTop,
+    icon,
+    pageId: "add-recovery-phrase",
+    label,
+    entries: [
+      { header: copy.what_is_phrase_q, content: copy.what_is_phrase_a },
+      {
+        header: copy.how_save_phrase_q,
+        content: [
+          copy.how_save_phrase_a_1,
+          copy.how_save_phrase_a_2,
+          copy.how_save_phrase_a_3,
+        ],
+      },
+      { header: copy.when_use_phrase_q, content: copy.when_use_phrase_a_1 },
+      { header: copy.share_phrase_q, content: copy.share_phrase_a_1 },
+    ],
   });
 };
 
