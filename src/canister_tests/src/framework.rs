@@ -8,6 +8,7 @@ use ic_representation_independent_hash::Value;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
+use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::SignedIdAlias;
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -541,6 +542,43 @@ pub fn verify_delegation(
         root_key.to_vec(),
     )
     .expect("delegation signature invalid");
+}
+
+pub fn verify_id_alias_credential(
+    env: &StateMachine,
+    canister_key: CanisterSigKey,
+    signed_id_alias: &SignedIdAlias,
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"ic-id-alias";
+
+    // The signed message is a signature domain separator
+    // followed by the representation independent hash of a map with entries
+    // pubkey, expiration and targets (if any), using the respective values from the delegation.
+    // See https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
+    let key_value_pairs = vec![
+        (
+            "id_alias".to_string(),
+            Value::Bytes(Vec::from(signed_id_alias.id_alias.as_slice())),
+        ),
+        (
+            "id_dapp".to_string(),
+            Value::Bytes(Vec::from(signed_id_alias.id_dapp.as_slice())),
+        ),
+    ];
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(
+        &ic_representation_independent_hash::representation_independent_hash(&key_value_pairs),
+    );
+
+    env.verify_canister_signature(
+        msg,
+        signed_id_alias.signature.clone().into_vec(),
+        canister_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("id_alias signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
