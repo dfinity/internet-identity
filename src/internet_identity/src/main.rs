@@ -27,6 +27,7 @@ mod http;
 mod nested_tree;
 mod state;
 mod storage;
+mod vc_mvp;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -564,22 +565,43 @@ mod attribute_sharing_mvp {
 
     #[update]
     #[candid_method]
-    fn prepare_id_alias(
-        _identity_number: IdentityNumber,
-        _relying_party: FrontendHostname,
-        _issuer: FrontendHostname,
+    async fn prepare_id_alias(
+        identity_number: IdentityNumber,
+        relying_party: FrontendHostname,
+        issuer: FrontendHostname,
     ) -> Option<PrepareIdAliasResponse> {
-        todo!("implement prepare_id_alias")
+        let Ok(_) = check_authentication(identity_number) else {
+            return Some(PrepareIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
+        };
+        let canister_key = vc_mvp::prepare_id_alias(
+            identity_number,
+            vc_mvp::InvolvedDapps {
+                relying_party,
+                issuer,
+            },
+        )
+        .await;
+        Some(PrepareIdAliasResponse::Ok(canister_key))
     }
 
     #[query]
     #[candid_method(query)]
     fn get_id_alias(
-        _identity_number: IdentityNumber,
-        _relying_party: FrontendHostname,
-        _issuer: FrontendHostname,
+        identity_number: IdentityNumber,
+        relying_party: FrontendHostname,
+        issuer: FrontendHostname,
     ) -> Option<GetIdAliasResponse> {
-        todo!("implement get_id_alias")
+        let Ok(_) = check_authentication(identity_number) else {
+            return Some(GetIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
+        };
+        let response = vc_mvp::get_id_alias(
+            identity_number,
+            vc_mvp::InvolvedDapps {
+                relying_party,
+                issuer,
+            },
+        );
+        Some(response)
     }
 }
 
