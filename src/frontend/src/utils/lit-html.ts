@@ -61,15 +61,6 @@ export const mount = (callback: (elem: Element) => void): DirectiveResult =>
     }
   });
 
-/* A lit-html directive that focuses the element when the element is added
- * to the DOM.
- */
-export const autofocus = mount((elem: Element) => {
-  if (elem instanceof HTMLElement) {
-    elem.focus();
-  }
-});
-
 /* A wrapper for lit-html's render, rendering a page to the "pageContent" element */
 export function renderPage<
   T extends (props: Parameters<T>[0]) => TemplateResult
