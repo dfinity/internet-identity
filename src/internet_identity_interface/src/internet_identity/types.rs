@@ -7,6 +7,7 @@ pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
 pub type DeviceKey = PublicKey;
 pub type UserKey = PublicKey;
+pub type CanisterSigKey = PublicKey;
 pub type SessionKey = PublicKey;
 pub type FrontendHostname = String;
 pub type Timestamp = u64; // in nanos since epoch
