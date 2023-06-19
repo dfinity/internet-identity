@@ -17,6 +17,7 @@ import { icLogo } from "./icons";
 export const mainWindow = ({
   slot,
   slotSidebar,
+  slotSidebarDecoration,
   id,
   showFooter = true,
   showLogo = true,
@@ -25,6 +26,7 @@ export const mainWindow = ({
 }: {
   slot: TemplateResult;
   slotSidebar?: TemplateResult;
+  slotSidebarDecoration?: TemplateResult;
   id?: string;
   showFooter?: boolean;
   showLogo?: boolean;
@@ -50,8 +52,15 @@ export const mainWindow = ({
     <div class="${wrapClasses.join(" ")}">
       ${slotSidebar !== undefined
         ? html`<div class="l-sidebar">
-            ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-            ${slotSidebar}
+            <div class="l-sidebar__main">
+              ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
+              ${slotSidebar}
+            </div>
+            ${slotSidebarDecoration !== undefined
+              ? html`<div class="l-sidebar__decoration">
+                  ${slotSidebarDecoration}
+                </div>`
+              : ""}
           </div>`
         : ""}
       <div

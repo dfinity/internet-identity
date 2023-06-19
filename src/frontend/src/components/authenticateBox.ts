@@ -34,7 +34,20 @@ import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
 
+import { getDapps } from "$src/flows/dappsExplorer/dapps";
+import { dappsHeader } from "$src/flows/dappsExplorer/teaser";
+import { shuffleArray } from "$src/utils/utils";
+
 import copyJson from "./authenticateBox.json";
+
+/** dapps visual used in sidebar */
+const dappsVisual = (): TemplateResult => {
+  const dapps = shuffleArray(getDapps());
+  return dappsHeader({
+    dapps,
+    clickable: false,
+  });
+};
 
 /** Template used for rendering specific authentication screens. See `authnPages` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -326,6 +339,10 @@ const page = (slot: TemplateResult) => {
     slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       ${slot}`,
+    slotSidebar: html`<h1 class="t-title t-title--main">
+      Securely connect to dapps on the Internet Computer
+    </h1>`,
+    slotSidebarDecoration: dappsVisual(),
   });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);

@@ -606,7 +606,6 @@ a:hover,
   width: 100%;
 }
 
-#pageContent,
 .l-wrap {
   position: relative;
   display: flex;
@@ -617,49 +616,58 @@ a:hover,
 }
 
 @media (max-width: 512px) {
-  #pageContent,
   .l-wrap {
     padding: var(--rs-card-bezel);
   }
 }
 
 .l-wrap--sidebar {
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 2rem;
-  padding: 0;
-  align-items: stretch;
+  --sidebar-width: calc(30rem + var(--rs-bezel-sidebar) * 2);
+  padding-left: var(--sidebar-width);
 }
 
 .l-sidebar {
-  flex: 0 0 20rem;
-  max-width: 20rem;
-  min-width: 20rem;
-
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: calc(30rem + var(--rs-bezel-sidebar) * 2);
   background: var(--rc-sidebar);
   color: var(--rc-onSidebar);
   padding: var(--rs-bezel-sidebar);
 }
 
+@media (max-width: 512px) {
+  .l-sidebar {
+    display: none;
+  }
+}
+
+.l-sidebar__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.l-sidebar__decoration {
+  position: relative;
+  margin: 0 calc(var(--rs-bezel-sidebar) * -1)
+    calc(var(--rs-bezel-sidebar) * -1);
+}
+
 .l-container {
   position: relative;
   font-size: 1.6rem;
-  min-width: 40rem;
-  max-width: 40rem;
+  width: 40rem;
   /* centers the container and adds a bit of space to make sure the footer does not stick to it */
   margin: 0 auto 2rem;
 }
 
 .l-container--wide {
   max-width: 60rem;
-}
-
-.l-wrap--sidebar .l-container {
-  margin: 0;
-  flex: 1 0 auto;
-  max-width: none;
-  min-width: 0;
 }
 
 .l-horizontal {
@@ -673,6 +681,10 @@ a:hover,
   bottom: 0;
   left: 0;
   right: 0;
+}
+
+.l-wrap--sidebar .l-footer {
+  left: var(--sidebar-width);
 }
 
 /**
@@ -2387,7 +2399,6 @@ a.c-action-list__item {
 /** responsiveness */
 
 @media (max-width: 512px) {
-  #pageContent,
   .l-wrap {
     justify-content: flex-start;
     padding: 0;
