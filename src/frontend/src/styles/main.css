@@ -687,6 +687,12 @@ a:hover,
   left: var(--sidebar-width);
 }
 
+@media (max-width: 512px) {
+  .l-wrap--sidebar .l-footer {
+    left: 0;
+  }
+}
+
 /**
  * Title with counter and Actions
  */
