@@ -277,16 +277,17 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
 
     let metrics = get_metrics(&env, canister_id);
     let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    // empty II has some metadata in stable memory which requires at least one page
-    assert_eq!(stable_memory_pages, 1f64);
+    // empty II has some metadata in stable memory which requires two pages:
+    // one page for the header, and one for the memory manager.
+    assert_eq!(stable_memory_pages, 2f64);
 
-    // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage to
-    // 3 pages
+    // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage by
+    // one bucket (ie. 128 pages) allocated by the memory manager.
     flows::register_anchor(&env, canister_id);
 
     let metrics = get_metrics(&env, canister_id);
     let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    assert_eq!(stable_memory_pages, 3f64);
+    assert_eq!(stable_memory_pages, 130f64);
     Ok(())
 }
 

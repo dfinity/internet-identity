@@ -4,9 +4,9 @@ name: Deploy Release Candidate
 on:
   schedule:
     # Run every Tuesday:
-    #   summer: 5pm Zurich time
-    #   winter: 6pm Zurich time
-    - cron:  '0 16 * * 2'
+    #   summer: 7pm Zurich time
+    #   winter: 8pm Zurich time
+    - cron:  '0 18 * * 2'
   workflow_dispatch:
 
 jobs:
@@ -84,3 +84,12 @@ jobs:
             Internet Identity release candidate
             RC link: https://${{ env.ii_canister_id }}.ic0.app
             test app: https://${{ env.testnet_app_canister_id }}.ic0.app
+
+        # Since the this is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "RC deployment failed"

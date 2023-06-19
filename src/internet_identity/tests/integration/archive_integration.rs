@@ -50,7 +50,6 @@ mod deployment_tests {
                 canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
                 register_rate_limit: None,
                 max_num_latest_delegation_origins: None,
-                migrate_storage_to_memory_manager: None,
             }),
         );
         env.add_cycles(ii_canister, 150_000_000_000);
@@ -185,7 +184,6 @@ mod deployment_tests {
                 canister_creation_cycles_cost: None, // current cost in application subnets
                 register_rate_limit: None,
                 max_num_latest_delegation_origins: None,
-                migrate_storage_to_memory_manager: None,
             }),
         )
         .unwrap();
@@ -602,7 +600,6 @@ mod pull_entries_tests {
             canister_creation_cycles_cost: Some(0),
             register_rate_limit: None,
             max_num_latest_delegation_origins: None,
-            migrate_storage_to_memory_manager: None,
         };
 
         let ii_canister = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));

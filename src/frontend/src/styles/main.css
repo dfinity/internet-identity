@@ -105,6 +105,7 @@
   --vc-shadow: rgba(32, 33, 36, 0.6);
   --vc-night: rgba(32, 33, 36, 0.8);
 
+  --vc-red: #ff0000;
   --vc-silver: #d9d9d9;
 
   --vc-brand-orange: #f15a24;
@@ -208,11 +209,14 @@
 
   --rc-errorLight: var(--vc-brand-pink--transparent);
   --rc-error: var(--vc-brand-pink);
+  --rc-error-strong: var(--vc-red);
   --rc-onError: var(--vc-snow);
 
   --rc-warning: var(--vc-brand-yellow);
   --rc-onWarning: var(--rc-snow);
 
+  --rc-info: var(--vc-brand-purple);
+  --rc-onInfo: var(--vc-snow);
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
@@ -739,6 +743,7 @@ a:hover,
 
 /* Small icons used to display status */
 .c-icon--ok,
+.c-icon--info__flipped,
 .c-icon--warning,
 .c-icon--error,
 .c-icon--error__flipped {
@@ -748,6 +753,12 @@ a:hover,
 .c-icon--ok {
   --onBgc: var(--rc-positive);
 }
+.c-icon--info__flipped {
+  --bgc: var(--rc-info);
+  --onBgc: var(--rc-onInfo);
+  border-radius: 50%;
+}
+
 .c-icon--warning {
   --onBgc: var(--rc-warning);
 }
@@ -2434,6 +2445,16 @@ a.c-action-list__item {
 .c-input--anchor__wrap {
   position: relative;
   display: block;
+  /* The halo around the input, used for style & feedback */
+  --halo: linear-gradient(270deg, var(--rg-brand));
+}
+
+.c-input--anchor__wrap--error {
+  --halo: var(--rc-error-strong);
+}
+
+.c-input--anchor__wrap--valid {
+  --halo: var(--rc-positive);
 }
 
 .c-input--anchor__wrap::before {
@@ -2442,14 +2463,16 @@ a.c-action-list__item {
   pointer-events: none;
   inset: 0;
   border-radius: 999999px;
-  background-image: linear-gradient(270deg, var(--rg-brand));
+  background: var(--halo);
   filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
-.c-input--anchor__wrap:focus-within::before {
+.c-input--anchor__wrap:focus-within::before,
+.c-input--anchor__wrap--error::before,
+.c-input--anchor__wrap--valid::before {
   opacity: 0.8;
   transform: scale(1) translateZ(0);
 }

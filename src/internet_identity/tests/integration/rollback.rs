@@ -49,7 +49,7 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
     let frontend_hostname = "frontend.com";
     let env = env();
 
-    // start with the previous release to initialize v1 layout
+    // start with the previous release
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     api::init_salt(&env, canister_id)?;
 

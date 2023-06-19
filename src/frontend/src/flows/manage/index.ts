@@ -22,7 +22,7 @@ import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { getDapps, KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
-import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
+import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
@@ -298,6 +298,12 @@ export const displayManage = (
           resolve();
         },
         addRecoveryPhrase: async () => {
+          const doAdd = await addPhrase({ intent: "userInitiated" });
+          if (doAdd === "cancel") {
+            resolve();
+            return;
+          }
+          doAdd satisfies "ok";
           await setupPhrase(userNumber, connection);
           resolve();
         },

@@ -54,9 +54,11 @@ export const authenticatorsSection = ({
                 class="c-card__label c-card__label--hasIcon"
                 aria-hidden="true"
               >
-                <i class="c-card__icon c-icon c-icon--error__flipped"
+                <i
+                  class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
                   >${warningIcon}</i
                 >
+                <h2>Security warning</h2>
               </span>
             `
           : undefined

@@ -88,11 +88,11 @@ pub mod anchor;
 mod tests;
 
 // version   0: invalid
-// version 1-5: no longer supported
-// version   6: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-// version   7: like version 6, but with memory manager (from 2nd page on)
+// version 1-6: no longer supported
+// version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
+//              with memory manager (from 2nd page on)
 // version  8+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 6..=7;
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=7;
 
 const WASM_PAGE_SIZE: u64 = 65_536;
 
@@ -129,7 +129,6 @@ pub const DEFAULT_RANGE_SIZE: u64 =
 pub type Salt = [u8; 32];
 
 enum AnchorMemory<M: Memory> {
-    Single(RestrictedMemory<M>),
     Managed(VirtualMemory<RestrictedMemory<M>>),
 }
 
@@ -188,12 +187,6 @@ impl<M: Memory> AnchorMemory<M> {
         buffer_size: usize,
     ) -> Rc<RefCell<dyn MemoryWriter + 'a>> {
         match self {
-            AnchorMemory::Single(ref mut memory) => {
-                let writer: Rc<RefCell<dyn MemoryWriter>> = Rc::new(RefCell::new(
-                    BufferedMemoryWriter::new(memory, address, buffer_size),
-                ));
-                writer
-            }
             AnchorMemory::Managed(ref mut memory) => {
                 let writer: Rc<RefCell<dyn MemoryWriter>> = Rc::new(RefCell::new(
                     BufferedMemoryWriter::new(memory, address, buffer_size),
@@ -208,12 +201,6 @@ impl<M: Memory> AnchorMemory<M> {
         buffer_size: usize,
     ) -> Rc<RefCell<dyn MemoryReader + 'a>> {
         match self {
-            AnchorMemory::Single(ref memory) => {
-                let reader: Rc<RefCell<dyn MemoryReader>> = Rc::new(RefCell::new(
-                    BufferedMemoryReader::new(memory, address, buffer_size),
-                ));
-                reader
-            }
             AnchorMemory::Managed(ref memory) => {
                 let reader: Rc<RefCell<dyn MemoryReader>> = Rc::new(RefCell::new(
                     BufferedMemoryReader::new(memory, address, buffer_size),
@@ -224,15 +211,9 @@ impl<M: Memory> AnchorMemory<M> {
     }
     fn size(&self) -> u64 {
         match self {
-            AnchorMemory::Single(ref memory) => memory.size(),
             AnchorMemory::Managed(ref memory) => memory.size(),
         }
     }
-}
-
-pub enum StableMemory<M: Memory> {
-    Single(M),
-    Managed(M),
 }
 
 /// Data type responsible for managing anchor data in stable memory.
@@ -241,7 +222,7 @@ pub struct Storage<M: Memory> {
     header_memory: RestrictedMemory<M>,
     anchor_memory: AnchorMemory<M>,
     #[allow(dead_code)]
-    maybe_memory_manager: Option<MemoryManager<RestrictedMemory<M>>>,
+    memory_manager: MemoryManager<RestrictedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -249,9 +230,9 @@ pub struct Storage<M: Memory> {
 struct Header {
     magic: [u8; 3],
     // version   0: invalid
-    // version 1-5: no longer supported
-    // version   6: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-    // version   7: like 6, but with managed memory
+    // version 1-6: no longer supported
+    // version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config
+    //              with managed memory
     // version  8+: invalid
     version: u8,
     num_anchors: u32,
@@ -262,37 +243,10 @@ struct Header {
     first_entry_offset: u64,
 }
 
-// A copy of MemoryManager's internal structures.
-// Used for migration only, will be deleted after migration is complete.
-mod mm {
-    pub const HEADER_RESERVED_BYTES: usize = 32;
-    pub const MAX_NUM_MEMORIES: u8 = 255;
-    pub const MAX_NUM_BUCKETS: u64 = 32768;
-    pub const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
-    pub const MAGIC: &[u8; 3] = b"MGR";
-
-    #[repr(C, packed)]
-    pub struct Header {
-        pub magic: [u8; 3],
-        pub version: u8,
-        // The number of buckets allocated by the memory manager.
-        pub num_allocated_buckets: u16,
-        // The size of a bucket in Wasm pages.
-        pub bucket_size_in_pages: u16,
-        // Reserved bytes for future extensions
-        pub _reserved: [u8; HEADER_RESERVED_BYTES],
-        // The size of each individual memory that can be created by the memory manager.
-        pub memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
-    }
-}
-
 impl<M: Memory + Clone> Storage<M> {
     /// Creates a new empty storage that manages the data of anchors in
     /// the specified range.
-    pub fn new(
-        (id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber),
-        memory: StableMemory<M>,
-    ) -> Self {
+    pub fn new((id_range_lo, id_range_hi): (AnchorNumber, AnchorNumber), memory: M) -> Self {
         if id_range_hi < id_range_lo {
             trap(&format!(
                 "improper Identity Anchor range: [{id_range_lo}, {id_range_hi})",
@@ -304,23 +258,13 @@ impl<M: Memory + Clone> Storage<M> {
                 "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {DEFAULT_RANGE_SIZE} entries)",
             ));
         }
-        let (header_memory, anchor_memory, maybe_memory_manager, version) = match memory {
-            StableMemory::Single(memory) => {
-                let header_memory = RestrictedMemory::new(memory.clone(), 0..2);
-                let anchor_memory =
-                    AnchorMemory::Single(RestrictedMemory::new(memory, 2..MAX_WASM_PAGES));
-                (header_memory, anchor_memory, None, 6)
-            }
-            StableMemory::Managed(memory) => {
-                let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
-                let memory_manager = MemoryManager::init_with_bucket_size(
-                    RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
-                    BUCKET_SIZE_IN_PAGES,
-                );
-                let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
-                (header_memory, anchor_memory, Some(memory_manager), 7)
-            }
-        };
+        let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
+        let memory_manager = MemoryManager::init_with_bucket_size(
+            RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
+            BUCKET_SIZE_IN_PAGES,
+        );
+        let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
+        let version: u8 = 7;
 
         let mut storage = Self {
             header: Header {
@@ -335,7 +279,7 @@ impl<M: Memory + Clone> Storage<M> {
             },
             header_memory,
             anchor_memory,
-            maybe_memory_manager,
+            memory_manager,
         };
         storage.flush();
         storage
@@ -397,15 +341,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         match header.version {
-            6 => Some(Self {
-                header,
-                header_memory: RestrictedMemory::new(memory.clone(), 0..2),
-                anchor_memory: AnchorMemory::Single(RestrictedMemory::new(
-                    memory,
-                    2..MAX_WASM_PAGES,
-                )),
-                maybe_memory_manager: None,
-            }),
             7 => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
                 let managed_memory = RestrictedMemory::new(memory, 1..MAX_WASM_PAGES);
@@ -416,103 +351,11 @@ impl<M: Memory + Clone> Storage<M> {
                     header,
                     header_memory,
                     anchor_memory,
-                    maybe_memory_manager: Some(memory_manager),
+                    memory_manager,
                 })
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
         }
-    }
-
-    pub fn from_memory_v6_to_v7(memory: M) -> Option<Self> {
-        let maybe_storage_v6 = Self::from_memory(memory.clone());
-        let storage_v6 = maybe_storage_v6?;
-        if storage_v6.header.version == 7 {
-            // Already at v7, no migration needed.
-            return Some(storage_v6);
-        }
-        if storage_v6.header.version != 6 {
-            trap(&format!(
-                "Expected storage version 6, got {}",
-                storage_v6.header.version
-            ));
-        }
-        // Update the header to v7.
-        let mut storage_v7_header: Header = storage_v6.header;
-        storage_v7_header.version = 7;
-        let header_bytes = unsafe {
-            std::slice::from_raw_parts(
-                &storage_v7_header as *const _ as *const u8,
-                std::mem::size_of::<Header>(),
-            )
-        };
-        let mut header_memory = RestrictedMemory::new(memory.clone(), 0..1);
-        let mut writer = Writer::new(&mut header_memory, 0);
-        // this should never fail as this write only requires a memory of size 1
-        writer
-            .write_all(header_bytes)
-            .expect("bug: failed to grow memory");
-
-        // Initialize 2nd page (i.e. page #1) with MemoryManager metadata.
-        let num_allocated_buckets: u16 =
-            ((storage_v6.anchor_memory.size() + (BUCKET_SIZE_IN_PAGES as u64) - 1)
-                / BUCKET_SIZE_IN_PAGES as u64) as u16;
-        let mut memory_sizes_in_pages: [u64; mm::MAX_NUM_MEMORIES as usize] =
-            [0u64; mm::MAX_NUM_MEMORIES as usize];
-        memory_sizes_in_pages[ANCHOR_MEMORY_INDEX as usize] = storage_v6.anchor_memory.size();
-        let mm_header = mm::Header {
-            magic: *mm::MAGIC,
-            version: 1u8,
-            num_allocated_buckets,
-            bucket_size_in_pages: BUCKET_SIZE_IN_PAGES,
-            _reserved: [0u8; 32],
-            memory_sizes_in_pages,
-        };
-        let pages_in_allocated_buckets = (BUCKET_SIZE_IN_PAGES * num_allocated_buckets) as u64;
-        memory.grow(pages_in_allocated_buckets - storage_v6.anchor_memory.size());
-        let mm_header_bytes = unsafe {
-            std::slice::from_raw_parts(
-                &mm_header as *const _ as *const u8,
-                std::mem::size_of::<mm::Header>(),
-            )
-        };
-        let mut mm_header_memory = RestrictedMemory::new(memory.clone(), 1..2);
-        let mut writer = Writer::new(&mut mm_header_memory, 0);
-        writer
-            .write_all(mm_header_bytes)
-            .expect("bug: failed to grow memory");
-        // Update bucket-to-memory assignments.
-        // The assignments begin after right after the header, which has the following layout
-        // -------------------------------------------------- <- Address 0
-        // Magic "MGR"                           ↕ 3 bytes
-        // --------------------------------------------------
-        // Layout version                        ↕ 1 byte
-        // --------------------------------------------------
-        // Number of allocated buckets           ↕ 2 bytes
-        // --------------------------------------------------
-        // Bucket size (in pages) = N            ↕ 2 bytes
-        // --------------------------------------------------
-        // Reserved space                        ↕ 32 bytes
-        // --------------------------------------------------
-        // Size of memory 0 (in pages)           ↕ 8 bytes
-        // --------------------------------------------------
-        // Size of memory 1 (in pages)           ↕ 8 bytes
-        // --------------------------------------------------
-        // ...
-        // --------------------------------------------------
-        // Size of memory 254 (in pages)         ↕ 8 bytes
-        // -------------------------------------------------- <- Bucket allocations
-        // ...
-        let buckets_offset: u64 = (3 + 1 + 2 + 2) + 32 + (255 * 8);
-        let mut writer = Writer::new(&mut mm_header_memory, buckets_offset);
-        let mut bucket_to_memory = [mm::UNALLOCATED_BUCKET_MARKER; mm::MAX_NUM_BUCKETS as usize];
-        for i in 0..num_allocated_buckets {
-            bucket_to_memory[i as usize] = 0u8;
-        }
-        writer
-            .write_all(&bucket_to_memory)
-            .expect("bug: failed writing bucket assignments");
-
-        Self::from_memory(memory)
     }
 
     /// Allocates a fresh Identity Anchor.
