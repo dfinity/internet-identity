@@ -7,7 +7,7 @@ import {
   IIWebAuthnIdentity,
   RegisterResult,
 } from "$src/utils/iiConnection";
-import { autofocus, mount, renderPage, withRef } from "$src/utils/lit-html";
+import { mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { html, TemplateResult } from "lit-html";
@@ -211,7 +211,7 @@ export const promptCaptchaTemplate = <T>({
         <label>
           <strong class="t-strong">${copy.instructions}</strong>
           <input
-            ${focus ? autofocus : undefined}
+            ?autofocus=${focus}
             ${ref(input)}
             id="captchaInput"
             class="c-input ${asyncReplace(hasError)}"
