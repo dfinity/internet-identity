@@ -104,7 +104,7 @@ fn get_signature(
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
-    let msg_hash = id_alias_signature_msg_hash(&alias_tuple);
+    let msg_hash = id_alias_signature_msg_hash(alias_tuple);
     let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
 
     let witness_hash = witness.reconstruct();

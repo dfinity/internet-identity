@@ -559,7 +559,7 @@ mod attribute_sharing_mvp {
             },
         )
         .await;
-        return Some(PrepareIdAliasResponse::Ok(canister_key));
+        Some(PrepareIdAliasResponse::Ok(canister_key))
     }
 
     #[query]
