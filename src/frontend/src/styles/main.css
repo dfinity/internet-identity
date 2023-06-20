@@ -1199,6 +1199,10 @@ by all browsers (FF is missing) */
   gap: 1em;
 }
 
+.c-logo--sidebar {
+  padding: var(--rs-logo-stack--top) 0 var(--rs-logo-stack--bottom);
+}
+
 .c-logo svg {
   display: block;
   width: 5.5rem;

@@ -25,6 +25,7 @@ import { displayError } from "./displayError";
 import {
   controlIcon,
   githubBigIcon,
+  icLogo,
   participateIcon,
   privacyIcon,
   secureIcon,
@@ -336,13 +337,19 @@ export const authenticate = async (
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
   const template = mainWindow({
+    showLogo: false,
     slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       ${slot}`,
-    slotSidebar: html`<h1 class="t-title t-title--main">
-      Securely connect to dapps on the Internet Computer
-    </h1>`,
-    slotSidebarDecoration: dappsVisual(),
+    slotSidebar: html`<div class="l-sidebar">
+      <div class="l-sidebar__main">
+        <div class="c-logo c-logo--sidebar">${icLogo}</div>
+        <h1 class="t-title t-title--main">
+          Securely connect to dapps on the Internet Computer
+        </h1>
+      </div>
+      <div class="l-sidebar__decoration">${dappsVisual()}</div>
+    </div>`,
   });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
