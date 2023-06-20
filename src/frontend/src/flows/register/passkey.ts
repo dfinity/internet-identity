@@ -51,7 +51,7 @@ const savePasskeyTemplate = ({
     >
       ${copy.cancel}
     </button>
-    <section style="margin-top: 7em;" class="c-marketing-block">
+    <section class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_passkey}</h3>
         <ul class="c-list c-list--bulleted">
