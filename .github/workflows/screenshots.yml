@@ -124,9 +124,6 @@ jobs:
           mkdir -p ./timestamps
           mkdir -p ./objs
 
-          # Remove all timestamps that don't have a target anymore
-          find ./timestamps -xtype l -delete
-
           # Remove expired timestamps
           while read -r timestamp
           do
@@ -177,6 +174,9 @@ jobs:
 
           mkdir -p "$dumpster_path"
           ln -s "../$dumpster_path" ./timestamps/${{ steps.sys.outputs.timestamp }}
+
+          # Clean up all timestamps that don't have a target anymore
+          find ./timestamps -xtype l -delete
 
       # Download the screenshots artifacts (head & base, mobile & desktop)
       - uses: actions/download-artifact@v3
@@ -324,10 +324,11 @@ jobs:
 
             // Create the new report as details/summary tags, inside of which we show the
             // screenshots
-            let report = "<hr/>";
-
+            let report = "";
             const addSection = (summ, files) => {
               if(files.length <= 0) { return ; }
+
+              if(report === "") { report += "<hr/>" } // add separation before screenshots
               report += "<details>";
               report += `<summary>${summ}</summary>`;
               files.forEach(file => {
