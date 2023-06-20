@@ -237,8 +237,8 @@ export class MainView extends View {
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "protect" }).click();
-    await this.browser.waitUntil(() => this.browser.isAlertOpen());
-    await this.browser.acceptAlert();
+    await this.browser.$('[data-page="protect-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -255,8 +255,8 @@ export class MainView extends View {
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "unprotect" }).click();
-    await this.browser.waitUntil(() => this.browser.isAlertOpen());
-    await this.browser.acceptAlert();
+    await this.browser.$('[data-page="unprotect-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
 
     const recoveryView = new RecoverView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -273,8 +273,8 @@ export class MainView extends View {
   async reset(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "reset" }).click();
-    await this.browser.waitUntil(() => this.browser.isAlertOpen());
-    await this.browser.acceptAlert();
+    await this.browser.$('[data-page="reset-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {

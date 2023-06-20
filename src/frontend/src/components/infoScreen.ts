@@ -2,6 +2,7 @@ import { infoIconNaked, warningIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey } from "$src/i18n";
 import { mount, TemplateElement } from "$src/utils/lit-html";
+import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 
 /* An entry in the info screen */
@@ -37,7 +38,7 @@ export const infoScreenTemplate = ({
   cancelText: DynamicKey | string;
   title: DynamicKey | string;
   paragraph: TemplateElement;
-  entries: {
+  entries?: {
     header: TemplateElement;
     content: TemplateElement | TemplateElement[];
   }[];
@@ -71,8 +72,13 @@ export const infoScreenTemplate = ({
         ${cancelText}
       </button>
     </div>
-    <section class="c-marketing-block">
-      ${entries.map((entry) => renderEntry(entry))}
+    ${
+      nonNullish(entries) && entries.length > 0
+        ? html`<section class="c-marketing-block">
+            ${entries.map((entry) => renderEntry(entry))}
+          </section>`
+        : undefined
+    }
     </section>
   `;
 

@@ -1,0 +1,49 @@
+{
+  "en": {
+    "protect_label": "Security warning",
+    "protect_title": "Lock your recovery phrase",
+    "protect_paragraph": "This will take a few minutes. Make sure no one is watching your screen, and that you have a pen and paper or password manager ready. ",
+    "protect_next": "Lock recovery phrase",
+    "protect_cancel": "Cancel",
+
+    "protect_what_happens_q": "What happens when I lock my recovery phrase?",
+    "protect_what_happens_a": "You will need to input your recovery phrase whenever you want to reset it or unlock it. So if you lose your locked phrase, you will not be able to recover or reset it.",
+
+    "protect_save_q": "How do I save my new recovery phrase?",
+    "protect_save_a_1": "Save in a password manager",
+    "protect_save_a_2": "Store in a safe deposit box",
+    "protect_save_a_3": "Write down and store in multiple secure places",
+
+    "protect_use_q": "When should I use my recovery phrase?",
+    "protect_use_a": "If you lose access to all your devices and have no other method for accessing your Internet Identity",
+
+    "protect_share_q": "Should I share my recovery phrase?",
+    "protect_share_a": "Never! If someone asks for your recovery phrase, they are likely trying to steal access to your accounts",
+
+    "unprotect_label": "Security warning",
+    "unprotect_title": "Unlock your Recovery Phrase",
+    "unprotect_paragraph": "If you unlock your recovery phrase, you will be able to reset your recovery phrase without re-entering the current phrase. Make sure you are in a secure environment. Are you sure you want to proceed?",
+    "unprotect_next": "Unlock",
+    "unprotect_cancel": "Cancel",
+
+    "reset_label": "Security warning",
+    "reset_title": "Reset your recovery phrase",
+    "reset_paragraph": "This will take a few minutes. Make sure no one is watching your screen, and that you have a pen and paper or password manager ready. ",
+    "reset_next": "Reset Recovery Phrase",
+    "reset_cancel": "Cancel",
+
+    "reset_what_happens_q": "What happens when I reset my recovery phrase?",
+    "reset_what_happens_a": "You will be given a new recovery phrase, and your previous recovery phrase is no longer valid",
+
+    "reset_save_q": "How do I save my new recovery phrase?",
+    "reset_save_a_1": "Save in a password manager",
+    "reset_save_a_2": "Store in a safe deposit box",
+    "reset_save_a_3": "Write down and store in multiple secure places",
+
+    "reset_use_q": "When should I use my recovery phrase?",
+    "reset_use_a": "If you lose access to all your devices and have no other method for accessing your Internet Identity",
+
+    "reset_share_q": "Should I share my recovery phrase?",
+    "reset_share_a": "Never! If someone asks for your recovery phrase, they are likely trying to steal access to your accounts"
+  }
+}
