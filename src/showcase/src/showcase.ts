@@ -28,6 +28,11 @@ import { dappsExplorerPage } from "$src/flows/dappsExplorer";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
 import {
+  protectDeviceInfoPage,
+  resetPhraseInfoPage,
+  unprotectDeviceInfoPage,
+} from "$src/flows/manage/deviceSettings";
+import {
   checkIndices,
   confirmSeedPhrasePage,
 } from "$src/flows/recovery/confirmSeedPhrase";
@@ -208,6 +213,27 @@ export const iiPages: Record<string, () => void> = {
     manage.pick({
       anchors: [BigInt(10000), BigInt(243099)],
       moreOptions: () => console.log("More options requested"),
+    }),
+
+  protectDeviceInfo: () =>
+    protectDeviceInfoPage({
+      next: () => console.log("next"),
+      cancel: () => console.log("cancel"),
+      i18n,
+    }),
+
+  unprotectDeviceInfo: () =>
+    unprotectDeviceInfoPage({
+      next: () => console.log("next"),
+      cancel: () => console.log("cancel"),
+      i18n,
+    }),
+
+  resetPhraseInfo: () =>
+    resetPhraseInfoPage({
+      next: () => console.log("next"),
+      cancel: () => console.log("cancel"),
+      i18n,
     }),
 
   recoverWithPhrase: () =>
