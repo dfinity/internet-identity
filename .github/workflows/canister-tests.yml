@@ -1,5 +1,5 @@
 # This describes all the tests we run on the canister code (various builds,
-# haskell tests, selenium tests). The canister code is built in docker and the
+# integration tests, selenium tests). The canister code is built in docker and the
 # wasm is then reused by subsequent build steps. We build various flavors of
 # the code, see `docker-build-...` for more info.
 name: Canister tests

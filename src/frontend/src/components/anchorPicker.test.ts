@@ -1,24 +1,19 @@
 import { render } from "lit-html";
 import { mkAnchorPicker } from "./anchorPicker";
 
-const commonProps = {
-  button: "go",
-  recoverAnchor: () => {},
-  register: () => {},
-  addDevice: () => {},
-};
-
 test("first anchor is focused", async () => {
   const picker = mkAnchorPicker({
     savedAnchors: [BigInt(10000), BigInt(9990042)],
     pick: () => {},
     moreOptions: () => {},
-    ...commonProps,
+    focus: true,
   });
   render(picker.template, document.body);
-  // Tick once, otherwise element isn't focused yet
-  await tick();
-  const elem = document.activeElement as HTMLElement;
+  // jsdom does not follow the HTML spec for 'autofocus':
+  //    https://github.com/jsdom/jsdom/issues/3041
+  // so instead of checking for the element to be focused, we just check that
+  // the attribute is present and trust the HTML spec.
+  const elem = document.querySelector("[autofocus]") as HTMLElement;
   expect(elem.dataset.anchorId).toBe("10000");
 });
 
@@ -30,7 +25,7 @@ test("pick saved anchor", async () => {
       picked = anchor;
     },
     moreOptions: () => {},
-    ...commonProps,
+    focus: true,
   });
   render(picker.template, document.body);
   // Tick once, otherwise element isn't focused yet

@@ -1,4 +1,3 @@
-import { autofocus } from "$src/utils/lit-html";
 import { NonEmptyArray } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
 import { arrowRight } from "./icons";
@@ -48,7 +47,7 @@ const anchorItem = (props: {
 }): TemplateResult => html`
   <li class="c-list__item c-list__item--vip c-list__item--icon icon-trigger">
     <button
-      ${props.focus ? autofocus : undefined}
+      ?autofocus=${props.focus}
       data-anchor-id=${props.anchor}
       class="c-list__parcel c-list__parcel--select"
       @click="${() => props.pick(props.anchor)}"
