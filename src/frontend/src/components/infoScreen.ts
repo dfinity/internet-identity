@@ -71,7 +71,7 @@ export const infoScreenTemplate = ({
         ${cancelText}
       </button>
     </div>
-    <section style="margin-top: 7em;" class="c-marketing-block">
+    <section class="c-marketing-block">
       ${entries.map((entry) => renderEntry(entry))}
     </section>
   `;
