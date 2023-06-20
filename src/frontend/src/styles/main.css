@@ -2438,6 +2438,18 @@ a.c-action-list__item {
   display: none !important;
 }
 
+@media (max-width: 512px) {
+  .is-hidden--mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 513px) {
+  .is-hidden--desktop {
+    display: none !important;
+  }
+}
+
 .is-visible {
   display: block !important;
 }

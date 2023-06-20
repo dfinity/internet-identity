@@ -337,7 +337,6 @@ export const authenticate = async (
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
   const template = mainWindow({
-    showLogo: false,
     slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       ${slot}`,

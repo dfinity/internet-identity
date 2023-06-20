@@ -53,8 +53,14 @@ export const mainWindow = ({
         id="${ifDefined(id !== null ? id : undefined)}"
         class="${containerClasses.join(" ")}"
       >
-        ${showLogo && slotSidebar === undefined
-          ? html`<div class="c-logo">${icLogo}</div>`
+        ${showLogo
+          ? html`<div
+              class="c-logo ${slotSidebar !== undefined
+                ? "is-hidden--desktop"
+                : ""}"
+            >
+              ${icLogo}
+            </div>`
           : ""}
         <div class="c-card c-card--background">
           <div class="c-card c-card--highlight">${slot}</div>
