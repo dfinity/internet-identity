@@ -1,0 +1,351 @@
+# This workflow notifies pull requests when a screen was changed. It first takes screenshots
+# of all screens, and then compares this with screenshots on the base branch.
+name: Screenshots
+
+# Cancel currently running workflows for the same branch
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+
+jobs:
+
+  # Job that starts the showcase and takes a screenshot of every page and
+  # saves it in artifacts (both head & base branches)
+  screenshots:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: [ 'desktop', 'mobile' ]
+        ref: [ 'head', 'base' ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+        if: ${{ matrix.ref == 'head' }}
+      - uses: actions/checkout@v3
+        if: ${{ matrix.ref == 'base' }}
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Setup node
+        uses: ./.github/actions/setup-node
+      - name: Remove old screenshots
+        run: rm -v -f screenshots/${{ matrix.device }}/*.png
+      - run: npm ci
+      - name: Save screenshots
+        run: |
+          npm run showcase&
+          showcase_pid=$!
+
+          # regularly check if localhost:5174 is reachable (i.e. devserver is up)
+          while ! nc -z localhost 5174; do
+            echo "dev server not ready; waiting"
+            sleep 5
+          done
+          SCREENSHOTS_DIR="./screenshots/${{ matrix.device }}" \
+            SCREENSHOTS_TYPE=${{ matrix.device }} \
+            npm run screenshots
+          kill "$showcase_pid"
+
+      - name: Summary
+        run: |
+          echo "The following screenshots were created:"
+          shasum -a 256 screenshots/${{ matrix.device }}/*.png | sort -k2 # sort by 2nd column (filename)
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-screenshots-${{ matrix.ref }}-${{ matrix.device }}
+          path: screenshots/${{ matrix.device }}/*.png
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: screenshots
+    concurrency: image-dumpster
+    # This should never take long, but _in case_ our setup changes inadvertently
+    # and this starts taking longer than expected, then we want to be aware of it.
+    timeout-minutes: 5
+    steps:
+
+        # Configuration used throughout the job
+      - name: Initialize config
+        run: |
+          now=$(date +%s)
+          # The current & expiration timestamps, used to evict old images
+          echo "timestamp=$now" >> "$GITHUB_OUTPUT"
+          echo "expire_before=$(( now - (7 * 24 * 60 * 60) ))" >> "$GITHUB_OUTPUT"
+
+          # Temporary directory where to unpack artifacts
+          echo "tmpdir=$(mktemp -d)" >> "$GITHUB_OUTPUT"
+
+          # A single-word representation of the branch name (branch names may contain
+          # slashes which makes everything more complicated when using them as dir names)
+          branch_alias=$(echo ${{ github.event.pull_request.head.ref }} | md5sum | cut -c 1-9)
+          echo "branch=$branch_alias" >> "$GITHUB_OUTPUT"
+
+          # The path for this run's objects (will overwrite previous objects)
+          echo "dumpster_path=objs/$branch_alias" >> "$GITHUB_OUTPUT"
+        id: sys
+
+      - uses: actions/checkout@v3
+        # Checks out 'image-dumpster', a single-commit branch used to keep objects (screenshots).
+        # We store the images in a branch (as opposed to e.g. artifacts) so that GitHub will serve
+        # them (on rawgithubusercontent), meaning we can display them on PRs.
+      - name: Set up image-dumpster branch
+        run: |
+          git fetch origin image-dumpster:image-dumpster
+          git checkout image-dumpster
+
+          # A dummy user; not very relevant since the branch should only ever have one
+          # commit that we keep overwriting
+          git config user.name "Image Dumpster"
+          git config user.email "<>"
+
+          # Always reset to the first commit; we don't want any history
+          initial_commit=$(git log --format=format:%H --reverse | head -1 )
+          git reset "$initial_commit"
+
+        # This runs some garbage collection on the stored images. The branch keeps two top-level
+        # directories:
+        #   * objs/: the actual objects (images) we want to store
+        #   * timestamps/: symlinks to the objects
+        # When an object is created in objs/<foo>, a timestamp timestamps/1234 is created that
+        # points to this new object. Check GCing, we remove expired timestamps. This means we can
+        # then safely remove all objects not pointed to by symlinks -- i.e. expired objects.
+        #
+        # We do also use objs/<branch-ish> to index directly based on the branch, so that we can
+        # evict old versions of a branch (to avoid creating lots of objects on PRs with many
+        # commits)
+      - name: Remove outdated directories
+        run: |
+          mkdir -p ./timestamps
+          mkdir -p ./objs
+
+          # Remove all timestamps that don't have a target anymore
+          find ./timestamps -xtype l -delete
+
+          # Remove expired timestamps
+          while read -r timestamp
+          do
+            echo "found symlink $timestamp"
+
+            timestamp_num=$(basename $timestamp)
+            if (( timestamp_num > ${{ steps.sys.outputs.expire_before }} ))
+            then
+              echo "$timestamp_num > ${{ steps.sys.outputs.expire_before }}, keeping $timestamp"
+            else
+              echo "$timestamp_num < ${{ steps.sys.outputs.expire_before }}, removing $timestamp"
+              rm "$timestamp"
+            fi
+          done  < <(find ./timestamps \
+                  -maxdepth 1 -mindepth 1 \
+                  -type l \
+                  )
+
+          # Remove objects without timestamps
+          while read -r obj
+          do
+            links=$(find -L ./timestamps -samefile "$obj")
+            if [ -n "$links" ]
+            then
+              echo "object $obj has timestamp, keeping: $links"
+            else
+              echo "object $obj does not have any timestamps, removing"
+              rm -r "$obj"
+            fi
+          done < <(find ./objs \
+                  -maxdepth 1 -mindepth 1 \
+                  -type d)
+
+          dumpster_path="${{ steps.sys.outputs.dumpster_path }}"
+
+          # If we already have a (live) path for this branch, clean it
+          if [ -d "$dumpster_path" ]
+          then
+            echo "path $dumpster_path for branch already exists, wiping"
+            link=$(find -L ./timestamps -samefile "$dumpster_path")
+            if [ -f "$link" ]
+            then
+              echo "removing associated timestamp $link"
+              rm "$link"
+            fi
+            rm -r "$dumpster_path"
+          fi
+
+          mkdir -p "$dumpster_path"
+          ln -s "../$dumpster_path" ./timestamps/${{ steps.sys.outputs.timestamp }}
+
+      # Download the screenshots artifacts (head & base, mobile & desktop)
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-screenshots-head-desktop
+          path: ${{ steps.sys.outputs.tmpdir }}/head/desktop/
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-screenshots-head-mobile
+          path: ${{ steps.sys.outputs.tmpdir }}/head/mobile/
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-screenshots-base-desktop
+          path: ${{ steps.sys.outputs.tmpdir }}/base/desktop/
+      - uses: actions/download-artifact@v3
+        with:
+          name: e2e-screenshots-base-mobile
+          path: ${{ steps.sys.outputs.tmpdir }}/base/mobile/
+
+      # Compare screenshots on head & base and report differences (as step outputs)
+      - name: Diff images
+        id: diff
+        run: |
+          base_dir="${{ steps.sys.outputs.tmpdir }}/base"
+          head_dir="${{ steps.sys.outputs.tmpdir }}/head"
+
+          dumpster_path="${{ steps.sys.outputs.dumpster_path }}"
+          echo "using dumpster path $dumpster_path"
+
+          # Couple of temp files where we store the list of added/changed/removed files,
+          # so that we can them dump them as github outputs
+          output_removed=$(mktemp)
+          output_changed=$(mktemp)
+          output_added=$(mktemp)
+
+          # We iterate through _all_ files, i.e. also the removed & added ones, for
+          # clarity. Then for each (deduped) filename we can check whether it's present in
+          # the base, head or both (and whether they are different).
+          while read -r some_file
+          do
+            file_head="$head_dir/$some_file"
+            file_base="$base_dir/$some_file"
+
+            full_outpath="$dumpster_path/$some_file"
+            mkdir -p "$(dirname $full_outpath)"
+
+            if ! [ -f "$file_base" ]
+            then
+              # the file exists in head but not base, so it's a new file
+              echo "head introduced $some_file"
+              echo "$some_file" >> "$output_added"
+              cp "$file_head" "$full_outpath"
+            elif ! [ -f "$file_head" ]
+            then
+              # the file exists in base but not head, so it's been removed
+              echo "head removed $some_file"
+              echo "$some_file" >> "$output_removed"
+              cp "$file_base" "$full_outpath"
+            else
+              # the file exists in head & base, so we check whether it's changed
+              magick_out=$(mktemp)
+              magick_diff=$(mktemp)
+              metric=0
+
+              # The 'AE' metric counts the number of pixels that differ between the two images
+              # and we store the visual diff (to be uploaded later if necessary)
+              # NOTE: imagemagick prints the value to stderr
+              if ! compare -metric AE "$file_head" "$file_base" "$magick_diff" 2> "$magick_out"
+              then
+                metric=$(<"$magick_out")
+                printf -v metric "%.f" "$metric"
+              fi
+              rm "$magick_out"
+
+              # Ensure that we got a meaningful output
+              if ! [[ $metric =~ ^[0-9]+$ ]]
+              then
+                echo "Magick didn't return a number: $metric"
+                exit 1
+              fi
+
+              if (( metric > 100 ))
+              then
+                echo "Big pixel difference for $some_file"
+                echo "$some_file" >> "$output_changed"
+                cp "$magick_diff" "$full_outpath"
+              fi
+
+              rm "$magick_diff"
+
+            fi
+          done < <( {
+            find "$head_dir" -type f | sed "s|$head_dir/||";
+            find "$base_dir" -type f | sed "s|$base_dir/||";
+          } | sort | uniq )
+
+          # Dump the file lists to github outputs
+          echo 'FILES_ADDED<<EOF' >> "$GITHUB_OUTPUT"
+          cat "$output_added" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+          echo 'FILES_CHANGED<<EOF' >> "$GITHUB_OUTPUT"
+          cat "$output_changed" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+          echo 'FILES_REMOVED<<EOF' >> "$GITHUB_OUTPUT"
+          cat "$output_removed" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+        # Force push the updates to the image-dumpster branch as a single commit
+      - name: Commit to image-dumpster
+        run: |
+          git add .
+
+          git commit --amen -m "Update from ${{ steps.sys.outputs.timestamp }}"
+          git config --add --bool push.autoSetupRemote true
+
+          git push --force
+
+
+        # Use the GitHub API to post links to screenshots if necessary
+      - name: Notify PR of screen changes
+        uses: actions/github-script@v6
+        env:
+          FILES_ADDED: ${{ steps.diff.outputs.FILES_ADDED }}
+          FILES_CHANGED: ${{ steps.diff.outputs.FILES_CHANGED }}
+          FILES_REMOVED: ${{ steps.diff.outputs.FILES_REMOVED }}
+        with:
+          script: |
+            // Anchors we use to figure out where we've written to in the PR description before,
+            // if we have
+            const REPORT_START = "<!-- SCREENSHOTS REPORT START -->";
+            const REPORT_STOP = "<!-- SCREENSHOTS REPORT STOP -->";
+
+            const pr = await github.rest.issues.get({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
+
+            let [ before, rest ] = pr.data.body.split(REPORT_START);
+            rest = rest ?? "";
+            let [ _outdated, after ] = rest.split(REPORT_STOP);
+            after = after ?? "";
+
+            // Create the new report as details/summary tags, inside of which we show the
+            // screenshots
+            let report = "<hr/>";
+
+            const addSection = (summ, files) => {
+              if(files.length <= 0) { return ; }
+              report += "<details>";
+              report += `<summary>${summ}</summary>`;
+              files.forEach(file => {
+                const imgUrl = "https://raw.githubusercontent.com/dfinity/internet-identity/image-dumpster/${{ steps.sys.outputs.dumpster_path }}/" + file;
+                report += `<img src="${imgUrl}" width="250">`;
+              });
+              report += "</details>";
+            }
+
+            const getFiles = (varname) => process.env[varname].split("\n").filter(Boolean);
+
+            addSection("🟢 Some screens were added", getFiles("FILES_ADDED"));
+            addSection("🟡 Some screens were changed", getFiles("FILES_CHANGED"));
+            addSection("🔴 Some screens were removed", getFiles("FILES_REMOVED"));
+
+            github.rest.issues.update({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: [before, REPORT_START, report, REPORT_STOP, after ].join("\n"),
+            });
