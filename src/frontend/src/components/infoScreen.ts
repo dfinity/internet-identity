@@ -72,14 +72,11 @@ export const infoScreenTemplate = ({
         ${cancelText}
       </button>
     </div>
-    ${
-      nonNullish(entries) && entries.length > 0
-        ? html`<section class="c-marketing-block">
-            ${entries.map((entry) => renderEntry(entry))}
-          </section>`
-        : undefined
-    }
-    </section>
+    ${nonNullish(entries) && entries.length > 0
+      ? html`<section class="c-marketing-block">
+          ${entries.map((entry) => renderEntry(entry))}
+        </section>`
+      : undefined}
   `;
 
   return mainWindow({
