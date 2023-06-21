@@ -1,0 +1,32 @@
+type ConsentInfo = record { consent_message : text; language : text };
+type ConsentMessageRequest = record { preferences : ConsentPreferences };
+type ConsentPreferences = record { language : text };
+type CredentialSpec = record {
+    info : text;
+    consent_message_request : ConsentMessageRequest;
+};
+type CredentialSubject = record {
+    id : text;
+    property_set : vec record { text; text };
+};
+type IssueCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    credential_spec : CredentialSpec;
+};
+type IssueCredentialResponse = record {
+    credential : VerifiableCredential;
+    consent_info : ConsentInfo;
+};
+type SignedIdAlias = record {
+    signature : vec nat8;
+    id_alias : principal;
+    id_dapp : principal;
+};
+type VerifiableCredential = record {
+    issuer : text;
+    proof : text;
+    credential_subject : CredentialSubject;
+};
+service : {
+    credential_request : (IssueCredentialRequest) -> (IssueCredentialResponse);
+}

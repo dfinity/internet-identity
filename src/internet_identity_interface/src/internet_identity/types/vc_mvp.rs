@@ -31,3 +31,55 @@ pub enum GetIdAliasResponse {
     #[serde(rename = "no_such_credentials")]
     NoSuchCredentials(String),
 }
+
+pub mod issuer {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct IssueCredentialRequest {
+        pub signed_id_alias: SignedIdAlias,
+        pub credential_spec: CredentialSpec,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct IssueCredentialResponse {
+        pub credential: VerifiableCredential,
+        pub consent_info: ConsentInfo,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct CredentialSpec {
+        pub info: String,
+        pub consent_message_request: ConsentMessageRequest,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ConsentPreferences {
+        pub language: String,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ConsentMessageRequest {
+        pub preferences: ConsentPreferences,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ConsentInfo {
+        pub consent_message: String,
+        pub language: String,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct CredentialSubject {
+        pub id: String,
+        pub property_set: HashMap<String, String>,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct VerifiableCredential {
+        pub issuer: String,
+        pub credential_subject: CredentialSubject,
+        pub proof: String,
+    }
+}
