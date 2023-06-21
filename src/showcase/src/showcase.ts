@@ -238,11 +238,13 @@ export const iiPages: Record<string, () => void> = {
 
   recoverWithPhrase: () =>
     recoverWithPhrasePage<
-      { tag: "ok"; words: string },
+      { tag: "ok"; userNumber: bigint; words: string[] },
       { tag: "err"; message: string }
     >({
-      verify: (words: string) => Promise.resolve({ tag: "ok", words }),
-      confirm: ({ words }) => console.log("confirmed: " + words),
+      verify: ({ userNumber, words }) =>
+        Promise.resolve({ tag: "ok", userNumber, words }),
+      confirm: ({ userNumber, words }) =>
+        console.log("confirmed: ", userNumber, words),
       back: () => console.log("remove"),
       message: "Something cool will happen if you type your anchor",
     }),

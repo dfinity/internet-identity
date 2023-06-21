@@ -187,7 +187,6 @@ export const resetPhrase = async ({
   const opConnection = isProtected(device)
     ? await deviceConnection(
         connection,
-        userNumber,
         "Please input your recovery phrase to reset it."
       )
     : connection;
@@ -286,12 +285,10 @@ const protectDeviceInfo = (): Promise<"ok" | "cancel"> => {
 
 /* Protect the device and re-render the device settings (with the updated device) */
 export const protectDevice = async ({
-  userNumber,
   connection,
   device,
   reload,
 }: {
-  userNumber: bigint;
   connection: AuthenticatedConnection;
   device: DeviceData & RecoveryPhrase;
   reload: () => void;
@@ -311,7 +308,6 @@ export const protectDevice = async ({
   // with the device.
   const newConnection = await deviceConnection(
     connection,
-    userNumber,
     "Please input your recovery phrase to lock it."
   );
 
@@ -367,7 +363,6 @@ const unprotectDeviceInfo = (): Promise<"ok" | "cancel"> => {
 
 /* Unprotect the device and re-render the device settings (with the updated device) */
 export const unprotectDevice = async (
-  userNumber: bigint,
   connection: AuthenticatedConnection,
   device: DeviceData & RecoveryPhrase,
   back: () => void
@@ -383,7 +378,6 @@ export const unprotectDevice = async (
   // NOTE: we do need to be authenticated with the device in order to unprotect it
   const newConnection = await deviceConnection(
     connection,
-    userNumber,
     "Please input your recovery phrase to unlock it."
   );
 
@@ -403,12 +397,10 @@ export const unprotectDevice = async (
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   connection: Connection,
-  userNumber: bigint,
   recoveryPhraseMessage: string
 ): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await recoverWithPhrase({
-      userNumber,
       connection,
       message: recoveryPhraseMessage,
     });

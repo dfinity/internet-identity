@@ -3,10 +3,7 @@ import { warningIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
-import {
-  dropLeadingUserNumber,
-  RECOVERYPHRASE_WORDCOUNT,
-} from "$src/crypto/mnemonic";
+import { RECOVERYPHRASE_WORDCOUNT } from "$src/crypto/mnemonic";
 import type {
   LoginFlowCanceled,
   LoginFlowError,
@@ -16,6 +13,7 @@ import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
 import { DynamicKey } from "$src/utils/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
+import { parseUserNumber } from "$src/utils/userNumber";
 import { Chan } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
@@ -35,7 +33,7 @@ const recoverWithPhraseTemplate = <
   message,
 }: {
   confirm: (result: T) => void;
-  verify: (phrase: string) => Promise<T | E>;
+  verify: (phrase: { userNumber: bigint; words: string[] }) => Promise<T | E>;
   back: () => void;
   message: TemplateResult | string;
 }) => {
@@ -55,7 +53,9 @@ const recoverWithPhraseTemplate = <
   });
 
   // Read the phrase from the input elements
-  const readPhrase = (): string | undefined => {
+  const readPhrase = ():
+    | { userNumber: bigint; words: string[] }
+    | undefined => {
     const userNumberWord = withRef(
       anchorInput.userNumberInput,
       (input) => input.value
@@ -63,17 +63,24 @@ const recoverWithPhraseTemplate = <
     if (isNullish(userNumberWord) || userNumberWord === "") {
       return undefined;
     }
-    const strings = [userNumberWord];
+
+    const userNumber = parseUserNumber(userNumberWord);
+
+    if (isNullish(userNumber)) {
+      return undefined;
+    }
+
+    const words = [];
     for (const wordRef of wordRefs) {
       const value = withRef(wordRef, (input) => input.value);
       if (isNullish(value)) {
         return undefined;
       }
 
-      strings.push(value);
+      words.push(value);
     }
 
-    return strings.join(" ");
+    return { userNumber, words };
   };
 
   // Read phrase from the page, verify it, and confirm back to the caller on success
@@ -295,26 +302,24 @@ export const recoverWithPhrasePage = <
   T extends { tag: "ok" },
   E extends { tag: "err"; message: string | DynamicKey }
 >(
-  props: TemplateProps<T, E>
-) => renderPage(recoverWithPhraseTemplate<T, E>)(props);
+  props: TemplateProps<T, E>,
+  container?: HTMLElement
+) => renderPage(recoverWithPhraseTemplate<T, E>)(props, container);
 
 export const recoverWithPhrase = ({
-  userNumber,
   connection,
   message,
 }: {
-  userNumber: bigint;
   connection: Connection;
   message: TemplateResult | string;
 }): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   return new Promise((resolve) => {
     recoverWithPhrasePage<LoginFlowSuccess, LoginFlowError>({
       confirm: (result) => resolve(result),
-      verify: async (phrase: string) => {
-        const mnemonic = dropLeadingUserNumber(phrase);
+      verify: async ({ userNumber, words }) => {
         const result = await withLoader(async () =>
           apiResultToLoginFlowResult(
-            await connection.fromSeedPhrase(userNumber, mnemonic)
+            await connection.fromSeedPhrase(userNumber, words.join(" "))
           )
         );
         return result;
