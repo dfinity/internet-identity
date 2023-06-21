@@ -8,7 +8,7 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
+use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::*;
