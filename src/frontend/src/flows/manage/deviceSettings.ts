@@ -188,7 +188,6 @@ export const resetPhrase = async ({
     ? await deviceConnection(
         connection,
         userNumber,
-        device,
         "Please input your recovery phrase to reset it."
       )
     : connection;
@@ -313,7 +312,6 @@ export const protectDevice = async ({
   const newConnection = await deviceConnection(
     connection,
     userNumber,
-    device,
     "Please input your recovery phrase to lock it."
   );
 
@@ -386,7 +384,6 @@ export const unprotectDevice = async (
   const newConnection = await deviceConnection(
     connection,
     userNumber,
-    device,
     "Please input your recovery phrase to unlock it."
   );
 
@@ -407,14 +404,12 @@ export const unprotectDevice = async (
 const deviceConnection = async (
   connection: Connection,
   userNumber: bigint,
-  device: DeviceData & RecoveryPhrase,
   recoveryPhraseMessage: string
 ): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await recoverWithPhrase({
       userNumber,
       connection,
-      device,
       message: recoveryPhraseMessage,
     });
     switch (loginResult.tag) {

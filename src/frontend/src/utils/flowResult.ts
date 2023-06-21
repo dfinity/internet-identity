@@ -83,6 +83,13 @@ export const apiResultToLoginFlowResult = (
           "Failed to register with Internet Identity, because the CAPTCHA challenge wasn't successful",
       };
     }
+    case "noSeedPhrase": {
+      return {
+        tag: "err",
+        title: "No Recovery Phrase",
+        message: "No recovery found for this Identity.",
+      };
+    }
     case "seedPhraseFail": {
       return {
         tag: "err",

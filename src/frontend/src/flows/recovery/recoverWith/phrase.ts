@@ -16,7 +16,6 @@ import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
 import { DynamicKey } from "$src/utils/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
-import { RecoveryDevice } from "$src/utils/recoveryDevice";
 import { Chan } from "$src/utils/utils";
 import { isNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
@@ -302,12 +301,10 @@ export const recoverWithPhrasePage = <
 export const recoverWithPhrase = ({
   userNumber,
   connection,
-  device,
   message,
 }: {
   userNumber: bigint;
   connection: Connection;
-  device: RecoveryDevice;
   message: TemplateResult | string;
 }): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
   return new Promise((resolve) => {
@@ -317,7 +314,7 @@ export const recoverWithPhrase = ({
         const mnemonic = dropLeadingUserNumber(phrase);
         const result = await withLoader(async () =>
           apiResultToLoginFlowResult(
-            await connection.fromSeedPhrase(userNumber, mnemonic, device)
+            await connection.fromSeedPhrase(userNumber, mnemonic)
           )
         );
         return result;
