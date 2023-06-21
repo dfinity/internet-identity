@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "vc_issuer"
+description = "Verifiable Credentials Issuer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# local dependencies
+internet_identity_interface = { path = "../../src/internet_identity_interface" }
+# ic dependencies
+candid = "0.8"
+ic-cdk = "0.8"
+ic-cdk-macros = "0.6"
