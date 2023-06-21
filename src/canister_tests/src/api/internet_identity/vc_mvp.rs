@@ -1,7 +1,7 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{call_candid_as, query_candid_as, CallError, StateMachine};
-use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
+use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::IdentityNumber;
