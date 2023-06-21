@@ -6,7 +6,7 @@ use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};
 use internet_identity::signature_map::SignatureMap;
-use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::{
+use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, IdAliasCredentials, SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::{
