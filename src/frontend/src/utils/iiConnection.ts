@@ -4,6 +4,7 @@
 import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
   AddTentativeDeviceResponse,
+  AnchorCredentials,
   Challenge,
   ChallengeResult,
   CredentialId,
@@ -79,6 +80,7 @@ export type LoginResult =
   | UnknownUser
   | AuthFail
   | ApiError
+  | NoSeedPhrase
   | SeedPhraseFail
   | CancelOrTimeout;
 export type RegisterResult =
@@ -100,6 +102,7 @@ type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
 type AuthFail = { kind: "authFail"; error: Error };
 type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
+type NoSeedPhrase = { kind: "noSeedPhrase" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
 type CancelOrTimeout = { kind: "cancelOrTimeout" };
 
@@ -340,17 +343,22 @@ export class Connection {
 
   fromSeedPhrase = async (
     userNumber: bigint,
-    seedPhrase: string,
-    expected: Omit<DeviceData, "alias">
+    seedPhrase: string
   ): Promise<LoginResult> => {
+    const pubkeys = (await this.lookupCredentials(userNumber)).recovery_phrases;
+    if (pubkeys.length === 0) {
+      return {
+        kind: "noSeedPhrase",
+      };
+    }
+
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
       IC_DERIVATION_PATH
     );
     if (
-      !bufferEqual(
-        identity.getPublicKey().toDer(),
-        derFromPubkey(expected.pubkey)
+      !pubkeys.some((pubkey) =>
+        bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey))
       )
     ) {
       return {
@@ -371,6 +379,13 @@ export class Connection {
         actor
       ),
     };
+  };
+
+  lookupCredentials = async (
+    userNumber: UserNumber
+  ): Promise<AnchorCredentials> => {
+    const actor = await this.createActor();
+    return await actor.get_anchor_credentials(userNumber);
   };
 
   lookupAll = async (
