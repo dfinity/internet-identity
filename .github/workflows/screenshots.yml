@@ -317,7 +317,7 @@ jobs:
               repo: context.repo.repo,
             })
 
-            let [ before, rest ] = pr.data.body.split(REPORT_START);
+            let [ before, rest ] = (pr.data.body ?? "").split(REPORT_START);
             rest = rest ?? "";
             let [ _outdated, after ] = rest.split(REPORT_STOP);
             after = after ?? "";
