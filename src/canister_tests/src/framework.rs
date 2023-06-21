@@ -8,7 +8,7 @@ use ic_representation_independent_hash::Value;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
-use internet_identity_interface::internet_identity::types::attribute_sharing_mvp::SignedIdAlias;
+use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
 use regex::Regex;
