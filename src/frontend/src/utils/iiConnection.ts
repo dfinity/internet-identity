@@ -270,60 +270,12 @@ export class Connection {
       actor
     );
 
-    try {
-      this.updateOriginIfNecessary(
-        devices,
-        delegationIdentity.getPublicKey().toDer(),
-        connection
-      );
-    } catch (e) {
-      console.warn("Could not update device origin:", e);
-    }
-
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
     };
   };
-
-  private updateOriginIfNecessary(
-    devices: Omit<DeviceData, "alias">[],
-    pubkey: ArrayBuffer,
-    authenticatedConnection: AuthenticatedConnection
-  ) {
-    // Find the device based on the pubkey
-    const device = findDeviceByPubkey(devices, pubkey);
-
-    // only update devices without origin information
-    if (nonNullish(device) && device.origin.length === 0) {
-      device.origin satisfies string[];
-      // we purposely do not await the promise as we just optimistically update
-      // if it fails, no harm done
-
-      authenticatedConnection
-        // We need to refetch the device using `getAnchorInfo` because the devices obtained by `lookup` no longer have an alias
-        .getAnchorInfo()
-        .then((info) => info.devices)
-        .then((devices) =>
-          findDeviceByPubkey(devices, Buffer.from(device.pubkey))
-        )
-        .then((device) => {
-          if (isNullish(device)) {
-            // this can happen if the device has been deleted between authentication and now
-            throw Error("device is undefined");
-          }
-          device.origin = readDeviceOrigin();
-          return device;
-        })
-        .then((device) => authenticatedConnection.update(device))
-        .catch((error) => {
-          console.warn(
-            `unable to update device ${JSON.stringify(device)}, error: ${error}`
-          );
-        });
-    }
-  }
 
   fromIdentity = async (
     userNumber: bigint,
@@ -688,15 +640,6 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   }
   return true;
 };
-
-function findDeviceByPubkey<T extends Omit<DeviceData, "alias">>(
-  devices: T[],
-  pubkey: ArrayBuffer
-): T | undefined {
-  return devices.find((device) => {
-    return bufferEqual(Buffer.from(device.pubkey), pubkey);
-  });
-}
 
 // Infer the host for the IC's HTTP api. II lives on a custom domain that may be different
 // from the domain where the api is served (agent-js otherwise infers the IC's HTTP URL from
