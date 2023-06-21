@@ -67,8 +67,25 @@ const init = (
     ) as HTMLButtonElement | null;
     if (buttonContinue !== null) {
       buttonContinue.onclick = async () => {
+        const { pubkey, credential_id } = device;
+
+        // This is a sanity check to give a more precise error message in case the
+        // inferred recovery device does not have webauthn credentials
+        if (credential_id.length === 0) {
+          await displayError({
+            title: "No credentials found",
+            message:
+              "There were no credentials associated with the recovery device",
+            primaryButton: "Try again",
+          });
+          return deviceRecoveryPage(userNumber, connection, device).then(
+            (res) => resolve(res)
+          );
+        }
         const result = apiResultToLoginFlowResult(
-          await connection.fromWebauthnDevices(userNumber, [device])
+          await connection.fromWebauthnCredentials(userNumber, [
+            { credential_id: credential_id[0], pubkey },
+          ])
         );
 
         switch (result.tag) {
