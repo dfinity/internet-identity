@@ -374,14 +374,12 @@ export const readRecovery = ({
       const protection: Protection = isProtected(device)
         ? {
             isProtected: true,
-            unprotect: () =>
-              unprotectDevice(userNumber, connection, device, reload),
+            unprotect: () => unprotectDevice(connection, device, reload),
           }
         : {
             isProtected: false,
             protect: () =>
               protectDevice({
-                userNumber,
                 connection,
                 device,
                 reload,

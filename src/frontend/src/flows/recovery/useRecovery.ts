@@ -60,7 +60,6 @@ const runRecovery = async (
 
   const res = isRecoveryPhrase(device)
     ? await recoverWithPhrase({
-        userNumber,
         connection,
         message: html`Type your recovery phrase below to access your Internet
           Identity <strong class="t-strong">${userNumber}</strong>`,
