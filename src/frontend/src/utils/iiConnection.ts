@@ -7,7 +7,6 @@ import {
   AnchorCredentials,
   Challenge,
   ChallengeResult,
-  CredentialId,
   DeviceData,
   DeviceKey,
   FrontendHostname,
@@ -21,6 +20,7 @@ import {
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
+  WebAuthnCredential,
   _SERVICE,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
@@ -222,12 +222,19 @@ export class Connection {
       return { kind: "unknownUser", userNumber };
     }
 
-    return this.fromWebauthnDevices(userNumber, devices);
+    return this.fromWebauthnCredentials(
+      userNumber,
+      devices.flatMap(({ credential_id, pubkey }) => {
+        return credential_id.length === 0
+          ? []
+          : [{ credential_id: credential_id[0], pubkey }];
+      })
+    );
   };
 
-  fromWebauthnDevices = async (
+  fromWebauthnCredentials = async (
     userNumber: bigint,
-    devices: Omit<DeviceData, "alias">[]
+    credentials: WebAuthnCredential[]
   ): Promise<LoginResult> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -236,12 +243,10 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : MultiWebAuthnIdentity.fromCredentials(
-          devices.flatMap((device) =>
-            device.credential_id.map((credentialId: CredentialId) => ({
-              pubkey: derFromPubkey(device.pubkey),
-              credentialId: Buffer.from(credentialId),
-            }))
-          )
+          credentials.map(({ credential_id, pubkey }) => ({
+            pubkey: derFromPubkey(pubkey),
+            credentialId: Buffer.from(credential_id),
+          }))
         );
     let delegationIdentity: DelegationIdentity;
     try {
@@ -276,7 +281,6 @@ export class Connection {
       connection,
     };
   };
-
   fromIdentity = async (
     userNumber: bigint,
     identity: SignIdentity
