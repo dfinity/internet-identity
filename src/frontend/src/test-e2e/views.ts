@@ -420,7 +420,7 @@ export class AddDeviceSuccessView extends View {
   async waitForDisplay(): Promise<void> {
     await Promise.all([
       await this.browser.execute(
-        `document.querySelector('${this.SELECTOR}').scrollIntoView({ behavior: "instant", block: "center"})`
+        "document.querySelector('[data-action='next']').scrollIntoView({ behavior: 'instant', block: 'center'})"
       ),
       await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 }),
     ]);
