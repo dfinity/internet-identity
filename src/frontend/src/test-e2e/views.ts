@@ -408,6 +408,9 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
     await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
   }
 
