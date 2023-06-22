@@ -645,7 +645,11 @@ a:hover,
 
 @media (max-width: 512px) {
   .l-sidebar {
-    display: none;
+    /* a bit of a hack to make sure the sidebar is not visible on mobile
+     but to ensure ID's used in the logo are still accessible */
+    visibility: hidden;
+    transform: translateX(calc(-100% - var(--rs-bezel-sidebar)));
+    pointer-events: none;
   }
 }
 

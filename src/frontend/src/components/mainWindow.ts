@@ -54,6 +54,8 @@ export const mainWindow = ({
         class="${containerClasses.join(" ")}"
       >
         ${showLogo
+          // when there is a sidebar, the logo is hidden on desktop
+          // because it comes inside the sidebar
           ? html`<div
               class="c-logo ${slotSidebar !== undefined
                 ? "is-hidden--desktop"
