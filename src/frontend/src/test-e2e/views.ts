@@ -367,14 +367,14 @@ export class AddRemoteDeviceInstructionsView extends View {
 
   async cancel(): Promise<void> {
     await this.browser.execute(
-      `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`,
+      `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`
     );
     await this.browser.$("#cancelAddRemoteDevice").click();
   }
 
   async addFIDODevice(): Promise<void> {
     await this.browser.execute(
-      `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`,
+      `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`
     );
     await this.browser.$('[data-action="use-fido"]').click();
   }
@@ -415,7 +415,7 @@ export class AddDeviceSuccessView extends View {
 
   async waitForDisplay(): Promise<void> {
     await this.browser.execute(
-      `document.querySelector('${this.SELECTOR}').scrollIntoView({ behavior: "instant", block: "center"})`,
+      `document.querySelector('${this.SELECTOR}').scrollIntoView({ behavior: "instant", block: "center"})`
     );
     await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
   }
