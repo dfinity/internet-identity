@@ -103,8 +103,8 @@ const recoverWithPhraseTemplate = <
 
   const pageContentSlot = html`
     <article>
-      <hgroup>
-        <h1 class="t-title t-title--main">Enter recovery phrase</h1>
+      <hgroup data-page="recover-with-phrase">
+        <h1 class="t-title t-title--main">Input your Recovery Phrase</h1>
         <p class="t-lead">${message}</p>
       </hgroup>
       <div class="c-input c-input--recovery l-stack">

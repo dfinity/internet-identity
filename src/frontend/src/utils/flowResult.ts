@@ -87,7 +87,8 @@ export const apiResultToLoginFlowResult = (
       return {
         tag: "err",
         title: "No Recovery Phrase",
-        message: "No recovery found for this Identity.",
+        message:
+          "There is no recovery phrase associated with this identity. Cancel and recover another way.",
       };
     }
     case "seedPhraseFail": {

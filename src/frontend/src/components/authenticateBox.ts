@@ -76,9 +76,9 @@ export const authenticateBox = async (
             newAnchor: true,
           });
         },
-        recover: async (userNumber) => {
+        recover: async (_userNumber) => {
           resolve({
-            ...(await useRecovery(connection, userNumber)),
+            ...(await useRecovery(connection)),
             newAnchor: false,
           });
         },

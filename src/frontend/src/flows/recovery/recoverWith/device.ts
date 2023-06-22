@@ -1,116 +1,85 @@
-import { displayError } from "$src/components/displayError";
-import { mainWindow } from "$src/components/mainWindow";
+import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
+import { toast } from "$src/components/toast";
 import {
   apiResultToLoginFlowResult,
-  cancel,
-  LoginFlowCanceled,
-  LoginFlowSuccess,
+  LoginFlowResult,
 } from "$src/utils/flowResult";
 import { Connection } from "$src/utils/iiConnection";
-import { RecoveryDevice } from "$src/utils/recoveryDevice";
-import { unreachable } from "$src/utils/utils";
-import { html, render } from "lit-html";
+import { renderPage } from "$src/utils/lit-html";
 
-const pageContent = () => {
-  const pageContentSlot = html`
-    <article>
-      <hgroup>
-        <h1 class="t-title t-title--main">Use Recovery Device</h1>
-        <p class="t-lead">
-          Click <strong class="t-strong">continue</strong> and follow your
-          browser's instructions to recover your Internet Identity with external
-          hardware.
-        </p>
-      </hgroup>
-      <div class="c-button-group">
-        <button
-          id="recover-with-device__cancel"
-          class="c-button c-button--secondary"
-        >
-          Cancel
-        </button>
-        <button
-          id="recover-with-device__continue"
-          class="c-button c-button--primary"
-        >
-          Continue
-        </button>
-      </div>
-    </article>
-  `;
+export const recoverWithDeviceTemplate = ({
+  next,
+  cancel,
+}: {
+  next: (userNumber: bigint) => void;
+  cancel: () => void;
+}) =>
+  promptUserNumberTemplate({
+    title: "Use Recovery Device",
+    message:
+      "Enter your Internet Identity and follow your browser's instructions to use your recovery device.",
+    onContinue: (userNumber) => next(userNumber),
+    onCancel: () => cancel(),
+  });
 
-  return mainWindow({
-    showLogo: false,
-    showFooter: false,
-    slot: pageContentSlot,
+export const recoverWithDevicePage = renderPage(recoverWithDeviceTemplate);
+
+export const recoverWithDevice = ({
+  connection,
+}: {
+  connection: Connection;
+}): Promise<LoginFlowResult> => {
+  return new Promise((resolve) => {
+    return recoverWithDevicePage({
+      next: async (userNumber: bigint) => {
+        const result = await attemptRecovery({ userNumber, connection });
+
+        if (result.tag === "err") {
+          toast.error([result.title, result.message].join(": "));
+          return;
+        }
+
+        if (result.tag === "canceled") {
+          toast.error("Authentication was canceled");
+          return;
+        }
+
+        result.tag satisfies "ok";
+        return resolve(result);
+      },
+      cancel: () => resolve({ tag: "canceled" }),
+    });
   });
 };
 
-export const deviceRecoveryPage = (
-  userNumber: bigint,
-  connection: Connection,
-  device: RecoveryDevice
-): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent(), container);
-  return init(userNumber, connection, device);
+const attemptRecovery = async ({
+  userNumber,
+  connection,
+}: {
+  userNumber: bigint;
+  connection: Connection;
+}): Promise<LoginFlowResult> => {
+  const { recovery_credentials: recoveryCredentials } =
+    await connection.lookupCredentials(userNumber);
+
+  if (recoveryCredentials.length === 0) {
+    const title = "No recovery device";
+    const message = "This identity does not have a recovery device";
+    return { tag: "err", title, message };
+  }
+
+  if (recoveryCredentials.length > 1) {
+    const title = "Too many recovery devices";
+    const message =
+      "This identity has more than one recovery devices, which is not expected";
+    return { tag: "err", title, message };
+  }
+
+  const result = apiResultToLoginFlowResult(
+    await connection.fromWebauthnCredentials(userNumber, [
+      recoveryCredentials[0],
+    ])
+  );
+
+  return result;
 };
-
-const init = (
-  userNumber: bigint,
-  connection: Connection,
-  device: RecoveryDevice
-): Promise<LoginFlowSuccess | LoginFlowCanceled> =>
-  new Promise((resolve) => {
-    const buttonContinue = document.getElementById(
-      "recover-with-device__continue"
-    ) as HTMLButtonElement | null;
-    if (buttonContinue !== null) {
-      buttonContinue.onclick = async () => {
-        const { pubkey, credential_id } = device;
-
-        // This is a sanity check to give a more precise error message in case the
-        // inferred recovery device does not have webauthn credentials
-        if (credential_id.length === 0) {
-          await displayError({
-            title: "No credentials found",
-            message:
-              "There were no credentials associated with the recovery device",
-            primaryButton: "Try again",
-          });
-          return deviceRecoveryPage(userNumber, connection, device).then(
-            (res) => resolve(res)
-          );
-        }
-        const result = apiResultToLoginFlowResult(
-          await connection.fromWebauthnCredentials(userNumber, [
-            { credential_id: credential_id[0], pubkey },
-          ])
-        );
-
-        switch (result.tag) {
-          case "ok":
-            resolve(result);
-            break;
-          case "err":
-            await displayError({ ...result, primaryButton: "Try again" });
-            void deviceRecoveryPage(userNumber, connection, device).then(
-              (res) => resolve(res)
-            );
-            break;
-          default:
-            unreachable(result);
-            break;
-        }
-      };
-    }
-
-    const buttonCancel = document.getElementById(
-      "recover-with-device__cancel"
-    ) as HTMLButtonElement | null;
-    if (buttonCancel !== null) {
-      buttonCancel.onclick = () => {
-        resolve(cancel);
-      };
-    }
-  });
