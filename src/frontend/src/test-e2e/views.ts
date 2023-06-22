@@ -366,21 +366,17 @@ export class AddRemoteDeviceInstructionsView extends View {
   }
 
   async cancel(): Promise<void> {
-    await Promise.all([
-      await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
-      ),
-      await this.browser.$("#cancelAddRemoteDevice").click(),
-    ]);
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    await this.browser.$("#cancelAddRemoteDevice").click();
   }
 
   async addFIDODevice(): Promise<void> {
-    await Promise.all([
-      await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
-      ),
-      await this.browser.$('[data-action="use-fido"]').click(),
-    ]);
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    await this.browser.$('[data-action="use-fido"]').click();
   }
 
   async addDeviceLink(): Promise<string> {
@@ -418,12 +414,10 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
-    await Promise.all([
-      await this.browser.execute(
-        "window.scrollTo(0, document.body.scrollHeight)"
-      ),
-      await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 }),
-    ]);
+    await this.browser.execute(
+      "window.scrollTo(0, document.body.scrollHeight)"
+    );
+    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
   }
 
   async continue(): Promise<void> {
