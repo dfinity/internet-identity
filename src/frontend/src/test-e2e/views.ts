@@ -366,10 +366,16 @@ export class AddRemoteDeviceInstructionsView extends View {
   }
 
   async cancel(): Promise<void> {
+    await this.browser.execute(
+      `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`,
+    );
     await this.browser.$("#cancelAddRemoteDevice").click();
   }
 
   async addFIDODevice(): Promise<void> {
+    await this.browser.execute(
+      `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`,
+    );
     await this.browser.$('[data-action="use-fido"]').click();
   }
 
