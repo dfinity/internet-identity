@@ -334,7 +334,7 @@ export const authenticate = async (
 };
 
 // Wrap the template with header & footer and render the page
-// we are including the logo because of SVG ID conflicts, instead of using the 
+// we are including the logo because of SVG ID conflicts, instead of using the
 // logo from the main window
 const page = (slot: TemplateResult) => {
   const template = mainWindow({
