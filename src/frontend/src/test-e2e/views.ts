@@ -368,7 +368,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   async cancel(): Promise<void> {
     await Promise.all([
       await this.browser.execute(
-        `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`
+        "window.scrollTo(0, document.body.scrollHeight)"
       ),
       await this.browser.$("#cancelAddRemoteDevice").click(),
     ]);
@@ -377,7 +377,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   async addFIDODevice(): Promise<void> {
     await Promise.all([
       await this.browser.execute(
-        `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`
+        "window.scrollTo(0, document.body.scrollHeight)"
       ),
       await this.browser.$('[data-action="use-fido"]').click(),
     ]);
