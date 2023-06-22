@@ -366,17 +366,21 @@ export class AddRemoteDeviceInstructionsView extends View {
   }
 
   async cancel(): Promise<void> {
-    await this.browser.execute(
-      `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`
-    );
-    await this.browser.$("#cancelAddRemoteDevice").click();
+    await Promise.all([
+      await this.browser.execute(
+        `document.querySelector('#cancelAddRemoteDevice').scrollIntoView({ behavior: "instant", block: "center"})`
+      ),
+      await this.browser.$("#cancelAddRemoteDevice").click(),
+    ]);
   }
 
   async addFIDODevice(): Promise<void> {
-    await this.browser.execute(
-      `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`
-    );
-    await this.browser.$('[data-action="use-fido"]').click();
+    await Promise.all([
+      await this.browser.execute(
+        `document.querySelector('[data-action="use-fido"]').scrollIntoView({ behavior: "instant", block: "center"})`
+      ),
+      await this.browser.$('[data-action="use-fido"]').click(),
+    ]);
   }
 
   async addDeviceLink(): Promise<string> {
@@ -414,10 +418,12 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
-    await this.browser.execute(
-      `document.querySelector('${this.SELECTOR}').scrollIntoView({ behavior: "instant", block: "center"})`
-    );
-    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
+    await Promise.all([
+      await this.browser.execute(
+        `document.querySelector('${this.SELECTOR}').scrollIntoView({ behavior: "instant", block: "center"})`
+      ),
+      await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 }),
+    ]);
   }
 
   async continue(): Promise<void> {
