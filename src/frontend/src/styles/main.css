@@ -643,16 +643,6 @@ a:hover,
   padding: var(--rs-bezel-sidebar);
 }
 
-@media (max-width: 512px) {
-  .l-sidebar {
-    /* a bit of a hack to make sure the sidebar is not visible on mobile
-     but to ensure ID's used in the logo are still accessible */
-    visibility: hidden;
-    transform: translateX(calc(-100% - var(--rs-bezel-sidebar)));
-    pointer-events: none;
-  }
-}
-
 .l-sidebar__main {
   flex: 1;
   display: flex;
@@ -675,6 +665,8 @@ a:hover,
 }
 
 .l-container--wide {
+  width: auto;
+  min-width: 40rem;
   max-width: 60rem;
 }
 
