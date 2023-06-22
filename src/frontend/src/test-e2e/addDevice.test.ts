@@ -49,9 +49,8 @@ test("Add device", async () => {
     const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
       browser
     );
+    await addRemoteDeviceInstructionsView.waitForDisplay();
     await addRemoteDeviceInstructionsView.addFIDODevice();
-
-    await browser.pause(10_000);
 
     // success page
     const addDeviceSuccessView = new AddDeviceSuccessView(browser);
