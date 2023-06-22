@@ -61,23 +61,19 @@ const displaySeedPhraseTemplate = ({
           ${operation === "create" ? copy.header : copy.header_reset}
         </p>
       </hgroup>
-      <div class="c-input--anchor l-stack">
-        <label class="c-input--anchor__wrap" aria-label="Identity Anchor">
-          <div
-            class="c-input c-input--vip c-input--readonly c-input--centered c-input--spacious"
-          >
-            ${userNumberWord}
-          </div>
-        </label>
-      </div>
-
       <div class="l-stack">
-        <output class="c-input c-input--recovery"
-          ><ol
+        <output class="c-input c-input--recovery">
+          <ol
             data-role="recovery-words"
             translate="no"
             class="c-list c-list--recovery"
           >
+            <li
+              class="c-list--recovery-word c-list--recovery-word--important"
+              style="--index: '#';"
+            >
+              ${userNumberWord}
+            </li>
             ${recoveryWords.map(
               (word, i) =>
                 html`<li

@@ -1,4 +1,3 @@
-import { mkAnchorInput } from "$src/components/anchorInput";
 import { warningIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
@@ -15,10 +14,11 @@ import { Connection } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
 import { Chan } from "$src/utils/utils";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 const recoverWithPhraseTemplate = <
@@ -44,22 +44,13 @@ const recoverWithPhraseTemplate = <
     () => createRef()
   );
 
-  const anchorInput = mkAnchorInput({
-    onSubmit: () => {
-      // If the user hits enter for some reason, focus the next word
-      // to fill in
-      wordRefs[0]?.value?.focus();
-    },
-  });
+  const userNumberInput = createRef<HTMLInputElement>();
 
   // Read the phrase from the input elements
   const readPhrase = ():
     | { userNumber: bigint; words: string[] }
     | undefined => {
-    const userNumberWord = withRef(
-      anchorInput.userNumberInput,
-      (input) => input.value
-    );
+    const userNumberWord = withRef(userNumberInput, (input) => input.value);
     if (isNullish(userNumberWord) || userNumberWord === "") {
       return undefined;
     }
@@ -85,6 +76,16 @@ const recoverWithPhraseTemplate = <
 
   // Read phrase from the page, verify it, and confirm back to the caller on success
   const verifyAndConfirm = async () => {
+    // Set (in)validity on the first word that hasn't been filled. We do only the first
+    // one to not overwhelm the user.
+    for (const input of [userNumberInput, ...wordRefs]) {
+      if (input.value?.value === "") {
+        input.value?.setCustomValidity("All fields should be filled");
+        input.value?.reportValidity();
+        break;
+      }
+    }
+
     const phrase = readPhrase();
     if (isNullish(phrase)) {
       toast.error("Could not read phrase");
@@ -106,10 +107,22 @@ const recoverWithPhraseTemplate = <
         <h1 class="t-title t-title--main">Enter recovery phrase</h1>
         <p class="t-lead">${message}</p>
       </hgroup>
-      ${anchorInput.template}
       <div class="c-input c-input--recovery l-stack">
         <ol class="c-list c-list--recovery">
-          ${wordRefs.map((wordRef, i) => wordTemplate({ wordRef, i }))}
+          ${wordTemplate({
+            index: "#",
+            classes: ["c-list--recovery-word--important"],
+            assignTo: userNumberInput,
+            placeholder: "Identity number",
+            validityType: "number",
+          })}
+          ${wordRefs.map((wordRef, i) =>
+            wordTemplate({
+              assignTo: wordRef,
+              index: `${i + 1}`,
+              validityType: "word",
+            })
+          )}
         </ol>
       </div>
 
@@ -140,13 +153,57 @@ const recoverWithPhraseTemplate = <
   });
 };
 
+type ValidityType = "word" | "number";
+
+const reportValidity = ({ element }: { element: HTMLInputElement }) => {
+  const validityType = element.dataset.validityType;
+  if (validityType !== "word" && validityType !== "number") {
+    console.warn("Could not find validity for element");
+    return;
+  }
+
+  const word = element.value;
+  const reason = {
+    word: (word: string) =>
+      word === ""
+        ? "Word cannot be empty"
+        : !wordlists.english.includes(word)
+        ? "This is not a word that is associated with recovery phrases. Try again."
+        : undefined,
+    number: (word: string) =>
+      word === ""
+        ? "User number cannot be empty"
+        : !/^\d+$/.test(word)
+        ? "Enter your Internet Identity here. This is a number and contains no other characters."
+        : undefined,
+  }[validityType](word);
+  if (nonNullish(reason)) {
+    element.setCustomValidity(reason);
+    element.reportValidity();
+    return;
+  }
+
+  return;
+};
+
+const resetValidity = ({ element }: { element: HTMLInputElement }) => {
+  element.setCustomValidity("");
+  element.reportValidity();
+};
+
 // Show a particular word
 export const wordTemplate = ({
-  wordRef,
-  i,
+  assignTo,
+  index,
+  classes: classes_,
+  validityType,
+  placeholder,
 }: {
-  wordRef: Ref<HTMLInputElement>;
-  i: number;
+  assignTo: Ref<HTMLInputElement>;
+  index: string;
+  classes?: string[];
+  validityType: ValidityType;
+  placeholder?: string;
 }): TemplateResult => {
   type State = "pending" | "incorrect";
   const state = new Chan<State>("pending");
@@ -164,43 +221,14 @@ export const wordTemplate = ({
     (s: State) =>
       ({
         pending: undefined,
-        incorrect: html`<i class="c-list--recovery-word__icon"
+        // when the icon is clicked, we tell the browser to show the validity message again
+        incorrect: html`<i
+          @click=${() => withRef(assignTo, (input) => input.reportValidity())}
+          class="c-list--recovery-word__icon"
           >${warningIcon}</i
         >`,
       }[s])
   );
-
-  // Check if the word is ok (known bip39 word or anchor for the first input with index = 0)
-  const isOk = (word: string): boolean => {
-    // Avoid being annoying if user has not written anything but e.g. is just tabbing through the inputs
-    if (word === "") {
-      return true;
-    }
-    const isAnchorNumber = () => /\d+/.test(word);
-    const isBipWord = wordlists.english.includes(word);
-
-    return i === 0 ? isAnchorNumber() || isBipWord : isBipWord;
-  };
-
-  // Set the word as "incorrect"
-  const setIncorrect = ({
-    word,
-    element,
-  }: {
-    word: string;
-    element: HTMLInputElement;
-  }) => {
-    element.setCustomValidity(`Unknown word: '${word}'`);
-    element.reportValidity();
-    state.send("incorrect");
-  };
-
-  // Reset the "incorrect" warning
-  const unsetIncorrect = ({ element }: { element: HTMLInputElement }) => {
-    element.setCustomValidity("");
-    element.reportValidity();
-    state.send("pending");
-  };
 
   // Helper to gain access to the event's target
   const withElement = <E extends Event>(
@@ -215,12 +243,19 @@ export const wordTemplate = ({
     return f(event, element);
   };
 
+  const classes = [...(classes_ ?? []), "c-list--recovery-word"];
+
   return html`<li
-    style="--index: '${i + 1}'"
-    class="c-list--recovery-word ${asyncReplace(clazz)}"
+    style="--index: '${index}'"
+    class="${classes.join(" ")} ${asyncReplace(clazz)}"
   >
     ${asyncReplace(icon)}
     <input
+      autofocus
+      data-validity-type=${validityType}
+      @invalid=${() => {
+        state.send("incorrect");
+      }}
       @paste=${(e: ClipboardEvent) =>
         withElement(e, (event, element) => {
           e.preventDefault();
@@ -242,9 +277,7 @@ export const wordTemplate = ({
 
           // Use the first word and set that as input value
           element.value = word;
-          if (!isOk(word)) {
-            setIncorrect({ word, element });
-          }
+          reportValidity({ element });
 
           // Forward the rest of the text (if any) to the next input element (if any)
           if (rest.length <= 0) {
@@ -274,20 +307,20 @@ export const wordTemplate = ({
       autocapitalize="none"
       spellcheck="false"
       class="c-recoveryInput"
-      ${ref(wordRef)}
-      data-role="recovery-word-input"
+      placeholder=${ifDefined(placeholder)}
+      ${nonNullish(assignTo) ? ref(assignTo) : undefined}
       data-state=${asyncReplace(state)}
-      @input=${(e: InputEvent) =>
+      @input=${(e: InputEvent) => {
+        state.send("pending");
         withElement(e, (_e, element) => {
-          // Reset validity
-          unsetIncorrect({ element });
-        })}
+          // Reset validity when typing
+          resetValidity({ element });
+        });
+      }}
       @change=${(e: InputEvent) =>
         withElement(e, (event, element) => {
-          const word = element.value;
-          if (!isOk(word)) {
-            setIncorrect({ word, element });
-          }
+          // Check validity when leaving the field
+          reportValidity({ element });
         })}
     />&nbsp;
   </li>`;

@@ -215,6 +215,8 @@
   --rc-positive: var(--vc-brand-green);
   --rc-onPositive: var(--rc-dark);
 
+  --rc-input-placeholder: var(--vc-grey);
+
   --rc-input: var(--rc-light);
   --rc-onInput: var(--rc-dark);
 
@@ -1393,7 +1395,7 @@ by all browsers (FF is missing) */
 }
 
 .c-input::placeholder {
-  color: var(--vc-grey);
+  color: var(--rc-input-placeholder);
 }
 
 .c-button-group {
@@ -1707,7 +1709,6 @@ by all browsers (FF is missing) */
   font-size: 0.7em;
   font-weight: bold;
   font-family: monospace;
-  text-align: center;
 }
 
 @media screen and (max-width: 512px) {
@@ -1840,6 +1841,11 @@ by all browsers (FF is missing) */
   color: transparent;
 }
 
+.c-list--recovery-word--important {
+  display: block;
+  margin: 0.5rem auto;
+}
+
 .c-recoveryInput {
   display: block;
 
@@ -1852,6 +1858,10 @@ by all browsers (FF is missing) */
 
   /* fixes layout-shifts in safari when input is empty */
   position: absolute;
+}
+
+.c-recoveryInput::placeholder {
+  color: var(--rc-input-placeholder);
 }
 
 .c-list__item--vip {

@@ -630,16 +630,9 @@ export class RecoverView extends View {
 
   async enterSeedPhrase(seedPhrase: string): Promise<void> {
     const words = seedPhrase.split(" ").filter(Boolean);
-    // eslint-disable-next-line
-    const userNumberWord = words.shift()!;
-    const userNumberInput = await this.browser.$(
-      'input[data-role="anchor-input"]'
-    );
-    await userNumberInput.setValue(userNumberWord);
 
-    const inputs = await this.browser.$$(
-      'input[data-role="recovery-word-input"]'
-    );
+    // Assume the only inputs on this screen are the phrase inputs
+    const inputs = await this.browser.$$("input");
     for (let i = 0; i < words.length; i++) {
       await inputs[i].setValue(words[i]);
     }
