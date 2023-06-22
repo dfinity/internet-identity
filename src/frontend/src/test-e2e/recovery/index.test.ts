@@ -21,8 +21,6 @@ test("Recover with phrase", async () => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.recover();
     const recoveryView = new RecoverView(browser);
-    await recoveryView.waitForDisplay();
-    await recoveryView.continue();
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();

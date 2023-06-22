@@ -608,16 +608,6 @@ export class DemoAppView extends View {
 }
 
 export class RecoverView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$('[data-page="prompt-recovery-type"]')
-      .waitForDisplayed({ timeout: 5_000 });
-  }
-
-  async continue(): Promise<void> {
-    await this.browser.$('[data-action="recover-with-phrase"]').click();
-  }
-
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
