@@ -111,6 +111,7 @@
   --vc-brand-orange: #f15a24;
   --vc-brand-yellow: #fbb03b;
   --vc-brand-pink: #ed1e79;
+  --vc-brand-pink--light: rgba(251, 172, 202, 1);
   --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
   --vc-brand-purple: #4b19d6;
   --vc-brand-purple-light: #890eed;
@@ -202,7 +203,7 @@
   --rc-onButton: var(--rc-text-interaction-inverted);
   --rc-onButton--disabled: var(--rc-light-transparent);
 
-  --rc-errorLight: var(--vc-brand-pink--transparent);
+  --rc-errorLight: var(--vc-brand-pink--light);
   --rc-error: var(--vc-brand-pink);
   --rc-error-strong: var(--vc-red);
   --rc-onError: var(--vc-snow);
@@ -1103,7 +1104,6 @@ by all browsers (FF is missing) */
 
 .c-toast {
   position: relative;
-  background: var(--rc-background);
   animation: appearFromBottom 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
