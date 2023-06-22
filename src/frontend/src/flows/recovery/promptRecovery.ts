@@ -22,7 +22,7 @@ export const promptRecoveryTemplate = ({
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
     >
       <h1 class="t-title t-title--main">Lost access?</h1>
-      <p class="t-paragraph">Choose the option that best fits:</p>
+      <p class="t-paragraph">Choose the option that best fits your needs.</p>
     </hgroup>
     <div class="l-stack">
       <button
@@ -49,7 +49,7 @@ export const promptRecoveryTemplate = ({
       <button
         @click=${() => cancel()}
         data-action="cancel"
-        class="c-button c-button--primary"
+        class="c-button c-button--primary l-stack"
       >
         Back to home
       </button>

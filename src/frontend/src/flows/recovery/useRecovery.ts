@@ -40,8 +40,9 @@ export const useRecovery = async (
     res === "phrase"
       ? recoverWithPhrase({
           connection,
-          message: html`Type your recovery phrase below to access your Internet
-          Identity`,
+          message: html`Your recovery phrase includes your Internet Identity
+          number and a unique combination of 24 words that represent your
+          private key`,
         })
       : recoverWithDevice({ connection });
 
