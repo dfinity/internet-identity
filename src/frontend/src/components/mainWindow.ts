@@ -55,7 +55,7 @@ export const mainWindow = ({
       >
         ${showLogo
           // when there is a sidebar, the logo is hidden on desktop
-          // because it comes inside the sidebar
+          // because it typically comes inside the sidebar
           ? html`<div
               class="c-logo ${slotSidebar !== undefined
                 ? "is-hidden--desktop"

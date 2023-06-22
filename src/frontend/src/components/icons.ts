@@ -94,7 +94,6 @@ export const icLogo = html`
     <g>
   </svg>
   <h1 class="c-logo__type">Internet Identity</h1>
-
 `;
 
 export const closeIcon = html`
