@@ -56,7 +56,6 @@ test("Recover access, after reset", async () => {
     await welcomeView.recover();
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForDisplay();
-    await recoveryView.enterIdentityAnchor(userNumber);
     await recoveryView.continue();
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
@@ -98,7 +97,6 @@ test("Canceling reset keeps old phrase", async () => {
     await welcomeView.recover();
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForDisplay();
-    await recoveryView.enterIdentityAnchor(userNumber);
     await recoveryView.continue();
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
@@ -126,7 +124,6 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
     await welcomeView.recover();
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForDisplay();
-    await recoveryView.enterIdentityAnchor(userNumber);
     await recoveryView.continue();
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);

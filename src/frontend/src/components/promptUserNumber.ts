@@ -4,7 +4,7 @@ import { createRef, Ref, ref } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "./anchorInput";
 import { mainWindow } from "./mainWindow";
 
-const promptUserNumberTemplate = ({
+export const promptUserNumberTemplate = ({
   title,
   message,
   userNumber,

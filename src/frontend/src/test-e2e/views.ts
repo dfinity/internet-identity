@@ -39,6 +39,7 @@ export class WelcomeView extends View {
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
+    await this.browser.$('[data-action="recover-with-phrase"]').click();
   }
 }
 
@@ -609,16 +610,12 @@ export class DemoAppView extends View {
 export class RecoverView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$(`//h1[string()='Recover Internet Identity']`)
+      .$('[data-page="prompt-recovery-type"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
-  async enterIdentityAnchor(identityAnchor: string): Promise<void> {
-    await this.browser.$('[data-role="anchor-input"]').setValue(identityAnchor);
-  }
-
   async continue(): Promise<void> {
-    await this.browser.$("#userNumberContinue").click();
+    await this.browser.$('[data-action="recover-with-phrase"]').click();
   }
 
   // enter seed phrase view

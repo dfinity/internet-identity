@@ -37,8 +37,9 @@ import {
   confirmSeedPhrasePage,
 } from "$src/flows/recovery/confirmSeedPhrase";
 import { displaySeedPhrasePage } from "$src/flows/recovery/displaySeedPhrase";
-import { pickRecoveryDevice } from "$src/flows/recovery/pickRecoveryDevice";
-import { deviceRecoveryPage } from "$src/flows/recovery/recoverWith/device";
+import { forgotNumberPage } from "$src/flows/recovery/forgotNumber";
+import { promptRecoveryPage } from "$src/flows/recovery/promptRecovery";
+import { recoverWithDevicePage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
 import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
@@ -48,9 +49,7 @@ import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
 import { I18n } from "$src/utils/i18n";
-import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { mount, withRef } from "$src/utils/lit-html";
-import { RecoveryDevice } from "$src/utils/recoveryDevice";
 import { asNonEmptyArray, Chan, NonEmptyArray } from "$src/utils/utils";
 import { html, render, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -58,39 +57,15 @@ import { createRef, ref, Ref } from "lit-html/directives/ref.js";
 
 const identityBackground = loadIdentityBackground();
 
-// A "dummy" connection which actually is just undefined, hoping pages won't call it
-const dummyConnection = undefined as unknown as AuthenticatedConnection;
 const userNumber = BigInt(10000);
 
 const i18n = new I18n("en");
-
-const recoveryPhrase: RecoveryDevice & DeviceData = {
-  alias: "Recovery Phrase",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 4],
-  key_type: { seed_phrase: null },
-  purpose: { recovery: null },
-  credential_id: [],
-  origin: [],
-  metadata: [],
-};
 
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
 const recoveryAnchorWord = recoveryPhraseText.split(" ")[0];
 const recoveryWords = recoveryPhraseText.split(" ").slice(1);
-
-const recoveryDevice: RecoveryDevice & DeviceData = {
-  alias: "Recovery Device",
-  protection: { unprotected: null },
-  pubkey: [1, 2, 3, 4],
-  key_type: { unknown: null },
-  purpose: { recovery: null },
-  credential_id: [],
-  origin: [],
-  metadata: [],
-};
 
 const chromeDevice: DeviceData = {
   alias: "Chrome on iPhone",
@@ -169,8 +144,6 @@ export const iiPages: Record<string, () => void> = {
       onContinue: () => console.log("done"),
     }),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
-  pickRecoveryDevice: () =>
-    pickRecoveryDevice([recoveryPhrase, recoveryDevice]),
   promptDeviceAlias: () =>
     promptDeviceAliasPage({
       title: "Register this device",
@@ -236,6 +209,14 @@ export const iiPages: Record<string, () => void> = {
       i18n,
     }),
 
+  promptRecovery: () =>
+    promptRecoveryPage({
+      onUsePhrase: () => console.log("Use phrase"),
+      onUseDevice: () => console.log("Use device"),
+      onForgotAnchor: () => console.log("Anchor forgotten"),
+      cancel: () => console.log("cancel"),
+    }),
+
   recoverWithPhrase: () =>
     recoverWithPhrasePage<
       { tag: "ok"; userNumber: bigint; words: string[] },
@@ -249,7 +230,11 @@ export const iiPages: Record<string, () => void> = {
       message: "Something cool will happen if you type your anchor",
     }),
   recoverWithDevice: () =>
-    deviceRecoveryPage(userNumber, dummyConnection, recoveryDevice),
+    recoverWithDevicePage({
+      next: () => console.log("next"),
+      cancel: () => console.log("cancel"),
+    }),
+  forgotNumber: () => forgotNumberPage({ cancel: () => console.log("cancel") }),
   savePasskey: () =>
     savePasskeyPage({
       i18n,

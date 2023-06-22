@@ -22,7 +22,6 @@ test("Recover with phrase", async () => {
     await welcomeView.recover();
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForDisplay();
-    await recoveryView.enterIdentityAnchor(userNumber);
     await recoveryView.continue();
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);

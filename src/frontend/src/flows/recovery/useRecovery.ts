@@ -1,11 +1,9 @@
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
-import { promptUserNumber } from "$src/components/promptUserNumber";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowResult } from "$src/utils/flowResult";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { isRecoveryPhrase } from "$src/utils/recoveryDevice";
 import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
@@ -15,66 +13,45 @@ import {
   isCancel,
   isDuplicateDeviceError,
 } from "$src/utils/webAuthnErrorUtils";
-import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
-import { pickRecoveryDevice } from "./pickRecoveryDevice";
-import { deviceRecoveryPage } from "./recoverWith/device";
+import { forgotNumber } from "./forgotNumber";
+import { promptRecovery } from "./promptRecovery";
+import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
-  connection: Connection,
-  userNumber?: bigint
-): Promise<LoginFlowResult> => {
-  if (nonNullish(userNumber)) {
-    return runRecovery(userNumber, connection);
-  } else {
-    const pUserNumber = await promptUserNumber({
-      title: "Recover Internet Identity",
-    });
-    if (pUserNumber !== "canceled") {
-      return runRecovery(pUserNumber, connection);
-    } else {
-      return window.location.reload() as never;
-    }
-  }
-};
-
-const runRecovery = async (
-  userNumber: bigint,
   connection: Connection
 ): Promise<LoginFlowResult> => {
-  const recoveryDevices = await connection.lookupRecovery(userNumber);
-  if (recoveryDevices.length === 0) {
-    await displayError({
-      title: "Failed to recover",
-      message: `You do not have any recovery devices configured for Internet Identity ${userNumber}. Did you mean to authenticate with one of your devices instead?`,
-      primaryButton: "Go back",
-    });
+  const res = await promptRecovery();
+
+  if (res === "forgotten") {
+    const cancel = await forgotNumber();
+    cancel satisfies "cancel";
     return window.location.reload() as never;
   }
 
-  const device =
-    recoveryDevices.length === 1
-      ? recoveryDevices[0]
-      : await pickRecoveryDevice(recoveryDevices);
-
-  const res = isRecoveryPhrase(device)
-    ? await recoverWithPhrase({
-        connection,
-        message: html`Type your recovery phrase below to access your Internet
-          Identity <strong class="t-strong">${userNumber}</strong>`,
-      })
-    : await deviceRecoveryPage(userNumber, connection, device);
-
-  // If res is null, the user canceled the flow, so we go back to the main page.
-  if (res.tag === "canceled") {
+  if (res === "cancel") {
     return window.location.reload() as never;
   }
 
-  // Wrap up recovery (notify of successful recovery, potentially add device)
-  await postRecoveryFlow({ userNumber, connection: res.connection });
+  res satisfies "phrase" | "device";
 
-  return res;
+  const op =
+    res === "phrase"
+      ? recoverWithPhrase({
+          connection,
+          message: html`Type your recovery phrase below to access your Internet
+          Identity`,
+        })
+      : recoverWithDevice({ connection });
+
+  const flowResult = await op;
+
+  if (flowResult.tag === "ok") {
+    await postRecoveryFlow(flowResult);
+  }
+
+  return flowResult;
 };
 
 // Show the user that the recovery was successful and offer to enroll a new device
