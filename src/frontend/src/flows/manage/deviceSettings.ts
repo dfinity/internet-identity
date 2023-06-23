@@ -110,10 +110,13 @@ export const resetPhraseInfoTemplate = ({
   next,
   cancel,
   i18n,
+  scrollToTop = false,
 }: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }) => {
   const copy = i18n.i18n(copyJson);
   return infoScreenTemplate({
@@ -142,6 +145,7 @@ export const resetPhraseInfoTemplate = ({
     pageId: "reset-phrase-info",
     label: copy.reset_label,
     icon: "warning",
+    scrollToTop,
   });
 };
 
@@ -236,10 +240,12 @@ export const protectDeviceInfoTemplate = ({
   next,
   cancel,
   i18n,
+  scrollToTop = false,
 }: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
+  scrollToTop?: boolean;
 }) => {
   const copy = i18n.i18n(copyJson);
   return infoScreenTemplate({
@@ -268,6 +274,7 @@ export const protectDeviceInfoTemplate = ({
     pageId: "protect-phrase-info",
     label: copy.protect_label,
     icon: "warning",
+    scrollToTop,
   });
 };
 
@@ -329,10 +336,13 @@ export const unprotectDeviceInfoTemplate = ({
   next,
   cancel,
   i18n,
+  scrollToTop = false,
 }: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }) => {
   const copy = i18n.i18n(copyJson);
   return infoScreenTemplate({
@@ -346,6 +356,7 @@ export const unprotectDeviceInfoTemplate = ({
     pageId: "unprotect-phrase-info",
     label: copy.unprotect_label,
     icon: "warning",
+    scrollToTop,
   });
 };
 
