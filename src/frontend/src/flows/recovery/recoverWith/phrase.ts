@@ -155,11 +155,11 @@ const recoverWithPhraseTemplate = <
 
 type ValidityType = "word" | "number";
 
-const reportValidity = ({ element }: { element: HTMLInputElement }) => {
+const reportValidity = ({ element }: { element: HTMLInputElement }): State => {
   const validityType = element.dataset.validityType;
   if (validityType !== "word" && validityType !== "number") {
     console.warn("Could not find validity for element");
-    return;
+    return "pending";
   }
 
   const word = element.value;
@@ -180,16 +180,18 @@ const reportValidity = ({ element }: { element: HTMLInputElement }) => {
   if (nonNullish(reason)) {
     element.setCustomValidity(reason);
     element.reportValidity();
-    return;
+    return "incorrect";
   }
 
-  return;
+  return "pending";
 };
 
 const resetValidity = ({ element }: { element: HTMLInputElement }) => {
   element.setCustomValidity("");
   element.reportValidity();
 };
+
+type State = "pending" | "incorrect";
 
 // Show a particular word
 export const wordTemplate = ({
@@ -205,7 +207,6 @@ export const wordTemplate = ({
   validityType: ValidityType;
   placeholder?: string;
 }): TemplateResult => {
-  type State = "pending" | "incorrect";
   const state = new Chan<State>("pending");
   // Visual feedback depending on state
   const clazz = state.map(
@@ -253,9 +254,6 @@ export const wordTemplate = ({
     <input
       autofocus
       data-validity-type=${validityType}
-      @invalid=${() => {
-        state.send("incorrect");
-      }}
       @paste=${(e: ClipboardEvent) =>
         withElement(e, (event, element) => {
           e.preventDefault();
@@ -277,7 +275,8 @@ export const wordTemplate = ({
 
           // Use the first word and set that as input value
           element.value = word;
-          reportValidity({ element });
+          // Trigger an event for the input to re-evaluate the validity
+          element.dispatchEvent(new Event("change"));
 
           // Forward the rest of the text (if any) to the next input element (if any)
           if (rest.length <= 0) {
@@ -317,11 +316,12 @@ export const wordTemplate = ({
           resetValidity({ element });
         });
       }}
-      @change=${(e: InputEvent) =>
+      @change=${(e: InputEvent) => {
         withElement(e, (event, element) => {
           // Check validity when leaving the field
-          reportValidity({ element });
-        })}
+          state.send(reportValidity({ element }));
+        });
+      }}
     />&nbsp;
   </li>`;
 };
