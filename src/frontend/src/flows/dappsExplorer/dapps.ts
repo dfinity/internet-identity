@@ -44,7 +44,7 @@ export class KnownDapp {
   }
 
   public get website(): string | undefined {
-    return this.descr.oneLiner;
+    return this.descr.website;
   }
 }
 
