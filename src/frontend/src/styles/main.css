@@ -614,9 +614,17 @@ a:hover,
   padding: 5vmax;
 }
 
+.l-wrap--spacious {
+  padding: 10vmax;
+}
+
 @media (max-width: 512px) {
   .l-wrap {
     padding: var(--rs-card-bezel);
+  }
+
+  .l-wrap--spacious {
+    padding: calc(var(--rs-card-bezel) + 5vmax);
   }
 }
 

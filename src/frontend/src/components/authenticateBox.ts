@@ -328,6 +328,7 @@ const page = (slot: TemplateResult) => {
       ${slot}`,
   });
   const container = document.getElementById("pageContent") as HTMLElement;
+  container.classList.add("l-wrap--spacious");
   render(template, container);
 };
 
