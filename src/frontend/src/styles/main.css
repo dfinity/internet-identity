@@ -605,7 +605,6 @@ a:hover,
   width: 100%;
 }
 
-#pageContent,
 .l-wrap {
   position: relative;
   display: flex;
@@ -616,7 +615,6 @@ a:hover,
 }
 
 @media (max-width: 512px) {
-  #pageContent,
   .l-wrap {
     padding: var(--rs-card-bezel);
   }
@@ -2374,7 +2372,6 @@ a.c-action-list__item {
 /** responsiveness */
 
 @media (max-width: 512px) {
-  #pageContent,
   .l-wrap {
     justify-content: flex-start;
     padding: 0;
