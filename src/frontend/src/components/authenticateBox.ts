@@ -31,7 +31,7 @@ import {
   signInIcon,
 } from "./icons";
 import { withLoader } from "./loader";
-import { mainWindow } from "./mainWindow";
+import { mainWindowWithSidebar } from "./mainWindowWithSidebar";
 import { promptUserNumber } from "./promptUserNumber";
 
 import copyJson from "./authenticateBox.json";
@@ -322,7 +322,7 @@ export const authenticate = async (
 
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
-  const template = mainWindow({
+  const template = mainWindowWithSidebar({
     slot: html` <!-- The title is hidden but used for accessibility -->
       <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
       ${slot}`,

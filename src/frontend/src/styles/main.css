@@ -139,6 +139,7 @@
   --vs-line-height: 1.4;
 
   --vs-border-radius: 0.8rem;
+  --vs-gutter-relative: 5vmax;
 
   /*
    * reference tokens
@@ -166,6 +167,9 @@
 
   --rc-background: var(--rc-light);
   --rc-background-transparent: var(--rc-light-transparent);
+
+  --rc-sidebar: var(--vc-brand-purple);
+  --rc-onSidebar: var(--vc-snow);
 
   --rc-footer: var(--rc-dark);
   --rc-onFooter: var(--rc-light);
@@ -242,6 +246,9 @@
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
+  --rs-bezel-layout: var(--vs-gutter-relative);
+  --rs-bezel-sidebar: calc(var(--vs-gutter-relative) * 0.5);
+
   --rs-inline-grid-gap: var(--vs-inline);
   --rs-inline-icon-gap: var(--vs-inline);
 
@@ -614,6 +621,37 @@ a:hover,
   padding: 5vmax;
 }
 
+.l-wrap--sidebar {
+  --sidebar-width: calc(30rem + var(--rs-bezel-sidebar) * 2);
+  padding-left: var(--sidebar-width);
+}
+
+.l-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: calc(30rem + var(--rs-bezel-sidebar) * 2);
+  background: var(--rc-sidebar);
+  color: var(--rc-onSidebar);
+  padding: var(--rs-bezel-sidebar);
+}
+
+.l-sidebar__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.l-sidebar__decoration {
+  position: relative;
+  margin: 0 calc(var(--rs-bezel-sidebar) * -1)
+    calc(var(--rs-bezel-sidebar) * -1);
+}
+
 @media (max-width: 512px) {
   .l-wrap {
     padding: var(--rs-card-bezel);
@@ -644,6 +682,16 @@ a:hover,
   bottom: 0;
   left: 0;
   right: 0;
+}
+
+.l-wrap--sidebar .l-footer {
+  left: var(--sidebar-width);
+}
+
+@media (max-width: 512px) {
+  .l-wrap--sidebar .l-footer {
+    left: 0;
+  }
 }
 
 /**
@@ -1145,6 +1193,10 @@ by all browsers (FF is missing) */
   display: flex;
   align-items: center;
   gap: 1em;
+}
+
+.c-logo--sidebar {
+  padding: var(--rs-logo-stack--top) 0 var(--rs-logo-stack--bottom);
 }
 
 .c-logo svg {
@@ -2418,6 +2470,18 @@ a.c-action-list__item {
 /* VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, */
 .is-hidden {
   display: none !important;
+}
+
+@media (max-width: 512px) {
+  .is-hidden--mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 513px) {
+  .is-hidden--desktop {
+    display: none !important;
+  }
 }
 
 .is-visible {
