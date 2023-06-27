@@ -30,16 +30,6 @@ export const mainWindow = ({
   additionalContainerClasses?: string[];
   HTMLwrapperTag?: string;
 }): TemplateResult => {
-  const pageContent = document.querySelector("#pageContent");
-  const wrap =
-    pageContent !== null ? pageContent : document.querySelector("body");
-
-  // make sure the wrapper always has the l-wrap class, since it is used to
-  // position the content and makes sure it has appropriate spacings
-  if (wrap !== null && wrap.classList.contains("l-wrap") === false) {
-    wrap.classList.add("l-wrap");
-  }
-
   const containerClasses = ["l-container"];
   if (isWideContainer === true) {
     containerClasses.push("l-container--wide");
@@ -48,15 +38,17 @@ export const mainWindow = ({
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-    <div
-      id="${ifDefined(id !== null ? id : undefined)}"
-      class="${containerClasses.join(" ")}"
-    >
-      ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-      <div class="c-card c-card--background">
-        <div class="c-card c-card--highlight">${slot}</div>
+    <div class="l-wrap">
+      <div
+        id="${ifDefined(id !== null ? id : undefined)}"
+        class="${containerClasses.join(" ")}"
+      >
+        ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
+        <div class="c-card c-card--background">
+          <div class="c-card c-card--highlight">${slot}</div>
+        </div>
       </div>
+      ${showFooter ? footer : ""}
     </div>
-    ${showFooter ? footer : ""}
   `;
 };
