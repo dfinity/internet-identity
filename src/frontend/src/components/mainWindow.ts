@@ -38,15 +38,17 @@ export const mainWindow = ({
     containerClasses.push(...additionalContainerClasses);
   }
   return html`
-    <div
-      id="${ifDefined(id !== null ? id : undefined)}"
-      class="${containerClasses.join(" ")}"
-    >
-      ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-      <div class="c-card c-card--background">
-        <div class="c-card c-card--highlight">${slot}</div>
+    <div class="l-wrap">
+      <div
+        id="${ifDefined(id !== null ? id : undefined)}"
+        class="${containerClasses.join(" ")}"
+      >
+        ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
+        <div class="c-card c-card--background">
+          <div class="c-card c-card--highlight">${slot}</div>
+        </div>
       </div>
+      ${showFooter ? footer : ""}
     </div>
-    ${showFooter ? footer : ""}
   `;
 };
