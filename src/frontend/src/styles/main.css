@@ -1173,6 +1173,12 @@ by all browsers (FF is missing) */
   color: var(--rc-interaction);
 }
 
+/**
+ *  spinner component
+ *
+ *  the spinner is made of layers, and is wrapped in an element that sets its size
+ */
+
 .c-spinner-wrapper {
   position: relative;
   width: 100%;
@@ -1190,13 +1196,14 @@ by all browsers (FF is missing) */
   left: 50%;
 
   transform: translate(-50%, -50%);
-  animation: rotate 3s linear infinite;
+  animation: rotate 2s linear infinite;
 }
 
 .c-spinner::after,
 .c-spinner::before,
 .c-spinner__inner,
-.c-spinner__inner::before {
+.c-spinner__inner::before,
+.c-spinner__inner::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1204,6 +1211,11 @@ by all browsers (FF is missing) */
   will-change: transform;
 }
 
+/* 
+  these are the brand rainbow layers
+  one is the outer ring that is sharp and the other one its blurred copy
+  to create a glow effect, as if the sharp layer was emitting colored light
+*/
 .c-spinner::after,
 .c-spinner::before {
   background-image: conic-gradient(var(--rg-brand-full));
@@ -1218,6 +1230,10 @@ by all browsers (FF is missing) */
   transform: scale(1.02);
 }
 
+/*
+ the inner element is a mask that hides the rainbow layers
+ slightly from the side (almost like a frosted glass effect)
+*/
 .c-spinner__inner {
   z-index: 1;
   background: var(--rc-background);
@@ -1229,6 +1245,20 @@ by all browsers (FF is missing) */
   opacity: 0.5;
 
   background-image: conic-gradient(var(--rg-brand-full));
+}
+
+/*
+  the after element creates a masked gradient that emphasizes the
+  the conic-gradient (conical gradient with a round hole in the middle)
+*/
+.c-spinner__inner::after {
+  background: conic-gradient(transparent 50%, var(--vc-brand-purple));
+  mask: radial-gradient(farthest-side at 50% 50%, transparent 98%, #000 99%);
+  -webkit-mask: radial-gradient(
+    farthest-side at 50% 50%,
+    transparent 98%,
+    #000 99%
+  );
 }
 
 /**
