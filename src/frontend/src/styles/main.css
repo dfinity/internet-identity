@@ -1240,13 +1240,14 @@ by all browsers (FF is missing) */
   left: 50%;
 
   transform: translate(-50%, -50%);
-  animation: rotate 3s linear infinite;
+  animation: rotate 2s linear infinite;
 }
 
 .c-spinner::after,
 .c-spinner::before,
 .c-spinner__inner,
-.c-spinner__inner::before {
+.c-spinner__inner::before,
+.c-spinner__inner::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1279,6 +1280,16 @@ by all browsers (FF is missing) */
   opacity: 0.5;
 
   background-image: conic-gradient(var(--rg-brand-full));
+}
+
+.c-spinner__inner::after {
+  background: conic-gradient(transparent 50%, var(--vc-brand-purple));
+  mask: radial-gradient(farthest-side at 50% 50%, transparent 98%, #000 99%);
+  -webkit-mask: radial-gradient(
+    farthest-side at 50% 50%,
+    transparent 98%,
+    #000 99%
+  );
 }
 
 /**
