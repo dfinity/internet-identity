@@ -50,6 +50,8 @@ export const mainWindowWithSidebar = ({
   if (additionalContainerClasses.length > 0) {
     containerClasses.push(...additionalContainerClasses);
   }
+  // we do not use the logo from the icons file because it duplicates the the ID's
+  // (also hides those corresponding IDs in the other instances of the logos when the sidebar is not visible)
   return html`
     <div class="l-wrap l-wrap--sidebar">
       <div class="l-sidebar is-hidden--mobile">
