@@ -34,7 +34,6 @@ pub enum GetIdAliasResponse {
 
 pub mod issuer {
     use super::*;
-    use std::collections::HashMap;
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct IssueCredentialRequest {
@@ -43,15 +42,35 @@ pub mod issuer {
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct IssueCredentialResponse {
-        pub credential: VerifiableCredential,
-        pub consent_info: ConsentInfo,
+    pub enum IssueCredentialResponse {
+        Ok(CredentialData),
+        Err(String),
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct CredentialData {
+        pub vc_jwt: String,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ManifestRequest {
+        pub consent_message_request: ConsentMessageRequest,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ManifestData {
+        pub consent_info: ConsentData,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub enum ManifestResponse {
+        Ok(ManifestData),
+        Err(String),
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct CredentialSpec {
         pub info: String,
-        pub consent_message_request: ConsentMessageRequest,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -65,21 +84,8 @@ pub mod issuer {
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentInfo {
+    pub struct ConsentData {
         pub consent_message: String,
         pub language: String,
-    }
-
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct CredentialSubject {
-        pub id: String,
-        pub property_set: HashMap<String, String>,
-    }
-
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct VerifiableCredential {
-        pub issuer: String,
-        pub credential_subject: CredentialSubject,
-        pub proof: String,
     }
 }
