@@ -1,32 +1,24 @@
-type ConsentInfo = record { consent_message : text; language : text };
+type ConsentData = record { consent_message : text; language : text };
 type ConsentMessageRequest = record { preferences : ConsentPreferences };
 type ConsentPreferences = record { language : text };
-type CredentialSpec = record {
-    info : text;
-    consent_message_request : ConsentMessageRequest;
-};
-type CredentialSubject = record {
-    id : text;
-    property_set : vec record { text; text };
-};
+type CredentialData = record { vc_jwt : text };
+type CredentialSpec = record { info : text };
 type IssueCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
 };
-type IssueCredentialResponse = record {
-    credential : VerifiableCredential;
-    consent_info : ConsentInfo;
+type IssueCredentialResponse = variant { Ok : CredentialData; Err : text };
+type ManifestData = record { consent_info : ConsentData };
+type ManifestRequest = record {
+    consent_message_request : ConsentMessageRequest;
 };
+type ManifestResponse = variant { Ok : ManifestData; Err : text };
 type SignedIdAlias = record {
     signature : vec nat8;
     id_alias : principal;
     id_dapp : principal;
 };
-type VerifiableCredential = record {
-    issuer : text;
-    proof : text;
-    credential_subject : CredentialSubject;
-};
 service : {
-    credential_request : (IssueCredentialRequest) -> (IssueCredentialResponse);
+    get_manifest : (ManifestRequest) -> (ManifestResponse);
+    issue_credential : (IssueCredentialRequest) -> (IssueCredentialResponse);
 }
