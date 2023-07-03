@@ -13,3 +13,10 @@ internet_identity_interface = { path = "../../src/internet_identity_interface" }
 candid = "0.8"
 ic-cdk = "0.8"
 ic-cdk-macros = "0.6"
+ssi-dids = { version = "0.1", features = ["example"] }
+ssi-vc = "0.2"
+
+[dev-dependencies]
+ic-test-state-machine-client = "2"
+canister_tests = { path = "../../src/canister_tests" }
+lazy_static = "1.4"
