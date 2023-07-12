@@ -242,7 +242,7 @@ export const authnTemplates = (
               withUserNumber((userNumber) => props.addDevice(userNumber))}
             id="addNewDeviceButton"
             class="t-link"
-            >Add a new Passkey?</a
+            >Continue with another device</a
           >
         </div>
         <ul class="c-link-group">
