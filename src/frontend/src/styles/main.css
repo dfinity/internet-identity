@@ -2295,6 +2295,11 @@ a.c-action-list__item {
   text-align: center;
 }
 
+.c-progress-stepper--narrow {
+  padding-left: 10%;
+  padding-right: 10%;
+}
+
 .c-progress-stepper__step {
   counter-increment: progress-step;
   display: flex;

@@ -7,7 +7,7 @@ export const phraseStepper = ({
   current: "store" | "confirm";
 }) => html`
   <div class="c-progress-container">
-    <ol class="c-progress-stepper">
+    <ol class="c-progress-stepper c-progress-stepper--narrow">
       <li class="c-progress-stepper__step" aria-current=${current === "store"}>
         <span class="c-progress-stepper__label">Store Phrase</span>
       </li>
