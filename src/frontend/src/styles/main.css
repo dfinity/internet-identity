@@ -181,7 +181,7 @@
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--vc-brand-blue--dark);
+  --rc-interaction-text: var(--vc-brand-purple-light);
   --rc-loading: var(--vc-brand-purple);
 
   --rc-marketing-icon: var(--vc-brand-purple);
@@ -562,9 +562,9 @@ a,
 .t-link {
   display: inline;
   color: var(--rc-interaction-text);
-  color: inherit;
-  text-decoration: underline;
+  text-decoration: none;
   cursor: pointer;
+  font-weight: 600;
 }
 
 .t-link:disabled,
@@ -581,7 +581,7 @@ a:focus,
 a:hover,
 .t-link:not([disabled]):focus,
 .t-link:not([disabled]):hover {
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .t-link--discreet:not([disabled]):focus,
@@ -1432,6 +1432,15 @@ by all browsers (FF is missing) */
   margin-top: var(--rs-button-stack);
 }
 
+.c-link-group {
+  display: flex;
+  gap: var(--rs-inline-button-gap);
+  margin-top: calc(var(--vs-stack) * 4);
+  justify-content: space-between;
+  border-top: var(--rs-line) solid var(--rc-line);
+  padding-top: var(--vs-stack);
+}
+
 /**
   * This is mostly used on buttons that don't look like buttons
   * but we still want to make an arbitrary area clickable
@@ -1649,6 +1658,7 @@ by all browsers (FF is missing) */
 
 .c-footer__link {
   padding: 0 var(--rs-footer-gap);
+  color: inherit;
 }
 
 .c-footer__link svg {

@@ -227,15 +227,29 @@ export const authnTemplates = (
         f(userNumber);
       };
       return html` ${props.useExisting.slot} ${anchorInput.template}
-        <ul class="c-list--flex l-stack--tight">
+        <div class="c-button-group">
+          <button
+            data-action="continue"
+            @click=${() => anchorInput.submit()}
+            class="c-button"
+          >
+            Continue
+          </button>
+        </div>
+        <div class="t-centered l-stack">
+          <a
+            @click=${() =>
+              withUserNumber((userNumber) => props.addDevice(userNumber))}
+            id="addNewDeviceButton"
+            class="t-link"
+            >Add a new Passkey?</a
+          >
+        </div>
+        <ul class="c-link-group">
           <li>
-            <a
-              @click=${() =>
-                withUserNumber((userNumber) => props.addDevice(userNumber))}
-              id="addNewDeviceButton"
-              class="t-link"
-              >Add a new Passkey?</a
-            >
+            <button @click=${() => props.register()} class="t-link">
+              Create New
+            </button>
           </li>
           <li>
             <a
@@ -246,22 +260,7 @@ export const authnTemplates = (
               >Lost Access?</a
             >
           </li>
-        </ul>
-        <div class="l-stack c-button-group">
-          <button
-            @click=${() => props.register()}
-            class="c-button c-button--secondary"
-          >
-            Create New
-          </button>
-          <button
-            data-action="continue"
-            @click=${() => anchorInput.submit()}
-            class="c-button"
-          >
-            Continue
-          </button>
-        </div>`;
+        </ul>`;
     },
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
