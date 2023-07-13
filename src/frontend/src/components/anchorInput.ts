@@ -114,7 +114,7 @@ export const mkAnchorInput = ({
     ? new Chan(defaultClass)
     : classes_.map((clzs) => [defaultClass, ...clzs].join(" "));
 
-  const template = html` <div class="c-input--anchor l-stack">
+  const template = html` <div class="c-input--anchor">
     <label class=${asyncReplace(classes)} aria-label="Identity Anchor">
       <input
         ${ref(userNumberInput)}

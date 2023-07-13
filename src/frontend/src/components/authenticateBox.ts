@@ -236,15 +236,15 @@ export const authnTemplates = (
             Continue
           </button>
         </div>
-        <div class="t-centered l-stack">
-          <a
-            @click=${() =>
-              withUserNumber((userNumber) => props.addDevice(userNumber))}
-            id="addNewDeviceButton"
-            class="t-link"
-            >Continue with another device</a
-          >
-        </div>
+        <button
+          @click=${() =>
+            withUserNumber((userNumber) => props.addDevice(userNumber))}
+          id="addNewDeviceButton"
+          class="c-button c-button--textOnly"
+        >
+          Continue with another device
+        </button>
+
         <ul class="c-link-group">
           <li>
             <button @click=${() => props.register()} class="t-link">
