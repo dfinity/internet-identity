@@ -63,7 +63,7 @@ export const authnTemplateManage = ({
     showDapps?: boolean;
   }): TemplateResult => html`
     ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
-    <header class="t-centered" style="text-align: left;">
+    <header class="l-stack">
       <h1 class="t-title t-title--main">${title}</h1>
       ${nonNullish(subtitle)
         ? html` <p class="t-lead l-stack">${subtitle}</p>`

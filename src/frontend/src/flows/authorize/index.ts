@@ -37,10 +37,7 @@ export const authnTemplateAuthorize = ({
   const strong = (slot: TemplateElement) =>
     html`<strong class="t-strong">${slot}</strong>`;
   const h1 = (slot: TemplateElement) =>
-    html`<h1
-      class="t-title t-title--main"
-      style="text-align: left; display: inline;"
-    >
+    html`<h1 class="t-title t-title--main" style="display: inline;">
       ${slot}
     </h1>`;
 

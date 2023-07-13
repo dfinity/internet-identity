@@ -279,7 +279,7 @@
   --rs-irregularity-stack: calc(var(--vs-stack) * 0.5);
   --rs-toast-stack: var(--rs-irregularity-stack);
 
-  --rs-button-bezel: calc(var(--vs-bezel) * 1.2);
+  --rs-button-bezel: calc(var(--vs-bezel) * 1.5);
   --rs-button-stack: var(--vs-stack);
   --rs-button-radius: var(--vs-border-radius);
 
@@ -582,6 +582,8 @@ a:hover,
 .t-link:not([disabled]):focus,
 .t-link:not([disabled]):hover {
   text-decoration: underline;
+  text-decoration-thickness: var(--rs-line);
+  text-underline-offset: 0.5ex;
 }
 
 .t-link--discreet:not([disabled]):focus,
@@ -1283,7 +1285,7 @@ by all browsers (FF is missing) */
   width: 100%;
   text-align: center;
   border-radius: var(--rs-button-radius);
-  font-size: 1.4rem;
+  font-size: inherit;
 
   font-weight: 600;
 }
@@ -1317,6 +1319,12 @@ by all browsers (FF is missing) */
   background: var(--rc-button-secondary);
   color: var(--rc-onButton-secondary);
   border: var(--rs-line) solid var(--rc-line-interaction);
+}
+
+.c-button--textOnly {
+  background: transparent;
+  color: var(--rc-interaction-text);
+  border: none;
 }
 
 .c-button:not([disabled]):focus,
@@ -1435,10 +1443,10 @@ by all browsers (FF is missing) */
 .c-link-group {
   display: flex;
   gap: var(--rs-inline-button-gap);
-  margin-top: calc(var(--vs-stack) * 4);
   justify-content: space-between;
   border-top: var(--rs-line) solid var(--rc-line);
-  padding-top: var(--vs-stack);
+  margin-top: calc(var(--vs-stack) * 6);
+  padding-top: calc(var(--vs-stack) * 2);
 }
 
 /**
@@ -1481,6 +1489,7 @@ by all browsers (FF is missing) */
   --bezel-top: calc(1.2 * var(--rs-input-bezel));
   --bezel-bottom: var(--rs-input-bezel);
   font-size: 1.4em;
+  margin-top: calc(var(--rs-input-stack) * 1.5);
 }
 
 .c-input--vip::placeholder {
