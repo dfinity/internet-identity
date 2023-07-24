@@ -18,7 +18,6 @@
       "wasm": "vc_issuer.wasm.gz",
       "build": "./build.sh"
     }
-
   },
   "defaults": {
     "build": {

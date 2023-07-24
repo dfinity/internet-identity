@@ -568,8 +568,8 @@ mod attribute_sharing_mvp {
         let response = vc_mvp::get_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
-                relying_party: req.relying_party.clone(),
-                issuer: req.issuer.clone(),
+                relying_party: req.relying_party,
+                issuer: req.issuer,
             },
         );
         Some(response)
