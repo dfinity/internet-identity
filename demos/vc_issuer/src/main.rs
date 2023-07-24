@@ -65,6 +65,7 @@ fn new_credential(req: &IssueCredentialRequest) -> Credential {
 fn verify_credential_request(_req: &IssueCredentialRequest) -> Result<(), Error> {
     Ok(())
 }
+
 // Order dependent: do not move above any function annotated with #[candid_method]!
 candid::export_service!();
 
