@@ -150,11 +150,22 @@ export const idlFactory = ({ IDL }) => {
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
   });
+  const IdAliasRequest = IDL.Record({
+    'issuer' : IDL.Text,
+    'relying_party' : IDL.Text,
+    'identity_number' : IDL.Nat64,
+  });
+  const SignedIdAlias = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'id_alias' : IDL.Principal,
+    'id_dapp' : IDL.Principal,
+  });
+  const IdAliasCredentials = IDL.Record({
+    'rp_id_alias_credential' : SignedIdAlias,
+    'issuer_id_alias_credential' : SignedIdAlias,
+  });
   const GetIdAliasResponse = IDL.Variant({
-    'ok' : IDL.Record({
-      'rp_id_alias_credential' : IDL.Text,
-      'issuer_id_alias_credential' : IDL.Text,
-    }),
+    'ok' : IdAliasCredentials,
     'authentication_failed' : IDL.Text,
     'no_such_credentials' : IDL.Text,
   });
@@ -201,7 +212,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
   const UserKey = PublicKey;
   const PrepareIdAliasResponse = IDL.Variant({
-    'ok' : IDL.Null,
+    'ok' : IDL.Vec(IDL.Nat8),
     'authentication_failed' : IDL.Text,
   });
   const ChallengeResult = IDL.Record({
@@ -298,7 +309,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_id_alias' : IDL.Func(
-        [UserNumber, FrontendHostname, FrontendHostname],
+        [IdAliasRequest],
         [IDL.Opt(GetIdAliasResponse)],
         ['query'],
       ),
@@ -327,7 +338,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'prepare_id_alias' : IDL.Func(
-        [UserNumber, FrontendHostname, FrontendHostname],
+        [IdAliasRequest],
         [IDL.Opt(PrepareIdAliasResponse)],
         [],
       ),

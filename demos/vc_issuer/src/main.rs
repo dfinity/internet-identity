@@ -1,33 +1,48 @@
 use candid::{candid_method, Principal};
 use ic_cdk_macros::{query, update};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    CredentialData, IssueCredentialRequest, IssueCredentialResponse, ManifestRequest,
-    ManifestResponse,
+    ConsentData, CredentialData, IssueCredentialRequest, IssueCredentialResponse, ManifestData,
+    ManifestRequest, ManifestResponse,
 };
-use ssi_dids::example::DIDExample;
-use ssi_vc::{Contexts, Credential, LinkedDataProofOptions, OneOrMany, DEFAULT_CONTEXT, URI};
+use serde::{Deserialize, Serialize};
+use std::fmt::Error;
 use std::ops::Add;
-use std::str::FromStr;
+
+// partial Credential, to be replaced by a ssi_vc::Credential
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Credential {
+    #[serde(rename = "@context")]
+    pub context: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub credential_subject: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+}
 
 #[update]
 #[candid_method]
 async fn issue_credential(req: IssueCredentialRequest) -> IssueCredentialResponse {
-    let vc = new_credential(&req);
-    let options = LinkedDataProofOptions {
-        checks: None,
-        created: None,
-        ..Default::default()
-    };
-    match vc.generate_jwt(None, &options, &DIDExample).await {
-        Ok(vc_jwt) => IssueCredentialResponse::Ok(CredentialData { vc_jwt }),
-        Err(err) => IssueCredentialResponse::Err(err.to_string()),
+    if let Err(err) = verify_credential_request(&req) {
+        return IssueCredentialResponse::Err(err.to_string());
     }
+    let vc = new_credential(&req);
+    let vc_jwt = serde_json::to_string(&vc).unwrap();
+    IssueCredentialResponse::Ok(CredentialData { vc_jwt })
 }
 
 #[query]
 #[candid_method]
-async fn get_manifest(_req: ManifestRequest) -> ManifestResponse {
-    ManifestResponse::Err("Not implemented yet".to_string())
+async fn get_manifest(req: ManifestRequest) -> ManifestResponse {
+    ManifestResponse::Ok(ManifestData {
+        consent_info: ConsentData {
+            consent_message: "Do you want to get a verifiable credential?".to_string(),
+            language: req.consent_message_request.preferences.language,
+        },
+    })
 }
 
 fn main() {}
@@ -38,32 +53,17 @@ fn did_from_principal(principal: &Principal) -> String {
 }
 
 fn new_credential(req: &IssueCredentialRequest) -> Credential {
-    let context = Contexts::One(ssi_vc::Context::URI(
-        DEFAULT_CONTEXT.parse().expect("bad URI"),
-    ));
-    let type_ = OneOrMany::One("some type".to_string());
-    let credential_subject = OneOrMany::One(ssi_vc::CredentialSubject {
-        id: Some(
-            URI::from_str(&*did_from_principal(&req.signed_id_alias.id_alias)).expect("bad Id"),
-        ),
-        property_set: None,
-    });
     Credential {
-        context,
-        id: None,
-        type_,
-        credential_subject,
-        issuer: None,
-        issuance_date: None,
-        proof: None,
-        expiration_date: None,
-        credential_status: None,
-        terms_of_use: None,
-        evidence: None,
-        credential_schema: None,
-        refresh_service: None,
-        property_set: None,
+        context: "test_context".to_string(),
+        id: Some("did:example:76e12ec712ebc6f1c221ebfeb1f".to_string()),
+        type_: "neuron owner".to_string(),
+        credential_subject: did_from_principal(&req.signed_id_alias.id_alias),
+        issuer: Some("Test IC issuer".to_string()),
     }
+}
+
+fn verify_credential_request(_req: &IssueCredentialRequest) -> Result<(), Error> {
+    Ok(())
 }
 
 // Order dependent: do not move above any function annotated with #[candid_method]!

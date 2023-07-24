@@ -9,7 +9,7 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasResponse, PrepareIdAliasResponse,
+    GetIdAliasResponse, IdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
@@ -563,22 +563,19 @@ mod v2_api {
 /// API for the attribute sharing mvp
 mod attribute_sharing_mvp {
     use super::*;
+    use internet_identity_interface::internet_identity::types::vc_mvp::IdAliasRequest;
 
     #[update]
     #[candid_method]
-    async fn prepare_id_alias(
-        identity_number: IdentityNumber,
-        relying_party: FrontendHostname,
-        issuer: FrontendHostname,
-    ) -> Option<PrepareIdAliasResponse> {
-        let Ok(_) = check_authentication(identity_number) else {
+    async fn prepare_id_alias(req: IdAliasRequest) -> Option<PrepareIdAliasResponse> {
+        let Ok(_) = check_authentication(req.identity_number) else {
             return Some(PrepareIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
         };
         let canister_key = vc_mvp::prepare_id_alias(
-            identity_number,
+            req.identity_number,
             vc_mvp::InvolvedDapps {
-                relying_party,
-                issuer,
+                relying_party: req.relying_party.clone(),
+                issuer: req.issuer.clone(),
             },
         )
         .await;
@@ -587,19 +584,15 @@ mod attribute_sharing_mvp {
 
     #[query]
     #[candid_method(query)]
-    fn get_id_alias(
-        identity_number: IdentityNumber,
-        relying_party: FrontendHostname,
-        issuer: FrontendHostname,
-    ) -> Option<GetIdAliasResponse> {
-        let Ok(_) = check_authentication(identity_number) else {
+    fn get_id_alias(req: IdAliasRequest) -> Option<GetIdAliasResponse> {
+        let Ok(_) = check_authentication(req.identity_number) else {
             return Some(GetIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
         };
         let response = vc_mvp::get_id_alias(
-            identity_number,
+            req.identity_number,
             vc_mvp::InvolvedDapps {
-                relying_party,
-                issuer,
+                relying_party: req.relying_party,
+                issuer: req.issuer,
             },
         );
         Some(response)

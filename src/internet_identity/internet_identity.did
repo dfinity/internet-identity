@@ -422,23 +422,36 @@ type IdentityMetadataReplaceResponse = variant {
     ok;
 };
 
+type IdAliasRequest = record {
+    issuer : text;
+    relying_party : text;
+    identity_number : nat64;
+};
+
 type PrepareIdAliasResponse = variant {
-    ok;
-    authentication_failed: text;
+    ok : vec nat8;
+    authentication_failed : text;
 };
 
 type GetIdAliasResponse = variant {
-    ok: record {
-        // Verifiable credential that provides an alias for the relying party identity.
-        // The alias identity is identitcal to the alias provided to the issuer (see below).
-        rp_id_alias_credential: text;
-        // Verifiable credential that provides an alias for the issuer identity.
-        // The alias identity is identitcal to the alias provided to the relying party (see above).
-        issuer_id_alias_credential: text;
-    };
-    authentication_failed: text;
-    // The credentials are not ready. Maybe retry by calling `prepare_id_alias`.
-    no_such_credentials: text;
+    ok : IdAliasCredentials;
+    authentication_failed : text;
+    no_such_credentials : text;
+};
+
+type IdAliasCredentials = record {
+    // Verifiable credential that provides an alias for the relying party identity.
+    // The alias identity is equal to the alias provided to the issuer (see below).
+    rp_id_alias_credential : SignedIdAlias;
+    // Verifiable credential that provides an alias for the issuer identity.
+    // The alias identity is equal to the alias provided to the relying party (see above).
+    issuer_id_alias_credential : SignedIdAlias;
+};
+
+type SignedIdAlias = record {
+    signature : vec nat8;
+    id_alias : principal;
+    id_dapp : principal;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -511,9 +524,9 @@ service : (opt InternetIdentityInit) -> {
     // a verifiable credential that is understood in both the relying party and the issuer context.
     // This call can be called multiple times. Only the latest credentials are returned by `get_id_alias`.
     // Requires authentication.
-    prepare_id_alias : (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt PrepareIdAliasResponse);
+    prepare_id_alias : (IdAliasRequest) -> (opt PrepareIdAliasResponse);
 
     // Returns the verifiable credentials that were prepared by `prepare_id_alias`, if any.
     // Requires authentication.
-    get_id_alias: (UserNumber, relying_party: FrontendHostname, issuer: FrontendHostname) -> (opt GetIdAliasResponse) query;
+    get_id_alias : (IdAliasRequest) -> (opt GetIdAliasResponse) query;
 }
