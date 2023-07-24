@@ -1,0 +1,29 @@
+{
+  "canisters": {
+    "internet_identity": {
+      "type": "custom",
+      "candid": "../../src/internet_identity/internet_identity.did",
+      "wasm": "../../internet_identity.wasm.gz",
+
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      }
+    },
+
+    "issuer": {
+      "type": "custom",
+      "candid": "vc_issuer.did",
+      "wasm": "vc_issuer.wasm.gz",
+      "build": "./build.sh"
+    }
+
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "version": 1
+}

@@ -11,10 +11,15 @@ edition = "2021"
 internet_identity_interface = { path = "../../src/internet_identity_interface" }
 # ic dependencies
 candid = "0.8"
-ic-cdk = "0.8"
+ic-cdk = "0.9"
 ic-cdk-macros = "0.6"
-ssi-dids = { version = "0.1", features = ["example"] }
-ssi-vc = "0.2"
+# vc dependencies
+# ssi-dids = { version = "0.1", features = ["example"] }
+# ssi-vc = "0.2"
+# other dependencies
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
 
 [dev-dependencies]
 ic-test-state-machine-client = "2"

@@ -1,5 +1,17 @@
-use crate::internet_identity::types::{CanisterSigKey, Signature};
+use crate::internet_identity::types::{
+    CanisterSigKey, FrontendHostname, IdentityNumber, Signature,
+};
 use candid::{CandidType, Deserialize, Principal};
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdAliasRequest {
+    #[serde(rename = "identity_number")]
+    pub identity_number: IdentityNumber,
+    #[serde(rename = "relying_party")]
+    pub relying_party: FrontendHostname,
+    #[serde(rename = "issuer")]
+    pub issuer: FrontendHostname,
+}
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum PrepareIdAliasResponse {
