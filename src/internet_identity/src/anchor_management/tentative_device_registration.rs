@@ -71,7 +71,7 @@ pub async fn add_tentative_device(
                 state: DeviceTentativelyAdded { .. },
                 ..
             }) => AnotherDeviceTentativelyAdded,
-            Some(mut registration) => {
+            Some(registration) => {
                 registration.state = DeviceTentativelyAdded {
                     tentative_device: device_data,
                     failed_attempts: 0,
