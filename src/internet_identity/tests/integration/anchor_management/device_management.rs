@@ -673,8 +673,8 @@ fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
         user_number,
         &device_data_2(),
     )?;
-    let devices =
-        api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
+    let devices = api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)?
+        .into_device_data();
     assert!(devices.iter().any(|device| device == &device_data_2()));
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());

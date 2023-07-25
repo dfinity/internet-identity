@@ -185,6 +185,7 @@ fn should_prevent_mutation_when_invariants_are_violated() {
             device1.clone(),
             recovery_phrase(2, DeviceProtection::Unprotected),
         ],
+        metadata: None,
     };
 
     device1.alias = "new alias".to_string();
@@ -200,6 +201,7 @@ fn should_prevent_addition_when_invariants_are_violated() {
             recovery_phrase(1, DeviceProtection::Unprotected),
             recovery_phrase(2, DeviceProtection::Unprotected),
         ],
+        metadata: None,
     };
 
     let result = anchor.add_device(sample_device());
@@ -215,6 +217,7 @@ fn should_allow_removal_when_invariants_are_violated() {
             device1.clone(),
             recovery_phrase(2, DeviceProtection::Unprotected),
         ],
+        metadata: None,
     };
 
     anchor.remove_device(&device1.pubkey).unwrap();

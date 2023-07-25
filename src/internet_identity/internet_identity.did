@@ -310,6 +310,8 @@ type IdentityAnchorInfo = record {
     devices : vec DeviceWithUsage;
     // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
+    // Device independent metadata
+    metadata: MetadataMap;
 };
 
 type AnchorCredentials = record {
@@ -403,6 +405,8 @@ type AuthnMethodRegistrationInfo = record {
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_data_registration: opt AuthnMethodRegistrationInfo;
+    // Authentication method independent metadata
+    metadata: MetadataMap;
 };
 
 type IdentityInfoResponse = variant {
@@ -412,6 +416,10 @@ type IdentityInfoResponse = variant {
 type AuthnMethodAddResponse = variant {
     ok;
     invalid_metadata: text;
+};
+
+type IdentityMetadataWriteResponse = variant {
+    ok;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -461,6 +469,11 @@ service : (opt InternetIdentityInit) -> {
     // Returns information about the identity with the given number.
     // Requires authentication.
     identity_info: (IdentityNumber) -> (opt IdentityInfoResponse);
+
+    // Writes the authentication method independent metadata map.
+    // Data in the existing metadata map will be overwritten.
+    // Requires authentication.
+    identity_metadata_write: (IdentityNumber, MetadataMap) -> (opt IdentityMetadataWriteResponse);
 
     // Adds a new authentication method to the identity.
     // Requires authentication.

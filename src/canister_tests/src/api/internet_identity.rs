@@ -312,25 +312,34 @@ pub mod compat {
     use super::*;
     use candid::{CandidType, Deserialize};
     use internet_identity_interface::internet_identity::types::{
-        ActiveAnchorCounter, ActiveAnchorStatistics, AnchorNumber, ArchiveInfo,
-        DomainActiveAnchorCounter,
+        DeviceData, DeviceRegistrationInfo, DeviceWithUsage,
     };
 
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct InternetIdentityStats {
-        pub assigned_user_number_range: (AnchorNumber, AnchorNumber),
-        pub users_registered: u64,
-        pub archive_info: ArchiveInfo,
-        pub canister_creation_cycles_cost: u64,
-        pub storage_layout_version: u8,
-        pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
-        pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    #[derive(Clone, Debug, CandidType, Deserialize)]
+    pub struct IdentityAnchorInfo {
+        pub devices: Vec<DeviceWithUsage>,
+        pub device_registration: Option<DeviceRegistrationInfo>,
     }
 
-    pub fn stats(
+    impl IdentityAnchorInfo {
+        pub fn into_device_data(self) -> Vec<DeviceData> {
+            self.devices.into_iter().map(DeviceData::from).collect()
+        }
+    }
+
+    pub fn get_anchor_info(
         env: &StateMachine,
         canister_id: CanisterId,
-    ) -> Result<InternetIdentityStats, CallError> {
-        query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
+        sender: Principal,
+        anchor_number: types::AnchorNumber,
+    ) -> Result<IdentityAnchorInfo, CallError> {
+        call_candid_as(
+            env,
+            canister_id,
+            sender,
+            "get_anchor_info",
+            (anchor_number,),
+        )
+        .map(|(x,)| x)
     }
 }

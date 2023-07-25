@@ -10,6 +10,7 @@ use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use storage::{Salt, Storage};
 
 mod active_anchor_stats;
@@ -510,6 +511,7 @@ mod v2_api {
             authn_method_registration: anchor_info
                 .device_registration
                 .map(AuthnMethodRegistration::from),
+            metadata: anchor_info.metadata,
         };
         Some(IdentityInfoResponse::Ok(identity_info))
     }
@@ -529,6 +531,21 @@ mod v2_api {
             }
             Err(err) => err,
         };
+        Some(result)
+    }
+
+    #[update]
+    #[candid_method]
+    fn identity_metadata_write(
+        identity_number: IdentityNumber,
+        metadata: HashMap<String, MetadataEntry>,
+    ) -> Option<IdentityMetadataWriteResponse> {
+        let result = authenticated_anchor_operation(identity_number, |anchor| {
+            Ok((
+                IdentityMetadataWriteResponse::Ok,
+                anchor_management::identity_metadata_write(anchor, metadata),
+            ))
+        });
         Some(result)
     }
 }

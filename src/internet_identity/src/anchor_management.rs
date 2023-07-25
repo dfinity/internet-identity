@@ -8,12 +8,15 @@ use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::*;
+use std::collections::HashMap;
 
 pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    let devices = state::anchor(anchor_number)
+    let anchor = state::anchor(anchor_number);
+    let metadata = anchor.metadata.clone().unwrap_or_default();
+    let devices = anchor
         .into_devices()
         .into_iter()
         .map(DeviceWithUsage::from)
@@ -34,6 +37,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     expiration: *expiration,
                     tentative_device: Some(tentative_device.clone()),
                 }),
+                metadata,
             },
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
                 IdentityAnchorInfo {
@@ -42,11 +46,13 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                         expiration: *expiration,
                         tentative_device: None,
                     }),
+                    metadata,
                 }
             }
             None | Some(_) => IdentityAnchorInfo {
                 devices,
                 device_registration: None,
+                metadata,
             },
         }
     })
@@ -154,4 +160,13 @@ pub fn remove(
 
     state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &device_key));
     Operation::RemoveDevice { device: device_key }
+}
+
+pub fn identity_metadata_write(
+    anchor: &mut Anchor,
+    metadata: HashMap<String, MetadataEntry>,
+) -> Operation {
+    let metadata_keys = metadata.keys().cloned().collect();
+    anchor.metadata = Some(metadata);
+    Operation::IdentityMetadataWrite { metadata_keys }
 }

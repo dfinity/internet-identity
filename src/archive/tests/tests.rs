@@ -57,6 +57,7 @@ fn should_expose_status() -> Result<(), CallError> {
 #[cfg(test)]
 mod rollback_tests {
     use super::*;
+    use canister_tests::api::archive::compat::CompatEntry;
 
     /// Verifies that the archive can be rolled back
     #[test]
@@ -64,7 +65,7 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
 
-        let entry = log_entry_1();
+        let entry = CompatEntry::from(log_entry_1());
         api::add_entry(
             &env,
             canister_id,
@@ -82,7 +83,10 @@ mod rollback_tests {
 
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
-        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
+        assert_eq!(
+            CompatEntry::from(logs.entries.get(0).unwrap().clone().unwrap()),
+            entry
+        );
         Ok(())
     }
 
@@ -92,8 +96,8 @@ mod rollback_tests {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
-        let entry1 = log_entry_1();
-        let entry2 = log_entry_2();
+        let entry1 = CompatEntry::from(log_entry_1());
+        let entry2 = CompatEntry::from(log_entry_2());
         api::add_entry(
             &env,
             canister_id,
@@ -116,8 +120,14 @@ mod rollback_tests {
 
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
-        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry1);
-        assert_eq!(logs.entries.get(1).unwrap().as_ref().unwrap(), &entry2);
+        assert_eq!(
+            CompatEntry::from(logs.entries.get(0).unwrap().clone().unwrap()),
+            entry1
+        );
+        assert_eq!(
+            CompatEntry::from(logs.entries.get(1).unwrap().clone().unwrap()),
+            entry2
+        );
         Ok(())
     }
 }

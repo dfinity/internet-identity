@@ -16,6 +16,7 @@ mod tests;
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Anchor {
     devices: Vec<Device>,
+    pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 impl Device {
@@ -100,7 +101,10 @@ impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
     pub(super) fn new() -> Anchor {
-        Self { devices: vec![] }
+        Self {
+            devices: vec![],
+            metadata: Some(HashMap::new()),
+        }
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {
