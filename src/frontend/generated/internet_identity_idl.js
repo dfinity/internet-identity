@@ -132,6 +132,7 @@ export const idlFactory = ({ IDL }) => {
     'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
+    'metadata' : MetadataMap,
     'devices' : IDL.Vec(DeviceWithUsage),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
@@ -186,9 +187,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
+    'metadata' : MetadataMap,
     'authn_data_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
+  const IdentityMetadataWriteResponse = IDL.Variant({ 'ok' : IDL.Null });
   const UserKey = PublicKey;
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -293,6 +296,11 @@ export const idlFactory = ({ IDL }) => {
     'identity_info' : IDL.Func(
         [IdentityNumber],
         [IDL.Opt(IdentityInfoResponse)],
+        [],
+      ),
+    'identity_metadata_write' : IDL.Func(
+        [IdentityNumber, MetadataMap],
+        [IDL.Opt(IdentityMetadataWriteResponse)],
         [],
       ),
     'init_salt' : IDL.Func([], [], []),

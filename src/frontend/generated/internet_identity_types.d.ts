@@ -141,14 +141,17 @@ export interface HttpResponse {
   'status_code' : number,
 }
 export interface IdentityAnchorInfo {
+  'metadata' : MetadataMap,
   'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
+  'metadata' : MetadataMap,
   'authn_data_registration' : [] | [AuthnMethodRegistrationInfo],
 }
 export type IdentityInfoResponse = { 'ok' : IdentityInfo };
+export type IdentityMetadataWriteResponse = { 'ok' : null };
 export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
@@ -251,6 +254,10 @@ export interface _SERVICE {
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'identity_info' : ActorMethod<[IdentityNumber], [] | [IdentityInfoResponse]>,
+  'identity_metadata_write' : ActorMethod<
+    [IdentityNumber, MetadataMap],
+    [] | [IdentityMetadataWriteResponse]
+  >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'prepare_delegation' : ActorMethod<
