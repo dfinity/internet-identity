@@ -10,7 +10,7 @@ edition = "2021"
 # local dependencies
 internet_identity_interface = { path = "../internet_identity_interface" }
 # ic dependencies
-candid = { version = "0.9", features = ["parser"] }
+candid = "0.9"
 ic-cdk = "0.10"
 ic-cdk-timers = "0.4"
 ic-cdk-macros = "0.7"
@@ -21,6 +21,7 @@ serde = "1"
 serde_bytes = "0.11"
 
 [dev-dependencies]
+candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
 ic-test-state-machine-client = "3"
