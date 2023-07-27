@@ -40,6 +40,11 @@ type Operation = variant {
     remove_device: record {
         device: PublicKey;
     };
+    identity_metadata_write: record {
+        // If present, the metadata has been changed and now contains the given keys.
+        // Only the top level keys are archived for privacy reasons.
+        metadata_keys: vec text;
+    };
 };
 
 type Entry = record {
