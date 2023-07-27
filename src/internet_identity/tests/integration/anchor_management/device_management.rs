@@ -204,10 +204,13 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
     );
 
     expect_user_error_with_message(
-            result,
-            CanisterCalledTrap,
-            Regex::new("Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\. Either use shorter aliases or remove an existing device\\.").unwrap(),
-        );
+        result,
+        CanisterCalledTrap,
+        Regex::new(
+            "Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\.",
+        )
+        .unwrap(),
+    );
     Ok(())
 }
 

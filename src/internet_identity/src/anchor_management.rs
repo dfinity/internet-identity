@@ -15,7 +15,7 @@ pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let anchor = state::anchor(anchor_number);
-    let metadata = anchor.metadata.clone().unwrap_or_default();
+    let metadata = anchor.identity_metadata().clone().unwrap_or_default();
     let devices = anchor
         .into_devices()
         .into_iter()
@@ -167,6 +167,8 @@ pub fn identity_metadata_write(
     metadata: HashMap<String, MetadataEntry>,
 ) -> Operation {
     let metadata_keys = metadata.keys().cloned().collect();
-    anchor.metadata = Some(metadata);
+    anchor
+        .replace_identity_metadata(metadata)
+        .unwrap_or_else(|err| trap(&format!("failed to write identity metadata: {err}")));
     Operation::IdentityMetadataWrite { metadata_keys }
 }

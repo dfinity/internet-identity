@@ -16,7 +16,7 @@ mod tests;
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Anchor {
     devices: Vec<Device>,
-    pub metadata: Option<HashMap<String, MetadataEntry>>,
+    metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
 impl Device {
@@ -114,7 +114,10 @@ impl Anchor {
             });
         }
         check_device_invariants(&device)?;
-        check_anchor_invariants(&self.devices.iter().chain(iter::once(&device)).collect())?;
+        check_anchor_invariants(
+            &self.devices.iter().chain(iter::once(&device)).collect(),
+            self.metadata.as_ref().unwrap_or(&HashMap::new()),
+        )?;
         self.devices.push(device);
         Ok(())
     }
@@ -156,6 +159,7 @@ impl Anchor {
                 // append the device with modification
                 .chain(iter::once(&modified_device))
                 .collect(),
+            self.metadata.as_ref().unwrap_or(&HashMap::new()),
         )?;
 
         self.devices[index] = modified_device;
@@ -262,6 +266,23 @@ impl Anchor {
             (false, false, false) => DomainActivity::None,
         }
     }
+
+    /// Returns a reference to the optional identity metadata map
+    /// (which is independent of devices / authentication methods).
+    pub fn identity_metadata(&self) -> &Option<HashMap<String, MetadataEntry>> {
+        &self.metadata
+    }
+
+    /// Replaces the existing identity metadata map (which is independent of devices / authentication
+    /// methods) with the provided one.
+    pub fn replace_identity_metadata(
+        &mut self,
+        metadata: HashMap<String, MetadataEntry>,
+    ) -> Result<(), AnchorError> {
+        check_anchor_invariants(&self.devices.iter().collect(), &metadata)?;
+        self.metadata = Some(metadata);
+        Ok(())
+    }
 }
 
 /// Possible outcomes of domain bound activity for an anchor since a specific timestamp.
@@ -301,22 +322,7 @@ impl Device {
             + self.pubkey.len()
             + self.credential_id.as_ref().map(|id| id.len()).unwrap_or(0)
             + self.origin.as_ref().map(|origin| origin.len()).unwrap_or(0)
-            + self.metadata.as_ref().map(Self::metadata_len).unwrap_or(0)
-    }
-
-    fn metadata_len(metadata: &HashMap<String, MetadataEntry>) -> usize {
-        metadata
-            .iter()
-            .map(|(key, value)| key.len() + Self::metadata_entry_len(value))
-            .sum()
-    }
-
-    fn metadata_entry_len(entry: &MetadataEntry) -> usize {
-        match entry {
-            MetadataEntry::String(value) => value.len(),
-            MetadataEntry::Bytes(value) => value.len(),
-            MetadataEntry::Map(data) => Self::metadata_len(data),
-        }
+            + self.metadata.as_ref().map(metadata_len).unwrap_or(0)
     }
 
     pub fn ii_domain(&self) -> Option<IIDomain> {
@@ -341,6 +347,21 @@ fn check_mutation_allowed(device: &Device) -> Result<(), AnchorError> {
     Ok(())
 }
 
+fn metadata_len(metadata: &HashMap<String, MetadataEntry>) -> usize {
+    metadata
+        .iter()
+        .map(|(key, value)| key.len() + metadata_entry_len(value))
+        .sum()
+}
+
+fn metadata_entry_len(entry: &MetadataEntry) -> usize {
+    match entry {
+        MetadataEntry::String(value) => value.len(),
+        MetadataEntry::Bytes(value) => value.len(),
+        MetadataEntry::Map(data) => metadata_len(data),
+    }
+}
+
 #[cfg(not(test))]
 fn caller() -> Principal {
     ic_cdk::caller()
@@ -363,7 +384,10 @@ fn caller() -> Principal {
 /// In order to not break those anchors, they need to have a path back to satisfying the invariants.
 /// To allow that transition, [remove_device](Anchor::remove_device) does _not_ check the invariants based on the assumption
 /// that the state of an anchor cannot get worse by removing a device.
-fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
+fn check_anchor_invariants(
+    devices: &Vec<&Device>,
+    identity_metadata: &HashMap<String, MetadataEntry>,
+) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
     /// by only allowing 8 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
@@ -373,8 +397,8 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 
     /// Single devices can use >500 bytes for the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector, we limit the sum of the
-    /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
-    /// or change anchors in the future.
+    /// size of all variable fields of all devices plus the device independent metadata.
+    /// This ensures that we have the flexibility to expand or change anchors in the future.
     /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
     /// plus an additional 452 bytes to fit new fields introduced since.
     const VARIABLE_FIELDS_LIMIT: usize = 2500;
@@ -386,15 +410,15 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
         });
     }
 
-    let existing_variable_size: usize = devices
+    let variable_fields_size = devices
         .iter()
-        // filter out the device being checked to not count it twice in case of update operations
         .map(|device| device.variable_fields_len())
-        .sum();
+        .sum::<usize>()
+        + metadata_len(identity_metadata);
 
-    if existing_variable_size > VARIABLE_FIELDS_LIMIT {
+    if variable_fields_size > VARIABLE_FIELDS_LIMIT {
         return Err(AnchorError::CumulativeDataLimitExceeded {
-            length: existing_variable_size,
+            length: variable_fields_size,
             limit: VARIABLE_FIELDS_LIMIT,
         });
     }
@@ -562,7 +586,7 @@ impl fmt::Display for AnchorError {
             ),
             AnchorError::CumulativeDataLimitExceeded { length, limit } => write!(
                 f,
-                "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}. Either use shorter aliases or remove an existing device."
+                "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}."
             ),
             AnchorError::InvalidDeviceProtection { key_type } => write!(
                 f,

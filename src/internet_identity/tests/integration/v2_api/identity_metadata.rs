@@ -50,7 +50,7 @@ fn should_write_metadata() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_fail_to_write_identity_metadata_with_wrong_sender() {
+fn should_not_write_identity_metadata_with_wrong_sender() {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -75,4 +75,36 @@ fn should_fail_to_write_identity_metadata_with_wrong_sender() {
         CanisterCalledTrap,
         Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
     );
+}
+
+#[test]
+fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
+    const METADATA_KEY: &str = "some-key";
+
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let authn_method = test_authn_method();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+    let info = api::get_anchor_info(&env, canister_id, authn_method.principal(), identity_number)?;
+    assert!(info.metadata.is_empty());
+
+    let metadata = HashMap::from_iter(vec![(
+        METADATA_KEY.to_string(),
+        MetadataEntry::String("a".repeat(3000)),
+    )]);
+
+    let result = api_v2::identity_metadata_write(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        &metadata,
+    );
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("failed to write identity metadata: Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\.").unwrap(),
+    );
+    Ok(())
 }
