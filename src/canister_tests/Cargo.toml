@@ -7,7 +7,7 @@ edition = "2021"
 base64 = "0.21"
 flate2 = "1.0"
 hex = "0.4.3"
-ic-test-state-machine-client = "2"
+ic-test-state-machine-client = "3"
 lazy_static = "1.4"
 regex = "1.5"
 serde = "1"
@@ -18,6 +18,6 @@ sha2 = "0.10"
 internet_identity_interface = { path = "../internet_identity_interface" }
 
 # All IC deps
-candid = "0.8"
-ic-cdk = "0.8"
+candid = "0.9"
+ic-cdk = "0.10"
 ic-representation-independent-hash = "0.3"
