@@ -333,10 +333,12 @@ const page = (slot: TemplateResult) => {
 // Register this device as a new device with the anchor
 const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
   // Prompt the user for an anchor (only used if we don't know the anchor already)
-  const askUserNumber = async () => {
+  const askUserNumber = async (userNumber?: bigint) => {
     const result = await promptUserNumber({
-      title: "Add a Trusted Device",
-      message: "What’s your Internet Identity?",
+      title: "Continue with another device",
+      message:
+        "Is this your first time connecting to Internet Identity on this device? In the next steps, you will add this device as an Internet Identity passkey. Do you wish to continue?",
+      userNumber,
     });
     if (result === "canceled") {
       // TODO L2-309: do this without reload
@@ -346,8 +348,5 @@ const asNewDevice = async (connection: Connection, userNumber?: bigint) => {
     return result;
   };
 
-  return registerTentativeDevice(
-    userNumber ?? (await askUserNumber()),
-    connection
-  );
+  return registerTentativeDevice(await askUserNumber(userNumber), connection);
 };
