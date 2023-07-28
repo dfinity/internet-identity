@@ -558,7 +558,7 @@ impl fmt::Display for AnchorError {
             ),
             AnchorError::CumulativeDataLimitExceeded { length, limit } => write!(
                 f,
-                "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}. Either use shorter aliases or remove an existing device."
+                "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}."
             ),
             AnchorError::InvalidDeviceProtection { key_type } => write!(
                 f,
