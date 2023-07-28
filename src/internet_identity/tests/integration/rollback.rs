@@ -25,18 +25,16 @@ fn upgrade_and_rollback_keeps_anchor_intact() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     let user_number = flows::register_anchor(&env, canister_id);
-    let mut devices_before =
-        api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
-            .unwrap()
-            .devices;
+    let mut devices_before = api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+        .unwrap()
+        .devices;
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     api::health_check(&env, canister_id);
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
     api::health_check(&env, canister_id);
-    let mut devices_after =
-        api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)
-            .unwrap()
-            .devices;
+    let mut devices_after = api::get_anchor_info(&env, canister_id, principal_1(), user_number)
+        .unwrap()
+        .devices;
 
     devices_before.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
     devices_after.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
@@ -70,8 +68,8 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
 
     // use anchor
-    let devices = api::compat::get_anchor_info(&env, canister_id, principal_1(), user_number)?
-        .into_device_data();
+    let devices =
+        api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
     assert_eq!(devices, vec![device_data_1()]);
 
     let (user_key, _) = api::prepare_delegation(

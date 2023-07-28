@@ -502,6 +502,11 @@ mod v2_api {
     fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
         authenticate_and_record_activity(identity_number);
         let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let metadata = state::anchor(identity_number)
+            .identity_metadata()
+            .clone()
+            .unwrap_or_default();
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -511,7 +516,7 @@ mod v2_api {
             authn_method_registration: anchor_info
                 .device_registration
                 .map(AuthnMethodRegistration::from),
-            metadata: anchor_info.metadata,
+            metadata,
         };
         Some(IdentityInfoResponse::Ok(identity_info))
     }

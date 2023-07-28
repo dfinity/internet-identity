@@ -170,7 +170,6 @@ pub struct DeviceRegistrationInfo {
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
-    pub metadata: HashMap<String, MetadataEntry>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

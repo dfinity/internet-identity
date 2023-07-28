@@ -310,8 +310,6 @@ type IdentityAnchorInfo = record {
     devices : vec DeviceWithUsage;
     // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
-    // Device independent metadata
-    metadata: MetadataMap;
 };
 
 type AnchorCredentials = record {
