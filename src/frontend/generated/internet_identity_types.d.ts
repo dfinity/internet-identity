@@ -141,7 +141,6 @@ export interface HttpResponse {
   'status_code' : number,
 }
 export interface IdentityAnchorInfo {
-  'metadata' : MetadataMap,
   'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }

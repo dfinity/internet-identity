@@ -132,7 +132,6 @@ export const idlFactory = ({ IDL }) => {
     'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
-    'metadata' : MetadataMap,
     'devices' : IDL.Vec(DeviceWithUsage),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
