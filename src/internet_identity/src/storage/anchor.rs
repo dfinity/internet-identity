@@ -367,7 +367,8 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
     /// due to the `VARIABLE_FIELDS_LIMIT`.
     const MAX_DEVICES_PER_ANCHOR: usize = 10;
 
-    /// Single devices can use >500 bytes for the variable length fields alone.
+    /// The list of devices can fill the whole space (4 KB) available for a single anchor with the
+    /// variable length fields alone.
     /// In order to not give away all the anchor space to the device vector, we limit the sum of the
     /// size of all variable fields of all devices. This ensures that we have the flexibility to expand
     /// or change anchors in the future.
@@ -384,7 +385,6 @@ fn check_anchor_invariants(devices: &Vec<&Device>) -> Result<(), AnchorError> {
 
     let existing_variable_size: usize = devices
         .iter()
-        // filter out the device being checked to not count it twice in case of update operations
         .map(|device| device.variable_fields_len())
         .sum();
 
