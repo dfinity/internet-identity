@@ -157,6 +157,27 @@ fn should_enforce_cumulative_size_limit_on_identity_metadata() {
 }
 
 #[test]
+fn should_enforce_cumulative_size_limit_on_device_and_metadata() {
+    let mut anchor = Anchor::new();
+
+    for i in 0..4 {
+        anchor.add_device(large_device(i)).unwrap();
+    }
+    let metadata = HashMap::from_iter(vec![(
+        "some key".to_string(),
+        MetadataEntry::String("a".repeat(2000)),
+    )]);
+
+    let result = anchor.replace_identity_metadata(metadata);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::CumulativeDataLimitExceeded { .. })
+    ));
+    assert!(anchor.identity_metadata().is_none());
+}
+
+#[test]
 fn should_enforce_single_recovery_phrase() {
     let mut anchor = Anchor::new();
 
