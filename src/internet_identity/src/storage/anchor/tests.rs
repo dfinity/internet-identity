@@ -153,7 +153,7 @@ fn should_enforce_cumulative_size_limit_on_identity_metadata() {
         result,
         Err(AnchorError::CumulativeDataLimitExceeded { .. })
     ));
-    assert!(anchor.identity_metadata().as_ref().unwrap().is_empty());
+    assert!(anchor.identity_metadata().is_none());
 }
 
 #[test]
