@@ -416,9 +416,7 @@ fn check_anchor_invariants(
         .iter()
         .map(|device| device.variable_fields_len())
         .sum::<usize>()
-        + identity_metadata
-            .as_ref()
-            .map_or(0, |map| metadata_len(map));
+        + identity_metadata.as_ref().map_or(0, metadata_len);
 
     if variable_fields_size > VARIABLE_FIELDS_LIMIT {
         return Err(AnchorError::CumulativeDataLimitExceeded {
