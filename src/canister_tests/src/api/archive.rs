@@ -98,7 +98,7 @@ pub mod compat {
                     new_device,
                 },
                 Operation::RemoveDevice { device } => CompatOperation::RemoveDevice { device },
-                Operation::IdentityMetadataWrite { .. } => panic!("not available in compat typ"),
+                Operation::IdentityMetadataWrite { .. } => panic!("not available in compat type"),
             }
         }
     }

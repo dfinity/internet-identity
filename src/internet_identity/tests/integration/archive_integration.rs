@@ -473,11 +473,11 @@ mod pull_entries_tests {
             .unwrap()
             .as_nanos() as u64;
 
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-        assert!(env.canister_exists(archive_canister));
-
         let device = DeviceData::auth_test_device();
         let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
 
         let metadata = HashMap::from_iter(vec![(
             METADATA_KEY.to_string(),
@@ -498,7 +498,7 @@ mod pull_entries_tests {
         env.tick();
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_eq!(entries.entries.len(), 2);
+        assert_eq!(entries.entries.len(), 1);
 
         let expected_metadata_entry = Entry {
             anchor,
@@ -507,10 +507,10 @@ mod pull_entries_tests {
             },
             timestamp,
             caller: device.principal(),
-            sequence_number: 1,
+            sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(1).unwrap().as_ref().unwrap(),
+            entries.entries.get(0).unwrap().as_ref().unwrap(),
             &expected_metadata_entry
         );
 

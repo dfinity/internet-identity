@@ -103,7 +103,7 @@ impl Anchor {
     pub(super) fn new() -> Anchor {
         Self {
             devices: vec![],
-            metadata: Some(HashMap::new()),
+            metadata: None,
         }
     }
 
@@ -116,7 +116,7 @@ impl Anchor {
         check_device_invariants(&device)?;
         check_anchor_invariants(
             &self.devices.iter().chain(iter::once(&device)).collect(),
-            self.metadata.as_ref().unwrap_or(&HashMap::new()),
+            &self.metadata,
         )?;
         self.devices.push(device);
         Ok(())
@@ -159,7 +159,7 @@ impl Anchor {
                 // append the device with modification
                 .chain(iter::once(&modified_device))
                 .collect(),
-            self.metadata.as_ref().unwrap_or(&HashMap::new()),
+            &self.metadata,
         )?;
 
         self.devices[index] = modified_device;
@@ -279,8 +279,9 @@ impl Anchor {
         &mut self,
         metadata: HashMap<String, MetadataEntry>,
     ) -> Result<(), AnchorError> {
+        let metadata = Some(metadata);
         check_anchor_invariants(&self.devices.iter().collect(), &metadata)?;
-        self.metadata = Some(metadata);
+        self.metadata = metadata;
         Ok(())
     }
 }
@@ -386,7 +387,7 @@ fn caller() -> Principal {
 /// that the state of an anchor cannot get worse by removing a device.
 fn check_anchor_invariants(
     devices: &Vec<&Device>,
-    identity_metadata: &HashMap<String, MetadataEntry>,
+    identity_metadata: &Option<HashMap<String, MetadataEntry>>,
 ) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
     /// by only allowing 8 devices with purpose `authentication` to make sure there is always
@@ -397,8 +398,8 @@ fn check_anchor_invariants(
 
     /// One device can fill more than one tenth of the available space for a single anchor (4 KB)
     /// with the variable length fields alone.
-    /// In order to not give away all the anchor space to the device vector and metadata, we limit
-    /// the sum of the size of all variable fields of all devices plus the device independent metadata.
+    /// In order to not give away all the anchor space to the device vector and identity metadata,
+    /// we limit the sum of the size of all variable fields of all devices plus the identity metadata.
     /// This ensures that we have the flexibility to expand or change anchors in the future.
     /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
     /// plus an additional 452 bytes to fit new fields introduced since.
@@ -415,7 +416,9 @@ fn check_anchor_invariants(
         .iter()
         .map(|device| device.variable_fields_len())
         .sum::<usize>()
-        + metadata_len(identity_metadata);
+        + identity_metadata
+            .as_ref()
+            .map_or(0, |map| metadata_len(map));
 
     if variable_fields_size > VARIABLE_FIELDS_LIMIT {
         return Err(AnchorError::CumulativeDataLimitExceeded {
