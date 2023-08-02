@@ -150,7 +150,7 @@ export interface IdentityInfo {
   'authn_data_registration' : [] | [AuthnMethodRegistrationInfo],
 }
 export type IdentityInfoResponse = { 'ok' : IdentityInfo };
-export type IdentityMetadataWriteResponse = { 'ok' : null };
+export type IdentityMetadataReplaceResponse = { 'ok' : null };
 export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
@@ -253,9 +253,9 @@ export interface _SERVICE {
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'identity_info' : ActorMethod<[IdentityNumber], [] | [IdentityInfoResponse]>,
-  'identity_metadata_write' : ActorMethod<
+  'identity_metadata_replace' : ActorMethod<
     [IdentityNumber, MetadataMap],
-    [] | [IdentityMetadataWriteResponse]
+    [] | [IdentityMetadataReplaceResponse]
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,

@@ -190,7 +190,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_data_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
-  const IdentityMetadataWriteResponse = IDL.Variant({ 'ok' : IDL.Null });
+  const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
   const UserKey = PublicKey;
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -297,9 +297,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IdentityInfoResponse)],
         [],
       ),
-    'identity_metadata_write' : IDL.Func(
+    'identity_metadata_replace' : IDL.Func(
         [IdentityNumber, MetadataMap],
-        [IDL.Opt(IdentityMetadataWriteResponse)],
+        [IDL.Opt(IdentityMetadataReplaceResponse)],
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
