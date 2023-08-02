@@ -395,9 +395,10 @@ fn check_anchor_invariants(
     /// due to the `VARIABLE_FIELDS_LIMIT`.
     const MAX_DEVICES_PER_ANCHOR: usize = 10;
 
-    /// Single devices can use >500 bytes for the variable length fields alone.
-    /// In order to not give away all the anchor space to the device vector, we limit the sum of the
-    /// size of all variable fields of all devices plus the device independent metadata.
+    /// One device can fill more than one tenth of the available space for a single anchor (4 KB)
+    /// with the variable length fields alone.
+    /// In order to not give away all the anchor space to the device vector and metadata, we limit
+    /// the sum of the size of all variable fields of all devices plus the device independent metadata.
     /// This ensures that we have the flexibility to expand or change anchors in the future.
     /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
     /// plus an additional 452 bytes to fit new fields introduced since.

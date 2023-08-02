@@ -15,6 +15,7 @@ use std::rc::Rc;
 const WASM_PAGE_SIZE: u64 = 1 << 16;
 const HEADER_SIZE: usize = 66;
 const RESERVED_HEADER_BYTES: u64 = 2 * WASM_PAGE_SIZE;
+const LENGTH_OFFSET: u64 = 2;
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS";
 
 #[test]
@@ -101,24 +102,24 @@ fn should_read_previous_write() {
 
 #[test]
 fn should_serialize_first_record() {
-    const EXPECTED_LENGTH: usize = 261;
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
     let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
+    let expected_length = candid::encode_one(&anchor).unwrap().len();
+
     storage.write(anchor_number, anchor.clone()).unwrap();
 
-    let mut buf = [0u8; EXPECTED_LENGTH];
-    memory.read(RESERVED_HEADER_BYTES, &mut buf);
-    let decoded_from_memory: Anchor = candid::decode_one(&buf[2..]).unwrap();
+    let mut buf = vec![0u8; expected_length];
+    memory.read(RESERVED_HEADER_BYTES + LENGTH_OFFSET, &mut buf);
+    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
     assert_eq!(decoded_from_memory, anchor);
 }
 
 #[test]
 fn should_serialize_subsequent_record_to_expected_memory_location() {
-    const EXPECTED_LENGTH: usize = 261;
     const EXPECTED_RECORD_OFFSET: u64 = 409_600; // 100 * max anchor size
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
@@ -129,11 +130,16 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
     assert_eq!(anchor_number, 223u64);
 
     anchor.add_device(sample_device()).unwrap();
+    let expected_length = candid::encode_one(&anchor).unwrap().len();
+
     storage.write(anchor_number, anchor.clone()).unwrap();
 
-    let mut buf = [0u8; EXPECTED_LENGTH];
-    memory.read(RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET, &mut buf);
-    let decoded_from_memory: Anchor = candid::decode_one(&buf[2..]).unwrap();
+    let mut buf = vec![0u8; expected_length];
+    memory.read(
+        RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET + LENGTH_OFFSET,
+        &mut buf,
+    );
+    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
     assert_eq!(decoded_from_memory, anchor);
 }
 
