@@ -541,14 +541,14 @@ mod v2_api {
 
     #[update]
     #[candid_method]
-    fn identity_metadata_write(
+    fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntry>,
-    ) -> Option<IdentityMetadataWriteResponse> {
+    ) -> Option<IdentityMetadataReplaceResponse> {
         let result = authenticated_anchor_operation(identity_number, |anchor| {
             Ok((
-                IdentityMetadataWriteResponse::Ok,
-                anchor_management::identity_metadata_write(anchor, metadata),
+                IdentityMetadataReplaceResponse::Ok,
+                anchor_management::identity_metadata_replace(anchor, metadata),
             ))
         });
         Some(result)

@@ -32,7 +32,7 @@ fn should_write_metadata() -> Result<(), CallError> {
         MetadataEntry::String("some value".to_string()),
     )]);
 
-    api_v2::identity_metadata_write(
+    api_v2::identity_metadata_replace(
         &env,
         canister_id,
         authn_method.principal(),
@@ -62,7 +62,7 @@ fn should_not_write_identity_metadata_with_wrong_sender() {
         MetadataEntry::String("some value".to_string()),
     )]);
 
-    let result = api_v2::identity_metadata_write(
+    let result = api_v2::identity_metadata_replace(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -96,7 +96,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
         MetadataEntry::String("a".repeat(3000)),
     )]);
 
-    let result = api_v2::identity_metadata_write(
+    let result = api_v2::identity_metadata_replace(
         &env,
         canister_id,
         authn_method.principal(),

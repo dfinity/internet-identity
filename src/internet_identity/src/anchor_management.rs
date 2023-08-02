@@ -157,7 +157,9 @@ pub fn remove(
     Operation::RemoveDevice { device: device_key }
 }
 
-pub fn identity_metadata_write(
+/// Replaces the identity metadata and returns the operation to be archived.
+/// Panics if the data cannot be written (due to size constraints).
+pub fn identity_metadata_replace(
     anchor: &mut Anchor,
     metadata: HashMap<String, MetadataEntry>,
 ) -> Operation {
@@ -165,5 +167,5 @@ pub fn identity_metadata_write(
     anchor
         .replace_identity_metadata(metadata)
         .unwrap_or_else(|err| trap(&format!("failed to write identity metadata: {err}")));
-    Operation::IdentityMetadataWrite { metadata_keys }
+    Operation::IdentityMetadataReplace { metadata_keys }
 }

@@ -74,7 +74,7 @@ pub enum AuthnMethodAddResponse {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum IdentityMetadataWriteResponse {
+pub enum IdentityMetadataReplaceResponse {
     #[serde(rename = "ok")]
     Ok,
 }

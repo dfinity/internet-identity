@@ -23,8 +23,8 @@ pub enum Operation {
     },
     #[serde(rename = "remove_device")]
     RemoveDevice { device: PublicKey },
-    #[serde(rename = "identity_metadata_write")]
-    IdentityMetadataWrite { metadata_keys: Vec<String> },
+    #[serde(rename = "identity_metadata_replace")]
+    IdentityMetadataReplace { metadata_keys: Vec<String> },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

@@ -416,7 +416,7 @@ type AuthnMethodAddResponse = variant {
     invalid_metadata: text;
 };
 
-type IdentityMetadataWriteResponse = variant {
+type IdentityMetadataReplaceResponse = variant {
     ok;
 };
 
@@ -468,10 +468,10 @@ service : (opt InternetIdentityInit) -> {
     // Requires authentication.
     identity_info: (IdentityNumber) -> (opt IdentityInfoResponse);
 
-    // Writes the authentication method independent metadata map.
-    // Data in the existing metadata map will be overwritten.
+    // Replaces the authentication method independent metadata map.
+    // The existing metadata map will be overwritten.
     // Requires authentication.
-    identity_metadata_write: (IdentityNumber, MetadataMap) -> (opt IdentityMetadataWriteResponse);
+    identity_metadata_replace: (IdentityNumber, MetadataMap) -> (opt IdentityMetadataReplaceResponse);
 
     // Adds a new authentication method to the identity.
     // Requires authentication.

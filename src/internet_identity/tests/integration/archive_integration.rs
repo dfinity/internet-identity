@@ -457,9 +457,9 @@ mod pull_entries_tests {
         Ok(())
     }
 
-    /// Test to verify that the archive pulls identity metadata changes from II.
+    /// Test to verify that the archive pulls identity metadata replace operations from II.
     #[test]
-    fn should_record_identity_metadata_change() -> Result<(), CallError> {
+    fn should_record_identity_metadata_replace() -> Result<(), CallError> {
         const METADATA_KEY: &str = "some-metadata-key";
         let env = env();
         let ii_canister = install_ii_canister_with_arg(
@@ -484,7 +484,7 @@ mod pull_entries_tests {
             MetadataEntry::String("some value".to_string()),
         )]);
 
-        ii_api::api_v2::identity_metadata_write(
+        ii_api::api_v2::identity_metadata_replace(
             &env,
             ii_canister,
             device.principal(),
@@ -502,7 +502,7 @@ mod pull_entries_tests {
 
         let expected_metadata_entry = Entry {
             anchor,
-            operation: Operation::IdentityMetadataWrite {
+            operation: Operation::IdentityMetadataReplace {
                 metadata_keys: metadata.keys().cloned().collect(),
             },
             timestamp,
