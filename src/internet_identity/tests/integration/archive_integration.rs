@@ -457,6 +457,66 @@ mod pull_entries_tests {
         Ok(())
     }
 
+    /// Test to verify that the archive pulls identity metadata replace operations from II.
+    #[test]
+    fn should_record_identity_metadata_replace() -> Result<(), CallError> {
+        const METADATA_KEY: &str = "some-metadata-key";
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        );
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let device = DeviceData::auth_test_device();
+        let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
+
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        assert!(env.canister_exists(archive_canister));
+
+        let metadata = HashMap::from_iter(vec![(
+            METADATA_KEY.to_string(),
+            MetadataEntry::String("some value".to_string()),
+        )]);
+
+        ii_api::api_v2::identity_metadata_replace(
+            &env,
+            ii_canister,
+            device.principal(),
+            anchor,
+            &metadata,
+        )?;
+
+        // the archive polls for entries once per second
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_eq!(entries.entries.len(), 1);
+
+        let expected_metadata_entry = Entry {
+            anchor,
+            operation: Operation::IdentityMetadataReplace {
+                metadata_keys: metadata.keys().cloned().collect(),
+            },
+            timestamp,
+            caller: device.principal(),
+            sequence_number: 0,
+        };
+        assert_eq!(
+            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            &expected_metadata_entry
+        );
+
+        Ok(())
+    }
+
     /// Test to verify that the archive pulls the anchor operations from II periodically.
     #[test]
     fn should_fetch_multiple_times() -> Result<(), CallError> {

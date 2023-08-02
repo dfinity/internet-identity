@@ -56,6 +56,7 @@ pub struct AuthnMethodRegistration {
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
     pub authn_method_registration: Option<AuthnMethodRegistration>,
+    pub metadata: HashMap<String, MetadataEntry>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -70,4 +71,10 @@ pub enum AuthnMethodAddResponse {
     Ok,
     #[serde(rename = "invalid_metadata")]
     InvalidMetadata(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdentityMetadataReplaceResponse {
+    #[serde(rename = "ok")]
+    Ok,
 }

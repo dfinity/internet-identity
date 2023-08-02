@@ -403,6 +403,8 @@ type AuthnMethodRegistrationInfo = record {
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_data_registration: opt AuthnMethodRegistrationInfo;
+    // Authentication method independent metadata
+    metadata: MetadataMap;
 };
 
 type IdentityInfoResponse = variant {
@@ -412,6 +414,10 @@ type IdentityInfoResponse = variant {
 type AuthnMethodAddResponse = variant {
     ok;
     invalid_metadata: text;
+};
+
+type IdentityMetadataReplaceResponse = variant {
+    ok;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -461,6 +467,11 @@ service : (opt InternetIdentityInit) -> {
     // Returns information about the identity with the given number.
     // Requires authentication.
     identity_info: (IdentityNumber) -> (opt IdentityInfoResponse);
+
+    // Replaces the authentication method independent metadata map.
+    // The existing metadata map will be overwritten.
+    // Requires authentication.
+    identity_metadata_replace: (IdentityNumber, MetadataMap) -> (opt IdentityMetadataReplaceResponse);
 
     // Adds a new authentication method to the identity.
     // Requires authentication.
