@@ -26,10 +26,10 @@ rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/nmattia/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 
 # All IC deps
-candid = "0.8"
-ic-cdk = "0.8"
-ic-cdk-macros = "0.6"
-ic-certified-map = "0.3"
+candid = "0.9"
+ic-cdk = "0.10"
+ic-cdk-macros = "0.7"
+ic-certified-map = "0.4"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
 
@@ -37,7 +37,8 @@ ic-stable-structures = "0.5"
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
-ic-test-state-machine-client = "2"
+ic-test-state-machine-client = "3"
+candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.5"

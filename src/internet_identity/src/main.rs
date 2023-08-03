@@ -10,6 +10,7 @@ use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use storage::{Salt, Storage};
 
 mod active_anchor_stats;
@@ -501,6 +502,11 @@ mod v2_api {
     fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
         authenticate_and_record_activity(identity_number);
         let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let metadata = state::anchor(identity_number)
+            .identity_metadata()
+            .clone()
+            .unwrap_or_default();
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -510,6 +516,7 @@ mod v2_api {
             authn_method_registration: anchor_info
                 .device_registration
                 .map(AuthnMethodRegistration::from),
+            metadata,
         };
         Some(IdentityInfoResponse::Ok(identity_info))
     }
@@ -529,6 +536,21 @@ mod v2_api {
             }
             Err(err) => err,
         };
+        Some(result)
+    }
+
+    #[update]
+    #[candid_method]
+    fn identity_metadata_replace(
+        identity_number: IdentityNumber,
+        metadata: HashMap<String, MetadataEntry>,
+    ) -> Option<IdentityMetadataReplaceResponse> {
+        let result = authenticated_anchor_operation(identity_number, |anchor| {
+            Ok((
+                IdentityMetadataReplaceResponse::Ok,
+                anchor_management::identity_metadata_replace(anchor, metadata),
+            ))
+        });
         Some(result)
     }
 }

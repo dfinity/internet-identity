@@ -7,6 +7,7 @@ use serde_bytes::ByteBuf;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Operation {
+    // V1 API
     #[serde(rename = "register_anchor")]
     RegisterAnchor { device: DeviceDataWithoutAlias },
     #[serde(rename = "add_device")]
@@ -23,6 +24,11 @@ pub enum Operation {
     },
     #[serde(rename = "remove_device")]
     RemoveDevice { device: PublicKey },
+
+    // V2 API
+    // See the II candid interface for more details.
+    #[serde(rename = "identity_metadata_replace")]
+    IdentityMetadataReplace { metadata_keys: Vec<String> },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

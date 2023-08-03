@@ -1,7 +1,7 @@
 //! Types as defined by the HTTP gateway spec.
 //! See https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
 
-use candid::{CandidType, Deserialize, Func};
+use candid::{define_function, CandidType, Deserialize};
 use serde_bytes::ByteBuf;
 
 pub type HeaderField = (String, String);
@@ -9,9 +9,14 @@ pub type HeaderField = (String, String);
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct Token {}
 
+define_function!(pub StreamingCallbackFunction : (Token) -> (StreamingCallbackHttpResponse) query);
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum StreamingStrategy {
-    Callback { callback: Func, token: Token },
+    Callback {
+        callback: StreamingCallbackFunction,
+        token: Token,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

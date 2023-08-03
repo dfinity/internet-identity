@@ -8,6 +8,7 @@ use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::*;
+use std::collections::HashMap;
 
 pub mod registration;
 pub mod tentative_device_registration;
@@ -154,4 +155,17 @@ pub fn remove(
 
     state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &device_key));
     Operation::RemoveDevice { device: device_key }
+}
+
+/// Replaces the identity metadata and returns the operation to be archived.
+/// Panics if the data cannot be written (due to size constraints).
+pub fn identity_metadata_replace(
+    anchor: &mut Anchor,
+    metadata: HashMap<String, MetadataEntry>,
+) -> Operation {
+    let metadata_keys = metadata.keys().cloned().collect();
+    anchor
+        .replace_identity_metadata(metadata)
+        .unwrap_or_else(|err| trap(&format!("failed to write identity metadata: {err}")));
+    Operation::IdentityMetadataReplace { metadata_keys }
 }

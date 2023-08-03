@@ -16,7 +16,7 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     let user_number: types::AnchorNumber = 0;
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
-    let _: (candid::parser::value::IDLValue,) =
+    let _: (candid::types::value::IDLValue,) =
         call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
@@ -308,29 +308,4 @@ pub fn acknowledge_entries(
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.
-pub mod compat {
-    use super::*;
-    use candid::{CandidType, Deserialize};
-    use internet_identity_interface::internet_identity::types::{
-        ActiveAnchorCounter, ActiveAnchorStatistics, AnchorNumber, ArchiveInfo,
-        DomainActiveAnchorCounter,
-    };
-
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct InternetIdentityStats {
-        pub assigned_user_number_range: (AnchorNumber, AnchorNumber),
-        pub users_registered: u64,
-        pub archive_info: ArchiveInfo,
-        pub canister_creation_cycles_cost: u64,
-        pub storage_layout_version: u8,
-        pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
-        pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
-    }
-
-    pub fn stats(
-        env: &StateMachine,
-        canister_id: CanisterId,
-    ) -> Result<InternetIdentityStats, CallError> {
-        query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
-    }
-}
+pub mod compat {}
