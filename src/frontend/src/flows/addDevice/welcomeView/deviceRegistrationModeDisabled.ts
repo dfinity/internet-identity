@@ -14,7 +14,7 @@ const deviceRegistrationDisabledInfoTemplate = ({
 }) => {
   const pageContentSlot = html` <article>
     <hgroup>
-      <h1 class="t-title t-title--main">Continue with another device</h1>
+      <h1 class="t-title t-title--main">Add this device as a passkey</h1>
       <p class="t-lead">
         If this is your first time connecting to Internet Identity on this
         device, follow these steps to continue:
@@ -22,10 +22,8 @@ const deviceRegistrationDisabledInfoTemplate = ({
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        Connect to
-        <strong class="t-strong">${LEGACY_II_URL_NO_PROTOCOL}</strong> on your
-        other device using Internet Identity
-        <strong class="t-strong">${userNumber}</strong>
+        Connect to ${LEGACY_II_URL_NO_PROTOCOL} on a recognized device using
+        Internet Identity ${userNumber}
       </li>
       <li>
         Once you are connected, select “<strong class="t-string"
@@ -33,14 +31,16 @@ const deviceRegistrationDisabledInfoTemplate = ({
         >”
       </li>
     </ol>
-    <p class="t-paragraph t-strong">Then, press Retry below.</p>
+    <p class="t-paragraph">
+      Then, press <strong class="t-strong">Refresh</strong> below.
+    </p>
     <div class="l-stack">
       <button
         id="deviceRegModeDisabledRetry"
         class="c-button"
         @click=${() => retry()}
       >
-        Retry
+        Refresh
       </button>
       <button
         id="deviceRegModeDisabledCancel"

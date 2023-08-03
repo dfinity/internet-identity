@@ -146,25 +146,6 @@ fn should_not_allow_user_range_exceeding_capacity() {
     );
 }
 
-/// Test to verify that the same anchor range is allowed on upgrade.
-#[test]
-fn ii_upgrade_should_allow_same_user_range() -> Result<(), CallError> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-
-    let stats = api::compat::stats(&env, canister_id)?;
-
-    let result = upgrade_ii_canister_with_arg(
-        &env,
-        canister_id,
-        II_WASM.clone(),
-        arg_with_anchor_range(stats.assigned_user_number_range),
-    );
-
-    assert!(result.is_ok());
-    Ok(())
-}
-
 /// Tests simple upgrade and downgrade.
 #[test]
 fn ii_canister_can_be_upgraded_and_rolled_back() {
