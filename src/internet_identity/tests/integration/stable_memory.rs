@@ -13,7 +13,7 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
 
-#[allow(dead_code)]
+#[cfg(test)]
 mod test_setup_helpers;
 
 /// Known devices that exist in the genesis memory backups.
