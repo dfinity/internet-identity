@@ -1,5 +1,5 @@
 name: 'Slack'
-description: 'A simple action that send a slack message to a channel.'
+description: 'A simple action that sends a slack message to a channel.'
 inputs:
   message:
     description: 'The message to send. A link to the action run will be appended.'
@@ -11,7 +11,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-        echo '{}' | jq --arg text "$MESSAGE: https://github.com/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID" '.text = $text' | \
+        echo '{}' | jq --arg text "$MESSAGE: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '.text = $text' | \
             curl -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK_URL"
       shell: bash
       env:
