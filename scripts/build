@@ -131,6 +131,14 @@ function build_canister() {
         ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:service -f "$SRC_DIR/$canister.did" -v public
         # indicate support for certificate version 1 and 2 in the canister metadata
         ic-wasm "$canister.wasm" -o "$canister.wasm" metadata supported_certificate_versions -d "1,2" -v public
+        # add git_commit_id, but only if this build is happening on CI
+        if [[ ! -e git_commit_id.txt ]]
+        then
+            # If there is no git_commit_id.txt file, assume we are not in CI.
+            # We add a rudimentary "icp:public git_commit_id" section that contains all zeros.
+            echo "0000000000000000000000000000000000000000" > git_commit_id.txt
+        fi
+        ic-wasm "$canister.wasm" -o "$canister.wasm" metadata git_commit_id -f "git_commit_id.txt" -v public
         gzip --no-name --force "$canister.wasm"
     fi
 }

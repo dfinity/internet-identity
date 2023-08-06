@@ -12,6 +12,8 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
+    - run: echo "${GITHUB_REF}" > git_commit_id.txt
+      shell: bash
     - run: ./scripts/build
       shell: bash
 
