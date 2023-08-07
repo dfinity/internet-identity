@@ -63,13 +63,10 @@
 //! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
-
-use std::cell::RefCell;
 use std::convert::TryInto;
-use std::io::{Error, Read, Write};
+use std::fmt;
+use std::io::{Read, Write};
 use std::ops::RangeInclusive;
-use std::rc::Rc;
-use std::{fmt, io};
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -128,101 +125,11 @@ pub const DEFAULT_RANGE_SIZE: u64 =
 
 pub type Salt = [u8; 32];
 
-enum AnchorMemory<M: Memory> {
-    Managed(VirtualMemory<RestrictedMemory<M>>),
-}
-
-// Auxiliary traits and structures to encapsulate read/write operations
-// to different flavours of anchor memory.
-trait MemoryWriter {
-    fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>;
-    fn flush(&mut self) -> io::Result<()>;
-}
-
-struct BufferedMemoryWriter<'a, M: Memory> {
-    writer: BufferedWriter<'a, M>,
-}
-
-impl<'a, M: Memory> BufferedMemoryWriter<'a, M> {
-    fn new(memory: &'a mut M, offset: u64, buffer_size: usize) -> Self {
-        let writer = BufferedWriter::new(buffer_size, Writer::new(memory, offset));
-        Self { writer }
-    }
-}
-
-impl<M: Memory> MemoryWriter for BufferedMemoryWriter<'_, M> {
-    fn write_all(&mut self, buf: &[u8]) -> Result<(), Error> {
-        self.writer.write_all(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
-    }
-}
-
-trait MemoryReader {
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error>;
-}
-
-struct BufferedMemoryReader<'a, M: Memory> {
-    reader: BufferedReader<'a, M>,
-}
-
-impl<'a, M: Memory> BufferedMemoryReader<'a, M> {
-    fn new(memory: &'a M, offset: u64, buffer_size: usize) -> Self {
-        let reader = BufferedReader::new(buffer_size, Reader::new(memory, offset));
-        Self { reader }
-    }
-}
-
-impl<M: Memory> MemoryReader for BufferedMemoryReader<'_, M> {
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error> {
-        self.reader.read_exact(buf)
-    }
-}
-
-impl<M: Memory> AnchorMemory<M> {
-    fn get_writer<'a>(
-        &'a mut self,
-        address: u64,
-        buffer_size: usize,
-    ) -> Rc<RefCell<dyn MemoryWriter + 'a>> {
-        match self {
-            AnchorMemory::Managed(ref mut memory) => {
-                let writer: Rc<RefCell<dyn MemoryWriter>> = Rc::new(RefCell::new(
-                    BufferedMemoryWriter::new(memory, address, buffer_size),
-                ));
-                writer
-            }
-        }
-    }
-    fn get_reader<'a>(
-        &'a self,
-        address: u64,
-        buffer_size: usize,
-    ) -> Rc<RefCell<dyn MemoryReader + 'a>> {
-        match self {
-            AnchorMemory::Managed(ref memory) => {
-                let reader: Rc<RefCell<dyn MemoryReader>> = Rc::new(RefCell::new(
-                    BufferedMemoryReader::new(memory, address, buffer_size),
-                ));
-                reader
-            }
-        }
-    }
-    fn size(&self) -> u64 {
-        match self {
-            AnchorMemory::Managed(ref memory) => memory.size(),
-        }
-    }
-}
-
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
-    anchor_memory: AnchorMemory<M>,
-    #[allow(dead_code)]
-    memory_manager: MemoryManager<RestrictedMemory<M>>,
+    anchor_memory: VirtualMemory<RestrictedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -263,7 +170,7 @@ impl<M: Memory + Clone> Storage<M> {
             RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
             BUCKET_SIZE_IN_PAGES,
         );
-        let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
+        let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
         let version: u8 = 7;
 
         let mut storage = Self {
@@ -279,7 +186,6 @@ impl<M: Memory + Clone> Storage<M> {
             },
             header_memory,
             anchor_memory,
-            memory_manager,
         };
         storage.flush();
         storage
@@ -346,12 +252,11 @@ impl<M: Memory + Clone> Storage<M> {
                 let managed_memory = RestrictedMemory::new(memory, 1..MAX_WASM_PAGES);
                 let memory_manager =
                     MemoryManager::init_with_bucket_size(managed_memory, BUCKET_SIZE_IN_PAGES);
-                let anchor_memory = AnchorMemory::Managed(memory_manager.get(ANCHOR_MEMORY_ID));
+                let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
                 Some(Self {
                     header,
                     header_memory,
                     anchor_memory,
-                    memory_manager,
                 })
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
@@ -385,10 +290,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let address = self.record_address(record_number);
-        let writer_cell = self
-            .anchor_memory
-            .get_writer(address, self.header.entry_size as usize);
-        let mut writer = writer_cell.borrow_mut();
+        let mut writer = BufferedWriter::new(
+            self.header.entry_size as usize,
+            Writer::new(&mut self.anchor_memory, address),
+        );
         writer
             .write_all(&(buf.len() as u16).to_le_bytes())
             .expect("memory write failed");
@@ -408,10 +313,10 @@ impl<M: Memory + Clone> Storage<M> {
         let address = self.record_address(record_number);
         // the reader will check stable memory bounds
         // use buffered reader to minimize expensive stable memory operations
-        let reader_cell = self
-            .anchor_memory
-            .get_reader(address, self.header.entry_size as usize);
-        let mut reader = reader_cell.borrow_mut();
+        let mut reader = BufferedReader::new(
+            self.header.entry_size as usize,
+            Reader::new(&self.anchor_memory, address),
+        );
         let mut len_buf = vec![0; 2];
         reader
             .read_exact(len_buf.as_mut_slice())
@@ -544,10 +449,10 @@ impl<M: Memory + Clone> Storage<M> {
 
         // In practice, for all reasonably sized persistent states (<800MB) the writes are
         // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
-        let writer_cell = self
-            .anchor_memory
-            .get_writer(address, self.header.entry_size as usize);
-        let mut writer = writer_cell.borrow_mut();
+        let mut writer = BufferedWriter::new(
+            self.header.entry_size as usize,
+            Writer::new(&mut self.anchor_memory, address),
+        );
         writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
         writer
             .write_all(&(encoded_state.len() as u64).to_le_bytes())
@@ -565,10 +470,10 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(PersistentStateError::NotFound);
         }
 
-        let reader_cell = self
-            .anchor_memory
-            .get_reader(address, self.header.entry_size as usize);
-        let mut reader = reader_cell.borrow_mut();
+        let mut reader = BufferedReader::new(
+            self.header.entry_size as usize,
+            Reader::new(&self.anchor_memory, address),
+        );
         let mut magic_buf: [u8; 4] = [0; 4];
         reader
             .read_exact(&mut magic_buf)
