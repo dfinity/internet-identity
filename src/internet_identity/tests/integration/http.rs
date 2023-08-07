@@ -5,7 +5,7 @@ use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_response_verification::types::{CertificationResult, Request, Response};
+use ic_response_verification::types::{Request, Response, VerificationInfo};
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -59,7 +59,6 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
                 http_response,
                 certification_version,
             );
-            assert!(result.passed);
             assert_eq!(result.verification_version, certification_version);
         }
     }
@@ -91,7 +90,6 @@ fn should_fallback_to_v1_certification() -> Result<(), CallError> {
         http_response,
         CERTIFICATION_VERSION,
     );
-    assert!(result.passed);
     assert_eq!(result.verification_version, CERTIFICATION_VERSION);
 
     Ok(())
@@ -126,7 +124,6 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         http_response,
         CERTIFICATION_VERSION,
     );
-    assert!(result.passed);
     assert_eq!(result.verification_version, CERTIFICATION_VERSION);
 
     Ok(())
@@ -473,12 +470,13 @@ fn verify_response_certification(
     request: HttpRequest,
     http_response: HttpResponse,
     min_certification_version: u16,
-) -> CertificationResult {
+) -> VerificationInfo {
     verify_request_response_pair(
         Request {
             method: request.method,
             url: request.url,
             headers: request.headers,
+            body: request.body.into_vec(),
         },
         Response {
             status_code: http_response.status_code,
