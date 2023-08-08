@@ -4,6 +4,7 @@
   "type": "module",
   "description": "",
   "keywords": [],
+  "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
     "dev": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite",
