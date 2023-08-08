@@ -42,7 +42,7 @@ candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.5"
-ic-response-verification = "0.3"
+ic-response-verification = "1.0"
 
 
 [features]
