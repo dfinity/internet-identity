@@ -761,24 +761,44 @@ fn should_keep_metadata() -> Result<(), CallError> {
 /// Verifies that reserved metadata keys are rejected.
 #[test]
 fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
+    const RESERVED_KEYS: &[&str] = &[
+        "pubkey",
+        "alias",
+        "credential_id",
+        "purpose",
+        "key_type",
+        "protection",
+        "origin",
+        "last_usage_timestamp",
+        "metadata",
+        "usage",
+        "authenticator_attachment",
+    ];
+
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
 
-    let device = DeviceData {
-        metadata: Some(HashMap::from([(
-            "alias".to_string(),
-            MetadataEntry::String("value".to_string()),
-        )])),
-        ..DeviceData::auth_test_device()
-    };
+    for reserved_key in RESERVED_KEYS {
+        let device = DeviceData {
+            metadata: Some(HashMap::from([(
+                reserved_key.to_string(),
+                MetadataEntry::String("value".to_string()),
+            )])),
+            ..DeviceData::auth_test_device()
+        };
 
-    let result = api::add(&env, canister_id, principal_1(), user_number, &device);
+        let result = api::add(&env, canister_id, principal_1(), user_number, &device);
 
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("Metadata key 'alias' is reserved and cannot be used\\.").unwrap(),
-    );
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new(&format!(
+                "Metadata key '{}' is reserved and cannot be used\\.",
+                reserved_key
+            ))
+            .unwrap(),
+        );
+    }
     Ok(())
 }

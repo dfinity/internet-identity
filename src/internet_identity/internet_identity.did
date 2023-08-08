@@ -80,6 +80,7 @@ type DeviceData = record {
     // Note: some fields above will be moved to the metadata map in the future.
     // All field names of `DeviceData` (such as 'alias', 'origin, etc.) are
     // reserved and cannot be written.
+    // In addition, the keys "usage" and "authenticator_attachment" are reserved as well.
     metadata: opt MetadataMap;
 };
 
@@ -382,7 +383,8 @@ type AuthnMethodData = record {
     // contains the following fields of the DeviceWithUsage type:
     // - alias
     // - origin
-    // - key_type: reduced to "platform", "cross_platform" on migration
+    // - authenticator_attachment: data taken from key_type and reduced to "platform", "cross_platform" or absent on migration
+    // - usage: data taken from key_type and reduced to "recovery_phrase", "browser_storage_key" or absent on migration
     // Note: for compatibility reasons with the v1 API, the entries above (if present)
     // must be of the `string` variant. This restriction may be lifted in the future.
     metadata: MetadataMap;

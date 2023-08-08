@@ -51,7 +51,7 @@ fn should_convert_device_data_to_authn_method_data() {
 
 #[test]
 fn should_fail_to_convert_to_device_on_bad_metadata_types() {
-    const KEYS: &[&str] = &["alias", "origin", "key_type"];
+    const KEYS: &[&str] = &["alias", "origin", "usage", "authenticator_attachment"];
 
     for key in KEYS {
         let (_, mut authn_method) = test_conversion_pairs().pop().unwrap();
@@ -71,6 +71,11 @@ fn should_fail_to_convert_to_device_on_bad_metadata_types() {
 }
 
 fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
+    const ORIGIN: &str = "origin";
+    const ALIAS: &str = "alias";
+    const AUTHENTICATOR_ATTACHMENT: &str = "authenticator_attachment";
+    const USAGE: &str = "usage";
+
     let pubkey = ByteBuf::from([123; 32]);
     let alias = "test device".to_string();
     let origin = "https://some.origin.com".to_string();
@@ -94,8 +99,8 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey: pubkey.clone(),
         }),
         metadata: HashMap::from([
-            ("alias".to_string(), MetadataEntry::String(alias.clone())),
-            ("origin".to_string(), MetadataEntry::String(origin)),
+            (ALIAS.to_string(), MetadataEntry::String(alias.clone())),
+            (ORIGIN.to_string(), MetadataEntry::String(origin.clone())),
             (
                 "some_key".to_string(),
                 MetadataEntry::String("some data".to_string()),
@@ -126,9 +131,9 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         }),
         purpose: Purpose::Authentication,
         metadata: HashMap::from([
-            ("alias".to_string(), MetadataEntry::String(alias)),
+            (ALIAS.to_string(), MetadataEntry::String(alias.clone())),
             (
-                "key_type".to_string(),
+                AUTHENTICATOR_ATTACHMENT.to_string(),
                 MetadataEntry::String("cross_platform".to_string()),
             ),
             (
@@ -156,7 +161,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         purpose: Purpose::Authentication,
         metadata: HashMap::from([
             (
-                "key_type".to_string(),
+                AUTHENTICATOR_ATTACHMENT.to_string(),
                 MetadataEntry::String("cross_platform".to_string()),
             ),
             (
@@ -168,9 +173,30 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         last_authentication: None,
     };
 
+    let device4 = DeviceWithUsage {
+        key_type: KeyType::SeedPhrase,
+        ..device1.clone()
+    };
+    let authn_method_data4 = AuthnMethodData {
+        metadata: HashMap::from([
+            (ALIAS.to_string(), MetadataEntry::String(alias)),
+            (ORIGIN.to_string(), MetadataEntry::String(origin)),
+            (
+                USAGE.to_string(),
+                MetadataEntry::String("recovery_phrase".to_string()),
+            ),
+            (
+                "some_key".to_string(),
+                MetadataEntry::String("some data".to_string()),
+            ),
+        ]),
+        ..authn_method_data1.clone()
+    };
+
     vec![
         (device1, authn_method_data1),
         (device2, authn_method_data2),
         (device3, authn_method_data3),
+        (device4, authn_method_data4),
     ]
 }
