@@ -101,4 +101,3 @@ pub mod issuer {
         pub language: String,
     }
 }
-
