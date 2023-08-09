@@ -147,7 +147,7 @@ export interface IdentityAnchorInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   'metadata' : MetadataMap,
-  'authn_data_registration' : [] | [AuthnMethodRegistrationInfo],
+  'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
 export type IdentityInfoResponse = { 'ok' : IdentityInfo };
 export type IdentityMetadataReplaceResponse = { 'ok' : null };
