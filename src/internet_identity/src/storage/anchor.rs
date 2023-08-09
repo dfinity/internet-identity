@@ -490,7 +490,7 @@ fn check_anchor_invariants(
 ///  NOTE: while in the future we may lift this restriction, for now we do ensure that
 ///  protected devices are limited to recovery phrases, which the webapp expects.
 fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
-    const RESERVED_KEYS: [&str; 9] = [
+    const RESERVED_KEYS: &[&str] = &[
         "pubkey",
         "alias",
         "credential_id",
@@ -500,11 +500,13 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
         "origin",
         "last_usage_timestamp",
         "metadata",
+        "usage",
+        "authenticator_attachment",
     ];
 
     if let Some(metadata) = &device.metadata {
         for key in RESERVED_KEYS {
-            if metadata.contains_key(key) {
+            if metadata.contains_key(*key) {
                 return Err(AnchorError::ReservedMetadataKey {
                     key: key.to_string(),
                 });

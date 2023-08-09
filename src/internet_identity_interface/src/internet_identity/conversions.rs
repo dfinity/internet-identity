@@ -97,17 +97,23 @@ impl From<DeviceWithUsage> for AuthnMethodData {
         match device_data.key_type {
             KeyType::Platform => {
                 metadata.insert(
-                    "key_type".to_string(),
+                    "authenticator_attachment".to_string(),
                     MetadataEntry::String("platform".to_string()),
                 );
             }
             KeyType::CrossPlatform => {
                 metadata.insert(
-                    "key_type".to_string(),
+                    "authenticator_attachment".to_string(),
                     MetadataEntry::String("cross_platform".to_string()),
                 );
             }
-            KeyType::SeedPhrase | KeyType::Unknown => {
+            KeyType::SeedPhrase => {
+                metadata.insert(
+                    "usage".to_string(),
+                    MetadataEntry::String("recovery_phrase".to_string()),
+                );
+            }
+            KeyType::Unknown => {
                 // nothing to do
             }
         };
@@ -172,7 +178,8 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
     /// In particular the following metadata entries must be of the `string` variant for the conversion to succeed:
     ///  - alias
     ///  - origin
-    ///  - key_type
+    ///  - authenticator_attachment
+    ///  - usage
     /// This restriction may be lifted in the future.
     fn try_from(mut data: AuthnMethodData) -> Result<Self, Self::Error> {
         fn remove_metadata_string(
@@ -197,13 +204,23 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
         // order to avoid duplication.
         let alias = remove_metadata_string(&mut data, "alias")?.unwrap_or_default();
         let origin = remove_metadata_string(&mut data, "origin")?;
-        let key_type = remove_metadata_string(&mut data, "key_type")?
+
+        let mut key_type = remove_metadata_string(&mut data, "authenticator_attachment")?
             .map(|key_type| match key_type.as_str() {
                 "platform" => KeyType::Platform,
                 "cross_platform" => KeyType::CrossPlatform,
                 _ => KeyType::Unknown,
             })
             .unwrap_or(KeyType::Unknown);
+
+        if key_type == KeyType::Unknown {
+            key_type = remove_metadata_string(&mut data, "usage")?
+                .map(|key_type| match key_type.as_str() {
+                    "recovery_phrase" => KeyType::SeedPhrase,
+                    _ => KeyType::Unknown,
+                })
+                .unwrap_or(KeyType::Unknown);
+        }
 
         let (pubkey, credential_id) = match data.authn_method {
             AuthnMethod::WebAuthn(WebAuthn {

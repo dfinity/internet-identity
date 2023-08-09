@@ -77,7 +77,7 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     let principal = authn_method_1.principal();
     let mut authn_method_2 = sample_authn_method(2);
     authn_method_2.metadata.insert(
-        "key_type".to_string(),
+        "usage".to_string(),
         MetadataEntry::Bytes(ByteBuf::from("invalid")),
     );
 
