@@ -1,4 +1,4 @@
-use crate::storage::anchor::{Anchor, AnchorError, Device};
+use crate::storage::anchor::{Anchor, AnchorError, Device, KeyTypeInternal};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
@@ -122,7 +122,7 @@ fn should_enforce_cumulative_device_limit() {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([0; 100])),
         purpose: Purpose::Recovery,
-        key_type: KeyType::Unknown,
+        key_type: KeyTypeInternal::Unknown,
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: None,
@@ -202,7 +202,7 @@ fn should_allow_protection_only_on_recovery_phrases() {
         alias: "".to_string(),
         credential_id: None,
         purpose: Purpose::Recovery,
-        key_type: KeyType::Unknown,
+        key_type: KeyTypeInternal::Unknown,
         protection: DeviceProtection::Protected,
         origin: None,
         last_usage_timestamp: None,
@@ -366,7 +366,7 @@ fn should_not_allow_modification_of_device_key() {
 fn should_not_allow_to_add_recovery_phrase_with_credential_id() {
     let mut anchor = Anchor::new();
     let device = Device {
-        key_type: KeyType::SeedPhrase,
+        key_type: KeyTypeInternal::SeedPhrase,
         credential_id: Some(ByteBuf::from(vec![1, 2, 3])),
         ..sample_device()
     };
@@ -383,7 +383,7 @@ fn should_not_allow_to_add_recovery_phrase_with_credential_id() {
 fn should_not_allow_to_modify_recovery_phrase_to_add_credential_id() {
     let mut anchor = Anchor::new();
     let mut device = Device {
-        key_type: KeyType::SeedPhrase,
+        key_type: KeyTypeInternal::SeedPhrase,
         credential_id: None,
         ..sample_device()
     };
@@ -483,7 +483,7 @@ fn sample_device() -> Device {
         alias: "Test alias".to_string(),
         credential_id: Some(ByteBuf::from("credential id of some sample device")),
         purpose: Purpose::Authentication,
-        key_type: KeyType::Platform,
+        key_type: KeyTypeInternal::Platform,
         protection: DeviceProtection::Unprotected,
         origin: Some("https://fooo.bar".to_string()),
         last_usage_timestamp: Some(465789),
@@ -497,7 +497,7 @@ fn device(n: u8) -> Device {
         alias: format!("test alias {n}"),
         credential_id: Some(ByteBuf::from([n; 64])),
         purpose: Purpose::Authentication,
-        key_type: KeyType::Platform,
+        key_type: KeyTypeInternal::Platform,
         protection: DeviceProtection::Unprotected,
         origin: Some(format!("https://foo{n}.bar")),
         last_usage_timestamp: Some(n as u64),
@@ -512,7 +512,7 @@ fn large_device(n: u8) -> Device {
         alias: "alias12chars".to_string(),
         credential_id: Some(ByteBuf::from(vec![n; 200])),
         purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
+        key_type: KeyTypeInternal::Unknown,
         protection: DeviceProtection::Unprotected,
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
         last_usage_timestamp: Some(12345679),
@@ -529,7 +529,7 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
         alias: format!("recovery phrase {n}"),
         credential_id: None,
         purpose: Purpose::Recovery,
-        key_type: KeyType::SeedPhrase,
+        key_type: KeyTypeInternal::SeedPhrase,
         protection,
         origin: None,
         last_usage_timestamp: None,
