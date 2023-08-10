@@ -201,54 +201,18 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
-  const DomainActiveAnchorCounter = IDL.Record({
-    'start_timestamp' : Timestamp,
-    'internetcomputer_org_counter' : IDL.Nat64,
-    'ic0_app_counter' : IDL.Nat64,
-    'both_ii_domains_counter' : IDL.Nat64,
-  });
-  const DomainCompletedActiveAnchorStats = IDL.Record({
-    'monthly_active_anchors' : IDL.Opt(DomainActiveAnchorCounter),
-    'daily_active_anchors' : IDL.Opt(DomainActiveAnchorCounter),
-  });
-  const DomainOngoingActiveAnchorStats = IDL.Record({
-    'monthly_active_anchors' : IDL.Vec(DomainActiveAnchorCounter),
-    'daily_active_anchors' : DomainActiveAnchorCounter,
-  });
-  const DomainActiveAnchorStatistics = IDL.Record({
-    'completed' : DomainCompletedActiveAnchorStats,
-    'ongoing' : DomainOngoingActiveAnchorStats,
-  });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
     'archive_canister' : IDL.Opt(IDL.Principal),
   });
-  const ActiveAnchorCounter = IDL.Record({
-    'counter' : IDL.Nat64,
-    'start_timestamp' : Timestamp,
-  });
-  const CompletedActiveAnchorStats = IDL.Record({
-    'monthly_active_anchors' : IDL.Opt(ActiveAnchorCounter),
-    'daily_active_anchors' : IDL.Opt(ActiveAnchorCounter),
-  });
-  const OngoingActiveAnchorStats = IDL.Record({
-    'monthly_active_anchors' : IDL.Vec(ActiveAnchorCounter),
-    'daily_active_anchors' : ActiveAnchorCounter,
-  });
-  const ActiveAnchorStatistics = IDL.Record({
-    'completed' : CompletedActiveAnchorStats,
-    'ongoing' : OngoingActiveAnchorStats,
-  });
   const InternetIdentityStats = IDL.Record({
     'storage_layout_version' : IDL.Nat8,
     'users_registered' : IDL.Nat64,
-    'domain_active_anchor_stats' : IDL.Opt(DomainActiveAnchorStatistics),
     'max_num_latest_delegation_origins' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
     'latest_delegation_origins' : IDL.Vec(FrontendHostname),
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
-    'active_anchor_stats' : IDL.Opt(ActiveAnchorStatistics),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
