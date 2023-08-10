@@ -334,6 +334,7 @@ fn acknowledge_entries(sequence_number: u64) {
 }
 
 #[init]
+#[candid_method(init)]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     state::init_new();
@@ -563,7 +564,7 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_compatible, CandidSource};
+    use candid::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is
@@ -571,16 +572,15 @@ mod test {
     #[test]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
-        service_compatible(
+        service_equal(
             CandidSource::Text(&canister_interface),
             CandidSource::File(Path::new("internet_identity.did")),
         )
-        .unwrap_or_else(|e| panic!("the canister code is incompatible to the did file: {:?}", e));
-
-        service_compatible(
-            CandidSource::File(Path::new("internet_identity.did")),
-            CandidSource::Text(&canister_interface),
-        )
-        .unwrap_or_else(|e| panic!("the did file is incompatible to the canister code: {:?}", e));
+        .unwrap_or_else(|e| {
+            panic!(
+                "the canister code interface is not equal to the did file: {:?}",
+                e
+            )
+        });
     }
 }

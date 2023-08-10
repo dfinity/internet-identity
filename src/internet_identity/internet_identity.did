@@ -404,7 +404,7 @@ type AuthnMethodRegistrationInfo = record {
 
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
-    authn_data_registration: opt AuthnMethodRegistrationInfo;
+    authn_method_registration: opt AuthnMethodRegistrationInfo;
     // Authentication method independent metadata
     metadata: MetadataMap;
 };
