@@ -1,7 +1,7 @@
-use crate::active_anchor_stats::IIDomain;
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::ii_domain::IIDomain;
 use crate::storage::anchor::{Anchor, KeyTypeInternal};
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
@@ -20,6 +20,7 @@ mod assets;
 mod delegation;
 mod hash;
 mod http;
+mod ii_domain;
 /// Infrastructure to help building nested certification trees.
 mod nested_tree;
 mod state;
@@ -276,12 +277,7 @@ fn stats() -> InternetIdentityStats {
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
-    let active_anchor_stats =
-        state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
 
-    let domain_active_anchor_stats = state::persistent_state(|persistent_state| {
-        persistent_state.domain_active_anchor_stats.clone()
-    });
     let (latest_delegation_origins, max_num_latest_delegation_origins) =
         state::persistent_state(|persistent_state| {
             let origins = persistent_state
@@ -303,8 +299,6 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
-        active_anchor_stats,
-        domain_active_anchor_stats,
         max_num_latest_delegation_origins,
         latest_delegation_origins,
     })
