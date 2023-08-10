@@ -41,7 +41,7 @@ ic-test-state-machine-client = "3"
 candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
-regex = "1.5"
+regex = "1.9"
 ic-response-verification = "1.0"
 
 
