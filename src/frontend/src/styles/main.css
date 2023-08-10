@@ -181,7 +181,8 @@
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--vc-brand-purple-light);
+  --rc-interaction-text: var(--vc-brand-purple);
+  --rc-interactionHighlight-text: var(--vc-brand-purple-light);
   --rc-loading: var(--vc-brand-purple);
 
   --rc-marketing-icon: var(--vc-brand-purple);
@@ -584,6 +585,7 @@ a:hover,
   text-decoration: underline;
   text-decoration-thickness: var(--rs-line);
   text-underline-offset: 0.5ex;
+  color: var(--rc-interactionHighlight-text);
 }
 
 .t-link--discreet:not([disabled]):focus,
@@ -1325,6 +1327,11 @@ by all browsers (FF is missing) */
   background: transparent;
   color: var(--rc-interaction-text);
   border: none;
+}
+
+.c-button--textOnly:hover,
+.c-button--textOnly:focus {
+  color: var(--rc-interactionHighlight-text);
 }
 
 .c-button:not([disabled]):focus,
