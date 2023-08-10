@@ -1,7 +1,5 @@
 use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
-use crate::activity_stats::{
-    ActiveAnchorStatistics, CompletedActiveAnchorStats, OngoingActiveAnchorStats,
-};
+use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device, KeyTypeInternal};
@@ -416,20 +414,20 @@ fn sample_persistent_state() -> PersistentState {
         },
         canister_creation_cycles_cost: 12_346_000_000,
         registration_rate_limit: None,
-        active_anchor_stats: Some(ActiveAnchorStatistics {
-            completed: CompletedActiveAnchorStats {
-                daily_active_anchors: Some(ActiveAnchorCounter {
+        active_anchor_stats: Some(ActivityStats {
+            completed: CompletedActivityStats {
+                daily_events: Some(ActiveAnchorCounter {
                     start_timestamp: 965485,
                     counter: 99,
                 }),
-                monthly_active_anchors: None,
+                monthly_events: None,
             },
-            ongoing: OngoingActiveAnchorStats {
-                daily_active_anchors: ActiveAnchorCounter {
+            ongoing: OngoingActivityStats {
+                daily_events: ActiveAnchorCounter {
                     start_timestamp: 5648954321,
                     counter: 44,
                 },
-                monthly_active_anchors: vec![ActiveAnchorCounter {
+                monthly_events: vec![ActiveAnchorCounter {
                     start_timestamp: 549843248,
                     counter: 66,
                 }],

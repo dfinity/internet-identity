@@ -12,7 +12,30 @@ pub struct DomainActiveAnchorCounter {
     pub both_ii_domains_counter: u64,
 }
 
+pub struct DomainActivityContext<'a> {
+    pub anchor: &'a Anchor,
+    pub current_domain: &'a IIDomain,
+}
+
+impl DomainActiveAnchorCounter {
+    fn increment_counter_for_domain(&mut self, domain: &IIDomain) {
+        match domain {
+            IIDomain::Ic0AppDomain => self.ic0_app_counter += 1,
+            IIDomain::InternetComputerOrgDomain => self.internetcomputer_org_counter += 1,
+        }
+    }
+
+    fn decrement_counter_for_domain(&mut self, domain: &IIDomain) {
+        match domain {
+            IIDomain::Ic0AppDomain => self.ic0_app_counter -= 1,
+            IIDomain::InternetComputerOrgDomain => self.internetcomputer_org_counter -= 1,
+        }
+    }
+}
+
 impl ActivityCounter for DomainActiveAnchorCounter {
+    type CountingContext<'a> = DomainActivityContext<'a>;
+
     fn new(start_timestamp: Timestamp) -> Self {
         Self {
             start_timestamp,
@@ -25,53 +48,38 @@ impl ActivityCounter for DomainActiveAnchorCounter {
     fn start_timestamp(&self) -> Timestamp {
         self.start_timestamp
     }
-}
 
-/// Increases the counter on a window for a single II domain if the there was no activity before.
-///
-/// If there has been activity on an II domain and this is activity on the _other II_ domain, then
-/// we decrement the counter for the previous single domain and instead increment the counter for
-/// both II domains.
-///
-/// If the anchor was already active on both domains, the activity has been counted in this window
-/// already and no action needs to be taken.
-///
-/// Only called if `current_domain` corresponds to an II domain.
-pub fn update_ii_domain_counter(
-    counter: &mut DomainActiveAnchorCounter,
-    anchor: &Anchor,
-    current_domain: &IIDomain,
-) {
-    let previous_domain_activity = anchor.domain_activity_since(counter.start_timestamp);
+    /// Increases the counter on a counter for a single II domain if the there was no activity before.
+    ///
+    /// If there has been activity on an II domain and this is activity on the _other II_ domain, then
+    /// we decrement the counter for the previous single domain and instead increment the counter for
+    /// both II domains.
+    ///
+    /// If the anchor was already active on both domains, the activity has been counted in this counter
+    /// already and no action needs to be taken.
+    ///
+    /// Only called if `current_domain` corresponds to an II domain.
+    fn count_event(&mut self, context: &Self::CountingContext<'_>) {
+        let previous_domain_activity = context.anchor.domain_activity_since(self.start_timestamp);
 
-    match previous_domain_activity {
-        DomainActivity::None | DomainActivity::NonIIDomain => {
-            increment_counter_for_domain(counter, current_domain)
-        }
-        DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
-            if !current_domain.is_same_domain(&previous_domain_activity) {
-                // the anchor switched from being active on only one II domain to being active on both
-                // --> total active remains the same, but the anchor switches to the both domains bucket
-                decrement_counter_for_domain(counter, &current_domain.other_ii_domain());
-                counter.both_ii_domains_counter += 1;
+        match previous_domain_activity {
+            DomainActivity::None | DomainActivity::NonIIDomain => {
+                self.increment_counter_for_domain(context.current_domain);
+            }
+            DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
+                if !context
+                    .current_domain
+                    .is_same_domain(&previous_domain_activity)
+                {
+                    // the anchor switched from being active on only one II domain to being active on both
+                    // --> total active remains the same, but the anchor switches to the both domains bucket
+                    self.decrement_counter_for_domain(&context.current_domain.other_ii_domain());
+                    self.both_ii_domains_counter += 1;
+                }
+            }
+            DomainActivity::BothIIDomains => {
+                // already counted => do nothing
             }
         }
-        DomainActivity::BothIIDomains => {
-            // already counted => do nothing
-        }
-    }
-}
-
-fn increment_counter_for_domain(counter: &mut DomainActiveAnchorCounter, domain: &IIDomain) {
-    match domain {
-        IIDomain::Ic0AppDomain => counter.ic0_app_counter += 1,
-        IIDomain::InternetComputerOrgDomain => counter.internetcomputer_org_counter += 1,
-    }
-}
-
-fn decrement_counter_for_domain(counter: &mut DomainActiveAnchorCounter, domain: &IIDomain) {
-    match domain {
-        IIDomain::Ic0AppDomain => counter.ic0_app_counter -= 1,
-        IIDomain::InternetComputerOrgDomain => counter.internetcomputer_org_counter -= 1,
     }
 }

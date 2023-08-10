@@ -1,6 +1,6 @@
 use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
-use crate::activity_stats::ActiveAnchorStatistics;
+use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::assets::CertifiedAssets;
 use crate::state::temp_keys::TempKeys;
@@ -82,9 +82,9 @@ pub struct PersistentState {
     // Configuration for the rate limit on `register`, if any.
     pub registration_rate_limit: Option<RateLimitConfig>,
     // Daily and monthly active anchor statistics
-    pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
+    pub active_anchor_stats: Option<ActivityStats<ActiveAnchorCounter>>,
     // Daily and monthly active anchor statistics (filtered by domain)
-    pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    pub domain_active_anchor_stats: Option<ActivityStats<DomainActiveAnchorCounter>>,
     // Hashmap of last used delegation origins
     pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
     // Maximum number of latest delegation origins to store

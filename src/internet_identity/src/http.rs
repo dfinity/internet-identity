@@ -224,7 +224,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             )?;
         }
         if let Some(ref stats) = persistent_state.active_anchor_stats {
-            if let Some(ref daily_active_anchor_stats) = stats.completed.daily_active_anchors {
+            if let Some(ref daily_active_anchor_stats) = stats.completed.daily_events {
                 w.encode_gauge(
                 "internet_identity_daily_active_anchors",
                 daily_active_anchor_stats.counter as f64,
@@ -236,7 +236,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                 "Timestamp of the last completed 24h collection window for unique active anchors.",
             )?;
             }
-            if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_active_anchors {
+            if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_events {
                 w.encode_gauge(
                 "internet_identity_monthly_active_anchors",
                 monthly_active_anchor_stats.counter as f64,
@@ -251,7 +251,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         };
         if let Some(ref stats) = persistent_state.domain_active_anchor_stats {
             const BOTH_DOMAINS: &str = "both_ii_domains";
-            if let Some(ref daily_stats) = stats.completed.daily_active_anchors {
+            if let Some(ref daily_stats) = stats.completed.daily_events {
                 w.gauge_vec("internet_identity_daily_active_anchors_by_domain", "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.")
                     .unwrap()
                     .value(&[("domain", IC0_APP_DOMAIN)], daily_stats.ic0_app_counter as f64)
@@ -260,7 +260,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
                     .unwrap()
                     .value(&[("domain", BOTH_DOMAINS)], daily_stats.both_ii_domains_counter as f64)?;
             }
-            if let Some(ref daily_stats) = stats.completed.monthly_active_anchors {
+            if let Some(ref daily_stats) = stats.completed.monthly_events {
                 w.gauge_vec("internet_identity_monthly_active_anchors_by_domain", "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.")
                     .unwrap()
                     .value(&[("domain", IC0_APP_DOMAIN)], daily_stats.ic0_app_counter as f64)
