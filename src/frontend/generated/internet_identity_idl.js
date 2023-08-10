@@ -187,7 +187,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMap,
-    'authn_data_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
+    'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
   const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
