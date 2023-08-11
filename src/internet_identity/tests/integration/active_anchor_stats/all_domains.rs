@@ -109,17 +109,20 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Tests that active anchor stats are kept across upgrades.
+/// Tests that active anchor stats are kept across upgrades from the previous and the same release.
 #[test]
 fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
     // ensure stats are initially absent
     assert!(!get_metrics(&env, canister_id).contains("internet_identity_daily_active_anchors"));
 
     let anchor_number = flows::register_anchor(&env, canister_id);
 
+    // upgrade previous -> current
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    // upgrade current -> current
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     env.advance_time(Duration::from_secs(DAY_SECONDS));
