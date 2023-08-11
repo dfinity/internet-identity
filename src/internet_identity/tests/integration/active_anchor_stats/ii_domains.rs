@@ -250,11 +250,11 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Tests that active anchor stats are kept across upgrades.
+/// Tests that active anchor stats are kept across upgrades from the previous and the same release.
 #[test]
 fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
     let anchor = flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
 
@@ -262,6 +262,9 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     assert!(!get_metrics(&env, canister_id)
         .contains("internet_identity_daily_active_anchors_by_domain"));
 
+    // upgrade previous -> current
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    // upgrade current -> current
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     env.advance_time(Duration::from_secs(DAY_SECONDS));
