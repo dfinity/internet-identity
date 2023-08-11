@@ -1,3 +1,6 @@
+use crate::active_anchor_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::active_anchor_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
+use crate::active_anchor_stats::ActiveAnchorStatistics;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::assets::CertifiedAssets;
 use crate::state::temp_keys::TempKeys;

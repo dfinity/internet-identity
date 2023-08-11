@@ -1,4 +1,4 @@
-use crate::active_anchor_stats::IIDomain;
+use crate::ii_domain::IIDomain;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;

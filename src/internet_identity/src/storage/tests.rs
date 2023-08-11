@@ -1,3 +1,7 @@
+use crate::active_anchor_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::active_anchor_stats::{
+    ActiveAnchorStatistics, CompletedActiveAnchorStats, OngoingActiveAnchorStats,
+};
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device, KeyTypeInternal};
@@ -6,8 +10,7 @@ use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    ActiveAnchorCounter, ActiveAnchorStatistics, ArchiveConfig, CompletedActiveAnchorStats,
-    DeviceProtection, OngoingActiveAnchorStats, Purpose,
+    ArchiveConfig, DeviceProtection, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::rc::Rc;
