@@ -25,4 +25,4 @@ candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
 ic-test-state-machine-client = "3"
-regex = "1.5"
+regex = "1.9"
