@@ -13,7 +13,7 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
-mod active_anchor_stats;
+mod activity_stats;
 mod anchor_management;
 mod archive;
 mod assets;

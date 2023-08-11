@@ -3,7 +3,7 @@ use crate::ii_domain::IIDomain;
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
-use crate::{active_anchor_stats, state};
+use crate::{activity_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
@@ -65,7 +65,7 @@ pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey)
         .device(current_device_key)
         .and_then(|device| device.origin.as_ref())
         .and_then(|origin| IIDomain::try_from(origin.as_str()).ok());
-    active_anchor_stats::update_active_anchors_stats(anchor, &domain);
+    activity_stats::update_active_anchors_stats(anchor, &domain);
     anchor
         .set_device_usage_timestamp(current_device_key, time())
         .expect("unable to update last usage timestamp");

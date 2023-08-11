@@ -1,5 +1,5 @@
-use crate::active_anchor_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
-use crate::active_anchor_stats::{
+use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::activity_stats::{
     ActiveAnchorStatistics, CompletedActiveAnchorStats, OngoingActiveAnchorStats,
 };
 use crate::archive::{ArchiveData, ArchiveState};

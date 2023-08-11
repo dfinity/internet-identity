@@ -1,5 +1,5 @@
-use crate::active_anchor_stats::activity_counter::ActivityCounter;
-use crate::active_anchor_stats::ActiveAnchorStatistics;
+use crate::activity_stats::activity_counter::ActivityCounter;
+use crate::activity_stats::ActiveAnchorStatistics;
 use crate::DAY_NS;
 use ic_cdk::api::time;
 
