@@ -1,4 +1,4 @@
-use crate::active_anchor_stats::activity_counter::ActivityCounter;
+use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::ii_domain::IIDomain;
 use crate::storage::anchor::{Anchor, DomainActivity};
 use candid::{CandidType, Deserialize};

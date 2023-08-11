@@ -1,6 +1,6 @@
-use crate::active_anchor_stats::activity_counter::active_anchor_counter::update_active_anchor_counter;
-use crate::active_anchor_stats::activity_counter::domain_active_anchor_counter::update_ii_domain_counter;
-use crate::active_anchor_stats::activity_counter::ActivityCounter;
+use crate::activity_stats::activity_counter::active_anchor_counter::update_active_anchor_counter;
+use crate::activity_stats::activity_counter::domain_active_anchor_counter::update_ii_domain_counter;
+use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::ii_domain::IIDomain;
 use crate::state;
 use crate::storage::anchor::Anchor;
