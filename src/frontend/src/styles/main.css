@@ -2199,6 +2199,11 @@ by all browsers (FF is missing) */
   clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
+.c-chasm__arrow-left {
+  margin-top: 10px;
+  margin-left: calc(1.25 * var(--rs-card-bezel));
+}
+
 .c-chasm__button {
   transition: transform 300ms cubic-bezier(0.3, 0.7, 0, 1);
   vertical-align: text-bottom;
