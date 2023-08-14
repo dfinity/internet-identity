@@ -1,6 +1,6 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { mount, renderPage } from "$src/utils/lit-html";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 
 export const promptRecoveryTemplate = ({
   onUsePhrase,

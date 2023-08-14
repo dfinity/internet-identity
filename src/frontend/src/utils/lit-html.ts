@@ -2,7 +2,7 @@
 
 import { toast } from "$src/components/toast";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { render, TemplateResult } from "lit-html";
+import { TemplateResult, render } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
 

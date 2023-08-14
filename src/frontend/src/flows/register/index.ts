@@ -158,6 +158,5 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
     return (await import("ua-parser-js")).default;
   } catch (e) {
     console.error(e);
-    return undefined;
   }
 };

@@ -1,7 +1,7 @@
 import { Challenge } from "$generated/internet_identity_types";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
-import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
+import { LoginFlowCanceled, cancel } from "$src/utils/flowResult";
 import {
   Connection,
   IIWebAuthnIdentity,
@@ -10,9 +10,9 @@ import {
 import { mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { registerStepper } from "./stepper";
 
 import { isNullish, nonNullish } from "@dfinity/utils";
