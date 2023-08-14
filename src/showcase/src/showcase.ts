@@ -363,7 +363,34 @@ export const iiPages: Record<string, () => void> = {
       i18n,
       userNumber: BigInt(1234),
       relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
+      verify: async (dapp) => {
+        console.log("Verifying through " + dapp.name + "...");
+
+        // Hacky button to resolve the fake promise
+        await new Promise<void>((resolve) => {
+          const closeBtn = document.createElement("button");
+          closeBtn.onclick = () => {
+            closeBtn.remove();
+            resolve();
+          };
+          closeBtn.classList.add("c-button");
+          closeBtn.style.position = "absolute";
+          closeBtn.style.inset = "0 0 auto auto";
+          closeBtn.style.width = "fit-content";
+          closeBtn.style.fontSize = "10px";
+          closeBtn.style.padding = "2px 4px";
+          closeBtn.style.marginTop = "0";
+          closeBtn.innerText = "done";
+          closeBtn.dataset.role = "done";
+          document.body.appendChild(closeBtn);
+        });
+        console.log("Done.");
+      },
+
       providers: [nnsDapp, juno],
+      onContinue: (res) => {
+        console.log("Received result", res);
+      },
     }),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
