@@ -282,6 +282,7 @@ jobs:
 
       - name: Download nextest
         run: |
+          set -euo pipefail
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
       - name: 'Download nextest test archive'
