@@ -53,6 +53,7 @@ import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
 import { promptPage } from "$src/flows/verifiableCredentials/prompt";
+import { selectPage } from "$src/flows/verifiableCredentials/select";
 
 const identityBackground = loadIdentityBackground();
 
@@ -119,6 +120,8 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
 });
 
 const openChat: KnownDapp = dapps.find((dapp) => dapp.name === "OpenChat")!;
+const nnsDapp: KnownDapp = dapps.find((dapp) => dapp.name === "NNS Dapp")!;
+const juno: KnownDapp = dapps.find((dapp) => dapp.name === "Juno")!;
 
 const authzTemplatesKnown = authnTemplateAuthorize({
   origin: "https://oc.app",
@@ -353,6 +356,13 @@ export const iiPages: Record<string, () => void> = {
       userNumber: BigInt(1234),
       knownDapp: openChat,
       cancel: () => console.log("cancel"),
+    }),
+  select: () =>
+    selectPage({
+      i18n,
+      userNumber: BigInt(1234),
+      relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
+      providers: [nnsDapp, juno],
     }),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
