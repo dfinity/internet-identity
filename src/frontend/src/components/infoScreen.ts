@@ -1,9 +1,9 @@
 import { infoIconNaked, warningIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey } from "$src/i18n";
-import { mount, TemplateElement } from "$src/utils/lit-html";
+import { TemplateElement, mount } from "$src/utils/lit-html";
 import { nonNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 
 /* An entry in the info screen */
 type Entry = {
