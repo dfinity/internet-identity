@@ -802,3 +802,24 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
     }
     Ok(())
 }
+
+/// Verifies that a device with key type BrowserStorageKey can be added.
+#[test]
+fn should_add_device_with_browser_storage_key_key_type() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    let device = DeviceData {
+        key_type: KeyType::BrowserStorageKey,
+        ..DeviceData::auth_test_device()
+    };
+
+    api::add(&env, canister_id, principal_1(), user_number, &device)?;
+
+    let mut devices =
+        api::get_anchor_info(&env, canister_id, principal_1(), user_number)?.into_device_data();
+    devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
+    assert_eq!(devices, vec![device, device_data_1()]);
+    Ok(())
+}

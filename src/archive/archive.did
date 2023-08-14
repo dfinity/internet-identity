@@ -14,6 +14,7 @@ type KeyType = variant {
     platform;
     cross_platform;
     seed_phrase;
+    browser_storage_key;
 };
 
 type DeviceProtection = variant {

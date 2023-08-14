@@ -2,7 +2,7 @@ use crate::anchor_management::{post_operation_bookkeeping, tentative_device_regi
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::ii_domain::IIDomain;
-use crate::storage::anchor::{Anchor, KeyTypeInternal};
+use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -176,7 +176,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
             recovery_phrases: vec![],
         },
         |mut credentials, device| {
-            if device.key_type == KeyTypeInternal::SeedPhrase {
+            if device.key_type == KeyType::SeedPhrase {
                 credentials.recovery_phrases.push(device.pubkey);
             } else if let Some(credential_id) = device.credential_id {
                 let credential = WebAuthnCredential {

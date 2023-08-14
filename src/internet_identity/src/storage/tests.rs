@@ -2,13 +2,13 @@ use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchor
 use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
-use crate::storage::anchor::{Anchor, Device, KeyTypeInternal};
+use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, DeviceProtection, Purpose,
+    ArchiveConfig, DeviceProtection, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::rc::Rc;
@@ -389,7 +389,7 @@ fn sample_device() -> Device {
         alias: "my test device".to_string(),
         credential_id: Some(ByteBuf::from("this is the credential id")),
         purpose: Purpose::Authentication,
-        key_type: KeyTypeInternal::Unknown,
+        key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: Some(1234),

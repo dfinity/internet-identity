@@ -113,6 +113,12 @@ impl From<DeviceWithUsage> for AuthnMethodData {
                     MetadataEntry::String("recovery_phrase".to_string()),
                 );
             }
+            KeyType::BrowserStorageKey => {
+                metadata.insert(
+                    "usage".to_string(),
+                    MetadataEntry::String("browser_storage_key".to_string()),
+                );
+            }
             KeyType::Unknown => {
                 // nothing to do
             }
@@ -217,6 +223,7 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
             key_type = remove_metadata_string(&mut data, "usage")?
                 .map(|key_type| match key_type.as_str() {
                     "recovery_phrase" => KeyType::SeedPhrase,
+                    "browser_storage_key" => KeyType::BrowserStorageKey,
                     _ => KeyType::Unknown,
                 })
                 .unwrap_or(KeyType::Unknown);
