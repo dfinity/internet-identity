@@ -24,7 +24,7 @@ import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showV
 import { authnTemplateAuthorize } from "$src/flows/authorize";
 import { compatibilityNotice } from "$src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "$src/flows/dappsExplorer";
-import { getDapps } from "$src/flows/dappsExplorer/dapps";
+import { getDapps, KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
 import {
   protectDeviceInfoPage,
@@ -51,6 +51,8 @@ import { I18n } from "$src/utils/i18n";
 import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
+
+import { promptPage } from "$src/flows/verifiableCredentials/prompt";
 
 const identityBackground = loadIdentityBackground();
 
@@ -115,6 +117,8 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
 
   knownDapp: dapps.find((dapp) => dapp.name === "NNS Dapp"),
 });
+
+const openChat: KnownDapp = dapps.find((dapp) => dapp.name === "OpenChat")!;
 
 const authzTemplatesKnown = authnTemplateAuthorize({
   origin: "https://oc.app",
@@ -342,6 +346,14 @@ export const iiPages: Record<string, () => void> = {
       },
     });
   },
+
+  prompt: () =>
+    promptPage({
+      i18n,
+      userNumber: BigInt(1234),
+      knownDapp: openChat,
+      cancel: () => console.log("cancel"),
+    }),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
