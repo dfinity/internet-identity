@@ -141,7 +141,8 @@ export interface InternetIdentityStats {
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
-  { 'unknown' : null };
+  { 'unknown' : null } |
+  { 'browser_storage_key' : null };
 export type MetadataMap = Array<
   [
     string,
