@@ -9,6 +9,8 @@ pub struct ActiveAnchorCounter {
 }
 
 impl ActivityCounter for ActiveAnchorCounter {
+    type CountingContext<'a> = Option<Timestamp>;
+
     fn new(start_timestamp: Timestamp) -> Self {
         Self {
             start_timestamp,
@@ -19,25 +21,22 @@ impl ActivityCounter for ActiveAnchorCounter {
     fn start_timestamp(&self) -> Timestamp {
         self.start_timestamp
     }
-}
 
-/// Increases the counter on a window if the `previous_activity_timestamp` lies before
-/// the `start_timestamp` (i.e. a window where the anchor has not yet had any activity in).
-///
-/// For any given anchor and window the `previous_activity_timestamp` is only absent or before the
-/// `window.start_timestamp` once because:
-/// * `previous_activity_timestamp` of the given anchor is set to `ic_cdk::time()` in this canister call
-/// * `window.start_timestamp` is <= `ic_cdk::time()` for any active window
-pub fn update_active_anchor_counter(
-    counter: &mut ActiveAnchorCounter,
-    previous_activity_timestamp: Option<Timestamp>,
-) {
-    if let Some(timestamp) = previous_activity_timestamp {
-        if counter.start_timestamp > timestamp {
-            counter.counter += 1;
+    /// Increases the counter on a counter if the `previous_activity_timestamp` lies before
+    /// the `start_timestamp` (i.e. a window where the anchor has not yet had any activity in).
+    ///
+    /// For any given anchor and counter the `previous_activity_timestamp` is only absent or before the
+    /// `window.start_timestamp` once because:
+    /// * `previous_activity_timestamp` of the given anchor is set to `ic_cdk::time()` in this canister call
+    /// * `window.start_timestamp` is <= `ic_cdk::time()` for any active counter
+    fn count_event(&mut self, previous_activity_timestamp: &Self::CountingContext<'_>) {
+        if let Some(timestamp) = previous_activity_timestamp {
+            if self.start_timestamp > *timestamp {
+                self.counter += 1;
+            }
+        } else {
+            // increase counter if there is no previous activity
+            self.counter += 1;
         }
-    } else {
-        // increase counter if there is no previous activity
-        counter.counter += 1;
     }
 }

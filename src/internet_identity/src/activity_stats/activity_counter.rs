@@ -16,9 +16,15 @@ pub mod domain_active_anchor_counter;
 ///     - ActiveAnchorCounter: used to track unique active anchors
 ///     - IIDomainCounter: used to track unique active anchors per domain
 pub trait ActivityCounter: Clone {
+    /// Context that is required for the counter to count an event.
+    type CountingContext<'a>;
+
     /// Creates a new counter with the given start timestamp.
     fn new(start_timestamp: Timestamp) -> Self;
 
     /// Returns the start timestamp of the counter.
     fn start_timestamp(&self) -> Timestamp;
+
+    /// Counts an event on the counter.
+    fn count_event(&mut self, context: &Self::CountingContext<'_>);
 }
