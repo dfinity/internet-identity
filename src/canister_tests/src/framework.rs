@@ -470,7 +470,23 @@ pub fn parse_metric(body: &str, metric: &str) -> (f64, SystemTime) {
 
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
-    assert_eq!(value, expected);
+    assert_eq!(value, expected, "metric {metric_name} does not match");
+}
+
+pub fn assert_labelled_metric(
+    metrics: &str,
+    metric_name: &str,
+    expected_value: f64,
+    label_name: &str,
+    label_values: &[&str],
+) {
+    for other_type in label_values {
+        assert_metric(
+            metrics,
+            &(metric_name.to_string() + &format!("{{{}=\"{}\"}}", label_name, other_type)),
+            expected_value,
+        );
+    }
 }
 
 pub fn assert_devices_equal(

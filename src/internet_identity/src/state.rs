@@ -1,4 +1,5 @@
 use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
 use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
@@ -85,6 +86,8 @@ pub struct PersistentState {
     pub active_anchor_stats: Option<ActivityStats<ActiveAnchorCounter>>,
     // Daily and monthly active anchor statistics (filtered by domain)
     pub domain_active_anchor_stats: Option<ActivityStats<DomainActiveAnchorCounter>>,
+    // Daily and monthly active authentication methods on the II domains.
+    pub active_authn_method_stats: Option<ActivityStats<AuthnMethodCounter>>,
     // Hashmap of last used delegation origins
     pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
     // Maximum number of latest delegation origins to store
@@ -99,6 +102,7 @@ impl Default for PersistentState {
             registration_rate_limit: None,
             active_anchor_stats: None,
             domain_active_anchor_stats: None,
+            active_authn_method_stats: None,
             latest_delegation_origins: None,
             max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
         }

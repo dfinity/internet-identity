@@ -14,7 +14,7 @@ pub struct DomainActiveAnchorCounter {
 
 pub struct DomainActivityContext<'a> {
     pub anchor: &'a Anchor,
-    pub current_domain: &'a IIDomain,
+    pub current_domain: IIDomain,
 }
 
 impl DomainActiveAnchorCounter {
@@ -64,7 +64,7 @@ impl ActivityCounter for DomainActiveAnchorCounter {
 
         match previous_domain_activity {
             DomainActivity::None | DomainActivity::NonIIDomain => {
-                self.increment_counter_for_domain(context.current_domain);
+                self.increment_counter_for_domain(&context.current_domain);
             }
             DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
                 if !context
