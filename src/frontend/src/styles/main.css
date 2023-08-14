@@ -2787,3 +2787,8 @@ input[type="checkbox"] {
 .l-stack--none {
   margin-top: 0;
 }
+
+.hacker-wrap svg {
+  display: block;
+  margin: 0 auto;
+}
