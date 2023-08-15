@@ -10,17 +10,22 @@ edition = "2021"
 # local dependencies
 internet_identity_interface = { path = "../../src/internet_identity_interface" }
 # ic dependencies
-candid = "0.8"
-ic-cdk = "0.9"
-ic-cdk-macros = "0.6"
+candid = "0.9"
+ic-cdk = "0.10"
+ic-cdk-macros = "0.7"
 # vc dependencies
 # ssi-dids = { version = "0.1", features = ["example"] }
 # ssi-vc = "0.2"
+identity_credential = {git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
+identity_core = {git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false}
+# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential"]}
+# identity_core = {path = "../../../identity.rs/identity_core", default-features = false}
 # other dependencies
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-ic-test-state-machine-client = "2"
+ic-test-state-machine-client = "3"
+candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../../src/canister_tests" }
 lazy_static = "1.4"

@@ -1,27 +1,15 @@
 use candid::{candid_method, Principal};
 use ic_cdk_macros::{query, update};
+use identity_core::common::Url;
+use identity_core::convert::FromJson;
+use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     ConsentData, CredentialData, IssueCredentialRequest, IssueCredentialResponse, ManifestData,
     ManifestRequest, ManifestResponse,
 };
-use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fmt::Error;
 use std::ops::Add;
-
-// partial Credential, to be replaced by a ssi_vc::Credential
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct Credential {
-    #[serde(rename = "@context")]
-    pub context: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub credential_subject: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuer: Option<String>,
-}
 
 #[update]
 #[candid_method]
@@ -53,13 +41,25 @@ fn did_from_principal(principal: &Principal) -> String {
 }
 
 fn new_credential(req: &IssueCredentialRequest) -> Credential {
-    Credential {
-        context: "test_context".to_string(),
-        id: Some("did:example:76e12ec712ebc6f1c221ebfeb1f".to_string()),
-        type_: "neuron owner".to_string(),
-        credential_subject: did_from_principal(&req.signed_id_alias.id_alias),
-        issuer: Some("Test IC issuer".to_string()),
-    }
+    let subject: Subject = Subject::from_json_value(json!({
+      "id": did_from_principal(&req.signed_id_alias.id_alias),
+      "name": "Alice",
+      "degree": {
+        "type": "BachelorDegree",
+        "name": "Bachelor of Science and Arts",
+      },
+      "GPA": "4.0",
+    }))
+    .unwrap();
+
+    // Build credential using subject above and issuer.
+    CredentialBuilder::default()
+        .id(Url::parse("https://example.edu/credentials/3732").unwrap())
+        .issuer(Url::parse("https://identity.ic0.app").unwrap())
+        .type_("UniversityDegreeCredential")
+        .subject(subject)
+        .build()
+        .unwrap()
 }
 
 fn verify_credential_request(_req: &IssueCredentialRequest) -> Result<(), Error> {

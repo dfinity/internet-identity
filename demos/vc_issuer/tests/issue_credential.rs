@@ -1,10 +1,10 @@
 //! Tests related to issue_credential canister call.
 
+use candid::Principal;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
-use ic_cdk::export::Principal;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
@@ -78,7 +78,6 @@ mod api {
 
 /// Verifies that the manifest can be requested.
 #[test]
-#[ignore]
 fn should_issue_credential() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
@@ -99,7 +98,6 @@ fn should_issue_credential() -> Result<(), CallError> {
 
 /// Verifies that a credential is being created including II interactions.
 #[test]
-#[ignore]
 fn should_issue_credential_e2e() -> Result<(), CallError> {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
