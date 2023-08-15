@@ -45,12 +45,8 @@ jobs:
       # NOTE: if you modify the flavors, update the #flavors table in README.md
       matrix:
         include:
-          # The production build
-          - name: internet_identity_production.wasm.gz
-            II_FETCH_ROOT_KEY: 0
-            II_DUMMY_CAPTCHA: 0
-            II_DUMMY_AUTH: 0
-            II_INSECURE_REQUESTS: 0
+          # The production build is built later because it has a dependency on the dev build (for dfx pull)
+          # See job: docker-build-internet_identity_production
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # selenium.
@@ -78,6 +74,13 @@ jobs:
           echo "Inferred version: '$version'"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: "Create dfx metadata for the dfx pull feature"
+        id: dfx-metadata
+        run: |
+          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name ${{ matrix.name }} )"
+          echo "using dfx metadata $dfx_metadata_json"
+          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
 
@@ -92,6 +95,7 @@ jobs:
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
             II_INSECURE_REQUESTS=${{ matrix.II_INSECURE_REQUESTS }}
             II_VERSION=${{ steps.version.outputs.version }}
+            DFX_METADATA=${{ steps.dfx-metadata.outputs.metadata }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
@@ -107,6 +111,65 @@ jobs:
           # path is the name used as the file to upload and the name of the
           # downloaded file
           path: ${{ matrix.name }}
+
+  # Build the production version of internet identity.
+  # The production build is separately because it has a dependency on the dev build (for dfx pull)
+  #
+  # Note: do not rename this job as it needs to contain the file name of the produced asset (without extension)
+  # in order for the release script action to work correctly.
+  docker-build-internet_identity_production:
+    runs-on: ubuntu-latest
+    needs: docker-build-ii
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Infer version
+        id: version
+        run: |
+          version="$(./scripts/version)"
+          echo "Inferred version: '$version'"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: 'Download dev build II wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_dev.wasm.gz
+          path: .
+
+      - name: "Create dfx metadata for the dfx pull feature"
+        id: dfx-metadata
+        run: |
+          sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
+          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash $sha256)"
+          echo "using dfx metadata $dfx_metadata_json"
+          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build internet_identity_production.wasm.gz
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            II_VERSION=${{ steps.version.outputs.version }}
+            DFX_METADATA=${{ steps.dfx-metadata.outputs.metadata }}
+          cache-from: type=gha,scope=cached-stage
+          # Exports the artefacts from the final stage
+          outputs: ./out
+          target: scratch_internet_identity
+
+      - run: mv out/internet_identity.wasm.gz internet_identity_production.wasm.gz
+      - run: sha256sum internet_identity_production.wasm.gz
+      - name: 'Upload internet_identity_production.wasm.gz'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: internet_identity_production.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: internet_identity_production.wasm.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -140,7 +203,7 @@ jobs:
 
   wasm-size:
     runs-on: ubuntu-latest
-    needs: docker-build-ii
+    needs: docker-build-internet_identity_production
     steps:
       - uses: actions/checkout@v3
       - name: 'Download wasm'
@@ -487,7 +550,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-ii, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive]
     steps:
       - uses: actions/checkout@v3
 
@@ -531,7 +594,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-ii, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive]
 
     steps:
       - uses: actions/checkout@v3
@@ -629,7 +692,7 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
-    needs: docker-build-ii
+    needs: [docker-build-internet_identity_production, docker-build-ii]
     strategy:
       matrix:
         # On main, we run the checks across all platforms. On other branches, in order to speed up checks (on PRs) we skip most platforms
@@ -639,11 +702,25 @@ jobs:
         os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04", "macos-11", "macos-12" ]') || fromJson('[ "ubuntu-22.04" ]') }}
     steps:
       - uses: actions/checkout@v3
-      - name: 'Download wasm.gz'
+      - name: 'Download production build wasm.gz'
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm.gz
           path: .
+      - name: 'Download dev build II wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_dev.wasm.gz
+          path: .
+
+      - name: "Create dfx metadata for the dfx pull feature"
+        id: dfx-metadata
+        run: |
+          sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
+          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash $sha256)"
+          echo "using dfx metadata $dfx_metadata_json"
+          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
       - run: |
           sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
@@ -653,6 +730,7 @@ jobs:
         with:
           # we check that ubuntu builds match the docker build
           sha256: ${{ startsWith(matrix.os, 'ubuntu') && steps.sha256.outputs.sha256 || '' }}
+          dfx-metadata: ${{ steps.dfx-metadata.outputs.metadata }}
 
   interface-compatibility:
     runs-on: ubuntu-latest

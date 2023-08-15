@@ -73,12 +73,15 @@ ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 ARG II_INSECURE_REQUESTS=
 
+# DFX specific metadata for dfx pull
+ARG DFX_METADATA=
+
 RUN touch src/internet_identity/src/lib.rs
 RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build
+RUN ./scripts/build ${DFX_METADATA:+"--dfx-metadata" "$DFX_METADATA"}
 RUN sha256sum /internet_identity.wasm.gz
 
 FROM deps as build_archive

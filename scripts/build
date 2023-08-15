@@ -18,12 +18,13 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies] [--internet-identity] [--archive]
+  $0 [--only-dependencies] [--internet-identity] [--archive] [--dfx-metadata METADATA]
 
 Options:
   --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
   --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
   --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --dfx-metadata METADATA      DFX metadata to include in the canister public metadata section
 EOF
 }
 
@@ -39,6 +40,7 @@ EOF
 
 ONLY_DEPS=
 CANISTERS=()
+DFX_METADATA=
 
 while [[ $# -gt 0  ]]
 do
@@ -60,6 +62,11 @@ do
         --archive)
             CANISTERS+=("archive")
             shift
+            ;;
+        --dfx-metadata)
+            DFX_METADATA="${2:?missing value for '--dfx-metadata'}"
+            shift; # shift past --dfx-metadata and value
+            shift;
             ;;
         *)
             echo "ERROR: unknown argument $1"
@@ -129,8 +136,20 @@ function build_canister() {
             -o "./$canister.wasm" \
             shrink
         ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:service -f "$SRC_DIR/$canister.did" -v public
+
         # indicate support for certificate version 1 and 2 in the canister metadata
         ic-wasm "$canister.wasm" -o "$canister.wasm" metadata supported_certificate_versions -d "1,2" -v public
+
+        if [ "$canister" == "internet_identity" ]
+        then
+          # indicate that the II canister does not require an init argument
+          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "()" -v public
+        fi
+
+        if [ -n "$DFX_METADATA" ]
+        then
+          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$DFX_METADATA" -v public
+        fi
         gzip --no-name --force "$canister.wasm"
     fi
 }

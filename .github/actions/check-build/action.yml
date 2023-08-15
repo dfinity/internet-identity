@@ -2,7 +2,10 @@ name: 'Check build'
 description: This action performs a clean, non-Docker build of II, and optionally checks the gzipped Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
 inputs:
   sha256:
-    description: The expected sha256 of the final Wasm module
+    description: The expected sha256 of the final production Wasm module
+    required: false
+  dfx-metadata:
+    description: The dfx metadata to include in the production build
     required: false
 runs:
   using: "composite"
@@ -12,7 +15,9 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
-    - run: ./scripts/build
+    - run: |
+        metadata='${{ inputs.dfx-metadata }}'
+        ./scripts/build ${metadata:+"--dfx-metadata" "$metadata"}
       shell: bash
 
     # check the hash

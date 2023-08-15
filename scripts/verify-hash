@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+
+declare expected_ii_hash=
+declare expected_archive_hash=
+GREEN=$(tput setaf 2)
+RED=$(tput setaf 1)
+NC=$(tput sgr0)
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Verifies the hash of the II and archive wasm files"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 --ii-hash II_HASH [--archive-hash ARCHIVE_HASH]
+
+Options:
+  --ii-hash HASH                  Expected II SHA256 hash of the II wasm.
+  --archive-hash ARCHIVE_HASH     Optional archive hash, if the archive needs to be verified as well.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Builds the II canister (and optionally also the archive) and compares the hash of the built wasm with the expected hash.
+EOF
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --ii-hash)
+            expected_ii_hash="${2:?missing value for '--ii-hash'}"
+            shift; # shift past --ii-hash and value
+            shift;
+            ;;
+        --archive-hash)
+            expected_archive_hash="${2:?missing value for '--archive-hash'}"
+            shift; # shift past --archive-hash and value
+            shift;
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'release --help' for more information."
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z "$expected_ii_hash" ]
+then
+    echo no II hash provided
+    usage
+    exit 1
+fi
+
+# dev build
+dfx_metadata_dev="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz)"
+II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 II_INSECURE_REQUESTS=1 ./scripts/docker-build ${dfx_metadata_dev:+"--dfx-metadata" "$dfx_metadata_dev"}
+dev_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
+# delete the dev wasm file
+rm ./internet_identity.wasm.gz
+
+# prod build
+dfx_metadata_prod="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash "$dev_build_sha256")"
+./scripts/docker-build ${dfx_metadata_prod:+"--dfx-metadata" "$dfx_metadata_prod"}
+prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
+
+if [ "$prod_build_sha256" == "$expected_ii_hash" ]
+then
+  echo "${GREEN}internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash${NC}"
+else
+  echo "${RED}sha mismatch: $prod_build_sha256 /= $expected_ii_hash${NC}"
+  exit 1
+fi
+
+if [ -n "$expected_archive_hash" ]
+then
+  ./scripts/docker-build.sh --archive
+  archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
+  if [ "$archive_sha256" == "$expected_archive_hash" ]
+  then
+    echo "${GREEN}archive.wasm.gz sha256 matches expected hash $expected_archive_hash${NC}"
+  else
+    echo "${RED}sha mismatch: $archive_sha256 /= $expected_archive_hash${NC}"
+    exit 1
+  fi
+fi
+
+echo "${GREEN}Wasm verification successful!${NC}"

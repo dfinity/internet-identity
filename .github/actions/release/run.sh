@@ -38,10 +38,7 @@ To build the wasm modules yourself and verify their hashes, run the following co
 \`\`\`
 git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
-./scripts/docker-build
-sha256sum internet_identity.wasm.gz
-./scripts/docker-build --archive
-sha256sum archive.wasm.gz
+./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1)
 \`\`\`
 EOF
 
