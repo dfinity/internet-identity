@@ -168,20 +168,29 @@ fn persistent_state_metrics(
     };
     if let Some(ref stats) = persistent_state.domain_active_anchor_stats {
         const BOTH_DOMAINS: &str = "both_ii_domains";
-        labelled_activity_metrics(
-            w,
-            stats,
-            "internet_identity_daily_active_anchors_by_domain",
-            "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.",
-            "internet_identity_monthly_active_anchors_by_domain",
-            "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.",
-            |counter, encoder| {
-                encoder
-                    .value(&[("domain", IC0_APP_DOMAIN)], counter.ic0_app_counter as f64)?
-                    .value(&[("domain", INTERNETCOMPUTER_ORG_DOMAIN)], counter.internetcomputer_org_counter as f64)?
-                    .value(&[("domain", BOTH_DOMAINS)], counter.both_ii_domains_counter as f64)?;
-                Ok(())
-            })?;
+
+        let labels = ActivityMetricsLabels {
+            daily_stats_label: "internet_identity_daily_active_anchors_by_domain",
+            daily_stats_doc: "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.",
+            monthly_stats_label: "internet_identity_monthly_active_anchors_by_domain",
+            monthly_stats_doc: "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.",
+        };
+        labelled_activity_metrics(w, stats, labels, |counter, encoder| {
+            encoder
+                .value(
+                    &[("domain", IC0_APP_DOMAIN)],
+                    counter.ic0_app_counter as f64,
+                )?
+                .value(
+                    &[("domain", INTERNETCOMPUTER_ORG_DOMAIN)],
+                    counter.internetcomputer_org_counter as f64,
+                )?
+                .value(
+                    &[("domain", BOTH_DOMAINS)],
+                    counter.both_ii_domains_counter as f64,
+                )?;
+            Ok(())
+        })?;
     };
     if let Some(delegation_origins_limit) = persistent_state.max_num_latest_delegation_origins {
         w.encode_gauge(
@@ -193,21 +202,25 @@ fn persistent_state_metrics(
     Ok(())
 }
 
+struct ActivityMetricsLabels<'a> {
+    daily_stats_label: &'a str,
+    daily_stats_doc: &'a str,
+    monthly_stats_label: &'a str,
+    monthly_stats_doc: &'a str,
+}
+
 fn labelled_activity_metrics<T: ActivityCounter>(
     w: &mut MetricsEncoder<Vec<u8>>,
     stats: &ActivityStats<T>,
-    daily_stats_label: &str,
-    daily_stats_doc: &str,
-    monthly_stats_label: &str,
-    monthly_stats_doc: &str,
+    labels: ActivityMetricsLabels<'_>,
     encoding: impl Fn(&T, LabeledMetricsBuilder<Vec<u8>>) -> Result<(), std::io::Error>,
 ) -> Result<(), std::io::Error> {
     if let Some(ref daily_stats) = stats.completed.daily_events {
-        let builder = w.gauge_vec(daily_stats_label, daily_stats_doc)?;
+        let builder = w.gauge_vec(labels.daily_stats_label, labels.daily_stats_doc)?;
         encoding(daily_stats, builder)?;
     }
     if let Some(ref monthly_stats) = stats.completed.monthly_events {
-        let builder = w.gauge_vec(monthly_stats_label, monthly_stats_doc)?;
+        let builder = w.gauge_vec(labels.monthly_stats_label, labels.monthly_stats_doc)?;
         encoding(monthly_stats, builder)?;
     }
     Ok(())
