@@ -50,10 +50,10 @@ import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
 import { I18n } from "$src/utils/i18n";
 import { mount, withRef } from "$src/utils/lit-html";
-import { asNonEmptyArray, Chan, NonEmptyArray } from "$src/utils/utils";
-import { html, render, TemplateResult } from "lit-html";
+import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
+import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 const identityBackground = loadIdentityBackground();
 

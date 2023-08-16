@@ -177,26 +177,27 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         key_type: KeyType::SeedPhrase,
         ..device1.clone()
     };
-    let authn_method_data4 = AuthnMethodData {
-        metadata: HashMap::from([
-            (ALIAS.to_string(), MetadataEntry::String(alias)),
-            (ORIGIN.to_string(), MetadataEntry::String(origin)),
-            (
-                USAGE.to_string(),
-                MetadataEntry::String("recovery_phrase".to_string()),
-            ),
-            (
-                "some_key".to_string(),
-                MetadataEntry::String("some data".to_string()),
-            ),
-        ]),
-        ..authn_method_data1.clone()
+    let mut authn_method_data4 = authn_method_data1.clone();
+    authn_method_data4.metadata.insert(
+        USAGE.to_string(),
+        MetadataEntry::String("recovery_phrase".to_string()),
+    );
+
+    let device5 = DeviceWithUsage {
+        key_type: KeyType::BrowserStorageKey,
+        ..device1.clone()
     };
+    let mut authn_method_data5 = authn_method_data1.clone();
+    authn_method_data5.metadata.insert(
+        USAGE.to_string(),
+        MetadataEntry::String("browser_storage_key".to_string()),
+    );
 
     vec![
         (device1, authn_method_data1),
         (device2, authn_method_data2),
         (device3, authn_method_data3),
         (device4, authn_method_data4),
+        (device5, authn_method_data5),
     ]
 }

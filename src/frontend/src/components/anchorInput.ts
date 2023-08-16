@@ -2,10 +2,10 @@ import { mount, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
 import { Chan } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({

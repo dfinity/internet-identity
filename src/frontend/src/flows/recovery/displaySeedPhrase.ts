@@ -4,7 +4,7 @@ import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { phraseStepper } from "./stepper";
 
 import copyJson from "./displaySeedPhrase.json";

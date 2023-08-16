@@ -43,7 +43,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
 import { isCancel } from "./webAuthnErrorUtils";
 
 /*
@@ -68,7 +68,7 @@ export class DummyIdentity
   }
 
   public getAuthenticatorAttachment(): undefined {
-    return undefined;
+    return;
   }
 }
 

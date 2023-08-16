@@ -52,6 +52,7 @@ type KeyType = variant {
     platform;
     cross_platform;
     seed_phrase;
+    browser_storage_key;
 };
 
 // This describes whether a device is "protected" or not.

@@ -1,6 +1,6 @@
 import { warningIcon } from "$src/components/icons";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
 
