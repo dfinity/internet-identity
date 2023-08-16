@@ -67,7 +67,10 @@ do
         html_url="https://example.com"
         step="step"
     else
-        job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs" \
+        # We have so many jobs in our CI run that we need to explicitly increase the number of jobs per page in order to
+        # not run into errors due to pagination (default is 30 jobs per page).
+        # See https://docs.github.com/en/rest/actions/workflow-jobs?apiVersion=2022-11-28#list-jobs-for-a-workflow-run
+        job_id=$(curl --silent "https://api.github.com/repos/dfinity/internet-identity/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" \
             | jq -cMr \
             --arg search_string "${filename%%.*}" \
             '.jobs[] | select(.name | contains($search_string)) | .id')
