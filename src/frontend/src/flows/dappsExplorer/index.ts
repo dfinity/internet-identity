@@ -2,7 +2,7 @@ import { closeIcon, externalLinkIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 
 import { KnownDapp } from "./dapps";
 

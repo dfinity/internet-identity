@@ -129,8 +129,6 @@ export const handleLoginFlowResult = async (
       unreachable(result);
       break;
   }
-
-  return undefined;
 };
 
 /** The templates for the authentication pages */
