@@ -403,7 +403,7 @@ pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
         key_type: if old.key_type == new.key_type {
             None
         } else {
-            Some(KeyType::from(new.key_type.clone()))
+            Some(new.key_type.clone())
         },
         protection: if old.protection == new.protection {
             None

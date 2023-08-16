@@ -41,6 +41,7 @@ export const idlFactory = ({ IDL }) => {
     'seed_phrase' : IDL.Null,
     'cross_platform' : IDL.Null,
     'unknown' : IDL.Null,
+    'browser_storage_key' : IDL.Null,
   });
   const Purpose = IDL.Variant({
     'authentication' : IDL.Null,

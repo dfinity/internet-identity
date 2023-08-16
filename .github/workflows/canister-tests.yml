@@ -619,8 +619,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          # we need the history for the tags, but we don't need the files (except for the GitHub workflows / actions)
+          # --> sparse checkout of only the needed things
+          fetch-depth: 0
+          sparse-checkout: |
+            src/internet_identity/internet_identity.did
+            .github
+            .didc-release
+          sparse-checkout-cone-mode: false
+
+      - name: 'Check disabled due to intentional breaking change'
+        id: skip-check
+        run: |
+          release="release-2023-08-11"
+          if [ "$(git describe --tags --match="release-[0-9-]*" HEAD --abbrev=0)" == "$release" ]; then
+            echo "Disabled for release $release until the next release due to intentional breaking change"
+            echo "interface-compatibility-disabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "interface-compatibility-disabled=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: ./.github/actions/setup-didc
       - name: "Check canister interface compatibility"
+        if: steps.skip-check.outputs.interface-compatibility-disabled != 'true'
         run: |
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
           didc check src/internet_identity/internet_identity.did internet_identity_previous.did
