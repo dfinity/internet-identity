@@ -560,6 +560,44 @@ jobs:
           name: archive.wasm.gz
           path: .
 
+      - uses: actions/github-script@v6
+        id: pipeline-jobs
+        with:
+          script: return await github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs");
+
+      - uses: actions/github-script@v6
+        id: latest-release-tag
+        with:
+          result-encoding: string
+          script: return (await github.rest.repos.getLatestRelease({owner:"dfinity", repo:"internet-identity"})).data.tag_name;
+
+      # NOTE: we create the release notes ourselves, instead of letting GitHub do it with
+      # 'generate_release_notes: true', here we can actually specify the release range. When doing
+      # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
+      # listing contributions since).
+      # https://github.com/github/feedback/discussions/5975
+      - uses: actions/github-script@v6
+        id: changelog
+        with:
+          result-encoding: string
+          script: |
+            return (await github.rest.repos.generateReleaseNotes({
+              owner: "dfinity",
+              repo: "internet-identity",
+              tag_name: "${{ github.ref }}",
+              previous_tag_name: "${{ steps.latest-release-tag.outputs.result }}",
+            })).data.body;
+
+      - name: Print prepare-release-inputs
+        env:
+          # use an env variable so that the GitHub templating does not cause issues with string escaping
+          # see: https://github.com/orgs/community/discussions/32012
+          CHANGELOG: ${{ steps.changelog.outputs.result }}
+        run: |
+          echo -e 'pipeline jobs:\n${{ steps.pipeline-jobs.outputs.result }}'
+          echo "latest-release-tag: ${{ steps.latest-release-tag.outputs.result }}"
+          echo -e "changelog:\n$CHANGELOG"
+
       - name: Prepare release
         uses: ./.github/actions/release
         id: prepare-release
@@ -570,7 +608,8 @@ jobs:
             internet_identity_test.wasm.gz
             archive.wasm.gz
           production_asset: internet_identity_production.wasm.gz
-          token: ${{ secrets.GITHUB_TOKEN }}
+          changelog: ${{ steps.changelog.outputs.result }}
+          workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
 
       - name: Publish release
         run: |
