@@ -247,6 +247,7 @@ export const iiPages: Record<string, () => void> = {
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
+      focus: true,
       requestChallenge: () =>
         new Promise(() => {
           /* noop */
@@ -261,6 +262,7 @@ export const iiPages: Record<string, () => void> = {
   promptCaptchaReady: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
+      focus: true,
       requestChallenge: () => Promise.resolve(dummyChallenge),
       verifyChallengeChars: () =>
         new Promise(() => {

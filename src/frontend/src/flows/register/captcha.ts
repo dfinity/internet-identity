@@ -43,7 +43,7 @@ export const promptCaptchaTemplate = <T>({
   /* put the page into view */
   scrollToTop?: boolean;
 }) => {
-  const focus = focus_ ?? true;
+  const focus = focus_ ?? false;
   const copy = i18n.i18n(copyJson);
 
   const spinnerImg: TemplateResult = html`
@@ -275,6 +275,7 @@ export const promptCaptcha = ({
     const i18n = new I18n();
     promptCaptchaPage({
       cancel: () => resolve(cancel),
+      focus: true,
       verifyChallengeChars: async ({ chars, challenge }) => {
         const tempIdentity = await ECDSAKeyIdentity.generate({
           extractable: false,
