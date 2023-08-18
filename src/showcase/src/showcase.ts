@@ -592,7 +592,7 @@ const i18nExample = () => {
       }
     </style>
     <section class="i18n-example">
-      <article class="l-statck c-card c-card--highlight">
+      <article class="l-stack c-card c-card--highlight">
         <h2 class="t-title t-tile--main">${copy.title}</h2>
         <p class="t-lead">${copy.paragraph}</p>
         <div class="c-button-group">
