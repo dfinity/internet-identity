@@ -83,6 +83,12 @@ export const defaultPage = () => {
   render(pageContent, container);
 };
 
+export const componentsPage = () => {
+  document.title = "Components";
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(components(), container);
+};
+
 // A challenge with a base64 CAPTCHA, apologies for the length
 const dummyChallenge: Challenge = {
   png_base64:
