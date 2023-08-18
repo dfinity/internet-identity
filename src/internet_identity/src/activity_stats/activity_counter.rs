@@ -1,6 +1,7 @@
 use internet_identity_interface::internet_identity::types::Timestamp;
 
 pub mod active_anchor_counter;
+pub mod authn_method_counter;
 pub mod domain_active_anchor_counter;
 
 /// This trait can be implemented by any counter that is used to track activity over both daily and

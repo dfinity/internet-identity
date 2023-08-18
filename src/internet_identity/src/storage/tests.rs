@@ -413,7 +413,6 @@ fn sample_persistent_state() -> PersistentState {
             },
         },
         canister_creation_cycles_cost: 12_346_000_000,
-        registration_rate_limit: None,
         active_anchor_stats: Some(ActivityStats {
             completed: CompletedActivityStats {
                 daily_events: Some(ActiveAnchorCounter {
@@ -433,8 +432,7 @@ fn sample_persistent_state() -> PersistentState {
                 }],
             },
         }),
-        domain_active_anchor_stats: None,
-        latest_delegation_origins: None,
         max_num_latest_delegation_origins: None,
+        ..PersistentState::default()
     }
 }

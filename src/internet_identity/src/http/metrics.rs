@@ -192,6 +192,35 @@ fn persistent_state_metrics(
             Ok(())
         })?;
     };
+    if let Some(ref stats) = persistent_state.active_authn_method_stats {
+        let labels = ActivityMetricsLabels {
+            daily_stats_label: "internet_identity_daily_active_authn_methods",
+            daily_stats_doc: "The number of unique authentication methods used in the last completed 24h collection window on II domains.",
+            monthly_stats_label: "internet_identity_monthly_active_authn_methods",
+            monthly_stats_doc: "The number of unique authentication methods used in the last completed 30-day collection window on II domains.",
+        };
+        labelled_activity_metrics(w, stats, labels, |counter, encoder| {
+            encoder
+                .value(
+                    &[("type", "webauthn_auth")],
+                    counter.webauthn_auth_counter as f64,
+                )?
+                .value(
+                    &[("type", "webauthn_recovery")],
+                    counter.webauthn_recovery_counter as f64,
+                )?
+                .value(
+                    &[("type", "recovery_phrase")],
+                    counter.recovery_phrase_counter as f64,
+                )?
+                .value(
+                    &[("type", "browser_storage_key")],
+                    counter.browser_storage_key_counter as f64,
+                )?
+                .value(&[("type", "other")], counter.other_counter as f64)?;
+            Ok(())
+        })?;
+    };
     if let Some(delegation_origins_limit) = persistent_state.max_num_latest_delegation_origins {
         w.encode_gauge(
             "internet_identity_max_num_latest_delegation_origins",
