@@ -40,6 +40,8 @@ fn should_report_daily_active_authn_methods() -> Result<(), CallError> {
         // advance time to ensure a new collection period
         env.advance_time(Duration::from_secs(DAY_SECONDS));
 
+        // Create two identities with the same authn_method to bump the counter to a value of 2
+        // so that it's more than an off-by-one error away from 0.
         create_identity_with_authn_method(&env, canister_id, &authn_method);
         let identity_nr = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -94,6 +96,8 @@ fn should_report_monthly_active_authn_methods() -> Result<(), CallError> {
         // advance time to ensure a new collection period
         env.advance_time(Duration::from_secs(MONTH_SECONDS));
 
+        // Create two identities with the same authn_method to bump the counter to a value of 2
+        // so that it's more than an off-by-one error away from 0.
         create_identity_with_authn_method(&env, canister_id, &authn_method);
         let identity_nr = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -139,16 +143,24 @@ fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    // ensure stats are initially absent
-    assert!(
-        !get_metrics(&env, canister_id).contains("internet_identity_daily_active_authn_methods")
-    );
+    let non_ii_authn_method = test_authn_method(); // not bound to II domain
+    let ii_authn_method = AuthnMethodData {
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntry::String("https://identity.ic0.app".to_string()),
+        )]),
+        ..test_authn_method()
+    };
 
-    let authn_method = test_authn_method(); // not bound to II domain
-    let identity_nr = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    // some activity on an II domain is required to initialize the stats
+    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
+    // let a day pass to not have the initialization influence the result
+    env.advance_time(Duration::from_secs(DAY_SECONDS));
+
+    let identity_nr = create_identity_with_authn_method(&env, canister_id, &non_ii_authn_method);
     env.advance_time(Duration::from_secs(DAY_SECONDS));
     // some activity is required to update the stats
-    api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
 
     // assert all counters are 0
     assert_labelled_metric(
@@ -159,9 +171,19 @@ fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
         &AUTHN_METHOD_TYPES,
     );
 
+    // let a month pass to not have the daily stats affect the monthly result
     env.advance_time(Duration::from_secs(MONTH_SECONDS));
-    // some activity is required to update the stats
-    api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+
+    // non-ii activity
+    api_v2::identity_info(
+        &env,
+        canister_id,
+        non_ii_authn_method.principal(),
+        identity_nr,
+    )?;
+    env.advance_time(Duration::from_secs(MONTH_SECONDS));
+    // some activity on an II domain is required to update the stats
+    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
 
     // assert all counters are 0
     assert_labelled_metric(

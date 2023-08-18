@@ -473,6 +473,8 @@ pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     assert_eq!(value, expected, "metric {metric_name} does not match");
 }
 
+/// Asserts that the given metric is present in the metrics string and that it has the expected value
+/// across all the provided label values for the given label.
 pub fn assert_labelled_metric(
     metrics: &str,
     metric_name: &str,
@@ -480,10 +482,10 @@ pub fn assert_labelled_metric(
     label_name: &str,
     label_values: &[&str],
 ) {
-    for other_type in label_values {
+    for label_value in label_values {
         assert_metric(
             metrics,
-            &(metric_name.to_string() + &format!("{{{}=\"{}\"}}", label_name, other_type)),
+            &(metric_name.to_string() + &format!("{{{}=\"{}\"}}", label_name, label_value)),
             expected_value,
         );
     }

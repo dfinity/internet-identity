@@ -86,10 +86,10 @@ pub struct OngoingActivityStats<T: ActivityCounter> {
 pub fn update_activity_stats(anchor: &Anchor, current_device: &Device) {
     state::persistent_state_mut(|persistent_state| {
         // Active anchor stats across all domains
-        let stats = persistent_state
+        let active_anchor_stats = persistent_state
             .active_anchor_stats
             .get_or_insert_with(|| ActivityStats::new(time()));
-        stats.update_counters(&anchor.last_activity());
+        active_anchor_stats.update_counters(&anchor.last_activity());
 
         // Active anchor stats, II domains only
         if let Some(domain) = current_device.ii_domain() {
@@ -97,16 +97,17 @@ pub fn update_activity_stats(anchor: &Anchor, current_device: &Device) {
                 anchor,
                 current_domain: domain,
             };
-            let stats = persistent_state
+            let domain_active_anchor_stats = persistent_state
                 .domain_active_anchor_stats
                 .get_or_insert_with(|| ActivityStats::new(time()));
-            stats.update_counters(&context);
-        }
+            domain_active_anchor_stats.update_counters(&context);
 
-        // Active authn methods stats, II domains only
-        let stats = persistent_state
-            .active_authn_method_stats
-            .get_or_insert_with(|| ActivityStats::new(time()));
-        stats.update_counters(&current_device);
+            // Active authn methods stats, II domains only
+            let authn_method_stats = persistent_state
+                .active_authn_method_stats
+                .get_or_insert_with(|| ActivityStats::new(time()));
+
+            authn_method_stats.update_counters(&current_device);
+        }
     })
 }

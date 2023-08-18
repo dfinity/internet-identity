@@ -39,6 +39,10 @@ impl ActivityCounter for AuthnMethodCounter {
         self.start_timestamp
     }
 
+    /// Increases the counter for the corresponding authn_method of the provided devce, if there was
+    /// no activity before.
+    ///
+    /// Only called if `current_domain` corresponds to an II domain.
     fn count_event(&mut self, device: &Self::CountingContext<'_>) {
         // only count authentications on devices that have not already been counted
         // i.e. the last usage timestamp is before the start of the window
@@ -47,10 +51,6 @@ impl ActivityCounter for AuthnMethodCounter {
                 return;
             }
         }
-        // only count authentications with keys that are bound to an Internet Identity domain
-        if device.ii_domain().is_none() {
-            return;
-        };
 
         match device.key_type {
             KeyType::SeedPhrase => self.recovery_phrase_counter += 1,
