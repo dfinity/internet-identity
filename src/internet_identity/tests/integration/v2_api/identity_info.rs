@@ -3,10 +3,10 @@
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::flows;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, time, II_WASM,
 };
+use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use ic_test_state_machine_client::{CallError, StateMachine};
@@ -26,10 +26,10 @@ fn should_get_identity_info() -> Result<(), CallError> {
     let devices = sample_devices();
     let identity_number = create_identity_with_devices(&env, canister_id, &devices);
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, devices[0].principal(), identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
+    match_value!(
+        api_v2::identity_info(&env, canister_id, devices[0].principal(), identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
 
     assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &devices);
     assert_eq!(identity_info.authn_method_registration, None);
@@ -80,10 +80,10 @@ fn should_provide_authn_registration() -> Result<(), CallError> {
     api::enter_device_registration_mode(&env, canister_id, device1.principal(), identity_number)?;
     api::add_tentative_device(&env, canister_id, identity_number, &device2)?;
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, device1.principal(), identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
+    match_value!(
+        api_v2::identity_info(&env, canister_id, device1.principal(), identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
 
     assert_eq!(
         identity_info.authn_method_registration,
@@ -125,16 +125,17 @@ fn create_identity_with_devices(
     let device1 = iter.next().unwrap();
     let identity_number = flows::register_anchor_with_device(env, canister_id, device1);
     for (idx, device) in iter.enumerate() {
-        let response = api_v2::authn_method_add(
-            env,
-            canister_id,
-            device1.principal(),
-            identity_number,
-            &AuthnMethodData::from(device.clone()),
-        )
-        .unwrap_or_else(|_| panic!("could not add device {}", idx))
-        .unwrap();
-        assert!(matches!(response, AuthnMethodAddResponse::Ok));
+        match_value!(
+            api_v2::authn_method_add(
+                env,
+                canister_id,
+                device1.principal(),
+                identity_number,
+                &AuthnMethodData::from(device.clone()),
+            )
+            .unwrap_or_else(|_| panic!("could not add device {}", idx)),
+            Some(AuthnMethodAddResponse::Ok)
+        );
     }
     identity_number
 }

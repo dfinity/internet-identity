@@ -664,3 +664,27 @@ pub fn test_principal(n: u64) -> Principal {
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
 }
+
+/// Macro to easily match a value against a pattern, and panic if the match fails.
+///
+/// This makes API v2 return types easier to handle.
+/// API v2 calls all return variants, requiring a match on the result.
+/// This macro allows to write the match in terms of the expected variant, with a fallback
+/// on unexpected variants.
+/// Example:
+/// ```
+/// use canister_tests::match_value;
+/// match_value!(
+///     api_v2::identity_info(&env, canister_id, principal, identity_number)?, // value
+///     Some(IdentityInfoResponse::Ok(identity_info)) // expected pattern, with binding to identity_info
+/// );
+/// ```
+#[macro_export]
+#[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
+macro_rules! match_value {
+    ($target: expr, $pat: pat_param) => {
+        let $pat = $target else {
+            panic!("expected {}", stringify!($pat));
+        };
+    };
+}
