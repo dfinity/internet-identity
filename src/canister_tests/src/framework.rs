@@ -673,15 +673,15 @@ pub fn test_principal(n: u64) -> Principal {
 /// on unexpected variants.
 /// Example:
 /// ```
-/// use canister_tests::assert_matches;
-/// assert_matches!(
+/// use canister_tests::match_value;
+/// match_value!(
 ///     api_v2::identity_info(&env, canister_id, principal, identity_number)?, // value
 ///     Some(IdentityInfoResponse::Ok(identity_info)) // expected pattern, with binding to identity_info
 /// );
 /// ```
 #[macro_export]
 #[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
-macro_rules! assert_matches {
+macro_rules! match_value {
     ($target: expr, $pat: pat_param) => {
         let $pat = $target else {
             panic!("expected {}", stringify!($pat));

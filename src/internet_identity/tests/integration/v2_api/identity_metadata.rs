@@ -3,10 +3,10 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::assert_matches;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
+use canister_tests::match_value;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{IdentityInfoResponse, MetadataEntry};
@@ -22,7 +22,7 @@ fn should_write_metadata() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    assert_matches!(
+    match_value!(
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
         Some(IdentityInfoResponse::Ok(identity_info))
     );
@@ -41,7 +41,7 @@ fn should_write_metadata() -> Result<(), CallError> {
         &metadata,
     )?;
 
-    assert_matches!(
+    match_value!(
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
         Some(IdentityInfoResponse::Ok(identity_info))
     );
@@ -86,7 +86,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    assert_matches!(
+    match_value!(
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
         Some(IdentityInfoResponse::Ok(identity_info))
     );
