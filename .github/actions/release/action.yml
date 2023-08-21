@@ -9,10 +9,14 @@ inputs:
         description: "Name of the production asset"
         required: true
         default: ""
-    token:
-        description: "GitHub authentication token"
+    changelog:
+        description: "Content of the changelog section"
         required: true
         default: ""
+    workflow_jobs:
+      description: "JSON array of workflow jobs (to generate the links to the workflow runs)"
+      required: true
+      default: ""
 outputs:
   notes-file:
     description: The release-notes file
@@ -26,6 +30,7 @@ runs:
         env:
           INPUT_PRODUCTION_ASSET: ${{ inputs.production_asset }}
           INPUT_ASSETS: ${{ inputs.assets }}
-          INPUT_TOKEN: ${{ inputs.token }}
+          INPUT_CHANGELOG: ${{ inputs.changelog }}
+          INPUT_WORKFLOW_JOBS: ${{ inputs.workflow_jobs }}
         run: |
           ${{ github.action_path }}/run.sh

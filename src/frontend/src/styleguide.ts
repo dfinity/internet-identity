@@ -321,7 +321,7 @@ export const styleguide = html`
       <aside class="l-stack demo-section">
         <h2 class="t-title t-title--sub">Recovery Word List</h2>
         <section class="demo" aria-label="Recovery List Elements Demo">
-          <output class="c-input c-input--recovery">
+          <output class="c-output--recovery">
             <ol class="c-list c-list--recovery">
               ${recoveryWords.map((word, i) => {
                 // loop through the demo recovery words and add some classes to

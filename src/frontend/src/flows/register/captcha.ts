@@ -214,7 +214,9 @@ export const promptCaptchaTemplate = <T>({
             ?autofocus=${focus}
             ${ref(input)}
             id="captchaInput"
-            class="c-input ${asyncReplace(hasError)}"
+            class="c-input c-input--stack c-input--fullwidth ${asyncReplace(
+              hasError
+            )}"
             autocapitalize="none"
             spellcheck="false"
           />

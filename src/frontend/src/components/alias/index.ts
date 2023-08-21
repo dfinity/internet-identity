@@ -65,7 +65,7 @@ export const promptDeviceAliasTemplate = (props: {
         maxlength="30"
         pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
-        class="c-input"
+        class="c-input c-input--stack c-input--fullwidth"
       />
       <div class="c-button-group">
         <button

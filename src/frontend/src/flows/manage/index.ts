@@ -200,7 +200,7 @@ const anchorSection = ({
 }): TemplateResult => html`
   <aside class="l-stack">
     <div
-      class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id"
+      class="c-input c-input--stack c-input--fullwidth c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
       ${identityCard({
         userNumber,
