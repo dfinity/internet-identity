@@ -142,8 +142,8 @@ function build_canister() {
 
         if [ "$canister" == "internet_identity" ]
         then
-          # indicate that the II canister does not require an init argument
-          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "()" -v public
+          # indicate that the II canister init argument type
+          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "(opt InternetIdentityInit)" -v public
         fi
 
         if [ -n "$DFX_METADATA" ]
