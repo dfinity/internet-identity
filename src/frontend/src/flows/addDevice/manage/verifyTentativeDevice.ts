@@ -69,7 +69,8 @@ const verifyTentativeDeviceTemplate = ({
   const pageContentSlot = html`<h1 class="t-title t-title--main">
       Do you want to create this Passkey for your Internet Identity?
     </h1>
-    <output class="c-input c-input--readonly t-vip t-vip--small"
+    <output
+      class="c-input c-input--fullwidth c-input--stack c-input--readonly t-vip t-vip--small"
       >${alias}</output
     >
     <p class="t-paragraph">
@@ -90,7 +91,9 @@ const verifyTentativeDeviceTemplate = ({
           }
         }}
         id="tentativeDeviceCode"
-        class="c-input ${asyncReplace(hasError)}"
+        class="c-input c-input--fullwidth c-input--stack ${asyncReplace(
+          hasError
+        )}"
         placeholder="Verification Code"
       />
     </label>

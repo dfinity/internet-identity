@@ -34,7 +34,7 @@ const showVerificationCodeTemplate = ({
       <h1 class="t-title t-title--main">Verify New Passkey</h1>
       <p class="t-paragraph">Your new Passkey:</p>
       <output
-        class="c-input c-input--readonly t-vip t-vip--small"
+        class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip t-vip--small"
         aria-label="Passkey Alias"
         >${alias}</output
       >
@@ -46,7 +46,7 @@ const showVerificationCodeTemplate = ({
     </hgroup>
     <output
       id="verificationCode"
-      class="c-input c-input--readonly t-vip"
+      class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip"
       aria-label="Verification Code"
     >
       ${tentativeRegistrationInfo.verification_code}

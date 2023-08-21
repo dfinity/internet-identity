@@ -1426,15 +1426,23 @@ by all browsers (FF is missing) */
     var(--bezel-left);
 
   position: relative;
-  display: block;
-  width: 100%;
   padding: var(--bezel);
-  margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
   border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
+}
+
+/* An input with some margin on top, useful when e.g. coming directly
+ * after some text */
+.c-input--stack {
+  margin-top: var(--rs-input-stack);
+}
+
+.c-input--fullwidth {
+  display: block;
+  width: 100%;
 }
 
 .c-input::placeholder {
@@ -1515,12 +1523,6 @@ by all browsers (FF is missing) */
 
 .c-input--textarea-narrow {
   --bezel: calc(1.5 * var(--rs-input-bezel));
-}
-
-.c-input--recovery {
-  --bezel: calc(1.5 * var(--rs-input-bezel));
-
-  background-color: var(--rc-line);
 }
 
 .c-input--with-button {
@@ -1720,6 +1722,19 @@ by all browsers (FF is missing) */
  *  We use a a pill style for each word
  *  and a counter to number them
  */
+
+/* The output element surrounding the recovery words */
+.c-output--recovery {
+  /* Needed for the floating "copy" button, if present */
+  position: relative;
+
+  background-color: var(--rc-line);
+  border-radius: var(--rs-input-border-radius);
+  --bezel: calc(1.5 * var(--rs-input-bezel));
+  padding: var(--bezel);
+  display: block;
+  width: 100%;
+}
 
 .c-list--recovery {
   position: relative;

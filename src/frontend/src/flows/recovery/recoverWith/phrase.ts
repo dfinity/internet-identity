@@ -107,7 +107,7 @@ const recoverWithPhraseTemplate = <
         <h1 class="t-title t-title--main">Input your Recovery Phrase</h1>
         <p class="t-lead">${message}</p>
       </hgroup>
-      <div class="c-input c-input--recovery l-stack">
+      <div class="c-output--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${wordTemplate({
             index: "#",

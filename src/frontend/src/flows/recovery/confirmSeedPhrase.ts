@@ -78,7 +78,7 @@ const confirmSeedPhraseTemplate = ({
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-lead">${copy.header}</p>
       </hgroup>
-      <div class="c-input c-input--recovery l-stack">
+      <div class="c-output--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${userNumberInput}
           ${words.map((word, i) =>
