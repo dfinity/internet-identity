@@ -76,6 +76,12 @@ jobs:
             --wasm internet_identity_production.wasm.gz \
             ${{ env.ii_canister_id }}
 
+      - uses: actions/github-script@v6
+        id: latest-release-tag
+        with:
+          result-encoding: string
+          script: return (await github.rest.repos.getLatestRelease({owner:"dfinity", repo:"internet-identity"})).data.tag_name;
+
       - name: Send RC link to slack
         uses: ./.github/actions/slack
         with:
@@ -84,6 +90,7 @@ jobs:
             Internet Identity release candidate
             RC link: https://${{ env.ii_canister_id }}.ic0.app
             test app: https://${{ env.testnet_app_canister_id }}.ic0.app
+            changes: https://github.com/dfinity/internet-identity/compare/${{ steps.latest-release-tag.outputs.result }}...main
 
         # Since the this is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.
