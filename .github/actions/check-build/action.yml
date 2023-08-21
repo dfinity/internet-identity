@@ -17,7 +17,9 @@ runs:
       shell: bash
     - name: Run build
       env:
-        METADATA: ${{ inputs.dfx-metadata }} # pass the metadata as an env var to avoid shell expansion issues
+        # use an env variable so that the GitHub templating does not cause issues with string escaping
+        # see: https://github.com/orgs/community/discussions/32012
+        METADATA: ${{ inputs.dfx-metadata }}
       run: |
         ./scripts/build ${METADATA:+"--dfx-metadata" "$METADATA"}
       shell: bash
