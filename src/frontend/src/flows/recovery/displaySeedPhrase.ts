@@ -66,7 +66,7 @@ const displaySeedPhraseTemplate = ({
           <ol
             data-role="recovery-words"
             translate="no"
-            class="c-list c-list--recovery"
+            class="c-list--recovery"
           >
             <li
               class="c-list--recovery-word c-list--recovery-word--important"

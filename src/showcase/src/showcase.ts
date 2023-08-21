@@ -83,6 +83,12 @@ export const defaultPage = () => {
   render(pageContent, container);
 };
 
+export const componentsPage = () => {
+  document.title = "Components";
+  const container = document.getElementById("pageContent") as HTMLElement;
+  render(components(), container);
+};
+
 // A challenge with a base64 CAPTCHA, apologies for the length
 const dummyChallenge: Challenge = {
   png_base64:
@@ -247,6 +253,7 @@ export const iiPages: Record<string, () => void> = {
   promptCaptcha: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
+      focus: true,
       requestChallenge: () =>
         new Promise(() => {
           /* noop */
@@ -261,6 +268,7 @@ export const iiPages: Record<string, () => void> = {
   promptCaptchaReady: () =>
     promptCaptchaPage({
       cancel: () => console.log("canceled"),
+      focus: true,
       requestChallenge: () => Promise.resolve(dummyChallenge),
       verifyChallengeChars: () =>
         new Promise(() => {
@@ -592,7 +600,7 @@ const i18nExample = () => {
       }
     </style>
     <section class="i18n-example">
-      <article class="l-statck c-card c-card--highlight">
+      <article class="l-stack c-card c-card--highlight">
         <h2 class="t-title t-tile--main">${copy.title}</h2>
         <p class="t-lead">${copy.paragraph}</p>
         <div class="c-button-group">
