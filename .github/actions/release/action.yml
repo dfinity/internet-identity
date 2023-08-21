@@ -10,7 +10,7 @@ inputs:
         required: true
         default: ""
     changelog:
-        description: "Content of the change log section"
+        description: "Content of the changelog section"
         required: true
         default: ""
     workflow_jobs:
