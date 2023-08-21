@@ -43,6 +43,7 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
+export type AuthnMethodRemoveResponse = { 'ok' : null };
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -202,6 +203,10 @@ export interface _SERVICE {
   'authn_method_add' : ActorMethod<
     [IdentityNumber, AuthnMethodData],
     [] | [AuthnMethodAddResponse]
+  >,
+  'authn_method_remove' : ActorMethod<
+    [IdentityNumber, PublicKey],
+    [] | [AuthnMethodRemoveResponse]
   >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
