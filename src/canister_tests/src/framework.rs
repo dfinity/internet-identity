@@ -671,7 +671,7 @@ pub fn test_principal(n: u64) -> Principal {
 /// on unexpected variants.
 #[macro_export]
 #[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
-macro_rules! cast {
+macro_rules! assert_matches {
     ($target: expr, $pat: pat_param) => {
         let $pat = $target else {
             panic!("expected {}", stringify!($pat));

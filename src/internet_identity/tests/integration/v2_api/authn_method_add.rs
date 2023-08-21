@@ -3,7 +3,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::cast;
+use canister_tests::assert_matches;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
@@ -25,7 +25,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
     let authn_method_2 = sample_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
-    cast!(
+    assert_matches!(
         api_v2::authn_method_add(
             &env,
             canister_id,
@@ -36,7 +36,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
         Some(AuthnMethodAddResponse::Ok)
     );
 
-    cast!(
+    assert_matches!(
         api_v2::identity_info(&env, canister_id, principal, identity_number)?,
         Some(IdentityInfoResponse::Ok(identity_info))
     );
@@ -85,7 +85,7 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
 
-    cast!(
+    assert_matches!(
         api_v2::authn_method_add(
             &env,
             canister_id,
