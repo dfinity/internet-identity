@@ -62,7 +62,7 @@ const displaySeedPhraseTemplate = ({
         </p>
       </hgroup>
       <div class="l-stack">
-        <output class="c-input c-input--recovery">
+        <output class="c-output--recovery">
           <ol
             data-role="recovery-words"
             translate="no"

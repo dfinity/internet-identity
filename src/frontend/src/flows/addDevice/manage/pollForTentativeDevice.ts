@@ -69,7 +69,9 @@ const pollForTentativeDeviceTemplate = ({
         )}
       ></div>
     </div>
-    <div class="t-wrap c-input c-input--with-button c-input--centered t-weak">
+    <div
+      class="t-wrap c-input c-input--stack c-input--with-button c-input--centered t-weak"
+    >
       <span data-role="add-device-link">${link}</span>
       <button
         ${ref(linkCopyElement)}

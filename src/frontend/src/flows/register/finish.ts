@@ -45,7 +45,7 @@ export const displayUserNumberTemplate = ({
         Save this number by taking a screenshot or writing it down.
       </p>
     </hgroup>
-    <div class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id" >
+    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id" >
       ${
         identityCard({
           userNumber,

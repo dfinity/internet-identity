@@ -121,7 +121,7 @@ export const mkAnchorInput = ({
         ${mount(selectInput)}
         type="text"
         data-role="anchor-input"
-        class="c-input c-input--vip c-input--centered c-input--spacious"
+        class="c-input c-input--stack c-input--fullwidth c-input--vip c-input--centered c-input--spacious"
         placeholder="Internet Identity"
         value="${ifDefined(userNumber?.toString())}"
         data-expected=${ifDefined(dataExpected)}
