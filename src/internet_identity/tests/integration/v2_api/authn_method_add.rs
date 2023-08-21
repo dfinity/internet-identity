@@ -3,6 +3,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
+use canister_tests::cast;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
@@ -24,21 +25,22 @@ fn should_add_authn_method() -> Result<(), CallError> {
     let authn_method_2 = sample_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
-    let result = api_v2::authn_method_add(
-        &env,
-        canister_id,
-        principal,
-        identity_number,
-        &authn_method_2,
-    )?
-    .unwrap();
+    cast!(
+        api_v2::authn_method_add(
+            &env,
+            canister_id,
+            principal,
+            identity_number,
+            &authn_method_2,
+        )?,
+        Some(AuthnMethodAddResponse::Ok)
+    );
 
-    assert!(matches!(result, AuthnMethodAddResponse::Ok));
+    cast!(
+        api_v2::identity_info(&env, canister_id, principal, identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, principal, identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
     assert!(eq_ignoring_last_authentication(
         &identity_info.authn_methods[1],
         &authn_method_2
@@ -82,16 +84,17 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     );
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
-    let result = api_v2::authn_method_add(
-        &env,
-        canister_id,
-        principal,
-        identity_number,
-        &authn_method_2,
-    )?
-    .unwrap();
 
-    assert!(matches!(result, AuthnMethodAddResponse::InvalidMetadata(_)));
+    cast!(
+        api_v2::authn_method_add(
+            &env,
+            canister_id,
+            principal,
+            identity_number,
+            &authn_method_2,
+        )?,
+        Some(AuthnMethodAddResponse::InvalidMetadata(_))
+    );
 
     Ok(())
 }

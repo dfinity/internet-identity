@@ -664,3 +664,17 @@ pub fn test_principal(n: u64) -> Principal {
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
 }
+
+/// Helper macro to make API v2 return types easier to handle.
+/// In particular, API v2 calls all return variants, requiring a match on the result.
+/// This macro allows to write the match in terms of the expected variant, with a fallback
+/// on unexpected variants.
+#[macro_export]
+#[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
+macro_rules! cast {
+    ($target: expr, $pat: pat_param) => {
+        let $pat = $target else {
+            panic!("expected {}", stringify!($pat));
+        };
+    };
+}
