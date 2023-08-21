@@ -89,6 +89,6 @@ metadata_json="{\"pullable\":{\
 \"wasm_url\": \"https://github.com/dfinity/internet-identity/releases/download/$release/$ASSET_NAME\",\
 ${WASM_SHA256:+"\"wasm_hash\":" "\"$WASM_SHA256\","}\
 \"dependencies\": [],\
-\"init_guide\": \"The empty tuple '()' provides sensible defaults. See the candid interface for more details.\"}}"
+\"init_guide\": \"Use '(null)' for sensible defaults. See the candid interface for more details.\"}}"
 
 echo  -n "$metadata_json"

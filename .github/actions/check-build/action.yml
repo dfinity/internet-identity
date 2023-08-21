@@ -15,9 +15,11 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
-    - run: |
-        metadata='${{ inputs.dfx-metadata }}'
-        ./scripts/build ${metadata:+"--dfx-metadata" "$metadata"}
+    - name: Run build
+      env:
+        METADATA: ${{ inputs.dfx-metadata }} # pass the metadata as an env var to avoid shell expansion issues
+      run: |
+        ./scripts/build ${METADATA:+"--dfx-metadata" "$METADATA"}
       shell: bash
 
     # check the hash
