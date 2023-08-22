@@ -489,6 +489,13 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 /// * uses terminology more aligned with the front-end and is more consistent in its naming.
 /// * uses opt variant return types consistently in order to by able to extend / change return types
 ///   in the future without breaking changes.
+///
+/// TODO, API v2 rollout plan:
+/// 1. Develop API v2 far enough so that front-ends can switch to it.
+/// 2. Deprecate the old API.
+/// 3. Add additional errors to the API v2 return type. The canister should no longer trap on invalid
+///    input.
+/// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
     use super::*;
 
