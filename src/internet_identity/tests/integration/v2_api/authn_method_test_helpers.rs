@@ -47,3 +47,12 @@ pub fn create_identity_with_authn_method(
     };
     user_number
 }
+
+pub fn sample_authn_method(i: u8) -> AuthnMethodData {
+    AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![i; 32]),
+        }),
+        ..test_authn_method()
+    }
+}

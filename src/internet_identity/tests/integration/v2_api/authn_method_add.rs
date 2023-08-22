@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, eq_ignoring_last_authentication, test_authn_method,
+    create_identity_with_authn_method, eq_ignoring_last_authentication, sample_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -10,8 +10,7 @@ use canister_tests::match_value;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodAddResponse, AuthnMethodData, IdentityInfoResponse, MetadataEntry,
-    PublicKeyAuthn,
+    AuthnMethodAddResponse, IdentityInfoResponse, MetadataEntry,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -97,13 +96,4 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     );
 
     Ok(())
-}
-
-fn sample_authn_method(i: u8) -> AuthnMethodData {
-    AuthnMethodData {
-        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
-            pubkey: ByteBuf::from(vec![i; 32]),
-        }),
-        ..test_authn_method()
-    }
 }
