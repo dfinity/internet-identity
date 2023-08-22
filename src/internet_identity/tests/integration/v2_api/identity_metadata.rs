@@ -50,7 +50,7 @@ fn should_write_metadata() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_not_write_identity_metadata_with_wrong_sender() {
+fn should_require_authentication_to_replace_identity_metadata() {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();

@@ -49,7 +49,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
+fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = sample_authn_method(1);
