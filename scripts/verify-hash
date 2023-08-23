@@ -13,6 +13,14 @@ GREEN=$(tput setaf 2)
 RED=$(tput setaf 1)
 NC=$(tput sgr0)
 
+print_red() {
+    echo "${RED}$*${NC}"
+}
+
+print_green() {
+    echo "${GREEN}$*${NC}"
+}
+
 #########
 # USAGE #
 #########
@@ -92,9 +100,9 @@ prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)
 
 if [ "$prod_build_sha256" == "$expected_ii_hash" ]
 then
-  echo "${GREEN}internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash${NC}"
+  print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
 else
-  echo "${RED}sha mismatch: $prod_build_sha256 /= $expected_ii_hash${NC}"
+  print_red "sha mismatch: $prod_build_sha256 /= $expected_ii_hash"
   exit 1
 fi
 
@@ -104,11 +112,11 @@ then
   archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
   if [ "$archive_sha256" == "$expected_archive_hash" ]
   then
-    echo "${GREEN}archive.wasm.gz sha256 matches expected hash $expected_archive_hash${NC}"
+    print_green "archive.wasm.gz sha256 matches expected hash $expected_archive_hash"
   else
-    echo "${RED}sha mismatch: $archive_sha256 /= $expected_archive_hash${NC}"
+    print_red "sha mismatch: $archive_sha256 /= $expected_archive_hash"
     exit 1
   fi
 fi
 
-echo "${GREEN}Wasm verification successful!${NC}"
+print_green "Wasm verification successful!"

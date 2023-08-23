@@ -73,7 +73,7 @@ ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 ARG II_INSECURE_REQUESTS=
 
-# DFX specific metadata for dfx pull
+# DFX specific metadata for dfx deps
 ARG DFX_METADATA=
 
 RUN touch src/internet_identity/src/lib.rs

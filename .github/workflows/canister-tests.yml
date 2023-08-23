@@ -45,7 +45,7 @@ jobs:
       # NOTE: if you modify the flavors, update the #flavors table in README.md
       matrix:
         include:
-          # The production build is built later because it has a dependency on the dev build (for dfx pull)
+          # The production build is built later because it has a dependency on the dev build (for dfx deps)
           # See job: docker-build-internet_identity_production
 
           # No captcha and fetching the root key, used in (our) tests, backend and
@@ -74,7 +74,7 @@ jobs:
           echo "Inferred version: '$version'"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: "Create dfx metadata for the dfx pull feature"
+      - name: "Create dfx metadata for the dfx deps feature"
         id: dfx-metadata
         run: |
           dfx_metadata_json="$(./scripts/dfx-metadata --asset-name ${{ matrix.name }} )"
@@ -109,11 +109,11 @@ jobs:
           # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
           # path is the name used as the file to upload and the name of the
-          # downloaded file
+          # file when downloaded
           path: ${{ matrix.name }}
 
   # Build the production version of internet identity.
-  # The production build is separately because it has a dependency on the dev build (for dfx pull)
+  # The production build is separately because it has a dependency on the dev build (for dfx deps)
   #
   # Note: do not rename this job as it needs to contain the file name of the produced asset (without extension)
   # in order for the release script action to work correctly.
@@ -136,7 +136,7 @@ jobs:
           name: internet_identity_dev.wasm.gz
           path: .
 
-      - name: "Create dfx metadata for the dfx pull feature"
+      - name: "Create dfx metadata for the dfx deps feature"
         id: dfx-metadata
         run: |
           sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
@@ -168,7 +168,7 @@ jobs:
           # name is the name used to display and retrieve the artifact
           name: internet_identity_production.wasm.gz
           # path is the name used as the file to upload and the name of the
-          # downloaded file
+          # file when downloaded
           path: internet_identity_production.wasm.gz
 
   docker-build-archive:
@@ -713,7 +713,7 @@ jobs:
           name: internet_identity_dev.wasm.gz
           path: .
 
-      - name: "Create dfx metadata for the dfx pull feature"
+      - name: "Create dfx metadata for the dfx deps feature"
         id: dfx-metadata
         run: |
           sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
