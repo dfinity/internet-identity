@@ -92,6 +92,7 @@ export const idlFactory = ({ IDL }) => {
     'ok' : IDL.Null,
     'invalid_metadata' : IDL.Text,
   });
+  const AuthnMethodRemoveResponse = IDL.Variant({ 'ok' : IDL.Null });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -232,6 +233,11 @@ export const idlFactory = ({ IDL }) => {
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
         [IDL.Opt(AuthnMethodAddResponse)],
+        [],
+      ),
+    'authn_method_remove' : IDL.Func(
+        [IdentityNumber, PublicKey],
+        [IDL.Opt(AuthnMethodRemoveResponse)],
         [],
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),

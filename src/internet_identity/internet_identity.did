@@ -363,6 +363,10 @@ type AuthnMethodAddResponse = variant {
     invalid_metadata: text;
 };
 
+type AuthnMethodRemoveResponse = variant {
+    ok;
+};
+
 type IdentityMetadataReplaceResponse = variant {
     ok;
 };
@@ -423,4 +427,8 @@ service : (opt InternetIdentityInit) -> {
     // Adds a new authentication method to the identity.
     // Requires authentication.
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (opt AuthnMethodAddResponse);
+
+    // Removes the authentication method associated with the public key from the identity.
+    // Requires authentication.
+    authn_method_remove: (IdentityNumber, PublicKey) -> (opt AuthnMethodRemoveResponse);
 }

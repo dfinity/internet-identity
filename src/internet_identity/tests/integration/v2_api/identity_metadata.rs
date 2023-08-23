@@ -6,6 +6,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
+use canister_tests::match_value;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{IdentityInfoResponse, MetadataEntry};
@@ -21,10 +22,10 @@ fn should_write_metadata() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
+    match_value!(
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
     assert!(identity_info.metadata.is_empty());
 
     let metadata = HashMap::from_iter(vec![(
@@ -40,16 +41,16 @@ fn should_write_metadata() -> Result<(), CallError> {
         &metadata,
     )?;
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
+    match_value!(
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
     assert_eq!(identity_info.metadata, metadata);
     Ok(())
 }
 
 #[test]
-fn should_not_write_identity_metadata_with_wrong_sender() {
+fn should_require_authentication_to_replace_identity_metadata() {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -85,10 +86,10 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let Some(IdentityInfoResponse::Ok(identity_info)) =
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)? else {
-        panic!("Expected identity info to be returned");
-    };
+    match_value!(
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
+        Some(IdentityInfoResponse::Ok(identity_info))
+    );
     assert!(identity_info.metadata.is_empty());
 
     let metadata = HashMap::from_iter(vec![(
