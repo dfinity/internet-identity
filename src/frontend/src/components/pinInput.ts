@@ -207,15 +207,16 @@ const onPaste = ({
     return;
   }
 
-  // Actually set the value (for reasons unclear, preventDefault() is not necessary here as tested on
-  // Chrome, Safari)
+  // Set the values manually
   for (const [input, char] of toBePasted) {
     input.value = char;
   }
+  // Prevent actually pasting the value in any of the fields since we just did this manually
+  event.preventDefault();
 
   if (toBePasted.length < nextInputs.length) {
     // If all inputs have NOT been filled, then focus on the one after the last paste/fill
-    nextInputs[toBePasted.length - 1].focus();
+    nextInputs[toBePasted.length].focus();
   } else {
     // otherwise, drop focus entirely
     element.blur();
