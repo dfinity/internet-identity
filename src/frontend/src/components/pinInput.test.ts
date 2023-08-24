@@ -159,7 +159,7 @@ describe("pin input", () => {
     dispatchPaste(inputs[2], content);
 
     // Focus should have moved (3 = length of "123")
-    expect(inputs[2 + content.length - 1]).toBe(document.activeElement);
+    expect(inputs[2 + content.length]).toBe(document.activeElement);
   });
 
   test("calling .submit() does submit", () => {
