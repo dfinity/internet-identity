@@ -14,6 +14,7 @@ import { displayError } from "$src/components/displayError";
 import { loadIdentityBackground } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { showMessage, showMessagePage } from "$src/components/message";
+import { pinInput } from "$src/components/pinInput";
 import { promptUserNumber } from "$src/components/promptUserNumber";
 import { showSpinnerPage } from "$src/components/spinner";
 import { toast } from "$src/components/toast";
@@ -388,7 +389,11 @@ export const iiPages: Record<string, () => void> = {
     verifyTentativeDevicePage({
       alias: chromeDevice.alias,
       cancel: () => console.log("canceled"),
-      verify: () => Promise.resolve({ retry: null }),
+      // We anything that ends with "2"
+      verify: (pin: string) =>
+        Promise.resolve(
+          pin.endsWith("2") ? { retry: false, value: pin } : { retry: true }
+        ),
       doContinue: (v) => console.log("continue with:", v),
       remaining: {
         async *[Symbol.asyncIterator]() {
@@ -523,7 +528,25 @@ const components = (): TemplateResult => {
 
   chan.send(mk([BigInt(10055), BigInt(1669234)]));
 
+  const submittedPin = new Chan("N/A");
+  const pinInput_ = pinInput({
+    verify: (pin: string) => ({ ok: true, value: pin }),
+    onSubmit: (pin) => submittedPin.send(pin),
+  });
+
   return html`
+    <div class="c-card" style="max-width: 30em; margin: 40px auto;">
+        ${pinInput_.template}
+
+        <output class="c-input c-input--readonly c-input--stack c-input--fullwidth">
+        Submitted: <strong class="t-strong">${asyncReplace(
+          submittedPin
+        )}</strong>
+
+        </output>
+        <button @click=${() =>
+          pinInput_.submit()} class="c-button c-input--stack">submit</button>
+    </div>
     <div class="c-card" style="margin: 40px;">
         <input class="c-input" ${ref(
           savedAnchors
