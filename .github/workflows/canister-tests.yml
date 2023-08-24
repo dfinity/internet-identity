@@ -692,7 +692,6 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
-    needs: [docker-build-internet_identity_production, docker-build-ii]
     strategy:
       matrix:
         # On main, we run the checks across all platforms. On other branches, in order to speed up checks (on PRs) we skip most platforms
@@ -702,35 +701,56 @@ jobs:
         os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04", "macos-11", "macos-12" ]') || fromJson('[ "ubuntu-22.04" ]') }}
     steps:
       - uses: actions/checkout@v3
-      - name: 'Download production build wasm.gz'
+      - uses: ./.github/actions/check-build
+      - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+      - name: 'Upload ${{ matrix.name }}'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # file when downloaded
+          path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+
+
+
+  verify-clean-build-hash:
+    needs: ['clean-build', 'docker-build-internet_identity_production']
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # On main, we run the hash check across all platforms where the non-dockerized build is reproducible (i.e. not mac-os).
+        # On other branches, in order to speed up checks (on PRs) we skip most platforms. A single ubuntu build is not long and gives us some signal.
+        # XXX: GHA does not support proper if/else so we implement a workaround: https://github.com/actions/runner/issues/409
+        # XXX: GHA fails if we return the matrix object directly, so we have to pretend it's JSON
+        os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04"]') || fromJson('[ "ubuntu-22.04" ]') }}
+    steps:
+      - name: Download internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+          path: .
+
+      - name: Download internet_identity_production.wasm.gz
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm.gz
           path: .
-      - name: 'Download dev build II wasm.gz'
-        uses: actions/download-artifact@v3
-        with:
-          name: internet_identity_dev.wasm.gz
-          path: .
 
-      - name: "Create dfx metadata for the dfx deps feature"
-        id: dfx-metadata
+      - name: Check hashes
         run: |
-          sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
-          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash $sha256)"
-          echo "using dfx metadata $dfx_metadata_json"
-          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+          clean_build_sha256=$(shasum -a 256 ./internet_identity_clean_build_${{ matrix.os }}.wasm.gz | cut -d ' ' -f1)
+          echo got clean build sha "$clean_build_sha256"
+          prod_build_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          echo got prod build sha "$prod_build_sha256"
+          if [ "$clean_build_sha256" == "$prod_build_sha256" ]
+          then
+            echo output clean build sha256 matches prod build sha256
+          else
+            echo "sha mismatch: clean build '$clean_build_sha256' /= prod build '$prod_build_sha256'"
+            exit 1
+          fi
 
-      - run: |
-          sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
-          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
-        id: sha256
-
-      - uses: ./.github/actions/check-build
-        with:
-          # we check that ubuntu builds match the docker build
-          sha256: ${{ startsWith(matrix.os, 'ubuntu') && steps.sha256.outputs.sha256 || '' }}
-          dfx-metadata: ${{ steps.dfx-metadata.outputs.metadata }}
 
   interface-compatibility:
     runs-on: ubuntu-latest
