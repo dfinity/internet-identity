@@ -1,3 +1,4 @@
+import { zip } from "$src/utils/utils";
 import { nonNullish } from "@dfinity/utils";
 
 class View {
@@ -397,7 +398,12 @@ export class VerifyRemoteDeviceView extends View {
   }
 
   async enterVerificationCode(code: string): Promise<void> {
-    await this.browser.$("#tentativeDeviceCode").setValue(code);
+    const inputs = await this.browser
+      .$('[data-role="verification-code"]')
+      .$$("input");
+    for (const [input, digit] of zip(inputs, code.split(""))) {
+      await input.setValue(digit);
+    }
   }
 
   async continue(): Promise<void> {
