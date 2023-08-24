@@ -17,11 +17,12 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--internet-identity] [--archive]
+  $0 [--internet-identity] [--archive] [--dfx-metadata METADATA]
 
 Options:
   --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
   --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --dfx-metadata METADATA      DFX metadata to include in the canister public metadata section
 
 Environment:
   II_FETCH_ROOT_KEY     When set to "1", enable the "II_FETCH_ROOT_KEY" feature.
@@ -61,6 +62,7 @@ function check_feature() {
 # CANISTER: possible values: [internet_identity, archive]
 function build() {
     local canister="$1"
+    local dfx_metadata="$2"
 
     # image name and build args, made global because they're used in
     # check_feature()
@@ -84,6 +86,7 @@ function build() {
     set -x
     DOCKER_BUILDKIT=1 docker build \
         --build-arg II_VERSION="$version" \
+        --build-arg DFX_METADATA="$dfx_metadata" \
         "${docker_build_args[@]}" \
         --output "$tmp_outdir"
     set +x
@@ -98,6 +101,7 @@ function build() {
 # ARGUMENT PARSING
 
 CANISTERS=()
+DFX_METADATA=
 while [[ $# -gt 0 ]]
 do
     case $1 in
@@ -114,6 +118,11 @@ do
         --archive)
             CANISTERS+=("archive")
             shift
+            ;;
+        --dfx-metadata)
+            DFX_METADATA="${2:?missing value for '--dfx-metadata'}"
+            shift; # shift past --dfx-metadata and value
+            shift;
             ;;
         *)
             echo "ERROR: unknown argument $1"
@@ -132,5 +141,5 @@ fi
 
 for canister in "${CANISTERS[@]}"
 do
-    build "$canister"
+    build "$canister" "$DFX_METADATA"
 done
