@@ -13,7 +13,7 @@ import { DynamicKey } from "$src/utils/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
-import { Chan } from "$src/utils/utils";
+import { Chan, withInputElement } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
 import { TemplateResult, html } from "lit-html";
@@ -230,20 +230,6 @@ export const wordTemplate = ({
         >`,
       }[s])
   );
-
-  // Helper to gain access to the event's target
-  const withElement = <E extends Event>(
-    event: E,
-    f: (event: E, element: HTMLInputElement) => void
-  ): void => {
-    const element = event.currentTarget;
-    if (!(element instanceof HTMLInputElement)) {
-      return;
-    }
-
-    return f(event, element);
-  };
-
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
 
   return html`<li
@@ -255,7 +241,7 @@ export const wordTemplate = ({
       autofocus
       data-validity-type=${validityType}
       @paste=${(e: ClipboardEvent) =>
-        withElement(e, (event, element) => {
+        withInputElement(e, (event, element) => {
           e.preventDefault();
 
           // Get the text pasted
@@ -311,13 +297,13 @@ export const wordTemplate = ({
       data-state=${asyncReplace(state)}
       @input=${(e: InputEvent) => {
         state.send("pending");
-        withElement(e, (_e, element) => {
+        withInputElement(e, (_e, element) => {
           // Reset validity when typing
           resetValidity({ element });
         });
       }}
       @change=${(e: InputEvent) => {
-        withElement(e, (event, element) => {
+        withInputElement(e, (event, element) => {
           // Check validity when leaving the field
           state.send(reportValidity({ element }));
         });

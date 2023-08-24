@@ -465,6 +465,10 @@ body {
   font-size: 0.8em;
 }
 
+.t-error {
+  color: var(--rc-error);
+}
+
 .t-centered {
   text-align: center;
 }
@@ -1714,6 +1718,42 @@ by all browsers (FF is missing) */
 
 .c-list--numbered {
   list-style-type: decimal;
+}
+
+/**
+ *  Pin Input
+ *
+ */
+
+.c-list--pin {
+  width: 100%;
+  display: inline-flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.c-list--pin-char {
+  display: block;
+  flex-basis: content;
+}
+
+.c-list--pin[data-haserror="true"] .c-input--pin {
+  border-color: red;
+}
+
+.c-input--pin {
+  text-align: center;
+
+  /* Sizing the input
+   *
+   * The 'input' is sized by its width (width here, or size=1 in HTML as fallback) and "height" (line-height), plus padding in both
+   * dimensions.
+   * */
+  font-size: 2em;
+  padding: 0.2em;
+  width: 1.4em;
+
+  font-weight: 600;
 }
 
 /**
