@@ -87,6 +87,10 @@ export const pinInput = <T>({
       currentError.send(undefined);
       onPaste({ event, element, inputs, onFilled: onSubmit });
     });
+  const onKeydown_ = (event: KeyboardEvent, element: HTMLInputElement) => {
+    currentError.send(undefined);
+    onKeydown({ event, element });
+  };
 
   // A function that can be called to trigger submission. If some digits are missing, then
   // we show and error message.
@@ -124,6 +128,8 @@ export const pinInput = <T>({
                       e,
                       (_, elem) => elem.select()
                     )}
+                  @keydown=${(e: KeyboardEvent) =>
+                    withInputElement(e, onKeydown_)}
                 />
               </label>
             </li>
@@ -226,6 +232,26 @@ const onPaste = ({
   submitIfFilled({ inputs, onSubmit: onFilled });
 };
 
+/* Callback used to handle pressing backspace on an empty input */
+const onKeydown = ({
+  event,
+  element,
+}: {
+  event: KeyboardEvent;
+  element: HTMLInputElement;
+}) => {
+  // If the input is empty, then move to the previous input
+  if (event.code === "Backspace" && element.value === "") {
+    const didMove = clearPrevious(element);
+
+    if (didMove) {
+      // If a previous input was found, then we prevent the default backspace behavior. Otherwise
+      // we let the browser e.g. ring the bell
+      event.preventDefault();
+    }
+  }
+};
+
 // Calls 'onSubmit', only if all inputs have a value. Otherwise, 'onMissing' is called.
 const submitIfFilled = ({
   inputs,
@@ -257,4 +283,20 @@ const focusNextOrBlur = (element: HTMLInputElement) => {
   } else {
     element.blur();
   }
+};
+
+// Focus the previous input in the list, if any, and clears it if it isn't empty.
+// Returns true if the focus was moved to a previous input.
+const clearPrevious = (element: HTMLInputElement): boolean => {
+  // Go up until we find a list item, then to the previous sibling, and finally back down until we find an input
+  const next = element
+    .closest("li")
+    ?.previousElementSibling?.querySelector("input");
+
+  if (nonNullish(next)) {
+    next.value = ""; // Clear the value, if any
+    next.focus();
+    return true;
+  }
+  return false;
 };
