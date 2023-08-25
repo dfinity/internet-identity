@@ -17,7 +17,8 @@ jobs:
   latest-release:
     outputs:
       ref: ${{ steps.release.outputs.ref }}
-      sha256: ${{ steps.release.outputs.sha256 }}
+      prod_sha256: ${{ steps.release.outputs.prod_sha256 }}
+      dev_sha256: ${{ steps.release.outputs.dev_sha256 }}
     runs-on: ubuntu-latest
     steps:
       - name: Get latest release information
@@ -30,10 +31,10 @@ jobs:
             echo "expected a release ref, got '$latest_release_ref'"
             exit 1
           fi
-          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_previous.wasm.gz
+          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_production.wasm.gz
           curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_dev.wasm.gz" -o internet_identity_dev.wasm.gz
-          latest_prod_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm.gz | cut -d ' ' -f1)
-          latest_dev_release_sha256=$(shasum -a 256 ./internet_identity_previous.wasm.gz | cut -d ' ' -f1)
+          latest_prod_release_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          latest_dev_release_sha256=$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
           echo latest prod release sha256 is "$latest_prod_release_sha256"
           echo latest dev release sha256 is "$latest_dev_release_sha256"
