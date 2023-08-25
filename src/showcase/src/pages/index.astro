@@ -1,10 +1,13 @@
 ---
+import Layout from "../layouts/Layout.astro";
 import "$src/styles/main.css";
 ---
 
-<div id="pageContent"></div>
-<script>
-  import { defaultPage } from "$showcase/showcase";
+<Layout>
+  <main id="pageContent" aria-live="polite"></main>
+  <script>
+    import { defaultPage } from "$showcase/showcase";
 
-  defaultPage();
-</script>
+    defaultPage();
+  </script>
+</Layout>

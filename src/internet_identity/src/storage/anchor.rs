@@ -168,7 +168,9 @@ impl Anchor {
 
     fn device_index(&self, device_key: &DeviceKey) -> Result<usize, AnchorError> {
         let Some(index) = self.devices.iter().position(|e| e.pubkey == device_key) else {
-            return Err(AnchorError::NotFound {device_key: device_key.clone()});
+            return Err(AnchorError::NotFound {
+                device_key: device_key.clone(),
+            });
         };
         Ok(index)
     }
@@ -198,7 +200,9 @@ impl Anchor {
         time: Timestamp,
     ) -> Result<(), AnchorError> {
         let Some(device) = self.devices.iter_mut().find(|d| d.pubkey == device_key) else {
-            return Err(AnchorError::NotFound { device_key: device_key.clone() })
+            return Err(AnchorError::NotFound {
+                device_key: device_key.clone(),
+            });
         };
         device.last_usage_timestamp = Some(time);
         Ok(())

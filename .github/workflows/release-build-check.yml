@@ -17,7 +17,7 @@ jobs:
   latest-release:
     outputs:
       ref: ${{ steps.release.outputs.ref }}
-      sha256: ${{ steps.release.outputs.sha256 }}
+      prod_sha256: ${{ steps.release.outputs.prod_sha256 }}
     runs-on: ubuntu-latest
     steps:
       - name: Get latest release information

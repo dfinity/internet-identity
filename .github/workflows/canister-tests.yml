@@ -488,6 +488,13 @@ jobs:
           path: test-failures/*
           if-no-files-found: ignore
 
+  # Aggregate all selenium matrix jobs, used in branch protection
+  selenium-all:
+    runs-on: ubuntu-latest
+    needs: selenium
+    steps:
+      - run: echo selenium ok
+
   using-dev-build:
     runs-on: ubuntu-latest
     needs: docker-build-ii

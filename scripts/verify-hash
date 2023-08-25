@@ -108,7 +108,7 @@ fi
 
 if [ -n "$expected_archive_hash" ]
 then
-  ./scripts/docker-build.sh --archive
+  ./scripts/docker-build --archive
   archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
   if [ "$archive_sha256" == "$expected_archive_hash" ]
   then
