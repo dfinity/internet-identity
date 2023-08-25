@@ -507,6 +507,33 @@ mod v2_api {
 
     #[update]
     #[candid_method]
+    async fn captcha_create() -> Option<CaptchaCreateResponse> {
+        let challenge = anchor_management::registration::create_challenge().await;
+        Some(CaptchaCreateResponse::Ok(challenge))
+    }
+
+    #[update]
+    #[candid_method]
+    fn identity_register(
+        authn_method: AuthnMethodData,
+        challenge_result: ChallengeAttempt,
+        temp_key: Option<Principal>,
+    ) -> Option<IdentityRegisterResponse> {
+        let result = match DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| IdentityRegisterResponse::InvalidMetadata(err.to_string()))
+        {
+            Ok(device) => IdentityRegisterResponse::from(register(
+                DeviceData::from(device),
+                challenge_result,
+                temp_key,
+            )),
+            Err(err) => err,
+        };
+        Some(result)
+    }
+
+    #[update]
+    #[candid_method]
     fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
         authenticate_and_record_activity(identity_number);
         let anchor_info = anchor_management::get_anchor_info(identity_number);

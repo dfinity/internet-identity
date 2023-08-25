@@ -250,3 +250,15 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
         })
     }
 }
+
+impl From<RegisterResponse> for IdentityRegisterResponse {
+    fn from(register_response: RegisterResponse) -> Self {
+        match register_response {
+            RegisterResponse::Registered { user_number } => {
+                IdentityRegisterResponse::Ok(user_number)
+            }
+            RegisterResponse::CanisterFull => IdentityRegisterResponse::CanisterFull,
+            RegisterResponse::BadChallenge => IdentityRegisterResponse::BadChallenge,
+        }
+    }
+}

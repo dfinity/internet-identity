@@ -1,4 +1,6 @@
-use crate::internet_identity::types::{CredentialId, MetadataEntry, PublicKey, Purpose, Timestamp};
+use crate::internet_identity::types::{
+    Challenge, CredentialId, MetadataEntry, PublicKey, Purpose, Timestamp,
+};
 use candid::{CandidType, Deserialize};
 use std::collections::HashMap;
 
@@ -57,6 +59,24 @@ pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
     pub authn_method_registration: Option<AuthnMethodRegistration>,
     pub metadata: HashMap<String, MetadataEntry>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum CaptchaCreateResponse {
+    #[serde(rename = "ok")]
+    Ok(Challenge),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdentityRegisterResponse {
+    #[serde(rename = "ok")]
+    Ok(IdentityNumber),
+    #[serde(rename = "canister_full")]
+    CanisterFull,
+    #[serde(rename = "bad_challenge")]
+    BadChallenge,
+    #[serde(rename = "invalid_metadata")]
+    InvalidMetadata(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
