@@ -4,6 +4,9 @@ inputs:
   sha256:
     description: The expected sha256 of the final production Wasm module
     required: false
+  dfx-metadata:
+    description: Unused, kept for backwards compatibility. Remove after next release.
+    required: false
 runs:
   using: "composite"
   steps:
