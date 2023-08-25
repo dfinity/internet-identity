@@ -1,11 +1,16 @@
 name: 'Check build'
 description: This action performs a clean, non-Docker build of II, and optionally checks the gzipped Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
 inputs:
+  # This action should be self-contained, i.e. take no other inputs than the sha256, otherwise it is difficult to use it
+  # in the release build check workflow. The reason is that this workflow runs off the latest main commit but checks out
+  # this action as it was at the time of the release. This means that any changes to the action's inputs will not be
+  # reflected in the release build check workflow.
+  # See compatibility parameter below for an example of why it was bad to introduce that in the first place.
   sha256:
     description: The expected sha256 of the final production Wasm module
     required: false
   dfx-metadata:
-    description: Unused, kept for backwards compatibility. Remove after next release.
+    description: Unused, kept for backwards compatibility. Remove once release-2023-08-25 is no longer the latest release.
     required: false
 runs:
   using: "composite"
