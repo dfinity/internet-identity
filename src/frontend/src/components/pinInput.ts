@@ -242,7 +242,7 @@ const onKeydown = ({
 }) => {
   // If the input is empty, then move to the previous input
   if (event.code === "Backspace" && element.value === "") {
-    const didMove = focusPrevious(element);
+    const didMove = clearPrevious(element);
 
     if (didMove) {
       // If a previous input was found, then we prevent the default backspace behavior. Otherwise
@@ -285,16 +285,16 @@ const focusNextOrBlur = (element: HTMLInputElement) => {
   }
 };
 
-// Focus the previous input in the list, if any. Returns true if the focus was moved
-// to a previous input.
-const focusPrevious = (element: HTMLInputElement): boolean => {
+// Focus the previous input in the list, if any, and clears it if it isn't empty.
+// Returns true if the focus was moved to a previous input.
+const clearPrevious = (element: HTMLInputElement): boolean => {
   // Go up until we find a list item, then to the previous sibling, and finally back down until we find an input
   const next = element
     .closest("li")
     ?.previousElementSibling?.querySelector("input");
 
   if (nonNullish(next)) {
-    next.value = "";
+    next.value = ""; // Clear the value, if any
     next.focus();
     return true;
   }
