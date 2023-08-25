@@ -70,7 +70,6 @@ jobs:
 
         # Since the release build check is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.
-      - uses: actions/checkout@v3 # checks out the latest slack action
       - name: Notify Slack on failure
         uses: ./.github/actions/slack
         if: ${{ failure() }}
