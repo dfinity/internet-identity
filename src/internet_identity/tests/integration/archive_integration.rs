@@ -760,7 +760,7 @@ mod pull_entries_tests {
         env.tick();
 
         let status = archive_api::status(&env, archive_canister)?;
-        assert!(matches!(status.call_info.last_successful_fetch, Some(_)));
+        assert!(status.call_info.last_successful_fetch.is_some());
         Ok(())
     }
 
