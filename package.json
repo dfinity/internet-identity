@@ -52,11 +52,11 @@
     "webdriverio": "^8.6.9"
   },
   "dependencies": {
-    "@dfinity/agent": "0.15.5",
-    "@dfinity/candid": "0.15.5",
-    "@dfinity/identity": "0.15.5",
-    "@dfinity/principal": "0.15.5",
-    "@dfinity/utils": "^0.0.14",
+    "@dfinity/agent": "^0.19.1",
+    "@dfinity/candid": "^0.19.1",
+    "@dfinity/identity": "^0.19.1",
+    "@dfinity/principal": "^0.19.1",
+    "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
     "lit-html": "^2.7.2",
