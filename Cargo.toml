@@ -5,6 +5,7 @@ members = [
     "src/internet_identity_interface",
     "src/archive",
 ]
+resolver = "2"
 
 [profile.release]
 debug = false # stripped by ic-wasm anyway
