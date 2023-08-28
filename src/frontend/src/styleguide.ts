@@ -118,7 +118,7 @@ export const styleguide = html`
         that can be used.
       </p>
       <aside class="l-stack demo-section">
-        <h2 class="t-title t-title--sub">Tiltes</h2>
+        <h2 class="t-title t-title--sub">Titles</h2>
         <section class="demo" aria-label="Titles Demo">
           <h1 class="t-title t-title--main">Large Title</h1>
           <h2 class="t-title">Default regular title</h2>
