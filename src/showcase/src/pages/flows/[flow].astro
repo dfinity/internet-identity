@@ -1,0 +1,25 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import "$src/styles/main.css";
+import { iiFlows } from "$showcase/flows";
+
+export function getStaticPaths() {
+  return Object.keys(iiFlows).map((key) => ({ params: { flow: key } }));
+}
+
+const { flow } = Astro.params;
+console.log(flow);
+---
+
+<Layout>
+  <main id="pageContent" aria-live="polite" data-flow-name={flow}></main>
+  <script>
+    import { iiFlows } from "$showcase/flows";
+
+    const flow = (document.querySelector("[data-flow-name]") as HTMLElement)
+      .dataset?.flowName as string;
+
+    const f = iiFlows[flow];
+    f();
+  </script>
+</Layout>
