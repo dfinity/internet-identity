@@ -126,6 +126,7 @@ export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
+  'max_inflight_captchas' : [] | [bigint],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
   'register_rate_limit' : [] | [RateLimitConfig],

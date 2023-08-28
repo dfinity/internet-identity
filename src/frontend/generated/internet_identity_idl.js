@@ -13,6 +13,7 @@ export const idlFactory = ({ IDL }) => {
   const InternetIdentityInit = IDL.Record({
     'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -310,6 +311,7 @@ export const init = ({ IDL }) => {
   const InternetIdentityInit = IDL.Record({
     'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

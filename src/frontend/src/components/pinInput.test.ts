@@ -16,13 +16,13 @@ function dispatchInput(elem: HTMLInputElement, text: string) {
 
 // Dispatch an "ClipboardEvent"-ish event that works in jsdom
 function dispatchPaste(elem: HTMLInputElement, text: string) {
-  const event: any = new Event("paste", { bubbles: true, cancelable: true });
-  event.clipboardData = {
+  const evnt: any = new Event("paste", { bubbles: true, cancelable: true });
+  evnt.clipboardData = {
     getData() {
       return text;
     },
   };
-  elem.dispatchEvent(event);
+  elem.dispatchEvent(evnt);
 }
 
 // Get all inputs on the page

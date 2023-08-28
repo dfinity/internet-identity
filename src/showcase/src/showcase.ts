@@ -8,13 +8,11 @@ import {
 } from "$generated/internet_identity_types";
 import { showWarning } from "$src/banner";
 import { promptDeviceAliasPage } from "$src/components/alias";
-import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { authnPages } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
 import { loadIdentityBackground } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { showMessage, showMessagePage } from "$src/components/message";
-import { pinInput } from "$src/components/pinInput";
 import { promptUserNumber } from "$src/components/promptUserNumber";
 import { showSpinnerPage } from "$src/components/spinner";
 import { toast } from "$src/components/toast";
@@ -43,24 +41,22 @@ import { promptRecoveryPage } from "$src/flows/recovery/promptRecovery";
 import { recoverWithDevicePage } from "$src/flows/recovery/recoverWith/device";
 import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
 import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
-import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
+import { promptCaptchaPage } from "$src/flows/register/captcha";
 import { displayUserNumberPage } from "$src/flows/register/finish";
 import { savePasskeyPage } from "$src/flows/register/passkey";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
 import { I18n } from "$src/utils/i18n";
-import { mount, withRef } from "$src/utils/lit-html";
-import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
+import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 const identityBackground = loadIdentityBackground();
 
 const userNumber = BigInt(10000);
 
-const i18n = new I18n("en");
+export const i18n = new I18n("en");
 
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
@@ -84,14 +80,8 @@ export const defaultPage = () => {
   render(pageContent, container);
 };
 
-export const componentsPage = () => {
-  document.title = "Components";
-  const container = document.getElementById("pageContent") as HTMLElement;
-  render(components(), container);
-};
-
 // A challenge with a base64 CAPTCHA, apologies for the length
-const dummyChallenge: Challenge = {
+export const dummyChallenge: Challenge = {
   png_base64:
     "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",
   challenge_key: "unimportant",
@@ -495,95 +485,6 @@ const showcase: TemplateResult = html`
   </div>
 `;
 
-const components = (): TemplateResult => {
-  const showSelected: Ref<HTMLDivElement> = createRef();
-  const savedAnchors: Ref<HTMLInputElement> = createRef();
-  const updateSavedAnchors: Ref<HTMLButtonElement> = createRef();
-
-  const mk = (anchors: NonEmptyArray<bigint>): TemplateResult =>
-    mkAnchorPicker({
-      savedAnchors: anchors,
-      pick: (anchor: bigint) =>
-        withRef(showSelected, (div) => {
-          div.innerText = anchor.toString();
-        }),
-      moreOptions: () => console.log("More options requested"),
-      focus: false,
-    }).template;
-
-  const chan = new Chan<TemplateResult>(html`loading...`);
-
-  const update = () => {
-    const value = savedAnchors.value?.value;
-    if (value !== undefined) {
-      if (value !== "") {
-        const values = value.split(",").map((x) => BigInt(x));
-        const anchors = asNonEmptyArray(values);
-        if (anchors !== undefined) {
-          chan.send(mk(anchors));
-        }
-      }
-    }
-  };
-
-  chan.send(mk([BigInt(10055), BigInt(1669234)]));
-
-  const submittedPin = new Chan("N/A");
-  const pinInput_ = pinInput({
-    verify: (pin: string) => ({ ok: true, value: pin }),
-    onSubmit: (pin) => submittedPin.send(pin),
-  });
-
-  return html`
-    <div class="c-card" style="max-width: 30em; margin: 40px auto;">
-        ${pinInput_.template}
-
-        <output class="c-input c-input--readonly c-input--stack c-input--fullwidth">
-        Submitted: <strong class="t-strong">${asyncReplace(
-          submittedPin
-        )}</strong>
-
-        </output>
-        <button @click=${() =>
-          pinInput_.submit()} class="c-button c-input--stack">submit</button>
-    </div>
-    <div class="c-card" style="margin: 40px;">
-        <input class="c-input" ${ref(
-          savedAnchors
-        )} placeholder="stored anchors: anchor1, anchor2, ..." ></input>
-        <button class="c-button" ${ref(
-          updateSavedAnchors
-        )} @click="${update}">update</button>
-        <div>${asyncReplace(chan)}</div>
-    <div ${ref(
-      showSelected
-    )} class="c-input c-input--readonly">Please select anchor</div></div>
-    <div
-        ${mount((container) =>
-          container instanceof HTMLElement
-            ? promptCaptchaPage(
-                {
-                  cancel: () => console.log("canceled"),
-                  requestChallenge: () =>
-                    new Promise((resolve) => setTimeout(resolve, 1000)).then(
-                      () => dummyChallenge
-                    ),
-                  verifyChallengeChars: (cr) =>
-                    new Promise((resolve) => setTimeout(resolve, 1000)).then(
-                      () => (cr.chars === "8wJ6Q" ? "yes" : badChallenge)
-                    ),
-                  onContinue: () => console.log("Done"),
-                  i18n,
-                  focus: false,
-                },
-                container
-              )
-            : ""
-        )}>
-                </div>
-    `;
-};
-
 const i18nExample = () => {
   type Lang = "en" | "fr";
   const exampleI18n = new I18n<Lang>("en");
@@ -680,7 +581,7 @@ const pageContent = html`
       font-size: 1.25rem;
     }
   </style>
-  ${showcase} ${i18nExample()} ${components()} ${styleguide}
+  ${showcase} ${i18nExample()} ${styleguide}
 `;
 
 // The 404 page
