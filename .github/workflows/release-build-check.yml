@@ -3,7 +3,7 @@
 #
 # We use this regular check to be notified early if our builds are not reproducible
 # over time (due to e.g. changing or missing dependencies).
-# TODO: remove all dfx metadata related actions once release-2023-08-25 is no longer the latest release.
+# TODO: remove all dfx metadata related actions once release-2023-08-28 is no longer the latest release.
 name: Release Build Check
 
 on:
