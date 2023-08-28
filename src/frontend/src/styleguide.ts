@@ -490,8 +490,7 @@ export const styleguide = html`
         <h2 class="t-title">Toast</h2>
         <p class="t-lead">
           Toasts are messages of varying length and importance that appear at
-          the bottom or the top of the screen. They typically use the
-          Irregularity component.
+          the bottom or the top of the screen.
         </p>
         <section class="demo" aria-label="Toast Elements Demo">
           <button
