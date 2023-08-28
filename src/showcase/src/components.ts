@@ -1,5 +1,6 @@
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { pinInput } from "$src/components/pinInput";
+import { toast } from "$src/components/toast";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { mount, withRef } from "$src/utils/lit-html";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
@@ -15,7 +16,36 @@ export const componentsPage = () => {
 };
 
 const components = (): TemplateResult => {
-  return html`${choosePin()} ${pickAnchor()}${completeCaptcha()}`;
+  return html`${mkToast()} ${choosePin()} ${pickAnchor()}${completeCaptcha()}`;
+};
+
+const mkToast = (): TemplateResult => {
+  const toastMessage = html`This is a
+    <strong class="t-strong">new</strong> message`;
+
+  return html`<div class="c-card" style="max-width: 30em; margin: 40px auto;">
+    <h2 class="t-title t-title--sub">Toasts</h2>
+    <div class="c-button-group">
+      <button
+        @click=${() => toast.info(toastMessage)}
+        class="c-button c-input--stack"
+      >
+        info
+      </button>
+      <button
+        @click=${() => toast.success(toastMessage)}
+        class="c-button c-input--stack"
+      >
+        success
+      </button>
+      <button
+        @click=${() => toast.error(toastMessage)}
+        class="c-button c-input--stack"
+      >
+        error
+      </button>
+    </div>
+  </div>`;
 };
 
 const choosePin = (): TemplateResult => {
