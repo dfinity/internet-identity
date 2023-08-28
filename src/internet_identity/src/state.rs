@@ -24,6 +24,9 @@ mod temp_keys;
 // Default value for max number of delegation origins to store in the list of latest used delegation origins
 const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
 
+// Default value for max number of inflight captchas.
+pub const MAX_INFLIGHT_CAPTCHAS: u64 = 500;
+
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
@@ -92,6 +95,8 @@ pub struct PersistentState {
     pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
     // Maximum number of latest delegation origins to store
     pub max_num_latest_delegation_origins: Option<u64>,
+    // Maximum number of inflight captchas
+    pub max_inflight_captchas: Option<u64>,
 }
 
 impl Default for PersistentState {
@@ -105,6 +110,7 @@ impl Default for PersistentState {
             active_authn_method_stats: None,
             latest_delegation_origins: None,
             max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
+            max_inflight_captchas: Some(MAX_INFLIGHT_CAPTCHAS),
         }
     }
 }

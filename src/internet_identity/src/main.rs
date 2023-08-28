@@ -379,6 +379,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.max_num_latest_delegation_origins = Some(limit);
             })
         }
+        if let Some(limit) = arg.max_inflight_captchas {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.max_inflight_captchas = Some(limit);
+            })
+        }
     }
 }
 
