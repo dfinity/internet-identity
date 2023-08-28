@@ -52,10 +52,10 @@
     "webdriverio": "^8.6.9"
   },
   "dependencies": {
-    "@dfinity/agent": "^0.19.1",
-    "@dfinity/candid": "^0.19.1",
-    "@dfinity/identity": "^0.19.1",
-    "@dfinity/principal": "^0.19.1",
+    "@dfinity/agent": "^0.19.2",
+    "@dfinity/candid": "^0.19.2",
+    "@dfinity/identity": "^0.19.2",
+    "@dfinity/principal": "^0.19.2",
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
