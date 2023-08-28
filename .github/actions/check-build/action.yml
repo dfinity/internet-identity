@@ -1,11 +1,16 @@
 name: 'Check build'
 description: This action performs a clean, non-Docker build of II, and optionally checks the gzipped Wasm module sha256 against the 'sha256' argument. Nothing is cached except for the bootstrap environment.
 inputs:
+  # This action should be self-contained, i.e. take no other inputs than the sha256, otherwise it is difficult to use it
+  # in the release build check workflow. The reason is that this workflow runs off the latest main commit but checks out
+  # this action as it was at the time of the most recent release. This means that any changes to the action's inputs will
+  # not be reflected in the release build check workflow.
+  # See compatibility parameter below for an example of why it was bad to introduce that in the first place.
   sha256:
     description: The expected sha256 of the final production Wasm module
     required: false
   dfx-metadata:
-    description: The dfx metadata to include in the production build
+    description: Unused, kept for backwards compatibility. Remove once release-2023-08-28 is no longer the latest release.
     required: false
 runs:
   using: "composite"
@@ -15,11 +20,49 @@ runs:
     # run the build
     - run: npm ci
       shell: bash
-    - name: Run build
+
+    - name: "Create dfx dev metadata for the dfx deps feature"
+      id: dev-metadata
+      shell: bash
+      run: |
+        dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz )"
+        echo "using dfx metadata $dfx_metadata_json"
+        echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
+    - name: Run dev build
+      # If the metadata is empty, then the build will not use the dfx deps feature --> no dev build dependency
+      # The metadata is empty for all non-release builds
+      if: ${{ steps.dev-metadata.outputs.metadata != '' }}
       env:
         # use an env variable so that the GitHub templating does not cause issues with string escaping
         # see: https://github.com/orgs/community/discussions/32012
-        METADATA: ${{ inputs.dfx-metadata }}
+        METADATA: ${{ steps.dev-metadata.outputs.metadata }}
+        II_FETCH_ROOT_KEY: "1"
+        II_DUMMY_AUTH: "1"
+        II_DUMMY_CAPTCHA: "1"
+        II_INSECURE_REQUESTS: "1"
+      run: |
+        ./scripts/build ${METADATA:+"--dfx-metadata" "$METADATA"}
+        mv internet_identity.wasm.gz internet_identity_dev.wasm.gz
+      shell: bash
+
+    - name: "Create dfx prod metadata for the dfx deps feature"
+      # If the metadata is empty, then the build will not use the dfx deps feature --> no dev build dependency
+      # The metadata is empty for all non-release builds
+      if: ${{ steps.dev-metadata.outputs.metadata != '' }}
+      id: prod-metadata
+      shell: bash
+      run: |
+        dev_sha256=$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)
+        dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash $dev_sha256 )"
+        echo "using dfx metadata $dfx_metadata_json"
+        echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
+    - name: Run prod build
+      env:
+        # use an env variable so that the GitHub templating does not cause issues with string escaping
+        # see: https://github.com/orgs/community/discussions/32012
+        METADATA: ${{ steps.prod-metadata.outputs.metadata }}
       run: |
         ./scripts/build ${METADATA:+"--dfx-metadata" "$METADATA"}
       shell: bash

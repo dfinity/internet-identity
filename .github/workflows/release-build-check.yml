@@ -3,6 +3,7 @@
 #
 # We use this regular check to be notified early if our builds are not reproducible
 # over time (due to e.g. changing or missing dependencies).
+# TODO: remove all dfx metadata related actions once release-2023-08-28 is no longer the latest release.
 name: Release Build Check
 
 on:
@@ -70,7 +71,6 @@ jobs:
 
         # Since the release build check is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.
-      - uses: actions/checkout@v3 # checks out the latest slack action
       - name: Notify Slack on failure
         uses: ./.github/actions/slack
         if: ${{ failure() }}
