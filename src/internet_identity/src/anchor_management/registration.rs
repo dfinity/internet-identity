@@ -1,5 +1,5 @@
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
-use crate::state::ChallengeInfo;
+use crate::state::{ChallengeInfo, MAX_INFLIGHT_CAPTCHAS};
 use crate::storage::anchor::Device;
 use crate::storage::Salt;
 use crate::{secs_to_nanos, state};
@@ -21,8 +21,6 @@ mod rate_limit;
 
 // 5 mins
 const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
-// How many captcha challenges we keep in memory (at most)
-const MAX_INFLIGHT_CHALLENGES: usize = 500;
 
 pub async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
@@ -35,7 +33,13 @@ pub async fn create_challenge() -> Challenge {
         inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
 
         // Error out if there are too many inflight challenges
-        if inflight_challenges.len() >= MAX_INFLIGHT_CHALLENGES {
+        if inflight_challenges.len()
+            >= state::persistent_state_mut(|state| {
+                *state
+                    .max_inflight_captchas
+                    .get_or_insert(MAX_INFLIGHT_CAPTCHAS)
+            }) as usize
+        {
             trap("too many inflight captchas");
         }
 

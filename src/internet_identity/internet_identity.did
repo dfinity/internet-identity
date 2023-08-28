@@ -230,6 +230,9 @@ type InternetIdentityInit = record {
     // Maximum number of latest delegation origins to track.
     // Default: 1000
     max_num_latest_delegation_origins : opt nat64;
+    // Maximum number of inflight captchas.
+    // Default: 500
+    max_inflight_captchas: opt nat64;
 };
 
 type ChallengeKey = text;

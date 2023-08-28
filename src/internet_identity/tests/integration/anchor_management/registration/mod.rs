@@ -194,9 +194,13 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
 #[test]
 fn should_limit_captcha_creation() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let init_arg = InternetIdentityInit {
+        max_inflight_captchas: Some(3),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));
 
-    for _ in 0..500 {
+    for _ in 0..3 {
         api::create_challenge(&env, canister_id)?;
     }
     let result = api::create_challenge(&env, canister_id);

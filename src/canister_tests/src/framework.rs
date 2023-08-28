@@ -164,7 +164,6 @@ pub fn install_ii_canister_with_arg(
 
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
-        assigned_user_number_range: None,
         archive_config: Some(ArchiveConfig {
             module_hash: archive_wasm_hash(&wasm),
             entries_buffer_limit: 10_000,
@@ -172,18 +171,14 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
-        register_rate_limit: None,
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
 pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
         register_rate_limit: Some(rate_limit),
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
@@ -192,10 +187,7 @@ pub fn arg_with_anchor_range(
 ) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         assigned_user_number_range: Some(anchor_range),
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
