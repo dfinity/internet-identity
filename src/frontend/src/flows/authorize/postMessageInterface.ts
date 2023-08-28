@@ -190,11 +190,11 @@ export async function authenticationProtocol({
  */
 const waitForAuthRequest = (): Promise<AuthContext> =>
   new Promise<AuthContext>((resolve) => {
-    const eventHandler = (event: MessageEvent) => {
-      const message: unknown = event.data; // Drop assumptions about event.data (an 'any')
+    const evntHandler = (evnt: MessageEvent) => {
+      const message: unknown = evnt.data; // Drop assumptions about evnt.data (an 'any')
       const authRequest = asAuthRequest(message);
       if (typeof authRequest !== "string") {
-        window.removeEventListener("message", eventHandler);
+        window.removeEventListener("message", evntHandler);
         console.log(
           `Handling authorize-client request ${JSON.stringify(
             authRequest,
@@ -203,7 +203,7 @@ const waitForAuthRequest = (): Promise<AuthContext> =>
         );
         resolve({
           authRequest,
-          requestOrigin: event.origin,
+          requestOrigin: evnt.origin,
         });
       } else {
         console.warn(
@@ -214,5 +214,5 @@ const waitForAuthRequest = (): Promise<AuthContext> =>
     };
 
     // Set up an event listener for receiving messages from the client.
-    window.addEventListener("message", eventHandler);
+    window.addEventListener("message", evntHandler);
   });

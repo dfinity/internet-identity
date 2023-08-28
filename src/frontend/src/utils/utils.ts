@@ -22,15 +22,15 @@ export function unknownToString(obj: unknown, def: string): string {
 
 // Helper to gain access to the event's target
 export const withInputElement = <E extends Event>(
-  event: E,
-  f: (event: E, element: HTMLInputElement) => void
+  evnt: E,
+  f: (evnt: E, element: HTMLInputElement) => void
 ): void => {
-  const element = event.currentTarget;
+  const element = evnt.currentTarget;
   if (!(element instanceof HTMLInputElement)) {
     return;
   }
 
-  return f(event, element);
+  return f(evnt, element);
 };
 
 /** Try to read unknown data as a record */

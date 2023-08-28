@@ -77,19 +77,19 @@ export const pinInput = <T>({
       return f(Array.from(inputs));
     });
 
-  const onInput_ = (event: InputEvent, element: HTMLInputElement) =>
+  const onInput_ = (evnt: InputEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
       currentError.send(undefined);
-      onInput({ element, event, inputs, onFilled: autosubmit });
+      onInput({ element, evnt, inputs, onFilled: autosubmit });
     });
-  const onPaste_ = (event: ClipboardEvent, element: HTMLInputElement) =>
+  const onPaste_ = (evnt: ClipboardEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
       currentError.send(undefined);
-      onPaste({ event, element, inputs, onFilled: onSubmit });
+      onPaste({ evnt, element, inputs, onFilled: onSubmit });
     });
-  const onKeydown_ = (event: KeyboardEvent, element: HTMLInputElement) => {
+  const onKeydown_ = (evnt: KeyboardEvent, element: HTMLInputElement) => {
     currentError.send(undefined);
-    onKeydown({ event, element });
+    onKeydown({ evnt, element });
   };
 
   // A function that can be called to trigger submission. If some digits are missing, then
@@ -146,18 +146,18 @@ export const pinInput = <T>({
 /* Callback used when an input is being set */
 const onInput = ({
   element,
-  event,
+  evnt,
   inputs,
   onFilled,
 }: {
   element: HTMLInputElement;
-  event: InputEvent;
+  evnt: InputEvent;
   inputs: HTMLInputElement[];
   onFilled: (pin: string) => void;
 }) => {
   // First, if the input is empty (i.e. the "input" was to delete the content OR the browser prevented inserting an extra char due to maxlength=1) then we do nothing
   // XXX: we don't test this because mocking the event data is really hard in jsdom
-  if (event.data === "") {
+  if (evnt.data === "") {
     return;
   }
 
@@ -178,18 +178,18 @@ const onInput = ({
 
 /* Callback used when the user pastes */
 const onPaste = ({
-  event,
+  evnt,
   inputs,
   element,
   onFilled,
 }: {
-  event: ClipboardEvent;
+  evnt: ClipboardEvent;
   element: HTMLInputElement;
   inputs: HTMLInputElement[];
   onFilled: (pin: string) => void;
 }) => {
   // If no actual data was pasted, do nothing
-  if (event.clipboardData === null) {
+  if (evnt.clipboardData === null) {
     return;
   }
 
@@ -207,7 +207,7 @@ const onPaste = ({
   // Create an array of pairs of inputs + the char/digit to be pasted in that input
   const toBePasted = zip(
     nextInputs,
-    event.clipboardData.getData("text").trim().split("")
+    evnt.clipboardData.getData("text").trim().split("")
   );
   if (toBePasted.length === 0) {
     return;
@@ -218,7 +218,7 @@ const onPaste = ({
     input.value = char;
   }
   // Prevent actually pasting the value in any of the fields since we just did this manually
-  event.preventDefault();
+  evnt.preventDefault();
 
   if (toBePasted.length < nextInputs.length) {
     // If all inputs have NOT been filled, then focus on the one after the last paste/fill
@@ -234,20 +234,20 @@ const onPaste = ({
 
 /* Callback used to handle pressing backspace on an empty input */
 const onKeydown = ({
-  event,
+  evnt,
   element,
 }: {
-  event: KeyboardEvent;
+  evnt: KeyboardEvent;
   element: HTMLInputElement;
 }) => {
   // If the input is empty, then move to the previous input
-  if (event.code === "Backspace" && element.value === "") {
+  if (evnt.code === "Backspace" && element.value === "") {
     const didMove = clearPrevious(element);
 
     if (didMove) {
       // If a previous input was found, then we prevent the default backspace behavior. Otherwise
       // we let the browser e.g. ring the bell
-      event.preventDefault();
+      evnt.preventDefault();
     }
   }
 };

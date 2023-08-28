@@ -240,15 +240,15 @@ export const wordTemplate = ({
     <input
       autofocus
       data-validity-type=${validityType}
-      @paste=${(e: ClipboardEvent) =>
-        withInputElement(e, (event, element) => {
-          e.preventDefault();
+      @paste=${(evnt: ClipboardEvent) =>
+        withInputElement(evnt, (_, element) => {
+          evnt.preventDefault();
 
           // Get the text pasted
-          if (event.clipboardData === null) {
+          if (evnt.clipboardData === null) {
             return;
           }
-          const text = event.clipboardData.getData("text");
+          const text = evnt.clipboardData.getData("text");
 
           // Split the text into words, dropping (leading) white spaces, empty strings (from e.g. double spaces), etc
           const [word = undefined, ...rest] = text
@@ -303,7 +303,7 @@ export const wordTemplate = ({
         });
       }}
       @change=${(e: InputEvent) => {
-        withInputElement(e, (event, element) => {
+        withInputElement(e, (_, element) => {
           // Check validity when leaving the field
           state.send(reportValidity({ element }));
         });
