@@ -83,17 +83,17 @@ export type LoginResult =
   | NoSeedPhrase
   | SeedPhraseFail
   | CancelOrTimeout;
-export type RegisterResult =
-  | LoginSuccess
+export type RegisterResult<T = AuthenticatedConnection> =
+  | LoginSuccess<T>
   | AuthFail
   | ApiError
   | RegisterNoSpace
   | BadChallenge
   | CancelOrTimeout;
 
-type LoginSuccess = {
+type LoginSuccess<T = AuthenticatedConnection> = {
   kind: "loginSuccess";
-  connection: AuthenticatedConnection;
+  connection: T;
   userNumber: bigint;
 };
 
