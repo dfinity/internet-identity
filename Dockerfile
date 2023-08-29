@@ -5,7 +5,7 @@
 #
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
-FROM ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
+FROM --platform=linux/amd64 ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
 
 ENV TZ=UTC
 
@@ -73,12 +73,15 @@ ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 ARG II_INSECURE_REQUESTS=
 
+# DFX specific metadata for dfx deps
+ARG DFX_METADATA=
+
 RUN touch src/internet_identity/src/lib.rs
 RUN touch src/internet_identity_interface/src/lib.rs
 RUN touch src/canister_tests/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build
+RUN ./scripts/build ${DFX_METADATA:+"--dfx-metadata" "$DFX_METADATA"}
 RUN sha256sum /internet_identity.wasm.gz
 
 FROM deps as build_archive

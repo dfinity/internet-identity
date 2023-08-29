@@ -312,9 +312,9 @@ async fn archive_status(archive_canister: Principal) -> ArchiveStatusCache {
 }
 
 pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operation: Operation) {
-    let Created {data, config} = state::archive_state() else {
+    let Created { data, config } = state::archive_state() else {
         // nothing to archive if the archive has not been deployed yet
-        return
+        return;
     };
 
     // For layout versions < 6 this will always be false because nothing is ever added to the buffer
@@ -348,7 +348,7 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
 }
 
 pub fn fetch_entries() -> Vec<BufferedEntry> {
-    let Created{data, config} = state::archive_state() else {
+    let Created { data, config } = state::archive_state() else {
         trap("no archive deployed!");
     };
     trap_if_caller_not_archive(&data);
@@ -364,7 +364,7 @@ pub fn fetch_entries() -> Vec<BufferedEntry> {
 
 pub fn acknowledge_entries(sequence_number: u64) {
     state::persistent_state_mut(|ps| {
-        let Created{ref mut data, .. } = ps.archive_state else {
+        let Created { ref mut data, .. } = ps.archive_state else {
             trap("no archive deployed!");
         };
         trap_if_caller_not_archive(data);
@@ -403,7 +403,7 @@ pub fn device_diff(old: &Device, new: &Device) -> DeviceDataUpdate {
         key_type: if old.key_type == new.key_type {
             None
         } else {
-            Some(KeyType::from(new.key_type.clone()))
+            Some(new.key_type.clone())
         },
         protection: if old.protection == new.protection {
             None

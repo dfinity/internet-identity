@@ -7,14 +7,14 @@ import {
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import {
+  TemplateElement,
   mount,
   renderPage,
-  TemplateElement,
   withRef,
 } from "$src/utils/lit-html";
 import { OmitParams } from "$src/utils/utils";
 import { html } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { registerStepper } from "./stepper";
 
 export const displayUserNumberTemplate = ({
@@ -45,7 +45,7 @@ export const displayUserNumberTemplate = ({
         Save this number by taking a screenshot or writing it down.
       </p>
     </hgroup>
-    <div class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id" >
+    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id" >
       ${
         identityCard({
           userNumber,

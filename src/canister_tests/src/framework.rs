@@ -166,7 +166,6 @@ pub fn install_ii_canister_with_arg(
 
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
-        assigned_user_number_range: None,
         archive_config: Some(ArchiveConfig {
             module_hash: archive_wasm_hash(&wasm),
             entries_buffer_limit: 10_000,
@@ -174,18 +173,14 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
-        register_rate_limit: None,
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
 pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
         register_rate_limit: Some(rate_limit),
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
@@ -194,10 +189,7 @@ pub fn arg_with_anchor_range(
 ) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         assigned_user_number_range: Some(anchor_range),
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        max_num_latest_delegation_origins: None,
+        ..InternetIdentityInit::default()
     })
 }
 
@@ -472,7 +464,25 @@ pub fn parse_metric(body: &str, metric: &str) -> (f64, SystemTime) {
 
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
-    assert_eq!(value, expected);
+    assert_eq!(value, expected, "metric {metric_name} does not match");
+}
+
+/// Asserts that the given metric is present in the metrics string and that it has the expected value
+/// across all the provided label values for the given label.
+pub fn assert_labelled_metric(
+    metrics: &str,
+    metric_name: &str,
+    expected_value: f64,
+    label_name: &str,
+    label_values: &[&str],
+) {
+    for label_value in label_values {
+        assert_metric(
+            metrics,
+            &(metric_name.to_string() + &format!("{{{}=\"{}\"}}", label_name, label_value)),
+            expected_value,
+        );
+    }
 }
 
 pub fn assert_devices_equal(
@@ -679,4 +689,28 @@ pub fn test_principal(n: u64) -> Principal {
     let mut bytes = n.to_le_bytes().to_vec();
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
+}
+
+/// Macro to easily match a value against a pattern, and panic if the match fails.
+///
+/// This makes API v2 return types easier to handle.
+/// API v2 calls all return variants, requiring a match on the result.
+/// This macro allows to write the match in terms of the expected variant, with a fallback
+/// on unexpected variants.
+/// Example:
+/// ```
+/// use canister_tests::match_value;
+/// match_value!(
+///     api_v2::identity_info(&env, canister_id, principal, identity_number)?, // value
+///     Some(IdentityInfoResponse::Ok(identity_info)) // expected pattern, with binding to identity_info
+/// );
+/// ```
+#[macro_export]
+#[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
+macro_rules! match_value {
+    ($target: expr, $pat: pat_param) => {
+        let $pat = $target else {
+            panic!("expected {}", stringify!($pat));
+        };
+    };
 }

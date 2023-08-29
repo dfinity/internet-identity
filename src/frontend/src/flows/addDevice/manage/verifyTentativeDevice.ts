@@ -2,13 +2,13 @@ import { VerifyTentativeDeviceResponse } from "$generated/internet_identity_type
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
+import { pinInput } from "$src/components/pinInput";
 import { AsyncCountdown } from "$src/utils/countdown";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import { renderPage, withRef } from "$src/utils/lit-html";
-import { Chan, unknownToString } from "$src/utils/utils";
-import { html } from "lit-html";
+import { renderPage } from "$src/utils/lit-html";
+import { unknownToString } from "$src/utils/utils";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref } from "lit-html/directives/ref.js";
 
 // The type that we return, pretty much the result of the canister
 // except that all retries have been exhausted
@@ -17,9 +17,11 @@ type VerifyResult =
   | { too_many_attempts: null };
 
 // A helper type for the page verification function where a retry may be possible/requested
-type VerifyResultOrRetry = VerifyResult | { retry: null };
+type VerifyResultOrRetry =
+  | { retry: false; value: VerifyResult }
+  | { retry: true };
 
-const verifyTentativeDeviceTemplate = ({
+const verifyTentativeDeviceTemplate = <T>({
   alias,
   remaining,
   verify,
@@ -29,47 +31,31 @@ const verifyTentativeDeviceTemplate = ({
   alias: string;
   remaining: AsyncIterable<string>;
   cancel: () => void;
-  verify: (value: string) => Promise<VerifyResultOrRetry>;
-  doContinue: (result: VerifyResult) => void;
+  verify: (
+    value: string
+  ) => Promise<{ retry: false; value: T } | { retry: true }>;
+  doContinue: (result: T) => void;
 }) => {
-  // The error shown on failed verification
-  const showRetryPrompt = new Chan<boolean>(false);
-  const retryPromptHidden = showRetryPrompt.map((showRetry) =>
-    showRetry ? "" : "is-hidden"
-  );
-
-  // The error shown on bad input (e.g. "")
-  const badInput = new Chan<"ok" | "bad">("ok");
-  const hasError = badInput.map((e) => (e === "bad" ? "has-error" : ""));
-
-  const pinInput = createRef<HTMLInputElement>();
-
-  // When submitting, we either give visual feedback on bad input (e.g. "") or we
-  // use the provided verification function to decide whether to retry or contine by forwarding
-  // the result.
-  const submit = () => {
-    void withRef(pinInput, async (pin) => {
-      const value = pin.value;
-      if (value === "") {
-        badInput.send("bad");
-      } else {
-        showRetryPrompt.send(false);
-        badInput.send("ok");
-
-        const result = await verify(value);
-        if ("retry" in result) {
-          showRetryPrompt.send(true);
-        } else {
-          doContinue(result);
-        }
+  const pinInput_ = pinInput({
+    verify: async (pin: string) => {
+      const result = await verify(pin);
+      if (result.retry) {
+        return {
+          ok: false,
+          error: "The entered verification code was invalid. Please try again.",
+        };
       }
-    });
-  };
+
+      return { ok: true, value: result.value };
+    },
+    onSubmit: doContinue,
+  });
 
   const pageContentSlot = html`<h1 class="t-title t-title--main">
       Do you want to create this Passkey for your Internet Identity?
     </h1>
-    <output class="c-input c-input--readonly t-vip t-vip--small"
+    <output
+      class="c-input c-input--fullwidth c-input--stack c-input--readonly t-vip t-vip--small"
       >${alias}</output
     >
     <p class="t-paragraph">
@@ -77,29 +63,23 @@ const verifyTentativeDeviceTemplate = ({
       the <strong class="t-strong">Verification Code</strong> displayed on your
       other window:
     </p>
-    <label class="l-stack" aria-label="Verification Code">
-      <p class="t-paragraph ${asyncReplace(retryPromptHidden)}">
-        The entered verification code was invalid. Please try again.
-      </p>
-      <input
-        ${ref(pinInput)}
-        @keypress=${(e: KeyboardEvent) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        id="tentativeDeviceCode"
-        class="c-input ${asyncReplace(hasError)}"
-        placeholder="Verification Code"
-      />
+    <label
+      class="l-stack"
+      data-role="verification-code"
+      aria-label="Verification Code"
+    >
+      <div class="c-input--stack">${pinInput_.template}</div>
     </label>
     <p class="t-paragraph">
       Time remaining: <span class="t-strong">${asyncReplace(remaining)}</span>
     </p>
 
     <div class="l-stack">
-      <button @click=${() => submit()} id="verifyDevice" class="c-button">
+      <button
+        @click=${() => pinInput_.submit()}
+        id="verifyDevice"
+        class="c-button"
+      >
         Verify Passkey
       </button>
       <button @click=${() => cancel()} class="c-button c-button--secondary">
@@ -114,9 +94,16 @@ const verifyTentativeDeviceTemplate = ({
   });
 };
 
-export const verifyTentativeDevicePage = renderPage(
-  verifyTentativeDeviceTemplate
-);
+type TemplateProps<T> = Parameters<typeof verifyTentativeDeviceTemplate<T>>[0];
+
+export function verifyTentativeDevicePage<T>(
+  props: TemplateProps<T>,
+  container?: HTMLElement
+): void {
+  return renderPage<(props: TemplateProps<T>) => TemplateResult>(
+    verifyTentativeDeviceTemplate
+  )(props, container);
+}
 
 /**
  * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.
@@ -136,7 +123,7 @@ export const verifyTentativeDevice = async ({
   const countdown: AsyncCountdown<VerifyResult | "canceled"> =
     AsyncCountdown.fromNanos(endTimestamp);
 
-  verifyTentativeDevicePage({
+  verifyTentativeDevicePage<VerifyResult>({
     alias,
     cancel: async () => {
       await withLoader(() => connection.exitDeviceRegistrationMode());
@@ -153,12 +140,12 @@ export const verifyTentativeDevice = async ({
 
       if ("wrong_code" in result) {
         if (result.wrong_code.retries_left === 0) {
-          return { too_many_attempts: null };
+          return { retry: false, value: { too_many_attempts: null } };
         } else {
-          return { retry: null };
+          return { retry: true };
         }
       } else {
-        return result;
+        return { retry: false, value: result };
       }
     },
     doContinue: (res) => countdown.stop(res),

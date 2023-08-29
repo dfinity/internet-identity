@@ -1,13 +1,14 @@
+use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
-use crate::storage::anchor::{Anchor, Device, KeyTypeInternal};
+use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    ActiveAnchorCounter, ActiveAnchorStatistics, ArchiveConfig, CompletedActiveAnchorStats,
-    DeviceProtection, OngoingActiveAnchorStats, Purpose,
+    ArchiveConfig, DeviceProtection, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::rc::Rc;
@@ -348,7 +349,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 fn should_read_previously_stored_persistent_state() {
     const NUM_ANCHORS: u64 = 3;
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + NUM_ANCHORS * 4096;
-    const PERSISTENT_STATE_BYTES: &str = "4949505368010000000000004449444c116c03949d879d0701f7f5cbfb0778eed5f3af090a6b04dee7beb6080291a5fcf10a7fd1d3dab70b05c8bbeff50d066c01c2adc9be0c036c04c3f9fca002788beea8c5047881cfaef40a0487eb979d0d7a6d7b6c02d6a9bbae0a78c2adc9be0c036c02aaac8d930407c2adc9be0c036c03c7e8ccee037884fbf0820968cfd6ffea0f086d096c04c7e8ccee0378f2f099840704938da78c0a78d6a9bbae0a786e0b6c028bc3e2f9040cbbd492d8090f6c0297beb4cb080d8b858cea090d6e0e6c02fcdde6ea0178f9a6ebf703786c0297beb4cb08108b858cea090e6d0e0100032700000000000000010a00000000006000b0010100005847f80d0000001027000000000000206363636363636363636363636363636363636363636363636363636363636363e8038002e1df0200000001000163000000000000006dbb0e000000000001420000000000000030f1c520000000002c00000000000000d133b45001000000";
+    let persistent_state_bytes = candid::encode_one(&sample_persistent_state()).unwrap();
     let memory = VectorMemory::default();
     // allocate space for the writes
     memory.grow(3);
@@ -362,10 +363,12 @@ fn should_read_previously_stored_persistent_state() {
             .expect("Failed writing anchor");
     }
 
+    memory.write(EXPECTED_ADDRESS, b"IIPS".as_ref());
     memory.write(
-        EXPECTED_ADDRESS,
-        &hex::decode(PERSISTENT_STATE_BYTES).unwrap(),
+        EXPECTED_ADDRESS + 4,
+        &(persistent_state_bytes.len() as u64).to_le_bytes(),
     );
+    memory.write(EXPECTED_ADDRESS + 12, &persistent_state_bytes);
 
     assert_eq!(
         storage
@@ -388,7 +391,7 @@ fn sample_device() -> Device {
         alias: "my test device".to_string(),
         credential_id: Some(ByteBuf::from("this is the credential id")),
         purpose: Purpose::Authentication,
-        key_type: KeyTypeInternal::Unknown,
+        key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
         origin: None,
         last_usage_timestamp: Some(1234),
@@ -412,28 +415,26 @@ fn sample_persistent_state() -> PersistentState {
             },
         },
         canister_creation_cycles_cost: 12_346_000_000,
-        registration_rate_limit: None,
-        active_anchor_stats: Some(ActiveAnchorStatistics {
-            completed: CompletedActiveAnchorStats {
-                daily_active_anchors: Some(ActiveAnchorCounter {
+        active_anchor_stats: Some(ActivityStats {
+            completed: CompletedActivityStats {
+                daily_events: Some(ActiveAnchorCounter {
                     start_timestamp: 965485,
                     counter: 99,
                 }),
-                monthly_active_anchors: None,
+                monthly_events: None,
             },
-            ongoing: OngoingActiveAnchorStats {
-                daily_active_anchors: ActiveAnchorCounter {
+            ongoing: OngoingActivityStats {
+                daily_events: ActiveAnchorCounter {
                     start_timestamp: 5648954321,
                     counter: 44,
                 },
-                monthly_active_anchors: vec![ActiveAnchorCounter {
+                monthly_events: vec![ActiveAnchorCounter {
                     start_timestamp: 549843248,
                     counter: 66,
                 }],
             },
         }),
-        domain_active_anchor_stats: None,
-        latest_delegation_origins: None,
         max_num_latest_delegation_origins: None,
+        ..PersistentState::default()
     }
 }

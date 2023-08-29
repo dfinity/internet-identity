@@ -10,7 +10,7 @@ import {
   recoveryPhraseLabel,
 } from "$src/utils/recoveryDevice";
 import { isNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Devices, RecoveryKey, RecoveryPhrase } from "./types";
 

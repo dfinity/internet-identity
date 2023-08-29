@@ -1,5 +1,5 @@
-use crate::active_anchor_stats::IIDomain;
 use crate::assets::CertifiedAssets;
+use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;

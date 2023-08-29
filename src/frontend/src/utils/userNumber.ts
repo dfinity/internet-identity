@@ -169,8 +169,6 @@ const asAnchor = (msg: unknown): Anchor | undefined => {
   if ("lastUsedTimestamp" in obj && typeof obj.lastUsedTimestamp === "number") {
     return { ...obj, lastUsedTimestamp: obj.lastUsedTimestamp };
   }
-
-  return undefined;
 };
 
 const writeAnchors = (anchors: Anchors) => {

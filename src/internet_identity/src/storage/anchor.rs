@@ -1,4 +1,4 @@
-use crate::active_anchor_stats::IIDomain;
+use crate::ii_domain::IIDomain;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
@@ -26,7 +26,7 @@ impl Device {
         self.alias = device_data.alias;
         self.credential_id = device_data.credential_id;
         self.purpose = device_data.purpose;
-        self.key_type = KeyTypeInternal::from(device_data.key_type);
+        self.key_type = device_data.key_type;
         self.protection = device_data.protection;
         self.origin = device_data.origin;
         self.metadata = device_data.metadata;
@@ -40,7 +40,7 @@ impl From<DeviceData> for Device {
             alias: device_data.alias,
             credential_id: device_data.credential_id,
             purpose: device_data.purpose,
-            key_type: KeyTypeInternal::from(device_data.key_type),
+            key_type: device_data.key_type,
             protection: device_data.protection,
             origin: device_data.origin,
             last_usage_timestamp: None,
@@ -56,7 +56,7 @@ impl From<Device> for DeviceData {
             alias: device.alias,
             credential_id: device.credential_id,
             purpose: device.purpose,
-            key_type: KeyType::from(device.key_type),
+            key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
             metadata: device.metadata,
@@ -71,7 +71,7 @@ impl From<Device> for DeviceWithUsage {
             alias: device.alias,
             credential_id: device.credential_id,
             purpose: device.purpose,
-            key_type: KeyType::from(device.key_type),
+            key_type: device.key_type,
             protection: device.protection,
             origin: device.origin,
             last_usage: device.last_usage_timestamp,
@@ -86,7 +86,7 @@ impl From<Device> for DeviceDataWithoutAlias {
             pubkey: device_data.pubkey,
             credential_id: device_data.credential_id,
             purpose: device_data.purpose,
-            key_type: KeyType::from(device_data.key_type),
+            key_type: device_data.key_type,
             protection: device_data.protection,
             origin: device_data.origin,
             metadata_keys: device_data
@@ -168,7 +168,9 @@ impl Anchor {
 
     fn device_index(&self, device_key: &DeviceKey) -> Result<usize, AnchorError> {
         let Some(index) = self.devices.iter().position(|e| e.pubkey == device_key) else {
-            return Err(AnchorError::NotFound {device_key: device_key.clone()});
+            return Err(AnchorError::NotFound {
+                device_key: device_key.clone(),
+            });
         };
         Ok(index)
     }
@@ -198,7 +200,9 @@ impl Anchor {
         time: Timestamp,
     ) -> Result<(), AnchorError> {
         let Some(device) = self.devices.iter_mut().find(|d| d.pubkey == device_key) else {
-            return Err(AnchorError::NotFound { device_key: device_key.clone() })
+            return Err(AnchorError::NotFound {
+                device_key: device_key.clone(),
+            });
         };
         device.last_usage_timestamp = Some(time);
         Ok(())
@@ -310,54 +314,11 @@ pub struct Device {
     pub alias: String,
     pub credential_id: Option<CredentialId>,
     pub purpose: Purpose,
-    pub key_type: KeyTypeInternal,
+    pub key_type: KeyType,
     pub protection: DeviceProtection,
     pub origin: Option<String>,
     pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: Option<HashMap<String, MetadataEntry>>,
-}
-
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
-pub enum KeyTypeInternal {
-    #[serde(rename = "unknown")]
-    Unknown,
-    #[serde(rename = "platform")]
-    Platform,
-    #[serde(rename = "cross_platform")]
-    CrossPlatform,
-    #[serde(rename = "seed_phrase")]
-    SeedPhrase,
-    #[serde(rename = "browser_storage_key")]
-    BrowserStorageKey,
-}
-
-impl From<KeyTypeInternal> for KeyType {
-    fn from(key_type_internal: KeyTypeInternal) -> Self {
-        match key_type_internal {
-            KeyTypeInternal::Unknown => KeyType::Unknown,
-            KeyTypeInternal::Platform => KeyType::Platform,
-            KeyTypeInternal::CrossPlatform => KeyType::CrossPlatform,
-            KeyTypeInternal::SeedPhrase => KeyType::SeedPhrase,
-            // This key type cannot be written through the API, so the only way to see it here, is
-            // if we roll back to this version after having upgraded to a version that allowed the
-            // browser_storage_key variant to be written.
-            // In that case, this is the best we can do. At worst, this well lead to data loss of the
-            // key type value (if the device is subsequently written again) which is only used for
-            // statistics. The identity itself remains fully functional, including the affected key.
-            KeyTypeInternal::BrowserStorageKey => KeyType::Unknown,
-        }
-    }
-}
-
-impl From<KeyType> for KeyTypeInternal {
-    fn from(key_type: KeyType) -> Self {
-        match key_type {
-            KeyType::Unknown => KeyTypeInternal::Unknown,
-            KeyType::Platform => KeyTypeInternal::Platform,
-            KeyType::CrossPlatform => KeyTypeInternal::CrossPlatform,
-            KeyType::SeedPhrase => KeyTypeInternal::SeedPhrase,
-        }
-    }
 }
 
 impl Device {
@@ -471,7 +432,7 @@ fn check_anchor_invariants(
     // check that there is only a single recovery phrase
     if devices
         .iter()
-        .filter(|device| device.key_type == KeyTypeInternal::SeedPhrase)
+        .filter(|device| device.key_type == KeyType::SeedPhrase)
         .count()
         > 1
     {
@@ -516,15 +477,13 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
 
     check_device_limits(device)?;
 
-    if device.key_type == KeyTypeInternal::SeedPhrase && device.credential_id.is_some() {
+    if device.key_type == KeyType::SeedPhrase && device.credential_id.is_some() {
         return Err(AnchorError::RecoveryPhraseCredentialIdMismatch);
     }
 
-    if device.protection == DeviceProtection::Protected
-        && device.key_type != KeyTypeInternal::SeedPhrase
-    {
+    if device.protection == DeviceProtection::Protected && device.key_type != KeyType::SeedPhrase {
         return Err(AnchorError::InvalidDeviceProtection {
-            key_type: KeyType::from(device.key_type.clone()),
+            key_type: device.key_type.clone(),
         });
     }
     Ok(())

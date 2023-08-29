@@ -100,7 +100,6 @@ test("Add remote device", async () => {
       const verificationView = new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
-      await verificationView.continue();
 
       // Verify success on Browser 1
 
@@ -179,7 +178,6 @@ test("Add remote device starting on new device", async () => {
       const verificationView = new VerifyRemoteDeviceView(browser);
       await verificationView.waitForDisplay();
       await verificationView.enterVerificationCode(code);
-      await verificationView.continue();
 
       // success page
       const addDeviceSuccessView = new AddDeviceSuccessView(browser);

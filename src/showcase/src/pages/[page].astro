@@ -1,4 +1,5 @@
 ---
+import Layout from "../layouts/Layout.astro";
 import "$src/styles/main.css";
 import { iiPages } from "$showcase/showcase";
 
@@ -9,13 +10,15 @@ export function getStaticPaths() {
 const { page } = Astro.params;
 ---
 
-<div id="pageContent" data-page-name={page}></div>
-<script>
-  import { iiPages } from "$showcase/showcase";
+<Layout>
+  <main id="pageContent" aria-live="polite" data-page-name={page}></main>
+  <script>
+    import { iiPages } from "$showcase/showcase";
 
-  const page = (document.querySelector("[data-page-name]") as HTMLDivElement)
-    .dataset?.pageName as string;
+    const page = (document.querySelector("[data-page-name]") as HTMLElement)
+      .dataset?.pageName as string;
 
-  const f = iiPages[page];
-  f();
-</script>
+    const f = iiPages[page];
+    f();
+  </script>
+</Layout>

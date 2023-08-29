@@ -1,9 +1,8 @@
-use crate::active_anchor_stats::IIDomain;
 use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, Device};
-use crate::{active_anchor_stats, state};
+use crate::{activity_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
@@ -54,18 +53,17 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 }
 
 /// Handles all the bookkeeping required on anchor activity:
-/// * Records anchor activity within aggregated activity stats
+/// * Records anchor & device activity within aggregated activity stats
 /// * Updates the last usage timestamp
 ///
 /// Note: modifies the anchor but not does not write to storage. It is the responsibility of the
 /// caller to persist the changes. This allows anchor operations to write to storage only once,
 /// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
 pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
-    let domain = anchor
+    let device = anchor
         .device(current_device_key)
-        .and_then(|device| device.origin.as_ref())
-        .and_then(|origin| IIDomain::try_from(origin.as_str()).ok());
-    active_anchor_stats::update_active_anchors_stats(anchor, &domain);
+        .unwrap_or_else(|| trap(&format!("bug: device {:?} not found", current_device_key)));
+    activity_stats::update_activity_stats(anchor, device);
     anchor
         .set_device_usage_timestamp(current_device_key, time())
         .expect("unable to update last usage timestamp");

@@ -4,8 +4,8 @@ import {
 } from "$generated/internet_identity_types";
 import { showWarning } from "$src/banner";
 import {
-  authenticateBox,
   AuthnTemplates,
+  authenticateBox,
 } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
 import {
@@ -20,13 +20,13 @@ import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
-import { getDapps, KnownDapp } from "$src/flows/dappsExplorer/dapps";
+import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { renderPage, TemplateElement } from "$src/utils/lit-html";
+import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
   hasRecoveryPhrase,
   isProtected,
@@ -35,7 +35,7 @@ import {
 } from "$src/utils/recoveryDevice";
 import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
@@ -200,7 +200,7 @@ const anchorSection = ({
 }): TemplateResult => html`
   <aside class="l-stack">
     <div
-      class="c-input c-input--textarea c-input--readonly c-input--icon c-input--id"
+      class="c-input c-input--stack c-input--fullwidth c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
       ${identityCard({
         userNumber,
@@ -405,7 +405,6 @@ export const readRecovery = ({
       };
     }
   }
-  return undefined;
 };
 
 // Convert devices read from the canister into types that are easier to work with
@@ -492,8 +491,6 @@ export const domainWarning = (
     return html`This Passkey may not be usable on the current URL
     (${window.origin})`;
   }
-
-  return undefined;
 };
 
 const unknownError = (): Error => {

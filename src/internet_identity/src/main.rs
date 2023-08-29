@@ -1,8 +1,8 @@
-use crate::active_anchor_stats::IIDomain;
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::storage::anchor::{Anchor, KeyTypeInternal};
+use crate::ii_domain::IIDomain;
+use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -16,13 +16,14 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
-mod active_anchor_stats;
+mod activity_stats;
 mod anchor_management;
 mod archive;
 mod assets;
 mod delegation;
 mod hash;
 mod http;
+mod ii_domain;
 /// Infrastructure to help building nested certification trees.
 mod nested_tree;
 mod state;
@@ -179,7 +180,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
             recovery_phrases: vec![],
         },
         |mut credentials, device| {
-            if device.key_type == KeyTypeInternal::SeedPhrase {
+            if device.key_type == KeyType::SeedPhrase {
                 credentials.recovery_phrases.push(device.pubkey);
             } else if let Some(credential_id) = device.credential_id {
                 let credential = WebAuthnCredential {
@@ -280,12 +281,7 @@ fn stats() -> InternetIdentityStats {
 
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
-    let active_anchor_stats =
-        state::persistent_state(|persistent_state| persistent_state.active_anchor_stats.clone());
 
-    let domain_active_anchor_stats = state::persistent_state(|persistent_state| {
-        persistent_state.domain_active_anchor_stats.clone()
-    });
     let (latest_delegation_origins, max_num_latest_delegation_origins) =
         state::persistent_state(|persistent_state| {
             let origins = persistent_state
@@ -307,8 +303,6 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
-        active_anchor_stats,
-        domain_active_anchor_stats,
         max_num_latest_delegation_origins,
         latest_delegation_origins,
     })
@@ -387,6 +381,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(limit) = arg.max_num_latest_delegation_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.max_num_latest_delegation_origins = Some(limit);
+            })
+        }
+        if let Some(limit) = arg.max_inflight_captchas {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.max_inflight_captchas = Some(limit);
             })
         }
     }
@@ -499,6 +498,13 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 /// * uses terminology more aligned with the front-end and is more consistent in its naming.
 /// * uses opt variant return types consistently in order to by able to extend / change return types
 ///   in the future without breaking changes.
+///
+/// TODO, API v2 rollout plan:
+/// 1. Develop API v2 far enough so that front-ends can switch to it.
+/// 2. Deprecate the old API.
+/// 3. Add additional errors to the API v2 return type. The canister should no longer trap on invalid
+///    input.
+/// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
     use super::*;
 
@@ -542,6 +548,16 @@ mod v2_api {
             Err(err) => err,
         };
         Some(result)
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_remove(
+        identity_number: IdentityNumber,
+        public_key: PublicKey,
+    ) -> Option<AuthnMethodRemoveResponse> {
+        remove(identity_number, public_key);
+        Some(AuthnMethodRemoveResponse::Ok)
     }
 
     #[update]

@@ -40,7 +40,6 @@ mod deployment_tests {
             &env,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: None,
                 archive_config: Some(ArchiveConfig {
                     module_hash: archive_wasm_hash(&ARCHIVE_WASM),
                     entries_buffer_limit: 0,
@@ -48,8 +47,7 @@ mod deployment_tests {
                     entries_fetch_limit: 0,
                 }),
                 canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
-                register_rate_limit: None,
-                max_num_latest_delegation_origins: None,
+                ..InternetIdentityInit::default()
             }),
         );
         env.add_cycles(ii_canister, 150_000_000_000);
@@ -174,16 +172,13 @@ mod deployment_tests {
             ii_canister,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                assigned_user_number_range: None,
                 archive_config: Some(ArchiveConfig {
                     module_hash: archive_wasm_hash(&ARCHIVE_WASM),
                     entries_buffer_limit: 10,
                     polling_interval_ns: 5_000,
                     entries_fetch_limit: 10,
                 }),
-                canister_creation_cycles_cost: None, // current cost in application subnets
-                register_rate_limit: None,
-                max_num_latest_delegation_origins: None,
+                ..InternetIdentityInit::default()
             }),
         )
         .unwrap();
@@ -650,7 +645,6 @@ mod pull_entries_tests {
         let env = env();
 
         let init_arg = InternetIdentityInit {
-            assigned_user_number_range: None,
             archive_config: Some(ArchiveConfig {
                 module_hash: archive_wasm_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 20_000,
@@ -658,8 +652,7 @@ mod pull_entries_tests {
                 entries_fetch_limit: 10,
             }),
             canister_creation_cycles_cost: Some(0),
-            register_rate_limit: None,
-            max_num_latest_delegation_origins: None,
+            ..InternetIdentityInit::default()
         };
 
         let ii_canister = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));
@@ -760,7 +753,7 @@ mod pull_entries_tests {
         env.tick();
 
         let status = archive_api::status(&env, archive_canister)?;
-        assert!(matches!(status.call_info.last_successful_fetch, Some(_)));
+        assert!(status.call_info.last_successful_fetch.is_some());
         Ok(())
     }
 

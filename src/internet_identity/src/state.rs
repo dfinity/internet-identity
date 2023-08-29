@@ -1,3 +1,7 @@
+use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
+use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
+use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::assets::CertifiedAssets;
 use crate::state::temp_keys::TempKeys;
@@ -19,6 +23,9 @@ mod temp_keys;
 
 // Default value for max number of delegation origins to store in the list of latest used delegation origins
 const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
+
+// Default value for max number of inflight captchas.
+pub const MAX_INFLIGHT_CAPTCHAS: u64 = 500;
 
 thread_local! {
     static STATE: State = State::default();
@@ -79,13 +86,17 @@ pub struct PersistentState {
     // Configuration for the rate limit on `register`, if any.
     pub registration_rate_limit: Option<RateLimitConfig>,
     // Daily and monthly active anchor statistics
-    pub active_anchor_stats: Option<ActiveAnchorStatistics<ActiveAnchorCounter>>,
+    pub active_anchor_stats: Option<ActivityStats<ActiveAnchorCounter>>,
     // Daily and monthly active anchor statistics (filtered by domain)
-    pub domain_active_anchor_stats: Option<ActiveAnchorStatistics<DomainActiveAnchorCounter>>,
+    pub domain_active_anchor_stats: Option<ActivityStats<DomainActiveAnchorCounter>>,
+    // Daily and monthly active authentication methods on the II domains.
+    pub active_authn_method_stats: Option<ActivityStats<AuthnMethodCounter>>,
     // Hashmap of last used delegation origins
     pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
     // Maximum number of latest delegation origins to store
     pub max_num_latest_delegation_origins: Option<u64>,
+    // Maximum number of inflight captchas
+    pub max_inflight_captchas: Option<u64>,
 }
 
 impl Default for PersistentState {
@@ -96,8 +107,10 @@ impl Default for PersistentState {
             registration_rate_limit: None,
             active_anchor_stats: None,
             domain_active_anchor_stats: None,
+            active_authn_method_stats: None,
             latest_delegation_origins: None,
             max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
+            max_inflight_captchas: Some(MAX_INFLIGHT_CAPTCHAS),
         }
     }
 }

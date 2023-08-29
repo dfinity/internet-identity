@@ -11,7 +11,7 @@ import { delayMillis } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import type QrCreator from "qr-creator"; // XXX: import to only import the _type_ to avoid pulling in the whole module (module itself is used as a dynamic import)
 
 import copyJson from "./pollForTentativeDevice.json";
@@ -69,7 +69,9 @@ const pollForTentativeDeviceTemplate = ({
         )}
       ></div>
     </div>
-    <div class="t-wrap c-input c-input--with-button c-input--centered t-weak">
+    <div
+      class="t-wrap c-input c-input--stack c-input--with-button c-input--centered t-weak"
+    >
       <span data-role="add-device-link">${link}</span>
       <button
         ${ref(linkCopyElement)}
@@ -187,7 +189,6 @@ const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
     return (await import("qr-creator")).default;
   } catch (e) {
     console.error(e);
-    return undefined;
   }
 };
 

@@ -117,6 +117,7 @@
   --vc-brand-purple-light: #890eed;
   --vc-brand-blue: #29abe2;
   --vc-brand-blue--dark: #1f6ef4;
+  --vc-brand-green--light: hsl(89 76% 86%);
   --vc-brand-green: #79d11c;
   --vc-brand-alt: rgba(215, 205, 235, 1);
   --vc-grey: grey;
@@ -277,8 +278,8 @@
 
   --rs-marketing-block-stack: calc(var(--vs-stack) * 5);
 
-  --rs-irregularity-stack: calc(var(--vs-stack) * 0.5);
-  --rs-toast-stack: var(--rs-irregularity-stack);
+  --rs-toast-body-stack: calc(var(--vs-stack) * 0.5);
+  --rs-toast-stack: var(--rs-toast-body-stack);
 
   --rs-button-bezel: calc(var(--vs-bezel) * 1.5);
   --rs-button-stack: var(--vs-stack);
@@ -463,6 +464,10 @@ body {
 .t-weak {
   font-weight: normal;
   font-size: 0.8em;
+}
+
+.t-error {
+  color: var(--rc-error);
 }
 
 .t-centered {
@@ -929,6 +934,7 @@ by all browsers (FF is missing) */
 }
 
 .c-card__close {
+  --scale: 1;
   position: absolute;
   right: var(--rs-card-bezel);
   top: var(--rs-card-bezel);
@@ -937,20 +943,25 @@ by all browsers (FF is missing) */
   background: var(--rc-button);
   border-radius: 50%;
   cursor: pointer;
+  transform: scale(var(--scale));
+  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-card__close:hover {
+  --scale: 1.3;
 }
 
 .c-card__close svg {
   position: absolute;
   display: block;
-  width: 60%;
-  height: 60%;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0.8);
 }
 
-.c-card__close svg [fill] {
+.c-card__close svg {
   fill: var(--rc-onButton);
+  stroke: var(--rc-background);
 }
 
 .c-card__title {
@@ -1010,80 +1021,6 @@ by all browsers (FF is missing) */
 }
 
 /**
- *  irregularity component
- */
-.c-irregularity {
-  display: flex;
-  align-items: stretch;
-  gap: calc(var(--rs-card-bezel-x) * 0.25);
-
-  --state-color: var(--rc-errorLight);
-  --state-onColor: var(--rc-error);
-
-  position: relative;
-  padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
-  border: var(--rs-line) solid var(--rc-line);
-  background-color: var(--state-color);
-  border-radius: var(--rs-card-border-radius);
-  overflow: hidden;
-  box-shadow: 0 0 0 1px var(--state-onColor);
-}
-
-.c-irregularity + .c-irregularity {
-  margin-top: var(--rs-irregularity-stack);
-}
-
-.c-irregularity__icon {
-  position: relative;
-  flex: 0 0 4.5rem;
-  background: var(--state-onColor);
-  margin: calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel-x) * 0.1)
-    calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel) * -0.4);
-  border-radius: var(--rs-card-border-radius);
-}
-
-.c-irregularity__icon svg {
-  display: block;
-  width: 70%;
-  height: 70%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-.c-irregularity__icon svg [fill] {
-  fill: #fff;
-}
-
-.c-irregularity__message {
-  flex: 1 1 auto;
-  font-size: 0.8em;
-  line-height: 1.2;
-}
-
-.c-irregularity__close {
-  position: relative;
-  background: #fff;
-  border-radius: 50%;
-  flex: 0 0 1.5rem;
-  height: 1.5rem;
-  cursor: pointer;
-}
-
-.c-irregularity__close svg {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  transform: translate(-50%, -50%) scale(0.8);
-  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.c-irregularity__close:hover svg {
-  transform: translate(-50%, -50%) scale(0.95);
-}
-
-/**
  *  toast component
  */
 
@@ -1134,6 +1071,95 @@ by all browsers (FF is missing) */
     opacity: 0;
     transform: translateY(100%);
   }
+}
+
+/**
+ *  toast-body component
+ */
+.c-toast-body {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--rs-card-bezel-x) * 0.25);
+
+  position: relative;
+  padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
+  border: var(--rs-line) solid var(--rc-line);
+  background-color: var(--state-color);
+  border-radius: var(--rs-card-border-radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--state-onColor);
+}
+
+.c-toast-body + .c-toast-body {
+  margin-top: var(--rs-toast-body-stack);
+}
+
+.c-toast-body__icon {
+  position: relative;
+  flex: 0 0 4.5rem;
+  background: var(--state-onColor);
+  margin: calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel-x) * 0.1)
+    calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel) * -0.4);
+  border-radius: var(--rs-card-border-radius);
+}
+
+.c-toast-body__icon svg {
+  display: block;
+  width: 70%;
+  height: 70%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.c-toast-body__icon svg [fill] {
+  fill: #fff;
+}
+
+.c-toast-body__message {
+  flex: 1 1 auto;
+  font-size: 0.8em;
+  line-height: 1.2;
+}
+
+.c-toast-body__close {
+  --scale: 1;
+  position: relative;
+  background: #fff;
+  border-radius: 50%;
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(var(--scale));
+}
+
+.c-toast-body__close svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+.c-toast-body__close:hover {
+  --scale: 1.3;
+}
+
+/** The various body types */
+.c-toast-body--info {
+  --state-color: var(--vc-brand-blue);
+  --state-onColor: var(--vc-brand-blue--dark);
+}
+
+.c-toast-body--success {
+  --state-color: var(--vc-brand-green--light);
+  --state-onColor: var(--vc-brand-green);
+}
+
+.c-toast-body--error {
+  --state-color: var(--rc-errorLight);
+  --state-onColor: var(--rc-error);
 }
 
 /**
@@ -1426,15 +1452,23 @@ by all browsers (FF is missing) */
     var(--bezel-left);
 
   position: relative;
-  display: block;
-  width: 100%;
   padding: var(--bezel);
-  margin-top: var(--rs-input-stack);
   background: var(--rc-input);
   color: var(--rc-onInput);
   border: calc(var(--rs-line) * 2) solid var(--rc-line);
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
+}
+
+/* An input with some margin on top, useful when e.g. coming directly
+ * after some text */
+.c-input--stack {
+  margin-top: var(--rs-input-stack);
+}
+
+.c-input--fullwidth {
+  display: block;
+  width: 100%;
 }
 
 .c-input::placeholder {
@@ -1515,12 +1549,6 @@ by all browsers (FF is missing) */
 
 .c-input--textarea-narrow {
   --bezel: calc(1.5 * var(--rs-input-bezel));
-}
-
-.c-input--recovery {
-  --bezel: calc(1.5 * var(--rs-input-bezel));
-
-  background-color: var(--rc-line);
 }
 
 .c-input--with-button {
@@ -1715,11 +1743,60 @@ by all browsers (FF is missing) */
 }
 
 /**
+ *  Pin Input
+ *
+ */
+
+.c-list--pin {
+  width: 100%;
+  display: inline-flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.c-list--pin-char {
+  display: block;
+  flex-basis: content;
+}
+
+.c-list--pin[data-haserror="true"] .c-input--pin {
+  border-color: red;
+}
+
+.c-input--pin {
+  text-align: center;
+
+  /* Sizing the input
+   *
+   * The 'input' is sized by its width (width here, or size=1 in HTML as fallback) and "height" (line-height), plus padding in both
+   * dimensions.
+   * */
+  font-size: 2em;
+  padding: 0.2em;
+  width: 1.4em;
+
+  font-weight: 600;
+}
+
+/**
  *  Recovery phrase
  *
  *  We use a a pill style for each word
  *  and a counter to number them
  */
+
+/* The output element surrounding the recovery words */
+.c-output--recovery {
+  /* Needed for the floating "copy" button, if present */
+  position: relative;
+
+  background-color: var(--rc-line);
+  border-radius: var(--rs-input-border-radius);
+  --bezel: calc(1.5 * var(--rs-input-bezel));
+  padding: var(--bezel);
+  display: block;
+  width: 100%;
+}
 
 .c-list--recovery {
   position: relative;

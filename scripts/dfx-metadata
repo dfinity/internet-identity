@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Assemble DFX metadata"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 --asset-name ASSET_NAME [--wasm-hash SHA256]
+
+Options:
+  --asset-name ASSET_NAME   Name of the asset to be used in the metadata.
+  --wasm-hash SHA256        Optional: SHA256 hash of the II wasm pointed at by the wasm_url.
+                            It is only needed if the wasm_url is pointing to a different wasm.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Assembles the dfx metadata to be put into the II canister wasm.
+If the current build is not a release build (and no alternative value is supplied using the II_RELEASE env variable),
+this will return an empty string, as no valid metadata can be generated for builds that are not published.
+EOF
+}
+
+WASM_SHA256=
+ASSET_NAME=
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --asset-name)
+            ASSET_NAME="${2:?missing value for '--asset-name'}"
+            shift; # shift past --asset-name and value
+            shift;
+            ;;
+        --wasm-hash)
+            WASM_SHA256="${2:?missing value for '--wasm-hash'}"
+            shift; # shift past --wasm-hash and value
+            shift;
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'build --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z "$ASSET_NAME" ]
+then
+    echo "no asset name provided"
+    usage
+    exit 1
+fi
+
+IFS=,
+read -r -a version_parts <<< "$(./scripts/version)"
+release="${II_RELEASE:-${version_parts[1]}}"
+
+if [ -z "$release" ]
+then
+    echo -n ""
+    exit 0
+fi
+
+metadata_json="{\"pullable\":{\
+\"wasm_url\": \"https://github.com/dfinity/internet-identity/releases/download/$release/$ASSET_NAME\",\
+${WASM_SHA256:+"\"wasm_hash\":" "\"$WASM_SHA256\","}\
+\"dependencies\": [],\
+\"init_guide\": \"Use '(null)' for sensible defaults. See the candid interface for more details.\"}}"
+
+echo  -n "$metadata_json"

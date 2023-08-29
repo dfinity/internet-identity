@@ -13,13 +13,13 @@ import { DynamicKey } from "$src/utils/i18n";
 import { Connection } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
-import { Chan } from "$src/utils/utils";
+import { Chan, withInputElement } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { wordlists } from "bip39";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 const recoverWithPhraseTemplate = <
   /* The successful return type on verification */
@@ -107,7 +107,7 @@ const recoverWithPhraseTemplate = <
         <h1 class="t-title t-title--main">Input your Recovery Phrase</h1>
         <p class="t-lead">${message}</p>
       </hgroup>
-      <div class="c-input c-input--recovery l-stack">
+      <div class="c-output--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${wordTemplate({
             index: "#",
@@ -230,20 +230,6 @@ export const wordTemplate = ({
         >`,
       }[s])
   );
-
-  // Helper to gain access to the event's target
-  const withElement = <E extends Event>(
-    event: E,
-    f: (event: E, element: HTMLInputElement) => void
-  ): void => {
-    const element = event.currentTarget;
-    if (!(element instanceof HTMLInputElement)) {
-      return;
-    }
-
-    return f(event, element);
-  };
-
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
 
   return html`<li
@@ -254,15 +240,15 @@ export const wordTemplate = ({
     <input
       autofocus
       data-validity-type=${validityType}
-      @paste=${(e: ClipboardEvent) =>
-        withElement(e, (event, element) => {
-          e.preventDefault();
+      @paste=${(evnt: ClipboardEvent) =>
+        withInputElement(evnt, (_, element) => {
+          evnt.preventDefault();
 
           // Get the text pasted
-          if (event.clipboardData === null) {
+          if (evnt.clipboardData === null) {
             return;
           }
-          const text = event.clipboardData.getData("text");
+          const text = evnt.clipboardData.getData("text");
 
           // Split the text into words, dropping (leading) white spaces, empty strings (from e.g. double spaces), etc
           const [word = undefined, ...rest] = text
@@ -311,13 +297,13 @@ export const wordTemplate = ({
       data-state=${asyncReplace(state)}
       @input=${(e: InputEvent) => {
         state.send("pending");
-        withElement(e, (_e, element) => {
+        withInputElement(e, (_e, element) => {
           // Reset validity when typing
           resetValidity({ element });
         });
       }}
       @change=${(e: InputEvent) => {
-        withElement(e, (event, element) => {
+        withInputElement(e, (_, element) => {
           // Check validity when leaving the field
           state.send(reportValidity({ element }));
         });

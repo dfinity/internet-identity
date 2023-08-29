@@ -20,6 +20,19 @@ export function unknownToString(obj: unknown, def: string): string {
   return def;
 }
 
+// Helper to gain access to the event's target
+export const withInputElement = <E extends Event>(
+  evnt: E,
+  f: (evnt: E, element: HTMLInputElement) => void
+): void => {
+  const element = evnt.currentTarget;
+  if (!(element instanceof HTMLInputElement)) {
+    return;
+  }
+
+  return f(evnt, element);
+};
+
 /** Try to read unknown data as a record */
 export function unknownToRecord(
   msg: unknown
@@ -329,3 +342,7 @@ export function shuffleArray<T>(array_: T[]): T[] {
 export type OmitParams<T extends (arg: any) => any, A extends string> = (
   a: Omit<Parameters<T>[0], A>
 ) => ReturnType<T>;
+
+// Zip two arrays together
+export const zip = <A, B>(a: A[], b: B[]): [A, B][] =>
+  Array.from(Array(Math.min(b.length, a.length)), (_, i) => [a[i], b[i]]);

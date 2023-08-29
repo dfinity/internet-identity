@@ -2,9 +2,9 @@ import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { validateAlias } from "$src/utils/validateAlias";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 import copyJson from "./index.json";
 
@@ -65,7 +65,7 @@ export const promptDeviceAliasTemplate = (props: {
         maxlength="30"
         pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
         spellcheck="false"
-        class="c-input"
+        class="c-input c-input--stack c-input--fullwidth"
       />
       <div class="c-button-group">
         <button

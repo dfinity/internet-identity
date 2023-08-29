@@ -42,8 +42,25 @@ pub fn create_identity_with_authn_method(
         chars: "a".to_string(),
         key: challenge.challenge_key,
     };
-    let RegisterResponse::Registered { user_number} = api::register(env, canister_id, device.principal(), &device, &challenge_attempt, None).unwrap() else {
+    let RegisterResponse::Registered { user_number } = api::register(
+        env,
+        canister_id,
+        device.principal(),
+        &device,
+        &challenge_attempt,
+        None,
+    )
+    .unwrap() else {
         panic!("Expected device to be registered");
     };
     user_number
+}
+
+pub fn sample_authn_method(i: u8) -> AuthnMethodData {
+    AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![i; 32]),
+        }),
+        ..test_authn_method()
+    }
 }

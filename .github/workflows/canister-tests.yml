@@ -45,12 +45,8 @@ jobs:
       # NOTE: if you modify the flavors, update the #flavors table in README.md
       matrix:
         include:
-          # The production build
-          - name: internet_identity_production.wasm.gz
-            II_FETCH_ROOT_KEY: 0
-            II_DUMMY_CAPTCHA: 0
-            II_DUMMY_AUTH: 0
-            II_INSECURE_REQUESTS: 0
+          # The production build is built later because it has a dependency on the dev build (for dfx deps)
+          # See job: docker-build-internet_identity_production
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # selenium.
@@ -78,6 +74,13 @@ jobs:
           echo "Inferred version: '$version'"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: "Create dfx metadata for the dfx deps feature"
+        id: dfx-metadata
+        run: |
+          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name ${{ matrix.name }} )"
+          echo "using dfx metadata $dfx_metadata_json"
+          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
 
@@ -92,6 +95,7 @@ jobs:
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
             II_INSECURE_REQUESTS=${{ matrix.II_INSECURE_REQUESTS }}
             II_VERSION=${{ steps.version.outputs.version }}
+            DFX_METADATA=${{ steps.dfx-metadata.outputs.metadata }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
@@ -105,8 +109,67 @@ jobs:
           # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
           # path is the name used as the file to upload and the name of the
-          # downloaded file
+          # file when downloaded
           path: ${{ matrix.name }}
+
+  # Build the production version of internet identity.
+  # The production build is separately because it has a dependency on the dev build (for dfx deps)
+  #
+  # Note: do not rename this job as it needs to contain the file name of the produced asset (without extension)
+  # in order for the release script action to work correctly.
+  docker-build-internet_identity_production:
+    runs-on: ubuntu-latest
+    needs: docker-build-ii
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Infer version
+        id: version
+        run: |
+          version="$(./scripts/version)"
+          echo "Inferred version: '$version'"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: 'Download dev build II wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_dev.wasm.gz
+          path: .
+
+      - name: "Create dfx metadata for the dfx deps feature"
+        id: dfx-metadata
+        run: |
+          sha256="$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)"
+          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash $sha256)"
+          echo "using dfx metadata $dfx_metadata_json"
+          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build internet_identity_production.wasm.gz
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            II_VERSION=${{ steps.version.outputs.version }}
+            DFX_METADATA=${{ steps.dfx-metadata.outputs.metadata }}
+          cache-from: type=gha,scope=cached-stage
+          # Exports the artefacts from the final stage
+          outputs: ./out
+          target: scratch_internet_identity
+
+      - run: mv out/internet_identity.wasm.gz internet_identity_production.wasm.gz
+      - run: sha256sum internet_identity_production.wasm.gz
+      - name: 'Upload internet_identity_production.wasm.gz'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: internet_identity_production.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # file when downloaded
+          path: internet_identity_production.wasm.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -140,7 +203,7 @@ jobs:
 
   wasm-size:
     runs-on: ubuntu-latest
-    needs: docker-build-ii
+    needs: docker-build-internet_identity_production
     steps:
       - uses: actions/checkout@v3
       - name: 'Download wasm'
@@ -282,6 +345,7 @@ jobs:
 
       - name: Download nextest
         run: |
+          set -euo pipefail
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
       - name: 'Download nextest test archive'
@@ -424,6 +488,13 @@ jobs:
           path: test-failures/*
           if-no-files-found: ignore
 
+  # Aggregate all selenium matrix jobs, used in branch protection
+  selenium-all:
+    runs-on: ubuntu-latest
+    needs: selenium
+    steps:
+      - run: echo selenium ok
+
   using-dev-build:
     runs-on: ubuntu-latest
     needs: docker-build-ii
@@ -486,7 +557,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-ii, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive]
     steps:
       - uses: actions/checkout@v3
 
@@ -530,7 +601,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-ii, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive]
 
     steps:
       - uses: actions/checkout@v3
@@ -559,6 +630,44 @@ jobs:
           name: archive.wasm.gz
           path: .
 
+      - uses: actions/github-script@v6
+        id: pipeline-jobs
+        with:
+          script: return github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs");
+
+      - uses: actions/github-script@v6
+        id: latest-release-tag
+        with:
+          result-encoding: string
+          script: return (await github.rest.repos.getLatestRelease({owner:"dfinity", repo:"internet-identity"})).data.tag_name;
+
+      # NOTE: we create the release notes ourselves, instead of letting GitHub do it with
+      # 'generate_release_notes: true', here we can actually specify the release range. When doing
+      # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
+      # listing contributions since).
+      # https://github.com/github/feedback/discussions/5975
+      - uses: actions/github-script@v6
+        id: changelog
+        with:
+          result-encoding: string
+          script: |
+            return (await github.rest.repos.generateReleaseNotes({
+              owner: "dfinity",
+              repo: "internet-identity",
+              tag_name: "${{ github.ref }}",
+              previous_tag_name: "${{ steps.latest-release-tag.outputs.result }}",
+            })).data.body;
+
+      - name: Print prepare-release-inputs
+        env:
+          # use an env variable so that the GitHub templating does not cause issues with string escaping
+          # see: https://github.com/orgs/community/discussions/32012
+          CHANGELOG: ${{ steps.changelog.outputs.result }}
+        run: |
+          echo -e 'pipeline jobs:\n${{ steps.pipeline-jobs.outputs.result }}'
+          echo "latest-release-tag: ${{ steps.latest-release-tag.outputs.result }}"
+          echo -e "changelog:\n$CHANGELOG"
+
       - name: Prepare release
         uses: ./.github/actions/release
         id: prepare-release
@@ -569,7 +678,8 @@ jobs:
             internet_identity_test.wasm.gz
             archive.wasm.gz
           production_asset: internet_identity_production.wasm.gz
-          token: ${{ secrets.GITHUB_TOKEN }}
+          changelog: ${{ steps.changelog.outputs.result }}
+          workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
 
       - name: Publish release
         run: |
@@ -589,7 +699,6 @@ jobs:
 
   clean-build:
     runs-on: ${{ matrix.os }}
-    needs: docker-build-ii
     strategy:
       matrix:
         # On main, we run the checks across all platforms. On other branches, in order to speed up checks (on PRs) we skip most platforms
@@ -599,20 +708,56 @@ jobs:
         os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04", "macos-11", "macos-12" ]') || fromJson('[ "ubuntu-22.04" ]') }}
     steps:
       - uses: actions/checkout@v3
-      - name: 'Download wasm.gz'
+      - uses: ./.github/actions/check-build
+      - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+      - name: 'Upload ${{ matrix.name }}'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # file when downloaded
+          path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+
+
+
+  verify-clean-build-hash:
+    needs: ['clean-build', 'docker-build-internet_identity_production']
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # On main, we run the hash check across all platforms where the non-dockerized build is reproducible (i.e. not mac-os).
+        # On other branches, in order to speed up checks (on PRs) we skip most platforms. A single ubuntu build is not long and gives us some signal.
+        # XXX: GHA does not support proper if/else so we implement a workaround: https://github.com/actions/runner/issues/409
+        # XXX: GHA fails if we return the matrix object directly, so we have to pretend it's JSON
+        os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04"]') || fromJson('[ "ubuntu-22.04" ]') }}
+    steps:
+      - name: Download internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
+          path: .
+
+      - name: Download internet_identity_production.wasm.gz
         uses: actions/download-artifact@v3
         with:
           name: internet_identity_production.wasm.gz
           path: .
-      - run: |
-          sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
-          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
-        id: sha256
 
-      - uses: ./.github/actions/check-build
-        with:
-          # we check that ubuntu builds match the docker build
-          sha256: ${{ startsWith(matrix.os, 'ubuntu') && steps.sha256.outputs.sha256 || '' }}
+      - name: Check hashes
+        run: |
+          clean_build_sha256=$(shasum -a 256 ./internet_identity_clean_build_${{ matrix.os }}.wasm.gz | cut -d ' ' -f1)
+          echo got clean build sha "$clean_build_sha256"
+          prod_build_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          echo got prod build sha "$prod_build_sha256"
+          if [ "$clean_build_sha256" == "$prod_build_sha256" ]
+          then
+            echo output clean build sha256 matches prod build sha256
+          else
+            echo "sha mismatch: clean build '$clean_build_sha256' /= prod build '$prod_build_sha256'"
+            exit 1
+          fi
+
 
   interface-compatibility:
     runs-on: ubuntu-latest

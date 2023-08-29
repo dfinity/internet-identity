@@ -4,7 +4,7 @@ import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { html } from "lit-html";
-import { createRef, ref, Ref } from "lit-html/directives/ref.js";
+import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { phraseStepper } from "./stepper";
 
 import copyJson from "./displaySeedPhrase.json";
@@ -62,11 +62,11 @@ const displaySeedPhraseTemplate = ({
         </p>
       </hgroup>
       <div class="l-stack">
-        <output class="c-input c-input--recovery">
+        <output class="c-output--recovery">
           <ol
             data-role="recovery-words"
             translate="no"
-            class="c-list c-list--recovery"
+            class="c-list--recovery"
           >
             <li
               class="c-list--recovery-word c-list--recovery-word--important"

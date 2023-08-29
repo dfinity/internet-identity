@@ -26,7 +26,8 @@ const addDeviceSuccessTemplate = ({
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${explore}</p>
     </hgroup>
-    <output class="c-input c-input--readonly t-vip t-vip--small"
+    <output
+      class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip t-vip--small"
       >${deviceAlias}</output
     >
     <div class="l-stack">
