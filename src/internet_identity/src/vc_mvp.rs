@@ -58,7 +58,7 @@ pub async fn prepare_id_alias(
     let seed = calculate_id_alias_seed(identity_number, &dapps);
 
     state::signature_map_mut(|sigs| {
-        add_signature(sigs, rp_msg_hash, seed.clone());
+        add_signature(sigs, rp_msg_hash, seed);
         add_signature(sigs, issuer_msg_hash, seed);
     });
     update_root_hash();
@@ -93,7 +93,7 @@ pub fn get_id_alias(
 
         let encoder = jws_encoder(rp_id_alias_jwt);
         let msg_hash = id_alias_signing_input_hash(encoder.signing_input());
-        let maybe_sig = get_signature(cert_assets, sigs, seed.clone(), msg_hash);
+        let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let rp_sig = if let Some(sig) = maybe_sig {
             sig
         } else {
@@ -211,7 +211,7 @@ fn calculate_id_alias_seed(identity_number: AnchorNumber, dapps: &InvolvedDapps)
 
 fn did_for_principal(principal: &Principal) -> String {
     let mut did = String::from("did:web:");
-    did.push_str(&*principal.to_text());
+    did.push_str(&principal.to_text());
     did
 }
 
@@ -234,8 +234,9 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
 
 fn prepare_id_alias_jwt(alias_tuple: &AliasTuple) -> String {
     let credential = id_alias_credential(alias_tuple);
-    let credential_jwt = credential.serialize_jwt().unwrap();
-    credential_jwt
+    credential
+        .serialize_jwt()
+        .expect("internal: JWT serialization failure")
 }
 
 fn jws_encoder(credential_jwt: &str) -> CompactJwsEncoder {
