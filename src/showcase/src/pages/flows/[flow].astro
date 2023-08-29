@@ -8,11 +8,11 @@ export function getStaticPaths() {
 }
 
 const { flow } = Astro.params;
-console.log(flow);
 ---
 
 <Layout>
   <main id="pageContent" aria-live="polite" data-flow-name={flow}></main>
+  <div id="loaderContainer"></div>
   <script>
     import { iiFlows } from "$showcase/flows";
 
