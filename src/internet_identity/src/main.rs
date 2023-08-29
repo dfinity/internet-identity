@@ -587,7 +587,10 @@ mod attribute_sharing_mvp {
     #[candid_method]
     async fn prepare_id_alias(req: PrepareIdAliasRequest) -> Option<PrepareIdAliasResponse> {
         let Ok(_) = check_authentication(req.identity_number) else {
-            return Some(PrepareIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
+            return Some(PrepareIdAliasResponse::AuthenticationFailed(format!(
+                "{} could not be authenticated.",
+                caller()
+            )));
         };
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
@@ -604,7 +607,10 @@ mod attribute_sharing_mvp {
     #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Option<GetIdAliasResponse> {
         let Ok(_) = check_authentication(req.identity_number) else {
-            return Some(GetIdAliasResponse::AuthenticationFailed(format!("{} could not be authenticated.", caller())));
+            return Some(GetIdAliasResponse::AuthenticationFailed(format!(
+                "{} could not be authenticated.",
+                caller()
+            )));
         };
         let response = vc_mvp::get_id_alias(
             req.identity_number,
