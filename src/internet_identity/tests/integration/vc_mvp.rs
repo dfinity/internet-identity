@@ -1,11 +1,11 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
-
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
+use identity_jose::jws::verify_id_alias_jws;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasResponse, IdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 
@@ -17,24 +17,31 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req = IdAliasRequest {
+    let prepare_id_alias_req = PrepareIdAliasRequest {
         identity_number,
-        relying_party,
-        issuer,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
     };
 
     let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req.clone())?
+        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), prepare_id_alias_req)?
             .expect("Got 'None' from prepare_id_alias");
 
-    let canister_sig_key = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
+    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
         key
     } else {
         panic!("prepare id_alias failed")
     };
 
+    let get_id_alias_req = GetIdAliasRequest {
+        identity_number,
+        relying_party,
+        issuer,
+        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
+        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+    };
     let id_alias_credentials =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -51,18 +58,33 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         id_alias_credentials.issuer_id_alias_credential.id_alias
     );
 
+    // Verify the credentials in two ways: via env and via external function.
     verify_id_alias_credential(
         &env,
-        canister_sig_key.clone(),
+        prepared_id_alias.canister_sig_pk.clone(),
         &id_alias_credentials.rp_id_alias_credential,
         &env.root_key(),
     );
+    verify_id_alias_jws(
+        &id_alias_credentials.rp_id_alias_credential.credential_jws,
+        &prepared_id_alias.canister_sig_pk,
+        &env.root_key(),
+    )
+    .expect("external verification failed");
     verify_id_alias_credential(
         &env,
-        canister_sig_key,
+        prepared_id_alias.canister_sig_pk.clone(),
         &id_alias_credentials.issuer_id_alias_credential,
         &env.root_key(),
     );
+    verify_id_alias_jws(
+        &id_alias_credentials
+            .issuer_id_alias_credential
+            .credential_jws,
+        &prepared_id_alias.canister_sig_pk,
+        &env.root_key(),
+    )
+    .expect("external verification failed");
     Ok(())
 }
 
@@ -74,39 +96,61 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
     let identity_number_2 = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req_1 = IdAliasRequest {
+    let prepare_id_alias_req_1 = PrepareIdAliasRequest {
         identity_number: identity_number_1,
         relying_party: relying_party.clone(),
         issuer: issuer.clone(),
     };
-    let id_alias_req_2 = IdAliasRequest {
+    let prepare_id_alias_req_2 = PrepareIdAliasRequest {
         identity_number: identity_number_2,
-        relying_party,
-        issuer,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_1.clone())?
-            .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let get_id_alias_req_1 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_1,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number_1,
+                relying_party: relying_party.clone(),
+                issuer: issuer.clone(),
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_2.clone())?
-            .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let get_id_alias_req_2 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_2,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number_2,
+                relying_party,
+                issuer,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_1)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -119,7 +163,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         };
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_2)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -135,17 +179,14 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         id_alias_credentials_1.rp_id_alias_credential.id_alias,
         id_alias_credentials_1.issuer_id_alias_credential.id_alias
     );
-
     assert_eq!(
         id_alias_credentials_2.rp_id_alias_credential.id_alias,
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
-
     assert_ne!(
         id_alias_credentials_1.rp_id_alias_credential.id_alias,
         id_alias_credentials_2.rp_id_alias_credential.id_alias
     );
-
     assert_ne!(
         id_alias_credentials_1.issuer_id_alias_credential.id_alias,
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
@@ -153,7 +194,6 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
 
     Ok(())
 }
-
 #[test]
 fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), CallError> {
     let env = env();
@@ -162,39 +202,61 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
     let relying_party_1 = FrontendHostname::from("https://some-dapp-1.com");
     let relying_party_2 = FrontendHostname::from("https://some-dapp-2.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req_1 = IdAliasRequest {
-        identity_number,
-        relying_party: relying_party_1,
+    let prepare_id_alias_req_1 = PrepareIdAliasRequest {
+        identity_number: identity_number,
+        relying_party: relying_party_1.clone(),
         issuer: issuer.clone(),
     };
-    let id_alias_req_2 = IdAliasRequest {
-        identity_number,
-        relying_party: relying_party_2,
-        issuer,
+    let prepare_id_alias_req_2 = PrepareIdAliasRequest {
+        identity_number: identity_number,
+        relying_party: relying_party_2.clone(),
+        issuer: issuer.clone(),
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_1.clone())?
-            .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let get_id_alias_req_1 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_1,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number,
+                relying_party: relying_party_1,
+                issuer: issuer.clone(),
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_2.clone())?
-            .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let get_id_alias_req_2 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_2,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number,
+                relying_party: relying_party_2,
+                issuer,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_1)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -207,7 +269,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         };
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_2)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -250,39 +312,61 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer_1 = FrontendHostname::from("https://some-issuer-1.com");
     let issuer_2 = FrontendHostname::from("https://some-issuer-2.com");
-    let id_alias_req_1 = IdAliasRequest {
-        identity_number,
+    let prepare_id_alias_req_1 = PrepareIdAliasRequest {
+        identity_number: identity_number,
         relying_party: relying_party.clone(),
-        issuer: issuer_1,
+        issuer: issuer_1.clone(),
     };
-    let id_alias_req_2 = IdAliasRequest {
-        identity_number,
-        relying_party,
-        issuer: issuer_2,
-    };
-
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_1.clone())?
-            .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let prepare_id_alias_req_2 = PrepareIdAliasRequest {
+        identity_number: identity_number,
+        relying_party: relying_party.clone(),
+        issuer: issuer_2.clone(),
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req_2.clone())?
-            .expect("Got 'None' from prepare_id_alias");
+    let get_id_alias_req_1 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_1,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number,
+                relying_party: relying_party.clone(),
+                issuer: issuer_1,
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
+    };
 
-    if let PrepareIdAliasResponse::Ok(_key) = prepare_response {
-        // Ok
-    } else {
-        panic!("prepare id_alias failed")
+    let get_id_alias_req_2 = {
+        let prepare_response = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req_2,
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
+            GetIdAliasRequest {
+                identity_number: identity_number,
+                relying_party: relying_party,
+                issuer: issuer_2,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            }
+        } else {
+            panic!("prepare id_alias failed")
+        }
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_1)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -295,7 +379,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         };
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req_2)?
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
             .expect("Got 'None' from get_id_alias")
         {
             GetIdAliasResponse::Ok(credentials) => credentials,
@@ -342,7 +426,7 @@ fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_2(),
-        IdAliasRequest {
+        PrepareIdAliasRequest {
             identity_number, // belongs to principal_1
             relying_party,
             issuer,
@@ -369,7 +453,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_1(),
-        IdAliasRequest {
+        PrepareIdAliasRequest {
             identity_number,
             relying_party: relying_party.clone(),
             issuer: issuer.clone(),
@@ -387,10 +471,12 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_2(),
-        IdAliasRequest {
+        GetIdAliasRequest {
             identity_number, // belongs to principal_1
             relying_party,
             issuer,
+            rp_id_alias_jwt: "dummy_jwt".to_string(),
+            issuer_id_alias_jwt: "another_dummy_jwt".to_string(),
         },
     )?
     .expect("Got 'None' from get_id_alias");
@@ -415,10 +501,12 @@ fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
         &env,
         canister_id,
         principal_1(),
-        IdAliasRequest {
+        GetIdAliasRequest {
             identity_number,
             relying_party,
             issuer,
+            rp_id_alias_jwt: "dummy jwt".to_string(),
+            issuer_id_alias_jwt: "another dummy jwt".to_string(),
         },
     )?
     .expect("Got 'None' from get_id_alias");
@@ -439,18 +527,23 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req = IdAliasRequest {
+    let prepare_id_alias_req = PrepareIdAliasRequest {
         identity_number,
-        relying_party,
-        issuer,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req.clone())?
-            .expect("Got 'None' from prepare_id_alias");
+    let prepare_response = api::vc_mvp::prepare_id_alias(
+        &env,
+        canister_id,
+        principal_1(),
+        prepare_id_alias_req.clone(),
+    )?
+    .expect("Got 'None' from prepare_id_alias");
 
-    let _canister_sig_key = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
-        key
+    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared_id_alias) = prepare_response
+    {
+        prepared_id_alias
     } else {
         panic!("prepare id_alias failed")
     };
@@ -458,7 +551,14 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
     // upgrade, even with the same WASM clears non-stable memory
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req)?
+    let get_id_alias_req = GetIdAliasRequest {
+        identity_number,
+        relying_party,
+        issuer,
+        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
+        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+    };
+    let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
         .expect("Got 'None' from get_id_alias");
 
     if let GetIdAliasResponse::NoSuchCredentials(_err) = response {
@@ -476,25 +576,38 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req = IdAliasRequest {
+    let prepare_id_alias_req = PrepareIdAliasRequest {
         identity_number,
-        relying_party,
-        issuer,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
     };
 
-    let prepare_response =
-        api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), id_alias_req.clone())
-            .expect("Result of prepare_id_alias is not Ok")
-            .expect("Got 'None' from prepare_id_alias");
+    let prepare_response = api::vc_mvp::prepare_id_alias(
+        &env,
+        canister_id,
+        principal_1(),
+        prepare_id_alias_req.clone(),
+    )
+    .expect("Result of prepare_id_alias is not Ok")
+    .expect("Got 'None' from prepare_id_alias");
 
-    let canister_sig_key = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
-        key
+    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared_id_alias) = prepare_response
+    {
+        prepared_id_alias
     } else {
         panic!("prepare id_alias failed")
     };
 
+    let get_id_alias_req = GetIdAliasRequest {
+        identity_number,
+        relying_party,
+        issuer,
+        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
+        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+    };
+
     let id_alias_credentials =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), id_alias_req)
+        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)
             .expect("Result of get_id_alias is not Ok")
             .expect("Got 'None' from get_id_alias")
         {
@@ -514,22 +627,22 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
 
     verify_id_alias_credential(
         &env,
-        canister_sig_key.clone(),
+        prepared_id_alias.canister_sig_pk.clone(),
         &id_alias_credentials.rp_id_alias_credential,
         &env.root_key(),
     );
     verify_id_alias_credential(
         &env,
-        canister_sig_key.clone(),
+        prepared_id_alias.canister_sig_pk.clone(),
         &id_alias_credentials.issuer_id_alias_credential,
         &env.root_key(),
     );
 
-    let mut bad_canister_sig_key = canister_sig_key.clone();
-    let index = canister_sig_key.as_ref().len() - 1;
+    let mut bad_canister_sig_key = prepared_id_alias.canister_sig_pk.clone();
+    let index = prepared_id_alias.canister_sig_pk.as_ref().len() - 1;
     let last_byte = bad_canister_sig_key.as_ref()[index];
     bad_canister_sig_key.as_mut()[index] = last_byte + 1;
-    assert_ne!(canister_sig_key, bad_canister_sig_key);
+    assert_ne!(prepared_id_alias.canister_sig_pk, bad_canister_sig_key);
 
     verify_id_alias_credential(
         &env,

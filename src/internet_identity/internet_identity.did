@@ -422,15 +422,29 @@ type IdentityMetadataReplaceResponse = variant {
     ok;
 };
 
-type IdAliasRequest = record {
+type PrepareIdAliasRequest = record {
     issuer : text;
     relying_party : text;
     identity_number : nat64;
 };
 
 type PrepareIdAliasResponse = variant {
-    ok : vec nat8;
+    ok : PreparedIdAlias;
     authentication_failed : text;
+};
+
+type PreparedIdAlias = record {
+    canister_sig_pk : vec nat8;
+    rp_id_alias_jwt : text;
+    issuer_id_alias_jwt : text;
+};
+
+type GetIdAliasRequest = record {
+    rp_id_alias_jwt : text;
+    issuer : text;
+    issuer_id_alias_jwt : text;
+    relying_party : text;
+    identity_number : nat64;
 };
 
 type GetIdAliasResponse = variant {
@@ -449,7 +463,7 @@ type IdAliasCredentials = record {
 };
 
 type SignedIdAlias = record {
-    signature : vec nat8;
+    credential_jws : text;
     id_alias : principal;
     id_dapp : principal;
 };
@@ -524,9 +538,9 @@ service : (opt InternetIdentityInit) -> {
     // a verifiable credential that is understood in both the relying party and the issuer context.
     // This call can be called multiple times. Only the latest credentials are returned by `get_id_alias`.
     // Requires authentication.
-    prepare_id_alias : (IdAliasRequest) -> (opt PrepareIdAliasResponse);
+    prepare_id_alias : (PrepareIdAliasRequest) -> (opt PrepareIdAliasResponse);
 
     // Returns the verifiable credentials that were prepared by `prepare_id_alias`, if any.
     // Requires authentication.
-    get_id_alias : (IdAliasRequest) -> (opt GetIdAliasResponse) query;
+    get_id_alias : (GetIdAliasRequest) -> (opt GetIdAliasResponse) query;
 }

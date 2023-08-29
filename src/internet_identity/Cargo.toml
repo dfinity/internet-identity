@@ -13,6 +13,7 @@ lazy_static = "1.4"
 serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
 serde_cbor = "0.11"
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 # Captcha deps
@@ -24,6 +25,16 @@ rand = { version ="*", default-features = false }
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/nmattia/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
+
+# VC Deps
+
+identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test" }
+identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
+
+# identity_core = { path = "../../../identity.rs/identity_core" }
+# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential"]}
+# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 
 # All IC deps
 candid = "0.9"
@@ -37,6 +48,7 @@ ic-stable-structures = "0.5"
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
+base64-url = "2.0"
 ic-test-state-machine-client = "3"
 candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }

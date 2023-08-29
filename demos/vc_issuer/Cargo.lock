@@ -40,6 +40,15 @@ dependencies = [
 
 [[package]]
 name = "autocfg"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dde43e75fd43e8a1bf86103336bc699aa8d17ad1be60c76c0bdfd4828e19b78"
+dependencies = [
+ "autocfg 1.1.0",
+]
+
+[[package]]
+name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
@@ -126,11 +135,34 @@ checksum = "630be753d4e58660abd17930c71b647fe46c27ea6b63cc59e1e3851406972e42"
 
 [[package]]
 name = "block-buffer"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "bls12_381"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3c196a77437e7cc2fb515ce413a6401291578b5afc8ecb29a3c7ab957f05941"
+dependencies = [
+ "digest 0.9.0",
+ "ff 0.12.1",
+ "group 0.12.1",
+ "pairing",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -164,7 +196,7 @@ dependencies = [
  "pretty",
  "serde",
  "serde_bytes",
- "sha2",
+ "sha2 0.10.7",
  "stacker",
  "thiserror",
 ]
@@ -190,15 +222,17 @@ dependencies = [
  "flate2",
  "hex",
  "ic-cdk",
+ "ic-certified-map",
  "ic-representation-independent-hash",
  "ic-test-state-machine-client",
+ "identity_jose 0.7.0-alpha.6",
  "internet_identity_interface",
  "lazy_static",
  "regex",
  "serde",
  "serde_bytes",
  "serde_cbor",
- "sha2",
+ "sha2 0.10.7",
 ]
 
 [[package]]
@@ -241,6 +275,15 @@ checksum = "defaa24ecc093c77630e6c15e17c51f5e187bf35ee514f4e2d67baaa96dae22b"
 dependencies = [
  "ciborium-io",
  "half",
+]
+
+[[package]]
+name = "cloudabi"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
+dependencies = [
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -394,7 +437,7 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.10.4",
  "const-oid",
  "crypto-common",
  "subtle",
@@ -450,9 +493,9 @@ dependencies = [
  "base16ct",
  "crypto-bigint",
  "digest 0.10.7",
- "ff",
+ "ff 0.13.0",
  "generic-array",
- "group",
+ "group 0.13.0",
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
@@ -498,6 +541,16 @@ dependencies = [
 
 [[package]]
 name = "ff"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
+dependencies = [
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "ff"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ded41244b729663b1e574f1b4fb731469f69f79c17667b5d776b16cda0479449"
@@ -538,6 +591,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuchsia-cprng"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -561,11 +620,22 @@ dependencies = [
 
 [[package]]
 name = "group"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfbfb3a6cfbd390d5c9564ab283a0349b9b9fcd46a706c1eb10e0db70bfbac7"
+dependencies = [
+ "ff 0.12.1",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
- "ff",
+ "ff 0.13.0",
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -643,13 +713,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-certification"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce514ae665701b9d85d5fbba87d177befef83a808b92adf53e2496376303a910"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_bytes",
+ "sha2 0.10.7",
+]
+
+[[package]]
+name = "ic-certified-map"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "197524aecec47db0b6c0c9f8821aad47272c2bd762c7a0ffe9715eaca0364061"
+dependencies = [
+ "serde",
+ "serde_bytes",
+ "sha2 0.10.7",
+]
+
+[[package]]
 name = "ic-representation-independent-hash"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2204e06271a81f9ffee9b7bc0c4d90687d035eba95f2eb3894e19d8ff263f9e"
 dependencies = [
  "leb128",
- "sha2",
+ "sha2 0.10.7",
 ]
 
 [[package]]
@@ -665,10 +758,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-verify-bls-signature"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd0f1f8d75f50002970cc2136f909287bf1d59024fbc80ebffbee871afcbd237"
+dependencies = [
+ "bls12_381",
+ "hex",
+ "lazy_static",
+ "pairing",
+ "rand",
+ "sha2 0.9.9",
+]
+
+[[package]]
 name = "ic0"
 version = "0.18.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "576c539151d4769fb4d1a0c25c4108dd18facd04c5695b02cf2d226ab4e43aa5"
+
+[[package]]
+name = "identity_core"
+version = "0.7.0-alpha.6"
+dependencies = [
+ "ic-cdk",
+ "iota-crypto",
+ "multibase",
+ "serde",
+ "serde_json",
+ "strum",
+ "thiserror",
+ "time",
+ "url",
+ "zeroize",
+]
 
 [[package]]
 name = "identity_core"
@@ -692,7 +815,7 @@ name = "identity_credential"
 version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#27f13daa6ac70065ca6454e7400208d97ee9e07a"
 dependencies = [
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "identity_did",
  "identity_document",
  "identity_verification",
@@ -711,7 +834,7 @@ source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=fre
 dependencies = [
  "did_url",
  "form_urlencoded",
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "serde",
  "strum",
  "thiserror",
@@ -723,7 +846,7 @@ version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#27f13daa6ac70065ca6454e7400208d97ee9e07a"
 dependencies = [
  "did_url",
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "identity_did",
  "identity_verification",
  "indexmap 2.0.0",
@@ -735,9 +858,30 @@ dependencies = [
 [[package]]
 name = "identity_jose"
 version = "0.7.0-alpha.6"
+dependencies = [
+ "candid",
+ "hex",
+ "ic-certification",
+ "ic-certified-map",
+ "ic-verify-bls-signature",
+ "identity_core 0.7.0-alpha.6",
+ "iota-crypto",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "serde_json",
+ "sha2 0.10.7",
+ "subtle",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "identity_jose"
+version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#27f13daa6ac70065ca6454e7400208d97ee9e07a"
 dependencies = [
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "iota-crypto",
  "serde",
  "serde_json",
@@ -751,9 +895,9 @@ name = "identity_verification"
 version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#27f13daa6ac70065ca6454e7400208d97ee9e07a"
 dependencies = [
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "identity_did",
- "identity_jose",
+ "identity_jose 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "serde",
  "strum",
  "thiserror",
@@ -775,7 +919,7 @@ version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "hashbrown 0.12.3",
 ]
 
@@ -806,12 +950,12 @@ version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c5d5a986d972c3a703d48ced24fdc0bf16fb2d02959ff4b152fa77b9132f6fb0"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "curve25519-dalek",
  "digest 0.10.7",
  "k256",
  "serde",
- "sha2",
+ "sha2 0.10.7",
  "x25519-dalek",
  "zeroize",
 ]
@@ -852,7 +996,7 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "once_cell",
- "sha2",
+ "sha2 0.10.7",
 ]
 
 [[package]]
@@ -917,7 +1061,7 @@ version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1cc9717a20b1bb222f333e6a92fd32f7d8a18ddc5a3191a11af45dcbf4dcd16"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "scopeguard",
 ]
 
@@ -997,7 +1141,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "num-integer",
  "num-traits",
  "serde",
@@ -1009,7 +1153,7 @@ version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
  "num-traits",
 ]
 
@@ -1019,7 +1163,7 @@ version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
 dependencies = [
- "autocfg",
+ "autocfg 1.1.0",
 ]
 
 [[package]]
@@ -1048,6 +1192,21 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+
+[[package]]
+name = "opaque-debug"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "pairing"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135590d8bdba2b31346f9cd1fb2a912329f5135e832a4f422942eb6ead8b6b3b"
+dependencies = [
+ "group 0.12.1",
+]
 
 [[package]]
 name = "parking_lot"
@@ -1174,6 +1333,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d71dacdc3c88c1fde3885a3be3fbab9f35724e6ce99467f7d9c5026132184ca"
+dependencies = [
+ "autocfg 0.1.8",
+ "libc",
+ "rand_chacha",
+ "rand_core 0.4.2",
+ "rand_hc",
+ "rand_isaac",
+ "rand_jitter",
+ "rand_os",
+ "rand_pcg",
+ "rand_xorshift",
+ "winapi",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "556d3a1ca6600bfcbab7c7c91ccb085ac7fbbcd70e008a98742e7847f4f7bcef"
+dependencies = [
+ "autocfg 0.1.8",
+ "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
+dependencies = [
+ "rand_core 0.4.2",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c33a3c44ca05fa6f1807d8e6743f3824e8509beca625669633be0acbdf509dc"
+
+[[package]]
 name = "rand_core"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1186,6 +1389,77 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "rand_hc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b40677c7be09ae76218dc623efbf7b18e34bced3f38883af07bb75630a21bc4"
+dependencies = [
+ "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_isaac"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ded997c9d5f13925be2a6fd7e66bf1872597f759fd9dd93513dd7e92e5a5ee08"
+dependencies = [
+ "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rand_jitter"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1166d5c91dc97b88d1decc3285bb0a99ed84b05cfd0bc2341bdf2d43fc41e39b"
+dependencies = [
+ "libc",
+ "rand_core 0.4.2",
+ "winapi",
+]
+
+[[package]]
+name = "rand_os"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b75f676a1e053fc562eafbb47838d67c84801e38fc1ba459e8f180deabd5071"
+dependencies = [
+ "cloudabi",
+ "fuchsia-cprng",
+ "libc",
+ "rand_core 0.4.2",
+ "rdrand",
+ "winapi",
+]
+
+[[package]]
+name = "rand_pcg"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abf9b09b01790cfe0364f52bf32995ea3c39f4d2dd011eac241d2914146d0b44"
+dependencies = [
+ "autocfg 0.1.8",
+ "rand_core 0.4.2",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
+dependencies = [
+ "rand_core 0.3.1",
+]
+
+[[package]]
+name = "rdrand"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
+dependencies = [
+ "rand_core 0.3.1",
 ]
 
 [[package]]
@@ -1366,6 +1640,19 @@ dependencies = [
  "proc-macro2",
  "serde",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "sha2"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
+dependencies = [
+ "block-buffer 0.9.0",
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.9.0",
+ "opaque-debug",
 ]
 
 [[package]]
@@ -1668,7 +1955,7 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-test-state-machine-client",
- "identity_core",
+ "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
  "identity_credential",
  "internet_identity_interface",
  "lazy_static",
