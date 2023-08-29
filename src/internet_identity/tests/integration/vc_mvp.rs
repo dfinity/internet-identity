@@ -203,12 +203,12 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
     let relying_party_2 = FrontendHostname::from("https://some-dapp-2.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
     let prepare_id_alias_req_1 = PrepareIdAliasRequest {
-        identity_number: identity_number,
+        identity_number,
         relying_party: relying_party_1.clone(),
         issuer: issuer.clone(),
     };
     let prepare_id_alias_req_2 = PrepareIdAliasRequest {
-        identity_number: identity_number,
+        identity_number,
         relying_party: relying_party_2.clone(),
         issuer: issuer.clone(),
     };
@@ -223,7 +223,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         .expect("Got 'None' from prepare_id_alias");
         if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
             GetIdAliasRequest {
-                identity_number: identity_number,
+                identity_number,
                 relying_party: relying_party_1,
                 issuer: issuer.clone(),
                 rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
@@ -244,7 +244,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         .expect("Got 'None' from prepare_id_alias");
         if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
             GetIdAliasRequest {
-                identity_number: identity_number,
+                identity_number,
                 relying_party: relying_party_2,
                 issuer,
                 rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
@@ -313,12 +313,12 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
     let issuer_1 = FrontendHostname::from("https://some-issuer-1.com");
     let issuer_2 = FrontendHostname::from("https://some-issuer-2.com");
     let prepare_id_alias_req_1 = PrepareIdAliasRequest {
-        identity_number: identity_number,
+        identity_number,
         relying_party: relying_party.clone(),
         issuer: issuer_1.clone(),
     };
     let prepare_id_alias_req_2 = PrepareIdAliasRequest {
-        identity_number: identity_number,
+        identity_number,
         relying_party: relying_party.clone(),
         issuer: issuer_2.clone(),
     };
@@ -333,7 +333,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         .expect("Got 'None' from prepare_id_alias");
         if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
             GetIdAliasRequest {
-                identity_number: identity_number,
+                identity_number,
                 relying_party: relying_party.clone(),
                 issuer: issuer_1,
                 rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
@@ -354,8 +354,8 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         .expect("Got 'None' from prepare_id_alias");
         if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
             GetIdAliasRequest {
-                identity_number: identity_number,
-                relying_party: relying_party,
+                identity_number,
+                relying_party,
                 issuer: issuer_2,
                 rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
                 issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,

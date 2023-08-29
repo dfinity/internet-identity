@@ -291,7 +291,7 @@ mod tests {
             .decode_compact_serialization(jws_bytes.as_ref(), None)
             .expect("Failure decoding JWS credential");
         let signing_input_2 = jws.signing_input();
-        let input_hash_2 = id_alias_signing_input_hash(&signing_input_2);
+        let input_hash_2 = id_alias_signing_input_hash(signing_input_2);
         assert_eq!(signing_input_1, signing_input_2);
         assert_eq!(input_hash_1, input_hash_2);
     }
