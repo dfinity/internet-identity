@@ -125,6 +125,13 @@ export interface DomainOngoingActiveAnchorStats {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export interface GetIdAliasRequest {
+  'rp_id_alias_jwt' : string,
+  'issuer' : string,
+  'issuer_id_alias_jwt' : string,
+  'relying_party' : string,
+  'identity_number' : bigint,
+}
 export type GetIdAliasResponse = { 'ok' : IdAliasCredentials } |
   { 'authentication_failed' : string } |
   { 'no_such_credentials' : string };
@@ -146,11 +153,6 @@ export interface HttpResponse {
 export interface IdAliasCredentials {
   'rp_id_alias_credential' : SignedIdAlias,
   'issuer_id_alias_credential' : SignedIdAlias,
-}
-export interface IdAliasRequest {
-  'issuer' : string,
-  'relying_party' : string,
-  'identity_number' : bigint,
 }
 export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
@@ -198,8 +200,18 @@ export interface OngoingActiveAnchorStats {
   'monthly_active_anchors' : Array<ActiveAnchorCounter>,
   'daily_active_anchors' : ActiveAnchorCounter,
 }
-export type PrepareIdAliasResponse = { 'ok' : Uint8Array | number[] } |
+export interface PrepareIdAliasRequest {
+  'issuer' : string,
+  'relying_party' : string,
+  'identity_number' : bigint,
+}
+export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
   { 'authentication_failed' : string };
+export interface PreparedIdAlias {
+  'canister_sig_pk' : Uint8Array | number[],
+  'rp_id_alias_jwt' : string,
+  'issuer_id_alias_jwt' : string,
+}
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
@@ -217,7 +229,7 @@ export interface SignedDelegation {
   'delegation' : Delegation,
 }
 export interface SignedIdAlias {
-  'signature' : Uint8Array | number[],
+  'credential_jws' : string,
   'id_alias' : Principal,
   'id_dapp' : Principal,
 }
@@ -268,7 +280,7 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_id_alias' : ActorMethod<[IdAliasRequest], [] | [GetIdAliasResponse]>,
+  'get_id_alias' : ActorMethod<[GetIdAliasRequest], [] | [GetIdAliasResponse]>,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -284,7 +296,7 @@ export interface _SERVICE {
     [UserKey, Timestamp]
   >,
   'prepare_id_alias' : ActorMethod<
-    [IdAliasRequest],
+    [PrepareIdAliasRequest],
     [] | [PrepareIdAliasResponse]
   >,
   'register' : ActorMethod<
