@@ -167,10 +167,6 @@ export type MetadataMap = Array<
       { 'bytes' : Uint8Array | number[] },
   ]
 >;
-export interface OngoingActiveAnchorStats {
-  'monthly_active_anchors' : Array<ActiveAnchorCounter>,
-  'daily_active_anchors' : ActiveAnchorCounter,
-}
 export interface PrepareIdAliasRequest {
   'issuer' : string,
   'relying_party' : string,
