@@ -1,3 +1,5 @@
+import { toast } from "$src/components/toast";
+import { registerFlow } from "$src/flows/register";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { TemplateResult, html, render } from "lit-html";
 import { dummyChallenge, i18n } from "./showcase";
@@ -25,6 +27,40 @@ export const iiFlows: Record<string, () => void> = {
       focus: false,
     });
   },
+
+  register: async () => {
+    const result = await registerFlow<null>({
+      createChallenge: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return dummyChallenge;
+      },
+      register: async ({ challengeResult: { chars } }) => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        if (chars !== "8wJ6Q") {
+          return { kind: "badChallenge" };
+        }
+        return {
+          kind: "loginSuccess",
+          userNumber: BigInt(12356),
+          connection: null,
+        };
+      },
+    });
+
+    toast.success(html`
+      Identity successfully created!<br />
+      <p class="l-stack">
+        <strong class="t-strong">${prettyResult(result)}</strong>
+      </p>
+      <button
+        class="l-stack c-button c-button--secondary"
+        @click=${() => window.location.reload()}
+      >
+        reload
+      </button>
+    `);
+  },
 };
 
 const pageContent: TemplateResult = html`
@@ -49,3 +85,19 @@ const pageContent: TemplateResult = html`
     </div>
   </div>
 `;
+
+const prettyResult = (obj: unknown) => {
+  if (typeof obj === "string") {
+    return obj;
+  }
+
+  if (typeof obj === "object" && obj !== null) {
+    return html`<ul>
+      ${Object.entries(obj).map(
+        ([k, v]) => html`<li><strong class="t-strong">${k}: ${v}</strong></li>`
+      )}
+    </ul>`;
+  }
+
+  return JSON.stringify(obj);
+};
