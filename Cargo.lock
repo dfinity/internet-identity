@@ -21,9 +21,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6748e8def348ed4d14996fa801f4122cd763fff530258cdc03f64b25f89d3a5a"
+checksum = "0c378d78423fdad8089616f827526ee33c19f2fddbd5de1629152c9593ba4783"
 dependencies = [
  "memchr",
 ]
@@ -106,15 +106,6 @@ name = "base64"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "414dcefbc63d77c526a76b3afcf6fbb9b5e2791c19c3aa2297733208750c6e53"
-
-[[package]]
-name = "base64-url"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c5b0a88aa36e9f095ee2e2b13fb8c5e4313e022783aedacc123328c0084916d"
-dependencies = [
- "base64 0.21.3",
-]
 
 [[package]]
 name = "base64ct"
@@ -230,9 +221,9 @@ checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 
 [[package]]
 name = "candid"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a31e5ab22cdcd093b93b02bdff4ba18ffee324b05e669b25cdd93fdb8402d207"
+checksum = "1791006b86aee82bd8adc1f56923c61aea91b6cd46965d48d63681ab6509e5be"
 dependencies = [
  "anyhow",
  "binread",
@@ -282,7 +273,7 @@ dependencies = [
  "ic-certified-map",
  "ic-representation-independent-hash",
  "ic-test-state-machine-client",
- "identity_jose 0.7.0-alpha.6",
+ "identity_jose",
  "internet_identity_interface",
  "lazy_static",
  "regex",
@@ -1076,23 +1067,7 @@ checksum = "576c539151d4769fb4d1a0c25c4108dd18facd04c5695b02cf2d226ab4e43aa5"
 [[package]]
 name = "identity_core"
 version = "0.7.0-alpha.6"
-dependencies = [
- "ic-cdk",
- "iota-crypto",
- "multibase",
- "serde",
- "serde_json",
- "strum",
- "thiserror",
- "time",
- "url",
- "zeroize",
-]
-
-[[package]]
-name = "identity_core"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
  "ic-cdk",
  "iota-crypto",
@@ -1109,9 +1084,9 @@ dependencies = [
 [[package]]
 name = "identity_credential"
 version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "identity_did",
  "identity_document",
  "identity_verification",
@@ -1126,11 +1101,11 @@ dependencies = [
 [[package]]
 name = "identity_did"
 version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
  "did_url",
  "form_urlencoded",
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "serde",
  "strum",
  "thiserror",
@@ -1139,10 +1114,10 @@ dependencies = [
 [[package]]
 name = "identity_document"
 version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
  "did_url",
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "identity_did",
  "identity_verification",
  "indexmap",
@@ -1154,35 +1129,14 @@ dependencies = [
 [[package]]
 name = "identity_jose"
 version = "0.7.0-alpha.6"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
  "candid",
  "hex",
  "ic-certification 0.24.1",
  "ic-certified-map",
  "ic-verify-bls-signature",
- "identity_core 0.7.0-alpha.6",
- "iota-crypto",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "serde_json",
- "sha2 0.10.7",
- "subtle",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "identity_jose"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
-dependencies = [
- "candid",
- "hex",
- "ic-certification 0.24.1",
- "ic-certified-map",
- "ic-verify-bls-signature",
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "iota-crypto",
  "serde",
  "serde_bytes",
@@ -1197,11 +1151,11 @@ dependencies = [
 [[package]]
 name = "identity_verification"
 version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#d373247500bcbb380122dd0492e58e85803e3f92"
+source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#2c9c153d0a93fd85a215a61a472c631482b1424a"
 dependencies = [
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "identity_did",
- "identity_jose 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_jose",
  "serde",
  "strum",
  "thiserror",
@@ -1266,7 +1220,6 @@ name = "internet_identity"
 version = "0.1.0"
 dependencies = [
  "base64 0.21.3",
- "base64-url",
  "candid",
  "canister_tests",
  "captcha",
@@ -1280,9 +1233,9 @@ dependencies = [
  "ic-response-verification",
  "ic-stable-structures",
  "ic-test-state-machine-client",
- "identity_core 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_core",
  "identity_credential",
- "identity_jose 0.7.0-alpha.6 (git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test)",
+ "identity_jose",
  "include_dir",
  "internet_identity_interface",
  "lazy_static",
@@ -1482,9 +1435,9 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.6.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76fc44e2588d5b436dbc3c6cf62aef290f90dab6235744a93dfe1cc18f451e2c"
+checksum = "f478948fd84d9f8e86967bf432640e46adfb5a4bd4f14ef7e864ab38220534ae"
 
 [[package]]
 name = "minimal-lexical"
