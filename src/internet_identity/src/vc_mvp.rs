@@ -8,7 +8,10 @@ use ic_certified_map::{Hash, HashTree};
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
+use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{CompactJwsEncoder, JwsAlgorithm, JwsHeader};
+use identity_jose::jwu::encode_b64;
+use std::ops::DerefMut;
 
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -42,6 +45,8 @@ pub async fn prepare_id_alias(
     check_frontend_length(&dapps.issuer);
 
     let id_alias_principal = get_id_alias_principal(identity_number, &dapps);
+    let seed = calculate_id_alias_seed(identity_number, &dapps);
+    let canister_sig_pk_der = delegation::der_encode_canister_sig_key(seed.to_vec());
 
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
@@ -52,27 +57,29 @@ pub async fn prepare_id_alias(
         id_dapp: delegation::get_principal(identity_number, dapps.issuer.clone()),
     };
 
-    let (rp_id_alias_jwt, rp_msg_hash) = id_alias_jwt_and_msg_hash(&rp_tuple);
-    let (issuer_id_alias_jwt, issuer_msg_hash) = id_alias_jwt_and_msg_hash(&issuer_tuple);
-
-    let seed = calculate_id_alias_seed(identity_number, &dapps);
+    let (rp_id_alias_jwt, rp_msg_hash) = id_alias_jwt_and_msg_hash(&rp_tuple, &canister_sig_pk_der);
+    let (issuer_id_alias_jwt, issuer_msg_hash) =
+        id_alias_jwt_and_msg_hash(&issuer_tuple, &canister_sig_pk_der);
 
     state::signature_map_mut(|sigs| {
         add_signature(sigs, rp_msg_hash, seed);
         add_signature(sigs, issuer_msg_hash, seed);
     });
     update_root_hash();
-    let canister_sig_pk = ByteBuf::from(delegation::der_encode_canister_sig_key(seed.to_vec()));
     PreparedIdAlias {
-        canister_sig_pk,
+        canister_sig_pk: ByteBuf::from(canister_sig_pk_der),
         rp_id_alias_jwt,
         issuer_id_alias_jwt,
     }
 }
 
-fn id_alias_jwt_and_msg_hash(alias_tuple: &AliasTuple) -> (String, Hash) {
+fn id_alias_jwt_and_msg_hash(
+    alias_tuple: &AliasTuple,
+    canister_sig_pk_der: &[u8],
+) -> (String, Hash) {
     let credential_jwt = prepare_id_alias_jwt(alias_tuple);
-    let msg_hash = id_alias_signing_input_hash(&jwt_signing_input(&credential_jwt));
+    let msg_hash =
+        id_alias_signing_input_hash(&jwt_signing_input(&credential_jwt, canister_sig_pk_der));
     (credential_jwt, msg_hash)
 }
 
@@ -90,8 +97,10 @@ pub fn get_id_alias(
         let seed = calculate_id_alias_seed(identity_number, &dapps);
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
+        let canister_sig_pk_der =
+            ByteBuf::from(delegation::der_encode_canister_sig_key(seed.to_vec()));
 
-        let encoder = jws_encoder(rp_id_alias_jwt);
+        let encoder = jws_encoder(rp_id_alias_jwt, canister_sig_pk_der.as_ref());
         let msg_hash = id_alias_signing_input_hash(encoder.signing_input());
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let rp_sig = if let Some(sig) = maybe_sig {
@@ -101,7 +110,7 @@ pub fn get_id_alias(
         };
         let rp_jws = encoder.into_jws(&rp_sig);
 
-        let encoder = jws_encoder(issuer_id_alias_jwt);
+        let encoder = jws_encoder(issuer_id_alias_jwt, canister_sig_pk_der.as_ref());
         let msg_hash = id_alias_signing_input_hash(encoder.signing_input());
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let issuer_sig = if let Some(sig) = maybe_sig {
@@ -239,20 +248,33 @@ fn prepare_id_alias_jwt(alias_tuple: &AliasTuple) -> String {
         .expect("internal: JWT serialization failure")
 }
 
-fn jws_encoder(credential_jwt: &str) -> CompactJwsEncoder {
+fn canister_sig_pk_jwk(canister_sig_pk_der: &[u8]) -> Jwk {
+    let mut cspk_jwk = Jwk::new(JwkType::Oct);
+    cspk_jwk.set_alg("IcCs");
+    cspk_jwk
+        .set_params(JwkParams::Oct(JwkParamsOct {
+            k: encode_b64(canister_sig_pk_der),
+        }))
+        .expect("internal: failed setting JwkParams");
+    cspk_jwk
+}
+
+fn jws_encoder<'a>(credential_jwt: &'a str, canister_sig_pk_der: &[u8]) -> CompactJwsEncoder<'a> {
     let mut header: JwsHeader = JwsHeader::new();
     header.set_alg(JwsAlgorithm::IcCs);
     let kid = "did:ic:ii-canister";
     header.set_kid(kid);
+    header
+        .deref_mut()
+        .set_jwk(canister_sig_pk_jwk(canister_sig_pk_der));
 
-    // let claims_bytes: Vec<u8> = serde_json::to_vec(&claims).expect("internal error: JSON serialization failed");
-    let encoder: CompactJwsEncoder<'_> = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
+    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
         .expect("internal error: JWS encoder failed");
     encoder
 }
 
-fn jwt_signing_input(credential_jwt: &str) -> Vec<u8> {
-    let encoder = jws_encoder(credential_jwt);
+fn jwt_signing_input(credential_jwt: &str, canister_sig_pk_der: &[u8]) -> Vec<u8> {
+    let encoder = jws_encoder(credential_jwt, canister_sig_pk_der);
     Vec::from(encoder.signing_input())
 }
 
@@ -279,10 +301,11 @@ mod tests {
             id_alias: principal_1(),
             id_dapp: principal_2(),
         };
+        let canister_sig_pk_der = vec![5, 6, 7, 8];
         let prepared_jwt = prepare_id_alias_jwt(&alias_tuple);
-        let signing_input_1 = jwt_signing_input(&prepared_jwt);
+        let signing_input_1 = jwt_signing_input(&prepared_jwt, &canister_sig_pk_der);
         let input_hash_1 = id_alias_signing_input_hash(&signing_input_1);
-        let encoder = jws_encoder(&prepared_jwt);
+        let encoder = jws_encoder(&prepared_jwt, &canister_sig_pk_der);
         let sig = vec![1, 2, 3, 4];
         let jws_bytes = encoder.into_jws(&sig);
 

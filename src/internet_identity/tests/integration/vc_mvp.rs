@@ -3,13 +3,29 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
-use identity_jose::jws::verify_id_alias_jws;
+use identity_jose::jwk::JwkType;
+use identity_jose::jws::{verify_id_alias_jws, Decoder};
+use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
+use std::ops::Deref;
 
-/// Verifies that valid id_alias is created.
+fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
+    let decoder: Decoder = Decoder::new();
+    let jws = decoder
+        .decode_compact_serialization(credential_jws.as_bytes(), None)
+        .expect("Failure decoding JWS credential");
+    let jws_header = jws.protected_header().expect("missing JWS header");
+    let jwk = jws_header.deref().jwk().expect("missing JWK in JWS header");
+    assert_eq!(jwk.alg(), Some("IcCs"));
+    assert_eq!(jwk.kty(), JwkType::Oct);
+    let jwk_params = jwk.try_oct_params().expect("missing JWK oct params");
+    assert_eq!(jwk_params.k, encode_b64(canister_sig_pk_der));
+}
+
+// Verifies that a valid id_alias is created.
 #[test]
 fn should_get_valid_id_alias() -> Result<(), CallError> {
     let env = env();
@@ -27,8 +43,8 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), prepare_id_alias_req)?
             .expect("Got 'None' from prepare_id_alias");
 
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
-        key
+    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared) = prepare_response {
+        prepared
     } else {
         panic!("prepare id_alias failed")
     };
@@ -58,6 +74,18 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         id_alias_credentials.issuer_id_alias_credential.id_alias
     );
 
+    // Verify that JWS-credentials contain correct canister signing PK.
+    verify_canister_sig_pk(
+        &id_alias_credentials.rp_id_alias_credential.credential_jws,
+        prepared_id_alias.canister_sig_pk.as_ref(),
+    );
+    verify_canister_sig_pk(
+        &id_alias_credentials
+            .issuer_id_alias_credential
+            .credential_jws,
+        prepared_id_alias.canister_sig_pk.as_ref(),
+    );
+
     // Verify the credentials in two ways: via env and via external function.
     verify_id_alias_credential(
         &env,
@@ -67,7 +95,6 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     );
     verify_id_alias_jws(
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
-        &prepared_id_alias.canister_sig_pk,
         &env.root_key(),
     )
     .expect("external verification failed");
@@ -81,7 +108,6 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
-        &prepared_id_alias.canister_sig_pk,
         &env.root_key(),
     )
     .expect("external verification failed");

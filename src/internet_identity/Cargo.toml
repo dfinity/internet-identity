@@ -48,7 +48,6 @@ ic-stable-structures = "0.5"
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
-base64-url = "2.0"
 ic-test-state-machine-client = "3"
 candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
