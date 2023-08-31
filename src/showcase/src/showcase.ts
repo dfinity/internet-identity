@@ -119,8 +119,11 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
   knownDapp: dapps.find((dapp) => dapp.name === "NNS Dapp"),
 });
 
+// eslint-disable-next-line
 const openChat: KnownDapp = dapps.find((dapp) => dapp.name === "OpenChat")!;
+// eslint-disable-next-line
 const nnsDapp: KnownDapp = dapps.find((dapp) => dapp.name === "NNS Dapp")!;
+// eslint-disable-next-line
 const juno: KnownDapp = dapps.find((dapp) => dapp.name === "Juno")!;
 
 const authzTemplatesKnown = authnTemplateAuthorize({
@@ -352,14 +355,14 @@ export const iiPages: Record<string, () => void> = {
 
   prompt: () =>
     promptPage({
-      i18n,
+      _i18n: i18n,
       userNumber: BigInt(1234),
       knownDapp: openChat,
       cancel: () => console.log("cancel"),
     }),
   select: () =>
     selectPage({
-      i18n,
+      _i18n: i18n,
       userNumber: BigInt(1234),
       relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
       verify: async (dapp) => {

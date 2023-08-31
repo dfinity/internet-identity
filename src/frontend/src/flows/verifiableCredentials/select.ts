@@ -12,7 +12,7 @@ import { vcStepper } from "./stepper";
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const selectTemplate = <T>({
-  i18n,
+  _i18n,
   userNumber,
   relying,
   providers,
@@ -20,7 +20,7 @@ const selectTemplate = <T>({
   onContinue,
   scrollToTop = false,
 }: {
-  i18n: I18n;
+  _i18n: I18n;
   userNumber: bigint;
   relying: { dapp: KnownDapp; reason: string };
   providers: NonEmptyArray<KnownDapp>;
@@ -112,7 +112,7 @@ export const select = <T>({
 }): Promise<T> => {
   return new Promise<T>((resolve) =>
     selectPage<T>({
-      i18n: new I18n(),
+      _i18n: new I18n(),
       userNumber,
       relying,
       providers,

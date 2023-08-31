@@ -12,13 +12,13 @@ import { vcStepper } from "./stepper";
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const promptTemplate = ({
-  i18n,
+  _i18n,
   cancel,
   userNumber,
   knownDapp,
   scrollToTop = false,
 }: {
-  i18n: I18n;
+  _i18n: I18n;
   cancel: () => void;
   userNumber: bigint;
   knownDapp: KnownDapp;
@@ -76,7 +76,7 @@ export const prompt = ({
 }): Promise<IIWebAuthnIdentity | "canceled"> => {
   return new Promise((resolve) =>
     promptPage({
-      i18n: new I18n(),
+      _i18n: new I18n(),
       userNumber,
       knownDapp,
       cancel: () => resolve("canceled"),
