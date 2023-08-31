@@ -5,7 +5,7 @@ import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { Chan, NonEmptyArray } from "$src/utils/utils";
-import { html, TemplateResult } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { vcStepper } from "./stepper";
 

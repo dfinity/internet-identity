@@ -24,7 +24,7 @@ import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showV
 import { authnTemplateAuthorize } from "$src/flows/authorize";
 import { compatibilityNotice } from "$src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "$src/flows/dappsExplorer";
-import { getDapps, KnownDapp } from "$src/flows/dappsExplorer/dapps";
+import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
 import {
   protectDeviceInfoPage,
