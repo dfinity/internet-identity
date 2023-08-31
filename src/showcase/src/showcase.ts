@@ -24,7 +24,7 @@ import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showV
 import { authnTemplateAuthorize } from "$src/flows/authorize";
 import { compatibilityNotice } from "$src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "$src/flows/dappsExplorer";
-import { getDapps } from "$src/flows/dappsExplorer/dapps";
+import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
 import {
   protectDeviceInfoPage,
@@ -51,6 +51,9 @@ import { I18n } from "$src/utils/i18n";
 import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
+
+import { promptPage } from "$src/flows/verifiableCredentials/prompt";
+import { selectPage } from "$src/flows/verifiableCredentials/select";
 
 const identityBackground = loadIdentityBackground();
 
@@ -115,6 +118,13 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
 
   knownDapp: dapps.find((dapp) => dapp.name === "NNS Dapp"),
 });
+
+// eslint-disable-next-line
+const openChat: KnownDapp = dapps.find((dapp) => dapp.name === "OpenChat")!;
+// eslint-disable-next-line
+const nnsDapp: KnownDapp = dapps.find((dapp) => dapp.name === "NNS Dapp")!;
+// eslint-disable-next-line
+const juno: KnownDapp = dapps.find((dapp) => dapp.name === "Juno")!;
 
 const authzTemplatesKnown = authnTemplateAuthorize({
   origin: "https://oc.app",
@@ -342,6 +352,48 @@ export const iiPages: Record<string, () => void> = {
       },
     });
   },
+
+  prompt: () =>
+    promptPage({
+      _i18n: i18n,
+      userNumber: BigInt(1234),
+      knownDapp: openChat,
+      cancel: () => console.log("cancel"),
+    }),
+  select: () =>
+    selectPage({
+      _i18n: i18n,
+      userNumber: BigInt(1234),
+      relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
+      verify: async (dapp) => {
+        console.log("Verifying through " + dapp.name + "...");
+
+        // Hacky button to resolve the fake promise
+        await new Promise<void>((resolve) => {
+          const closeBtn = document.createElement("button");
+          closeBtn.onclick = () => {
+            closeBtn.remove();
+            resolve();
+          };
+          closeBtn.classList.add("c-button");
+          closeBtn.style.position = "absolute";
+          closeBtn.style.inset = "0 0 auto auto";
+          closeBtn.style.width = "fit-content";
+          closeBtn.style.fontSize = "10px";
+          closeBtn.style.padding = "2px 4px";
+          closeBtn.style.marginTop = "0";
+          closeBtn.innerText = "done";
+          closeBtn.dataset.role = "done";
+          document.body.appendChild(closeBtn);
+        });
+        console.log("Done.");
+      },
+
+      providers: [nnsDapp, juno],
+      onContinue: (res) => {
+        console.log("Received result", res);
+      },
+    }),
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
