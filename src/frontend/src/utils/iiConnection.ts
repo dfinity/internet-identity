@@ -11,8 +11,12 @@ import {
   DeviceKey,
   FrontendHostname,
   GetDelegationResponse,
+  GetIdAliasRequest,
+  GetIdAliasResponse,
   IdentityAnchorInfo,
   KeyType,
+  PrepareIdAliasResponse,
+  PreparedIdAlias,
   PublicKey,
   Purpose,
   RegisterResponse,
@@ -554,6 +558,62 @@ export class AuthenticatedConnection extends Connection {
         sessionKey,
         timestamp
       );
+    } catch (e: unknown) {
+      console.error(e);
+      return { error: e };
+    }
+  };
+
+  prepareIdAlias = async (
+    issuerDerivationOrigin: string,
+    relyingPartyOrigin: string
+  ): Promise<PrepareIdAliasResponse | { error: unknown }> => {
+    try {
+      console.log(
+        `prepare_id_alias(user: ${this.userNumber}, issuer: ${issuerDerivationOrigin}, relying party: ${relyingPartyOrigin})`
+      );
+      const actor = await this.getActor();
+      const [maybeResponse] = await actor.prepare_id_alias({
+        issuer: issuerDerivationOrigin,
+        identity_number: this.userNumber,
+        relying_party: relyingPartyOrigin,
+      });
+      if (isNullish(maybeResponse)) {
+        return { error: new Error("Empty response, update candid bindings?") };
+      }
+      return maybeResponse;
+    } catch (e: unknown) {
+      console.error(e);
+      return { error: e };
+    }
+  };
+
+  getIdAlias = async (
+    preparedIdAlias: PreparedIdAlias,
+    issuerDerivationOrigin: string,
+    relyingPartyOrigin: string
+  ): Promise<GetIdAliasResponse | { error: unknown }> => {
+    try {
+      console.log(
+        `get_id_alias(user: ${
+          this.userNumber
+        }, preparedIdAlias: ${JSON.stringify(
+          preparedIdAlias
+        )}, issuerDerivationOrigin: ${issuerDerivationOrigin}, relyingPartyOrigin: ${relyingPartyOrigin})`
+      );
+      const request: GetIdAliasRequest = {
+        issuer: issuerDerivationOrigin,
+        identity_number: this.userNumber,
+        relying_party: relyingPartyOrigin,
+        rp_id_alias_jwt: preparedIdAlias.rp_id_alias_jwt,
+        issuer_id_alias_jwt: preparedIdAlias.issuer_id_alias_jwt,
+      };
+      const actor = await this.getActor();
+      const [maybeResponse] = await actor.get_id_alias(request);
+      if (isNullish(maybeResponse)) {
+        return { error: new Error("Empty response, update candid bindings?") };
+      }
+      return maybeResponse;
     } catch (e: unknown) {
       console.error(e);
       return { error: e };

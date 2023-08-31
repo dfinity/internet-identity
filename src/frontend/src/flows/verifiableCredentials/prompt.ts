@@ -2,7 +2,6 @@ import { caretDownIcon, verifyIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { I18n } from "$src/i18n";
-import { IIWebAuthnIdentity } from "$src/utils/iiConnection";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
@@ -13,12 +12,14 @@ import { vcStepper } from "./stepper";
 
 const promptTemplate = ({
   _i18n,
+  continue_action,
   cancel,
   userNumber,
   knownDapp,
   scrollToTop = false,
 }: {
   _i18n: I18n;
+  continue_action: () => void;
   cancel: () => void;
   userNumber: bigint;
   knownDapp: KnownDapp;
@@ -53,7 +54,8 @@ const promptTemplate = ({
       >
         Cancel
       </button>
-      <button class="c-button" class="c-button c-button--primary">Allow</button>
+      <button class="c-button" class="c-button c-button--primary" type="button" @click=${() =>
+        continue_action()}>Allow</button>
     </div>
   `;
 
@@ -66,19 +68,19 @@ const promptTemplate = ({
 
 export const promptPage = renderPage(promptTemplate);
 
-// Prompt the user to create a WebAuthn identity
 export const prompt = ({
   userNumber,
   knownDapp,
 }: {
   userNumber: bigint;
   knownDapp: KnownDapp;
-}): Promise<IIWebAuthnIdentity | "canceled"> => {
+}): Promise<"continue" | "canceled"> => {
   return new Promise((resolve) =>
     promptPage({
       _i18n: new I18n(),
       userNumber,
       knownDapp,
+      continue_action: () => resolve("continue"),
       cancel: () => resolve("canceled"),
       scrollToTop: true,
     })

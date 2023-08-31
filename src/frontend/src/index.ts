@@ -1,4 +1,5 @@
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
@@ -12,13 +13,12 @@ import { checkRequiredFeatures } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
-import { isNullish, nonNullish } from "@dfinity/utils";
-
 // Polyfill Buffer globally for the browser
 import {
   authenticate,
   handleLoginFlowResult,
 } from "$src/components/authenticateBox";
+import { vcFlow } from "$src/flows/verifiableCredentials";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -127,6 +127,12 @@ const init = async () => {
         connection: loginData.connection,
       });
     }
+  }
+
+  if (url.pathname === "/vc-flow") {
+    // do vc flow
+    // don't do the other flows below
+    return await vcFlow(connection);
   }
 
   // Simple, #-based routing

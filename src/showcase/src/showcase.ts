@@ -358,6 +358,7 @@ export const iiPages: Record<string, () => void> = {
       _i18n: i18n,
       userNumber: BigInt(1234),
       knownDapp: openChat,
+      continue_action: () => console.log("continue"),
       cancel: () => console.log("cancel"),
     }),
   select: () =>
