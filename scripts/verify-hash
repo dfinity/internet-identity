@@ -10,9 +10,13 @@ cd "$SCRIPTS_DIR/.."
 declare expected_ii_hash=
 declare expected_archive_hash=
 
+GREEN=
+RED=
+NC=
+
 # Check that colors are supported (i.e. that we are running in a terminal)
 # I.e. github actions does not support colors
-if [ -n "$TERM" ]
+if [ -n "$TERM" ] && [ "$TERM" != "dumb" ]
 then
     GREEN=$(tput setaf 2)
     RED=$(tput setaf 1)
