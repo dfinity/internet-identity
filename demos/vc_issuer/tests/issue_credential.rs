@@ -7,12 +7,13 @@ use canister_tests::framework::{env, get_wasm_path, principal_1, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
+use identity_jose::jws::verify_credential_jws;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     ConsentMessageRequest, ConsentPreferences, CredentialSpec, IssueCredentialRequest,
     IssueCredentialResponse, ManifestRequest, ManifestResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasResponse, IdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
@@ -106,33 +107,48 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
-    let id_alias_req = IdAliasRequest {
+    let prepare_id_alias_req = PrepareIdAliasRequest {
         identity_number,
-        relying_party,
-        issuer,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
     };
 
     let prepare_response =
-        ii_api::prepare_id_alias(&env, ii_id, principal_1(), id_alias_req.clone())?
+        ii_api::prepare_id_alias(&env, ii_id, principal_1(), prepare_id_alias_req)?
             .expect("Got 'None' from prepare_id_alias");
 
-    let _canister_sig_key = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
-        key
+    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(response) = prepare_response {
+        response
     } else {
         panic!("prepare id_alias failed")
     };
 
-    let id_alias_credentials = match ii_api::get_id_alias(&env, ii_id, principal_1(), id_alias_req)?
-        .expect("Got 'None' from get_id_alias")
-    {
-        GetIdAliasResponse::Ok(credentials) => credentials,
-        GetIdAliasResponse::NoSuchCredentials(err) => {
-            panic!("{}", format!("failed to get id_alias credentials: {}", err))
-        }
-        GetIdAliasResponse::AuthenticationFailed(err) => {
-            panic!("{}", format!("failed authentication: {}", err))
-        }
+    let get_id_alias_req = GetIdAliasRequest {
+        identity_number,
+        relying_party,
+        issuer,
+        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
+        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
     };
+    let id_alias_credentials =
+        match ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
+            .expect("Got 'None' from get_id_alias")
+        {
+            GetIdAliasResponse::Ok(credentials) => credentials,
+            GetIdAliasResponse::NoSuchCredentials(err) => {
+                panic!("{}", format!("failed to get id_alias credentials: {}", err))
+            }
+            GetIdAliasResponse::AuthenticationFailed(err) => {
+                panic!("{}", format!("failed authentication: {}", err))
+            }
+        };
+    verify_credential_jws(
+        &id_alias_credentials
+            .issuer_id_alias_credential
+            .credential_jws,
+        &env.root_key(),
+    )
+    .expect("Invalid ID alias");
 
     let _credential = api::issue_credential(
         &env,
