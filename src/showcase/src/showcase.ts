@@ -130,7 +130,7 @@ const authzKnownAlt = authnPages(i18n, {
   ...authzTemplatesKnownAlt,
 });
 
-const manageTemplates = authnTemplateManage({ dapps });
+export const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 export const iiPages: Record<string, () => void> = {

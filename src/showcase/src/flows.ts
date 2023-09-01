@@ -1,8 +1,9 @@
+import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { toast } from "$src/components/toast";
 import { registerFlow } from "$src/flows/register";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { TemplateResult, html, render } from "lit-html";
-import { dummyChallenge, i18n } from "./showcase";
+import { dummyChallenge, i18n, manageTemplates } from "./showcase";
 
 export const flowsPage = () => {
   document.title = "Flows";
@@ -11,6 +12,52 @@ export const flowsPage = () => {
 };
 
 export const iiFlows: Record<string, () => void> = {
+  loginManage: async () => {
+    const result = await authenticateBoxFlow<null>({
+      i18n,
+      templates: manageTemplates,
+      addDevice: () => {
+        toast.info(html`Added device`);
+        return Promise.resolve({ alias: "My Device" });
+      },
+      login: () => {
+        toast.info(html`Logged in`);
+        return Promise.resolve({
+          tag: "ok",
+          userNumber: BigInt(1234),
+          connection: null,
+        });
+      },
+      register: () => {
+        toast.info(html`Registered`);
+        return Promise.resolve({
+          tag: "ok",
+          userNumber: BigInt(1234),
+          connection: null,
+        });
+      },
+      recover: () => {
+        toast.info(html`Recovered`);
+        return Promise.resolve({
+          tag: "ok",
+          userNumber: BigInt(1234),
+          connection: null,
+        });
+      },
+    });
+    toast.success(html`
+      Authentication complete!<br />
+      <p class="l-stack">
+        <strong class="t-strong">${prettyResult(result)}</strong>
+      </p>
+      <button
+        class="l-stack c-button c-button--secondary"
+        @click=${() => window.location.reload()}
+      >
+        reload
+      </button>
+    `);
+  },
   captcha: () => {
     promptCaptchaPage({
       cancel: () => console.log("canceled"),

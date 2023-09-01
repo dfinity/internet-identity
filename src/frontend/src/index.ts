@@ -16,7 +16,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
 import {
-  authenticate,
+  handleLogin,
   handleLoginFlowResult,
 } from "$src/components/authenticateBox";
 import { Buffer } from "buffer";
@@ -117,7 +117,9 @@ const init = async () => {
     const renderManage = renderManageWarmup();
 
     // If user "Click" continue in success page, proceed with authentication
-    const result = await authenticate(connection, userNumber);
+    const result = await handleLogin({
+      login: () => connection.login(userNumber),
+    });
     const loginData = await handleLoginFlowResult(result);
 
     // User have successfully signed-in we can jump to manage page

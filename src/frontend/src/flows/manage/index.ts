@@ -106,7 +106,11 @@ export const authFlowManage = async (connection: Connection) => {
     userNumber,
     connection: authenticatedConnection,
     newAnchor,
-  } = await authenticateBox(connection, i18n, authnTemplateManage({ dapps }));
+  } = await authenticateBox({
+    connection,
+    i18n,
+    templates: authnTemplateManage({ dapps }),
+  });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.

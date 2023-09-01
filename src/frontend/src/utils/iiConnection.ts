@@ -74,9 +74,11 @@ export class DummyIdentity
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
-export type ApiResult = LoginResult | RegisterResult;
-export type LoginResult =
-  | LoginSuccess
+export type ApiResult<T = AuthenticatedConnection> =
+  | LoginResult<T>
+  | RegisterResult<T>;
+export type LoginResult<T = AuthenticatedConnection> =
+  | LoginSuccess<T>
   | UnknownUser
   | AuthFail
   | ApiError
