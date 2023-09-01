@@ -8,7 +8,7 @@ import {
   LoginFlowResult,
   LoginFlowSuccess,
 } from "$src/utils/flowResult";
-import { Connection } from "$src/utils/iiConnection";
+import { Connection, LoginResult } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
 import { registerIfAllowed } from "$src/utils/registerAllowedCheck";
 import {
@@ -52,34 +52,66 @@ export type AuthnTemplates = {
   };
 };
 
+export const authenticateBox = ({
+  connection,
+  i18n,
+  templates,
+}: {
+  connection: Connection;
+  i18n: I18n;
+  templates: AuthnTemplates;
+}): Promise<LoginData & { newAnchor: boolean }> => {
+  return authenticateBoxFlow({
+    i18n,
+    templates,
+    addDevice: (userNumber) => asNewDevice(connection, userNumber),
+    login: (userNumber) =>
+      handleLogin({
+        login: () => connection.login(userNumber),
+      }),
+    register: () => registerIfAllowed(connection),
+    recover: () => useRecovery(connection),
+  });
+};
+
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBox = async (
-  connection: Connection,
-  i18n: I18n,
-  templates: AuthnTemplates
-): Promise<LoginData & { newAnchor: boolean }> => {
+export const authenticateBoxFlow = async <T>({
+  i18n,
+  templates,
+  addDevice,
+  login,
+  register,
+  recover,
+}: {
+  i18n: I18n;
+  templates: AuthnTemplates;
+  addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
+  login: (userNumber: bigint) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  register: () => Promise<LoginFlowResult<T>>;
+  recover: () => Promise<LoginFlowResult<T>>;
+}): Promise<LoginData<T> & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    new Promise<LoginFlowResult & { newAnchor: boolean }>((resolve) => {
+    new Promise<LoginFlowResult<T> & { newAnchor: boolean }>((resolve) => {
       const pages = authnPages(i18n, {
         ...templates,
-        addDevice: (userNumber) => asNewDevice(connection, userNumber),
+        addDevice: (userNumber) => addDevice(userNumber),
         onSubmit: async (userNumber) => {
           resolve({
             newAnchor: false,
-            ...(await authenticate(connection, userNumber)),
+            ...(await login(userNumber)),
           });
         },
         register: async () => {
           resolve({
-            ...(await registerIfAllowed(connection)),
             newAnchor: true,
+            ...(await register()),
           });
         },
         recover: async (_userNumber) => {
           resolve({
-            ...(await useRecovery(connection)),
             newAnchor: false,
+            ...(await recover()),
           });
         },
       });
@@ -108,9 +140,9 @@ export const authenticateBox = async (
   }
 };
 
-export const handleLoginFlowResult = async (
-  result: LoginFlowResult
-): Promise<LoginData | undefined> => {
+export const handleLoginFlowResult = async <T>(
+  result: LoginFlowResult<T>
+): Promise<LoginData<T> | undefined> => {
   switch (result.tag) {
     case "ok":
       setAnchorUsed(result.userNumber);
@@ -300,13 +332,14 @@ export const authnPages = (
   };
 };
 
-export const authenticate = async (
-  connection: Connection,
-  userNumber: bigint
-): Promise<LoginFlowSuccess | LoginFlowError> => {
+export const handleLogin = async <T>({
+  login,
+}: {
+  login: () => Promise<LoginResult<T>>;
+}): Promise<LoginFlowSuccess<T> | LoginFlowError> => {
   try {
-    const result = await withLoader(() => connection.login(userNumber));
-    return apiResultToLoginFlowResult(result);
+    const result = await withLoader(() => login());
+    return apiResultToLoginFlowResult<T>(result);
   } catch (error) {
     return {
       tag: "err",

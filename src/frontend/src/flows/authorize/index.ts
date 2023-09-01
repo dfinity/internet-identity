@@ -159,18 +159,18 @@ export const authFlowAuthorize = async (
   showSpinner({ message: copy.starting_authentication });
   const result = await authenticationProtocol({
     authenticate: async (authContext) => {
-      const authSuccess = await authenticateBox(
+      const authSuccess = await authenticateBox({
         connection,
         i18n,
-        authnTemplateAuthorize({
+        templates: authnTemplateAuthorize({
           origin: authContext.requestOrigin,
           derivationOrigin: authContext.authRequest.derivationOrigin,
           i18n,
           knownDapp: getDapps().find((dapp) =>
             dapp.hasOrigin(authContext.requestOrigin)
           ),
-        })
-      );
+        }),
+      });
 
       // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
       // one. The exact flow depends on the device they use.
