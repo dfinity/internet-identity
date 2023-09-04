@@ -4,8 +4,9 @@ use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ConsentData, CredentialData, IssueCredentialRequest, IssueCredentialResponse, ManifestData,
-    ManifestRequest, ManifestResponse,
+    ConsentInfo, ConsentMessageRequest, ConsentMessageResponse, GetCredentialRequest,
+    GetCredentialResponse, IssuedCredentialData, PrepareCredentialRequest,
+    PrepareCredentialResponse, PreparedCredentialData,
 };
 use serde_json::json;
 use std::fmt::Error;
@@ -13,23 +14,34 @@ use std::ops::Add;
 
 #[update]
 #[candid_method]
-async fn issue_credential(req: IssueCredentialRequest) -> IssueCredentialResponse {
-    if let Err(err) = verify_credential_request(&req) {
-        return IssueCredentialResponse::Err(err.to_string());
+async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
+    if let Err(err) = verify_prepare_credential_request(&req) {
+        return PrepareCredentialResponse::Err(err.to_string());
     }
-    let vc = new_credential(&req);
+    let vc = new_credential(&req.signed_id_alias.id_alias);
+    // TODO: convert to JWT.
     let vc_jwt = serde_json::to_string(&vc).unwrap();
-    IssueCredentialResponse::Ok(CredentialData { vc_jwt })
+    PrepareCredentialResponse::Ok(PreparedCredentialData { vc_jwt })
+}
+
+#[query]
+#[candid_method(query)]
+fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
+    if let Err(err) = verify_get_credential_request(&req) {
+        return GetCredentialResponse::Err(err.to_string());
+    }
+    // TODO: reuse the JWT from the request, and sign it.
+    let vc = new_credential(&req.signed_id_alias.id_alias);
+    let vc_jws = serde_json::to_string(&vc).unwrap();
+    GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
 }
 
 #[query]
 #[candid_method]
-async fn get_manifest(req: ManifestRequest) -> ManifestResponse {
-    ManifestResponse::Ok(ManifestData {
-        consent_info: ConsentData {
-            consent_message: "Do you want to get a verifiable credential?".to_string(),
-            language: req.consent_message_request.preferences.language,
-        },
+async fn consent_message(req: ConsentMessageRequest) -> ConsentMessageResponse {
+    ConsentMessageResponse::Valid(ConsentInfo {
+        consent_message: "Do you want to get a verifiable credential?".to_string(),
+        language: req.preferences.language,
     })
 }
 
@@ -40,9 +52,9 @@ fn did_from_principal(principal: &Principal) -> String {
     prefix.add(&*principal.to_string())
 }
 
-fn new_credential(req: &IssueCredentialRequest) -> Credential {
+fn new_credential(principal: &Principal) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
-      "id": did_from_principal(&req.signed_id_alias.id_alias),
+      "id": did_from_principal(principal),
       "name": "Alice",
       "degree": {
         "type": "BachelorDegree",
@@ -62,7 +74,11 @@ fn new_credential(req: &IssueCredentialRequest) -> Credential {
         .unwrap()
 }
 
-fn verify_credential_request(_req: &IssueCredentialRequest) -> Result<(), Error> {
+fn verify_prepare_credential_request(_req: &PrepareCredentialRequest) -> Result<(), Error> {
+    Ok(())
+}
+
+fn verify_get_credential_request(_req: &GetCredentialRequest) -> Result<(), Error> {
     Ok(())
 }
 
