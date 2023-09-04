@@ -9,8 +9,9 @@ use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use identity_jose::jws::verify_credential_jws;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ConsentMessageRequest, ConsentPreferences, CredentialSpec, IssueCredentialRequest,
-    IssueCredentialResponse, ManifestRequest, ManifestResponse,
+    ConsentMessageRequest, ConsentMessageResponse, ConsentPreferences, CredentialSpec,
+    GetCredentialRequest, GetCredentialResponse, PrepareCredentialRequest,
+    PrepareCredentialResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
@@ -44,56 +45,72 @@ pub fn install_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
 mod api {
     use super::*;
 
-    pub fn get_manifest(
+    pub fn consent_message(
         env: &StateMachine,
         canister_id: CanisterId,
         sender: Principal,
-        manifest_request: &ManifestRequest,
-    ) -> Result<Option<ManifestResponse>, CallError> {
+        consent_message_request: &ConsentMessageRequest,
+    ) -> Result<Option<ConsentMessageResponse>, CallError> {
         query_candid_as(
             env,
             canister_id,
             sender,
-            "get_manifest",
-            (manifest_request,),
+            "consent_message",
+            (consent_message_request,),
         )
         .map(|(x,)| x)
     }
 
-    pub fn issue_credential(
+    pub fn prepare_credential(
         env: &StateMachine,
         canister_id: CanisterId,
         sender: Principal,
-        credential_request: &IssueCredentialRequest,
-    ) -> Result<IssueCredentialResponse, CallError> {
+        prepare_credential_request: &PrepareCredentialRequest,
+    ) -> Result<PrepareCredentialResponse, CallError> {
         call_candid_as(
             env,
             canister_id,
             sender,
-            "issue_credential",
-            (credential_request,),
+            "prepare_credential",
+            (prepare_credential_request,),
+        )
+        .map(|(x,)| x)
+    }
+
+    pub fn get_credential(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: Principal,
+        get_credential_request: &GetCredentialRequest,
+    ) -> Result<GetCredentialResponse, CallError> {
+        query_candid_as(
+            env,
+            canister_id,
+            sender,
+            "get_credential",
+            (get_credential_request,),
         )
         .map(|(x,)| x)
     }
 }
 
-/// Verifies that the manifest can be requested.
+/// Verifies that the consent message can be requested.
 #[test]
-fn should_issue_credential() -> Result<(), CallError> {
+fn should_return_consent_message() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
-    let manifest_request = ManifestRequest {
-        consent_message_request: ConsentMessageRequest {
-            preferences: ConsentPreferences {
-                language: "en".to_string(),
-            },
+    let consent_message_request = ConsentMessageRequest {
+        method: "dummy_method".to_string(),
+        arg: Default::default(),
+        preferences: ConsentPreferences {
+            language: "en".to_string(),
         },
     };
 
-    let _manifest_response =
-        api::get_manifest(&env, canister_id, principal_1(), &manifest_request)?
-            .expect("Got 'None' from get_manifest");
+    let _consent_message_response =
+        api::consent_message(&env, canister_id, principal_1(), &consent_message_request)?
+            .expect("Got 'None' from consent_message");
     Ok(())
 }
 
@@ -150,17 +167,44 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     )
     .expect("Invalid ID alias");
 
-    let _credential = api::issue_credential(
+    let prepare_credential_response = api::prepare_credential(
         &env,
         issuer_id,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
-        &IssueCredentialRequest {
+        &PrepareCredentialRequest {
+            credential_spec: CredentialSpec {
+                info: "foo".to_string(),
+            },
+            signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
+        },
+    )?;
+    let prepared_credential =
+        if let PrepareCredentialResponse::Ok(data) = prepare_credential_response {
+            data
+        } else {
+            panic!(
+                "Prepare credential failed: {:?}",
+                prepare_credential_response
+            );
+        };
+
+    let get_credential_response = api::get_credential(
+        &env,
+        issuer_id,
+        id_alias_credentials.issuer_id_alias_credential.id_dapp,
+        &GetCredentialRequest {
             credential_spec: CredentialSpec {
                 info: "foo".to_string(),
             },
             signed_id_alias: id_alias_credentials.issuer_id_alias_credential,
+            vc_jwt: prepared_credential.vc_jwt,
         },
     )?;
 
+    if let GetCredentialResponse::Ok(_data) = get_credential_response {
+        // OK
+    } else {
+        panic!("Get credential failed: {:?}", get_credential_response);
+    };
     Ok(())
 }

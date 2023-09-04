@@ -1,24 +1,42 @@
-type ConsentData = record { consent_message : text; language : text };
-type ConsentMessageRequest = record { preferences : ConsentPreferences };
+type ConsentErrorInfo = record { description : text; error_code : nat64 };
+type ConsentInfo = record { consent_message : text; language : text };
+type ConsentMessageRequest = record {
+    arg : vec nat8;
+    method : text;
+    preferences : ConsentPreferences;
+};
+type ConsentMessageResponse = variant {
+    MalformedCall : ConsentErrorInfo;
+    Valid : ConsentInfo;
+    Forbidden : ConsentErrorInfo;
+};
 type ConsentPreferences = record { language : text };
-type CredentialData = record { vc_jwt : text };
 type CredentialSpec = record { info : text };
-type IssueCredentialRequest = record {
+type GetCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    vc_jwt : text;
+    credential_spec : CredentialSpec;
+};
+type GetCredentialResponse = variant { Ok : IssuedCredentialData; Err : text };
+type IssuedCredentialData = record { vc_jws : text };
+type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
 };
-type IssueCredentialResponse = variant { Ok : CredentialData; Err : text };
-type ManifestData = record { consent_info : ConsentData };
-type ManifestRequest = record {
-    consent_message_request : ConsentMessageRequest;
+type PrepareCredentialResponse = variant {
+    Ok : PreparedCredentialData;
+    Err : text;
 };
-type ManifestResponse = variant { Ok : ManifestData; Err : text };
+type PreparedCredentialData = record { vc_jwt : text };
 type SignedIdAlias = record {
-    signature : vec nat8;
+    credential_jws : text;
     id_alias : principal;
     id_dapp : principal;
 };
 service : {
-    get_manifest : (ManifestRequest) -> (ManifestResponse);
-    issue_credential : (IssueCredentialRequest) -> (IssueCredentialResponse);
+    consent_message : (ConsentMessageRequest) -> (ConsentMessageResponse);
+    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
+    prepare_credential : (PrepareCredentialRequest) -> (
+    PrepareCredentialResponse,
+    );
 }

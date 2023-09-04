@@ -68,38 +68,41 @@ pub enum GetIdAliasResponse {
 
 pub mod issuer {
     use super::*;
+    use serde_bytes::ByteBuf;
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct IssueCredentialRequest {
+    pub struct PrepareCredentialRequest {
         pub signed_id_alias: SignedIdAlias,
         pub credential_spec: CredentialSpec,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub enum IssueCredentialResponse {
-        Ok(CredentialData),
+    pub enum PrepareCredentialResponse {
+        Ok(PreparedCredentialData),
         Err(String),
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct CredentialData {
+    pub struct GetCredentialRequest {
+        pub signed_id_alias: SignedIdAlias,
+        pub credential_spec: CredentialSpec,
         pub vc_jwt: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ManifestRequest {
-        pub consent_message_request: ConsentMessageRequest,
-    }
-
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ManifestData {
-        pub consent_info: ConsentData,
-    }
-
-    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub enum ManifestResponse {
-        Ok(ManifestData),
+    pub enum GetCredentialResponse {
+        Ok(IssuedCredentialData),
         Err(String),
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct PreparedCredentialData {
+        pub vc_jwt: String,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct IssuedCredentialData {
+        pub vc_jws: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -108,18 +111,46 @@ pub mod issuer {
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ManifestRequest {}
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub enum ManifestResponse {
+        Ok(ManifestData),
+        Err(String),
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ManifestData {}
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct ConsentMessageRequest {
+        pub method: String,
+        pub arg: ByteBuf,
+        pub preferences: ConsentPreferences,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct ConsentPreferences {
         pub language: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentMessageRequest {
-        pub preferences: ConsentPreferences,
+    #[serde(rename = "error_info")]
+    pub struct ConsentErrorInfo {
+        pub error_code: u64,
+        pub description: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentData {
+    pub struct ConsentInfo {
         pub consent_message: String,
         pub language: String,
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub enum ConsentMessageResponse {
+        Valid(ConsentInfo),
+        Forbidden(ConsentErrorInfo),
+        MalformedCall(ConsentErrorInfo),
     }
 }
