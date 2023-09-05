@@ -30,7 +30,6 @@
     "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
   },
   "devDependencies": {
-    "@trust/webcrypto": "^0.9.2",
     "@types/html-minifier-terser": "^7.0.0",
     "@types/selenium-standalone": "^7.0.1",
     "@types/ua-parser-js": "^0.7.36",
