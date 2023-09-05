@@ -1,8 +1,8 @@
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { toast } from "$src/components/toast";
-import { registerFlow } from "$src/flows/register";
+import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
 import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
-import { TemplateResult, html, render } from "lit-html";
+import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge, i18n, manageTemplates } from "./showcase";
 
 export const flowsPage = () => {
@@ -10,6 +10,26 @@ export const flowsPage = () => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(pageContent, container);
 };
+
+const registerFlowOpts: RegisterFlowOpts<null> = {
+  createChallenge: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return dummyChallenge;
+  },
+  register: async ({ challengeResult: { chars } }) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    if (chars !== "8wJ6Q") {
+      return { kind: "badChallenge" };
+    }
+    return {
+      kind: "loginSuccess",
+      userNumber: BigInt(12356),
+      connection: null,
+    };
+  },
+  registrationAllowed: true,
+} as const;
 
 export const iiFlows: Record<string, () => void> = {
   loginManage: async () => {
@@ -20,16 +40,9 @@ export const iiFlows: Record<string, () => void> = {
         toast.info(html`Added device`);
         return Promise.resolve({ alias: "My Device" });
       },
-      login: () => {
+      login: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         toast.info(html`Logged in`);
-        return Promise.resolve({
-          tag: "ok",
-          userNumber: BigInt(1234),
-          connection: null,
-        });
-      },
-      register: () => {
-        toast.info(html`Registered`);
         return Promise.resolve({
           tag: "ok",
           userNumber: BigInt(1234),
@@ -44,6 +57,7 @@ export const iiFlows: Record<string, () => void> = {
           connection: null,
         });
       },
+      registerFlowOpts,
     });
     toast.success(html`
       Authentication complete!<br />
@@ -76,24 +90,7 @@ export const iiFlows: Record<string, () => void> = {
   },
 
   register: async () => {
-    const result = await registerFlow<null>({
-      createChallenge: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return dummyChallenge;
-      },
-      register: async ({ challengeResult: { chars } }) => {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        if (chars !== "8wJ6Q") {
-          return { kind: "badChallenge" };
-        }
-        return {
-          kind: "loginSuccess",
-          userNumber: BigInt(12356),
-          connection: null,
-        };
-      },
-    });
+    const result = await registerFlow<null>(registerFlowOpts);
 
     toast.success(html`
       Identity successfully created!<br />

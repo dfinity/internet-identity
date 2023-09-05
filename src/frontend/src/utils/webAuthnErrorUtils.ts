@@ -35,9 +35,9 @@ export const displayDuplicateDeviceError = (options: {
  *  * https://www.w3.org/TR/webauthn-2/#sctn-op-make-cred (Step 3)
  * @param error error to check
  */
-export function isDuplicateDeviceError(error: unknown): boolean {
+export const isWebAuthnDuplicateDevice = (error: unknown): boolean => {
   return error instanceof DOMException && error.name === "InvalidStateError";
-}
+};
 
 /** Checks whether the error corresponds with the WebAuthnSpec for cancelling the operation:
  *  * https://www.w3.org/TR/webauthn-2/#sctn-createCredential (Step 16)
@@ -50,6 +50,6 @@ export function isDuplicateDeviceError(error: unknown): boolean {
  *
  * @param error error to check
  */
-export function isCancel(error: unknown): boolean {
+export const isWebAuthnCancel = (error: unknown): boolean => {
   return error instanceof DOMException && error.name === "NotAllowedError";
-}
+};

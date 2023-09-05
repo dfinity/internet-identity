@@ -1,24 +1,24 @@
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
+import { getRegisterFlowOpts, registerFlow } from "$src/flows/register";
 import { I18n } from "$src/i18n";
 import {
-  apiResultToLoginFlowResult,
   LoginData,
   LoginFlowError,
   LoginFlowResult,
   LoginFlowSuccess,
+  apiResultToLoginFlowResult,
 } from "$src/utils/flowResult";
 import { Connection, LoginResult } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
-import { registerIfAllowed } from "$src/utils/registerAllowedCheck";
 import {
   getAnchors,
   parseUserNumber,
   setAnchorUsed,
 } from "$src/utils/userNumber";
-import { isNonEmptyArray, NonEmptyArray, unreachable } from "$src/utils/utils";
+import { NonEmptyArray, isNonEmptyArray, unreachable } from "$src/utils/utils";
 import { nonNullish } from "@dfinity/utils";
-import { html, render, TemplateResult } from "lit-html";
+import { TemplateResult, html, render } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
 import { displayError } from "./displayError";
@@ -52,7 +52,7 @@ export type AuthnTemplates = {
   };
 };
 
-export const authenticateBox = ({
+export const authenticateBox = async ({
   connection,
   i18n,
   templates,
@@ -61,72 +61,17 @@ export const authenticateBox = ({
   i18n: I18n;
   templates: AuthnTemplates;
 }): Promise<LoginData & { newAnchor: boolean }> => {
-  return authenticateBoxFlow({
-    i18n,
-    templates,
-    addDevice: (userNumber) => asNewDevice(connection, userNumber),
-    login: (userNumber) =>
-      handleLogin({
-        login: () => connection.login(userNumber),
-      }),
-    register: () => registerIfAllowed(connection),
-    recover: () => useRecovery(connection),
-  });
-};
-
-/** Authentication box component which authenticates a user
- * to II or to another dapp */
-export const authenticateBoxFlow = async <T>({
-  i18n,
-  templates,
-  addDevice,
-  login,
-  register,
-  recover,
-}: {
-  i18n: I18n;
-  templates: AuthnTemplates;
-  addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
-  login: (userNumber: bigint) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
-  register: () => Promise<LoginFlowResult<T>>;
-  recover: () => Promise<LoginFlowResult<T>>;
-}): Promise<LoginData<T> & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    new Promise<LoginFlowResult<T> & { newAnchor: boolean }>((resolve) => {
-      const pages = authnPages(i18n, {
-        ...templates,
-        addDevice: (userNumber) => addDevice(userNumber),
-        onSubmit: async (userNumber) => {
-          resolve({
-            newAnchor: false,
-            ...(await login(userNumber)),
-          });
-        },
-        register: async () => {
-          resolve({
-            newAnchor: true,
-            ...(await register()),
-          });
-        },
-        recover: async (_userNumber) => {
-          resolve({
-            newAnchor: false,
-            ...(await recover()),
-          });
-        },
-      });
-
-      // If there _are_ some anchors, then we show the "pick" screen, otherwise
-      // we assume a new user and show the "firstTime" screen.
-      const anchors = getAnchors();
-      if (isNonEmptyArray(anchors)) {
-        pages.pick({
-          anchors: anchors,
-          moreOptions: () => pages.useExisting(),
-        });
-      } else {
-        pages.firstTime({ useExisting: () => pages.useExisting() });
-      }
+    authenticateBoxFlow({
+      i18n,
+      templates,
+      addDevice: (userNumber) => asNewDevice(connection, userNumber),
+      login: (userNumber) =>
+        handleLogin({
+          login: () => connection.login(userNumber),
+        }),
+      recover: () => useRecovery(connection),
+      registerFlowOpts: getRegisterFlowOpts({ connection }),
     });
 
   // Retry until user has successfully authenticated
@@ -139,6 +84,71 @@ export const authenticateBoxFlow = async <T>({
     }
   }
 };
+
+/** Authentication box component which authenticates a user
+ * to II or to another dapp */
+export const authenticateBoxFlow = <T>({
+  i18n,
+  templates,
+  addDevice,
+  login,
+  recover,
+  registerFlowOpts,
+}: {
+  i18n: I18n;
+  templates: AuthnTemplates;
+  addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
+  login: (userNumber: bigint) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  recover: () => Promise<LoginFlowResult<T>>;
+  registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
+}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> =>
+  new Promise((resolve) => {
+    const pages = authnPages(i18n, {
+      ...templates,
+      addDevice: (userNumber) => addDevice(userNumber),
+      onSubmit: async (userNumber) => {
+        const result = await withLoader(() => login(userNumber));
+        resolve({
+          newAnchor: false,
+          ...result,
+        });
+      },
+      register: async () => {
+        const result = await registerFlow<T>(registerFlowOpts);
+
+        if (result === "canceled") {
+          resolve({
+            newAnchor: true,
+            tag: "canceled",
+          });
+          return;
+        }
+
+        resolve({
+          newAnchor: true,
+          ...apiResultToLoginFlowResult<T>(result),
+        });
+      },
+      recover: async (_userNumber) => {
+        resolve({
+          newAnchor: false,
+          ...(await recover()),
+        });
+      },
+    });
+
+    // If there _are_ some anchors, then we show the "pick" screen, otherwise
+    // we assume a new user and show the "firstTime" screen.
+    const anchors = getAnchors();
+    if (isNonEmptyArray(anchors)) {
+      pages.pick({
+        anchors: anchors,
+        moreOptions: () => pages.useExisting(),
+      });
+    } else {
+      pages.firstTime({ useExisting: () => pages.useExisting() });
+    }
+  });
 
 export const handleLoginFlowResult = async <T>(
   result: LoginFlowResult<T>
@@ -338,7 +348,7 @@ export const handleLogin = async <T>({
   login: () => Promise<LoginResult<T>>;
 }): Promise<LoginFlowSuccess<T> | LoginFlowError> => {
   try {
-    const result = await withLoader(() => login());
+    const result = await login();
     return apiResultToLoginFlowResult<T>(result);
   } catch (error) {
     return {
