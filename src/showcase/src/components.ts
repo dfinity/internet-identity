@@ -1,13 +1,11 @@
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { pinInput } from "$src/components/pinInput";
 import { toast } from "$src/components/toast";
-import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
-import { mount, withRef } from "$src/utils/lit-html";
+import { withRef } from "$src/utils/lit-html";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { dummyChallenge, i18n } from "./showcase";
 
 export const componentsPage = () => {
   document.title = "Components";
@@ -16,7 +14,7 @@ export const componentsPage = () => {
 };
 
 const components = (): TemplateResult => {
-  return html`${mkToast()} ${choosePin()} ${pickAnchor()}${completeCaptcha()}`;
+  return html`${mkToast()} ${choosePin()} ${pickAnchor()}`;
 };
 
 const mkToast = (): TemplateResult => {
@@ -107,30 +105,4 @@ const pickAnchor = (): TemplateResult => {
           showSelected
         )} </div>
     </div>`;
-};
-
-const completeCaptcha = (): TemplateResult => {
-  return html` <div
-    ${mount((container) =>
-      container instanceof HTMLElement
-        ? promptCaptchaPage(
-            {
-              cancel: () => console.log("canceled"),
-              requestChallenge: () =>
-                new Promise((resolve) => setTimeout(resolve, 1000)).then(
-                  () => dummyChallenge
-                ),
-              verifyChallengeChars: (cr) =>
-                new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
-                  cr.chars === "8wJ6Q" ? "yes" : badChallenge
-                ),
-              onContinue: () => console.log("Done"),
-              i18n,
-              focus: false,
-            },
-            container
-          )
-        : ""
-    )}
-  ></div>`;
 };
