@@ -6,7 +6,7 @@ import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 // A Pin Input component
 export const pinInput = <T>({
@@ -124,12 +124,14 @@ export const pinInput = <T>({
                 <input
                   ?autofocus=${focus}
                   autocomplete="off"
+                  autocapitalize="off"
+                  spellcheck="false"
                   type="text"
                   inputmode="tel"
                   size="1"
                   maxlength="1"
                   class="c-input c-input--pin c-input--pin__error ${secret
-                    ? "c-input--pin__hidden"
+                    ? "c-input--pin__secret"
                     : undefined}"
                   @input=${(e: InputEvent) => withInputElement(e, onInput_)}
                   @paste=${(e: ClipboardEvent) => withInputElement(e, onPaste_)}

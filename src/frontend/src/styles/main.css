@@ -1773,7 +1773,7 @@ by all browsers (FF is missing) */
 }
 
 /* Use a fake font for "password"-style pin input */
-.c-input--pin__hidden {
+.c-input--pin__secret {
   font-family: "password";
 }
 
