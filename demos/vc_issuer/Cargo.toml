@@ -13,17 +13,19 @@ internet_identity_interface = { path = "../../src/internet_identity_interface" }
 candid = "0.9"
 ic-cdk = "0.10"
 ic-cdk-macros = "0.7"
+ic-certified-map = "0.4"
 # vc dependencies
-# ssi-dids = { version = "0.1", features = ["example"] }
-# ssi-vc = "0.2"
 identity_core = {git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false}
 identity_credential = {git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
 identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
-# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential"]}
 # identity_core = {path = "../../../identity.rs/identity_core", default-features = false}
+# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential"]}
+# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
+
 # other dependencies
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 [dev-dependencies]
 ic-test-state-machine-client = "3"
