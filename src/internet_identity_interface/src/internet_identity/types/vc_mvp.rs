@@ -123,34 +123,40 @@ pub mod issuer {
     pub struct ManifestData {}
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentMessageRequest {
+    pub struct Icrc21ConsentMessageRequest {
         pub method: String,
         pub arg: ByteBuf,
-        pub preferences: ConsentPreferences,
+        pub preferences: Icrc21ConsentPreferences,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentPreferences {
+    pub struct Icrc21ConsentPreferences {
         pub language: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    #[serde(rename = "error_info")]
-    pub struct ConsentErrorInfo {
+    pub struct Icrc21ErrorInfo {
         pub error_code: u64,
         pub description: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct ConsentInfo {
+    pub enum Icrc21Error {
+        Forbidden(Icrc21ErrorInfo),
+        MalformedCall(Icrc21ErrorInfo),
+        NotSupported(Icrc21ErrorInfo),
+        GenericError(Icrc21ErrorInfo),
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub struct Icrc21ConsentInfo {
         pub consent_message: String,
         pub language: String,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub enum ConsentMessageResponse {
-        Valid(ConsentInfo),
-        Forbidden(ConsentErrorInfo),
-        MalformedCall(ConsentErrorInfo),
+    pub enum Icrc21ConsentMessageResponse {
+        Ok(Icrc21ConsentInfo),
+        Err(Icrc21Error),
     }
 }

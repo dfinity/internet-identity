@@ -9,8 +9,8 @@ use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use identity_jose::jws::verify_credential_jws;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ConsentMessageRequest, ConsentMessageResponse, ConsentPreferences, CredentialSpec,
-    GetCredentialRequest, GetCredentialResponse, PrepareCredentialRequest,
+    CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentMessageRequest,
+    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, PrepareCredentialRequest,
     PrepareCredentialResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -49,9 +49,9 @@ mod api {
         env: &StateMachine,
         canister_id: CanisterId,
         sender: Principal,
-        consent_message_request: &ConsentMessageRequest,
-    ) -> Result<Option<ConsentMessageResponse>, CallError> {
-        query_candid_as(
+        consent_message_request: &Icrc21ConsentMessageRequest,
+    ) -> Result<Option<Icrc21ConsentMessageResponse>, CallError> {
+        call_candid_as(
             env,
             canister_id,
             sender,
@@ -100,10 +100,10 @@ fn should_return_consent_message() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
-    let consent_message_request = ConsentMessageRequest {
+    let consent_message_request = Icrc21ConsentMessageRequest {
         method: "dummy_method".to_string(),
         arg: Default::default(),
-        preferences: ConsentPreferences {
+        preferences: Icrc21ConsentPreferences {
             language: "en".to_string(),
         },
     };
