@@ -1909,6 +1909,7 @@ dependencies = [
  "canister_tests",
  "ic-cdk",
  "ic-cdk-macros",
+ "ic-certified-map",
  "ic-test-state-machine-client",
  "identity_core",
  "identity_credential",
@@ -1917,6 +1918,7 @@ dependencies = [
  "lazy_static",
  "serde",
  "serde_json",
+ "sha2 0.10.7",
 ]
 
 [[package]]
