@@ -1,16 +1,3 @@
-type ConsentErrorInfo = record { description : text; error_code : nat64 };
-type ConsentInfo = record { consent_message : text; language : text };
-type ConsentMessageRequest = record {
-    arg : vec nat8;
-    method : text;
-    preferences : ConsentPreferences;
-};
-type ConsentMessageResponse = variant {
-    MalformedCall : ConsentErrorInfo;
-    Valid : ConsentInfo;
-    Forbidden : ConsentErrorInfo;
-};
-type ConsentPreferences = record { language : text };
 type CredentialSpec = record { info : text };
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
@@ -18,6 +5,24 @@ type GetCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant { Ok : IssuedCredentialData; Err : text };
+type Icrc21ConsentInfo = record { consent_message : text; language : text };
+type Icrc21ConsentMessageRequest = record {
+    arg : vec nat8;
+    method : text;
+    preferences : Icrc21ConsentPreferences;
+};
+type Icrc21ConsentMessageResponse = variant {
+    Ok : Icrc21ConsentInfo;
+    Err : Icrc21Error;
+};
+type Icrc21ConsentPreferences = record { language : text };
+type Icrc21Error = variant {
+    GenericError : Icrc21ErrorInfo;
+    MalformedCall : Icrc21ErrorInfo;
+    NotSupported : Icrc21ErrorInfo;
+    Forbidden : Icrc21ErrorInfo;
+};
+type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
@@ -34,7 +39,9 @@ type SignedIdAlias = record {
     id_dapp : principal;
 };
 service : {
-    consent_message : (ConsentMessageRequest) -> (ConsentMessageResponse);
+    consent_message : (Icrc21ConsentMessageRequest) -> (
+    Icrc21ConsentMessageResponse,
+    );
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
     prepare_credential : (PrepareCredentialRequest) -> (
     PrepareCredentialResponse,

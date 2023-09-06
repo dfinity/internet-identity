@@ -8,8 +8,8 @@ use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{CompactJwsEncoder, JwsAlgorithm, JwsHeader};
 use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ConsentInfo, ConsentMessageRequest, ConsentMessageResponse, GetCredentialRequest,
-    GetCredentialResponse, IssuedCredentialData, PrepareCredentialRequest,
+    GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo, Icrc21ConsentMessageRequest,
+    Icrc21ConsentMessageResponse, IssuedCredentialData, PrepareCredentialRequest,
     PrepareCredentialResponse, PreparedCredentialData,
 };
 use serde_json::json;
@@ -54,10 +54,10 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
 }
 
-#[query]
+#[update]
 #[candid_method]
-async fn consent_message(req: ConsentMessageRequest) -> ConsentMessageResponse {
-    ConsentMessageResponse::Valid(ConsentInfo {
+async fn consent_message(req: Icrc21ConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+    Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
         consent_message: "Do you want to get a verifiable credential?".to_string(),
         language: req.preferences.language,
     })
