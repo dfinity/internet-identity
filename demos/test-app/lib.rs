@@ -218,8 +218,8 @@ lazy_static! {
 
         // the string we are replacing here is inserted by webpack during the front-end build
         let index_html = index_html.replace(
-            r#"<script defer src="bundle.js"></script>"#,
-            &format!(r#"<script>var canisterId = '{canister_id}';</script><script defer="defer" src="bundle.js"></script>"#).to_string()
+            r#"<script type="module" crossorigin src="/index.js"></script>"#,
+            &format!(r#"<script>var canisterId = '{canister_id}';</script><script type="module" crossorigin src="/index.js"></script>"#).to_string()
         );
         index_html
     };

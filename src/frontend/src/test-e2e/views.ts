@@ -597,7 +597,7 @@ export class DemoAppView extends View {
   }
 
   async openIiTab(): Promise<void> {
-    await this.browser.$("#openIiWindowBtn").click();
+    await this.browser.$("#openIiWindowAuthBtn").click();
   }
 
   async sendInvalidData(): Promise<void> {
@@ -609,7 +609,7 @@ export class DemoAppView extends View {
   }
 
   async sendValidMessage(): Promise<void> {
-    await this.browser.$("#validMessageBtn").click();
+    await this.browser.$("#validAuthMessageBtn").click();
   }
 }
 
