@@ -1,10 +1,6 @@
 import { Challenge } from "$generated/internet_identity_types";
-import {
-  LoginFlowCanceled,
-  LoginFlowResult,
-  apiResultToLoginFlowResult,
-  cancel,
-} from "$src/utils/flowResult";
+import { registerDisabled } from "$src/flows/registerDisabled";
+import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
   AuthenticatedConnection,
   Connection,
@@ -12,7 +8,6 @@ import {
   RegisterResult,
 } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
-import { unknownToString } from "$src/utils/utils";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import type { UAParser } from "ua-parser-js";
@@ -24,6 +19,7 @@ import { savePasskey } from "./passkey";
 export const registerFlow = async <T>({
   createChallenge: createChallenge_,
   register,
+  registrationAllowed,
 }: {
   createChallenge: () => Promise<Challenge>;
   register: (opts: {
@@ -31,7 +27,14 @@ export const registerFlow = async <T>({
     identity: IIWebAuthnIdentity;
     challengeResult: { chars: string; challenge: Challenge };
   }) => Promise<RegisterResult<T>>;
-}): Promise<RegisterResult<T> | LoginFlowCanceled> => {
+  registrationAllowed: boolean;
+}): Promise<RegisterResult<T> | "canceled"> => {
+  if (!registrationAllowed) {
+    const result = await registerDisabled();
+    result satisfies LoginFlowCanceled;
+    return "canceled";
+  }
+
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
 
@@ -41,7 +44,7 @@ export const registerFlow = async <T>({
 
   const identity = await savePasskey();
   if (identity === "canceled") {
-    return cancel;
+    return "canceled";
   }
 
   const alias = await inferAlias({
@@ -71,7 +74,7 @@ export const registerFlow = async <T>({
 
   if ("tag" in result) {
     result.tag satisfies "canceled";
-    return result;
+    return "canceled";
   }
 
   if (result.kind === "loginSuccess") {
@@ -82,52 +85,45 @@ export const registerFlow = async <T>({
   return result;
 };
 
-/** Concrete implementation of the registration flow */
-export const register = async ({
+export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
+  typeof registerFlow<T>
+>[0];
+
+export const getRegisterFlowOpts = ({
   connection,
 }: {
   connection: Connection;
-}): Promise<LoginFlowResult> => {
-  try {
-    const result = await registerFlow<AuthenticatedConnection>({
-      createChallenge: () => connection.createChallenge(),
-      register: async ({
-        identity,
-        alias,
-        challengeResult: {
-          chars,
-          challenge: { challenge_key: key },
-        },
-      }) => {
-        const tempIdentity = await ECDSAKeyIdentity.generate({
-          extractable: false,
-        });
-        const result = await connection.register({
-          identity,
-          tempIdentity,
-          alias,
-          challengeResult: { chars, key },
-        });
-
-        return result;
-      },
+}): RegisterFlowOpts => ({
+  /** Check that the current origin is not the explicit canister id or a raw url.
+   *  Explanation why we need to do this:
+   *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
+   **/
+  registrationAllowed:
+    !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
+      window.origin
+    ),
+  createChallenge: () => connection.createChallenge(),
+  register: async ({
+    identity,
+    alias,
+    challengeResult: {
+      chars,
+      challenge: { challenge_key: key },
+    },
+  }) => {
+    const tempIdentity = await ECDSAKeyIdentity.generate({
+      extractable: false,
+    });
+    const result = await connection.register({
+      identity,
+      tempIdentity,
+      alias,
+      challengeResult: { chars, key },
     });
 
-    if ("tag" in result) {
-      result satisfies { tag: "canceled" };
-      return result;
-    }
-
-    return apiResultToLoginFlowResult(result);
-  } catch (e) {
-    return {
-      tag: "err",
-      title: "Failed to create Internet Identity",
-      message: "An error occurred during Internet Identity creation.",
-      detail: unknownToString(e, "unknown error"),
-    };
-  }
-};
+    return result;
+  },
+});
 
 type AuthenticatorType = ReturnType<
   IIWebAuthnIdentity["getAuthenticatorAttachment"]

@@ -44,7 +44,7 @@ import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
-import { isCancel } from "./webAuthnErrorUtils";
+import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -84,14 +84,14 @@ export type LoginResult<T = AuthenticatedConnection> =
   | ApiError
   | NoSeedPhrase
   | SeedPhraseFail
-  | CancelOrTimeout;
+  | WebAuthnFailed;
 export type RegisterResult<T = AuthenticatedConnection> =
   | LoginSuccess<T>
   | AuthFail
   | ApiError
   | RegisterNoSpace
   | BadChallenge
-  | CancelOrTimeout;
+  | WebAuthnFailed;
 
 type LoginSuccess<T = AuthenticatedConnection> = {
   kind: "loginSuccess";
@@ -106,7 +106,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type NoSeedPhrase = { kind: "noSeedPhrase" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
-type CancelOrTimeout = { kind: "cancelOrTimeout" };
+type WebAuthnFailed = { kind: "webAuthnFailed" };
 
 export type { ChallengeResult } from "$generated/internet_identity_types";
 
@@ -254,8 +254,8 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
-      if (isCancel(e)) {
-        return { kind: "cancelOrTimeout" };
+      if (isWebAuthnCancel(e)) {
+        return { kind: "webAuthnFailed" };
       }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };

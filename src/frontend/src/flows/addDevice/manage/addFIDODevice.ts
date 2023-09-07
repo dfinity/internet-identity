@@ -11,8 +11,8 @@ import { setAnchorUsed } from "$src/utils/userNumber";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
-  isCancel,
-  isDuplicateDeviceError,
+  isWebAuthnCancel,
+  isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "@dfinity/identity";
 import { addDeviceSuccess } from "./addDeviceSuccess";
@@ -47,9 +47,9 @@ export const addFIDODevice = async (
       publicKey: creationOptions(devices),
     });
   } catch (error: unknown) {
-    if (isDuplicateDeviceError(error)) {
+    if (isWebAuthnDuplicateDevice(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Back to manage" });
-    } else if (isCancel(error)) {
+    } else if (isWebAuthnCancel(error)) {
       await displayCancelError({ primaryButton: "Back to manage" });
     } else {
       await displayFailedToAddDevice(

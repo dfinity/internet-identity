@@ -99,7 +99,7 @@ export const apiResultToLoginFlowResult = <T>(
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
       };
     }
-    case "cancelOrTimeout": {
+    case "webAuthnFailed": {
       const copy = webAuthnErrorCopy();
       return {
         tag: "err",

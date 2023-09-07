@@ -6,7 +6,10 @@ import { IIWebAuthnIdentity } from "$src/utils/iiConnection";
 import { mount, renderPage, TemplateElement } from "$src/utils/lit-html";
 import { unknownToString } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
-import { isCancel, webAuthnErrorCopy } from "$src/utils/webAuthnErrorUtils";
+import {
+  isWebAuthnCancel,
+  webAuthnErrorCopy,
+} from "$src/utils/webAuthnErrorUtils";
 import { html, TemplateResult } from "lit-html";
 import { registerStepper } from "./stepper";
 
@@ -102,7 +105,7 @@ export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error
 const errorMessage = (e: unknown): TemplateElement => {
-  if (isCancel(e)) {
+  if (isWebAuthnCancel(e)) {
     const copy = webAuthnErrorCopy();
     return html`<p class="t-paragraph">
       <strong class="t-strong">${copy.cancel_title}</strong>:
