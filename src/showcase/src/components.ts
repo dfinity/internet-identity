@@ -48,21 +48,39 @@ const mkToast = (): TemplateResult => {
 
 const choosePin = (): TemplateResult => {
   const submittedPin = new Chan("N/A");
+  const pinInputHidden_ = pinInput({
+    verify: (pin: string) => ({ ok: true, value: pin }),
+    onSubmit: (pin) => submittedPin.send(pin),
+    secret: true,
+  });
   const pinInput_ = pinInput({
     verify: (pin: string) => ({ ok: true, value: pin }),
     onSubmit: (pin) => submittedPin.send(pin),
   });
 
   return html` <div class="c-card" style="max-width: 30em; margin: 40px auto;">
-    ${pinInput_.template}
+    <h2 class="t-title t-title--sub">Regular & Secret PIN inputs</h2>
+    <div class="c-input--stack">${pinInput_.template}</div>
+    <div class="c-input--stack">${pinInputHidden_.template}</div>
 
     <output class="c-input c-input--readonly c-input--stack c-input--fullwidth">
       Submitted:
       <strong class="t-strong">${asyncReplace(submittedPin)}</strong>
     </output>
-    <button @click=${() => pinInput_.submit()} class="c-button c-input--stack">
-      submit
-    </button>
+    <div class="c-button-group">
+      <button
+        @click=${() => pinInput_.submit()}
+        class="c-button c-input--stack"
+      >
+        submit regular
+      </button>
+      <button
+        @click=${() => pinInputHidden_.submit()}
+        class="c-button c-input--stack"
+      >
+        submit hidden
+      </button>
+    </div>
   </div>`;
 };
 

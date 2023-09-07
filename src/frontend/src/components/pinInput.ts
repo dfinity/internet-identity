@@ -13,6 +13,8 @@ export const pinInput = <T>({
   pinLength = 6,
   onSubmit: onSubmit_,
   verify,
+  secret = false,
+  focus = false,
 }: {
   pinLength?: number;
   onSubmit: (
@@ -21,6 +23,8 @@ export const pinInput = <T>({
   verify: (
     pin: string
   ) => Promise<Result<T>> | Result<T> /* Used to verify & transform the pin */;
+  secret?: boolean;
+  focus?: boolean;
 }): {
   template: TemplateResult;
   submit: () => void;
@@ -112,15 +116,23 @@ export const pinInput = <T>({
       >
         ${Array.from(
           { length: pinLength },
+          /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
+           * type="password", otherwise the browser tries to save one char as a password */
           (_, _ix) => html`
             <li class="c-list--pin-char c-input--anchor">
               <label class="c-input--anchor__wrap">
                 <input
+                  ?autofocus=${focus}
                   autocomplete="off"
-                  type="tel"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  type="text"
+                  inputmode="tel"
                   size="1"
                   maxlength="1"
-                  class="c-input c-input--pin c-input--pin__error"
+                  class="c-input c-input--pin c-input--pin__error ${secret
+                    ? "c-input--pin__secret"
+                    : undefined}"
                   @input=${(e: InputEvent) => withInputElement(e, onInput_)}
                   @paste=${(e: ClipboardEvent) => withInputElement(e, onPaste_)}
                   @focus=${(e: Event) =>
