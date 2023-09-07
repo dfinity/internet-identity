@@ -1,4 +1,3 @@
-import crypto from "@trust/webcrypto";
 import { TextEncoder } from "util";
 import { vi } from "vitest";
 
@@ -46,7 +45,8 @@ declare global {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-global.crypto.subtle = crypto.subtle;
+// eslint-disable-next-line
+global.crypto = require("crypto").webcrypto;
+// eslint-disable-next-line
+global.CryptoKey = require("crypto").webcrypto.CryptoKey;
 global.TextEncoder = TextEncoder;
