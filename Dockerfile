@@ -47,6 +47,7 @@ COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
 COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
+COPY src/canister_sig_util/Cargo.toml src/canister_sig_util/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
 COPY ./scripts/build ./scripts/build
 RUN mkdir -p src/internet_identity/src \
@@ -57,6 +58,8 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/archive/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
+    && mkdir -p src/canister_sig_util/src \
+    && touch src/canister_sig_util/src/lib.rs \
     && ./scripts/build --only-dependencies --internet-identity --archive \
     && rm -rf src
 

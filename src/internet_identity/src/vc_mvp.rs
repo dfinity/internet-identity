@@ -2,16 +2,16 @@ use crate::assets::CertifiedAssets;
 use crate::delegation::check_frontend_length;
 use crate::{delegation, hash, state, update_root_hash, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
+use canister_sig_util::{
+    der_encoded_canister_sig_pk, did_for_principal, vc_jwt_to_jws, vc_signing_input,
+    vc_signing_input_hash,
+};
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
-use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
-use identity_jose::jws::{CompactJwsEncoder, JwsAlgorithm, JwsHeader};
-use identity_jose::jwu::encode_b64;
-use std::ops::DerefMut;
 
 use internet_identity::signature_map::SignatureMap;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -23,7 +23,6 @@ use internet_identity_interface::internet_identity::types::{
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 // The expiration used for signatures
 #[allow(clippy::identity_op)]
@@ -46,7 +45,8 @@ pub async fn prepare_id_alias(
 
     let id_alias_principal = get_id_alias_principal(identity_number, &dapps);
     let seed = calculate_id_alias_seed(identity_number, &dapps);
-    let canister_sig_pk_der = delegation::der_encode_canister_sig_key(seed.to_vec());
+    let canister_id = ic_cdk::id();
+    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
 
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
@@ -57,9 +57,10 @@ pub async fn prepare_id_alias(
         id_dapp: delegation::get_principal(identity_number, dapps.issuer.clone()),
     };
 
-    let (rp_id_alias_jwt, rp_msg_hash) = id_alias_jwt_and_msg_hash(&rp_tuple, &canister_sig_pk_der);
+    let (rp_id_alias_jwt, rp_msg_hash) =
+        id_alias_jwt_and_msg_hash(&rp_tuple, &canister_sig_pk_der, canister_id);
     let (issuer_id_alias_jwt, issuer_msg_hash) =
-        id_alias_jwt_and_msg_hash(&issuer_tuple, &canister_sig_pk_der);
+        id_alias_jwt_and_msg_hash(&issuer_tuple, &canister_sig_pk_der, canister_id);
 
     state::signature_map_mut(|sigs| {
         add_signature(sigs, rp_msg_hash, seed);
@@ -76,10 +77,11 @@ pub async fn prepare_id_alias(
 fn id_alias_jwt_and_msg_hash(
     alias_tuple: &AliasTuple,
     canister_sig_pk_der: &[u8],
+    canister_id: Principal,
 ) -> (String, Hash) {
     let credential_jwt = prepare_id_alias_jwt(alias_tuple);
-    let msg_hash =
-        id_alias_signing_input_hash(&jwt_signing_input(&credential_jwt, canister_sig_pk_der));
+    let signing_input = vc_signing_input(&credential_jwt, canister_sig_pk_der, canister_id);
+    let msg_hash = vc_signing_input_hash(&signing_input);
     (credential_jwt, msg_hash)
 }
 
@@ -97,28 +99,34 @@ pub fn get_id_alias(
         let seed = calculate_id_alias_seed(identity_number, &dapps);
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
-        let canister_sig_pk_der =
-            ByteBuf::from(delegation::der_encode_canister_sig_key(seed.to_vec()));
+        let canister_id = ic_cdk::id();
+        let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
 
-        let encoder = jws_encoder(rp_id_alias_jwt, canister_sig_pk_der.as_ref());
-        let msg_hash = id_alias_signing_input_hash(encoder.signing_input());
+        let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk_der, canister_id);
+        let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let rp_sig = if let Some(sig) = maybe_sig {
             sig
         } else {
             return GetIdAliasResponse::NoSuchCredentials("rp_sig not found".to_string());
         };
-        let rp_jws = encoder.into_jws(&rp_sig);
+        let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk_der, &rp_sig, canister_id);
 
-        let encoder = jws_encoder(issuer_id_alias_jwt, canister_sig_pk_der.as_ref());
-        let msg_hash = id_alias_signing_input_hash(encoder.signing_input());
+        let signing_input =
+            vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk_der, canister_id);
+        let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let issuer_sig = if let Some(sig) = maybe_sig {
             sig
         } else {
             return GetIdAliasResponse::NoSuchCredentials("issuer_sig not found".to_string());
         };
-        let issuer_jws = encoder.into_jws(&issuer_sig);
+        let issuer_jws = vc_jwt_to_jws(
+            issuer_id_alias_jwt,
+            &canister_sig_pk_der,
+            &issuer_sig,
+            canister_id,
+        );
 
         GetIdAliasResponse::Ok(IdAliasCredentials {
             rp_id_alias_credential: SignedIdAlias {
@@ -218,16 +226,10 @@ fn calculate_id_alias_seed(identity_number: AnchorNumber, dapps: &InvolvedDapps)
     hash::hash_bytes(blob)
 }
 
-fn did_for_principal(principal: &Principal) -> String {
-    let mut did = String::from("did:web:");
-    did.push_str(&principal.to_text());
-    did
-}
-
 fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
-        "id": did_for_principal(&alias_tuple.id_dapp),
-        "has_id_alias": did_for_principal(&alias_tuple.id_alias),
+        "id": did_for_principal(alias_tuple.id_dapp),
+        "has_id_alias": did_for_principal(alias_tuple.id_alias),
     }))
     .expect("internal: failed building id_alias subject");
 
@@ -248,46 +250,6 @@ fn prepare_id_alias_jwt(alias_tuple: &AliasTuple) -> String {
         .expect("internal: JWT serialization failure")
 }
 
-fn canister_sig_pk_jwk(canister_sig_pk_der: &[u8]) -> Jwk {
-    let mut cspk_jwk = Jwk::new(JwkType::Oct);
-    cspk_jwk.set_alg("IcCs");
-    cspk_jwk
-        .set_params(JwkParams::Oct(JwkParamsOct {
-            k: encode_b64(canister_sig_pk_der),
-        }))
-        .expect("internal: failed setting JwkParams");
-    cspk_jwk
-}
-
-fn jws_encoder<'a>(credential_jwt: &'a str, canister_sig_pk_der: &[u8]) -> CompactJwsEncoder<'a> {
-    let mut header: JwsHeader = JwsHeader::new();
-    header.set_alg(JwsAlgorithm::IcCs);
-    let kid = "did:ic:ii-canister";
-    header.set_kid(kid);
-    header
-        .deref_mut()
-        .set_jwk(canister_sig_pk_jwk(canister_sig_pk_der));
-
-    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
-        .expect("internal error: JWS encoder failed");
-    encoder
-}
-
-fn jwt_signing_input(credential_jwt: &str, canister_sig_pk_der: &[u8]) -> Vec<u8> {
-    let encoder = jws_encoder(credential_jwt, canister_sig_pk_der);
-    Vec::from(encoder.signing_input())
-}
-
-fn id_alias_signing_input_hash(signing_input: &[u8]) -> Hash {
-    let sep = b"iccs_verifiable_credential";
-    let mut hasher = Sha256::new();
-    let buf = [sep.len() as u8];
-    hasher.update(buf);
-    hasher.update(sep);
-    hasher.update(signing_input);
-    hasher.finalize().into()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,20 +263,20 @@ mod tests {
             id_alias: principal_1(),
             id_dapp: principal_2(),
         };
+        let canister_id = principal_1();
         let canister_sig_pk_der = vec![5, 6, 7, 8];
         let prepared_jwt = prepare_id_alias_jwt(&alias_tuple);
-        let signing_input_1 = jwt_signing_input(&prepared_jwt, &canister_sig_pk_der);
-        let input_hash_1 = id_alias_signing_input_hash(&signing_input_1);
-        let encoder = jws_encoder(&prepared_jwt, &canister_sig_pk_der);
+        let signing_input_1 = vc_signing_input(&prepared_jwt, &canister_sig_pk_der, canister_id);
+        let input_hash_1 = vc_signing_input_hash(&signing_input_1);
         let sig = vec![1, 2, 3, 4];
-        let jws_bytes = encoder.into_jws(&sig);
+        let jws_bytes = vc_jwt_to_jws(&prepared_jwt, &canister_sig_pk_der, &sig, canister_id);
 
         let decoder: Decoder = Decoder::new();
         let jws = decoder
             .decode_compact_serialization(jws_bytes.as_ref(), None)
             .expect("Failure decoding JWS credential");
         let signing_input_2 = jws.signing_input();
-        let input_hash_2 = id_alias_signing_input_hash(signing_input_2);
+        let input_hash_2 = vc_signing_input_hash(signing_input_2);
         assert_eq!(signing_input_1, signing_input_2);
         assert_eq!(input_hash_1, input_hash_2);
     }

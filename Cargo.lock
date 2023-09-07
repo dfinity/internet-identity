@@ -262,6 +262,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "canister_sig_util"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "canister_tests",
+ "ic-cdk",
+ "ic-certified-map",
+ "ic-test-state-machine-client",
+ "identity_jose",
+ "lazy_static",
+ "sha2 0.10.7",
+]
+
+[[package]]
 name = "canister_tests"
 version = "0.1.0"
 dependencies = [
@@ -1221,6 +1235,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.21.3",
  "candid",
+ "canister_sig_util",
  "canister_tests",
  "captcha",
  "getrandom",

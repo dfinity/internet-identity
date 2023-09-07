@@ -1,21 +1,20 @@
 use candid::{candid_method, Principal};
+use canister_sig_util::{
+    der_encoded_canister_sig_pk, did_for_principal, hash_bytes, vc_jwt_to_jws, vc_signing_input,
+    vc_signing_input_hash,
+};
 use ic_cdk_macros::{query, update};
 use ic_certified_map::Hash;
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
-use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
-use identity_jose::jws::{CompactJwsEncoder, JwsAlgorithm, JwsHeader};
-use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo, Icrc21ConsentMessageRequest,
     Icrc21ConsentMessageResponse, IssuedCredentialData, PrepareCredentialRequest,
     PrepareCredentialResponse, PreparedCredentialData,
 };
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::fmt::Error;
-use std::ops::{Add, DerefMut};
 
 #[update]
 #[candid_method]
@@ -23,15 +22,16 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     if let Err(err) = verify_prepare_credential_request(&req) {
         return PrepareCredentialResponse::Err(err.to_string());
     }
-    let user = req.signed_id_alias.id_dapp;
+    let user = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&user);
-    let canister_sig_pk_der = der_encoded_canister_sig_pk(&seed);
+    let canister_id = ic_cdk::id();
+    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
     let credential = new_credential(&user);
     let credential_jwt = credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure");
-    let encoder = jws_encoder(&credential_jwt, &canister_sig_pk_der);
-    let _msg_hash = vc_signing_input_hash(encoder.signing_input());
+    let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk_der, canister_id);
+    let _msg_hash = vc_signing_input_hash(&signing_input);
     // TODO: add the (seed, msg_hash) to the canister sigs in certified data.
     PrepareCredentialResponse::Ok(PreparedCredentialData {
         vc_jwt: credential_jwt,
@@ -47,10 +47,10 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     // TODO: retrieve the actual signature and add it to the JWS.
     let user = req.signed_id_alias.id_dapp;
     let seed = calculate_seed(&user);
-    let canister_sig_pk_der = der_encoded_canister_sig_pk(&seed);
-    let encoder = jws_encoder(&req.vc_jwt, &canister_sig_pk_der);
+    let canister_id = ic_cdk::id();
+    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
     let sig = b"dummy sig";
-    let vc_jws = encoder.into_jws(sig);
+    let vc_jws = vc_jwt_to_jws(&req.vc_jwt, &canister_sig_pk_der, sig, canister_id);
     GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
 }
 
@@ -65,13 +65,6 @@ async fn consent_message(req: Icrc21ConsentMessageRequest) -> Icrc21ConsentMessa
 
 fn main() {}
 
-// TODO: move the helpers to an util-crate.
-pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(value.as_ref());
-    hasher.finalize().into()
-}
-
 fn calculate_seed(principal: &Principal) -> Hash {
     let dummy_salt = [5u8; 32];
 
@@ -85,76 +78,9 @@ fn calculate_seed(principal: &Principal) -> Hash {
     hash_bytes(bytes)
 }
 
-fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
-    let sep = b"iccs_verifiable_credential";
-    let mut hasher = Sha256::new();
-    let buf = [sep.len() as u8];
-    hasher.update(buf);
-    hasher.update(sep);
-    hasher.update(signing_input);
-    hasher.finalize().into()
-}
-
-pub fn der_encoded_canister_sig_pk(seed: &[u8]) -> Vec<u8> {
-    let my_canister_id: Vec<u8> = ic_cdk::id().as_ref().to_vec();
-
-    let mut bitstring: Vec<u8> = vec![];
-    bitstring.push(my_canister_id.len() as u8);
-    bitstring.extend(my_canister_id);
-    bitstring.extend(seed);
-
-    let mut der: Vec<u8> = vec![];
-    // sequence of length 17 + the bit string length
-    der.push(0x30);
-    der.push(17 + bitstring.len() as u8);
-    der.extend(vec![
-        // sequence of length 12 for the OID
-        0x30, 0x0C, // OID 1.3.6.1.4.1.56387.1.2
-        0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
-    ]);
-    // BIT string of given length
-    der.push(0x03);
-    der.push(1 + bitstring.len() as u8);
-    der.push(0x00);
-    der.extend(bitstring);
-    der
-}
-
-// Per https://datatracker.ietf.org/doc/html/rfc7518#section-6.4,
-// JwkParamsOct are for symmetric keys or another key whose value is a single octet sequence.
-fn canister_sig_pk_jwk(canister_sig_pk_der: &[u8]) -> Jwk {
-    let mut cspk_jwk = Jwk::new(JwkType::Oct);
-    cspk_jwk.set_alg("IcCs");
-    cspk_jwk
-        .set_params(JwkParams::Oct(JwkParamsOct {
-            k: encode_b64(canister_sig_pk_der),
-        }))
-        .expect("internal: failed setting JwkParams");
-    cspk_jwk
-}
-
-fn jws_encoder<'a>(credential_jwt: &'a str, canister_sig_pk_der: &[u8]) -> CompactJwsEncoder<'a> {
-    let mut header: JwsHeader = JwsHeader::new();
-    header.set_alg(JwsAlgorithm::IcCs);
-    let kid = did_from_principal(&ic_cdk::id());
-    header.set_kid(kid);
-    header
-        .deref_mut()
-        .set_jwk(canister_sig_pk_jwk(canister_sig_pk_der));
-
-    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
-        .expect("internal error: JWS encoder failed");
-    encoder
-}
-
-fn did_from_principal(principal: &Principal) -> String {
-    let prefix = String::from("did:icp:");
-    prefix.add(&*principal.to_string())
-}
-
 fn new_credential(principal: &Principal) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
-      "id": did_from_principal(principal),
+      "id": did_for_principal(principal.clone()),
       "name": "Alice",
       "degree": {
         "type": "BachelorDegree",

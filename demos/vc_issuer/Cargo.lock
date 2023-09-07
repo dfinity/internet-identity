@@ -214,6 +214,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "canister_sig_util"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "ic-cdk",
+ "ic-certified-map",
+ "identity_jose",
+ "sha2 0.10.7",
+]
+
+[[package]]
 name = "canister_tests"
 version = "0.1.0"
 dependencies = [
@@ -1906,6 +1917,7 @@ name = "vc_issuer"
 version = "0.1.0"
 dependencies = [
  "candid",
+ "canister_sig_util",
  "canister_tests",
  "ic-cdk",
  "ic-cdk-macros",
