@@ -30,7 +30,6 @@
     "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
   },
   "devDependencies": {
-    "@trust/webcrypto": "^0.9.2",
     "@types/html-minifier-terser": "^7.0.0",
     "@types/selenium-standalone": "^7.0.1",
     "@types/ua-parser-js": "^0.7.36",
@@ -63,7 +62,8 @@
     "process": "^0.11.10",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
-    "ua-parser-js": "^1.0.35"
+    "ua-parser-js": "^1.0.35",
+    "zod": "^3.22.2"
   },
   "engines": {
     "npm": ">=9.0.0 <10.0.0",
