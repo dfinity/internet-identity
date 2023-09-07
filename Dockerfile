@@ -57,6 +57,8 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/archive/src/lib.rs \
     && mkdir -p src/canister_tests/src \
     && touch src/canister_tests/src/lib.rs \
+    && mkdir -p src/canister_sig_util/src \
+    && touch src/canister_sig_util/src/lib.rs \
     && ./scripts/build --only-dependencies --internet-identity --archive \
     && rm -rf src
 
