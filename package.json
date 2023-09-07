@@ -58,6 +58,7 @@
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
+    "idb-keyval": "^6.2.1",
     "lit-html": "^2.7.2",
     "process": "^0.11.10",
     "qr-creator": "^1.0.0",
