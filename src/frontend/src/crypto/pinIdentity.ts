@@ -2,7 +2,7 @@ import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { z } from "zod";
 
-/** This modules defines the crypto operations for the browser storage Identity.
+/** This module defines the crypto operations for the browser storage Identity.
  *
  * The identity is an ECDSA keypair. The keypair is meant to be indirectly stored in browser storage (IndexedDB).
  * Before being stored, the keypair in encrypted twice (symmetrically).
@@ -51,7 +51,7 @@ export const constructPinIdentity = async ({
   const browserIv = window.crypto.getRandomValues(new Uint8Array(96));
   const pinIv = window.crypto.getRandomValues(new Uint8Array(96));
   const pinSalt = window.crypto.getRandomValues(new Uint8Array(96));
-  const pinPbkdfIters: number = 10000;
+  const pinPbkdfIters: number = 100000;
   const keypairNamedCurve: NistEc = "P-256";
 
   const keypair = await generateKeyPair({ namedCurve: keypairNamedCurve });
