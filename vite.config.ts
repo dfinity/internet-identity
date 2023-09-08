@@ -38,6 +38,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       alias: aliasConfig,
     },
     build: {
+      assetsInlineLimit: 0,
       outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
