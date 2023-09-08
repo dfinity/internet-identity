@@ -31,6 +31,9 @@ import {
   resetPhraseInfoPage,
   unprotectDeviceInfoPage,
 } from "$src/flows/manage/deviceSettings";
+import { confirmPinPage } from "$src/flows/pin/confirmPin";
+import { setPinPage } from "$src/flows/pin/setPin";
+import { usePinPage } from "$src/flows/pin/usePin";
 import {
   checkIndices,
   confirmSeedPhrasePage,
@@ -322,6 +325,27 @@ export const iiPages: Record<string, () => void> = {
       stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
+    }),
+  setPin: () =>
+    setPinPage({
+      i18n,
+      onContinue: (pin) => console.log("PIN:", pin),
+      cancel: () => console.log("cancel"),
+    }),
+  confirmPin: () =>
+    confirmPinPage({
+      i18n,
+      onContinue: () => console.log("PIN confirmed"),
+      expectedPin: "123456",
+      cancel: () => console.log("cancel"),
+    }),
+  usePin: () =>
+    usePinPage({
+      i18n,
+      onContinue: (pin) =>
+        toast.info(html`PIN: <strong class="t-strong">${pin}</strong>`),
+      onUsePasskey: () => toast.info("Requested to use passkey"),
+      cancel: () => toast.info("Canceled"),
     }),
   displayManage: () => {
     displayManagePage({
