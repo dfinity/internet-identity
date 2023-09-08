@@ -1,4 +1,5 @@
 import { Challenge } from "$generated/internet_identity_types";
+import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
@@ -70,6 +71,7 @@ export const registerFlow = async <T>({
 
       return result;
     },
+    stepper: registerStepper({ current: "captcha" }),
   });
 
   if ("tag" in result) {

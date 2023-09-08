@@ -1,7 +1,6 @@
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { toast } from "$src/components/toast";
 import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
-import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
 import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge, i18n, manageTemplates } from "./showcase";
 
@@ -72,23 +71,6 @@ export const iiFlows: Record<string, () => void> = {
       </button>
     `);
   },
-  captcha: () => {
-    promptCaptchaPage({
-      cancel: () => console.log("canceled"),
-      requestChallenge: () =>
-        new Promise((resolve) => setTimeout(resolve, 1000)).then(
-          () => dummyChallenge
-        ),
-      verifyChallengeChars: (cr) =>
-        new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
-          cr.chars === "8wJ6Q" ? "yes" : badChallenge
-        ),
-      onContinue: () => console.log("Done"),
-      i18n,
-      focus: false,
-    });
-  },
-
   register: async () => {
     const result = await registerFlow<null>(registerFlowOpts);
 

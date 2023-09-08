@@ -44,6 +44,7 @@ import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
 import { promptCaptchaPage } from "$src/flows/register/captcha";
 import { displayUserNumberPage } from "$src/flows/register/finish";
 import { savePasskeyPage } from "$src/flows/register/passkey";
+import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
@@ -305,6 +306,7 @@ export const iiPages: Record<string, () => void> = {
         new Promise(() => {
           /* noop */
         }),
+      stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
     }),
@@ -317,6 +319,7 @@ export const iiPages: Record<string, () => void> = {
         new Promise(() => {
           /* noop */
         }),
+      stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
     }),
