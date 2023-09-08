@@ -48,14 +48,21 @@ export const constructPinIdentity = async ({
   identity: SignIdentity;
   pinIdentityMaterial: PinIdentityMaterial;
 }> => {
-  const browserIv = window.crypto.getRandomValues(new Uint8Array(96));
-  const pinIv = window.crypto.getRandomValues(new Uint8Array(96));
-  const pinSalt = window.crypto.getRandomValues(new Uint8Array(96));
-  const pinPbkdfIters: number = 100000;
+  // For initialization vectors, recommendation is 96 bit = 12 bytes
+  const browserIv = window.crypto.getRandomValues(new Uint8Array(12));
+  const pinIv = window.crypto.getRandomValues(new Uint8Array(12));
+  // For salt, recommendation is 128 bit = 16 bytes
+  const pinSalt = window.crypto.getRandomValues(new Uint8Array(16));
+  // Recommended iterations is 600k
+  // https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2
+  const pinPbkdfIters: number = 600_1000;
   const keypairNamedCurve: NistEc = "P-256";
 
-  const keypair = await generateKeyPair({ namedCurve: keypairNamedCurve });
-  const secretKey = keypair.getKeyPair().privateKey;
+  /* The (extractable, for storage) key pair */
+  const keypair_ = await generateKeyPair({ namedCurve: keypairNamedCurve });
+  const secretKey = keypair_.getKeyPair().privateKey;
+
+  // We re-create a non-extractable
 
   const browserKey = await generateBrowserKey();
   const encryptedOnce = await crypto.subtle.wrapKey(
@@ -64,6 +71,22 @@ export const constructPinIdentity = async ({
     browserKey /* the wrapping key */,
     { name: "AES-GCM", iv: browserIv }
   );
+
+  /* Instead of using the extractable key pair as identity, we re-create it
+   * from the wrap key but this time NON-extractable */
+  const keypairPrivate = await crypto.subtle.unwrapKey(
+    "pkcs8",
+    encryptedOnce,
+    browserKey,
+    { name: "AES-GCM", iv: browserIv },
+    { name: "ECDSA", namedCurve: keypairNamedCurve },
+    false /* non-extractable */,
+    ["sign"] /* key usages */
+  );
+  const keypair = await ECDSAKeyIdentity.fromKeyPair({
+    publicKey: keypair_.getKeyPair().publicKey,
+    privateKey: keypairPrivate,
+  });
 
   const pinKey = await derivePinKey({
     pin,
@@ -190,7 +213,7 @@ export const derivePinKey = async ({
     },
     passwordKeyMaterial,
     AesKeyGenParams,
-    true,
+    false /* non-extractable, only used to encrypt/decrypt */,
     [
       "encrypt",
       "decrypt",

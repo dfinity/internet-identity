@@ -16,5 +16,5 @@ describe("pin identity", () => {
     expect(new Uint8Array(reconstructed.getPublicKey().toDer())).toStrictEqual(
       new Uint8Array(identity.getPublicKey().toDer())
     );
-  });
+  }, 30000 /* large timeout (in millis) because the crypto ops are heavy */);
 });
