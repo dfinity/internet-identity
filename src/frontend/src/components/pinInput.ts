@@ -132,7 +132,6 @@ export const pinInput = <T>({
                       ? mount((e) => {
                           if (e instanceof HTMLElement) {
                             e.focus();
-                            console.log(e);
                           }
                         })
                       : undefined
