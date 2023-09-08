@@ -36,7 +36,7 @@ import { promptUserNumber } from "./promptUserNumber";
 
 import copyJson from "./authenticateBox.json";
 
-/** Template used for rendering specific authentication screens. See `authnPages` below
+/** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
   firstTime: {
@@ -66,10 +66,7 @@ export const authenticateBox = async ({
       i18n,
       templates,
       addDevice: (userNumber) => asNewDevice(connection, userNumber),
-      login: (userNumber) =>
-        handleLogin({
-          login: () => connection.login(userNumber),
-        }),
+      login: (userNumber) => login({ connection, userNumber }),
       recover: () => useRecovery(connection),
       registerFlowOpts: getRegisterFlowOpts({ connection }),
     });
@@ -87,7 +84,7 @@ export const authenticateBox = async ({
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBoxFlow = <T>({
+export const authenticateBoxFlow = async <T>({
   i18n,
   templates,
   addDevice,
@@ -101,54 +98,84 @@ export const authenticateBoxFlow = <T>({
   login: (userNumber: bigint) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
   recover: () => Promise<LoginFlowResult<T>>;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
-}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> =>
-  new Promise((resolve) => {
-    const pages = authnPages(i18n, {
-      ...templates,
-      addDevice: (userNumber) => addDevice(userNumber),
-      onSubmit: async (userNumber) => {
-        const result = await withLoader(() => login(userNumber));
-        resolve({
-          newAnchor: false,
-          ...result,
-        });
-      },
-      register: async () => {
-        const result = await registerFlow<T>(registerFlowOpts);
+}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
+  const pages = authnScreens(i18n, { ...templates });
 
-        if (result === "canceled") {
-          resolve({
-            newAnchor: true,
-            tag: "canceled",
-          });
-          return;
-        }
+  // The registration flow for a new identity
+  const doRegister = async (): Promise<
+    LoginFlowResult<T> & { newAnchor: boolean }
+  > => {
+    const result2 = await registerFlow<T>(registerFlowOpts);
 
-        resolve({
-          newAnchor: true,
-          ...apiResultToLoginFlowResult<T>(result),
-        });
-      },
-      recover: async (_userNumber) => {
-        resolve({
-          newAnchor: false,
-          ...(await recover()),
-        });
-      },
-    });
-
-    // If there _are_ some anchors, then we show the "pick" screen, otherwise
-    // we assume a new user and show the "firstTime" screen.
-    const anchors = getAnchors();
-    if (isNonEmptyArray(anchors)) {
-      pages.pick({
-        anchors: anchors,
-        moreOptions: () => pages.useExisting(),
-      });
-    } else {
-      pages.firstTime({ useExisting: () => pages.useExisting() });
+    if (result2 === "canceled") {
+      return {
+        newAnchor: true,
+        tag: "canceled",
+      } as const;
     }
-  });
+
+    return {
+      newAnchor: true,
+      ...apiResultToLoginFlowResult<T>(result2),
+    };
+  };
+
+  // Prompt for an identity number
+  const doPrompt = async (): Promise<
+    LoginFlowResult<T> & { newAnchor: boolean }
+  > => {
+    const result = await pages.useExisting();
+    if (result.tag === "submit") {
+      const result2 = await withLoader(() => login(result.userNumber));
+      return { newAnchor: false, ...result2 };
+    }
+
+    if (result.tag === "add_device") {
+      const _ = await addDevice(result.userNumber);
+      // XXX: we don't currently do anything with the result from adding a device and
+      // we let the flow hang.
+      const hang = await new Promise<never>((_) => {
+        /* hang forever */
+      });
+      return hang;
+    }
+
+    if (result.tag === "register") {
+      return await doRegister();
+    }
+
+    result satisfies { tag: "recover" };
+    const result2 = await recover();
+    return {
+      newAnchor: false,
+      ...result2,
+    };
+  };
+
+  // If there _are_ some anchors, then we show the "pick" screen, otherwise
+  // we assume a new user and show the "firstTime" screen.
+  const anchors = getAnchors();
+  if (isNonEmptyArray(anchors)) {
+    const result = await pages.pick({ anchors });
+
+    if (result.tag === "pick") {
+      const result1 = await withLoader(() => login(result.userNumber));
+      return { newAnchor: false, ...result1 };
+    }
+
+    result satisfies { tag: "more_options" };
+    return await doPrompt();
+  } else {
+    const result = await pages.firstTime();
+
+    if (result.tag === "register") {
+      return await doRegister();
+    }
+
+    result satisfies { tag: "use_existing" };
+    return await doPrompt();
+  }
+};
 
 export const handleLoginFlowResult = async <T>(
   result: LoginFlowResult<T>
@@ -174,15 +201,7 @@ export const handleLoginFlowResult = async <T>(
 };
 
 /** The templates for the authentication pages */
-export const authnTemplates = (
-  i18n: I18n,
-  props: {
-    register: () => void;
-    onSubmit: (anchor: bigint) => void;
-    addDevice: (anchor?: bigint) => void;
-    recover: (anchor?: bigint) => void;
-  } & AuthnTemplates
-) => {
+export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
   const copy = i18n.i18n(copyJson);
 
   const marketingBlocks = [
@@ -219,12 +238,15 @@ export const authnTemplates = (
   ];
 
   return {
-    firstTime: (firstTimeProps: { useExisting: () => void }) => {
+    firstTime: (firstTimeProps: {
+      useExisting: () => void;
+      register: () => void;
+    }) => {
       return html`${props.firstTime.slot}
         <div class="l-stack">
           <button
             type="button"
-            @click=${() => props.register()}
+            @click=${() => firstTimeProps.register()}
             id="registerButton"
             class="c-button"
           >
@@ -254,8 +276,15 @@ export const authnTemplates = (
           )}
         </div> `;
     },
-    useExisting: () => {
-      const anchorInput = mkAnchorInput({ onSubmit: props.onSubmit });
+    useExisting: (useExistingProps: {
+      register: () => void;
+      onSubmit: (userNumber: bigint) => void;
+      recover: (userNumber?: bigint) => void;
+      addDevice: (userNumber?: bigint) => void;
+    }) => {
+      const anchorInput = mkAnchorInput({
+        onSubmit: useExistingProps.onSubmit,
+      });
       const withUserNumber = (f: (arg: bigint | undefined) => void) => {
         const value = withRef(
           anchorInput.userNumberInput,
@@ -278,7 +307,9 @@ export const authnTemplates = (
         </div>
         <button
           @click=${() =>
-            withUserNumber((userNumber) => props.addDevice(userNumber))}
+            withUserNumber((userNumber) =>
+              useExistingProps.addDevice(userNumber)
+            )}
           id="addNewDeviceButton"
           class="c-button c-button--textOnly"
         >
@@ -287,14 +318,16 @@ export const authnTemplates = (
 
         <ul class="c-link-group">
           <li>
-            <button @click=${() => props.register()} class="t-link">
+            <button @click=${() => useExistingProps.register()} class="t-link">
               Create New
             </button>
           </li>
           <li>
             <a
               @click="${() =>
-                withUserNumber((userNumber) => props.recover(userNumber))}"
+                withUserNumber((userNumber) =>
+                  useExistingProps.recover(userNumber)
+                )}"
               id="recoverButton"
               class="t-link"
               >Lost Access?</a
@@ -304,13 +337,14 @@ export const authnTemplates = (
     },
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
+      onSubmit: (userNumber: bigint) => void;
       moreOptions: () => void;
     }) => {
       return html`
         ${props.pick.slot}
         ${mkAnchorPicker({
           savedAnchors: pickProps.anchors,
-          pick: props.onSubmit,
+          pick: pickProps.onSubmit,
           moreOptions: pickProps.moreOptions,
         }).template}
       `;
@@ -318,27 +352,59 @@ export const authnTemplates = (
   };
 };
 
+export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
+  const templates = authnTemplates(i18n, props);
+
+  return {
+    firstTime: (opts: Parameters<typeof templates.firstTime>[0]) =>
+      page(templates.firstTime(opts)),
+    useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
+      page(templates.useExisting(opts)),
+    pick: (opts: Parameters<typeof templates.pick>[0]) =>
+      page(templates.pick(opts)),
+  };
+};
+
 /** The authentication pages, namely "firstTime" (for new users), "useExisting" (for users who
  * don't have saved anchors or who wish to use non-saved anchors) and "pick" (for users
  * picking a saved anchor) */
-export const authnPages = (
-  i18n: I18n,
-  props: {
-    register: () => void;
-    onSubmit: (anchor: bigint) => void;
-    addDevice: (anchor?: bigint) => void;
-    recover: (anchor?: bigint) => void;
-  } & AuthnTemplates
-) => {
-  const tpls = authnTemplates(i18n, props);
+export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
+  const pages = authnPages(i18n, props);
   return {
-    firstTime: (firstTimeProps: { useExisting: () => void }) =>
-      page(tpls.firstTime(firstTimeProps)),
-    useExisting: () => page(tpls.useExisting()),
-    pick: (pickProps: {
-      anchors: NonEmptyArray<bigint>;
-      moreOptions: () => void;
-    }) => page(tpls.pick(pickProps)),
+    firstTime: () =>
+      new Promise<{ tag: "use_existing" } | { tag: "register" }>((resolve) =>
+        pages.firstTime({
+          useExisting: () => resolve({ tag: "use_existing" }),
+          register: () => resolve({ tag: "register" }),
+        })
+      ),
+    useExisting: () =>
+      new Promise<
+        | { tag: "register" }
+        | { tag: "submit"; userNumber: bigint }
+        | { tag: "add_device"; userNumber?: bigint }
+        | { tag: "recover"; userNumber?: bigint }
+      >((resolve) =>
+        pages.useExisting({
+          register: () => resolve({ tag: "register" }),
+          onSubmit: (userNumber: bigint) =>
+            resolve({ tag: "submit", userNumber }),
+          addDevice: (userNumber?: bigint) =>
+            resolve({ tag: "add_device", userNumber }),
+          recover: (userNumber?: bigint) =>
+            resolve({ tag: "recover", userNumber }),
+        })
+      ),
+    pick: (pickProps: { anchors: NonEmptyArray<bigint> }) =>
+      new Promise<
+        { tag: "more_options" } | { tag: "pick"; userNumber: bigint }
+      >((resolve) =>
+        pages.pick({
+          ...pickProps,
+          onSubmit: (userNumber) => resolve({ tag: "pick", userNumber }),
+          moreOptions: () => resolve({ tag: "more_options" }),
+        })
+      ),
   };
 };
 
@@ -370,6 +436,17 @@ const page = (slot: TemplateResult) => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
 };
+
+const login = ({
+  connection,
+  userNumber,
+}: {
+  connection: Connection;
+  userNumber: bigint;
+}) =>
+  handleLogin({
+    login: () => connection.login(userNumber),
+  });
 
 // Register this device as a new device with the anchor
 const asNewDevice = async (

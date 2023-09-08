@@ -124,7 +124,10 @@ const authzTemplatesKnown = authnTemplateAuthorize({
 
 const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
 const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
-const authzKnown = authnPages(i18n, { ...authnCnfg, ...authzTemplatesKnown });
+const authzKnown = authnPages(i18n, {
+  ...authnCnfg,
+  ...authzTemplatesKnown,
+});
 const authzKnownAlt = authnPages(i18n, {
   ...authnCnfg,
   ...authzTemplatesKnownAlt,
@@ -152,37 +155,86 @@ export const iiPages: Record<string, () => void> = {
   // Authorize screens
 
   authorizeNew: () =>
-    authz.firstTime({ useExisting: () => console.log("Use existing") }),
+    authz.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewKnown: () =>
-    authzKnown.firstTime({ useExisting: () => console.log("Use existing") }),
+    authzKnown.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewAlt: () =>
-    authzAlt.firstTime({ useExisting: () => console.log("Use existing") }),
+    authzAlt.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewKnownAlt: () =>
-    authzKnownAlt.firstTime({ useExisting: () => console.log("Use existing") }),
-  authorizeUseExisting: () => authz.useExisting(),
-  authorizeUseExistingKnown: () => authzKnown.useExisting(),
-  authorizeUseExistingKnownAlt: () => authzKnownAlt.useExisting(),
+    authzKnownAlt.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExisting: () =>
+    authz.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExistingKnown: () =>
+    authzKnown.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExistingKnownAlt: () =>
+    authzKnownAlt.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizePick: () =>
     authz.pick({
       anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
   authorizePickMany: () =>
     authz.pick({
       anchors: [...Array(10).keys()].map((x) =>
         BigInt(10000 + 129 * x * x)
       ) as NonEmptyArray<bigint>,
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
 
   // Manage Auth screens
   manageNew: () =>
-    manage.firstTime({ useExisting: () => console.log("Use existing") }),
-  manageUseExisting: () => manage.useExisting(),
+    manage.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  manageUseExisting: () =>
+    manage.useExisting({
+      register: () => toast.info(html`Asked for registration`),
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+    }),
   managePick: () =>
     manage.pick({
       anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
 
   protectDeviceInfo: () =>
@@ -437,7 +489,10 @@ export const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber({ title: "hello" }),
   banner: () => {
-    manage.firstTime({ useExisting: () => console.log("Use existing") });
+    manage.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    });
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),
