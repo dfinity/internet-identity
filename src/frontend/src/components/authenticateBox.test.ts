@@ -7,10 +7,6 @@ test("anchors are forwarded", async () => {
   const addDevice: (anchor?: bigint) => void = vi.fn();
   const recover: (anchor?: bigint) => void = vi.fn();
   const pages = authnTemplates(new I18n("en"), {
-    register: () => {},
-    onSubmit: () => {},
-    addDevice,
-    recover,
     firstTime: {
       slot: html``,
       useExistingText: "",
@@ -24,7 +20,12 @@ test("anchors are forwarded", async () => {
     },
   });
 
-  const useExisting = pages.useExisting();
+  const useExisting = pages.useExisting({
+    register: () => {},
+    onSubmit: () => {},
+    addDevice,
+    recover,
+  });
   render(useExisting, document.body);
   const addDeviceButton = document.querySelector(
     "#addNewDeviceButton"
