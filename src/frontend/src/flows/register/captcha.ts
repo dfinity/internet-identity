@@ -7,7 +7,6 @@ import { Chan } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { registerStepper } from "./stepper";
 
 import { isNullish, nonNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
@@ -22,6 +21,7 @@ export const promptCaptchaTemplate = <T>({
   verifyChallengeChars,
   onContinue,
   i18n,
+  stepper,
   focus: focus_,
   scrollToTop = false,
 }: {
@@ -33,6 +33,7 @@ export const promptCaptchaTemplate = <T>({
   }) => Promise<T | typeof badChallenge>;
   onContinue: (result: T) => void;
   i18n: I18n;
+  stepper: TemplateResult;
   focus?: boolean;
   /* put the page into view */
   scrollToTop?: boolean;
@@ -181,7 +182,7 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      ${registerStepper({ current: "captcha" })}
+      ${stepper}
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div
@@ -258,9 +259,11 @@ export function promptCaptchaPage<T>(
 
 export const promptCaptcha = <T>({
   createChallenge,
+  stepper,
   register,
 }: {
   createChallenge: () => Promise<Challenge>;
+  stepper: TemplateResult;
   register: (cr: {
     chars: string;
     challenge: Challenge;
@@ -274,6 +277,7 @@ export const promptCaptcha = <T>({
       cancel: () => resolve(cancel),
       onContinue: resolve,
       i18n,
+      stepper,
       scrollToTop: true,
       focus: true,
     });
