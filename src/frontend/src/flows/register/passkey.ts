@@ -10,6 +10,7 @@ import {
   isWebAuthnCancel,
   webAuthnErrorCopy,
 } from "$src/utils/webAuthnErrorUtils";
+import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import { registerStepper } from "./stepper";
 
@@ -18,18 +19,30 @@ import copyJson from "./passkey.json";
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const savePasskeyTemplate = ({
-  construct,
+  constructPasskey,
+  constructPin,
   i18n,
   cancel,
   scrollToTop = false,
 }: {
-  construct: () => void;
+  constructPasskey: () => void;
+  constructPin?: () => void;
   i18n: I18n;
   cancel: () => void;
   /* put the page into view */
   scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
+  const createPinButton = (constructPin: () => void) => html`
+    <button
+      @click=${() => constructPin()}
+      data-action="construct-pin-identity"
+      class="c-button c-button--secondary"
+    >
+      ${copy.without_passkey}
+    </button>
+  `;
+
   const slot = html`
     ${registerStepper({ current: "create" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
@@ -41,16 +54,17 @@ const savePasskeyTemplate = ({
       </p>
     </hgroup>
     <button
-      @click=${() => construct()}
+      @click=${() => constructPasskey()}
       data-action="construct-identity"
       class="c-button"
     >
       ${copy.save_passkey}
     </button>
+    ${nonNullish(constructPin) ? createPinButton(constructPin) : ""}
     <button
       @click=${() => cancel()}
       data-action="cancel"
-      class="c-button c-button--secondary"
+      class="c-button c-button--textOnly"
     >
       ${copy.cancel}
     </button>
@@ -91,7 +105,7 @@ export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
       i18n: new I18n(),
       cancel: () => resolve("canceled"),
       scrollToTop: true,
-      construct: async () => {
+      constructPasskey: async () => {
         try {
           const identity = await withLoader(() => constructIdentity({}));
           resolve(identity);
