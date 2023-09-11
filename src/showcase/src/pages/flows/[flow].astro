@@ -1,10 +1,10 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import "$src/styles/main.css";
-import { iiFlows } from "$showcase/flows";
 
+export const iiFlowNames = ["loginManage", "register"];
 export function getStaticPaths() {
-  return Object.keys(iiFlows).map((key) => ({ params: { flow: key } }));
+  return iiFlowNames.map((name) => ({ params: { flow: name } }));
 }
 
 const { flow } = Astro.params;
