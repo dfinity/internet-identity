@@ -55,7 +55,7 @@ export const constructPinIdentity = async ({
   const pinSalt = window.crypto.getRandomValues(new Uint8Array(16));
   // Recommended iterations is 600k
   // https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2
-  const pinPbkdfIters: number = 600_1000;
+  const pinPbkdfIters: number = 600_000;
   const keypairNamedCurve: NistEc = "P-256";
 
   /* The (extractable, for storage) key pair */
