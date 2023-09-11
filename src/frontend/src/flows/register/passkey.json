@@ -3,6 +3,7 @@
     "select": "Select",
     "cancel": "Cancel",
     "save_passkey": "Create Passkey",
+    "without_passkey": "Continue without Passkey",
     "and_complete_prompts": "and complete the prompts that pop-up on your device",
 
     "what_is_passkey": "What is a passkey?",

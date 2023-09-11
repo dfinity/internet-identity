@@ -292,7 +292,20 @@ export const iiPages: Record<string, () => void> = {
     savePasskeyPage({
       i18n,
       cancel: () => console.log("cancel"),
-      construct: () =>
+      constructPasskey: () =>
+        new Promise((_) => {
+          console.log("Identity Construction");
+        }),
+    }),
+  savePasskeyWithPin: () =>
+    savePasskeyPage({
+      i18n,
+      cancel: () => console.log("cancel"),
+      constructPasskey: () =>
+        new Promise((_) => {
+          console.log("Identity Construction");
+        }),
+      constructPin: () =>
         new Promise((_) => {
           console.log("Identity Construction");
         }),
