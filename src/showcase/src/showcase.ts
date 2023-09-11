@@ -303,11 +303,11 @@ export const iiPages: Record<string, () => void> = {
       cancel: () => console.log("cancel"),
       constructPasskey: () =>
         new Promise((_) => {
-          console.log("Identity Construction");
+          console.log("Passkey Construction");
         }),
       constructPin: () =>
         new Promise((_) => {
-          console.log("Identity Construction");
+          console.log("Pin Identity Construction");
         }),
     }),
   promptCaptcha: () =>

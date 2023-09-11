@@ -10,7 +10,8 @@ import {
   isWebAuthnCancel,
   webAuthnErrorCopy,
 } from "$src/utils/webAuthnErrorUtils";
-import { html, nothing, TemplateResult } from "lit-html";
+import { nonNullish } from "@dfinity/utils";
+import { html, TemplateResult } from "lit-html";
 import { registerStepper } from "./stepper";
 
 import copyJson from "./passkey.json";
@@ -32,17 +33,16 @@ const savePasskeyTemplate = ({
   scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
-  const constructPinButton = constructPin
-    ? html`
-        <button
-          @click=${() => constructPasskey()}
-          data-action="construct-pin-identity"
-          class="c-button c-button--secondary"
-        >
-          ${copy.without_passkey}
-        </button>
-      `
-    : nothing;
+  const createPinButton = (constructPin: () => void) => html`
+    <button
+      @click=${() => constructPin()}
+      data-action="construct-pin-identity"
+      class="c-button c-button--secondary"
+    >
+      ${copy.without_passkey}
+    </button>
+  `;
+
   const slot = html`
     ${registerStepper({ current: "create" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
@@ -60,7 +60,7 @@ const savePasskeyTemplate = ({
     >
       ${copy.save_passkey}
     </button>
-    ${constructPinButton}
+    ${nonNullish(constructPin) ? createPinButton(constructPin) : ""}
     <button
       @click=${() => cancel()}
       data-action="cancel"
