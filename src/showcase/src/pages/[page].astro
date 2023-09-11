@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import "$src/styles/main.css";
-export const pagesNames = [
+export const iiPageNames = [
   "displayUserNumber",
   "compatibilityNotice",
   "promptDeviceAlias",
@@ -53,7 +53,7 @@ export const pagesNames = [
 ];
 
 export function getStaticPaths() {
-  return pagesNames.map((key) => ({ params: { page: key } }));
+  return iiPageNames.map((page) => ({ params: { page } }));
 }
 
 const { page } = Astro.params;

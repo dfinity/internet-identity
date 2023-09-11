@@ -4,7 +4,7 @@ import "$src/styles/main.css";
 
 export const iiFlowNames = ["loginManage", "register"];
 export function getStaticPaths() {
-  return iiFlowNames.map((name) => ({ params: { flow: name } }));
+  return iiFlowNames.map((flow) => ({ params: { flow } }));
 }
 
 const { flow } = Astro.params;
