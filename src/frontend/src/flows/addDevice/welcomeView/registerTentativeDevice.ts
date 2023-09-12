@@ -5,7 +5,7 @@ import {
 } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
-import { inferAlias, loadUAParser } from "$src/flows/register";
+import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { Connection, creationOptions } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
@@ -56,7 +56,7 @@ export const registerTentativeDevice = async (
     return window.location.reload() as never;
   }
 
-  const alias = await inferAlias({
+  const alias = await inferPasskeyAlias({
     authenticatorType: result.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,

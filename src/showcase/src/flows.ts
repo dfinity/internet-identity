@@ -5,6 +5,19 @@ import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
 import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge, i18n, manageTemplates } from "./showcase";
 
+const registerSuccessToastTemplate = (result: unknown) => html`
+  Identity successfully created!<br />
+  <p class="l-stack">
+    <strong class="t-strong">${prettyResult(result)}</strong>
+  </p>
+  <button
+    class="l-stack c-button c-button--secondary"
+    @click=${() => window.location.reload()}
+  >
+    reload
+  </button>
+`;
+
 export const flowsPage = () => {
   document.title = "Flows";
   const container = document.getElementById("pageContent") as HTMLElement;
@@ -29,6 +42,12 @@ const registerFlowOpts: RegisterFlowOpts<null> = {
     };
   },
   registrationAllowed: true,
+  storePinIdentity: () => {
+    toast.info("PIN identity was stored");
+    return Promise.resolve();
+  },
+  pinAllowed: () => Promise.resolve(false),
+  uaParser: Promise.resolve(undefined),
 } as const;
 
 export const iiFlows: Record<string, () => void> = {
@@ -105,19 +124,14 @@ export const iiFlows: Record<string, () => void> = {
   },
   register: async () => {
     const result = await registerFlow<null>(registerFlowOpts);
-
-    toast.success(html`
-      Identity successfully created!<br />
-      <p class="l-stack">
-        <strong class="t-strong">${prettyResult(result)}</strong>
-      </p>
-      <button
-        class="l-stack c-button c-button--secondary"
-        @click=${() => window.location.reload()}
-      >
-        reload
-      </button>
-    `);
+    toast.success(registerSuccessToastTemplate(result));
+  },
+  registerWithPin: async () => {
+    const result = await registerFlow<null>({
+      ...registerFlowOpts,
+      pinAllowed: () => Promise.resolve(true),
+    });
+    toast.success(registerSuccessToastTemplate(result));
   },
 };
 
