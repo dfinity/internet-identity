@@ -1,4 +1,5 @@
 import { toast } from "$src/components/toast";
+import { DynamicKey } from "$src/utils/i18n";
 import { mount, withRef } from "$src/utils/lit-html";
 import { Chan, withInputElement, zip } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -8,7 +9,7 @@ import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 export type PinResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string | DynamicKey };
 
 // A Pin Input component
 export const pinInput = <T>({
@@ -39,7 +40,7 @@ export const pinInput = <T>({
   const listRoot: Ref<HTMLUListElement> = createRef();
 
   // A currently displayed error, if any
-  const currentError = new Chan<string | undefined>(undefined);
+  const currentError = new Chan<string | DynamicKey | undefined>(undefined);
   const hasError = currentError.map((e) => nonNullish(e));
 
   // Called on submission, either autosubmit (when filled) or when '.submit()' is called
