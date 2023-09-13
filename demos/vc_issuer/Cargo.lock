@@ -218,9 +218,12 @@ name = "canister_sig_util"
 version = "0.1.0"
 dependencies = [
  "candid",
+ "hex",
  "ic-cdk",
  "ic-certified-map",
  "identity_jose",
+ "serde",
+ "serde_bytes",
  "sha2 0.10.7",
 ]
 
@@ -1919,6 +1922,7 @@ dependencies = [
  "candid",
  "canister_sig_util",
  "canister_tests",
+ "hex",
  "ic-cdk",
  "ic-cdk-macros",
  "ic-certified-map",
@@ -1929,6 +1933,8 @@ dependencies = [
  "internet_identity_interface",
  "lazy_static",
  "serde",
+ "serde_bytes",
+ "serde_cbor",
  "serde_json",
  "sha2 0.10.7",
 ]

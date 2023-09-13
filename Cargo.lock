@@ -267,11 +267,15 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "canister_tests",
+ "hex",
  "ic-cdk",
  "ic-certified-map",
  "ic-test-state-machine-client",
  "identity_jose",
  "lazy_static",
+ "rand 0.8.5",
+ "serde",
+ "serde_bytes",
  "sha2 0.10.7",
 ]
 

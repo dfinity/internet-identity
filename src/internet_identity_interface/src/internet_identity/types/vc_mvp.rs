@@ -79,7 +79,16 @@ pub mod issuer {
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum PrepareCredentialResponse {
         Ok(PreparedCredentialData),
-        Err(String),
+        Err(IssueCredentialError),
+    }
+
+    #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+    pub enum IssueCredentialError {
+        UnknownSubject,
+        UnauthorizedSubject,
+        InvalidIdAlias,
+        SignatureNotFound,
+        Internal(String),
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -92,7 +101,7 @@ pub mod issuer {
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum GetCredentialResponse {
         Ok(IssuedCredentialData),
-        Err(String),
+        Err(IssueCredentialError),
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

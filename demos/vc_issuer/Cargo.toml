@@ -24,7 +24,10 @@ identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git
 # identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 
 # other dependencies
+hex = "0.4"
 serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+serde_cbor = "0.11"
 serde_json = "1"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
