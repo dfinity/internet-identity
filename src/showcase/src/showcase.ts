@@ -354,9 +354,22 @@ export const iiPages: Record<string, () => void> = {
     }),
   usePin: () =>
     usePinPage({
+      verify: (pin: string) => {
+        toast.info(`submitted pin: '${pin}'`);
+        if (pin !== "123456") {
+          toast.info("correct pin is '123456'");
+          return Promise.resolve({ ok: false, error: "Invalid PIN" });
+        }
+        return Promise.resolve({
+          ok: true,
+          value: pin,
+        });
+      },
       i18n,
       onContinue: (pin) =>
-        toast.info(html`PIN: <strong class="t-strong">${pin}</strong>`),
+        toast.success(
+          html`Success, PIN: <strong class="t-strong">${pin}</strong>`
+        ),
       onUsePasskey: () => toast.info("Requested to use passkey"),
       cancel: () => toast.info("Canceled"),
     }),
