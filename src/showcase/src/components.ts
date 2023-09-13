@@ -1,13 +1,11 @@
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { pinInput } from "$src/components/pinInput";
 import { toast } from "$src/components/toast";
-import { badChallenge, promptCaptchaPage } from "$src/flows/register/captcha";
-import { mount, withRef } from "$src/utils/lit-html";
+import { withRef } from "$src/utils/lit-html";
 import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { dummyChallenge, i18n } from "./showcase";
 
 export const componentsPage = () => {
   document.title = "Components";
@@ -16,7 +14,7 @@ export const componentsPage = () => {
 };
 
 const components = (): TemplateResult => {
-  return html`${mkToast()} ${choosePin()} ${pickAnchor()}${completeCaptcha()}`;
+  return html`${mkToast()} ${choosePin()} ${pickAnchor()}`;
 };
 
 const mkToast = (): TemplateResult => {
@@ -50,21 +48,39 @@ const mkToast = (): TemplateResult => {
 
 const choosePin = (): TemplateResult => {
   const submittedPin = new Chan("N/A");
+  const pinInputHidden_ = pinInput({
+    verify: (pin: string) => ({ ok: true, value: pin }),
+    onSubmit: (pin) => submittedPin.send(pin),
+    secret: true,
+  });
   const pinInput_ = pinInput({
     verify: (pin: string) => ({ ok: true, value: pin }),
     onSubmit: (pin) => submittedPin.send(pin),
   });
 
   return html` <div class="c-card" style="max-width: 30em; margin: 40px auto;">
-    ${pinInput_.template}
+    <h2 class="t-title t-title--sub">Regular & Secret PIN inputs</h2>
+    <div class="c-input--stack">${pinInput_.template}</div>
+    <div class="c-input--stack">${pinInputHidden_.template}</div>
 
     <output class="c-input c-input--readonly c-input--stack c-input--fullwidth">
       Submitted:
       <strong class="t-strong">${asyncReplace(submittedPin)}</strong>
     </output>
-    <button @click=${() => pinInput_.submit()} class="c-button c-input--stack">
-      submit
-    </button>
+    <div class="c-button-group">
+      <button
+        @click=${() => pinInput_.submit()}
+        class="c-button c-input--stack"
+      >
+        submit regular
+      </button>
+      <button
+        @click=${() => pinInputHidden_.submit()}
+        class="c-button c-input--stack"
+      >
+        submit hidden
+      </button>
+    </div>
   </div>`;
 };
 
@@ -107,30 +123,4 @@ const pickAnchor = (): TemplateResult => {
           showSelected
         )} </div>
     </div>`;
-};
-
-const completeCaptcha = (): TemplateResult => {
-  return html` <div
-    ${mount((container) =>
-      container instanceof HTMLElement
-        ? promptCaptchaPage(
-            {
-              cancel: () => console.log("canceled"),
-              requestChallenge: () =>
-                new Promise((resolve) => setTimeout(resolve, 1000)).then(
-                  () => dummyChallenge
-                ),
-              verifyChallengeChars: (cr) =>
-                new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
-                  cr.chars === "8wJ6Q" ? "yes" : badChallenge
-                ),
-              onContinue: () => console.log("Done"),
-              i18n,
-              focus: false,
-            },
-            container
-          )
-        : ""
-    )}
-  ></div>`;
 };

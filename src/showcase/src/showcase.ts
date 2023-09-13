@@ -31,6 +31,9 @@ import {
   resetPhraseInfoPage,
   unprotectDeviceInfoPage,
 } from "$src/flows/manage/deviceSettings";
+import { confirmPinPage } from "$src/flows/pin/confirmPin";
+import { setPinPage } from "$src/flows/pin/setPin";
+import { usePinPage } from "$src/flows/pin/usePin";
 import {
   checkIndices,
   confirmSeedPhrasePage,
@@ -44,6 +47,7 @@ import { addPhrasePage } from "$src/flows/recovery/recoveryWizard";
 import { promptCaptchaPage } from "$src/flows/register/captcha";
 import { displayUserNumberPage } from "$src/flows/register/finish";
 import { savePasskeyPage } from "$src/flows/register/passkey";
+import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { styleguide } from "$src/styleguide";
 import "$src/styles/main.css";
@@ -134,13 +138,16 @@ const authzTemplatesKnown = authnTemplateAuthorize({
 
 const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });
 const authzAlt = authnPages(i18n, { ...authnCnfg, ...authzTemplatesAlt });
-const authzKnown = authnPages(i18n, { ...authnCnfg, ...authzTemplatesKnown });
+const authzKnown = authnPages(i18n, {
+  ...authnCnfg,
+  ...authzTemplatesKnown,
+});
 const authzKnownAlt = authnPages(i18n, {
   ...authnCnfg,
   ...authzTemplatesKnownAlt,
 });
 
-const manageTemplates = authnTemplateManage({ dapps });
+export const manageTemplates = authnTemplateManage({ dapps });
 const manage = authnPages(i18n, { ...authnCnfg, ...manageTemplates });
 
 export const iiPages: Record<string, () => void> = {
@@ -162,37 +169,86 @@ export const iiPages: Record<string, () => void> = {
   // Authorize screens
 
   authorizeNew: () =>
-    authz.firstTime({ useExisting: () => console.log("Use existing") }),
+    authz.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewKnown: () =>
-    authzKnown.firstTime({ useExisting: () => console.log("Use existing") }),
+    authzKnown.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewAlt: () =>
-    authzAlt.firstTime({ useExisting: () => console.log("Use existing") }),
+    authzAlt.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizeNewKnownAlt: () =>
-    authzKnownAlt.firstTime({ useExisting: () => console.log("Use existing") }),
-  authorizeUseExisting: () => authz.useExisting(),
-  authorizeUseExistingKnown: () => authzKnown.useExisting(),
-  authorizeUseExistingKnownAlt: () => authzKnownAlt.useExisting(),
+    authzKnownAlt.firstTime({
+      useExisting: () => console.log("Use existing"),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExisting: () =>
+    authz.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExistingKnown: () =>
+    authzKnown.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  authorizeUseExistingKnownAlt: () =>
+    authzKnownAlt.useExisting({
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
   authorizePick: () =>
     authz.pick({
       anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
   authorizePickMany: () =>
     authz.pick({
       anchors: [...Array(10).keys()].map((x) =>
         BigInt(10000 + 129 * x * x)
       ) as NonEmptyArray<bigint>,
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
 
   // Manage Auth screens
   manageNew: () =>
-    manage.firstTime({ useExisting: () => console.log("Use existing") }),
-  manageUseExisting: () => manage.useExisting(),
+    manage.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    }),
+  manageUseExisting: () =>
+    manage.useExisting({
+      register: () => toast.info(html`Asked for registration`),
+      recover: () => toast.info(html`Asked for recovery`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info(html`Asked for adding device`),
+    }),
   managePick: () =>
     manage.pick({
       anchors: [BigInt(10000), BigInt(243099)],
-      moreOptions: () => console.log("More options requested"),
+      moreOptions: () => toast.info(html`Asked for more options`),
+      onSubmit: (userNumber) =>
+        toast.info(html`User number submitted: ${userNumber.toString()}`),
     }),
 
   protectDeviceInfo: () =>
@@ -246,9 +302,22 @@ export const iiPages: Record<string, () => void> = {
     savePasskeyPage({
       i18n,
       cancel: () => console.log("cancel"),
-      construct: () =>
+      constructPasskey: () =>
         new Promise((_) => {
           console.log("Identity Construction");
+        }),
+    }),
+  savePasskeyWithPin: () =>
+    savePasskeyPage({
+      i18n,
+      cancel: () => console.log("cancel"),
+      constructPasskey: () =>
+        new Promise((_) => {
+          console.log("Passkey Construction");
+        }),
+      constructPin: () =>
+        new Promise((_) => {
+          console.log("Pin Identity Construction");
         }),
     }),
   promptCaptcha: () =>
@@ -263,6 +332,7 @@ export const iiPages: Record<string, () => void> = {
         new Promise(() => {
           /* noop */
         }),
+      stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
     }),
@@ -275,8 +345,30 @@ export const iiPages: Record<string, () => void> = {
         new Promise(() => {
           /* noop */
         }),
+      stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
+    }),
+  setPin: () =>
+    setPinPage({
+      i18n,
+      onContinue: (pin) => console.log("PIN:", pin),
+      cancel: () => console.log("cancel"),
+    }),
+  confirmPin: () =>
+    confirmPinPage({
+      i18n,
+      onContinue: () => console.log("PIN confirmed"),
+      expectedPin: "123456",
+      cancel: () => console.log("cancel"),
+    }),
+  usePin: () =>
+    usePinPage({
+      i18n,
+      onContinue: (pin) =>
+        toast.info(html`PIN: <strong class="t-strong">${pin}</strong>`),
+      onUsePasskey: () => toast.info("Requested to use passkey"),
+      cancel: () => toast.info("Canceled"),
     }),
   displayManage: () => {
     displayManagePage({
@@ -489,7 +581,10 @@ export const iiPages: Record<string, () => void> = {
     }),
   promptUserNumber: () => promptUserNumber({ title: "hello" }),
   banner: () => {
-    manage.firstTime({ useExisting: () => console.log("Use existing") });
+    manage.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`),
+    });
     showWarning(html`This is a test page, be very careful!`);
   },
   registerDisabled: () => registerDisabled(),

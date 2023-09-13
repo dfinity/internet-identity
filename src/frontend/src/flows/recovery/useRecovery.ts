@@ -10,8 +10,8 @@ import { constructIdentity } from "$src/utils/webAuthn";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
-  isCancel,
-  isDuplicateDeviceError,
+  isWebAuthnCancel,
+  isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
 import { html } from "lit-html";
 import { forgotNumber } from "./forgotNumber";
@@ -27,11 +27,11 @@ export const useRecovery = async (
   if (res === "forgotten") {
     const cancel = await forgotNumber();
     cancel satisfies "cancel";
-    return window.location.reload() as never;
+    return { tag: "canceled" };
   }
 
   if (res === "cancel") {
-    return window.location.reload() as never;
+    return { tag: "canceled" };
   }
 
   res satisfies "phrase" | "device";
@@ -126,9 +126,9 @@ const enrollAuthenticator = async ({
       })
     );
   } catch (error: unknown) {
-    if (isDuplicateDeviceError(error)) {
+    if (isWebAuthnDuplicateDevice(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
-    } else if (isCancel(error)) {
+    } else if (isWebAuthnCancel(error)) {
       await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({

@@ -44,7 +44,7 @@ import * as tweetnacl from "tweetnacl";
 import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
-import { isCancel } from "./webAuthnErrorUtils";
+import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -74,26 +74,28 @@ export class DummyIdentity
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
-export type ApiResult = LoginResult | RegisterResult;
-export type LoginResult =
-  | LoginSuccess
+export type ApiResult<T = AuthenticatedConnection> =
+  | LoginResult<T>
+  | RegisterResult<T>;
+export type LoginResult<T = AuthenticatedConnection> =
+  | LoginSuccess<T>
   | UnknownUser
   | AuthFail
   | ApiError
   | NoSeedPhrase
   | SeedPhraseFail
-  | CancelOrTimeout;
-export type RegisterResult =
-  | LoginSuccess
+  | WebAuthnFailed;
+export type RegisterResult<T = AuthenticatedConnection> =
+  | LoginSuccess<T>
   | AuthFail
   | ApiError
   | RegisterNoSpace
   | BadChallenge
-  | CancelOrTimeout;
+  | WebAuthnFailed;
 
-type LoginSuccess = {
+type LoginSuccess<T = AuthenticatedConnection> = {
   kind: "loginSuccess";
-  connection: AuthenticatedConnection;
+  connection: T;
   userNumber: bigint;
 };
 
@@ -104,7 +106,7 @@ type ApiError = { kind: "apiError"; error: Error };
 type RegisterNoSpace = { kind: "registerNoSpace" };
 type NoSeedPhrase = { kind: "noSeedPhrase" };
 type SeedPhraseFail = { kind: "seedPhraseFail" };
-type CancelOrTimeout = { kind: "cancelOrTimeout" };
+type WebAuthnFailed = { kind: "webAuthnFailed" };
 
 export type { ChallengeResult } from "$generated/internet_identity_types";
 
@@ -252,8 +254,8 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
-      if (isCancel(e)) {
-        return { kind: "cancelOrTimeout" };
+      if (isWebAuthnCancel(e)) {
+        return { kind: "webAuthnFailed" };
       }
       if (e instanceof Error) {
         return { kind: "authFail", error: e };

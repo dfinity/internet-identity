@@ -2,18 +2,11 @@ import { Challenge } from "$generated/internet_identity_types";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
 import { LoginFlowCanceled, cancel } from "$src/utils/flowResult";
-import {
-  Connection,
-  IIWebAuthnIdentity,
-  RegisterResult,
-} from "$src/utils/iiConnection";
 import { mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { registerStepper } from "./stepper";
 
 import { isNullish, nonNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
@@ -28,6 +21,7 @@ export const promptCaptchaTemplate = <T>({
   verifyChallengeChars,
   onContinue,
   i18n,
+  stepper,
   focus: focus_,
   scrollToTop = false,
 }: {
@@ -39,6 +33,7 @@ export const promptCaptchaTemplate = <T>({
   }) => Promise<T | typeof badChallenge>;
   onContinue: (result: T) => void;
   i18n: I18n;
+  stepper: TemplateResult;
   focus?: boolean;
   /* put the page into view */
   scrollToTop?: boolean;
@@ -187,7 +182,7 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      ${registerStepper({ current: "captcha" })}
+      ${stepper}
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div
@@ -262,62 +257,38 @@ export function promptCaptchaPage<T>(
   )(props, container);
 }
 
-export const promptCaptcha = ({
-  connection,
-  identity,
-  alias,
-  challenge,
+export const promptCaptcha = <T>({
+  createChallenge,
+  stepper,
+  register,
 }: {
-  connection: Connection;
-  identity: IIWebAuthnIdentity;
-  alias: string;
-  challenge?: Promise<Challenge>;
-}): Promise<RegisterResult | LoginFlowCanceled> => {
+  createChallenge: () => Promise<Challenge>;
+  stepper: TemplateResult;
+  register: (cr: {
+    chars: string;
+    challenge: Challenge;
+  }) => Promise<T | typeof badChallenge>;
+}): Promise<T | LoginFlowCanceled> => {
   return new Promise((resolve) => {
     const i18n = new I18n();
     promptCaptchaPage({
+      verifyChallengeChars: register,
+      requestChallenge: () => createChallenge(),
       cancel: () => resolve(cancel),
-      focus: true,
-      verifyChallengeChars: async ({ chars, challenge }) => {
-        const tempIdentity = await ECDSAKeyIdentity.generate({
-          extractable: false,
-        });
-        const result = await connection.register({
-          identity,
-          tempIdentity,
-          alias,
-          challengeResult: {
-            key: challenge.challenge_key,
-            chars,
-          },
-        });
-
-        switch (result.kind) {
-          case "badChallenge":
-            return badChallenge;
-          default:
-            return result;
-        }
-      },
-
-      requestChallenge: precomputedFirst(
-        // For the first call, use a pre-generated challenge
-        // if available.
-        challenge ?? connection.createChallenge(),
-        () => connection.createChallenge()
-      ),
-
       onContinue: resolve,
       i18n,
+      stepper,
       scrollToTop: true,
+      focus: true,
     });
   });
 };
 
 // Returns a function that returns `first` on the first call,
 // and values returned by `f()` from the second call on.
-function precomputedFirst<T>(first: T, f: () => T): () => T {
+export function precomputeFirst<T>(f: () => T): () => T {
   let firstTime = true;
+  const first: T = f();
 
   return () => {
     if (firstTime) {

@@ -259,8 +259,13 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
             "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
             "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
             "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
+            "woff2" => (file_bytes, ContentEncoding::Identity, ContentType::WOFF2),
             "woff2.gz" => (file_bytes, ContentEncoding::GZip, ContentType::WOFF2),
-            _ => panic!("Unknown asset type: {}", asset.path().display()),
+            ext => panic!(
+                "Unknown asset type '{}' for asset '{}'",
+                ext,
+                asset.path().display()
+            ),
         };
 
         assets.push((file_to_asset_path(asset), content, encoding, content_type));

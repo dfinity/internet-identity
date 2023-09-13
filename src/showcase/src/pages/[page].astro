@@ -1,10 +1,60 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import "$src/styles/main.css";
-import { iiPages } from "$showcase/showcase";
+export const iiPageNames = [
+  "displayUserNumber",
+  "compatibilityNotice",
+  "promptDeviceAlias",
+  "authorizeNew",
+  "authorizeNewKnown",
+  "authorizeNewAlt",
+  "authorizeNewKnownAlt",
+  "authorizeUseExisting",
+  "authorizeUseExistingKnown",
+  "authorizeUseExistingKnownAlt",
+  "authorizePick",
+  "authorizePickMany",
+  "manageNew",
+  "manageUseExisting",
+  "managePick",
+  "protectDeviceInfo",
+  "unprotectDeviceInfo",
+  "resetPhraseInfo",
+  "promptRecovery",
+  "recoverWithPhrase",
+  "recoverWithDevice",
+  "forgotNumber",
+  "savePasskey",
+  "savePasskeyWithPin",
+  "promptCaptcha",
+  "promptCaptchaReady",
+  "setPin",
+  "confirmPin",
+  "usePin",
+  "displayManage",
+  "displayManageSingle",
+  "pollForTentativeDevicePage",
+  "deviceRegistrationDisabledInfo",
+  "showVerificationCode",
+  "verifyTentativeDevice",
+  "loader",
+  "addPhrase",
+  "addPhraseWarning",
+  "displaySeedPhrase",
+  "confirmSeedPhrase",
+  "displayError",
+  "promptUserNumber",
+  "banner",
+  "registerDisabled",
+  "toasts",
+  "dappsExplorer",
+  "showMessage",
+  "showSpinner",
+  "addDeviceSuccess",
+];
 
 export function getStaticPaths() {
-  return Object.keys(iiPages).map((key) => ({ params: { page: key } }));
+  return iiPageNames.map((page) => ({ params: { page } }));
 }
 
 const { page } = Astro.params;
@@ -12,6 +62,7 @@ const { page } = Astro.params;
 
 <Layout>
   <main id="pageContent" aria-live="polite" data-page-name={page}></main>
+  <div id="loaderContainer"></div>
   <script>
     import { iiPages } from "$showcase/showcase";
 

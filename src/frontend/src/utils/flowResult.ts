@@ -2,18 +2,18 @@ import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
 import { webAuthnErrorCopy } from "./webAuthnErrorUtils";
 
-export type LoginFlowResult =
-  | LoginFlowSuccess
+export type LoginFlowResult<T = AuthenticatedConnection> =
+  | LoginFlowSuccess<T>
   | LoginFlowError
   | LoginFlowCanceled;
 
-export type LoginFlowSuccess = {
+export type LoginFlowSuccess<T = AuthenticatedConnection> = {
   tag: "ok";
-} & LoginData;
+} & LoginData<T>;
 
-export type LoginData = {
+export type LoginData<T = AuthenticatedConnection> = {
   userNumber: bigint;
-  connection: AuthenticatedConnection;
+  connection: T;
 };
 
 export type LoginFlowError = {
@@ -30,9 +30,9 @@ export type LoginError = {
 export type LoginFlowCanceled = { tag: "canceled" };
 export const cancel: LoginFlowCanceled = { tag: "canceled" };
 
-export const apiResultToLoginFlowResult = (
-  result: ApiResult
-): LoginFlowSuccess | LoginFlowError => {
+export const apiResultToLoginFlowResult = <T>(
+  result: ApiResult<T>
+): LoginFlowSuccess<T> | LoginFlowError => {
   switch (result.kind) {
     case "loginSuccess": {
       return {
@@ -99,7 +99,7 @@ export const apiResultToLoginFlowResult = (
           "Failed to authenticate using this seed phrase. Did you enter it correctly?",
       };
     }
-    case "cancelOrTimeout": {
+    case "webAuthnFailed": {
       const copy = webAuthnErrorCopy();
       return {
         tag: "err",

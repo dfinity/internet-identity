@@ -3,7 +3,6 @@
 #
 # We use this regular check to be notified early if our builds are not reproducible
 # over time (due to e.g. changing or missing dependencies).
-# TODO: remove all dfx metadata related actions once release-2023-08-28 is no longer the latest release.
 name: Release Build Check
 
 on:
@@ -33,15 +32,11 @@ jobs:
             exit 1
           fi
           curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_production.wasm.gz
-          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_dev.wasm.gz" -o internet_identity_dev.wasm.gz
           latest_prod_release_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
-          latest_dev_release_sha256=$(shasum -a 256 ./internet_identity_dev.wasm.gz | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
           echo latest prod release sha256 is "$latest_prod_release_sha256"
-          echo latest dev release sha256 is "$latest_dev_release_sha256"
           echo "ref=$latest_release_ref" >> "$GITHUB_OUTPUT"
           echo "prod_sha256=$latest_prod_release_sha256" >> "$GITHUB_OUTPUT"
-          echo "dev_sha256=$latest_dev_release_sha256" >> "$GITHUB_OUTPUT"
         id: release
 
   # Then perform the build, using the release as checkout
@@ -56,18 +51,10 @@ jobs:
         with:
           ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
 
-      - name: "Create dfx metadata"
-        id: dfx-metadata
-        run: |
-          dfx_metadata_json="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash ${{ needs.latest-release.outputs.dev_sha256 }})"
-          echo "using dfx metadata $dfx_metadata_json"
-          echo "metadata=$dfx_metadata_json" >> "$GITHUB_OUTPUT"
-
       - uses: ./.github/actions/check-build
         with:
           # we check that ubuntu builds match the latest release build
           sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.prod_sha256 || '' }}
-          dfx-metadata: ${{ steps.dfx-metadata.outputs.metadata }}
 
         # Since the release build check is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.

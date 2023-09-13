@@ -1,69 +1,131 @@
+import { Challenge } from "$generated/internet_identity_types";
+import { registerStepper } from "$src/flows/register/stepper";
+import { registerDisabled } from "$src/flows/registerDisabled";
+import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
-  apiResultToLoginFlowResult,
-  cancel,
-  LoginFlowResult,
-} from "$src/utils/flowResult";
-import { Connection, IIWebAuthnIdentity } from "$src/utils/iiConnection";
+  AuthenticatedConnection,
+  Connection,
+  IIWebAuthnIdentity,
+  RegisterResult,
+} from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
-import { unknownToString } from "$src/utils/utils";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import type { UAParser } from "ua-parser-js";
-import { promptCaptcha } from "./captcha";
+import { badChallenge, precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskey } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
-export const register = async ({
+export const registerFlow = async <T>({
+  createChallenge: createChallenge_,
+  register,
+  registrationAllowed,
+}: {
+  createChallenge: () => Promise<Challenge>;
+  register: (opts: {
+    alias: string;
+    identity: IIWebAuthnIdentity;
+    challengeResult: { chars: string; challenge: Challenge };
+  }) => Promise<RegisterResult<T>>;
+  registrationAllowed: boolean;
+}): Promise<RegisterResult<T> | "canceled"> => {
+  if (!registrationAllowed) {
+    const result = await registerDisabled();
+    result satisfies LoginFlowCanceled;
+    return "canceled";
+  }
+
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
+
+  // Kick-off the challenge request early, so that we might already
+  // have a captcha to show once we get to the CAPTCHA screen
+  const createChallenge = precomputeFirst(() => createChallenge_());
+
+  const identity = await savePasskey();
+  if (identity === "canceled") {
+    return "canceled";
+  }
+
+  const alias = await inferAlias({
+    authenticatorType: identity.getAuthenticatorAttachment(),
+    userAgent: navigator.userAgent,
+    uaParser,
+  });
+
+  const displayUserNumber = displayUserNumberWarmup();
+
+  const result = await promptCaptcha({
+    createChallenge,
+    register: async ({ chars, challenge }) => {
+      const result = await register({
+        identity,
+        alias,
+        challengeResult: { chars, challenge },
+      });
+
+      if (result.kind === "badChallenge") {
+        return badChallenge;
+      }
+
+      return result;
+    },
+    stepper: registerStepper({ current: "captcha" }),
+  });
+
+  if ("tag" in result) {
+    result.tag satisfies "canceled";
+    return "canceled";
+  }
+
+  if (result.kind === "loginSuccess") {
+    const userNumber = result.userNumber;
+    setAnchorUsed(userNumber);
+    await displayUserNumber({ userNumber });
+  }
+  return result;
+};
+
+export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
+  typeof registerFlow<T>
+>[0];
+
+export const getRegisterFlowOpts = ({
   connection,
 }: {
   connection: Connection;
-}): Promise<LoginFlowResult> => {
-  try {
-    // Kick-off fetching "ua-parser-js";
-    const uaParser = loadUAParser();
-
-    // Kick-off the challenge request early, so that we might already
-    // have a captcha to show once we get to the CAPTCHA screen
-    const preloadedChallenge = connection.createChallenge();
-    const identity = await savePasskey();
-    if (identity === "canceled") {
-      return cancel;
-    }
-
-    const alias = await inferAlias({
-      authenticatorType: identity.getAuthenticatorAttachment(),
-      userAgent: navigator.userAgent,
-      uaParser,
+}): RegisterFlowOpts => ({
+  /** Check that the current origin is not the explicit canister id or a raw url.
+   *  Explanation why we need to do this:
+   *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
+   **/
+  registrationAllowed:
+    !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
+      window.origin
+    ),
+  createChallenge: () => connection.createChallenge(),
+  register: async ({
+    identity,
+    alias,
+    challengeResult: {
+      chars,
+      challenge: { challenge_key: key },
+    },
+  }) => {
+    const tempIdentity = await ECDSAKeyIdentity.generate({
+      extractable: false,
     });
-
-    const displayUserNumber = displayUserNumberWarmup();
-    const captchaResult = await promptCaptcha({
-      connection,
-      challenge: preloadedChallenge,
+    const result = await connection.register({
       identity,
+      tempIdentity,
       alias,
+      challengeResult: { chars, key },
     });
 
-    if ("tag" in captchaResult) {
-      return captchaResult;
-    } else {
-      const result = apiResultToLoginFlowResult(captchaResult);
-      if (result.tag === "ok") {
-        const { userNumber } = result;
-        setAnchorUsed(userNumber);
-        await displayUserNumber({ userNumber });
-      }
-      return result;
-    }
-  } catch (e) {
-    return {
-      tag: "err",
-      title: "Failed to create Internet Identity",
-      message: "An error occurred during Internet Identity creation.",
-      detail: unknownToString(e, "unknown error"),
-    };
-  }
-};
+    return result;
+  },
+});
 
 type AuthenticatorType = ReturnType<
   IIWebAuthnIdentity["getAuthenticatorAttachment"]

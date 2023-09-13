@@ -1,18 +1,22 @@
 import { toast } from "$src/components/toast";
-import { withRef } from "$src/utils/lit-html";
+import { mount, withRef } from "$src/utils/lit-html";
 import { Chan, withInputElement, zip } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
-type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+export type PinResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
 
 // A Pin Input component
 export const pinInput = <T>({
   pinLength = 6,
   onSubmit: onSubmit_,
   verify,
+  secret = false,
+  focus = false,
 }: {
   pinLength?: number;
   onSubmit: (
@@ -20,7 +24,11 @@ export const pinInput = <T>({
   ) => void /* Called when all inputs have been set or when .submit() is called */;
   verify: (
     pin: string
-  ) => Promise<Result<T>> | Result<T> /* Used to verify & transform the pin */;
+  ) =>
+    | Promise<PinResult<T>>
+    | PinResult<T> /* Used to verify & transform the pin */;
+  secret?: boolean;
+  focus?: boolean;
 }): {
   template: TemplateResult;
   submit: () => void;
@@ -112,15 +120,32 @@ export const pinInput = <T>({
       >
         ${Array.from(
           { length: pinLength },
-          (_, _ix) => html`
+          /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
+           * type="password", otherwise the browser tries to save one char as a password */
+          (_, ix) => html`
             <li class="c-list--pin-char c-input--anchor">
               <label class="c-input--anchor__wrap">
                 <input
+                  ${
+                    /* autofocus doesn't always work, so we use a manual approach */
+                    (focus ?? false) && ix === 0
+                      ? mount((e) => {
+                          if (e instanceof HTMLElement) {
+                            e.focus();
+                          }
+                        })
+                      : undefined
+                  }
                   autocomplete="off"
-                  type="tel"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  type="text"
+                  inputmode="tel"
                   size="1"
                   maxlength="1"
-                  class="c-input c-input--pin c-input--pin__error"
+                  class="c-input c-input--pin c-input--pin__error ${secret
+                    ? "c-input--pin__secret"
+                    : undefined}"
                   @input=${(e: InputEvent) => withInputElement(e, onInput_)}
                   @paste=${(e: ClipboardEvent) => withInputElement(e, onPaste_)}
                   @focus=${(e: Event) =>

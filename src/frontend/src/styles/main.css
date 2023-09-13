@@ -69,6 +69,15 @@
   font-display: swap;
 }
 
+/* Workaround font for pretending a field is a password without setting type="password"
+ * (all chars in the font are the dot symbol) */
+@font-face {
+  font-family: "password";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../../assets/fonts/dots.woff2") format("woff2");
+}
+
 /* I) Settings: Global variables, config switches. */
 
 :root {
@@ -1239,7 +1248,7 @@ by all browsers (FF is missing) */
   will-change: transform;
 }
 
-/* 
+/*
   these are the brand rainbow layers
   one is the outer ring that is sharp and the other one its blurred copy
   to create a glow effect, as if the sharp layer was emitting colored light
@@ -1761,6 +1770,11 @@ by all browsers (FF is missing) */
 
 .c-list--pin[data-haserror="true"] .c-input--pin {
   border-color: red;
+}
+
+/* Use a fake font for "password"-style pin input */
+.c-input--pin__secret {
+  font-family: "password";
 }
 
 .c-input--pin {
