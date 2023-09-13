@@ -1,5 +1,5 @@
 import { toast } from "$src/components/toast";
-import { DynamicKey } from "$src/utils/i18n";
+import type { DynamicKey } from "$src/utils/i18n";
 import { mount, withRef } from "$src/utils/lit-html";
 import { Chan, withInputElement, zip } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
