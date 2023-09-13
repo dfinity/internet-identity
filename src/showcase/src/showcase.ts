@@ -354,7 +354,7 @@ export const iiPages: Record<string, () => void> = {
     }),
   usePin: () =>
     usePinPage({
-      verify: async (pin: string) => {
+      verify: (pin: string) => {
         toast.info(`submitted pin: '${pin}'`);
         if (pin !== "123456") {
           toast.info("correct pin is '123456'");
