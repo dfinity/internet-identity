@@ -56,17 +56,6 @@ export const pinInput = <T>({
     onSubmit_(result.value);
   };
 
-  // We autosubmit only once
-  let didAutosubmit = false;
-  const autosubmit = (pin: string) => {
-    if (didAutosubmit) {
-      return;
-    }
-
-    didAutosubmit = true;
-    onSubmit(pin);
-  };
-
   const errorMessage = currentError.map((currentError) =>
     nonNullish(currentError)
       ? html`<p class="t-centered t-error c-input--stack">${currentError}</p>`
@@ -89,7 +78,7 @@ export const pinInput = <T>({
   const onInput_ = (evnt: InputEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
       currentError.send(undefined);
-      onInput({ element, evnt, inputs, onFilled: autosubmit });
+      onInput({ element, evnt, inputs, onFilled: onSubmit });
     });
   const onPaste_ = (evnt: ClipboardEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
