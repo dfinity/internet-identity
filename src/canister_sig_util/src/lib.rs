@@ -1,10 +1,21 @@
 use candid::Principal;
-use ic_certified_map::Hash;
+use ic_certified_map::{Hash, HashTree};
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{CompactJwsEncoder, JwsAlgorithm, JwsHeader};
 use identity_jose::jwu::encode_b64;
+use serde::Serialize;
+use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::ops::{Add, DerefMut};
+
+pub mod signature_map;
+pub use identity_jose::jws::verify_credential_jws;
+
+#[derive(Serialize)]
+pub struct CanisterSig<'a> {
+    pub certificate: ByteBuf,
+    pub tree: HashTree<'a>,
+}
 
 pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
