@@ -216,9 +216,11 @@ export const resetPhrase = async ({
   if ("ok" in res) {
     // If the user was authenticated with the phrase, then replace the connection
     // to use the new phrase to void logging them out
-    const nextConnection = sameDevice
-      ? await connection.fromIdentity(userNumber, res.ok)
-      : undefined;
+    let nextConnection = undefined;
+    if (sameDevice) {
+      nextConnection = (await connection.fromIdentity(userNumber, res.ok))
+        .connection;
+    }
     return reload(nextConnection);
   } else if ("error" in res) {
     await displayError({

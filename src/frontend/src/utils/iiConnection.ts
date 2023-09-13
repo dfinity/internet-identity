@@ -286,17 +286,22 @@ export class Connection {
   fromIdentity = async (
     userNumber: bigint,
     identity: SignIdentity
-  ): Promise<AuthenticatedConnection> => {
+  ): Promise<LoginSuccess> => {
     const delegationIdentity = await this.requestFEDelegation(identity);
     const actor = await this.createActor(delegationIdentity);
 
-    return new AuthenticatedConnection(
+    const connection = new AuthenticatedConnection(
       this.canisterId,
       identity,
       delegationIdentity,
       userNumber,
       actor
     );
+    return {
+      kind: "loginSuccess",
+      userNumber,
+      connection,
+    };
   };
 
   fromSeedPhrase = async (
