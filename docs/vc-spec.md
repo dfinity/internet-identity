@@ -21,7 +21,7 @@ After receiving the notification that II is ready, the relying party can request
  
 * Method: `request_credential`
 * Params:
-  * `issuers`: An array of issuers that the relying party trusts. Each issuer is an object with the following properties:
+  * `issuer`: An issuer that the relying party trusts. It has the following properties:
     * `issuerOrigin`: The origin of the issuer.
     * `credentialId`: The ID of the credential that the relying party wants to request from the issuer.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
@@ -34,16 +34,10 @@ After receiving the notification that II is ready, the relying party can request
   "jsonrpc": "2.0",
   "method": "request_credential",
   "params": {
-    "issuers": [
-      {
-        "issuerOrigin": "https://nns.ic0.app",
-        "credentialId": "credential1"
-      },
-      {
-        "issuerOrigin": "https://example.com",
-        "credentialId": "credential2"
-      }
-    ],
+    "issuer": {
+        "issuerOrigin": "https://example-issuer.com",
+        "credentialId": "age_credential"
+    },
     "credentialSubject": "2mdal-aedsb-hlpnv-qu3zl-ae6on-72bt5-fwha5-xzs74-5dkaz-dfywi-aqe"
   }
 }
