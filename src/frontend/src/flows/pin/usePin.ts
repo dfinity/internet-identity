@@ -2,7 +2,8 @@ import { mainWindow } from "$src/components/mainWindow";
 import { pinInput, PinResult } from "$src/components/pinInput";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
-import { html, TemplateResult } from "lit-html";
+import type { TemplateResult } from "lit-html";
+import { html } from "lit-html";
 
 import copyJson from "./usePin.json";
 
@@ -27,7 +28,7 @@ const usePinTemplate = <T>({
   const copy = i18n.i18n(copyJson);
   const pinInput_ = pinInput({
     onSubmit: onContinue,
-    verify: verify,
+    verify,
     secret: true,
   });
   const slot = html`
