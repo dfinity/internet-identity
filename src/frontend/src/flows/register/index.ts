@@ -10,6 +10,7 @@ import {
 } from "$src/crypto/pinIdentity";
 import { confirmPin } from "$src/flows/pin/confirmPin";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
+import { promptPinInfo } from "$src/flows/pin/pinInfo";
 import { setPin } from "$src/flows/pin/setPin";
 import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
@@ -76,6 +77,11 @@ export const registerFlow = async <T>({
   }
   const result_ = await (async () => {
     if (savePasskeyResult === "pin") {
+      const pinInfoResult = await promptPinInfo();
+      if (pinInfoResult === "canceled") {
+        return "canceled";
+      }
+
       const result = await setPin();
       if (result.tag === "canceled") {
         return "canceled";
