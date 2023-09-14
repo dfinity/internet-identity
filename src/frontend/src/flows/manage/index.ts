@@ -36,7 +36,10 @@ import {
 import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
-import { authenticatorsSection } from "./authenticatorsSection";
+import {
+  authenticatorsSection,
+  tempKeysSection,
+} from "./authenticatorsSection";
 import {
   deleteDevice,
   protectDevice,
@@ -142,7 +145,7 @@ const displayFailedToListDevices = (error: Error) =>
 // recovery devices.
 const displayManageTemplate = ({
   userNumber,
-  devices: { authenticators, recoveries },
+  devices: { authenticators, recoveries, pinAuthenticators },
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
@@ -185,6 +188,9 @@ const displayManageTemplate = ({
       onAddDevice,
       warnFewDevices,
     })}
+    ${pinAuthenticators.length > 0
+      ? tempKeysSection({ authenticators: pinAuthenticators })
+      : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     ${logoutSection()}
   </section>`;
@@ -446,17 +452,29 @@ export const devicesFromDeviceDatas = ({
         return acc;
       }
 
-      acc.authenticators.push({
+      const authenticator = {
         alias: device.alias,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
         remove: hasSingleDevice
           ? undefined
           : () => deleteDevice({ connection, device, reload }),
-      });
+      };
+
+      if ("browser_storage_key" in device.key_type) {
+        acc.pinAuthenticators.push(authenticator);
+      } else {
+        acc.authenticators.push(authenticator);
+      }
       return acc;
     },
-    { authenticators: [], recoveries: {}, dupPhrase: false, dupKey: false }
+    {
+      authenticators: [],
+      recoveries: {},
+      pinAuthenticators: [],
+      dupPhrase: false,
+      dupKey: false,
+    }
   );
 };
 
