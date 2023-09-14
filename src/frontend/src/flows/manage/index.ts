@@ -22,7 +22,11 @@ import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
-import { tempKeysSection } from "$src/flows/manage/tempKeys";
+import {
+  TempKeysWarning,
+  tempKeyWarningSection,
+  tempKeysSection,
+} from "$src/flows/manage/tempKeys";
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
@@ -35,6 +39,7 @@ import {
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
 import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
+import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { authenticatorsSection } from "./authenticatorsSection";
@@ -150,6 +155,7 @@ const displayManageTemplate = ({
   dapps,
   exploreDapps,
   identityBackground,
+  tempKeysWarning,
 }: {
   userNumber: bigint;
   devices: Devices;
@@ -159,18 +165,23 @@ const displayManageTemplate = ({
   dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: IdentityBackground;
+  tempKeysWarning?: TempKeysWarning;
 }): TemplateResult => {
   // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
   const warnFewDevices =
     authenticators.length <= 1 &&
     isNullish(recoveries.recoveryPhrase) &&
     isNullish(recoveries.recoveryKey);
+  const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
       <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
     ${anchorSection({ userNumber, identityBackground })}
+    ${nonNullish(tempKeysWarning)
+      ? tempKeyWarningSection({ i18n, tempKeysWarning })
+      : ""}
     <p class="t-paragraph">
       ${dappsTeaser({
         dapps,
@@ -187,7 +198,7 @@ const displayManageTemplate = ({
       warnFewDevices,
     })}
     ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators, i18n: new I18n() })
+      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
       : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     ${logoutSection()}
@@ -271,6 +282,20 @@ export const renderManage = async ({
 
 export const displayManagePage = renderPage(displayManageTemplate);
 
+function isPinAuthenticated(
+  devices_: DeviceData[],
+  connection: AuthenticatedConnection
+): boolean {
+  const principal = connection.identity.getPrincipal();
+  const currentDevice = devices_.find((device) => {
+    const principal1 = Principal.selfAuthenticating(
+      new Uint8Array(device.pubkey)
+    );
+    return principal1.compareTo(principal) === "eq";
+  });
+  return !!(currentDevice && "browser_storage_key" in currentDevice.key_type);
+}
+
 export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
@@ -297,24 +322,53 @@ export const displayManage = (
         "More than one recovery keys are registered, which is unexpected. Only one will be shown."
       );
     }
+
+    const onAddDevice = async () => {
+      await addDevice({ userNumber, connection });
+      resolve();
+    };
+    const addRecoveryPhrase = async () => {
+      const doAdd = await addPhrase({ intent: "userInitiated" });
+      if (doAdd === "cancel") {
+        resolve();
+        return;
+      }
+      doAdd satisfies "ok";
+      await setupPhrase(userNumber, connection);
+      resolve();
+    };
+
+    // Function to figure out what temp keys warning should be shown, if any.
+    const determineTempKeysWarning = (): TempKeysWarning | undefined => {
+      if (!isPinAuthenticated(devices_, connection)) {
+        // Don't show the warning, if the user is not authenticated using a PIN
+        // protected browser storage key
+        return undefined;
+      }
+      // First priority, nudge to add a recovery phrase
+      if (devices.recoveries.recoveryPhrase === undefined) {
+        return {
+          tag: "add_recovery",
+          action: addRecoveryPhrase,
+        };
+      }
+      // Second priority, nudge to add a passkey
+      if (devices.authenticators.length === 0) {
+        return {
+          tag: "add_passkey",
+          action: onAddDevice,
+        };
+      }
+      // If both, recovery phrase and passkey are present, don't show a warning
+      return undefined;
+    };
+
     const display = () =>
       displayManagePage({
         userNumber,
         devices,
-        onAddDevice: async () => {
-          await addDevice({ userNumber, connection });
-          resolve();
-        },
-        addRecoveryPhrase: async () => {
-          const doAdd = await addPhrase({ intent: "userInitiated" });
-          if (doAdd === "cancel") {
-            resolve();
-            return;
-          }
-          doAdd satisfies "ok";
-          await setupPhrase(userNumber, connection);
-          resolve();
-        },
+        onAddDevice,
+        addRecoveryPhrase,
         addRecoveryKey: async () => {
           const confirmed = confirm(
             "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
@@ -335,6 +389,7 @@ export const displayManage = (
           display();
         },
         identityBackground,
+        tempKeysWarning: determineTempKeysWarning(),
       });
 
     display();

@@ -1,6 +1,12 @@
 {
   "en": {
     "temporary_key": "Temporary Keys",
-    "key_stored_in_browser": "These keys are stored in browser cache, clearing your browser storage will erase them."
+    "key_stored_in_browser": "These keys are stored in browser cache, clearing your browser storage will erase them.",
+
+    "security_warning": "Security Warning",
+    "you_are_using_temporary_key": "You are using a temporary key. Do not hold any assets with this identity.",
+    "set_up_recovery_and_passkey": "Clearing your browser storage will erase this key. Set up a recovery method to avoid losing access to your identity. Add a passkey to securely hold assets with this identity.",
+    "add_recovery_phrase": "Add Recovery Phrase",
+    "add_new_passkey": "Add new Passkey"
   }
 }
