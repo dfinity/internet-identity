@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import "$src/styles/main.css";
 
-export const iiFlowNames = ["loginManage", "register"];
+export const iiFlowNames = ["loginManage", "register", "registerWithPin"];
 export function getStaticPaths() {
   return iiFlowNames.map((flow) => ({ params: { flow } }));
 }

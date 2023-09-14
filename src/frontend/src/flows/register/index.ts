@@ -3,6 +3,15 @@ import {
   CredentialId,
   KeyType,
 } from "$generated/internet_identity_types";
+import { withLoader } from "$src/components/loader";
+import {
+  PinIdentityMaterial,
+  constructPinIdentity,
+} from "$src/crypto/pinIdentity";
+import { confirmPin } from "$src/flows/pin/confirmPin";
+import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
+import { setPin } from "$src/flows/pin/setPin";
+import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
@@ -17,16 +26,20 @@ import { setAnchorUsed } from "$src/utils/userNumber";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
+import { TemplateResult } from "lit-html";
 import type { UAParser } from "ua-parser-js";
 import { badChallenge, precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
-import { savePasskey } from "./passkey";
+import { savePasskeyOrPin } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
 export const registerFlow = async <T>({
   createChallenge: createChallenge_,
   register,
+  storePinIdentity,
   registrationAllowed,
+  pinAllowed,
+  uaParser,
 }: {
   createChallenge: () => Promise<Challenge>;
   register: (opts: {
@@ -36,7 +49,13 @@ export const registerFlow = async <T>({
     credentialId?: CredentialId;
     challengeResult: { chars: string; challenge: Challenge };
   }) => Promise<RegisterResult<T>>;
+  storePinIdentity: (opts: {
+    userNumber: bigint;
+    pinIdentityMaterial: PinIdentityMaterial;
+  }) => Promise<void>;
   registrationAllowed: boolean;
+  pinAllowed: () => Promise<boolean>;
+  uaParser: PreloadedUAParser;
 }): Promise<RegisterResult<T> | "canceled"> => {
   if (!registrationAllowed) {
     const result = await registerDisabled();
@@ -44,36 +63,98 @@ export const registerFlow = async <T>({
     return "canceled";
   }
 
-  // Kick-off fetching "ua-parser-js";
-  const uaParser = loadUAParser();
-
   // Kick-off the challenge request early, so that we might already
   // have a captcha to show once we get to the CAPTCHA screen
   const createChallenge = precomputeFirst(() => createChallenge_());
 
-  const identity = await savePasskey();
-  if (identity === "canceled") {
+  const displayUserNumber = displayUserNumberWarmup();
+  const savePasskeyResult = await savePasskeyOrPin({
+    pinAllowed: await pinAllowed(),
+  });
+  if (savePasskeyResult === "canceled") {
+    return "canceled";
+  }
+  const result_ = await (async () => {
+    if (savePasskeyResult === "pin") {
+      const result = await setPin();
+      if (result.tag === "canceled") {
+        return "canceled";
+      }
+
+      result.tag satisfies "ok";
+      const { pin } = result;
+      const confirmed = await confirmPin({ expectedPin: pin });
+      if (confirmed.tag === "canceled") {
+        return "canceled";
+      }
+      confirmed.tag satisfies "ok";
+
+      // XXX: this withLoader could be replaced with one that indicates what's happening (like the
+      // "Hang tight, ..." spinner)
+      const { identity, pinIdentityMaterial } = await withLoader(() =>
+        constructPinIdentity({
+          pin,
+        })
+      );
+      return {
+        identity,
+        alias: await inferPinAlias({
+          userAgent: navigator.userAgent,
+          uaParser,
+        }),
+        stepper: pinStepper({ current: "captcha" }),
+        keyType: { browser_storage_key: null },
+        finalizeIdentity: (userNumber: bigint) =>
+          storePinIdentity({ userNumber, pinIdentityMaterial }),
+      };
+    } else {
+      const identity = savePasskeyResult;
+      const alias = await inferPasskeyAlias({
+        authenticatorType: identity.getAuthenticatorAttachment(),
+        userAgent: navigator.userAgent,
+        uaParser,
+      });
+      return {
+        identity,
+        alias,
+        stepper: registerStepper({ current: "captcha" }),
+        credentialId: new Uint8Array(identity.rawId),
+        keyType: authenticatorAttachmentToKeyType(
+          identity.getAuthenticatorAttachment()
+        ),
+      };
+    }
+  })();
+
+  if (result_ === "canceled") {
     return "canceled";
   }
 
-  const alias = await inferAlias({
-    authenticatorType: identity.getAuthenticatorAttachment(),
-    userAgent: navigator.userAgent,
-    uaParser,
-  });
-
-  const displayUserNumber = displayUserNumberWarmup();
+  const {
+    identity,
+    alias,
+    stepper,
+    credentialId,
+    keyType,
+    finalizeIdentity,
+  }: {
+    identity: SignIdentity;
+    alias: string;
+    stepper: TemplateResult;
+    credentialId?: CredentialId;
+    keyType: KeyType;
+    finalizeIdentity?: (userNumber: bigint) => Promise<void>;
+  } = result_;
 
   const result = await promptCaptcha({
     createChallenge,
+    stepper,
     register: async ({ chars, challenge }) => {
       const result = await register({
         identity,
         alias,
-        keyType: authenticatorAttachmentToKeyType(
-          identity.getAuthenticatorAttachment()
-        ),
-        credentialId: new Uint8Array(identity.rawId),
+        keyType,
+        credentialId,
         challengeResult: { chars, challenge },
       });
 
@@ -83,7 +164,6 @@ export const registerFlow = async <T>({
 
       return result;
     },
-    stepper: registerStepper({ current: "captcha" }),
   });
 
   if ("tag" in result) {
@@ -93,6 +173,7 @@ export const registerFlow = async <T>({
 
   if (result.kind === "loginSuccess") {
     const userNumber = result.userNumber;
+    await finalizeIdentity?.(userNumber);
     setAnchorUsed(userNumber);
     await displayUserNumber({ userNumber });
   }
@@ -107,41 +188,47 @@ export const getRegisterFlowOpts = ({
   connection,
 }: {
   connection: Connection;
-}): RegisterFlowOpts => ({
-  /** Check that the current origin is not the explicit canister id or a raw url.
-   *  Explanation why we need to do this:
-   *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
-   **/
-  registrationAllowed:
-    !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
-      window.origin
-    ),
-  createChallenge: () => connection.createChallenge(),
-  register: async ({
-    identity,
-    alias,
-    credentialId,
-    keyType,
-    challengeResult: {
-      chars,
-      challenge: { challenge_key: key },
-    },
-  }) => {
-    const tempIdentity = await ECDSAKeyIdentity.generate({
-      extractable: false,
-    });
-    const result = await connection.register({
+}): RegisterFlowOpts => {
+  // Kick-off fetching "ua-parser-js";
+  const uaParser = loadUAParser();
+  return {
+    /** Check that the current origin is not the explicit canister id or a raw url.
+     *  Explanation why we need to do this:
+     *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
+     **/
+    registrationAllowed:
+      !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
+        window.origin
+      ),
+    createChallenge: () => connection.createChallenge(),
+    pinAllowed: () =>
+      pinRegisterAllowed({ userAgent: navigator.userAgent, uaParser }),
+    register: async ({
       identity,
-      tempIdentity,
       alias,
       keyType,
       credentialId,
-      challengeResult: { chars, key },
-    });
-
-    return result;
-  },
-});
+      challengeResult: {
+        chars,
+        challenge: { challenge_key: key },
+      },
+    }) => {
+      const tempIdentity = await ECDSAKeyIdentity.generate({
+        extractable: false,
+      });
+      return await connection.register({
+        identity,
+        tempIdentity,
+        alias,
+        keyType,
+        credentialId,
+        challengeResult: { chars, key },
+      });
+    },
+    uaParser,
+    storePinIdentity: idbStorePinIdentityMaterial,
+  };
+};
 
 type AuthenticatorType = ReturnType<
   IIWebAuthnIdentity["getAuthenticatorAttachment"]
@@ -149,7 +236,7 @@ type AuthenticatorType = ReturnType<
 type PreloadedUAParser = ReturnType<typeof loadUAParser>;
 
 // Logic for inferring a passkey alias based on the authenticator type & user agent
-export const inferAlias = async ({
+export const inferPasskeyAlias = async ({
   authenticatorType,
   userAgent,
   uaParser: uaParser_,
@@ -228,6 +315,57 @@ export const inferAlias = async ({
 
   // If all else fails, the device is unnamed
   return UNNAMED;
+};
+
+export const inferPinAlias = async ({
+  userAgent,
+  uaParser: uaParser_,
+}: {
+  userAgent: typeof navigator.userAgent;
+  uaParser: PreloadedUAParser;
+}): Promise<string> => {
+  const UNNAMED = "Temporary Key";
+
+  // Otherwise, make sure the UA parser module is loaded, because
+  // everything from here will use UA heuristics
+  const UAParser = await uaParser_;
+  if (UAParser === undefined) {
+    return UNNAMED;
+  }
+  const uaParser = new UAParser(userAgent);
+  const browser = uaParser.getBrowser().name;
+  // We try to show something like "Temporary Key: Opera on Linux" or just "Temporary Key: Opera" or just "Temporary Key: Linux"
+  const os = uaParser.getOS().name;
+  const browserOn = [
+    ...(nonNullish(browser) ? [browser] : []),
+    ...(nonNullish(os) ? [os] : []),
+  ];
+  if (browserOn.length !== 0) {
+    // XXX: remove temp key prefix, once temp keys are correctly separated in their own lists
+    return UNNAMED + ": " + browserOn.join(" on ");
+  }
+
+  // If all else fails, the device is unnamed
+  return UNNAMED;
+};
+
+// Logic for deciding whether PIN identity registration is allowed based on the user agent
+export const pinRegisterAllowed = async ({
+  userAgent,
+  uaParser: uaParser_,
+}: {
+  userAgent: typeof navigator.userAgent;
+  uaParser: PreloadedUAParser;
+}): Promise<boolean> => {
+  // Otherwise, make sure the UA parser module is loaded, because
+  // everything from here will use UA heuristics
+  const UAParser = await uaParser_;
+  if (UAParser === undefined) {
+    // When in doubt, allow PIN registration
+    return true;
+  }
+  const uaParser = new UAParser(userAgent);
+  return uaParser.getDevice().vendor === "Apple";
 };
 
 // Dynamically load the user agent parser module
