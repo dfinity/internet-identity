@@ -1,0 +1,18 @@
+{
+  "en": {
+    "continue_and_set_pin": "Continue and set pin",
+    "cancel": "Cancel",
+    "create_temporary_key_form_pin": "Create a temporary key from a PIN",
+    "set_memorable_pin": "Set a memorable PIN and securely store a temporary key in your browser cache",
+
+    "what_is_temporary_key": "What is a temporary key?",
+    "unique_key_pair": "A unique private key that is safely stored in your browser cache and protected by two layers of advanced encryption",
+    "convenient_secure_replacement": "A convenient and more secure replacement for passwords",
+    "enables_sign_by_pin": "Enables you to sign into dapps on your devices using a simple PIN",
+
+    "why_temporary": "Why is it temporary?",
+    "clear_browser_storage": "Clearing your browser storage will erase your key",
+    "set_up_recovery": "Set up a recovery phrase after registering to avoid loss",
+    "do_not_store_assets": "Do not store assets on the Internet Identity until you create a passkey or recovery phrase"
+  }
+}

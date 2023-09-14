@@ -32,6 +32,7 @@ import {
   unprotectDeviceInfoPage,
 } from "$src/flows/manage/deviceSettings";
 import { confirmPinPage } from "$src/flows/pin/confirmPin";
+import { pinInfoPage } from "$src/flows/pin/pinInfo";
 import { setPinPage } from "$src/flows/pin/setPin";
 import { usePinPage } from "$src/flows/pin/usePin";
 import {
@@ -338,6 +339,12 @@ export const iiPages: Record<string, () => void> = {
       stepper: registerStepper({ current: "captcha" }),
       onContinue: () => console.log("Done"),
       i18n,
+    }),
+  pinInfo: () =>
+    pinInfoPage({
+      i18n,
+      onContinue: () => console.log("continue"),
+      cancel: () => console.log("cancel"),
     }),
   setPin: () =>
     setPinPage({
