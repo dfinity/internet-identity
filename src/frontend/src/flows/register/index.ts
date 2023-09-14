@@ -1,6 +1,11 @@
-import { Challenge } from "$generated/internet_identity_types";
+import {
+  Challenge,
+  CredentialId,
+  KeyType,
+} from "$generated/internet_identity_types";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
+import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
   AuthenticatedConnection,
@@ -9,6 +14,7 @@ import {
   RegisterResult,
 } from "$src/utils/iiConnection";
 import { setAnchorUsed } from "$src/utils/userNumber";
+import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import type { UAParser } from "ua-parser-js";
@@ -25,7 +31,9 @@ export const registerFlow = async <T>({
   createChallenge: () => Promise<Challenge>;
   register: (opts: {
     alias: string;
-    identity: IIWebAuthnIdentity;
+    identity: SignIdentity;
+    keyType: KeyType;
+    credentialId?: CredentialId;
     challengeResult: { chars: string; challenge: Challenge };
   }) => Promise<RegisterResult<T>>;
   registrationAllowed: boolean;
@@ -62,6 +70,10 @@ export const registerFlow = async <T>({
       const result = await register({
         identity,
         alias,
+        keyType: authenticatorAttachmentToKeyType(
+          identity.getAuthenticatorAttachment()
+        ),
+        credentialId: new Uint8Array(identity.rawId),
         challengeResult: { chars, challenge },
       });
 
@@ -108,6 +120,8 @@ export const getRegisterFlowOpts = ({
   register: async ({
     identity,
     alias,
+    credentialId,
+    keyType,
     challengeResult: {
       chars,
       challenge: { challenge_key: key },
@@ -120,6 +134,8 @@ export const getRegisterFlowOpts = ({
       identity,
       tempIdentity,
       alias,
+      keyType,
+      credentialId,
       challengeResult: { chars, key },
     });
 

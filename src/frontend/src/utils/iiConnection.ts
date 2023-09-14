@@ -7,6 +7,7 @@ import {
   AnchorCredentials,
   Challenge,
   ChallengeResult,
+  CredentialId,
   DeviceData,
   DeviceKey,
   FrontendHostname,
@@ -41,7 +42,6 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import * as tweetnacl from "tweetnacl";
-import { authenticatorAttachmentToKeyType } from "./authenticatorAttachment";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
@@ -126,11 +126,15 @@ export class Connection {
   register = async ({
     identity,
     tempIdentity,
+    credentialId,
+    keyType,
     alias,
     challengeResult,
   }: {
-    identity: IIWebAuthnIdentity;
+    identity: SignIdentity;
     tempIdentity: SignIdentity;
+    credentialId?: CredentialId;
+    keyType: KeyType;
     alias: string;
     challengeResult: ChallengeResult;
   }): Promise<RegisterResult> => {
@@ -149,7 +153,6 @@ export class Connection {
     }
 
     const actor = await this.createActor(delegationIdentity);
-    const credential_id = Array.from(new Uint8Array(identity.rawId));
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
 
     let registerResponse: RegisterResponse;
@@ -158,10 +161,8 @@ export class Connection {
         {
           alias,
           pubkey,
-          credential_id: [credential_id],
-          key_type: authenticatorAttachmentToKeyType(
-            identity.getAuthenticatorAttachment()
-          ),
+          credential_id: credentialId ? [credentialId] : [],
+          key_type: keyType,
           purpose: { authentication: null },
           protection: { unprotected: null },
           origin: readDeviceOrigin(),
