@@ -324,7 +324,7 @@ export const inferPinAlias = async ({
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
 }): Promise<string> => {
-  const UNNAMED = "Temporary Key";
+  const UNNAMED = "Unnamed Temporary Key";
 
   // Otherwise, make sure the UA parser module is loaded, because
   // everything from here will use UA heuristics
@@ -341,8 +341,7 @@ export const inferPinAlias = async ({
     ...(nonNullish(os) ? [os] : []),
   ];
   if (browserOn.length !== 0) {
-    // XXX: remove temp key prefix, once temp keys are correctly separated in their own lists
-    return UNNAMED + ": " + browserOn.join(" on ");
+    return browserOn.join(" on ");
   }
 
   // If all else fails, the device is unnamed

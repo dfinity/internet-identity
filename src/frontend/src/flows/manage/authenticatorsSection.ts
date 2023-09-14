@@ -109,6 +109,32 @@ export const authenticatorsSection = ({
     </aside>`;
 };
 
+export const tempKeysSection = ({
+  authenticators: authenticators_,
+}: {
+  authenticators: Authenticator[];
+}): TemplateResult => {
+  const authenticators = dedupLabels(authenticators_);
+
+  return html` <aside class="l-stack c-card c-card--narrow">
+    <div class="t-title t-title--complications">
+      <h2 class="t-title">Temporary Keys</h2>
+    </div>
+
+    <p style="max-width: 30rem;" class="t-paragraph t-lead">
+      These keys are stored in browser cache, clearing your browser storage will
+      erase them.
+    </p>
+    <div class="c-action-list">
+      <ul>
+        ${authenticators.map((authenticator, index) =>
+          authenticatorItem({ authenticator, index })
+        )}
+      </ul>
+    </div>
+  </aside>`;
+};
+
 export const authenticatorItem = ({
   authenticator: { alias, dupCount, warn, remove, rename },
   index,

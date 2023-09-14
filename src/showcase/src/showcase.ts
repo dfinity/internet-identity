@@ -403,6 +403,7 @@ export const iiPages: Record<string, () => void> = {
             reset: () => Promise.resolve(),
           },
         },
+        pinAuthenticators: [],
       },
       onAddDevice: () => {
         console.log("add device requested");
@@ -431,6 +432,43 @@ export const iiPages: Record<string, () => void> = {
           },
         ],
         recoveries: {},
+        pinAuthenticators: [],
+      },
+      onAddDevice: () => {
+        console.log("add device requested");
+      },
+      addRecoveryPhrase: () => {
+        console.log("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        console.log("add recovery key");
+      },
+      dapps,
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
+    });
+  },
+  displayManageTempKey: () => {
+    displayManagePage({
+      identityBackground,
+      userNumber,
+      devices: {
+        authenticators: [
+          {
+            alias: "Some Passkey",
+            rename: () => console.log("rename"),
+            remove: () => console.log("remove"),
+          },
+        ],
+        recoveries: {},
+        pinAuthenticators: [
+          {
+            alias: "Chrome on iPhone",
+            rename: () => console.log("rename"),
+            remove: () => console.log("remove"),
+          },
+        ],
       },
       onAddDevice: () => {
         console.log("add device requested");
