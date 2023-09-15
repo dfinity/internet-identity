@@ -75,21 +75,15 @@ export const authenticatorsSection = ({
             </span>
           </span>
         </div>
-        ${
+        <p
+          style="max-width: 30rem;"
+          class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
+        >${
           warnNoPasskeys
-            ? html`<p
-                style="max-width: 30rem;"
-                class="warning-message t-paragraph t-lead"
-              >
-                Set up a passkey and securely sign into dapps by unlocking your
-                device.
-              </p>`
-            : html`<p style="max-width: 30rem;" class="t-paragraph t-lead">
-                Use passkeys to hold assets and securely sign into dapps by
-                unlocking your device.
-              </p>`
+            ? "Set up a passkey and securely sign into dapps by unlocking your device."
+            : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
         }
-
+        </p>
         <div class="c-action-list">
           <ul>
           ${authenticators.map((authenticator, index) =>
