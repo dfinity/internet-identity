@@ -22,28 +22,12 @@ export const tempKeyWarningSection = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
 
-  const warningButtonTemplate = (btnAction: TempKeysWarning) => {
+  const warningButtonCopy = (btnAction: TempKeysWarning) => {
     switch (btnAction.tag) {
       case "add_recovery":
-        return html`
-          <button
-            class="c-button c-button--primary"
-            @click="${btnAction.action}"
-            id="addRecovery"
-          >
-            <span>${copy.add_recovery_phrase}</span>
-          </button>
-        `;
+        return copy.add_recovery_phrase;
       case "add_passkey":
-        return html`
-          <button
-            class="c-button c-button--primary"
-            @click="${btnAction.action}"
-            id="addPasskey"
-          >
-            <span>${copy.add_new_passkey}</span>
-          </button>
-        `;
+        return copy.add_new_passkey;
       default:
         unreachable(btnAction, "unknown temp keys warning action");
     }
@@ -65,7 +49,13 @@ export const tempKeyWarningSection = ({
       <p style="max-width: 30rem;" class="warning-message t-paragraph t-lead">
         ${copy.set_up_recovery_and_passkey}
       </p>
-      ${warningButtonTemplate(tempKeysWarning)}
+      <button
+        class="c-button c-button--primary"
+        @click="${tempKeysWarning.action}"
+        id="addRecovery"
+      >
+        <span>${warningButtonCopy(tempKeysWarning)}</span>
+      </button>
     </aside>
   `;
 };
