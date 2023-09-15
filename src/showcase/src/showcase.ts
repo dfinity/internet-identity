@@ -490,6 +490,10 @@ export const iiPages: Record<string, () => void> = {
       exploreDapps: () => {
         console.log("explore dapps");
       },
+      tempKeysWarning: {
+        tag: "add_recovery",
+        action: () => console.log("add recovery phrase"),
+      },
     });
   },
   pollForTentativeDevicePage: () =>
