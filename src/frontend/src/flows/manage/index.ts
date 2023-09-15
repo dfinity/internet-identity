@@ -286,14 +286,16 @@ function isPinAuthenticated(
   devices_: DeviceData[],
   connection: AuthenticatedConnection
 ): boolean {
-  const principal = connection.identity.getPrincipal();
-  const currentDevice = devices_.find((device) => {
-    const principal1 = Principal.selfAuthenticating(
-      new Uint8Array(device.pubkey)
+  const connectionPrincipal = connection.identity.getPrincipal();
+  const currentDevice = devices_.find(({ pubkey }) => {
+    const devicePrincipal = Principal.selfAuthenticating(
+      new Uint8Array(pubkey)
     );
-    return principal1.compareTo(principal) === "eq";
+    return devicePrincipal.toText() === connectionPrincipal.toText();
   });
-  return !!(currentDevice && "browser_storage_key" in currentDevice.key_type);
+  return (
+    nonNullish(currentDevice) && "browser_storage_key" in currentDevice.key_type
+  );
 }
 
 export const displayManage = (
