@@ -192,14 +192,14 @@ const displayManageTemplate = ({
         },
       })}
     </p>
+    ${pinAuthenticators.length > 0
+      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
+      : ""}
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
       warnFewDevices,
     })}
-    ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
-      : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     ${logoutSection()}
   </section>`;
