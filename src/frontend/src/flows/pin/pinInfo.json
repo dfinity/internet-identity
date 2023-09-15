@@ -5,6 +5,10 @@
     "create_temporary_key_form_pin": "Create a temporary key from a PIN",
     "set_memorable_pin": "Set a memorable PIN and securely store a temporary key in your browser cache",
 
+    "security_warning": "Security Warning",
+    "are_you_sure": "Are you sure you want to set up a temporary key?",
+    "clear_browser_storage_add_passkey": "Clearing your browser storage will erase this key. Add a passkey if you want to hold assets with this identity.",
+
     "what_is_temporary_key": "What is a temporary key?",
     "unique_key_pair": "A unique private key that is safely stored in your browser cache and protected by two layers of advanced encryption",
     "convenient_secure_replacement": "A convenient and more secure replacement for passwords",
