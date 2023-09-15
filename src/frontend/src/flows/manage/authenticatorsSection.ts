@@ -33,16 +33,16 @@ export const dedupLabels = (
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
-  warnFewDevices,
+  warnNoPasskeys,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
-  warnFewDevices: boolean;
+  warnNoPasskeys: boolean;
 }): TemplateResult => {
-  const wrapClasses = ["l-stack"];
+  const wrapClasses = ["l-stack", "c-card", "c-card--narrow"];
 
-  if (warnFewDevices) {
-    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
+  if (warnNoPasskeys) {
+    wrapClasses.push("c-card--warning");
   }
 
   const authenticators = dedupLabels(authenticators_);
@@ -50,7 +50,7 @@ export const authenticatorsSection = ({
   return html`
     <aside class=${wrapClasses.join(" ")}>
       ${
-        warnFewDevices
+        warnNoPasskeys
           ? html`
               <span
                 class="c-card__label c-card__label--hasIcon"
@@ -76,15 +76,18 @@ export const authenticatorsSection = ({
           </span>
         </div>
         ${
-          warnFewDevices
+          warnNoPasskeys
             ? html`<p
                 style="max-width: 30rem;"
                 class="warning-message t-paragraph t-lead"
               >
-                Add a Passkey or recovery method to make your Internet Identity
-                more secure.
+                Set up a passkey and securely sign into dapps by unlocking your
+                device.
               </p>`
-            : undefined
+            : html`<p style="max-width: 30rem;" class="t-paragraph t-lead">
+                Use passkeys to hold assets and securely sign into dapps by
+                unlocking your device.
+              </p>`
         }
 
         <div class="c-action-list">

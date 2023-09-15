@@ -462,13 +462,7 @@ export const iiPages: Record<string, () => void> = {
       identityBackground,
       userNumber,
       devices: {
-        authenticators: [
-          {
-            alias: "Some Passkey",
-            rename: () => console.log("rename"),
-            remove: () => console.log("remove"),
-          },
-        ],
+        authenticators: [],
         recoveries: {},
         pinAuthenticators: [
           {
