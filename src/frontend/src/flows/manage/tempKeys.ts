@@ -27,7 +27,7 @@ export const tempKeyWarningSection = ({
       case "add_recovery":
         return html`
           <button
-            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+            class="c-button c-button--primary"
             @click="${btnAction.action}"
             id="addRecovery"
           >
@@ -37,7 +37,7 @@ export const tempKeyWarningSection = ({
       case "add_passkey":
         return html`
           <button
-            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+            class="c-button c-button--primary"
             @click="${btnAction.action}"
             id="addRecovery"
           >
