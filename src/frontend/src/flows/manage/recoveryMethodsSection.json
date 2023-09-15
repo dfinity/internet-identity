@@ -1,5 +1,6 @@
 {
   "en": {
+    "security_warning": "Security Warning",
     "recovery_phrase_enabled": "You enabled a recovery phrase.",
     "recovery_key_enabled": "You enabled a recovery device."
   }
