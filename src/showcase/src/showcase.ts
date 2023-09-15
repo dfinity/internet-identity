@@ -147,6 +147,7 @@ export const iiPages: Record<string, () => void> = {
       identityBackground,
       userNumber,
       onContinue: () => console.log("done"),
+      stepper: registerStepper({ current: "finish" }),
     }),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   promptDeviceAlias: () =>
