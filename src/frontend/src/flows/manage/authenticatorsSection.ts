@@ -33,24 +33,25 @@ export const dedupLabels = (
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
-  warnFewDevices,
+  warnNoPasskeys,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
-  warnFewDevices: boolean;
+  warnNoPasskeys: boolean;
 }): TemplateResult => {
-  const wrapClasses = ["l-stack"];
-
-  if (warnFewDevices) {
-    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
-  }
+  const wrapClasses = [
+    "l-stack",
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoPasskeys ? ["c-card--warning"] : []),
+  ];
 
   const authenticators = dedupLabels(authenticators_);
 
   return html`
     <aside class=${wrapClasses.join(" ")}>
       ${
-        warnFewDevices
+        warnNoPasskeys
           ? html`
               <span
                 class="c-card__label c-card__label--hasIcon"
@@ -63,7 +64,7 @@ export const authenticatorsSection = ({
                 <h2>Security warning</h2>
               </span>
             `
-          : undefined
+          : ""
       }
         <div class="t-title t-title--complications">
           <h2 class="t-title">Passkeys</h2>
@@ -75,18 +76,15 @@ export const authenticatorsSection = ({
             </span>
           </span>
         </div>
-        ${
-          warnFewDevices
-            ? html`<p
-                style="max-width: 30rem;"
-                class="warning-message t-paragraph t-lead"
-              >
-                Add a Passkey or recovery method to make your Internet Identity
-                more secure.
-              </p>`
-            : undefined
+        <p
+          style="max-width: 30rem;"
+          class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
+        >${
+          warnNoPasskeys
+            ? "Set up a passkey and securely sign into dapps by unlocking your device."
+            : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
         }
-
+        </p>
         <div class="c-action-list">
           <ul>
           ${authenticators.map((authenticator, index) =>

@@ -167,11 +167,8 @@ const displayManageTemplate = ({
   identityBackground: IdentityBackground;
   tempKeysWarning?: TempKeysWarning;
 }): TemplateResult => {
-  // Nudge the user to add a device iff there is one or fewer authenticators and no recoveries
-  const warnFewDevices =
-    authenticators.length <= 1 &&
-    isNullish(recoveries.recoveryPhrase) &&
-    isNullish(recoveries.recoveryKey);
+  // Nudge the user to add a passkey if there is none
+  const warnNoPasskeys = authenticators.length === 0;
   const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
@@ -198,7 +195,7 @@ const displayManageTemplate = ({
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
-      warnFewDevices,
+      warnNoPasskeys,
     })}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     ${logoutSection()}
