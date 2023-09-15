@@ -39,7 +39,7 @@ export const tempKeyWarningSection = ({
           <button
             class="c-button c-button--primary"
             @click="${btnAction.action}"
-            id="addRecovery"
+            id="addPasskey"
           >
             <span>${copy.add_new_passkey}</span>
           </button>
