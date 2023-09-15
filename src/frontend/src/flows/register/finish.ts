@@ -13,26 +13,27 @@ import {
   withRef,
 } from "$src/utils/lit-html";
 import { OmitParams } from "$src/utils/utils";
-import { html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { registerStepper } from "./stepper";
 
 export const displayUserNumberTemplate = ({
   onContinue,
   userNumber,
   identityBackground,
+  stepper,
   scrollToTop = false,
 }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: IdentityBackground;
+  stepper: TemplateResult;
   /* put the page into view */
   scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
 
-  ${registerStepper({ current: "finish" })}
+  ${stepper}
 <hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
@@ -124,15 +125,18 @@ export const displayUserNumberWarmup = (): OmitParams<
 export const displayUserNumber = ({
   userNumber,
   identityBackground,
+  stepper,
 }: {
   userNumber: bigint;
   identityBackground: IdentityBackground;
+  stepper: TemplateResult;
 }): Promise<void> => {
   return new Promise((resolve) =>
     displayUserNumberPage({
       onContinue: () => resolve(),
       userNumber,
       identityBackground,
+      stepper,
       scrollToTop: true,
     })
   );

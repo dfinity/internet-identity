@@ -108,7 +108,8 @@ export const registerFlow = async <T>({
           userAgent: navigator.userAgent,
           uaParser,
         }),
-        stepper: pinStepper({ current: "captcha" }),
+        captchaStepper: pinStepper({ current: "captcha" }),
+        finishStepper: pinStepper({ current: "finish" }),
         keyType: { browser_storage_key: null },
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
@@ -123,7 +124,8 @@ export const registerFlow = async <T>({
       return {
         identity,
         alias,
-        stepper: registerStepper({ current: "captcha" }),
+        captchaStepper: registerStepper({ current: "captcha" }),
+        finishStepper: registerStepper({ current: "finish" }),
         credentialId: new Uint8Array(identity.rawId),
         keyType: authenticatorAttachmentToKeyType(
           identity.getAuthenticatorAttachment()
@@ -139,14 +141,16 @@ export const registerFlow = async <T>({
   const {
     identity,
     alias,
-    stepper,
+    captchaStepper,
+    finishStepper,
     credentialId,
     keyType,
     finalizeIdentity,
   }: {
     identity: SignIdentity;
     alias: string;
-    stepper: TemplateResult;
+    captchaStepper: TemplateResult;
+    finishStepper: TemplateResult;
     credentialId?: CredentialId;
     keyType: KeyType;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
@@ -154,7 +158,7 @@ export const registerFlow = async <T>({
 
   const result = await promptCaptcha({
     createChallenge,
-    stepper,
+    stepper: captchaStepper,
     register: async ({ chars, challenge }) => {
       const result = await register({
         identity,
@@ -181,7 +185,10 @@ export const registerFlow = async <T>({
     const userNumber = result.userNumber;
     await finalizeIdentity?.(userNumber);
     setAnchorUsed(userNumber);
-    await displayUserNumber({ userNumber });
+    await displayUserNumber({
+      userNumber,
+      stepper: finishStepper,
+    });
   }
   return result;
 };
