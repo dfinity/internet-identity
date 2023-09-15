@@ -39,11 +39,12 @@ export const authenticatorsSection = ({
   onAddDevice: () => void;
   warnNoPasskeys: boolean;
 }): TemplateResult => {
-  const wrapClasses = ["l-stack", "c-card", "c-card--narrow"];
-
-  if (warnNoPasskeys) {
-    wrapClasses.push("c-card--warning");
-  }
+  const wrapClasses = [
+    "l-stack",
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoPasskeys ? ["c-card--warning"] : []),
+  ];
 
   const authenticators = dedupLabels(authenticators_);
 
@@ -63,7 +64,7 @@ export const authenticatorsSection = ({
                 <h2>Security warning</h2>
               </span>
             `
-          : undefined
+          : ""
       }
         <div class="t-title t-title--complications">
           <h2 class="t-title">Passkeys</h2>
