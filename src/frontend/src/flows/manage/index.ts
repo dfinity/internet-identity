@@ -22,6 +22,7 @@ import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { tempKeysSection } from "$src/flows/manage/tempKeys";
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
@@ -36,10 +37,7 @@ import {
 import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
-import {
-  authenticatorsSection,
-  tempKeysSection,
-} from "./authenticatorsSection";
+import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
   protectDevice,
@@ -189,7 +187,7 @@ const displayManageTemplate = ({
       warnFewDevices,
     })}
     ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators })
+      ? tempKeysSection({ authenticators: pinAuthenticators, i18n: new I18n() })
       : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     ${logoutSection()}
