@@ -32,7 +32,7 @@ const setPinTemplate = ({
     focus,
   });
   const slot = html`
-    ${pinStepper({ current: "set" })}
+    ${pinStepper({ current: "set_pin" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.set_pin_for_ii}</h1>
     </hgroup>

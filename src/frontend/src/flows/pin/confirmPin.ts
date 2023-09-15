@@ -43,7 +43,7 @@ const confirmPinTemplate = ({
     focus,
   });
   const slot = html`
-    ${pinStepper({ current: "confirm" })}
+    ${pinStepper({ current: "set_pin" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.confirm_pin}</h1>
     </hgroup>
