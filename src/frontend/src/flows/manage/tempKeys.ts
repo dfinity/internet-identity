@@ -22,14 +22,14 @@ export const tempKeyWarningSection = ({
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
 
-  const warningButtonCopy = (btnAction: TempKeysWarning) => {
-    switch (btnAction.tag) {
+  const warningButtonCopy = (tempKeysWarning: TempKeysWarning) => {
+    switch (tempKeysWarning.tag) {
       case "add_recovery":
         return copy.add_recovery_phrase;
       case "add_passkey":
         return copy.add_new_passkey;
       default:
-        unreachable(btnAction, "unknown temp keys warning action");
+        unreachable(tempKeysWarning, "unknown temp keys warning tag");
     }
   };
 
