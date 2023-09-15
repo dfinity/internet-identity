@@ -29,12 +29,12 @@ export const recoveryMethodsSection = ({
   const i18n = new I18n();
 
   const copy = i18n.i18n(copyJson);
-  const wrapClasses = ["l-stack"];
   const warnNoRecovery = isNullish(recoveryPhrase) && isNullish(recoveryKey);
+  const wrapClasses = [
+    "l-stack",
+    ...(warnNoRecovery ? ["c-card", "c-card--narrow", "c-card--warning"] : []),
+  ];
 
-  if (warnNoRecovery) {
-    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
-  }
   return html`
     <aside class=${wrapClasses.join(" ")}>
       ${warnNoRecovery
@@ -50,7 +50,7 @@ export const recoveryMethodsSection = ({
               <h2>${copy.security_warning}</h2>
             </span>
           `
-        : undefined}
+        : ""}
       <div class="t-title">
         <h2>Recovery Methods</h2>
       </div>
@@ -58,10 +58,10 @@ export const recoveryMethodsSection = ({
         <ul>
           ${isNullish(recoveryPhrase)
             ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
-            : recoveryPhraseItem({ recoveryPhrase, i18n: i18n })}
+            : recoveryPhraseItem({ recoveryPhrase, i18n })}
           ${isNullish(recoveryKey)
             ? missingRecovery({ recovery: "key", addRecoveryKey })
-            : recoveryKeyItem({ recoveryKey, i18n: i18n })}
+            : recoveryKeyItem({ recoveryKey, i18n })}
         </ul>
       </div>
     </aside>
