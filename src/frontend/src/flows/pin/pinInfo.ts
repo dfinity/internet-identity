@@ -1,3 +1,4 @@
+import { warningIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
 import { pinStepper } from "$src/flows/pin/stepper";
 import { I18n } from "$src/i18n";
@@ -42,6 +43,24 @@ const pinInfoTemplate = ({
     >
       ${copy.cancel}
     </button>
+    <section class="l-stack--tight">
+      <aside class="c-card c-card--narrow">
+        <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
+          <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+            >${warningIcon}</i
+          >
+          <h2>${copy.security_warning}</h2>
+        </span>
+        <div class="t-title t-title--complications">
+          <h2 style="max-width: 30rem;" class="t-title">
+            ${copy.are_you_sure}
+          </h2>
+        </div>
+        <p style="max-width: 30rem;" class="warning-message t-paragraph t-lead">
+          ${copy.clear_browser_storage_add_passkey}
+        </p>
+      </aside>
+    </section>
     <section class="c-marketing-block">
       <aside class="l-stack">
         <h3 class="t-title">${copy.what_is_temporary_key}</h3>
