@@ -132,7 +132,7 @@ function update() {
             echo "converting '$old' -> '$new'"
             # if the file is a huge SVG (surprising, but why not)
             # then convert it to a raster webp (with transparency)
-            convert -background none -size 256x256 "$old" "$new"
+            convert -background none -resize 256x256 "$old" "$new"
             dapps_json_tmp=$(mktemp)
             jq <"$DAPPS_JSON" \
                 --arg old "$(basename "$old")" --arg new "$(basename "$new")" \
