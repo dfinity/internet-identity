@@ -28,7 +28,7 @@ services:
   # Selenium container with chromedriver and chrome
   selenium:
     # use the seleniarm image that provides multiple architecture variants including one for M1 chips
-    image: seleniarm/standalone-chromium:104.0
+    image: seleniarm/standalone-chromium:116.0
     ports:
       - "4444:4444" # port for the test runner to connect to chromedriver
       - "7900:7900" # port to access the page to watch what chrome is doing (http://localhost:7900, pw is secret)
@@ -36,6 +36,8 @@ services:
     environment: # default number of sessions is 1. We need more because of flows involving multiple devices (which we simulate using parallel sessions).
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true
       - SE_NODE_MAX_SESSIONS=5
+      - SCREEN_WIDTH=1920
+      - SCREEN_HEIGHT=1080
     networks:
       - ic
 networks:
