@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
+      - run: npm ci
 
       # Run the update
       - name: Check new dapps file
