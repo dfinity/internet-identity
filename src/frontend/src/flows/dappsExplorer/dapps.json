@@ -6,6 +6,34 @@
     "logo": "dscvr_logo.webp"
   },
   {
+    "name": "OpenChat",
+    "oneLiner": "Decentralized alternative to WhatsApp",
+    "website": "https://oc.app/",
+    "logo": "openchat_logo.webp"
+  },
+  {
+    "name": "ICPSwap",
+    "website": "https://icpswap.com",
+    "logo": "icpswap_logo.webp"
+  },
+  {
+    "name": "Funded",
+    "oneLiner": "Fund your favorite projects and get NFT rewards",
+    "website": "https://funded.app/",
+    "logo": "funded_logo.webp"
+  },
+  {
+    "name": "Dmail",
+    "oneLiner": "Web3 Decentralized Email Client",
+    "website": "https://dmail.ai/",
+    "logo": "dmail_logo.webp"
+  },
+  {
+    "name": "ICDex",
+    "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
+    "logo": "icdex_logo.webp"
+  },
+  {
     "name": "distrikt",
     "oneLiner": "Censorship-resistant fully on-chain social media platform",
     "website": "https://distrikt.app",
@@ -16,17 +44,16 @@
     "logo": "distrikt_logo.webp"
   },
   {
-    "name": "Kontribute",
-    "oneLiner": "Web3 storytelling",
-    "website": "https://kontribute.app",
-    "logo": "kontribute_logo.webp"
+    "name": "Hot or Not",
+    "oneLiner": "Token rewards for both content creators and lurkers",
+    "website": "https://hotornot.wtf/",
+    "logo": "hot_or_not_logo.webp"
   },
   {
-    "name": "Juno",
-    "oneLiner": "Build Web3 Apps Like It's Web2",
-    "website": "https://juno.build",
-    "authOrigins": ["https://console.juno.build"],
-    "logo": "juno_logo.svg"
+    "name": "Yumi",
+    "oneLiner": "NFT marketplace for digital and physical assets",
+    "website": "https://tppkg-ziaaa-aaaal-qatrq-cai.raw.ic0.app/",
+    "logo": "yumi_logo.webp"
   },
   {
     "name": "Kinic",
@@ -35,21 +62,9 @@
     "logo": "kinic_logo.webp"
   },
   {
-    "name": "OpenChat",
-    "oneLiner": "Decentralized alternative to WhatsApp",
-    "website": "https://oc.app/",
-    "logo": "openchat_logo.webp"
-  },
-  {
-    "name": "Uniswap Front End on the IC",
-    "website": "https://yrog5-xqaaa-aaaap-qa5za-cai.ic0.app/#/swap",
-    "oneLiner": "Front-End On-Chain",
-    "logo": "uniswapfrontendontheic_logo.webp"
-  },
-  {
-    "name": "Seers",
-    "website": "https://seers.social/",
-    "logo": "seers_logo.webp"
+    "name": "MODCLUB",
+    "website": "https://ljyte-qiaaa-aaaah-qaiva-cai.raw.ic0.app/",
+    "logo": "modclub_logo.webp"
   },
   {
     "name": "TAGGR",
@@ -62,20 +77,46 @@
     "oneLiner": "Blending forums and blogs - controlled by a DAO"
   },
   {
-    "name": "Funded",
-    "oneLiner": "Fund your favorite projects and get NFT rewards",
-    "website": "https://funded.app/",
-    "logo": "funded_logo.webp"
+    "name": "Catalyze",
+    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
+    "oneLiner": "Manage your Web3 communities and events",
+    "logo": "catalyze_logo.webp"
   },
   {
-    "name": "Content Fly",
-    "website": "https://contentfly.app/",
-    "logo": "contentfly_logo.webp"
+    "name": "Juno",
+    "oneLiner": "Build Web3 dApps like Web2",
+    "website": "https://juno.build",
+    "authOrigins": ["https://console.juno.build"],
+    "logo": "juno_logo.svg"
   },
   {
-    "name": "ICDex",
-    "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
-    "logo": "icdex_logo.webp"
+    "name": "Arth",
+    "oneLiner": "Arth ckBTC wallet and swap btc<>ckBtc",
+    "website": "https://arth.foo",
+    "logo": "arth_logo.png"
+  },
+  {
+    "name": "Signals",
+    "website": "https://signalsicp.com/",
+    "logo": "signals_logo.webp",
+    "oneLiner": "A location based app for empowering local communities"
+  },
+  {
+    "name": "Canistergeek",
+    "oneLiner": "IC canister management tool",
+    "website": "https://canistergeek.app/",
+    "logo": "canistergeek_logo.webp"
+  },
+  {
+    "name": "MORA",
+    "oneLiner": "A Web3 space for writers to express autonomy of thought ",
+    "website": "https://mora.app",
+    "logo": "mora_logo.png"
+  },
+  {
+    "name": "DSocial",
+    "website": "https://DSocial.app ",
+    "logo": "dsocial_logo.webp"
   },
   {
     "name": "UnfoldVR",
@@ -84,22 +125,52 @@
     "logo": "unfoldvr_logo.webp"
   },
   {
-    "name": "Yumi",
-    "oneLiner": "NFT marketplace for digital and physical assets",
-    "website": "https://tppkg-ziaaa-aaaal-qatrq-cai.raw.ic0.app/",
-    "logo": "yumi_logo.webp"
+    "name": "Seers",
+    "website": "https://seers.social/",
+    "logo": "seers_logo.webp"
   },
   {
-    "name": "Hot or Not",
-    "oneLiner": "Token rewards for both content creators and lurkers",
-    "website": "https://hotornot.wtf/",
-    "logo": "hot_or_not_logo.webp"
+    "name": "Nuance",
+    "website": "https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app/",
+    "logo": "nuance_logo.webp"
   },
   {
-    "name": "Canlista",
-    "oneLiner": "Internet Computer Canister Registry",
-    "website": "https://k7gat-daaaa-aaaae-qaahq-cai.ic0.app/",
-    "logo": "canlista_logo.webp"
+    "name": "Kontribute",
+    "oneLiner": "Web3 storytelling",
+    "website": "https://kontribute.app",
+    "logo": "kontribute_logo.webp"
+  },
+  {
+    "name": "IC Drive",
+    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/#/",
+    "logo": "icdrive_logo.webp"
+  },
+  {
+    "name": "Content Fly",
+    "website": "https://contentfly.app/",
+    "logo": "contentfly_logo.webp"
+  },
+  {
+    "name": "CrowdGov.org",
+    "oneLiner": "The simplified, one stop shop for IC Governance.",
+    "website": "https://crowdgov.org",
+    "logo": "crowdgovorg_logo.webp"
+  },
+  {
+    "name": "Saga Tarot",
+    "website": "https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app/",
+    "logo": "sagatarot_logo.webp"
+  },
+  {
+    "name": "ICME",
+    "website": "https://sygsn-caaaa-aaaaf-qaahq-cai.raw.ic0.app/",
+    "logo": "icme_logo.webp"
+  },
+  {
+    "name": "iKnows",
+    "oneLiner": "Explore unlimited knowledge, with Q&A interaction between you and me!",
+    "website": "https://ffxwx-3yaaa-aaaah-qajua-cai.ic0.app",
+    "logo": "iknows_logo.png"
   },
   {
     "name": "Mission Is Possible",
@@ -108,31 +179,70 @@
     "logo": "missionispossible_logo.webp"
   },
   {
-    "name": "Catalyze",
-    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
-    "oneLiner": "Manage your Web3 communities and events",
-    "logo": "catalyze_logo.webp"
+    "name": "Canlista",
+    "oneLiner": "Internet Computer Canister Registry",
+    "website": "https://k7gat-daaaa-aaaae-qaahq-cai.ic0.app/",
+    "logo": "canlista_logo.webp"
   },
   {
-    "name": "ICME",
-    "website": "https://sygsn-caaaa-aaaaf-qaahq-cai.raw.ic0.app/",
-    "logo": "icme_logo.webp"
+    "name": "aedile",
+    "website": "https://aedile.io",
+    "logo": "aedile_logo.webp"
   },
   {
-    "name": "Saga Tarot",
-    "website": "https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app/",
-    "logo": "sagatarot_logo.webp"
+    "name": "Uniswap Frontend on ICP",
+    "website": "https://yrog5-xqaaa-aaaap-qa5za-cai.ic0.app/#/swap",
+    "oneLiner": "Front-End On-Chain",
+    "logo": "uniswapfrontendontheic_logo.webp"
   },
   {
-    "name": "IC Drive",
-    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/#/",
-    "logo": "icdrive_logo.webp"
+    "name": "NFTAnvil",
+    "website": "https://nftanvil.com",
+    "logo": "nftanvil_logo.webp"
   },
   {
-    "name": "CrowdGov.org",
-    "oneLiner": "The simplified, one stop shop for IC Governance.",
-    "website": "https://crowdgov.org",
-    "logo": "crowdgovorg_logo.webp"
+    "name": "ICEvent",
+    "website": "https://icevent.app/",
+    "logo": "icevent_logo_112x112.png"
+  },
+  {
+    "name": "Stoic Wallet",
+    "website": "https://www.stoicwallet.com/",
+    "logo": "stoicwallet_logo.webp"
+  },
+  {
+    "name": "Usergeek",
+    "oneLiner": "Product analytics for IC dapps",
+    "website": "https://usergeek.app/",
+    "logo": "usergeek_logo.webp"
+  },
+  {
+    "name": "Configeek",
+    "oneLiner": "Remote configuration tool",
+    "website": "https://configeek.app/",
+    "logo": "configeek_logo.webp"
+  },
+  {
+    "name": "Canister Store",
+    "oneLiner": "Empowering Users to Easily Deploy Canisters on the Internet Computer",
+    "website": "https://canister.app",
+    "logo": "canister-store_logo.png"
+  },
+  {
+    "name": "cyql.io",
+    "website": "https://cyql.io/",
+    "logo": "cyqlio_logo.svg",
+    "oneLiner": "Curated Internet Computer projects gallery."
+  },
+  {
+    "name": "Dbox",
+    "website": "https://dbox.foundation/",
+    "logo": "dbox_logo.webp"
+  },
+  {
+    "name": "ICNaming",
+    "website": "https://app-testnet.icnaming.com/",
+    "logo": "icnaming_logo.webp"
   },
   {
     "name": "NNS Dapp",
@@ -146,94 +256,9 @@
     "logo": "tipjar_logo.webp"
   },
   {
-    "name": "aedile",
-    "website": "https://aedile.io",
-    "logo": "aedile_logo.webp"
-  },
-  {
     "name": "Rise of the Magni",
     "website": "https://riseofthemagni.com/",
     "logo": "riseofthemagni_logo.webp"
-  },
-  {
-    "name": "Nuance",
-    "website": "https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app/",
-    "logo": "nuance_logo.webp"
-  },
-  {
-    "name": "MODCLUB",
-    "website": "https://ljyte-qiaaa-aaaah-qaiva-cai.raw.ic0.app/",
-    "logo": "modclub_logo.webp"
-  },
-  {
-    "name": "NFTAnvil",
-    "website": "https://nftanvil.com",
-    "logo": "nftanvil_logo.webp"
-  },
-  {
-    "name": "Dbox",
-    "website": "https://dbox.foundation/",
-    "logo": "dbox_logo.webp"
-  },
-  {
-    "name": "Canistergeek",
-    "oneLiner": "IC canister management tool",
-    "website": "https://canistergeek.app/",
-    "logo": "canistergeek_logo.webp"
-  },
-  {
-    "name": "Configeek",
-    "oneLiner": "Remote configuration tool",
-    "website": "https://configeek.app/",
-    "logo": "configeek_logo.webp"
-  },
-  {
-    "name": "Usergeek",
-    "oneLiner": "Product analytics for IC dapps",
-    "website": "https://usergeek.app/",
-    "logo": "usergeek_logo.webp"
-  },
-  {
-    "name": "ICPSwap",
-    "website": "https://icpswap.com",
-    "logo": "icpswap_logo.webp"
-  },
-  {
-    "name": "Dmail",
-    "oneLiner": "Web3 Decentralized Email Client",
-    "website": "https://dmail.ai/",
-    "logo": "dmail_logo.webp"
-  },
-  {
-    "name": "DSocial",
-    "website": "https://DSocial.app ",
-    "logo": "dsocial_logo.webp"
-  },
-  {
-    "name": "ICNaming",
-    "website": "https://app-testnet.icnaming.com/",
-    "logo": "icnaming_logo.webp"
-  },
-  {
-    "name": "Stoic Wallet",
-    "website": "https://www.stoicwallet.com/",
-    "logo": "stoicwallet_logo.webp"
-  },
-  {
-    "name": "Departure Labs",
-    "website": "https://uhmvd-qqaaa-aaaam-aavna-cai.ic0.app/",
-    "logo": "departurelabs_logo.webp"
-  },
-  {
-    "name": "MORA",
-    "oneLiner": "A Web3 space for writers to express autonomy of thought ",
-    "website": "https://mora.app",
-    "logo": "mora_logo.png"
-  },
-  {
-    "name": "ICEvent",
-    "website": "https://icevent.app/",
-    "logo": "icevent_logo_112x112.png"
   },
   {
     "name": "FootballGod",
@@ -251,21 +276,63 @@
     "logo": "blocklist.png"
   },
   {
-    "name": "Bink",
-    "oneLiner": "Superior alternative to Linktree",
-    "website": "https://b.ink",
-    "logo": "bink_logo.png"
+    "name": "Vibeverse",
+    "oneLiner": "A vibrant ecosystem where users can learn about new AI tools, AI content, AI Movies, and more",
+    "website": "https://h5fnl-4iaaa-aaaap-abddq-cai.icp0.io/",
+    "logo": "vibeverse_logo.png"
   },
   {
-    "name": "iKnows",
-    "oneLiner": "Explore unlimited knowledge, with Q&A interaction between you and me!",
-    "website": "https://ffxwx-3yaaa-aaaah-qajua-cai.ic0.app",
-    "logo": "iknows_logo.png"
+    "name": "DSign",
+    "website": "https://www.dsign.ooo",
+    "logo": "dsign_logo.webp",
+    "oneLiner": "Collaborative Product Design Innovation Hub"
   },
   {
-    "name": "Canister Store",
-    "oneLiner": "Empowering Users to Easily Deploy Canisters on the Internet Computer",
-    "website": "https://canister.app",
-    "logo": "canister-store_logo.png"
+    "name": "Metaforo ICP deployment",
+    "oneLiner": "Deploy the frontend of a web3 forum system - metaforo.io on ICP",
+    "website": "https://can1.metaforo.io/",
+    "logo": "metaforo-icp_logo.png"
+  },
+  {
+    "name": "Rakeoff",
+    "website": "https://rakeoff.io/",
+    "logo": "rakeoff_logo.webp",
+    "oneLiner": "Rakeoff is a user-friendly crypto staking rewards platform on ICP."
+  },
+  {
+    "name": "Oisy Wallet",
+    "oneLiner": "A novel Ethereum wallet hosted on the Internet Computer",
+    "website": "https://oisy.com",
+    "logo": "oisy_logo.svg"
+  },
+  {
+    "name": "D-VOTE",
+    "website": "https://7y3zv-rqaaa-aaaag-abswa-cai.icp0.io",
+    "logo": "d-vote_logo.webp",
+    "oneLiner": "Transparent, tamper-proof voting on blockchain."
+  },
+  {
+    "name": "Joined Africa",
+    "oneLiner": "Joined Africa is a marketplace where sellers advertise products in crypto currency, connecting buyers directly with sellers within Africa.",
+    "website": "https://joinedafrica.com",
+    "logo": "joined-africa_logo.webp"
+  },
+  {
+    "name": "IC HUB",
+    "oneLiner": "Your gateway to web3 apps: connect, chat and explore all in one place",
+    "website": "https://md7ke-jyaaa-aaaak-qbrya-cai.ic0.app/",
+    "logo": "ichub_logo.png"
+  },
+  {
+    "name": "MotokoPilot",
+    "website": "https://d7dm6-sqaaa-aaaag-qcgma-cai.icp0.io/",
+    "oneLiner": "Your AI-powered companion for simplifying and streamlining the Motoko coding experience.",
+    "logo": "motokopilot_logo.png"
+  },
+  {
+    "name": "NOBLEBLOCKS",
+    "website": "https://www.nobleblocks.com",
+    "logo": "nobleblocks_logo.webp",
+    "oneLiner": "A Community-Driven DeSci Project for Scientific Publishing"
   }
 ]
