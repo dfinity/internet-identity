@@ -71,6 +71,10 @@ export class RegisterView extends View {
     await this.browser.$('[data-action="construct-identity"').click();
   }
 
+  async createPin(): Promise<void> {
+    await this.browser.$('[data-action="construct-pin-identity"').click();
+  }
+
   // View: Register confirmation
   async waitForRegisterConfirm(): Promise<void> {
     await this.browser
@@ -104,6 +108,50 @@ export class RegisterView extends View {
 
   async registerConfirmIdentity(): Promise<void> {
     await this.browser.$("#displayUserContinue").click();
+  }
+
+  async assertPinRegistrationNotShown(): Promise<void> {
+    await this.browser
+      .$('[data-action="construct-pin-identity"')
+      .waitForDisplayed({ reverse: true });
+  }
+}
+
+export class PinRegistrationView extends View {
+  async waitForPinInfo(): Promise<void> {
+    await this.browser
+      .$('[data-action="continue-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async pinInfoContinue(): Promise<void> {
+    await this.browser.$('[data-action="continue-pin"').click();
+  }
+  async waitForSetPin(): Promise<void> {
+    await this.browser
+      .$('[data-role="set-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async setPin(pin: string): Promise<void> {
+    const inputs = await this.browser.$('[data-role="set-pin"]').$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
+  }
+  async waitForConfirmPin(): Promise<void> {
+    await this.browser
+      .$('[data-role="confirm-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async confirmPin(pin: string): Promise<void> {
+    const inputs = await this.browser
+      .$('[data-role="confirm-pin"]')
+      .$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
   }
 }
 
