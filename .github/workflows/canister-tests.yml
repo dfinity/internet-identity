@@ -337,12 +337,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Required by the ic-test-state-machine
-      - name: Install openssl (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew install openssl@3
-
       - name: Download nextest
         run: |
           set -euo pipefail
