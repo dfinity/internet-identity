@@ -4,7 +4,7 @@ use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use identity_jose::jwk::JwkType;
-use identity_jose::jws::{verify_credential_jws, Decoder};
+use identity_jose::jws::{set_ic_root_public_key_for_testing, verify_credential_jws, Decoder};
 use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
@@ -87,6 +87,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     );
 
     // Verify the credentials in two ways: via env and via external function.
+    set_ic_root_public_key_for_testing(env.root_key());
     verify_id_alias_credential(
         &env,
         prepared_id_alias.canister_sig_pk.clone(),
@@ -95,7 +96,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     );
     verify_credential_jws(
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
-        &env.root_key(),
+        canister_id,
     )
     .expect("external verification failed");
     verify_id_alias_credential(
@@ -108,7 +109,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
-        &env.root_key(),
+        canister_id,
     )
     .expect("external verification failed");
     Ok(())
