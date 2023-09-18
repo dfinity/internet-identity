@@ -91,6 +91,7 @@ pub enum ContentType {
     OCTETSTREAM,
     PNG,
     SVG,
+    JPG,
     WOFF2,
 }
 
@@ -258,6 +259,7 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
             "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
             "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
             "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
+            "jpg" | "jpeg" => (file_bytes, ContentEncoding::Identity, ContentType::JPG),
             "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
             "woff2" => (file_bytes, ContentEncoding::Identity, ContentType::WOFF2),
             "woff2.gz" => (file_bytes, ContentEncoding::GZip, ContentType::WOFF2),

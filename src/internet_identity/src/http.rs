@@ -28,6 +28,7 @@ impl ContentType {
             ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
             ContentType::PNG => "image/png".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
+            ContentType::JPG => "image/jpeg".to_string(),
             ContentType::WOFF2 => "application/font-woff2".to_string(),
         }
     }
