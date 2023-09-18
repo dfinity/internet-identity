@@ -113,7 +113,7 @@ export const pinInput = <T>({
           /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
            * type="password", otherwise the browser tries to save one char as a password */
           (_, ix) => html`
-            <li class="c-list--pin-char c-input--anchor">
+            <li class="c-list__item--pin c-input--anchor">
               <label class="c-input--anchor__wrap">
                 <input
                   ${
