@@ -8,10 +8,8 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
-import { confirmPin } from "$src/flows/pin/confirmPin";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
-import { promptPinInfo } from "$src/flows/pin/pinInfo";
-import { setPin } from "$src/flows/pin/setPin";
+import { setPinFlow } from "$src/flows/pin/setPin";
 import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
@@ -77,30 +75,17 @@ export const registerFlow = async <T>({
   }
   const result_ = await (async () => {
     if (savePasskeyResult === "pin") {
-      const pinInfoResult = await promptPinInfo();
-      if (pinInfoResult === "canceled") {
+      const pinResult = await setPinFlow();
+      if (pinResult.tag === "canceled") {
         return "canceled";
       }
 
-      const result = await setPin();
-      if (result.tag === "canceled") {
-        return "canceled";
-      }
-
-      result.tag satisfies "ok";
-      const { pin } = result;
-      const confirmed = await confirmPin({ expectedPin: pin });
-      if (confirmed.tag === "canceled") {
-        return "canceled";
-      }
-      confirmed.tag satisfies "ok";
+      pinResult.tag satisfies "ok";
 
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
       const { identity, pinIdentityMaterial } = await withLoader(() =>
-        constructPinIdentity({
-          pin,
-        })
+        constructPinIdentity(pinResult)
       );
       return {
         identity,

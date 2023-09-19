@@ -359,6 +359,7 @@ export const iiPages: Record<string, () => void> = {
       onContinue: () => console.log("PIN confirmed"),
       expectedPin: "123456",
       cancel: () => console.log("cancel"),
+      retry: () => console.log("retry"),
     }),
   usePin: () =>
     usePinPage({
