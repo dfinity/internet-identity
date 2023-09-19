@@ -155,6 +155,21 @@ export class PinRegistrationView extends View {
   }
 }
 
+export class PinAuthView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-role="pin"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterPin(pin: string): Promise<void> {
+    const inputs = await this.browser.$('[data-role="pin"]').$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
+  }
+}
+
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
@@ -238,7 +253,9 @@ export class MainView extends View {
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
-    const elems = await this.browser.$$(`//li[@data-device="${deviceName}"]`);
+    const elems = await this.browser.$$(
+      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
+    );
     if (elems.length !== count) {
       throw Error("Bad number of elements");
     }
@@ -246,14 +263,20 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//li[@data-device="${deviceName}"]`)
+      .$(`//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000 });
   }
 
-  async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
+  async waitForRecoveryDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//li[@data-device="${deviceName}"]`)
-      .waitForDisplayed({ timeout: 10_000, reverse: true });
+      .$(`//aside[@data-role="recoveries"]//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForTempKeyDisplay(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//aside[@data-role="temp-keys"]//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async addAdditionalDevice(): Promise<void> {

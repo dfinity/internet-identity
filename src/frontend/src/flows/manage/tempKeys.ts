@@ -70,7 +70,10 @@ export const tempKeysSection = ({
   const authenticators = dedupLabels(authenticators_);
   const copy = i18n.i18n(copyJson);
 
-  return html` <aside class="l-stack c-card c-card--narrow">
+  return html` <aside
+    class="l-stack c-card c-card--narrow"
+    data-role="temp-keys"
+  >
     <div class="t-title t-title--complications">
       <h2 class="t-title">${copy.temporary_key}</h2>
     </div>

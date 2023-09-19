@@ -1,6 +1,7 @@
 import {
   AuthenticateView,
   MainView,
+  PinAuthView,
   PinRegistrationView,
   RecoveryMethodSelectorView,
   RegisterView,
@@ -61,6 +62,15 @@ export const FLOWS = {
     await registerView.registerConfirmIdentity();
     return userNumber;
   },
+  registerPinWelcomeView: async (
+    browser: WebdriverIO.Browser,
+    pin: string
+  ): Promise<string> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.register();
+    return await FLOWS.registerPin(browser, pin);
+  },
   login: async (
     userNumber: string,
     deviceName: string,
@@ -79,6 +89,27 @@ export const FLOWS = {
     await recoveryMethodSelectorView.skipRecovery();
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
+  },
+  loginPin: async (
+    userNumber: string,
+    pin: string,
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.login();
+    await welcomeView.typeUserNumber(userNumber);
+    await browser.$("button[data-action='continue']").click();
+    const pinAuthView = new PinAuthView(browser);
+    await pinAuthView.waitForDisplay();
+    await pinAuthView.enterPin(pin);
+    // NOTE: handle recovery nag because there is no recovery phrase
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skipRecovery();
+    const mainView = new MainView(browser);
+    await mainView.waitForTempKeyDisplay(deviceName);
   },
   addRecoveryMechanismSeedPhrase: async (
     browser: WebdriverIO.Browser

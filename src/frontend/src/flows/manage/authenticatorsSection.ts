@@ -49,7 +49,7 @@ export const authenticatorsSection = ({
   const authenticators = dedupLabels(authenticators_);
 
   return html`
-    <aside class=${wrapClasses.join(" ")}>
+    <aside class=${wrapClasses.join(" ")} data-role="passkeys">
       ${
         warnNoPasskeys
           ? html`
