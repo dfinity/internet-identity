@@ -1,4 +1,6 @@
 import {
+  AddDeviceSuccessView,
+  AddRemoteDeviceInstructionsView,
   AuthenticateView,
   MainView,
   PinAuthView,
@@ -140,5 +142,21 @@ export const FLOWS = {
     await recoveryMethodSelectorView.seedPhraseFill();
 
     return seedPhrase;
+  },
+  addFidoDevice: async (browser: WebdriverIO.Browser): Promise<void> => {
+    const mainView = new MainView(browser);
+    await mainView.waitForDisplay();
+    await mainView.addAdditionalDevice();
+    const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
+      browser
+    );
+    await addRemoteDeviceInstructionsView.addFIDODevice();
+
+    await browser.pause(10_000);
+
+    // success page
+    const addDeviceSuccessView = new AddDeviceSuccessView(browser);
+    await addDeviceSuccessView.waitForDisplay();
+    await addDeviceSuccessView.continue();
   },
 };

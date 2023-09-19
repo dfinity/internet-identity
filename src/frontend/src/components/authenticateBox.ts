@@ -1,6 +1,7 @@
 import { withLoader } from "$src/components/loader";
 import {
   PinIdentityMaterial,
+  pinIdentityToDerPubkey,
   reconstructPinIdentity,
 } from "$src/crypto/pinIdentity";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
@@ -16,7 +17,12 @@ import {
   LoginFlowSuccess,
   apiResultToLoginFlowResult,
 } from "$src/utils/flowResult";
-import { Connection, LoginResult } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  LoginResult,
+  bufferEqual,
+} from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
 import {
   getAnchors,
@@ -40,6 +46,7 @@ import {
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
 
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import copyJson from "./authenticateBox.json";
 
 /** Template used for rendering specific authentication screens. See `authnScreens` below
@@ -68,7 +75,7 @@ export const authenticateBox = async ({
   templates: AuthnTemplates;
 }): Promise<LoginData & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    authenticateBoxFlow({
+    authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
       i18n,
       templates,
       addDevice: (userNumber) => asNewDevice(connection, userNumber),
@@ -77,7 +84,8 @@ export const authenticateBox = async ({
         loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
       registerFlowOpts: getRegisterFlowOpts({ connection }),
-      retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
+      retrievePinIdentityMaterial: ({ userNumber }) =>
+        retrievePinIdentityWithCheck(connection, userNumber),
     });
 
   // Retry until user has successfully authenticated
@@ -578,4 +586,29 @@ const asNewDevice = async (
     await promptUserNumberWithInfo(prefilledUserNumber),
     connection
   );
+};
+
+// Retrieve the PIN identity material from the browser storage and check that it is still valid for the given user number.
+const retrievePinIdentityWithCheck = async (
+  connection: Connection,
+  userNumber: bigint
+): Promise<PinIdentityMaterial | undefined> => {
+  const [pinIdentity, authenticators] = await Promise.all([
+    idbRetrievePinIdentityMaterial({ userNumber }),
+    connection.lookupAuthenticators(userNumber),
+  ]);
+  if (nonNullish(pinIdentity)) {
+    const pinPubkeyDer = await pinIdentityToDerPubkey(pinIdentity);
+    // Check that the authenticator is still present on the identity.
+    const authenticator = authenticators.find((authenticator) =>
+      bufferEqual(
+        new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
+        pinPubkeyDer
+      )
+    );
+    if (nonNullish(authenticator)) {
+      return pinIdentity;
+    }
+  }
+  return undefined;
 };

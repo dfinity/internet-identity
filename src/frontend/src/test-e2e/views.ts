@@ -307,6 +307,11 @@ export class MainView extends View {
     await renameView.submit();
   }
 
+  async remove(deviceName: string): Promise<void> {
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "remove" }).click();
+  }
+
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "protect" }).click();

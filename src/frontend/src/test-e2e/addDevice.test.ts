@@ -44,19 +44,7 @@ test("Add device", async () => {
     // leads to flaky tests otherwise.
     await removeVirtualAuthenticator(browser, firstAuthenticator);
     await addVirtualAuthenticator(browser);
-    await mainView.addAdditionalDevice();
-
-    const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-      browser
-    );
-    await addRemoteDeviceInstructionsView.addFIDODevice();
-
-    await browser.pause(10_000);
-
-    // success page
-    const addDeviceSuccessView = new AddDeviceSuccessView(browser);
-    await addDeviceSuccessView.waitForDisplay();
-    await addDeviceSuccessView.continue();
+    await FLOWS.addFidoDevice(browser);
 
     // home
     await mainView.waitForDisplay();
