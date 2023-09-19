@@ -77,7 +77,6 @@ export const authenticatorsSection = ({
           </span>
         </div>
         <p
-          style="max-width: 30rem;"
           class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
         >${
           warnNoPasskeys

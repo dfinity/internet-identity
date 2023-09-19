@@ -56,11 +56,9 @@ const pinInfoTemplate = ({
           <h2>${copy.security_warning}</h2>
         </span>
         <div class="t-title t-title--complications">
-          <h2 style="max-width: 30rem;" class="t-title">
-            ${copy.are_you_sure}
-          </h2>
+          <h2 class="t-title">${copy.are_you_sure}</h2>
         </div>
-        <p style="max-width: 30rem;" class="warning-message t-paragraph t-lead">
+        <p class="warning-message t-paragraph t-lead">
           ${copy.clear_browser_storage_add_passkey}
         </p>
       </aside>
