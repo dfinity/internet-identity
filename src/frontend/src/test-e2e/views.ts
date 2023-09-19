@@ -71,6 +71,10 @@ export class RegisterView extends View {
     await this.browser.$('[data-action="construct-identity"').click();
   }
 
+  async createPin(): Promise<void> {
+    await this.browser.$('[data-action="construct-pin-identity"').click();
+  }
+
   // View: Register confirmation
   async waitForRegisterConfirm(): Promise<void> {
     await this.browser
@@ -104,6 +108,65 @@ export class RegisterView extends View {
 
   async registerConfirmIdentity(): Promise<void> {
     await this.browser.$("#displayUserContinue").click();
+  }
+
+  async assertPinRegistrationNotShown(): Promise<void> {
+    await this.browser
+      .$('[data-action="construct-pin-identity"')
+      .waitForDisplayed({ reverse: true });
+  }
+}
+
+export class PinRegistrationView extends View {
+  async waitForPinInfo(): Promise<void> {
+    await this.browser
+      .$('[data-action="continue-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async pinInfoContinue(): Promise<void> {
+    await this.browser.$('[data-action="continue-pin"').click();
+  }
+  async waitForSetPin(): Promise<void> {
+    await this.browser
+      .$('[data-role="set-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async setPin(pin: string): Promise<void> {
+    const inputs = await this.browser.$('[data-role="set-pin"]').$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
+  }
+  async waitForConfirmPin(): Promise<void> {
+    await this.browser
+      .$('[data-role="confirm-pin"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async confirmPin(pin: string): Promise<void> {
+    const inputs = await this.browser
+      .$('[data-role="confirm-pin"]')
+      .$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
+  }
+}
+
+export class PinAuthView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-role="pin"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterPin(pin: string): Promise<void> {
+    const inputs = await this.browser.$('[data-role="pin"]').$$("input");
+    for (const [input, digit] of zip(inputs, pin.split(""))) {
+      await input.setValue(digit);
+    }
   }
 }
 
@@ -190,7 +253,9 @@ export class MainView extends View {
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
-    const elems = await this.browser.$$(`//li[@data-device="${deviceName}"]`);
+    const elems = await this.browser.$$(
+      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
+    );
     if (elems.length !== count) {
       throw Error("Bad number of elements");
     }
@@ -198,14 +263,20 @@ export class MainView extends View {
 
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//li[@data-device="${deviceName}"]`)
+      .$(`//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`)
       .waitForDisplayed({ timeout: 10_000 });
   }
 
-  async waitForDeviceNotDisplay(deviceName: string): Promise<void> {
+  async waitForRecoveryDisplay(deviceName: string): Promise<void> {
     await this.browser
-      .$(`//li[@data-device="${deviceName}"]`)
-      .waitForDisplayed({ timeout: 10_000, reverse: true });
+      .$(`//aside[@data-role="recoveries"]//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForTempKeyDisplay(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//aside[@data-role="temp-keys"]//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async addAdditionalDevice(): Promise<void> {

@@ -12,11 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
 
       # Run the update
       - name: Check new dapps file
         id: update
         run: ./scripts/update-dapps
+
+      # Run the formatter so that the dapps.json file is formatted
+      - run: npm run format
 
       # If the dapps changed, create a PR.
       # This action creates a PR only if there are changes.
