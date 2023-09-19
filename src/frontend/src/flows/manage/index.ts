@@ -200,7 +200,6 @@ const displayManageTemplate = ({
   </section>`;
 
   return mainWindow({
-    isWideContainer: true,
     slot: pageContentSlot,
   });
 };

@@ -299,6 +299,7 @@
   --rs-input-stack: calc(var(--rs-button-stack) * 2);
   --rs-input-message-stack: var(--vs-stack);
   --rs-input-border-radius: var(--vs-border-radius);
+  --rs-input-inline: var(--rs-button-stack);
 
   --rs-line-height-body: var(--vs-line-height);
   --rs-dropdown-bezel: var(--vs-bezel);
@@ -733,6 +734,10 @@ a:hover,
 .c-icon--error {
   --onBgc: var(--rc-error);
   border-radius: 50%;
+}
+
+.c-icon--pin [fill] {
+  fill: var(--vc-brand-purple);
 }
 
 /* "Flipped" version where the background pops (instead
@@ -1753,23 +1758,19 @@ by all browsers (FF is missing) */
 
 /**
  *  Pin Input
- *
  */
 
 .c-list--pin {
-  width: 100%;
-  display: inline-flex;
+  --pinDigits: 6;
+
+  display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
+  gap: var(--rs-input-inline);
 }
 
-.c-list--pin-char {
-  display: block;
-  flex-basis: content;
-}
-
-.c-list--pin[data-haserror="true"] .c-input--pin {
-  border-color: red;
+.c-list__item--pin {
+  flex-basis: calc(100% / var(--pinDigits) - var(--rs-input-inline));
 }
 
 /* Use a fake font for "password"-style pin input */
@@ -1786,10 +1787,15 @@ by all browsers (FF is missing) */
    * dimensions.
    * */
   font-size: 2em;
+  line-height: 1.2;
   padding: 0.2em;
-  width: 1.4em;
+  width: 100%;
 
   font-weight: 600;
+}
+
+[data-haserror="true"] .c-input--pin {
+  border-color: var(--rc-error);
 }
 
 /**
@@ -2557,6 +2563,7 @@ a.c-action-list__item {
   --halo: linear-gradient(270deg, var(--rg-brand));
 }
 
+[data-haserror="true"] .c-input--anchor__wrap--error,
 .c-input--anchor__wrap--error {
   --halo: var(--rc-error-strong);
 }
@@ -2578,6 +2585,7 @@ a.c-action-list__item {
   transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
 }
 
+[data-haserror="true"] .c-input--anchor__wrap::before,
 .c-input--anchor__wrap:focus-within::before,
 .c-input--anchor__wrap--error::before,
 .c-input--anchor__wrap--valid::before {

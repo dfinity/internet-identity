@@ -32,7 +32,7 @@ const pinInfoTemplate = ({
     <button
       @click=${() => onContinue()}
       data-action="continue-pin"
-      class="c-button"
+      class="c-button l-stack"
     >
       ${copy.continue_and_set_pin}
     </button>
@@ -40,11 +40,15 @@ const pinInfoTemplate = ({
       @click=${() => cancel()}
       data-action="cancel"
       class="c-button c-button--textOnly"
+      c-card--warning
     >
       ${copy.cancel}
     </button>
-    <section class="l-stack--tight">
-      <aside class="c-card c-card--narrow">
+    <article
+      class="c-marketing-block"
+      label="${copy.temporary_key_section_label}"
+    >
+      <aside class="c-card c-card--narrow c-card--warning">
         <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
           <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
             >${warningIcon}</i
@@ -52,34 +56,31 @@ const pinInfoTemplate = ({
           <h2>${copy.security_warning}</h2>
         </span>
         <div class="t-title t-title--complications">
-          <h2 style="max-width: 30rem;" class="t-title">
-            ${copy.are_you_sure}
-          </h2>
+          <h2 class="t-title">${copy.are_you_sure}</h2>
         </div>
-        <p style="max-width: 30rem;" class="warning-message t-paragraph t-lead">
+        <p class="warning-message t-paragraph t-lead">
           ${copy.clear_browser_storage_add_passkey}
         </p>
       </aside>
-    </section>
-    <section class="c-marketing-block">
-      <aside class="l-stack">
+
+      <section class="l-stack">
         <h3 class="t-title">${copy.what_is_temporary_key}</h3>
         <ul class="c-list c-list--bulleted">
           <li>${copy.unique_key_pair}</li>
           <li>${copy.convenient_secure_replacement}</li>
           <li>${copy.enables_sign_by_pin}</li>
         </ul>
-      </aside>
+      </section>
 
-      <aside class="l-stack">
+      <section class="l-stack">
         <h3 class="t-title">${copy.why_temporary}</h3>
         <ul class="c-list c-list--bulleted">
           <li>${copy.clear_browser_storage}</li>
           <li>${copy.set_up_recovery}</li>
           <li>${copy.do_not_store_assets}</li>
         </ul>
-      </aside>
-    </section>
+      </section>
+    </article>
   `;
 
   return mainWindow({

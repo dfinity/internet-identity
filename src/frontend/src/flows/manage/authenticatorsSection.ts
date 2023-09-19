@@ -77,7 +77,6 @@ export const authenticatorsSection = ({
           </span>
         </div>
         <p
-          style="max-width: 30rem;"
           class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
         >${
           warnNoPasskeys
@@ -112,9 +111,11 @@ export const authenticatorsSection = ({
 export const authenticatorItem = ({
   authenticator: { alias, dupCount, warn, remove, rename },
   index,
+  icon,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
+  icon?: TemplateResult;
 }) => {
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
@@ -127,6 +128,7 @@ export const authenticatorItem = ({
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
+      ${isNullish(icon) ? undefined : html`${icon}`}
       <div class="c-action-list__label">
         ${alias}
         ${nonNullish(dupCount) && dupCount > 0

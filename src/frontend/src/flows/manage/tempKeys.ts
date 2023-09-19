@@ -1,4 +1,4 @@
-import { warningIcon } from "$src/components/icons";
+import { cypherIcon, warningIcon } from "$src/components/icons";
 import {
   authenticatorItem,
   dedupLabels,
@@ -42,15 +42,13 @@ export const tempKeyWarningSection = ({
         <h2>${copy.security_warning}</h2>
       </span>
       <div class="t-title t-title--complications">
-        <h2 style="max-width: 30rem;" class="t-title">
-          ${copy.you_are_using_temporary_key}
-        </h2>
+        <h2 class="t-title">${copy.you_are_using_temporary_key}</h2>
       </div>
-      <p style="max-width: 30rem;" class="warning-message t-paragraph t-lead">
+      <p class="warning-message t-paragraph t-lead">
         ${copy.set_up_recovery_and_passkey}
       </p>
       <button
-        class="c-button c-button--primary"
+        class="c-button c-button--primary l-stack"
         @click="${tempKeysWarning.action}"
         id="addRecovery"
       >
@@ -78,13 +76,17 @@ export const tempKeysSection = ({
       <h2 class="t-title">${copy.temporary_key}</h2>
     </div>
 
-    <p style="max-width: 30rem;" class="t-paragraph t-lead">
-      ${copy.key_stored_in_browser}
-    </p>
+    <p class="t-paragraph t-lead">${copy.key_stored_in_browser}</p>
     <div class="c-action-list">
       <ul>
         ${authenticators.map((authenticator, index) =>
-          authenticatorItem({ authenticator, index })
+          authenticatorItem({
+            authenticator,
+            index,
+            icon: html`<span class="c-icon c-icon--pin"
+              >${cypherIcon}<span></span
+            ></span>`,
+          })
         )}
       </ul>
     </div>
