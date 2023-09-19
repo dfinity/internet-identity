@@ -2,7 +2,6 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
-import { showWarning } from "$src/banner";
 import {
   AuthnTemplates,
   authenticateBox,
@@ -33,7 +32,6 @@ import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
-  hasRecoveryPhrase,
   isProtected,
   isRecoveryDevice,
   isRecoveryPhrase,
@@ -392,27 +390,6 @@ export const displayManage = (
       });
 
     display();
-
-    // When visiting the legacy URL (ic0.app) we extra-nudge the users to create a recovery phrase,
-    // if they don't have one already. We lead them straight to recovery phrase creation, because
-    // recovery _device_ would be tied to the domain (which we want to avoid).
-    if (
-      window.location.origin === LEGACY_II_URL &&
-      !hasRecoveryPhrase(devices_)
-    ) {
-      const elem = showWarning(html`<strong class="t-strong">Important!</strong>
-        Create a recovery phrase.
-        <button
-          class="features-warning-btn"
-          @click=${async () => {
-            await setupPhrase(userNumber, connection);
-            elem.remove();
-            resolve();
-          }}
-        >
-          Create
-        </button> `);
-    }
   });
 };
 
