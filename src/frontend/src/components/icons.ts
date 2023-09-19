@@ -522,3 +522,12 @@ export const githubIcon = html`
     />
   </svg>
 `;
+
+export const cypherIcon = html`
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M13.4757 5V9.89326L18.1297 8.35955L19 10.9888L14.3081 12.486L17.4108 16.3202L15.1027 18L11.9622 14.0197L9.01081 17.9635L6.7027 16.2837L9.69189 12.486L5 10.9888L5.87027 8.35955L10.4865 9.92978V5H13.4757Z"
+      fill="currentColor"
+    />
+  </svg>
+`;

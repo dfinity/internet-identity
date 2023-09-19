@@ -80,7 +80,7 @@ export const tempKeysSection = ({
     <div class="c-action-list">
       <ul>
         ${authenticators.map((authenticator, index) =>
-          authenticatorItem({ authenticator, index })
+          authenticatorItem({ authenticator, index, isPin: true })
         )}
       </ul>
     </div>

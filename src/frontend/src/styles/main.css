@@ -736,6 +736,10 @@ a:hover,
   border-radius: 50%;
 }
 
+.c-icon--pin [fill] {
+  fill: var(--vc-brand-purple);
+}
+
 /* "Flipped" version where the background pops (instead
  * of the icon itself) */
 .c-icon--error__flipped {
