@@ -56,7 +56,7 @@ const savePasskeyTemplate = ({
     <button
       @click=${() => constructPasskey()}
       data-action="construct-identity"
-      class="c-button"
+      class="c-button l-stack"
     >
       ${copy.save_passkey}
     </button>

@@ -48,7 +48,7 @@ export const tempKeyWarningSection = ({
         ${copy.set_up_recovery_and_passkey}
       </p>
       <button
-        class="c-button c-button--primary"
+        class="c-button c-button--primary l-stack"
         @click="${tempKeysWarning.action}"
         id="addRecovery"
       >
