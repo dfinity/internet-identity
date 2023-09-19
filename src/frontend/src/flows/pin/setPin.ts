@@ -6,6 +6,8 @@ import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { pinStepper } from "./stepper";
 
+import { confirmPin } from "$src/flows/pin/confirmPin";
+import { promptPinInfo } from "$src/flows/pin/pinInfo";
 import copyJson from "./setPin.json";
 
 /* Prompt the user to create a new PIN */
@@ -85,4 +87,34 @@ export const setPin = (): Promise<
       scrollToTop: true,
     })
   );
+};
+
+export const setPinFlow = async (): Promise<
+  { tag: "ok"; pin: string } | { tag: "canceled" }
+> => {
+  const pinInfoResult = await promptPinInfo();
+  if (pinInfoResult === "canceled") {
+    return { tag: "canceled" };
+  }
+
+  for (;;) {
+    const result = await setPin();
+    if (result.tag === "canceled") {
+      return { tag: "canceled" };
+    }
+
+    result.tag satisfies "ok";
+    const { pin } = result;
+
+    const confirmed = await confirmPin({ expectedPin: pin });
+    if (confirmed.tag === "canceled") {
+      return { tag: "canceled" };
+    }
+    if (confirmed.tag === "retry") {
+      continue;
+    }
+
+    confirmed.tag satisfies "ok";
+    return { tag: "ok", pin };
+  }
 };

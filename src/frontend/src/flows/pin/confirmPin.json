@@ -1,6 +1,7 @@
 {
   "en": {
     "confirm_pin": "Confirm PIN for Internet Identity on this Device",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "retry": "Retry"
   }
 }

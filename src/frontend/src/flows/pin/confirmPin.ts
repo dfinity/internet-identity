@@ -5,6 +5,8 @@ import { mount, renderPage } from "$src/utils/lit-html";
 import { TemplateResult, html } from "lit-html";
 import { pinStepper } from "./stepper";
 
+import { Chan } from "$src/utils/utils";
+import { asyncReplace } from "lit-html/directives/async-replace.js";
 import copyJson from "./confirmPin.json";
 
 /* PIN confirmation (just prompts the user to re-enter their PIN) */
@@ -12,6 +14,7 @@ import copyJson from "./confirmPin.json";
 const confirmPinTemplate = ({
   i18n,
   cancel,
+  retry,
   onContinue,
   expectedPin: expectedPin,
   focus = false,
@@ -19,6 +22,7 @@ const confirmPinTemplate = ({
 }: {
   i18n: I18n;
   cancel: () => void;
+  retry: () => void;
   onContinue: () => void;
   expectedPin: string;
   focus?: boolean;
@@ -26,13 +30,30 @@ const confirmPinTemplate = ({
   scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
+
+  const cancelButton = html`<button
+    @click=${() => cancel()}
+    data-action="cancel"
+    class="c-button c-button--secondary l-stack"
+  >
+    ${copy.cancel}
+  </button>`;
+  const retryButton = html`<button
+    @click=${() => retry()}
+    data-action="retry"
+    class="c-button c-button--secondary l-stack"
+  >
+    ${copy.retry}
+  </button>`;
+
+  const currentAction = new Chan<TemplateResult>(cancelButton);
   const verify = (pin: string): PinResult<string> => {
     if (pin === expectedPin) {
       return { ok: true, value: pin };
     }
 
-    // XXX: there is currently no way to restart the PIN. We need to figure
-    // out what to do UX-wise first.
+    // update the button from 'cancel' to 'retry'
+    currentAction.send(retryButton);
     return { ok: false, error: "PINs don't match" };
   };
 
@@ -50,13 +71,7 @@ const confirmPinTemplate = ({
     <div class="l-stack" data-role="confirm-pin">
       <div class="c-input--stack">${pinInput_.template}</div>
     </div>
-    <button
-      @click=${() => cancel()}
-      data-action="cancel"
-      class="c-button c-button--secondary l-stack"
-    >
-      ${copy.cancel}
-    </button>
+    ${asyncReplace(currentAction)}
   `;
 
   return mainWindow({
@@ -71,13 +86,14 @@ export const confirmPin = ({
   expectedPin,
 }: {
   expectedPin: string;
-}): Promise<{ tag: "ok" } | { tag: "canceled" }> => {
+}): Promise<{ tag: "ok" } | { tag: "canceled" } | { tag: "retry" }> => {
   return new Promise((resolve) =>
     confirmPinPage({
       i18n: new I18n(),
       onContinue: () => resolve({ tag: "ok" }),
       expectedPin,
       cancel: () => resolve({ tag: "canceled" }),
+      retry: () => resolve({ tag: "retry" }),
       focus: true,
       scrollToTop: true,
     })
