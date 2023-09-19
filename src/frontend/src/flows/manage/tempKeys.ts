@@ -1,4 +1,4 @@
-import { warningIcon } from "$src/components/icons";
+import { cypherIcon, warningIcon } from "$src/components/icons";
 import {
   authenticatorItem,
   dedupLabels,
@@ -80,7 +80,13 @@ export const tempKeysSection = ({
     <div class="c-action-list">
       <ul>
         ${authenticators.map((authenticator, index) =>
-          authenticatorItem({ authenticator, index, isPin: true })
+          authenticatorItem({
+            authenticator,
+            index,
+            icon: html`<span class="c-icon c-icon--pin"
+              >${cypherIcon}<span></span
+            ></span>`,
+          })
         )}
       </ul>
     </div>

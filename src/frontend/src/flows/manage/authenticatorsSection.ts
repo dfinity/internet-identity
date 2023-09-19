@@ -1,4 +1,4 @@
-import { cypherIcon, warningIcon } from "$src/components/icons";
+import { warningIcon } from "$src/components/icons";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
@@ -111,11 +111,11 @@ export const authenticatorsSection = ({
 export const authenticatorItem = ({
   authenticator: { alias, dupCount, warn, remove, rename },
   index,
-  isPin,
+  icon,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
-  isPin?: boolean;
+  icon?: TemplateResult;
 }) => {
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
@@ -128,9 +128,7 @@ export const authenticatorItem = ({
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
-      ${isNullish(isPin)
-        ? undefined
-        : html`<span class="c-icon c-icon--pin">${cypherIcon}</span>`}
+      ${isNullish(icon) ? undefined : html`${icon}`}
       <div class="c-action-list__label">
         ${alias}
         ${nonNullish(dupCount) && dupCount > 0
