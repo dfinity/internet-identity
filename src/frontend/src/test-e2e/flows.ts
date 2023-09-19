@@ -1,6 +1,7 @@
 import {
   AuthenticateView,
   MainView,
+  PinRegistrationView,
   RecoveryMethodSelectorView,
   RegisterView,
   WelcomeView,
@@ -38,6 +39,27 @@ export const FLOWS = {
     await authenticateView.waitForDisplay();
     await authenticateView.register();
     return await FLOWS.register(browser, deviceName);
+  },
+  registerPin: async function (
+    browser: WebdriverIO.Browser,
+    pin: string
+  ): Promise<string> {
+    const registerView = new RegisterView(browser);
+    await registerView.waitForDisplay();
+    await registerView.createPin();
+    const pinRegistrationView = new PinRegistrationView(browser);
+    await pinRegistrationView.waitForPinInfo();
+    await pinRegistrationView.pinInfoContinue();
+    await pinRegistrationView.waitForSetPin();
+    await pinRegistrationView.setPin(pin);
+    await pinRegistrationView.waitForConfirmPin();
+    await pinRegistrationView.confirmPin(pin);
+    await registerView.waitForRegisterConfirm();
+    await registerView.confirmRegisterConfirm();
+    await registerView.waitForIdentity();
+    const userNumber = await registerView.registerGetIdentity();
+    await registerView.registerConfirmIdentity();
+    return userNumber;
   },
   login: async (
     userNumber: string,
