@@ -14,7 +14,7 @@ test("Reset recovery phrase", async () => {
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
 
-    await mainView.waitForDeviceDisplay(RECOVERY_PHRASE_NAME);
+    await mainView.waitForRecoveryDisplay(RECOVERY_PHRASE_NAME);
 
     // Ensure the settings dropdown is in view
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");

@@ -1,4 +1,5 @@
 import { randomString, wrapError } from "$src/utils/utils";
+import { nonNullish } from "@dfinity/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fs from "fs";
 import * as fsasync from "fs/promises";
@@ -25,7 +26,8 @@ export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
     runConfig: RunConfiguration
-  ) => Promise<void>
+  ) => Promise<void>,
+  userAgent?: string
 ): Promise<void> {
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
@@ -34,6 +36,7 @@ export async function runInBrowser(
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
+      ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,

@@ -36,7 +36,7 @@ export const recoveryMethodsSection = ({
   ];
 
   return html`
-    <aside class=${wrapClasses.join(" ")}>
+    <aside class=${wrapClasses.join(" ")} data-role="recoveries">
       ${warnNoRecovery
         ? html`
             <span

@@ -36,7 +36,7 @@ const setPinTemplate = ({
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.set_pin_for_ii}</h1>
     </hgroup>
-    <div class="l-stack">
+    <div class="l-stack" data-role="set-pin">
       <div class="c-input--stack">${pinInput_.template}</div>
     </div>
     <button
