@@ -1790,6 +1790,10 @@ by all browsers (FF is missing) */
   font-weight: 600;
 }
 
+[data-haserror="true"] .c-input--pin {
+  border-color: var(--rc-error);
+}
+
 /**
  *  Recovery phrase
  *
