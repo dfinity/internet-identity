@@ -32,7 +32,7 @@ const pinInfoTemplate = ({
     <button
       @click=${() => onContinue()}
       data-action="continue-pin"
-      class="c-button"
+      class="c-button l-stack"
     >
       ${copy.continue_and_set_pin}
     </button>
