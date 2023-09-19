@@ -267,6 +267,12 @@ export class MainView extends View {
       .waitForDisplayed({ timeout: 10_000 });
   }
 
+  async waitForRecoveryDisplay(deviceName: string): Promise<void> {
+    await this.browser
+      .$(`//aside[@data-role="recoveries"]//li[@data-device="${deviceName}"]`)
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
   async waitForTempKeyDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//aside[@data-role="temp-keys"]//li[@data-device="${deviceName}"]`)
