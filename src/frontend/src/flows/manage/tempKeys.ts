@@ -9,21 +9,22 @@ import { unreachable } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
 
 import { warnBox } from "$src/components/warnBox";
+import { nonNullish } from "@dfinity/utils";
 import copyJson from "./tempKeys.json";
 
-export type TempKeysWarning =
+export type TempKeyWarningAction =
   | { tag: "add_recovery"; action: () => void }
   | { tag: "add_passkey"; action: () => void };
-export const tempKeyWarningSection = ({
+export const tempKeyWarningBox = ({
   i18n,
-  tempKeysWarning,
+  warningAction,
 }: {
   i18n: I18n;
-  tempKeysWarning: TempKeysWarning;
+  warningAction?: TempKeyWarningAction;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
 
-  const warningButtonCopy = (tempKeysWarning: TempKeysWarning) => {
+  const warningButtonCopy = (tempKeysWarning: TempKeyWarningAction) => {
     switch (tempKeysWarning.tag) {
       case "add_recovery":
         return copy.add_recovery_phrase;
@@ -34,19 +35,21 @@ export const tempKeyWarningSection = ({
     }
   };
 
-  const button = html`<button
-    class="c-button c-button--primary l-stack"
-    @click="${tempKeysWarning.action}"
-    id="addRecovery"
-  >
-    <span>${warningButtonCopy(tempKeysWarning)}</span>
-  </button>`;
+  const buttonTemplate = nonNullish(warningAction)
+    ? html`<button
+        class="c-button c-button--primary l-stack"
+        @click="${warningAction.action}"
+        id="addRecovery"
+      >
+        <span>${warningButtonCopy(warningAction)}</span>
+      </button>`
+    : undefined;
 
   return warnBox({
     headerSlot: html`<h2>${copy.security_warning}</h2>`,
     title: copy.you_are_using_temporary_key,
     message: copy.set_up_recovery_and_passkey,
-    slot: button,
+    slot: buttonTemplate,
   });
 };
 
