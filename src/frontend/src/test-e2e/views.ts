@@ -168,13 +168,17 @@ export class PinAuthView extends View {
       await input.setValue(digit);
     }
   }
+
+  async waitForError(): Promise<void> {
+    await this.browser
+      .$('[data-haserror="true"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
 }
 
 export class RecoveryMethodSelectorView extends View {
   async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$('[data-action="cancel"]')
-      .waitForDisplayed({ timeout: 10_000 });
+    await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
   }
 
   async waitForSeedPhrase(): Promise<void> {
