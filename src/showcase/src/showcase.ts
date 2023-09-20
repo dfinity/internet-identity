@@ -31,6 +31,7 @@ import {
   resetPhraseInfoPage,
   unprotectDeviceInfoPage,
 } from "$src/flows/manage/deviceSettings";
+import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
 import { confirmPinPage } from "$src/flows/pin/confirmPin";
 import { pinInfoPage } from "$src/flows/pin/pinInfo";
 import { setPinPage } from "$src/flows/pin/setPin";
@@ -148,6 +149,14 @@ export const iiPages: Record<string, () => void> = {
       userNumber,
       onContinue: () => console.log("done"),
       stepper: registerStepper({ current: "finish" }),
+    }),
+  displayUserNumberTempKey: () =>
+    displayUserNumberPage({
+      identityBackground,
+      userNumber,
+      onContinue: () => console.log("done"),
+      stepper: registerStepper({ current: "finish" }),
+      slot: tempKeyWarningBox({ i18n: new I18n("en") }),
     }),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   promptDeviceAlias: () =>

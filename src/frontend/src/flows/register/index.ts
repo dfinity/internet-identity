@@ -8,11 +8,13 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { setPinFlow } from "$src/flows/pin/setPin";
 import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
+import { I18n } from "$src/i18n";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
@@ -98,6 +100,7 @@ export const registerFlow = async <T>({
         keyType: { browser_storage_key: null },
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
+        finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
       };
     } else {
       const identity = savePasskeyResult;
@@ -131,6 +134,7 @@ export const registerFlow = async <T>({
     credentialId,
     keyType,
     finalizeIdentity,
+    finishSlot,
   }: {
     identity: SignIdentity;
     alias: string;
@@ -139,6 +143,7 @@ export const registerFlow = async <T>({
     credentialId?: CredentialId;
     keyType: KeyType;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
+    finishSlot?: TemplateResult;
   } = result_;
 
   const result = await promptCaptcha({
@@ -173,6 +178,7 @@ export const registerFlow = async <T>({
     await displayUserNumber({
       userNumber,
       stepper: finishStepper,
+      slot: finishSlot,
     });
   }
   return result;
