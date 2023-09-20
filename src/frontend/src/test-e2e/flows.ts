@@ -73,6 +73,15 @@ export const FLOWS = {
     await welcomeView.register();
     return await FLOWS.registerPin(browser, pin);
   },
+  registerPinNewIdentityAuthenticateView: async (
+    pin: string,
+    browser: WebdriverIO.Browser
+  ): Promise<string> => {
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.register();
+    return await FLOWS.registerPin(browser, pin);
+  },
   login: async (
     userNumber: string,
     deviceName: string,

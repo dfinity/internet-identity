@@ -156,6 +156,7 @@ export class PinRegistrationView extends View {
 }
 
 export class PinAuthView extends View {
+  private readonly ERROR_SELECTOR = '[data-haserror="true"]';
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="pin"]')
@@ -168,13 +169,18 @@ export class PinAuthView extends View {
       await input.setValue(digit);
     }
   }
+
+  async waitForError(): Promise<void> {
+    await this.browser
+      .$(this.ERROR_SELECTOR)
+      .waitForDisplayed({ timeout: 5_000 });
+  }
 }
 
 export class RecoveryMethodSelectorView extends View {
+  private readonly SELECTOR = '[data-page="add-recovery-phrase"]';
   async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$('[data-action="cancel"]')
-      .waitForDisplayed({ timeout: 10_000 });
+    await this.browser.$(this.SELECTOR).waitForExist();
   }
 
   async waitForSeedPhrase(): Promise<void> {
