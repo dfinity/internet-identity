@@ -21,14 +21,14 @@ export const displayUserNumberTemplate = ({
   userNumber,
   identityBackground,
   stepper,
-  slot,
+  marketingIntroSlot,
   scrollToTop = false,
 }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: IdentityBackground;
   stepper: TemplateResult;
-  slot?: TemplateResult;
+  marketingIntroSlot?: TemplateResult;
   /* put the page into view */
   scrollToTop?: boolean;
 }) => {
@@ -86,7 +86,7 @@ export const displayUserNumberTemplate = ({
         I saved it, continue
       </button>
     <section class="c-marketing-block">
-      ${slot}
+      ${marketingIntroSlot}
       <aside class="l-stack">
         <h3 class="t-title">This number is your Internet Identity</h3>
         <p class="t-paragraph">With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</p>
@@ -129,12 +129,12 @@ export const displayUserNumber = ({
   userNumber,
   identityBackground,
   stepper,
-  slot,
+  marketingIntroSlot,
 }: {
   userNumber: bigint;
   identityBackground: IdentityBackground;
   stepper: TemplateResult;
-  slot?: TemplateResult;
+  marketingIntroSlot?: TemplateResult;
 }): Promise<void> => {
   return new Promise((resolve) =>
     displayUserNumberPage({
@@ -142,7 +142,7 @@ export const displayUserNumber = ({
       userNumber,
       identityBackground,
       stepper,
-      slot,
+      marketingIntroSlot,
       scrollToTop: true,
     })
   );

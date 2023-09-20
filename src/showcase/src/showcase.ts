@@ -156,7 +156,7 @@ export const iiPages: Record<string, () => void> = {
       userNumber,
       onContinue: () => console.log("done"),
       stepper: registerStepper({ current: "finish" }),
-      slot: tempKeyWarningBox({ i18n: new I18n("en") }),
+      marketingIntroSlot: tempKeyWarningBox({ i18n: new I18n("en") }),
     }),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   promptDeviceAlias: () =>

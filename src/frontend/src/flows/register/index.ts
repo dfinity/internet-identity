@@ -178,7 +178,7 @@ export const registerFlow = async <T>({
     await displayUserNumber({
       userNumber,
       stepper: finishStepper,
-      slot: finishSlot,
+      marketingIntroSlot: finishSlot,
     });
   }
   return result;
