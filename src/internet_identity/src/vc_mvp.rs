@@ -2,10 +2,7 @@ use crate::assets::CertifiedAssets;
 use crate::delegation::check_frontend_length;
 use crate::{delegation, hash, state, update_root_hash, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::{
-    der_encoded_canister_sig_pk, did_for_principal, vc_jwt_to_jws, vc_signing_input,
-    vc_signing_input_hash,
-};
+use canister_sig_util::canister_sig_pk_der;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};
@@ -23,6 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
+use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
 // The expiration used for signatures
 #[allow(clippy::identity_op)]
@@ -46,7 +44,7 @@ pub async fn prepare_id_alias(
     let id_alias_principal = get_id_alias_principal(identity_number, &dapps);
     let seed = calculate_id_alias_seed(identity_number, &dapps);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
+    let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
 
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
@@ -100,7 +98,7 @@ pub fn get_id_alias(
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
         let canister_id = ic_cdk::id();
-        let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
+        let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
 
         let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk_der, canister_id);
         let msg_hash = vc_signing_input_hash(&signing_input);
