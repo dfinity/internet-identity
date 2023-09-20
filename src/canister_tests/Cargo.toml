@@ -16,6 +16,7 @@ serde_bytes = "0.11"
 sha2 = "0.10"
 
 internet_identity_interface = { path = "../internet_identity_interface" }
+pocket-ic = { git = "https://github.com/dfinity/ic.git" }
 
 # All IC deps
 candid = "0.9"
