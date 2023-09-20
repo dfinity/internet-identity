@@ -62,6 +62,7 @@ test("Register and Log in with PIN identity", async () => {
 test("Register and log in with PIN identity, retry on wrong PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
+    const wrongPin = "456321";
 
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
@@ -76,9 +77,9 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
     await browser.$("button[data-action='continue']").click();
     const pinAuthView = new PinAuthView(browser);
     await pinAuthView.waitForDisplay();
-    await pinAuthView.enterPin("456321"); // wrong PIN
+    await pinAuthView.enterPin(wrongPin);
     await pinAuthView.waitForError();
-    await pinAuthView.enterPin(pin); // enter correct PIN
+    await pinAuthView.enterPin(pin);
 
     // NOTE: handle recovery nag because there is no recovery phrase
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
