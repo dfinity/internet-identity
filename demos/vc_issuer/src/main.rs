@@ -1,8 +1,5 @@
 use candid::{candid_method, Principal};
-use canister_sig_util::{
-    der_encoded_canister_sig_pk, did_for_principal, hash_bytes, vc_jwt_to_jws, vc_signing_input,
-    vc_signing_input_hash, CanisterSig,
-};
+use canister_sig_util::{canister_sig_pk_der, hash_bytes, CanisterSig};
 use ic_cdk_macros::{query, update};
 use ic_certified_map::Hash;
 use identity_core::common::Url;
@@ -21,6 +18,7 @@ use std::cell::RefCell;
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::trap;
+use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
 const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
@@ -41,7 +39,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
+    let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
     let credential = new_credential(subject_principal);
     let credential_jwt = credential
         .serialize_jwt()
@@ -77,7 +75,7 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = der_encoded_canister_sig_pk(canister_id, &seed);
+    let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
     let signing_input = vc_signing_input(&req.vc_jwt, &canister_sig_pk_der, canister_id);
     let msg_hash = vc_signing_input_hash(&signing_input);
     let maybe_sig = SIGNATURES.with(|sigs| {

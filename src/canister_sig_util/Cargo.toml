@@ -10,19 +10,10 @@ candid = "0.9"
 ic-cdk = "0.10"
 ic-certified-map = "0.4"
 
-# vc dependencies
-identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
-# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
-
 # other dependencies
-hex = "0.4"
 serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 [dev-dependencies]
-ic-test-state-machine-client = "3"
-candid = { version = "0.9", features = ["parser"] }
-canister_tests = { path = "../../src/canister_tests" }
-lazy_static = "1.4"
 rand = { version ="0.8.5" }
