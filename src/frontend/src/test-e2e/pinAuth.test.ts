@@ -1,3 +1,4 @@
+import { Principal } from "@dfinity/principal";
 import {
   DEVICE_NAME1,
   II_URL,
@@ -111,21 +112,23 @@ test("Should not prompt for PIN after deleting temp key", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Log into client application, after PIN registration", async () => {
+test("Log into client application using PIN registration flow", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe(
+      Principal.anonymous().toText()
+    );
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerPinNewIdentityAuthenticateView(pin, browser);
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe("2vxsx-fae");
+    expect(principal).not.toBe(Principal.anonymous().toText());
 
     expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
       principal
@@ -147,7 +150,9 @@ test("Register with PIN then log into client application", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe(
+      Principal.anonymous().toText()
+    );
     await demoAppView.signin();
 
     await switchToPopup(browser);
@@ -167,6 +172,6 @@ test("Register with PIN then log into client application", async () => {
 
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe("2vxsx-fae");
+    expect(principal).not.toBe(Principal.anonymous().toText());
   }, APPLE_USER_AGENT);
 }, 300_000);
