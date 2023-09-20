@@ -15,17 +15,17 @@ import {
 import { withLoader } from "$src/components/loader";
 import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
+import {
+  TempKeysWarning,
+  tempKeyWarning,
+} from "$src/components/tempKeysWarning";
 import { toast } from "$src/components/toast";
 import { LEGACY_II_URL } from "$src/config";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
-import {
-  TempKeysWarning,
-  tempKeyWarningSection,
-  tempKeysSection,
-} from "$src/flows/manage/tempKeys";
+import { tempKeysSection } from "$src/flows/manage/tempKeys";
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
@@ -175,7 +175,7 @@ const displayManageTemplate = ({
     </hgroup>
     ${anchorSection({ userNumber, identityBackground })}
     ${nonNullish(tempKeysWarning)
-      ? tempKeyWarningSection({ i18n, tempKeysWarning })
+      ? tempKeyWarning({ i18n, tempKeysWarning })
       : ""}
     <p class="t-paragraph">
       ${dappsTeaser({
