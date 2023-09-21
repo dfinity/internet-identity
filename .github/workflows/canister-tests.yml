@@ -347,16 +347,16 @@ jobs:
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
-      - name: Download ic-test-state-machine binary
+      - name: Download pocket-ic binary
         run: |
           uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
           echo "uname_sys: $uname_sys"
           commit_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
           echo "commit sha: $commit_sha"
-          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
-          gzip -d ic-test-state-machine.gz
-          chmod a+x ic-test-state-machine
-          ./ic-test-state-machine --version
+          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/pocket-ic.gz"
+          gzip -d pocket-ic.gz
+          chmod a+x pocket-ic
+          ./pocket-ic --help
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3

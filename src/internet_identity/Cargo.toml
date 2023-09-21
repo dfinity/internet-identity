@@ -39,7 +39,6 @@ pocket-ic = { git = "https://github.com/dfinity/ic.git" }
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
-ic-test-state-machine-client = "3"
 candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"

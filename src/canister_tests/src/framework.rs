@@ -117,7 +117,7 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
     }
 }
 
-/// The path to the state machine binary to run the tests with
+/// The path to the PocketIC binary to run the tests with
 pub static POCKET_IC_BIN: &str = "../../pocket-ic";
 
 pub fn env() -> PocketIc {
@@ -237,7 +237,7 @@ pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId,
     let mut buffer = vec![];
     file.read_to_end(&mut buffer)
         .expect("error while reading stable memory file");
-    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
+    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip).expect("Failed to set stable memory");
 }
 
 pub const PUBKEY_1: &str = "test";

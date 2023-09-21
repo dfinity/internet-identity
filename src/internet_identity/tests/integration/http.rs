@@ -161,7 +161,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         assert_eq!(
             metric_timestamp,
             env.time(),
-            "metric timestamp did not match state machine time"
+            "metric timestamp did not match PocketIC time"
         )
     }
     Ok(())
@@ -302,7 +302,7 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
         env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos() as f64,
     );
 
-    env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
+    env.advance_time(Duration::from_secs(300)); // PocketIC does not advance time on its own
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     assert_metric(

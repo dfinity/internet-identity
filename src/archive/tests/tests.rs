@@ -538,7 +538,7 @@ mod metrics_tests {
             assert_eq!(
                 metric_timestamp,
                 env.time(),
-                "metric timestamp did not match state machine time"
+                "metric timestamp did not match PocketIC time"
             )
         }
         Ok(())

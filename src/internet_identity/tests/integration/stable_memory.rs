@@ -395,7 +395,8 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
         canister_id,
         stable_memory_backup,
         BlobCompression::NoCompression,
-    );
+    )
+    .expect("Failed to set stable memory");
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
     assert!(result.is_err());
     let err = result.err().unwrap();

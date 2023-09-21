@@ -1,3 +1,3 @@
-# the commit used to pull the state machine executable
+# the commit used to pull the PocketIC executable
 # see rust canister tests for more info
-6deaa2b4550bbd1e174258c253fc9771b4d761a9
+7e65aa74958e54e37c235e673f7f719083c55b60
