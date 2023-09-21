@@ -8,12 +8,12 @@ use canister_tests::framework::{
 };
 use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodAddResponse, AuthnMethodData, AuthnMethodRegistration, DeviceData,
     IdentityInfoResponse, IdentityNumber, KeyType, MetadataEntry, Purpose,
 };
+use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::{CallError, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -117,7 +117,7 @@ fn assert_eq_ignoring_last_authentication(
 }
 
 fn create_identity_with_devices(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     devices: &[DeviceData],
 ) -> IdentityNumber {

@@ -5,9 +5,10 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::BlobCompression;
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use rand::Rng;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -390,7 +391,11 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
 
     let stable_memory_backup =
         std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
-    env.set_stable_memory(canister_id, ByteBuf::from(stable_memory_backup));
+    env.set_stable_memory(
+        canister_id,
+        stable_memory_backup,
+        BlobCompression::NoCompression,
+    );
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
     assert!(result.is_err());
     let err = result.err().unwrap();

@@ -7,11 +7,11 @@ use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
 use canister_tests::match_value;
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodAddResponse, IdentityInfoResponse, MetadataEntry,
 };
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 

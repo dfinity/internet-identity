@@ -7,9 +7,9 @@ use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::{Request, Response, VerificationInfo};
 use ic_response_verification::verify_request_response_pair;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
+use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -465,7 +465,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
 }
 
 fn verify_response_certification(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     request: HttpRequest,
     http_response: HttpResponse,

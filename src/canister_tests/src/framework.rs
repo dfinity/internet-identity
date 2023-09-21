@@ -1,15 +1,14 @@
 use crate::api;
 use crate::api::http_request;
 use candid::Principal;
-use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_representation_independent_hash::Value;
-use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
+use pocket_ic::{BlobCompression, CallError, ErrorCode, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -119,11 +118,14 @@ fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8
 }
 
 /// The path to the state machine binary to run the tests with
-pub static STATE_MACHINE_BINARY: &str = "../../ic-test-state-machine";
+pub static POCKET_IC_BIN: &str = "../../pocket-ic";
 
-pub fn env() -> StateMachine {
-    let path = match env::var_os("STATE_MACHINE_BINARY") {
-        None => STATE_MACHINE_BINARY.to_string(),
+pub fn env() -> PocketIc {
+    let path = match env::var_os("POCKET_IC_BIN") {
+        None => {
+            env::set_var("POCKET_IC_BIN", POCKET_IC_BIN);
+            POCKET_IC_BIN.to_string()
+        }
         Some(path) => path
             .clone()
             .into_string()
@@ -132,27 +134,27 @@ pub fn env() -> StateMachine {
 
     if !Path::new(&path).exists() {
         println!("
-        Could not find state machine binary to run canister integration tests.
+        Could not find the PocketIC binary to run canister integration tests.
 
-        I looked for it at {:?}. You can specify another path with the environment variable STATE_MACHINE_BINARY (note that I run from {:?}).
+        I looked for it at {:?}. You can specify another path with the environment variable POCKET_IC_BIN (note that I run from {:?}).
 
         Run the following command to get the binary:
-            curl -sLO https://download.dfinity.systems/ic/$commit/binaries/$platform/ic-test-state-machine.gz
-            gzip -d ic-test-state-machine.gz
-            chmod +x ic-test-state-machine
+            curl -sLO https://download.dfinity.systems/ic/$commit/openssl-static-binaries/$platform/pocket-ic.gz
+            gzip -d pocket-ic.gz
+            chmod +x pocket-ic
         where $commit can be read from `.ic-commit` and $platform is 'x86_64-linux' for Linux and 'x86_64-darwin' for Intel/rosetta-enabled Darwin.
         ", &path, &env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
     }
 
-    StateMachine::new(&path, false)
+    PocketIc::new()
 }
 
-pub fn install_ii_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
+pub fn install_ii_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
     install_ii_canister_with_arg(env, wasm, None)
 }
 
 pub fn install_ii_canister_with_arg(
-    env: &StateMachine,
+    env: &PocketIc,
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
@@ -197,12 +199,12 @@ pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-pub fn upgrade_ii_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
+pub fn upgrade_ii_canister(env: &PocketIc, canister_id: CanisterId, wasm: Vec<u8>) {
     upgrade_ii_canister_with_arg(env, canister_id, wasm, None).unwrap()
 }
 
 pub fn upgrade_ii_canister_with_arg(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
@@ -213,7 +215,7 @@ pub fn upgrade_ii_canister_with_arg(
 
 /// Utility function to create compressed stable memory backups for use in backup tests.
 pub fn save_compressed_stable_memory(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     path: &str,
     decompressed_name: &str,
@@ -223,21 +225,19 @@ pub fn save_compressed_stable_memory(
         .filename(decompressed_name)
         .write(file, Compression::best());
     encoder
-        .write_all(env.stable_memory(canister_id).as_slice())
+        .write_all(env.get_stable_memory(canister_id).as_slice())
         .unwrap();
     encoder.flush().unwrap();
     let mut file = encoder.finish().unwrap();
     file.flush().unwrap();
 }
 
-pub fn restore_compressed_stable_memory(env: &StateMachine, canister_id: CanisterId, path: &str) {
-    let file = File::open(path).expect("Failed to open stable memory file");
-    let mut decoder = GzDecoder::new(file);
+pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId, path: &str) {
+    let mut file = File::open(path).expect("Failed to open stable memory file");
     let mut buffer = vec![];
-    decoder
-        .read_to_end(&mut buffer)
-        .expect("error while decoding stable memory file");
-    env.set_stable_memory(canister_id, ByteBuf::from(buffer));
+    file.read_to_end(&mut buffer)
+        .expect("error while reading stable memory file");
+    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
 }
 
 pub const PUBKEY_1: &str = "test";
@@ -431,7 +431,7 @@ frame-ancestors 'none';$"
     .is_match(csp));
 }
 
-pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
+pub fn get_metrics(env: &PocketIc, canister_id: CanisterId) -> String {
     let response = http_request(
         env,
         canister_id,
@@ -484,7 +484,7 @@ pub fn assert_labelled_metric(
 }
 
 pub fn assert_devices_equal(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     anchor: AnchorNumber,
     mut expected_devices: Vec<DeviceData>,
@@ -509,7 +509,7 @@ pub fn assert_device_last_used(
     assert_eq!(device.last_usage, Some(expected_timestamp));
 }
 
-pub fn time(env: &StateMachine) -> u64 {
+pub fn time(env: &PocketIc) -> u64 {
     env.time()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -517,7 +517,7 @@ pub fn time(env: &StateMachine) -> u64 {
 }
 
 pub fn verify_delegation(
-    env: &StateMachine,
+    env: &PocketIc,
     user_key: UserKey,
     signed_delegation: &SignedDelegation,
     root_key: &[u8],
@@ -553,20 +553,20 @@ pub fn verify_delegation(
     .expect("delegation signature invalid");
 }
 
-pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
+pub fn deploy_archive_via_ii(env: &PocketIc, ii_canister: CanisterId) -> CanisterId {
     match api::internet_identity::deploy_archive(env, ii_canister, &ARCHIVE_WASM) {
         Ok(DeployArchiveResult::Success(archive_principal)) => archive_principal,
         err => panic!("archive deployment failed: {err:?}"),
     }
 }
 
-pub fn install_archive_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
+pub fn install_archive_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
     let canister_id = env.create_canister(None);
     env.install_canister(canister_id, wasm, encode_config(principal_1()), None);
     canister_id
 }
 
-pub fn upgrade_archive_canister(env: &StateMachine, canister_id: CanisterId, wasm: Vec<u8>) {
+pub fn upgrade_archive_canister(env: &PocketIc, canister_id: CanisterId, wasm: Vec<u8>) {
     env.upgrade_canister(canister_id, wasm, encode_config(principal_1()), None)
         .unwrap();
 }

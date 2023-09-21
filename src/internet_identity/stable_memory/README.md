@@ -9,9 +9,9 @@ These tests serve two purposes:
 
 ### Using Canister Test Infrastructure
 These backup memory files are generated using the `canister_tests` infrastructure. To create a new backup file:
-1. Install II on the `StateMachine`
+1. Install II on the `PocketIc`
     ```rust
-    let env = StateMachine::new();
+    let env = PocketIc::new();
     let canister_id = install_ii_canister(&env, framework::II_WASM.clone());
     ```
 2. Create the desired state in II by interacting with it.

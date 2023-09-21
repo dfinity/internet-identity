@@ -1,10 +1,10 @@
 use canister_tests::api::internet_identity as api;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, ChallengeAttempt, DeviceData,
     DeviceWithUsage, IdentityNumber, PublicKeyAuthn, Purpose, RegisterResponse,
 };
+use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
 
 pub fn eq_ignoring_last_authentication(a: &AuthnMethodData, b: &AuthnMethodData) -> bool {
@@ -32,7 +32,7 @@ pub fn test_authn_method() -> AuthnMethodData {
 }
 
 pub fn create_identity_with_authn_method(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {

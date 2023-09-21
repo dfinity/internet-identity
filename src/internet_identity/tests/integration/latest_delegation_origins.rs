@@ -7,10 +7,10 @@ use canister_tests::framework::{
     upgrade_ii_canister, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DeviceData, InternetIdentityInit,
 };
+use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -121,7 +121,7 @@ fn should_not_record_delegation_origin_for_devices_on_non_ii_domains() -> Result
     Ok(())
 }
 
-fn install_ii_with_latest_origin_limit(env: &StateMachine, limit: u64) -> CanisterId {
+fn install_ii_with_latest_origin_limit(env: &PocketIc, limit: u64) -> CanisterId {
     install_ii_canister_with_arg(
         env,
         II_WASM.clone(),
@@ -133,7 +133,7 @@ fn install_ii_with_latest_origin_limit(env: &StateMachine, limit: u64) -> Canist
 }
 
 fn delegation_for_origin(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     user_number: AnchorNumber,
     frontend_hostname: &str,

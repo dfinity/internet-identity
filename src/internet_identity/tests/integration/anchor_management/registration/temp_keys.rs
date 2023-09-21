@@ -8,10 +8,10 @@ use canister_tests::framework::{
     install_ii_canister, test_principal, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Challenge, ChallengeAttempt, DeviceData, RegisterResponse,
 };
+use pocket_ic::{CallError, ErrorCode, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
@@ -171,7 +171,7 @@ fn should_provide_temp_keys_metric() -> Result<(), CallError> {
 }
 
 fn register_with_temp_key(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     temp_key: Principal,
     device: &DeviceData,

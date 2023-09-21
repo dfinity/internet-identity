@@ -1,14 +1,14 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{call_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodAddResponse, AuthnMethodData, AuthnMethodRemoveResponse, IdentityInfoResponse,
     IdentityMetadataReplaceResponse, IdentityNumber, MetadataEntry, PublicKey,
 };
+use pocket_ic::{call_candid_as, CallError, PocketIc};
 use std::collections::HashMap;
 
 pub fn identity_info(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -24,7 +24,7 @@ pub fn identity_info(
 }
 
 pub fn identity_metadata_replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -41,7 +41,7 @@ pub fn identity_metadata_replace(
 }
 
 pub fn authn_method_add(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -58,7 +58,7 @@ pub fn authn_method_add(
 }
 
 pub fn authn_method_remove(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,

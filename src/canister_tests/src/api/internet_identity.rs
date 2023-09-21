@@ -1,10 +1,8 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{
-    call_candid, call_candid_as, query_candid, query_candid_as, CallError, StateMachine,
-};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types;
+use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
 
 /// The experimental v2 API
 pub mod api_v2;
@@ -12,7 +10,7 @@ pub mod api_v2;
 /** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
-pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
+pub fn health_check(env: &PocketIc, canister_id: CanisterId) {
     let user_number: types::AnchorNumber = 0;
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
@@ -21,14 +19,14 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
 }
 
 pub fn create_challenge(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
 ) -> Result<types::Challenge, CallError> {
     call_candid(env, canister_id, "create_challenge", ()).map(|(x,)| x)
 }
 
 pub fn register(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     device_data: &types::DeviceData,
@@ -46,7 +44,7 @@ pub fn register(
 }
 
 pub fn prepare_delegation(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -68,12 +66,12 @@ pub fn prepare_delegation(
     )
 }
 
-pub fn init_salt(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {
+pub fn init_salt(env: &PocketIc, canister_id: CanisterId) -> Result<(), CallError> {
     call_candid(env, canister_id, "init_salt", ())
 }
 
 pub fn get_delegation(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -92,7 +90,7 @@ pub fn get_delegation(
 }
 
 pub fn get_principal(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -109,7 +107,7 @@ pub fn get_principal(
 }
 
 pub fn lookup(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
 ) -> Result<Vec<types::DeviceData>, CallError> {
@@ -117,7 +115,7 @@ pub fn lookup(
 }
 
 pub fn get_anchor_credentials(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
 ) -> Result<types::AnchorCredentials, CallError> {
@@ -125,7 +123,7 @@ pub fn get_anchor_credentials(
 }
 
 pub fn add(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -141,7 +139,7 @@ pub fn add(
 }
 
 pub fn update(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -158,7 +156,7 @@ pub fn update(
 }
 
 pub fn replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -175,7 +173,7 @@ pub fn replace(
 }
 
 pub fn remove(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -191,7 +189,7 @@ pub fn remove(
 }
 
 pub fn get_anchor_info(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -207,7 +205,7 @@ pub fn get_anchor_info(
 }
 
 pub fn enter_device_registration_mode(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -223,7 +221,7 @@ pub fn enter_device_registration_mode(
 }
 
 pub fn exit_device_registration_mode(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -238,7 +236,7 @@ pub fn exit_device_registration_mode(
 }
 
 pub fn add_tentative_device(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
     device_data: &types::DeviceData,
@@ -253,7 +251,7 @@ pub fn add_tentative_device(
 }
 
 pub fn verify_tentative_device(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
@@ -270,7 +268,7 @@ pub fn verify_tentative_device(
 }
 
 pub fn deploy_archive(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     wasm: &Vec<u8>,
 ) -> Result<types::DeployArchiveResult, CallError> {
@@ -278,14 +276,14 @@ pub fn deploy_archive(
 }
 
 pub fn stats(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
 ) -> Result<types::InternetIdentityStats, CallError> {
     query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
 }
 
 pub fn fetch_entries(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
 ) -> Result<Vec<BufferedEntry>, CallError> {
@@ -293,7 +291,7 @@ pub fn fetch_entries(
 }
 
 pub fn acknowledge_entries(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     sequence_number: u64,

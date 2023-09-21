@@ -6,10 +6,10 @@ use canister_tests::framework::{
     assert_labelled_metric, assert_metric, env, get_metrics, install_ii_canister,
     upgrade_ii_canister, II_WASM,
 };
-use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, MetadataEntry, Purpose, WebAuthn,
 };
+use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
