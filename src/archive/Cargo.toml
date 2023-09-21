@@ -19,6 +19,8 @@ ic-stable-structures = "0.5"
 # other
 serde = "1"
 serde_bytes = "0.11"
+pocket-ic = { git = "https://github.com/dfinity/ic.git" }
+
 
 [dev-dependencies]
 candid = { version = "0.9", features = ["parser"] }

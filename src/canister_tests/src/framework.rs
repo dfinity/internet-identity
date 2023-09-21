@@ -139,7 +139,7 @@ pub fn env() -> PocketIc {
         I looked for it at {:?}. You can specify another path with the environment variable POCKET_IC_BIN (note that I run from {:?}).
 
         Run the following command to get the binary:
-            curl -sLO https://download.dfinity.systems/ic/$commit/openssl-static-binaries/$platform/pocket-ic.gz
+            curl -sLO https://download.dfinity.systems/ic/$commit/binaries/$platform/pocket-ic.gz
             gzip -d pocket-ic.gz
             chmod +x pocket-ic
         where $commit can be read from `.ic-commit` and $platform is 'x86_64-linux' for Linux and 'x86_64-darwin' for Intel/rosetta-enabled Darwin.
@@ -237,7 +237,8 @@ pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId,
     let mut buffer = vec![];
     file.read_to_end(&mut buffer)
         .expect("error while reading stable memory file");
-    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip).expect("Failed to set stable memory");
+    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip)
+        .expect("Failed to set stable memory");
 }
 
 pub const PUBKEY_1: &str = "test";

@@ -56,6 +56,7 @@ dependencies = [
  "ic-metrics-encoder",
  "ic-stable-structures",
  "internet_identity_interface",
+ "pocket-ic",
  "regex",
  "serde",
  "serde_bytes",
