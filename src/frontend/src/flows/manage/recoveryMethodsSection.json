@@ -2,6 +2,7 @@
   "en": {
     "security_warning": "Security Warning",
     "recovery_phrase_enabled": "You enabled a recovery phrase.",
-    "recovery_key_enabled": "You enabled a recovery device."
+    "recovery_key_enabled": "You enabled a recovery device.",
+    "enable_recovery_to_make_secure": "Enable recovery methods to make your Internet Identity more secure."
   }
 }

@@ -1,4 +1,4 @@
-import { cypherIcon, warningIcon } from "$src/components/icons";
+import { cypherIcon } from "$src/components/icons";
 import {
   authenticatorItem,
   dedupLabels,
@@ -8,21 +8,23 @@ import { I18n } from "$src/i18n";
 import { unreachable } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
 
+import { warnBox } from "$src/components/warnBox";
+import { nonNullish } from "@dfinity/utils";
 import copyJson from "./tempKeys.json";
 
-export type TempKeysWarning =
+export type TempKeyWarningAction =
   | { tag: "add_recovery"; action: () => void }
   | { tag: "add_passkey"; action: () => void };
-export const tempKeyWarningSection = ({
+export const tempKeyWarningBox = ({
   i18n,
-  tempKeysWarning,
+  warningAction,
 }: {
   i18n: I18n;
-  tempKeysWarning: TempKeysWarning;
+  warningAction?: TempKeyWarningAction;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
 
-  const warningButtonCopy = (tempKeysWarning: TempKeysWarning) => {
+  const warningButtonCopy = (tempKeysWarning: TempKeyWarningAction) => {
     switch (tempKeysWarning.tag) {
       case "add_recovery":
         return copy.add_recovery_phrase;
@@ -33,29 +35,22 @@ export const tempKeyWarningSection = ({
     }
   };
 
-  return html`
-    <aside class="c-card c-card--narrow c-card--warning">
-      <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
-        <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
-          >${warningIcon}</i
-        >
-        <h2>${copy.security_warning}</h2>
-      </span>
-      <div class="t-title t-title--complications">
-        <h2 class="t-title">${copy.you_are_using_temporary_key}</h2>
-      </div>
-      <p class="warning-message t-paragraph t-lead">
-        ${copy.set_up_recovery_and_passkey}
-      </p>
-      <button
+  const buttonTemplate = nonNullish(warningAction)
+    ? html`<button
         class="c-button c-button--primary l-stack"
-        @click="${tempKeysWarning.action}"
+        @click="${warningAction.action}"
         id="addRecovery"
       >
-        <span>${warningButtonCopy(tempKeysWarning)}</span>
-      </button>
-    </aside>
-  `;
+        <span>${warningButtonCopy(warningAction)}</span>
+      </button>`
+    : undefined;
+
+  return warnBox({
+    headerSlot: html`<h2>${copy.security_warning}</h2>`,
+    title: copy.you_are_using_temporary_key,
+    message: copy.set_up_recovery_and_passkey,
+    slot: buttonTemplate,
+  });
 };
 
 export const tempKeysSection = ({

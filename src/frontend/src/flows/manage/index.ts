@@ -22,8 +22,8 @@ import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import {
-  TempKeysWarning,
-  tempKeyWarningSection,
+  TempKeyWarningAction,
+  tempKeyWarningBox,
   tempKeysSection,
 } from "$src/flows/manage/tempKeys";
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
@@ -163,7 +163,7 @@ const displayManageTemplate = ({
   dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: IdentityBackground;
-  tempKeysWarning?: TempKeysWarning;
+  tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
@@ -175,7 +175,7 @@ const displayManageTemplate = ({
     </hgroup>
     ${anchorSection({ userNumber, identityBackground })}
     ${nonNullish(tempKeysWarning)
-      ? tempKeyWarningSection({ i18n, tempKeysWarning })
+      ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
       : ""}
     <p class="t-paragraph">
       ${dappsTeaser({
@@ -335,7 +335,7 @@ export const displayManage = (
     };
 
     // Function to figure out what temp keys warning should be shown, if any.
-    const determineTempKeysWarning = (): TempKeysWarning | undefined => {
+    const determineTempKeysWarning = (): TempKeyWarningAction | undefined => {
       if (!isPinAuthenticated(devices_, connection)) {
         // Don't show the warning, if the user is not authenticated using a PIN
         // protected browser storage key
