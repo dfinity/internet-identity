@@ -32,7 +32,9 @@ export const recoveryMethodsSection = ({
   const warnNoRecovery = isNullish(recoveryPhrase) && isNullish(recoveryKey);
   const wrapClasses = [
     "l-stack",
-    ...(warnNoRecovery ? ["c-card", "c-card--narrow", "c-card--warning"] : []),
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoRecovery ? ["c-card--warning"] : []),
   ];
 
   return html`
@@ -54,6 +56,7 @@ export const recoveryMethodsSection = ({
       <div class="t-title">
         <h2>Recovery Methods</h2>
       </div>
+      <p class="t-paragraph t-lead">${copy.enable_recovery_to_make_secure}</p>
       <div class="c-action-list">
         <ul>
           ${isNullish(recoveryPhrase)
