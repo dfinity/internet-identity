@@ -1011,7 +1011,7 @@ dependencies = [
 name = "internet_identity"
 version = "0.1.0"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.4",
  "candid",
  "canister_tests",
  "captcha",
@@ -1539,13 +1539,13 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "pretty"
-version = "0.12.1"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "563c9d701c3a31dfffaaf9ce23507ba09cbe0b9125ba176d15e629b0235e9acc"
+checksum = "b55c4d17d994b637e2f4daf6e5dc5d660d209d5642377d675d7a1c3ab69fa579"
 dependencies = [
  "arrayvec",
  "typed-arena",
- "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
