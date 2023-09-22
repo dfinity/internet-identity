@@ -1011,7 +1011,7 @@ dependencies = [
 name = "internet_identity"
 version = "0.1.0"
 dependencies = [
- "base64 0.21.4",
+ "base64 0.13.1",
  "candid",
  "canister_tests",
  "captcha",
@@ -1512,7 +1512,7 @@ dependencies = [
 [[package]]
 name = "pocket-ic"
 version = "0.0.1"
-source = "git+https://github.com/dfinity/ic.git#d0d23094de6d7092c2916b7cb07cd52df59a1406"
+source = "git+https://github.com/dfinity/ic.git?rev=41aae0f203995dc79ba3b736404bad851731ec51#41aae0f203995dc79ba3b736404bad851731ec51"
 dependencies = [
  "async-trait",
  "base64 0.11.0",

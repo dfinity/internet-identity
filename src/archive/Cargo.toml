@@ -19,7 +19,7 @@ ic-stable-structures = "0.5"
 # other
 serde = "1"
 serde_bytes = "0.11"
-pocket-ic = { git = "https://github.com/dfinity/ic.git" }
+pocket-ic = { git = "https://github.com/dfinity/ic.git", rev = "41aae0f203995dc79ba3b736404bad851731ec51" }
 
 
 [dev-dependencies]

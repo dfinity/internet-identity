@@ -33,7 +33,7 @@ ic-certified-map = "0.4"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
 
-pocket-ic = { git = "https://github.com/dfinity/ic.git" }
+pocket-ic = { git = "https://github.com/dfinity/ic.git", rev = "41aae0f203995dc79ba3b736404bad851731ec51" }
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
