@@ -64,7 +64,7 @@ pub fn validate_id_alias_claims(
     let decoder: Decoder = Decoder::new();
     let jws = decoder
         .decode_compact_serialization(credential_jws.as_ref(), None)
-        .map_err(|e| JwtValidationError::JwsDecodingError(e))?;
+        .map_err(JwtValidationError::JwsDecodingError)?;
     let claims: JwtClaims<serde_json::Value> = serde_json::from_slice(jws.claims())
         .map_err(|_| inconsistent_jwt_claims("failed parsing JSON JWT claims"))?;
     validate_claim("sub", did_for_principal(alias_tuple.id_dapp), claims.sub())?;
