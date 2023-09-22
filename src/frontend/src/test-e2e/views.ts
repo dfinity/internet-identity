@@ -542,16 +542,12 @@ export class AuthenticateView extends View {
 export class WelcomeBackView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#loginDifferent")
+      .$('[data-page="authorize-pick"]')
       .waitForDisplayed({ timeout: 15_000 });
   }
 
-  async getIdentityAnchor(): Promise<string> {
-    return await this.browser.$("[data-usernumber]").getText();
-  }
-
-  async login(): Promise<void> {
-    await this.browser.$("#login").click();
+  async login(userNumber: string): Promise<void> {
+    await this.browser.$(`[data-anchor-id]="${userNumber}"`).click();
   }
 }
 
