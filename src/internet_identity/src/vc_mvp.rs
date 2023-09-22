@@ -20,13 +20,14 @@ use internet_identity_interface::internet_identity::types::{
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
+use vc_util::{
+    did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash, AliasTuple,
+    II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
+};
 
 // The expiration used for signatures
 #[allow(clippy::identity_op)]
 const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
-const II_CREDENTIAL_URL: &str = "https://internetcomputer.org/credential/internet-idenity";
-const II_ISSUER_URL: &str = "https://internetcomputer.org/issuers/internet-idenity";
 
 pub struct InvolvedDapps {
     pub(crate) relying_party: FrontendHostname,
@@ -184,11 +185,6 @@ fn get_signature(
     Some(cbor.into_inner())
 }
 
-struct AliasTuple {
-    id_alias: Principal,
-    id_dapp: Principal,
-}
-
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
     let expires_at = time().saturating_add(SIGNATURE_EXPIRATION_PERIOD_NS);
     sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
@@ -232,7 +228,7 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
     .expect("internal: failed building id_alias subject");
 
     let credential: Credential = CredentialBuilder::default()
-        .id(Url::parse(II_CREDENTIAL_URL).expect("internal: bad credential id"))
+        .id(prepare_credential_id())
         .issuer(Url::parse(II_ISSUER_URL).expect("internal: bad issuer url"))
         .type_("InternetIdentityIdAlias")
         .subject(subject)
@@ -241,41 +237,15 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
     credential
 }
 
+fn prepare_credential_id() -> Url {
+    let url = Url::parse(II_CREDENTIAL_URL_PREFIX).expect("internal: bad credential id base url");
+    url.join(time().to_string())
+        .expect("internal: bad credential id extension")
+}
+
 fn prepare_id_alias_jwt(alias_tuple: &AliasTuple) -> String {
     let credential = id_alias_credential(alias_tuple);
     credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::vc_mvp::AliasTuple;
-    use canister_tests::framework::{principal_1, principal_2};
-    use identity_jose::jws::Decoder;
-
-    #[test]
-    fn signing_input_encoder_decoder_test() {
-        let alias_tuple = AliasTuple {
-            id_alias: principal_1(),
-            id_dapp: principal_2(),
-        };
-        let canister_id = principal_1();
-        let canister_sig_pk_der = vec![5, 6, 7, 8];
-        let prepared_jwt = prepare_id_alias_jwt(&alias_tuple);
-        let signing_input_1 = vc_signing_input(&prepared_jwt, &canister_sig_pk_der, canister_id);
-        let input_hash_1 = vc_signing_input_hash(&signing_input_1);
-        let sig = vec![1, 2, 3, 4];
-        let jws_bytes = vc_jwt_to_jws(&prepared_jwt, &canister_sig_pk_der, &sig, canister_id);
-
-        let decoder: Decoder = Decoder::new();
-        let jws = decoder
-            .decode_compact_serialization(jws_bytes.as_ref(), None)
-            .expect("Failure decoding JWS credential");
-        let signing_input_2 = jws.signing_input();
-        let input_hash_2 = vc_signing_input_hash(signing_input_2);
-        assert_eq!(signing_input_1, signing_input_2);
-        assert_eq!(input_hash_1, input_hash_2);
-    }
 }

@@ -4,13 +4,14 @@ use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use identity_jose::jwk::JwkType;
-use identity_jose::jws::{set_ic_root_public_key_for_testing, verify_credential_jws, Decoder};
+use identity_jose::jws::{set_ic_root_public_key_for_testing, Decoder};
 use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use std::ops::Deref;
+use vc_util::verify_credential_jws;
 
 fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
     let decoder: Decoder = Decoder::new();

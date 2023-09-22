@@ -7,7 +7,7 @@ use canister_tests::framework::{env, get_wasm_path, principal_1, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
-use identity_jose::jws::{set_ic_root_public_key_for_testing, verify_credential_jws};
+use identity_jose::jws::set_ic_root_public_key_for_testing;
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentMessageRequest,
     Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, PrepareCredentialRequest,
@@ -19,6 +19,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
+use vc_util::verify_credential_jws;
 
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
