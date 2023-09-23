@@ -1,7 +1,7 @@
 use candid::{candid_method, Principal};
-use canister_sig_util::{canister_sig_pk_der, hash_bytes, CanisterSig};
+use canister_sig_util::{canister_sig_pk_der, hash_bytes};
 use ic_cdk_macros::{query, update};
-use ic_certified_map::Hash;
+use ic_certified_map::{Hash, HashTree};
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -123,7 +123,13 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
         ));
     }
     let tree = ic_certified_map::labeled(LABEL_SIG, witness);
-    let sig = CanisterSig {
+    #[derive(Serialize)]
+    struct Sig<'a> {
+        certificate: ByteBuf,
+        tree: HashTree<'a>,
+    }
+
+    let sig = Sig {
         certificate: ByteBuf::from(certificate),
         tree,
     };

@@ -56,6 +56,7 @@ canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.9"
 ic-response-verification = "1.0"
+serial_test = "2"
 
 
 [features]

@@ -8,7 +8,9 @@ edition = "2021"
 # ic dependencies
 candid = "0.9"
 ic-cdk = "0.10"
+ic-certification = "0.24.1"
 ic-certified-map = "0.4"
+canister_sig_util = { path = "../canister_sig_util" }
 
 # vc dependencies
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false }
@@ -21,6 +23,7 @@ identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git
 hex = "0.4"
 serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
+serde_cbor = "0.11"
 serde_json = "1"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
