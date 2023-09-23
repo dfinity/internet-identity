@@ -100,14 +100,14 @@ pub fn verify_credential_jws(
     let jws = decoder
         .decode_compact_serialization(credential_jws.as_ref(), None)
         .map_err(|e| key_decoding_err(&format!("credential JWS parsing error: {}", e)))?;
-    let canister_sig: CanisterSig = serde_cbor::from_slice(&jws.decoded_signature())
+    let canister_sig: CanisterSig = serde_cbor::from_slice(jws.decoded_signature())
         .map_err(|e| invalid_signature_err(&format!("signature parsing error: {}", e)))?;
     let ic_certificate: Certificate = serde_cbor::from_slice(canister_sig.certificate.as_ref())
         .map_err(|e| key_decoding_err(&format!("certificate parsing error: {}", e)))?;
     let jws_header = jws
         .protected_header()
         .ok_or(key_decoding_err("missing JWS header"))?;
-    let canister_sig_pk = get_canister_sig_pk(&jws_header)?;
+    let canister_sig_pk = get_canister_sig_pk(jws_header)?;
 
     ///// Check if root hash of the signatures hash tree matches the certified data in the certificate
     let certified_data_path = [
