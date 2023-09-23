@@ -1,17 +1,21 @@
 use candid::Principal;
+use canister_sig_util::{verify_root_signature, CanisterSig, CanisterSigPublicKey};
+use ic_certification::{Certificate, LookupResult};
 use ic_certified_map::Hash;
 use identity_core::convert::FromJson;
 use identity_credential::credential::Subject;
 use identity_credential::error::Error as JwtVcError;
 use identity_credential::validator::JwtValidationError;
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
-use identity_jose::jws::{CompactJwsEncoder, Decoder, JwsAlgorithm, JwsHeader};
+use identity_jose::jws::{
+    CompactJwsEncoder, Decoder, JwsAlgorithm, JwsHeader, SignatureVerificationError,
+    SignatureVerificationErrorKind,
+};
 use identity_jose::jwt::JwtClaims;
-use identity_jose::jwu::encode_b64;
+use identity_jose::jwu::{decode_b64, encode_b64};
 use sha2::{Digest, Sha256};
-use std::ops::{Add, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 
-pub use identity_jose::jws::verify_credential_jws;
 use serde_json::Value;
 
 pub const II_CREDENTIAL_URL_PREFIX: &str =
@@ -85,6 +89,70 @@ pub fn validate_id_alias_claims(
     Ok(())
 }
 
+/// Verifies the specified JWS credential against the given root public key.
+#[allow(dead_code)]
+pub fn verify_credential_jws(
+    credential_jws: &str,
+    signing_canister_id: Principal,
+) -> Result<(), SignatureVerificationError> {
+    ///// Decode JWS.
+    let decoder: Decoder = Decoder::new();
+    let jws = decoder
+        .decode_compact_serialization(credential_jws.as_ref(), None)
+        .map_err(|e| key_decoding_err(&format!("credential JWS parsing error: {}", e)))?;
+    let canister_sig: CanisterSig = serde_cbor::from_slice(&jws.decoded_signature())
+        .map_err(|e| invalid_signature_err(&format!("signature parsing error: {}", e)))?;
+    let ic_certificate: Certificate = serde_cbor::from_slice(canister_sig.certificate.as_ref())
+        .map_err(|e| key_decoding_err(&format!("certificate parsing error: {}", e)))?;
+    let jws_header = jws
+        .protected_header()
+        .ok_or(key_decoding_err("missing JWS header"))?;
+    let canister_sig_pk = get_canister_sig_pk(&jws_header)?;
+
+    ///// Check if root hash of the signatures hash tree matches the certified data in the certificate
+    let certified_data_path = [
+        b"canister",
+        canister_sig_pk.signing_canister_id.as_slice(),
+        b"certified_data",
+    ];
+    // Get value of the certified data in the certificate
+    let witness = match ic_certificate.tree.lookup_path(&certified_data_path) {
+        LookupResult::Found(witness) => witness,
+        _ => {
+            return Err(invalid_signature_err(&format!(
+                "certificate tree has no certified data witness for canister {} (0x{})",
+                canister_sig_pk.signing_canister_id.to_text(),
+                hex::encode(canister_sig_pk.signing_canister_id.as_slice())
+            )))
+        }
+    };
+    // Recompute the root hash of the signatures hash tree
+    let digest = canister_sig.tree.digest();
+
+    if witness != digest {
+        return Err(invalid_signature_err(
+            "certificate tree witness doesn't match signature tree digest",
+        ));
+    }
+
+    ///// Check the certification path.
+    let seed_hash = hash_bytes_sha256(&canister_sig_pk.seed);
+    let signing_input_hash = verifiable_credential_signing_input_hash(jws.signing_input());
+    let cert_sig_path = [b"sig", &seed_hash[..], &signing_input_hash[..]];
+    match canister_sig.tree.lookup_path(&cert_sig_path) {
+        LookupResult::Found(_) => {}
+        _ => {
+            return Err(invalid_signature_err(
+                "missing signature path in canister's certified data",
+            ))
+        }
+    }
+
+    ///// Verify root signature (with delegation, if any).
+    verify_root_signature(&ic_certificate, signing_canister_id)
+        .map_err(|e| invalid_signature_err(&format!("{:?}", e)))
+}
+
 fn validate_credential_subject(
     subject_value: &Value,
     alias_tuple: &AliasTuple,
@@ -153,6 +221,61 @@ fn jws_encoder<'a>(
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
         .expect("internal error: JWS encoder failed");
     encoder
+}
+
+fn unsupported_alg_err(custom_message: &str) -> SignatureVerificationError {
+    let err: SignatureVerificationError = SignatureVerificationErrorKind::UnsupportedAlg.into();
+    err.with_custom_message(custom_message.to_string())
+}
+
+fn key_decoding_err(custom_message: &str) -> SignatureVerificationError {
+    let err: SignatureVerificationError = SignatureVerificationErrorKind::KeyDecodingFailure.into();
+    err.with_custom_message(custom_message.to_string())
+}
+
+fn invalid_signature_err(custom_message: &str) -> SignatureVerificationError {
+    let err: SignatureVerificationError = SignatureVerificationErrorKind::InvalidSignature.into();
+    err.with_custom_message(custom_message.to_string())
+}
+
+fn hash_bytes_sha256(bytes: &[u8]) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
+fn verifiable_credential_signing_input_hash(signing_input: &[u8]) -> Hash {
+    let sep = b"iccs_verifiable_credential";
+    let mut hasher = Sha256::new();
+    let buf = [sep.len() as u8];
+    hasher.update(buf);
+    hasher.update(sep);
+    hasher.update(signing_input);
+    hasher.finalize().into()
+}
+
+fn get_canister_sig_pk(
+    jws_header: &JwsHeader,
+) -> Result<CanisterSigPublicKey, SignatureVerificationError> {
+    let jwk = jws_header
+        .deref()
+        .jwk()
+        .ok_or(key_decoding_err("missing JWK in JWS header"))?;
+    if jwk.alg() != Some("IcCs") {
+        return Err(unsupported_alg_err("expected IcCs"));
+    }
+    // Per https://datatracker.ietf.org/doc/html/rfc7518#section-6.4,
+    // JwkParamsOct are for symmetric keys or another key whose value is a single octet sequence.
+    if jwk.kty() != JwkType::Oct {
+        return Err(unsupported_alg_err("expected JWK of type oct"));
+    }
+    let jwk_params = jwk
+        .try_oct_params()
+        .map_err(|_| key_decoding_err("missing JWK oct params"))?;
+    let pk_der = decode_b64(jwk_params.k.as_bytes())
+        .map_err(|_| key_decoding_err("invalid base64url encoding"))?;
+    CanisterSigPublicKey::try_from(pk_der.as_slice())
+        .map_err(|e| key_decoding_err(&format!("{:?}", e)))
 }
 
 #[cfg(test)]
