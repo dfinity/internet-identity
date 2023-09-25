@@ -56,7 +56,7 @@ const savePasskeyTemplate = ({
     <button
       @click=${() => constructPasskey()}
       data-action="construct-identity"
-      class="c-button"
+      class="c-button l-stack"
     >
       ${copy.save_passkey}
     </button>
@@ -98,8 +98,12 @@ const savePasskeyTemplate = ({
 
 export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
-// Prompt the user to create a WebAuthn identity
-export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
+// Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
+export const savePasskeyOrPin = ({
+  pinAllowed,
+}: {
+  pinAllowed: boolean;
+}): Promise<IIWebAuthnIdentity | "pin" | "canceled"> => {
   return new Promise((resolve) =>
     savePasskeyPage({
       i18n: new I18n(),
@@ -113,6 +117,7 @@ export const savePasskey = (): Promise<IIWebAuthnIdentity | "canceled"> => {
           toast.error(errorMessage(e));
         }
       },
+      constructPin: pinAllowed ? () => resolve("pin") : undefined,
     })
   );
 };

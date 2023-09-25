@@ -1,8 +1,22 @@
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
+import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
 import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
 import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge, i18n, manageTemplates } from "./showcase";
+
+const registerSuccessToastTemplate = (result: unknown) => html`
+  Identity successfully created!<br />
+  <p class="l-stack">
+    <strong class="t-strong">${prettyResult(result)}</strong>
+  </p>
+  <button
+    class="l-stack c-button c-button--secondary"
+    @click=${() => window.location.reload()}
+  >
+    reload
+  </button>
+`;
 
 export const flowsPage = () => {
   document.title = "Flows";
@@ -28,19 +42,44 @@ const registerFlowOpts: RegisterFlowOpts<null> = {
     };
   },
   registrationAllowed: true,
+  storePinIdentity: () => {
+    toast.info("PIN identity was stored");
+    return Promise.resolve();
+  },
+  pinAllowed: () => Promise.resolve(false),
+  uaParser: Promise.resolve(undefined),
 } as const;
 
 export const iiFlows: Record<string, () => void> = {
   loginManage: async () => {
-    const result = await authenticateBoxFlow<null>({
+    const result = await authenticateBoxFlow<null, "identity">({
       i18n,
       templates: manageTemplates,
       addDevice: () => {
         toast.info(html`Added device`);
         return Promise.resolve({ alias: "My Device" });
       },
-      login: async () => {
+      loginPasskey: async () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
+        toast.info(html`Logged in`);
+        return Promise.resolve({
+          tag: "ok",
+          userNumber: BigInt(1234),
+          connection: null,
+        });
+      },
+      loginPinIdentityMaterial: async ({ pin }) => {
+        toast.info(html`Valid PIN is '123456'`);
+        await withLoader(
+          () => new Promise((resolve) => setTimeout(resolve, 2000))
+        );
+        if (pin !== "123456") {
+          return Promise.resolve({
+            tag: "err",
+            title: "Invalid PIN",
+            message: "Invalid PIN",
+          });
+        }
         toast.info(html`Logged in`);
         return Promise.resolve({
           tag: "ok",
@@ -55,6 +94,18 @@ export const iiFlows: Record<string, () => void> = {
           userNumber: BigInt(1234),
           connection: null,
         });
+      },
+      retrievePinIdentityMaterial: ({ userNumber }) => {
+        toast.info(
+          html`Looking up identity for ${userNumber} (pretending only 10000 has
+          pin identity)`
+        );
+
+        if (userNumber !== BigInt(10000)) {
+          return Promise.resolve(undefined);
+        }
+
+        return Promise.resolve("identity");
       },
       registerFlowOpts,
     });
@@ -73,19 +124,14 @@ export const iiFlows: Record<string, () => void> = {
   },
   register: async () => {
     const result = await registerFlow<null>(registerFlowOpts);
-
-    toast.success(html`
-      Identity successfully created!<br />
-      <p class="l-stack">
-        <strong class="t-strong">${prettyResult(result)}</strong>
-      </p>
-      <button
-        class="l-stack c-button c-button--secondary"
-        @click=${() => window.location.reload()}
-      >
-        reload
-      </button>
-    `);
+    toast.success(registerSuccessToastTemplate(result));
+  },
+  registerWithPin: async () => {
+    const result = await registerFlow<null>({
+      ...registerFlowOpts,
+      pinAllowed: () => Promise.resolve(true),
+    });
+    toast.success(registerSuccessToastTemplate(result));
   },
 };
 

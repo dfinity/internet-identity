@@ -31,7 +31,9 @@ import {
   resetPhraseInfoPage,
   unprotectDeviceInfoPage,
 } from "$src/flows/manage/deviceSettings";
+import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
 import { confirmPinPage } from "$src/flows/pin/confirmPin";
+import { pinInfoPage } from "$src/flows/pin/pinInfo";
 import { setPinPage } from "$src/flows/pin/setPin";
 import { usePinPage } from "$src/flows/pin/usePin";
 import {
@@ -156,6 +158,15 @@ export const iiPages: Record<string, () => void> = {
       identityBackground,
       userNumber,
       onContinue: () => console.log("done"),
+      stepper: registerStepper({ current: "finish" }),
+    }),
+  displayUserNumberTempKey: () =>
+    displayUserNumberPage({
+      identityBackground,
+      userNumber,
+      onContinue: () => console.log("done"),
+      stepper: registerStepper({ current: "finish" }),
+      marketingIntroSlot: tempKeyWarningBox({ i18n: new I18n("en") }),
     }),
   compatibilityNotice: () => compatibilityNotice("This is the reason."),
   promptDeviceAlias: () =>
@@ -349,6 +360,12 @@ export const iiPages: Record<string, () => void> = {
       onContinue: () => console.log("Done"),
       i18n,
     }),
+  pinInfo: () =>
+    pinInfoPage({
+      i18n,
+      onContinue: () => console.log("continue"),
+      cancel: () => console.log("cancel"),
+    }),
   setPin: () =>
     setPinPage({
       i18n,
@@ -361,12 +378,26 @@ export const iiPages: Record<string, () => void> = {
       onContinue: () => console.log("PIN confirmed"),
       expectedPin: "123456",
       cancel: () => console.log("cancel"),
+      retry: () => console.log("retry"),
     }),
   usePin: () =>
     usePinPage({
+      verify: (pin: string) => {
+        toast.info(`submitted pin: '${pin}'`);
+        if (pin !== "123456") {
+          toast.info("correct pin is '123456'");
+          return Promise.resolve({ ok: false, error: "Invalid PIN" });
+        }
+        return Promise.resolve({
+          ok: true,
+          value: pin,
+        });
+      },
       i18n,
       onContinue: (pin) =>
-        toast.info(html`PIN: <strong class="t-strong">${pin}</strong>`),
+        toast.success(
+          html`Success, PIN: <strong class="t-strong">${pin}</strong>`
+        ),
       onUsePasskey: () => toast.info("Requested to use passkey"),
       cancel: () => toast.info("Canceled"),
     }),
@@ -400,6 +431,7 @@ export const iiPages: Record<string, () => void> = {
             reset: () => Promise.resolve(),
           },
         },
+        pinAuthenticators: [],
       },
       onAddDevice: () => {
         console.log("add device requested");
@@ -428,6 +460,7 @@ export const iiPages: Record<string, () => void> = {
           },
         ],
         recoveries: {},
+        pinAuthenticators: [],
       },
       onAddDevice: () => {
         console.log("add device requested");
@@ -444,48 +477,40 @@ export const iiPages: Record<string, () => void> = {
       },
     });
   },
-
-  prompt: () =>
-    promptPage({
-      _i18n: i18n,
-      userNumber: BigInt(1234),
-      knownDapp: openChat,
-      cancel: () => console.log("cancel"),
-    }),
-  select: () =>
-    selectPage({
-      _i18n: i18n,
-      userNumber: BigInt(1234),
-      relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
-      verify: async (dapp) => {
-        console.log("Verifying through " + dapp.name + "...");
-
-        // Hacky button to resolve the fake promise
-        await new Promise<void>((resolve) => {
-          const closeBtn = document.createElement("button");
-          closeBtn.onclick = () => {
-            closeBtn.remove();
-            resolve();
-          };
-          closeBtn.classList.add("c-button");
-          closeBtn.style.position = "absolute";
-          closeBtn.style.inset = "0 0 auto auto";
-          closeBtn.style.width = "fit-content";
-          closeBtn.style.fontSize = "10px";
-          closeBtn.style.padding = "2px 4px";
-          closeBtn.style.marginTop = "0";
-          closeBtn.innerText = "done";
-          closeBtn.dataset.role = "done";
-          document.body.appendChild(closeBtn);
-        });
-        console.log("Done.");
+  displayManageTempKey: () => {
+    displayManagePage({
+      identityBackground,
+      userNumber,
+      devices: {
+        authenticators: [],
+        recoveries: {},
+        pinAuthenticators: [
+          {
+            alias: "Chrome on iPhone",
+            rename: () => console.log("rename"),
+            remove: () => console.log("remove"),
+          },
+        ],
       },
-
-      providers: [nnsDapp, juno],
-      onContinue: (res) => {
-        console.log("Received result", res);
+      onAddDevice: () => {
+        console.log("add device requested");
       },
-    }),
+      addRecoveryPhrase: () => {
+        console.log("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        console.log("add recovery key");
+      },
+      dapps,
+      exploreDapps: () => {
+        console.log("explore dapps");
+      },
+      tempKeysWarning: {
+        tag: "add_recovery",
+        action: () => console.log("add recovery phrase"),
+      },
+    });
+  },
   pollForTentativeDevicePage: () =>
     pollForTentativeDevicePage({
       cancel: () => console.log("canceled"),
@@ -611,6 +636,47 @@ export const iiPages: Record<string, () => void> = {
       i18n,
       deviceAlias: chromeDevice.alias,
       onContinue: () => console.log("Continue"),
+    }),
+  vcPrompt: () =>
+    promptPage({
+      _i18n: i18n,
+      userNumber: BigInt(1234),
+      knownDapp: openChat,
+      cancel: () => console.log("cancel"),
+    }),
+  vcSelect: () =>
+    selectPage({
+      _i18n: i18n,
+      userNumber: BigInt(1234),
+      relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
+      verify: async (dapp) => {
+        console.log("Verifying through " + dapp.name + "...");
+
+        // Hacky button to resolve the fake promise
+        await new Promise<void>((resolve) => {
+          const closeBtn = document.createElement("button");
+          closeBtn.onclick = () => {
+            closeBtn.remove();
+            resolve();
+          };
+          closeBtn.classList.add("c-button");
+          closeBtn.style.position = "absolute";
+          closeBtn.style.inset = "0 0 auto auto";
+          closeBtn.style.width = "fit-content";
+          closeBtn.style.fontSize = "10px";
+          closeBtn.style.padding = "2px 4px";
+          closeBtn.style.marginTop = "0";
+          closeBtn.innerText = "done";
+          closeBtn.dataset.role = "done";
+          document.body.appendChild(closeBtn);
+        });
+        console.log("Done.");
+      },
+
+      providers: [nnsDapp, juno],
+      onContinue: (res) => {
+        console.log("Received result", res);
+      },
     }),
 };
 

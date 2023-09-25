@@ -29,4 +29,5 @@ export type Devices = {
     recoveryKey?: RecoveryKey;
     recoveryPhrase?: RecoveryPhrase;
   };
+  pinAuthenticators: Authenticator[];
 };

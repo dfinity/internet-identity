@@ -58,7 +58,7 @@ describe("pin input", () => {
     );
   });
 
-  test("writing to all chars triggers autosubmit only once", () => {
+  test("writing to all chars triggers submit on every dispatch", () => {
     const onSubmit: (pin: string) => void = vi.fn();
 
     render(pinInputId({ onSubmit }).template, document.body);
@@ -70,8 +70,8 @@ describe("pin input", () => {
     }
 
     expect(onSubmit).toHaveBeenCalledOnce();
-    dispatchInput(inputs[0], "a"); // after an extra dispatch, the submit should still only have been called once
-    expect(onSubmit).toHaveBeenCalledOnce();
+    dispatchInput(inputs[0], "a"); // after an extra dispatch the value should be submitted again
+    expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 
   test("writing to all chars removes focus", () => {

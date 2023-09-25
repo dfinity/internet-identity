@@ -1,4 +1,5 @@
 import { toast } from "$src/components/toast";
+import type { DynamicKey } from "$src/utils/i18n";
 import { mount, withRef } from "$src/utils/lit-html";
 import { Chan, withInputElement, zip } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -8,7 +9,7 @@ import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 export type PinResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string | DynamicKey };
 
 // A Pin Input component
 export const pinInput = <T>({
@@ -39,7 +40,7 @@ export const pinInput = <T>({
   const listRoot: Ref<HTMLUListElement> = createRef();
 
   // A currently displayed error, if any
-  const currentError = new Chan<string | undefined>(undefined);
+  const currentError = new Chan<string | DynamicKey | undefined>(undefined);
   const hasError = currentError.map((e) => nonNullish(e));
 
   // Called on submission, either autosubmit (when filled) or when '.submit()' is called
@@ -53,17 +54,6 @@ export const pinInput = <T>({
     }
 
     onSubmit_(result.value);
-  };
-
-  // We autosubmit only once
-  let didAutosubmit = false;
-  const autosubmit = (pin: string) => {
-    if (didAutosubmit) {
-      return;
-    }
-
-    didAutosubmit = true;
-    onSubmit(pin);
   };
 
   const errorMessage = currentError.map((currentError) =>
@@ -88,7 +78,7 @@ export const pinInput = <T>({
   const onInput_ = (evnt: InputEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
       currentError.send(undefined);
-      onInput({ element, evnt, inputs, onFilled: autosubmit });
+      onInput({ element, evnt, inputs, onFilled: onSubmit });
     });
   const onPaste_ = (evnt: ClipboardEvent, element: HTMLInputElement) =>
     withInputs((inputs) => {
@@ -123,7 +113,7 @@ export const pinInput = <T>({
           /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
            * type="password", otherwise the browser tries to save one char as a password */
           (_, ix) => html`
-            <li class="c-list--pin-char c-input--anchor">
+            <li class="c-list__item--pin c-input--anchor">
               <label class="c-input--anchor__wrap">
                 <input
                   ${

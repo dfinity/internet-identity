@@ -9,6 +9,7 @@ import { warningIcon } from "./icons";
 
 interface warnBoxProps {
   title: TemplateElement;
+  headerSlot?: TemplateElement;
   message: TemplateElement;
   slot?: TemplateResult;
   htmlElement?: "div" | "aside";
@@ -17,6 +18,7 @@ interface warnBoxProps {
 
 export const warnBox = ({
   title,
+  headerSlot,
   message,
   slot,
   htmlElement = "aside",
@@ -28,7 +30,10 @@ export const warnBox = ({
   }
   const contents: TemplateResult = html`
     <span class="c-card__label c-card__label--hasIcon" aria-hidden="true">
-      <i class="c-card__icon c-icon c-icon--error__flipped">${warningIcon}</i>
+      <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+        >${warningIcon}</i
+      >
+      ${headerSlot}
     </span>
     <h3 class="t-title c-card__title">${title}</h3>
     <div data-role="warning-message" class="t-paragraph c-card__paragraph">

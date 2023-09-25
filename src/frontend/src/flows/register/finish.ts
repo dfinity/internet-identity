@@ -13,26 +13,29 @@ import {
   withRef,
 } from "$src/utils/lit-html";
 import { OmitParams } from "$src/utils/utils";
-import { html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { registerStepper } from "./stepper";
 
 export const displayUserNumberTemplate = ({
   onContinue,
   userNumber,
   identityBackground,
+  stepper,
+  marketingIntroSlot,
   scrollToTop = false,
 }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: IdentityBackground;
+  stepper: TemplateResult;
+  marketingIntroSlot?: TemplateResult;
   /* put the page into view */
   scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
 
-  ${registerStepper({ current: "finish" })}
+  ${stepper}
 <hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
@@ -83,6 +86,7 @@ export const displayUserNumberTemplate = ({
         I saved it, continue
       </button>
     <section class="c-marketing-block">
+      ${marketingIntroSlot}
       <aside class="l-stack">
         <h3 class="t-title">This number is your Internet Identity</h3>
         <p class="t-paragraph">With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</p>
@@ -124,15 +128,21 @@ export const displayUserNumberWarmup = (): OmitParams<
 export const displayUserNumber = ({
   userNumber,
   identityBackground,
+  stepper,
+  marketingIntroSlot,
 }: {
   userNumber: bigint;
   identityBackground: IdentityBackground;
+  stepper: TemplateResult;
+  marketingIntroSlot?: TemplateResult;
 }): Promise<void> => {
   return new Promise((resolve) =>
     displayUserNumberPage({
       onContinue: () => resolve(),
       userNumber,
       identityBackground,
+      stepper,
+      marketingIntroSlot,
       scrollToTop: true,
     })
   );

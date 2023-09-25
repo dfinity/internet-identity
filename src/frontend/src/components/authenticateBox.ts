@@ -1,4 +1,12 @@
+import { withLoader } from "$src/components/loader";
+import {
+  PinIdentityMaterial,
+  pinIdentityToDerPubkey,
+  reconstructPinIdentity,
+} from "$src/crypto/pinIdentity";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
+import { idbRetrievePinIdentityMaterial } from "$src/flows/pin/idb";
+import { usePin } from "$src/flows/pin/usePin";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
 import { getRegisterFlowOpts, registerFlow } from "$src/flows/register";
 import { I18n } from "$src/i18n";
@@ -9,7 +17,12 @@ import {
   LoginFlowSuccess,
   apiResultToLoginFlowResult,
 } from "$src/utils/flowResult";
-import { Connection, LoginResult } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  LoginResult,
+  bufferEqual,
+} from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
 import {
   getAnchors,
@@ -30,10 +43,10 @@ import {
   secureIcon,
   signInIcon,
 } from "./icons";
-import { withLoader } from "./loader";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
 
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import copyJson from "./authenticateBox.json";
 
 /** Template used for rendering specific authentication screens. See `authnScreens` below
@@ -62,13 +75,17 @@ export const authenticateBox = async ({
   templates: AuthnTemplates;
 }): Promise<LoginData & { newAnchor: boolean }> => {
   const promptAuth = () =>
-    authenticateBoxFlow({
+    authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
       i18n,
       templates,
       addDevice: (userNumber) => asNewDevice(connection, userNumber),
-      login: (userNumber) => login({ connection, userNumber }),
+      loginPasskey: (userNumber) => loginPasskey({ connection, userNumber }),
+      loginPinIdentityMaterial: (opts) =>
+        loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
       registerFlowOpts: getRegisterFlowOpts({ connection }),
+      retrievePinIdentityMaterial: ({ userNumber }) =>
+        retrievePinIdentityWithCheck(connection, userNumber),
     });
 
   // Retry until user has successfully authenticated
@@ -84,19 +101,37 @@ export const authenticateBox = async ({
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBoxFlow = async <T>({
+export const authenticateBoxFlow = async <T, I>({
   i18n,
   templates,
   addDevice,
-  login,
+  loginPasskey,
+  loginPinIdentityMaterial,
   recover,
   registerFlowOpts,
+  retrievePinIdentityMaterial,
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
   addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
-  login: (userNumber: bigint) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  loginPasskey: (
+    userNumber: bigint
+  ) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  loginPinIdentityMaterial: ({
+    userNumber,
+    pin,
+    pinIdentityMaterial,
+  }: {
+    userNumber: bigint;
+    pin: string;
+    pinIdentityMaterial: I;
+  }) => Promise<LoginFlowResult<T> | { tag: "err"; message: string }>;
   recover: () => Promise<LoginFlowResult<T>>;
+  retrievePinIdentityMaterial: ({
+    userNumber,
+  }: {
+    userNumber: bigint;
+  }) => Promise<I | undefined>;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
 }): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
   const pages = authnScreens(i18n, { ...templates });
@@ -120,14 +155,62 @@ export const authenticateBoxFlow = async <T>({
     };
   };
 
+  const doLogin = async ({
+    userNumber,
+  }: {
+    userNumber: bigint;
+  }): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
+    const pinIdentityMaterial = await retrievePinIdentityMaterial({
+      userNumber,
+    });
+
+    if (pinIdentityMaterial === undefined) {
+      // this user number does not have a browser storage identity
+      const result = await withLoader(() => loginPasskey(userNumber));
+      return { newAnchor: false, ...result };
+    }
+
+    // Otherwise, attempt login with PIN
+    const result = await usePin({
+      verifyPin: async (pin) => {
+        const result = await loginPinIdentityMaterial({
+          userNumber,
+          pin,
+          pinIdentityMaterial,
+        });
+        if (result.tag === "err") {
+          return { ok: false, error: result.message };
+        }
+        return { ok: true, value: result };
+      },
+    });
+
+    if (result.kind === "canceled") {
+      return {
+        newAnchor: false,
+        tag: "canceled",
+      } as const;
+    }
+
+    if (result.kind === "passkey") {
+      // User still decided to use a passkey
+      const result = await withLoader(() => loginPasskey(userNumber));
+      return { newAnchor: false, ...result };
+    }
+
+    result satisfies { kind: "pin" };
+    const { result: pinResult } = result;
+
+    return { newAnchor: false, ...pinResult };
+  };
+
   // Prompt for an identity number
   const doPrompt = async (): Promise<
     LoginFlowResult<T> & { newAnchor: boolean }
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
-      const result2 = await withLoader(() => login(result.userNumber));
-      return { newAnchor: false, ...result2 };
+      return doLogin({ userNumber: result.userNumber });
     }
 
     if (result.tag === "add_device") {
@@ -159,8 +242,7 @@ export const authenticateBoxFlow = async <T>({
     const result = await pages.pick({ anchors });
 
     if (result.tag === "pick") {
-      const result1 = await withLoader(() => login(result.userNumber));
-      return { newAnchor: false, ...result1 };
+      return doLogin({ userNumber: result.userNumber });
     }
 
     result satisfies { tag: "more_options" };
@@ -437,7 +519,7 @@ const page = (slot: TemplateResult) => {
   render(template, container);
 };
 
-const login = ({
+const loginPasskey = ({
   connection,
   userNumber,
 }: {
@@ -447,6 +529,36 @@ const login = ({
   handleLogin({
     login: () => connection.login(userNumber),
   });
+
+const loginPinIdentityMaterial = ({
+  connection,
+  userNumber,
+  pin,
+  pinIdentityMaterial,
+}: {
+  connection: Connection;
+  userNumber: bigint;
+  pin: string;
+  pinIdentityMaterial: PinIdentityMaterial;
+}): Promise<LoginFlowResult | { tag: "err"; message: string }> => {
+  return withLoader(async () => {
+    try {
+      const identity = await reconstructPinIdentity({
+        pin,
+        pinIdentityMaterial,
+      });
+      return handleLogin({
+        login: () => connection.fromIdentity(userNumber, identity),
+      });
+    } catch {
+      // We handle all exceptions as wrong PIN because there is no nice way to check for that particular failure.
+      // The best we could do is check that the error is a DOMException and that the name is "OperationError". However,
+      // the "OperationError" names is still marked as experimental, so we should not rely on that.
+      // See https://developer.mozilla.org/en-US/docs/Web/API/DOMException
+      return { tag: "err", message: "Invalid PIN" };
+    }
+  });
+};
 
 // Register this device as a new device with the anchor
 const asNewDevice = async (
@@ -474,4 +586,29 @@ const asNewDevice = async (
     await promptUserNumberWithInfo(prefilledUserNumber),
     connection
   );
+};
+
+// Retrieve the PIN identity material from the browser storage and check that it is still valid for the given user number.
+const retrievePinIdentityWithCheck = async (
+  connection: Connection,
+  userNumber: bigint
+): Promise<PinIdentityMaterial | undefined> => {
+  const [pinIdentity, authenticators] = await Promise.all([
+    idbRetrievePinIdentityMaterial({ userNumber }),
+    connection.lookupAuthenticators(userNumber),
+  ]);
+  if (nonNullish(pinIdentity)) {
+    const pinPubkeyDer = await pinIdentityToDerPubkey(pinIdentity);
+    // Check that the authenticator is still present on the identity.
+    const authenticator = authenticators.find((authenticator) =>
+      bufferEqual(
+        new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
+        pinPubkeyDer
+      )
+    );
+    if (nonNullish(authenticator)) {
+      return pinIdentity;
+    }
+  }
+  return undefined;
 };
