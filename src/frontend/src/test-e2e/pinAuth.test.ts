@@ -18,7 +18,6 @@ import {
   DemoAppView,
   MainView,
   PinAuthView,
-  RecoveryMethodSelectorView,
   RegisterView,
   WelcomeView,
 } from "./views";
@@ -82,9 +81,7 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
     await pinAuthView.enterPin(pin);
 
     // NOTE: handle recovery nag because there is no recovery phrase
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
+    await FLOWS.skipRecoveryNag(browser);
     const mainView2 = new MainView(browser);
     await mainView2.waitForDisplay(); // we should be logged in
   }, APPLE_USER_AGENT);
@@ -166,9 +163,7 @@ test("Register with PIN then log into client application", async () => {
     await pinAuthView.waitForDisplay();
     await pinAuthView.enterPin(pin);
 
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
+    await FLOWS.skipRecoveryNag(browser);
     await waitToClose(browser);
 
     await demoAppView.waitForDisplay();

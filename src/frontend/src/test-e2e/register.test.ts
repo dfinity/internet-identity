@@ -8,13 +8,7 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
-import {
-  AuthenticateView,
-  DemoAppView,
-  MainView,
-  RecoveryMethodSelectorView,
-  WelcomeView,
-} from "./views";
+import { AuthenticateView, DemoAppView, MainView, WelcomeView } from "./views";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
@@ -102,9 +96,7 @@ test("Register first then log into client application", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
+    await FLOWS.skipRecoveryNag(browser);
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
