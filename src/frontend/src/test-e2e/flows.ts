@@ -5,6 +5,7 @@ import {
   MainView,
   PinAuthView,
   PinRegistrationView,
+  RecoverView,
   RecoveryMethodSelectorView,
   RegisterView,
   WelcomeView,
@@ -166,5 +167,17 @@ export const FLOWS = {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
+  },
+  recoverUsingSeedPhrase: async (
+    browser: WebdriverIO.Browser,
+    recoveryPhrase: string
+  ): Promise<void> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.recover();
+    const recoveryView = new RecoverView(browser);
+    await recoveryView.waitForSeedInputDisplay();
+    await recoveryView.enterSeedPhrase(recoveryPhrase);
+    await recoveryView.enterSeedPhraseContinue();
+    await recoveryView.skipDeviceEnrollment();
   },
 };

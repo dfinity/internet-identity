@@ -1,6 +1,6 @@
 import { FLOWS } from "../flows";
 import { addVirtualAuthenticator, runInBrowser } from "../util";
-import { MainView, RecoverView, WelcomeView } from "../views";
+import { MainView } from "../views";
 
 import { DEVICE_NAME1, II_URL } from "../constants";
 
@@ -18,13 +18,7 @@ test("Recover with phrase", async () => {
     await mainView.waitForDisplay();
     await mainView.logout();
 
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.recover();
-    const recoveryView = new RecoverView(browser);
-    await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase(seedPhrase);
-    await recoveryView.enterSeedPhraseContinue();
-    await recoveryView.skipDeviceEnrollment();
+    await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
