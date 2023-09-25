@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "lodepng"
-version = "3.8.1"
+version = "3.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e113c98c2de55d874de965268d29e41b5873b720f61434d187a10a158fb3f65e"
+checksum = "73c81862c9e16a943631de5160969379758f13fb3c788110db4ab49430b4feab"
 dependencies = [
  "crc32fast",
  "fallible_collections",
@@ -1512,7 +1512,7 @@ dependencies = [
 [[package]]
 name = "pocket-ic"
 version = "0.0.1"
-source = "git+https://github.com/dfinity/ic.git?rev=41aae0f203995dc79ba3b736404bad851731ec51#41aae0f203995dc79ba3b736404bad851731ec51"
+source = "git+https://github.com/dfinity/ic.git?rev=6529a74eea03c55c1e093cc262e1237150b3a93f#6529a74eea03c55c1e093cc262e1237150b3a93f"
 dependencies = [
  "async-trait",
  "base64 0.11.0",
