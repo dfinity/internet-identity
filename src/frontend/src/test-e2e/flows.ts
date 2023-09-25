@@ -7,6 +7,7 @@ import {
   PinRegistrationView,
   RecoveryMethodSelectorView,
   RegisterView,
+  WelcomeBackView,
   WelcomeView,
 } from "./views";
 
@@ -92,6 +93,19 @@ export const FLOWS = {
     await welcomeView.login();
     await welcomeView.typeUserNumber(userNumber);
     await browser.$("button[data-action='continue']").click();
+    // NOTE: handle recovery nag because there is no recovery phrase
+    await FLOWS.skipRecoveryNag(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(deviceName);
+  },
+  loginPick: async (
+    userNumber: string,
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const welcomeView = new WelcomeBackView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.login(userNumber);
     // NOTE: handle recovery nag because there is no recovery phrase
     await FLOWS.skipRecoveryNag(browser);
     const mainView = new MainView(browser);
