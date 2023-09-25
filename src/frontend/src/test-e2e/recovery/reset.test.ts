@@ -1,6 +1,6 @@
 import { FLOWS } from "../flows";
 import { addVirtualAuthenticator, runInBrowser } from "../util";
-import { MainView, RecoverView, WelcomeView } from "../views";
+import { MainView } from "../views";
 
 import { DEVICE_NAME1, II_URL, RECOVERY_PHRASE_NAME } from "../constants";
 
@@ -52,13 +52,7 @@ test("Recover access, after reset", async () => {
     await mainView.logout();
 
     // Recover with new phrase
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.recover();
-    const recoveryView = new RecoverView(browser);
-    await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase(seedPhrase);
-    await recoveryView.enterSeedPhraseContinue();
-    await recoveryView.skipDeviceEnrollment();
+    await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
@@ -91,13 +85,7 @@ test("Canceling reset keeps old phrase", async () => {
     await mainView.logout();
 
     // Recover with old phrase
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.recover();
-    const recoveryView = new RecoverView(browser);
-    await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase(seedPhrase);
-    await recoveryView.enterSeedPhraseContinue();
-    await recoveryView.skipDeviceEnrollment();
+    await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
@@ -116,13 +104,7 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
     await mainView.waitForDisplay();
     await mainView.logout();
 
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.recover();
-    const recoveryView = new RecoverView(browser);
-    await recoveryView.waitForSeedInputDisplay();
-    await recoveryView.enterSeedPhrase(seedPhrase);
-    await recoveryView.enterSeedPhraseContinue();
-    await recoveryView.skipDeviceEnrollment();
+    await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
     // Ensure the settings dropdown is in view
