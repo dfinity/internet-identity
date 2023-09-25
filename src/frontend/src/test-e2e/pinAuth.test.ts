@@ -158,11 +158,7 @@ test("Register with PIN then log into client application", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-
-    const pinAuthView = new PinAuthView(browser);
-    await pinAuthView.waitForDisplay();
-    await pinAuthView.enterPin(pin);
-
+    await FLOWS.enterPin(browser, pin);
     await FLOWS.skipRecoveryNag(browser);
     await waitToClose(browser);
 

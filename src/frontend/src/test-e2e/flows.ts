@@ -122,9 +122,7 @@ export const FLOWS = {
     await welcomeView.login();
     await welcomeView.typeUserNumber(userNumber);
     await browser.$("button[data-action='continue']").click();
-    const pinAuthView = new PinAuthView(browser);
-    await pinAuthView.waitForDisplay();
-    await pinAuthView.enterPin(pin);
+    await FLOWS.enterPin(browser, pin);
     // NOTE: handle recovery nag because there is no recovery phrase
     await FLOWS.skipRecoveryNag(browser);
     const mainView = new MainView(browser);
@@ -180,5 +178,13 @@ export const FLOWS = {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForDisplay();
     await recoveryMethodSelectorView.skipRecovery();
+  },
+  enterPin: async (
+    browser: WebdriverIO.Browser,
+    pin: string
+  ): Promise<void> => {
+    const pinAuthView = new PinAuthView(browser);
+    await pinAuthView.waitForDisplay();
+    await pinAuthView.enterPin(pin);
   },
 };
