@@ -32,16 +32,6 @@ export class WelcomeView extends View {
     await this.browser.$("#loginButton").click();
     await this.browser.$("#addNewDeviceButton").click();
   }
-
-  async recover(): Promise<void> {
-    await this.browser.$("#loginButton").waitForDisplayed();
-    await this.browser.$("#loginButton").scrollIntoView();
-    await this.browser.$("#loginButton").click();
-    await this.browser.$("#recoverButton").waitForDisplayed();
-    await this.browser.$("#recoverButton").scrollIntoView();
-    await this.browser.$("#recoverButton").click();
-    await this.browser.$('[data-action="recover-with-phrase"]').click();
-  }
 }
 
 export class RenameView extends View {
@@ -536,6 +526,17 @@ export class AuthenticateView extends View {
 
   async switchToAnchorInput(): Promise<void> {
     await this.browser.$('[data-role="anchor-input"]').click();
+  }
+
+  async recover(): Promise<void> {
+    await await this.browser.$('[data-role="more-options"]').click();
+    await this.browser.$("#recoverButton").waitForDisplayed();
+    await this.browser.$("#recoverButton").scrollIntoView();
+    await this.browser.$("#recoverButton").click();
+    await this.browser
+      .$('[data-action="recover-with-phrase"]')
+      .waitForDisplayed();
+    await this.browser.$('[data-action="recover-with-phrase"]').click();
   }
 }
 
