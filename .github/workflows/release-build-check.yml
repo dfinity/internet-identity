@@ -17,8 +17,8 @@ jobs:
   latest-release:
     outputs:
       ref: ${{ steps.release.outputs.ref }}
-      prod_sha256: ${{ steps.release.outputs.prod_sha256 }}
-      dev_sha256: ${{ steps.release.outputs.dev_sha256 }}
+      ii_prod_sha256: ${{ steps.release.outputs.ii_prod_sha256 }}
+      archive_sha256: ${{ steps.release.outputs.archive_sha256 }}
     runs-on: ubuntu-latest
     steps:
       - name: Get latest release information
@@ -32,14 +32,18 @@ jobs:
             exit 1
           fi
           curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_production.wasm.gz
-          latest_prod_release_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/archive.wasm.gz" -o archive.wasm.gz
+          latest_release_ii_prod_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          latest_release_archive_sha256=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)
           echo latest release is "$latest_release_ref"
-          echo latest prod release sha256 is "$latest_prod_release_sha256"
+          echo latest prod release sha256 is "$latest_release_ii_prod_sha256"
+          echo latest archive release sha256 is "$latest_release_archive_sha256"
           echo "ref=$latest_release_ref" >> "$GITHUB_OUTPUT"
-          echo "prod_sha256=$latest_prod_release_sha256" >> "$GITHUB_OUTPUT"
+          echo "ii_prod_sha256=$latest_release_ii_prod_sha256" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$latest_release_archive_sha256" >> "$GITHUB_OUTPUT"
         id: release
 
-  # Then perform the build, using the release as checkout
+  # Perform the clean build (non-docker), using the release as checkout
   clean-build:
     runs-on: ${{ matrix.os }}
     needs: latest-release
@@ -54,7 +58,7 @@ jobs:
       - uses: ./.github/actions/check-build
         with:
           # we check that ubuntu builds match the latest release build
-          sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.prod_sha256 || '' }}
+          sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.ii_prod_sha256 || '' }}
 
         # Since the release build check is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.
@@ -64,3 +68,40 @@ jobs:
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           MESSAGE: "Release build check failed"
+
+  # Verify the hash using the verify-hash script, using the release as checkout.
+  # This runs the build using docker and should work on all platforms.
+  verify-build-dockerized:
+    runs-on: ${{ matrix.os }}
+    needs: latest-release
+    strategy:
+      matrix:
+        os: [ ubuntu-22.04, ubuntu-20.04, macos-11, macos-12 ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
+
+      - name: Setup docker (missing on MacOS)
+        if: runner.os == 'macos'
+        run: |
+          brew install docker
+          brew install docker-buildx
+          # The following 2 commands are taken from the post install instructions printed by `brew install docker-buildx` 
+          mkdir -p ~/.docker/cli-plugins
+          ln -sfn /usr/local/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+          colima start
+
+      - name: "Verify Hash"
+        id: dfx-metadata
+        run: |
+          ./scripts/verify-hash --ii-hash ${{ needs.latest-release.outputs.ii_prod_sha256 }} --archive-hash ${{ needs.latest-release.outputs.archive_sha256 }}
+
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Verify hash check failed"
