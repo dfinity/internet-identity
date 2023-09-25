@@ -52,7 +52,7 @@ test("Add device", async () => {
     await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
 
     await mainView.logout();
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginPick(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 

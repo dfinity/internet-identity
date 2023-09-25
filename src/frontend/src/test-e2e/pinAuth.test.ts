@@ -106,7 +106,7 @@ test("Should not prompt for PIN after deleting temp key", async () => {
     await browser.acceptAlert();
 
     // login now happens using the WebAuthn flow
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginPick(userNumber, DEVICE_NAME1, browser);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
