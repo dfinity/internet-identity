@@ -93,7 +93,7 @@ export const FLOWS = {
     await welcomeView.login();
     await welcomeView.typeUserNumber(userNumber);
     await browser.$("button[data-action='continue']").click();
-    // This flows assumes no recovery phrase, so we handle recovery nag here
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
     await FLOWS.skipRecoveryNag(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
@@ -112,7 +112,7 @@ export const FLOWS = {
     const pinAuthView = new PinAuthView(browser);
     await pinAuthView.waitForDisplay();
     await pinAuthView.enterPin(pin);
-    // This flows assumes no recovery phrase, so we handle recovery nag here
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
     await FLOWS.skipRecoveryNag(browser);
     const mainView = new MainView(browser);
     await mainView.waitForTempKeyDisplay(deviceName);
