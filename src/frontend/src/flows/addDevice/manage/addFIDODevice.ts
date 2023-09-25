@@ -1,7 +1,7 @@
 import { DeviceData } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
-import { inferAlias, loadUAParser } from "$src/flows/register";
+import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
@@ -59,7 +59,7 @@ export const addFIDODevice = async (
     return;
   }
 
-  const deviceName = await inferAlias({
+  const deviceName = await inferPasskeyAlias({
     authenticatorType: newDevice.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,

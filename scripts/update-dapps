@@ -132,7 +132,7 @@ function update() {
             echo "converting '$old' -> '$new'"
             # if the file is a huge SVG (surprising, but why not)
             # then convert it to a raster webp (with transparency)
-            convert -background none -size 256x256 "$old" "$new"
+            convert -background none -resize 256x256 "$old" "$new"
             dapps_json_tmp=$(mktemp)
             jq <"$DAPPS_JSON" \
                 --arg old "$(basename "$old")" --arg new "$(basename "$new")" \
@@ -141,6 +141,24 @@ function update() {
             rm "$old"
         fi
     done < <(find "$II_LOGO_PREFIX" -mindepth 1 -type f -size +20k)
+
+    # This goes through all logos ending in jpg or jpeg and converts them to webp
+    while read -r jpg_logo
+    do
+        echo "found JPG logo '$jpg_logo'"
+        old="$jpg_logo"
+        new="${jpg_logo%.*}.webp"
+
+        echo "converting '$old' -> '$new'"
+        # convert to webp
+        convert "$old" "$new"
+        dapps_json_tmp=$(mktemp)
+        jq <"$DAPPS_JSON" \
+            --arg old "$(basename "$old")" --arg new "$(basename "$new")" \
+            '[ .[] | .logo |= sub("^" + $old + "$"; $new) ]' > "$dapps_json_tmp"
+        mv "$dapps_json_tmp" "$DAPPS_JSON"
+        rm "$old"
+    done < <(find "$II_LOGO_PREFIX" -mindepth 1 -type f \( -name \*.jpg -o -name \*.jpeg \) )
 
     # Remove logos that are still too big
     # This goes through all logos bigger than a certain size and removes them

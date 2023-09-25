@@ -15,7 +15,9 @@ const MAX_AUTHENTICATORS = 8;
 export type DedupAuthenticator = Authenticator & { dupCount?: number };
 
 // Deduplicate devices with same (duplicated) aliases
-const dedupLabels = (authenticators: Authenticator[]): DedupAuthenticator[] => {
+export const dedupLabels = (
+  authenticators: Authenticator[]
+): DedupAuthenticator[] => {
   return authenticators.reduce<Authenticator[]>((acc, authenticator) => {
     const _authenticator: DedupAuthenticator = { ...authenticator };
     const sameName = acc.filter((a) => a.alias === _authenticator.alias);
@@ -31,24 +33,25 @@ const dedupLabels = (authenticators: Authenticator[]): DedupAuthenticator[] => {
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
-  warnFewDevices,
+  warnNoPasskeys,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
-  warnFewDevices: boolean;
+  warnNoPasskeys: boolean;
 }): TemplateResult => {
-  const wrapClasses = ["l-stack"];
-
-  if (warnFewDevices) {
-    wrapClasses.push("c-card", "c-card--narrow", "c-card--warning");
-  }
+  const wrapClasses = [
+    "l-stack",
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoPasskeys ? ["c-card--warning"] : []),
+  ];
 
   const authenticators = dedupLabels(authenticators_);
 
   return html`
-    <aside class=${wrapClasses.join(" ")}>
+    <aside class=${wrapClasses.join(" ")} data-role="passkeys">
       ${
-        warnFewDevices
+        warnNoPasskeys
           ? html`
               <span
                 class="c-card__label c-card__label--hasIcon"
@@ -61,7 +64,7 @@ export const authenticatorsSection = ({
                 <h2>Security warning</h2>
               </span>
             `
-          : undefined
+          : ""
       }
         <div class="t-title t-title--complications">
           <h2 class="t-title">Passkeys</h2>
@@ -73,18 +76,14 @@ export const authenticatorsSection = ({
             </span>
           </span>
         </div>
-        ${
-          warnFewDevices
-            ? html`<p
-                style="max-width: 30rem;"
-                class="warning-message t-paragraph t-lead"
-              >
-                Add a Passkey or recovery method to make your Internet Identity
-                more secure.
-              </p>`
-            : undefined
+        <p
+          class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
+        >${
+          warnNoPasskeys
+            ? "Set up a passkey and securely sign into dapps by unlocking your device."
+            : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
         }
-
+        </p>
         <div class="c-action-list">
           <ul>
           ${authenticators.map((authenticator, index) =>
@@ -112,9 +111,11 @@ export const authenticatorsSection = ({
 export const authenticatorItem = ({
   authenticator: { alias, dupCount, warn, remove, rename },
   index,
+  icon,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
+  icon?: TemplateResult;
 }) => {
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
@@ -127,6 +128,7 @@ export const authenticatorItem = ({
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
+      ${isNullish(icon) ? undefined : html`${icon}`}
       <div class="c-action-list__label">
         ${alias}
         ${nonNullish(dupCount) && dupCount > 0

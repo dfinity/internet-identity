@@ -1,4 +1,4 @@
-import { SignIdentity } from "@dfinity/agent";
+import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { z } from "zod";
 
@@ -235,4 +235,13 @@ export const generateBrowserKey = async (): Promise<CryptoKey> => {
     ] /* key is used to wrap (and unwrap) the identity secret key */
   );
   return key;
+};
+
+export const pinIdentityToDerPubkey = async (
+  pinIdentity: PinIdentityMaterial
+): Promise<DerEncodedPublicKey> => {
+  return (await crypto.subtle.exportKey(
+    "spki",
+    pinIdentity.publicKey
+  )) as DerEncodedPublicKey;
 };

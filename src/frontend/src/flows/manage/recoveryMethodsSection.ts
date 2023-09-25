@@ -26,19 +26,45 @@ export const recoveryMethodsSection = ({
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
 }): TemplateResult => {
+  const i18n = new I18n();
+
+  const copy = i18n.i18n(copyJson);
+  const warnNoRecovery = isNullish(recoveryPhrase) && isNullish(recoveryKey);
+  const wrapClasses = [
+    "l-stack",
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoRecovery ? ["c-card--warning"] : []),
+  ];
+
   return html`
-    <aside class="l-stack">
+    <aside class=${wrapClasses.join(" ")} data-role="recoveries">
+      ${warnNoRecovery
+        ? html`
+            <span
+              class="c-card__label c-card__label--hasIcon"
+              aria-hidden="true"
+            >
+              <i
+                class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+                >${warningIcon}</i
+              >
+              <h2>${copy.security_warning}</h2>
+            </span>
+          `
+        : ""}
       <div class="t-title">
         <h2>Recovery Methods</h2>
       </div>
+      <p class="t-paragraph t-lead">${copy.enable_recovery_to_make_secure}</p>
       <div class="c-action-list">
         <ul>
           ${isNullish(recoveryPhrase)
             ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
-            : recoveryPhraseItem({ recoveryPhrase, i18n: new I18n() })}
+            : recoveryPhraseItem({ recoveryPhrase, i18n })}
           ${isNullish(recoveryKey)
             ? missingRecovery({ recovery: "key", addRecoveryKey })
-            : recoveryKeyItem({ recoveryKey, i18n: new I18n() })}
+            : recoveryKeyItem({ recoveryKey, i18n })}
         </ul>
       </div>
     </aside>
