@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
+use std::fmt::{Display, Formatter};
 use std::sync::RwLock;
 
 pub mod signature_map;
@@ -48,7 +49,7 @@ fn extract_ic_root_key_from_der(buf: &[u8]) -> Result<Vec<u8>, CanisterSigVerifi
 
 pub fn set_ic_root_public_key_for_testing(pk_der: Vec<u8>) {
     let mut root_pk = IC_ROOT_PUBLIC_KEY.write().unwrap();
-    *root_pk = extract_ic_root_key_from_der(&pk_der).expect("Failed decoding IC root key.");
+    *root_pk = pk_der;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -109,6 +110,12 @@ pub enum CanisterSigVerificationError {
     Unknown(String),
 }
 
+impl Display for CanisterSigVerificationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", &self)
+    }
+}
+
 pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(value.as_ref());
@@ -142,7 +149,8 @@ pub fn verify_root_signature(
     ic_certificate: &Certificate,
     signing_canister_id: Principal,
 ) -> Result<(), CanisterSigVerificationError> {
-    let signing_pk = validate_delegation(&ic_certificate.delegation, signing_canister_id)?;
+    let signing_pk_der = validate_delegation(&ic_certificate.delegation, signing_canister_id)?;
+    let signing_pk = extract_ic_root_key_from_der(&signing_pk_der)?;
     let root_hash = ic_certificate.tree.digest();
     let mut msg = vec![];
     msg.extend_from_slice(IC_STATE_ROOT_DOMAIN_SEPARATOR);
