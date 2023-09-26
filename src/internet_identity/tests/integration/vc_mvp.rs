@@ -98,11 +98,8 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials.rp_id_alias_credential,
         &env.root_key(),
     );
-    verify_credential_jws(
-        &id_alias_credentials.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_id_alias_credential(
         &env,
         prepared_id_alias.canister_sig_pk.clone(),
@@ -113,7 +110,6 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
     Ok(())
@@ -225,28 +221,20 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
     );
 
     set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(
-        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
-    verify_credential_jws(
-        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
     Ok(())
@@ -361,28 +349,20 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
     );
 
     set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(
-        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
-    verify_credential_jws(
-        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
 
@@ -498,28 +478,20 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
     );
 
     set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(
-        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
-    verify_credential_jws(
-        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
-        canister_id,
-    )
-    .expect("external verification failed");
+    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
+        .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
-        canister_id,
     )
     .expect("external verification failed");
 

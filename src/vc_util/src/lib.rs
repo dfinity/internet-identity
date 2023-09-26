@@ -74,10 +74,10 @@ pub fn verify_id_alias_credential_jws(
     credential_jws: &str,
     alias_tuple: &AliasTuple,
 ) -> Result<(), CredentialVerificationError> {
-    let claims = verify_credential_jws(credential_jws)
-        .map_err(|e| CredentialVerificationError::InvalidJws(e))?;
+    let claims =
+        verify_credential_jws(credential_jws).map_err(CredentialVerificationError::InvalidJws)?;
     validate_id_alias_claims(claims, alias_tuple)
-        .map_err(|e| CredentialVerificationError::InvalidClaims(e))
+        .map_err(CredentialVerificationError::InvalidClaims)
 }
 
 /// Validates that the given claims are consistent with id_alias-credential
