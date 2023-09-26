@@ -27,6 +27,12 @@ pub struct AliasTuple {
     pub id_dapp: Principal,
 }
 
+#[derive(Debug)]
+pub enum CredentialVerificationError {
+    InvalidJws(SignatureVerificationError),
+    InvalidClaims(JwtValidationError),
+}
+
 pub fn vc_signing_input(
     credential_jwt: &str,
     canister_sig_pk_der: &[u8],
@@ -61,16 +67,25 @@ pub fn did_for_principal(principal: Principal) -> String {
     prefix.add(&principal.to_string())
 }
 
-pub fn validate_id_alias_claims(
+/// Verifies the given JWS-credential as an id_alias-VC for the specified alias tuple.
+/// Performs both the cryptographic verification of the credential, and the semantic
+/// validation of the id_alias-claims.
+pub fn verify_id_alias_credential_jws(
     credential_jws: &str,
     alias_tuple: &AliasTuple,
+) -> Result<(), CredentialVerificationError> {
+    let claims = verify_credential_jws(credential_jws)
+        .map_err(|e| CredentialVerificationError::InvalidJws(e))?;
+    validate_id_alias_claims(claims, alias_tuple)
+        .map_err(|e| CredentialVerificationError::InvalidClaims(e))
+}
+
+/// Validates that the given claims are consistent with id_alias-credential
+/// for the given alias tuple.
+pub fn validate_id_alias_claims(
+    claims: JwtClaims<Value>,
+    alias_tuple: &AliasTuple,
 ) -> Result<(), JwtValidationError> {
-    let decoder: Decoder = Decoder::new();
-    let jws = decoder
-        .decode_compact_serialization(credential_jws.as_ref(), None)
-        .map_err(JwtValidationError::JwsDecodingError)?;
-    let claims: JwtClaims<serde_json::Value> = serde_json::from_slice(jws.claims())
-        .map_err(|_| inconsistent_jwt_claims("failed parsing JSON JWT claims"))?;
     validate_claim("sub", did_for_principal(alias_tuple.id_dapp), claims.sub())?;
     validate_claim("iss", II_ISSUER_URL, claims.iss())?;
     let jti = claims.jti().ok_or(inconsistent_jwt_claims(
@@ -89,24 +104,26 @@ pub fn validate_id_alias_claims(
     Ok(())
 }
 
-/// Verifies the specified JWS credential against the given root public key.
+/// Verifies the specified JWS credential cryptographically.
+/// DOES NOT perform semantic validation of the claims in the credential.
 pub fn verify_credential_jws(
     credential_jws: &str,
-    signing_canister_id: Principal,
-) -> Result<(), SignatureVerificationError> {
+) -> Result<JwtClaims<Value>, SignatureVerificationError> {
     ///// Decode JWS.
     let decoder: Decoder = Decoder::new();
     let jws = decoder
         .decode_compact_serialization(credential_jws.as_ref(), None)
-        .map_err(|e| key_decoding_err(&format!("credential JWS parsing error: {}", e)))?;
+        .map_err(|e| invalid_signature_err(&format!("credential JWS parsing error: {}", e)))?;
     let canister_sig: CanisterSig = serde_cbor::from_slice(jws.decoded_signature())
         .map_err(|e| invalid_signature_err(&format!("signature parsing error: {}", e)))?;
     let ic_certificate: Certificate = serde_cbor::from_slice(canister_sig.certificate.as_ref())
-        .map_err(|e| key_decoding_err(&format!("certificate parsing error: {}", e)))?;
+        .map_err(|e| invalid_signature_err(&format!("certificate parsing error: {}", e)))?;
     let jws_header = jws
         .protected_header()
-        .ok_or(key_decoding_err("missing JWS header"))?;
+        .ok_or(invalid_signature_err("missing JWS header"))?;
     let canister_sig_pk = get_canister_sig_pk(jws_header)?;
+    let claims: JwtClaims<Value> = serde_json::from_slice(jws.claims())
+        .map_err(|e| invalid_signature_err(&format!("failed parsing JSON JWT claims: {}", e)))?;
 
     ///// Check if root hash of the signatures hash tree matches the certified data in the certificate
     let certified_data_path = [
@@ -148,8 +165,9 @@ pub fn verify_credential_jws(
     }
 
     ///// Verify root signature (with delegation, if any).
-    verify_root_signature(&ic_certificate, signing_canister_id)
-        .map_err(|e| invalid_signature_err(&e.to_string()))
+    verify_root_signature(&ic_certificate, canister_sig_pk.signing_canister_id)
+        .map_err(|e| invalid_signature_err(&e.to_string()))?;
+    Ok(claims)
 }
 
 fn validate_credential_subject(
@@ -315,10 +333,20 @@ mod tests {
         Principal::from_slice(&bytes)
     }
 
+    fn claims_from_jws(credential_jws: &str) -> JwtClaims<Value> {
+        let decoder: Decoder = Decoder::new();
+        let jws = decoder
+            .decode_compact_serialization(credential_jws.as_ref(), None)
+            .expect("failed JWS parsing");
+        let claims: JwtClaims<Value> =
+            serde_json::from_slice(jws.claims()).expect("failed parsing JSON JWT claims");
+        claims
+    }
+
     #[test]
     fn should_validate_id_alias_claims() {
         validate_id_alias_claims(
-            ID_ALIAS_CREDENTIAL_JWS,
+            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
             &AliasTuple {
                 id_alias: alias_principal(),
                 id_dapp: dapp_principal(),
@@ -328,9 +356,9 @@ mod tests {
     }
 
     #[test]
-    fn should_fail_validating_id_alias_claims_if_wrong_id_alias() {
+    fn should_fail_validate_id_alias_claims_if_wrong_id_alias() {
         let result = validate_id_alias_claims(
-            ID_ALIAS_CREDENTIAL_JWS,
+            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
             &AliasTuple {
                 id_alias: dapp_principal(),
                 id_dapp: dapp_principal(),
@@ -340,9 +368,9 @@ mod tests {
     }
 
     #[test]
-    fn should_fail_validating_id_alias_claims_if_wrong_id_dapp() {
+    fn should_fail_validate_id_alias_claims_if_wrong_id_dapp() {
         let result = validate_id_alias_claims(
-            ID_ALIAS_CREDENTIAL_JWS,
+            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
             &AliasTuple {
                 id_alias: dapp_principal(),
                 id_dapp: dapp_principal(),
@@ -355,30 +383,23 @@ mod tests {
     #[serial]
     fn should_verify_id_alias_vc_jws() {
         set_ic_root_public_key_for_testing(test_ic_root_pk_der());
-        let signing_canister_id =
-            Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("failed parsing canister id");
-        verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS, signing_canister_id)
-            .expect("JWS verification failed");
+        verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS).expect("JWS verification failed");
     }
 
     #[test]
-    fn should_not_verify_id_alias_vc_jws_without_canister_pk() {
-        let signing_canister_id =
-            Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("failed parsing canister id");
-        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS_NO_JWK, signing_canister_id);
+    fn should_fail_verify_id_alias_vc_jws_without_canister_pk() {
+        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS_NO_JWK);
         assert_matches!(result, Err(e) if e.to_string().contains("missing JWK in JWS header"));
     }
 
     #[test]
     #[serial]
-    fn should_not_verify_id_alias_vc_jws_with_wrong_root_pk() {
-        let signing_canister_id =
-            Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("failed parsing canister id");
+    fn should_fail_verify_id_alias_vc_jws_with_wrong_root_pk() {
         let mut ic_root_pk_der = test_ic_root_pk_der();
         ic_root_pk_der[IC_ROOT_KEY_DER_PREFIX.len()] =
             ic_root_pk_der[IC_ROOT_KEY_DER_PREFIX.len()] + 1; // change the root pk value
         set_ic_root_public_key_for_testing(ic_root_pk_der);
-        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS, signing_canister_id);
+        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS);
         assert_matches!(result, Err(e) if e.to_string().contains("InvalidBlsSignature"));
     }
 
@@ -470,5 +491,19 @@ mod tests {
             result,
             Err(CanisterSigVerificationError::InvalidBlsSignature)
         );
+    }
+
+    #[test]
+    #[serial]
+    fn should_verify_id_alias_credential_jws() {
+        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
+        verify_id_alias_credential_jws(
+            ID_ALIAS_CREDENTIAL_JWS,
+            &AliasTuple {
+                id_alias: alias_principal(),
+                id_dapp: dapp_principal(),
+            },
+        )
+        .expect("JWS verification failed");
     }
 }
