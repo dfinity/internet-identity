@@ -13,13 +13,16 @@ export class WelcomeView extends View {
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
     await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
   }
 
-  async login(): Promise<void> {
+  async login(userNumber: string): Promise<void> {
     await this.browser.$("#loginButton").waitForDisplayed();
     await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
+    await this.typeUserNumber(userNumber);
+    await this.browser.$('[data-action="continue"').click();
   }
 
   async register(): Promise<void> {
