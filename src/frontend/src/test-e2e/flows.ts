@@ -83,7 +83,7 @@ export const FLOWS = {
     await authenticateView.register();
     return await FLOWS.registerPin(browser, pin);
   },
-  login: async (
+  loginAuthenticateView: async (
     userNumber: string,
     deviceName: string,
     browser: WebdriverIO.Browser
@@ -96,7 +96,7 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
-  loginPin: async (
+  loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,
     browser: WebdriverIO.Browser

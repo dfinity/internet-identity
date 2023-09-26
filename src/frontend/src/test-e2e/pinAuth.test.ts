@@ -54,7 +54,7 @@ test("Register and Log in with PIN identity", async () => {
     await mainView.waitForDisplay(); // we should be logged in
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
     await mainView.logout();
-    await FLOWS.loginPin(userNumber, pin, browser);
+    await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
 }, 300_000);
@@ -106,7 +106,7 @@ test("Should not prompt for PIN after deleting temp key", async () => {
     await browser.acceptAlert();
 
     // login now happens using the WebAuthn flow
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
@@ -155,7 +155,7 @@ test("Register with PIN then log into client application", async () => {
 
     await switchToPopup(browser);
 
-    await FLOWS.loginPin(userNumber, pin, browser);
+    await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await waitToClose(browser);
 
     await demoAppView.waitForDisplay();
