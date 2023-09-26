@@ -20,7 +20,7 @@ use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use serial_test::serial;
 use std::path::PathBuf;
-use vc_util::verify_credential_jws;
+use vc_util::{verify_id_alias_credential_jws, AliasTuple};
 
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
@@ -163,11 +163,14 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             }
         };
     set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(
+    verify_id_alias_credential_jws(
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
-        ii_id,
+        &AliasTuple {
+            id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
+            id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
+        },
     )
     .expect("Invalid ID alias");
 
