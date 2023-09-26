@@ -209,7 +209,7 @@ export class Connection {
   login = async (userNumber: bigint): Promise<LoginResult> => {
     let devices: Omit<DeviceData, "alias">[];
     try {
-      devices = await this.lookupAuthenticators(userNumber);
+      devices = await this.lookupAll(userNumber);
     } catch (e: unknown) {
       if (e instanceof Error) {
         return { kind: "apiError", error: e };

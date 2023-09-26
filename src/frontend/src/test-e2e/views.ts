@@ -293,6 +293,12 @@ export class MainView extends View {
     await this.browser.$('[data-action="next"]').click();
   }
 
+  async addFidoRecovery(): Promise<void> {
+    await this.browser.$('[data-action="add-recovery-device"]').click();
+    await this.browser.waitUntil(this.browser.isAlertOpen);
+    await this.browser.acceptAlert();
+  }
+
   async rename(deviceName: string, newName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "rename" }).click();
