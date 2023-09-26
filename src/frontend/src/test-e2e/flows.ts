@@ -83,39 +83,32 @@ export const FLOWS = {
     await authenticateView.register();
     return await FLOWS.registerPin(browser, pin);
   },
-  login: async (
+  loginAuthenticateView: async (
     userNumber: string,
     deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<void> => {
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.login();
-    await welcomeView.typeUserNumber(userNumber);
-    await browser.$("button[data-action='continue']").click();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
     // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
     await FLOWS.skipRecoveryNag(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
-  loginPin: async (
+  loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,
-    deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<void> => {
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.login();
-    await welcomeView.typeUserNumber(userNumber);
-    await browser.$("button[data-action='continue']").click();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
     const pinAuthView = new PinAuthView(browser);
     await pinAuthView.waitForDisplay();
     await pinAuthView.enterPin(pin);
     // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
     await FLOWS.skipRecoveryNag(browser);
-    const mainView = new MainView(browser);
-    await mainView.waitForTempKeyDisplay(deviceName);
   },
   addRecoveryMechanismSeedPhrase: async (
     browser: WebdriverIO.Browser
@@ -172,8 +165,8 @@ export const FLOWS = {
     browser: WebdriverIO.Browser,
     recoveryPhrase: string
   ): Promise<void> => {
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.recover();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.recover();
     const recoveryView = new RecoverView(browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(recoveryPhrase);

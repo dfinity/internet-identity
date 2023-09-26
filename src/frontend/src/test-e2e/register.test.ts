@@ -37,7 +37,7 @@ test("Register new identity and login with it", async () => {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.logout();
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 

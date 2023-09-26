@@ -94,9 +94,8 @@ export const deleteDevice = async ({
   });
 
   if (sameDevice) {
-    // clear anchor and reload the page.
+    // reload the page.
     // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
-    localStorage.clear();
     location.reload();
     return;
   } else {

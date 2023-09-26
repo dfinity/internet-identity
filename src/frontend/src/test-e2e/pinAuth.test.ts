@@ -54,7 +54,8 @@ test("Register and Log in with PIN identity", async () => {
     await mainView.waitForDisplay(); // we should be logged in
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
     await mainView.logout();
-    await FLOWS.loginPin(userNumber, pin, DEFAULT_PIN_DEVICE_NAME, browser);
+    await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
+    await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
@@ -69,11 +70,10 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
     await mainView.waitForDisplay(); // we should be logged in
     await mainView.logout();
 
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.login();
-    await welcomeView.typeUserNumber(userNumber);
-    await browser.$("button[data-action='continue']").click();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
+
     const pinAuthView = new PinAuthView(browser);
     await pinAuthView.waitForDisplay();
     await pinAuthView.enterPin(wrongPin);
@@ -106,7 +106,7 @@ test("Should not prompt for PIN after deleting temp key", async () => {
     await browser.acceptAlert();
 
     // login now happens using the WebAuthn flow
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
@@ -155,15 +155,7 @@ test("Register with PIN then log into client application", async () => {
 
     await switchToPopup(browser);
 
-    const authenticateView = new AuthenticateView(browser);
-    await authenticateView.waitForDisplay();
-    await authenticateView.pickAnchor(userNumber);
-
-    const pinAuthView = new PinAuthView(browser);
-    await pinAuthView.waitForDisplay();
-    await pinAuthView.enterPin(pin);
-
-    await FLOWS.skipRecoveryNag(browser);
+    await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await waitToClose(browser);
 
     await demoAppView.waitForDisplay();
