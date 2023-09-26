@@ -8,7 +8,7 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
-import { AuthenticateView, DemoAppView, MainView, WelcomeView } from "./views";
+import { AuthenticateView, DemoAppView, MainView } from "./views";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
@@ -25,11 +25,7 @@ const TEST_APP_NICE_URL = "https://nice-name.com";
 test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.register();
     await addVirtualAuthenticator(browser);
-    await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
