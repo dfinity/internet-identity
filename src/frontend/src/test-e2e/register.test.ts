@@ -37,6 +37,26 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
+test("Register new identity and login without prefilled identity number", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    await addVirtualAuthenticator(browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    // clear local storage, so that the identity number is not prefilled
+    await browser.execute("localStorage.clear()");
+
+    // load the II page again
+    await browser.url(II_URL);
+    await FLOWS.loginWelcomeView(userNumber, DEVICE_NAME1, browser);
+  });
+}, 300_000);
+
 test("Log into client application, after registration", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);

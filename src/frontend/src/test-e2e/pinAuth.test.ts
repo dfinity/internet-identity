@@ -59,6 +59,25 @@ test("Register and Log in with PIN identity", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
+test("Register with PIN and login without prefilled identity number", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const pin = "123456";
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
+
+    const mainView = new MainView(browser);
+    await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
+
+    // clear local storage, so that the identity number is not prefilled
+    await browser.execute("localStorage.clear()");
+
+    // load the II page again
+    await browser.url(II_URL);
+    await FLOWS.loginPinWelcomeView(userNumber, pin, browser);
+    await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
+  }, APPLE_USER_AGENT);
+}, 300_000);
+
 test("Register and log in with PIN identity, retry on wrong PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";

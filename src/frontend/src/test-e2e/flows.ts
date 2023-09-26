@@ -83,6 +83,19 @@ export const FLOWS = {
     await authenticateView.register();
     return await FLOWS.registerPin(browser, pin);
   },
+  loginWelcomeView: async (
+    userNumber: string,
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.login(userNumber);
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
+    await FLOWS.skipRecoveryNag(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(deviceName);
+  },
   loginAuthenticateView: async (
     userNumber: string,
     deviceName: string,
@@ -104,6 +117,20 @@ export const FLOWS = {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
+    const pinAuthView = new PinAuthView(browser);
+    await pinAuthView.waitForDisplay();
+    await pinAuthView.enterPin(pin);
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
+    await FLOWS.skipRecoveryNag(browser);
+  },
+  loginPinWelcomeView: async (
+    userNumber: string,
+    pin: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await welcomeView.login(userNumber);
     const pinAuthView = new PinAuthView(browser);
     await pinAuthView.waitForDisplay();
     await pinAuthView.enterPin(pin);
