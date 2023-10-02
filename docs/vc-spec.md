@@ -14,7 +14,7 @@ services and the corresponding messages in more detail.
 type CredentialSpec = record { info : text };
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    vc_jwt : opt text;
+    prepared_context : opt blob;
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
@@ -41,10 +41,10 @@ type Icrc21Error = variant {
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type IssueCredentialError = variant {
     Internal : text;
-    SignatureNotFound;
-    InvalidIdAlias;
-    UnauthorizedSubject;
-    UnknownSubject;
+    SignatureNotFound : text;
+    InvalidIdAlias : text;
+    UnauthorizedSubject : text;
+    UnknownSubject : text;
 };
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
@@ -55,20 +55,16 @@ type PrepareCredentialResponse = variant {
     Ok : PreparedCredentialData;
     Err : IssueCredentialError;
 };
-type PreparedCredentialData = record { vc_jwt : opt text };
+type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
     credential_jws : text;
     id_alias : principal;
     id_dapp : principal;
 };
 service : {
-    consent_message : (Icrc21ConsentMessageRequest) -> (
-    Icrc21ConsentMessageResponse,
-    );
+    consent_message : (Icrc21ConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
-    prepare_credential : (PrepareCredentialRequest) -> (
-    PrepareCredentialResponse,
-    );
+    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
 }
 ```
 
@@ -88,7 +84,7 @@ and upon success, preparation of the actual credential requested by the user.
 
 ```candid
 service : {
-  prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse, );
+  prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
 };
 
 type PrepareCredentialRequest = record {
@@ -112,18 +108,21 @@ type PrepareCredentialResponse = variant {
     Err : IssueCredentialError;
 };
 
-type PreparedCredentialData = record { vc_jwt : opt text };
+type PreparedCredentialData = record { prepared_context : opt text };
 ```
 
 Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified via `id_dapp` on the issuer
 side can be identified using `id_alias` for the purpose of attribute sharing, and that the credential
 described by `credential_spec` does apply to the user.  When these checks are successful, the issuer
-prepares and returns the credential in JWT format.
+prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then 
+passed back to the issuer in a subsequent `get_credential`-call (see below).
 
-**NOTE**: `prepare_credential`-service is needed only for some issuers, e.g. those that use [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures)
-during the credential issuance.  For issuers that don't need "preparation"-step, this operation
-can be essentially a no-op that immediately returns `PrepareCredentialResponse::Ok` with an empty
-`PreparedCredentialData.vc_jwt`.
+**NOTE:** 
+The value of `prepared_context` is basically used to transfer information between `prepare_credential`
+and `get_credential` steps, and it is totally up to the issuer to decide on the content of 
+that field.  That is, the issuer creates `prepared_context`, and is the only entity that
+consumes it.
+
 
 ### 3: Get Credential
 
@@ -136,7 +135,7 @@ service : {
 
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    vc_jwt : opt text;
+    prepared_context : opt text;
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
@@ -148,16 +147,17 @@ type IssuedCredentialData = record { vc_jws : text };
 ```
 
 `GetCredentialRequest` should contain the same parameters as `PrepareCredentialRequest`, plus the
-prepared JWT-credential returned by `prepare_credential`, if any.
+`prepared_context`-value  returned by `prepare_credential`, if any.
 The issuer performs the same checks as during the `prepare_credential`-call,
-plus verify that the JWT-credential is consistent with the other parameters.
+plus verify that `prepared_context` is consistent with the other parameters.
 
 Upon successful checks, issuer returns the signed credential in JWS-format.
 
 
+##  Identity Provider API 
 
-
-##  Relying Party API (Window Post Message Interface)
+This section describes the _Window Post Message_-interface implemented by the identity provider (Internet Idenity).
+This interface is used by a Relying Party during attribute sharing flow (cf. [flow description](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/attribute-sharing.md))
 
 ### 1: Load II in a new window
 
