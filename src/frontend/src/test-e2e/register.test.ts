@@ -8,13 +8,7 @@ import {
   switchToPopup,
   waitToClose,
 } from "./util";
-import {
-  AuthenticateView,
-  DemoAppView,
-  MainView,
-  RecoveryMethodSelectorView,
-  WelcomeView,
-} from "./views";
+import { AuthenticateView, DemoAppView, MainView } from "./views";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
@@ -31,11 +25,7 @@ const TEST_APP_NICE_URL = "https://nice-name.com";
 test("Register new identity and login with it", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.register();
     await addVirtualAuthenticator(browser);
-    await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
@@ -43,7 +33,27 @@ test("Register new identity and login with it", async () => {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await mainView.logout();
-    await FLOWS.login(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
+  });
+}, 300_000);
+
+test("Register new identity and login without prefilled identity number", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    await addVirtualAuthenticator(browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+      DEVICE_NAME1,
+      browser
+    );
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    // clear local storage, so that the identity number is not prefilled
+    await browser.execute("localStorage.clear()");
+
+    // load the II page again
+    await browser.url(II_URL);
+    await FLOWS.loginWelcomeView(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 
@@ -102,9 +112,7 @@ test("Register first then log into client application", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
+    await FLOWS.skipRecoveryNag(browser);
     await waitToClose(browser);
     await demoAppView.waitForDisplay();
     const principal = await demoAppView.getPrincipal();
