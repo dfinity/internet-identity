@@ -211,12 +211,15 @@ export const authenticateBoxFlow = async <T, I>({
 
     // Here we ensure the PIN identity is still valid, i.e. the user did not explicitly delete
     // that "passkey" (DeviceData).
-    // XXX: we don't actually delete delete the identity material, because the current implementation
-    // cannot certify the response from the node and a malicious node might pretend the PIN has been removed.
-    const isValid = await verifyPinValidity({
-      pinIdentityMaterial,
-      userNumber,
-    });
+    // XXX: we don't actually delete the identity material, because the current implementation
+    // cannot certify the response from the node and a malicious node might pretend the PIN has
+    // been removed.
+    const isValid = await withLoader(() =>
+      verifyPinValidity({
+        pinIdentityMaterial,
+        userNumber,
+      })
+    );
     if (isValid === "expired") {
       // the PIN identity seems to have been expired
       return doLoginPasskey();
