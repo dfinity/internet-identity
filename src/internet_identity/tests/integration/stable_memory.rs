@@ -6,7 +6,7 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::BlobCompression;
+use pocket_ic::common::blob::BlobCompression;
 use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use rand::Rng;
@@ -395,8 +395,7 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
         canister_id,
         stable_memory_backup,
         BlobCompression::NoCompression,
-    )
-    .expect("Failed to set stable memory");
+    );
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
     assert!(result.is_err());
     let err = result.err().unwrap();

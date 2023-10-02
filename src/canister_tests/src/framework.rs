@@ -8,7 +8,8 @@ use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
-use pocket_ic::{BlobCompression, CallError, ErrorCode, PocketIc};
+use pocket_ic::common::blob::BlobCompression;
+use pocket_ic::{CallError, ErrorCode, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -237,8 +238,7 @@ pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId,
     let mut buffer = vec![];
     file.read_to_end(&mut buffer)
         .expect("error while reading stable memory file");
-    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip)
-        .expect("Failed to set stable memory");
+    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
 }
 
 pub const PUBKEY_1: &str = "test";

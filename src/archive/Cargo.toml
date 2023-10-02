@@ -19,7 +19,6 @@ ic-stable-structures = "0.5"
 # other
 serde = "1"
 serde_bytes = "0.11"
-pocket-ic = { git = "https://github.com/dfinity/ic.git", rev = "6529a74eea03c55c1e093cc262e1237150b3a93f" }
 
 
 [dev-dependencies]
@@ -27,3 +26,4 @@ candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
 regex = "1.9"
+pocket-ic = { path = "/home/fxgst/ic/packages/pocket-ic" }

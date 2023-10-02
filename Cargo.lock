@@ -1512,7 +1512,6 @@ dependencies = [
 [[package]]
 name = "pocket-ic"
 version = "0.0.1"
-source = "git+https://github.com/dfinity/ic.git?rev=6529a74eea03c55c1e093cc262e1237150b3a93f#6529a74eea03c55c1e093cc262e1237150b3a93f"
 dependencies = [
  "async-trait",
  "base64 0.11.0",
