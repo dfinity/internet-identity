@@ -108,7 +108,7 @@ type PrepareCredentialResponse = variant {
     Err : IssueCredentialError;
 };
 
-type PreparedCredentialData = record { prepared_context : opt text };
+type PreparedCredentialData = record { prepared_context : opt blob };
 ```
 
 Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified via `id_dapp` on the issuer
@@ -135,7 +135,7 @@ service : {
 
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    prepared_context : opt text;
+    prepared_context : opt blob;
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
