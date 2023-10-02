@@ -40,7 +40,29 @@ For more information, see [What is Internet Identity?](https://internetcomputer.
 
 This section gives an overview of Internet Identity's architecture, instructions on how to build the Wasm module (canister), and finally pointers for integrating Internet Identity in your own applications.
 
-### Architecture overview
+### Local Replica
+
+Use the Internet Identity canister in your local dfx project by adding the following code snippet to your `dfx.json` file:
+
+```json
+{
+  "canisters": {
+    "internet_identity": {
+      "type": "custom",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      },
+      "frontend": {}
+    }
+  }
+}
+```
+
+### Architecture Overview
 
 Internet Identity is an authentication service for the [Internet Computer][ic]. All programs on the Internet Computer are Wasm modules, or canisters (canister smart contracts).
 
