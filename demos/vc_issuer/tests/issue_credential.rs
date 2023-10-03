@@ -204,7 +204,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 info: "foo".to_string(),
             },
             signed_id_alias: id_alias_credentials.issuer_id_alias_credential,
-            vc_jwt: prepared_credential.vc_jwt,
+            prepared_context: prepared_credential.prepared_context,
         },
     )?;
 

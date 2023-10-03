@@ -84,10 +84,10 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum IssueCredentialError {
-        UnknownSubject,
-        UnauthorizedSubject,
-        InvalidIdAlias,
-        SignatureNotFound,
+        UnknownSubject(String),
+        UnauthorizedSubject(String),
+        InvalidIdAlias(String),
+        SignatureNotFound(String),
         Internal(String),
     }
 
@@ -95,7 +95,7 @@ pub mod issuer {
     pub struct GetCredentialRequest {
         pub signed_id_alias: SignedIdAlias,
         pub credential_spec: CredentialSpec,
-        pub vc_jwt: String,
+        pub prepared_context: Option<ByteBuf>,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -106,7 +106,7 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct PreparedCredentialData {
-        pub vc_jwt: String,
+        pub prepared_context: Option<ByteBuf>,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -53,7 +53,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     });
     update_root_hash();
     PrepareCredentialResponse::Ok(PreparedCredentialData {
-        vc_jwt: credential_jwt,
+        prepared_context: Some(ByteBuf::from(credential_jwt.as_bytes())),
     })
 }
 
@@ -76,7 +76,15 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
     let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
-    let signing_input = vc_signing_input(&req.vc_jwt, &canister_sig_pk_der, canister_id);
+    let prepared_context = match req.prepared_context {
+        Some(context) => context,
+        None => return GetCredentialResponse::Err(internal_error("missing prepared_context")),
+    };
+    let credential_jwt = match String::from_utf8(prepared_context.into_vec()) {
+        Ok(s) => s,
+        Err(_) => return GetCredentialResponse::Err(internal_error("invalid prepared_context")),
+    };
+    let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk_der, canister_id);
     let msg_hash = vc_signing_input_hash(&signing_input);
     let maybe_sig = SIGNATURES.with(|sigs| {
         let sigs = sigs.borrow();
@@ -85,9 +93,11 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let sig = if let Some(sig) = maybe_sig {
         sig
     } else {
-        return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound);
+        return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound(String::from(
+            "signature not prepared or expired",
+        )));
     };
-    let vc_jws = vc_jwt_to_jws(&req.vc_jwt, &canister_sig_pk_der, &sig, canister_id);
+    let vc_jws = vc_jwt_to_jws(&credential_jwt, &canister_sig_pk_der, &sig, canister_id);
     GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
 }
 
@@ -183,6 +193,10 @@ fn verify_prepare_credential_request(
 
 fn verify_get_credential_request(_req: &GetCredentialRequest) -> Result<(), IssueCredentialError> {
     Ok(())
+}
+
+fn internal_error(msg: &str) -> IssueCredentialError {
+    IssueCredentialError::Internal(String::from(msg))
 }
 
 // Order dependent: do not move above any function annotated with #[candid_method]!

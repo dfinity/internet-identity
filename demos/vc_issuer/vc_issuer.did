@@ -1,10 +1,13 @@
 type CredentialSpec = record { info : text };
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    vc_jwt : text;
+    prepared_context : opt blob;
     credential_spec : CredentialSpec;
 };
-type GetCredentialResponse = variant { Ok : IssuedCredentialData; Err : text };
+type GetCredentialResponse = variant {
+    Ok : IssuedCredentialData;
+    Err : IssueCredentialError;
+};
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentMessageRequest = record {
     arg : vec nat8;
@@ -23,6 +26,13 @@ type Icrc21Error = variant {
     Forbidden : Icrc21ErrorInfo;
 };
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
+type IssueCredentialError = variant {
+    Internal : text;
+    SignatureNotFound : text;
+    InvalidIdAlias : text;
+    UnauthorizedSubject : text;
+    UnknownSubject : text;
+};
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
@@ -30,9 +40,9 @@ type PrepareCredentialRequest = record {
 };
 type PrepareCredentialResponse = variant {
     Ok : PreparedCredentialData;
-    Err : text;
+    Err : IssueCredentialError;
 };
-type PreparedCredentialData = record { vc_jwt : text };
+type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
     credential_jws : text;
     id_alias : principal;
