@@ -107,6 +107,10 @@ export const iiFlows: Record<string, () => void> = {
 
         return Promise.resolve("identity");
       },
+      verifyPinValidity: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return "valid";
+      },
       registerFlowOpts,
     });
     toast.success(html`
