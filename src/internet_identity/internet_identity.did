@@ -363,6 +363,11 @@ type AuthnMethodRegistrationInfo = record {
     expiration: Timestamp;
 };
 
+type IdentityAuthnInfo = record {
+    authn_methods: vec AuthnMethod;
+    recovery_authn_methods: vec AuthnMethod;
+};
+
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_method_registration: opt AuthnMethodRegistrationInfo;
@@ -482,6 +487,10 @@ service : (opt InternetIdentityInit) -> {
     // A valid captcha solution to a previously generated captcha (using create_captcha) must be provided.
     // The sender needs to match the supplied authn_method.
     identity_register: (AuthnMethodData, CaptchaResult, opt principal) -> (variant {Ok: IdentityNumber; Err: IdentityRegisterError;});
+
+    // Returns information about the authentication methods of the identity with the given number.
+    // Only returns the minimal information required for authentication without exposing any metadata such as aliases.
+    identity_authn_info: (IdentityNumber) -> (variant {Ok: IdentityAuthnInfo; Err;}) query;
 
     // Returns information about the identity with the given number.
     // Requires authentication.

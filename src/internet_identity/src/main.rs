@@ -524,6 +524,40 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 mod v2_api {
     use super::*;
 
+    #[query]
+    #[candid_method(query)]
+    fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
+        let anchor =
+            state::storage_borrow(|storage| storage.read(identity_number).unwrap_or_default());
+
+        let authn_info = anchor.into_devices().into_iter().fold(
+            IdentityAuthnInfo {
+                authn_methods: vec![],
+                recovery_authn_methods: vec![],
+            },
+            |mut authn_info, device| {
+                let purpose = device.purpose;
+
+                let authn_method = if let Some(credential_id) = device.credential_id {
+                    AuthnMethod::WebAuthn(WebAuthn {
+                        credential_id,
+                        pubkey: device.pubkey,
+                    })
+                } else {
+                    AuthnMethod::PubKey(PublicKeyAuthn {
+                        pubkey: device.pubkey,
+                    })
+                };
+                match purpose {
+                    Purpose::Authentication => authn_info.authn_methods.push(authn_method),
+                    Purpose::Recovery => authn_info.recovery_authn_methods.push(authn_method),
+                }
+                authn_info
+            },
+        );
+        Ok(authn_info)
+    }
+
     #[update]
     #[candid_method]
     async fn captcha_create() -> Result<Challenge, ()> {
