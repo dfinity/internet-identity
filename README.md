@@ -63,6 +63,30 @@ Use the Internet Identity canister in your local dfx project by adding the follo
 }
 ```
 
+Alternatively, you can use the [`dfx deps`](https://internetcomputer.org/blog/features/dfx-deps) subcommand to manage a
+local Internet Identity canister. 
+
+Add the following to your `dfx.json` file:
+
+```json
+{
+  "canisters": {
+    "internet_identity": {
+      "type": "pull",
+      "id": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    }
+  },
+}
+```
+
+Next, run the following commands:
+
+```sh
+dfx deps pull
+dfx deps init rdmx6-jaaaa-aaaaa-aaadq-cai --argument '(null)'
+dfx deps deploy
+```
+
 ### Architecture Overview
 
 Internet Identity is an authentication service for the [Internet Computer][ic]. All programs on the Internet Computer are Wasm modules, or canisters (canister smart contracts).
