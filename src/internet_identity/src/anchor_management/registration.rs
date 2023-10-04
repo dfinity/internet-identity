@@ -19,18 +19,11 @@ use lazy_static::lazy_static;
 
 mod rate_limit;
 
-// 5 mins
-const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
-
 pub async fn create_challenge() -> Challenge {
     let mut rng = make_rng().await;
 
     state::inflight_challenges_mut(|inflight_challenges| {
-        let now = time();
-
-        // Prune old challenges. This drops all challenges that are older than
-        // CAPTCHA_CHALLENGE_LIFETIME
-        inflight_challenges.retain(|_, v| v.created > now - CAPTCHA_CHALLENGE_LIFETIME);
+        prune_expired_challenges(inflight_challenges);
 
         // Error out if there are too many inflight challenges
         if inflight_challenges.len()
@@ -59,7 +52,7 @@ pub async fn create_challenge() -> Challenge {
                 inflight_challenges.insert(
                     challenge_key.clone(),
                     ChallengeInfo {
-                        created: now,
+                        created: time(),
                         chars,
                     },
                 );
@@ -73,6 +66,14 @@ pub async fn create_challenge() -> Challenge {
 
         trap(&format!("Could not find a new key after {MAX_TRIES} tries"));
     })
+}
+
+/// Remove challenges older than CAPTCHA_CHALLENGE_LIFETIME from the inflight challenges map
+fn prune_expired_challenges(inflight_challenges: &mut HashMap<ChallengeKey, ChallengeInfo>) {
+    // 5 mins
+    const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
+
+    inflight_challenges.retain(|_, v| v.created > time() - CAPTCHA_CHALLENGE_LIFETIME);
 }
 
 // Get a random number generator based on 'raw_rand'
@@ -215,6 +216,8 @@ fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
         .collect();
 
     state::inflight_challenges_mut(|inflight_challenges| {
+        prune_expired_challenges(inflight_challenges);
+
         match inflight_challenges.remove(&res.key) {
             Some(challenge) => {
                 if normalized_challenge_res != challenge.chars {
