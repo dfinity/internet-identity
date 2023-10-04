@@ -1,7 +1,6 @@
 import { withLoader } from "$src/components/loader";
 import {
   PinIdentityMaterial,
-  pinIdentityToDerPubkey,
   reconstructPinIdentity,
 } from "$src/crypto/pinIdentity";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
@@ -30,7 +29,7 @@ import {
   setAnchorUsed,
 } from "$src/utils/userNumber";
 import { NonEmptyArray, isNonEmptyArray, unreachable } from "$src/utils/utils";
-import { nonNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
@@ -84,8 +83,14 @@ export const authenticateBox = async ({
         loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
       registerFlowOpts: getRegisterFlowOpts({ connection }),
+      verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
+        pinIdentityAuthenticatorValidity({
+          userNumber,
+          pinIdentityMaterial,
+          connection,
+        }),
       retrievePinIdentityMaterial: ({ userNumber }) =>
-        retrievePinIdentityWithCheck(connection, userNumber),
+        idbRetrievePinIdentityMaterial({ userNumber }),
     });
 
   // Retry until user has successfully authenticated
@@ -99,6 +104,29 @@ export const authenticateBox = async ({
   }
 };
 
+// Check that the PIN identity has a corresponding authenticator
+const pinIdentityAuthenticatorValidity = async ({
+  pinIdentityMaterial,
+  connection,
+  userNumber,
+}: {
+  pinIdentityMaterial: PinIdentityMaterial;
+  connection: Connection;
+  userNumber: bigint;
+}) => {
+  const authenticators = await connection.lookupAuthenticators(userNumber);
+  const pinPubkeyDer = await pinIdentityToDerPubkey(pinIdentityMaterial);
+  // Check that the authenticator is still present on the identity.
+  const hasAuthenticator = authenticators.some((authenticator) =>
+    bufferEqual(
+      new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
+      pinPubkeyDer
+    )
+  );
+
+  return hasAuthenticator ? "valid" : "expired";
+};
+
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
 export const authenticateBoxFlow = async <T, I>({
@@ -109,6 +137,7 @@ export const authenticateBoxFlow = async <T, I>({
   loginPinIdentityMaterial,
   recover,
   registerFlowOpts,
+  verifyPinValidity,
   retrievePinIdentityMaterial,
 }: {
   i18n: I18n;
@@ -132,6 +161,10 @@ export const authenticateBoxFlow = async <T, I>({
   }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
+  verifyPinValidity: (opts: {
+    userNumber: bigint;
+    pinIdentityMaterial: I;
+  }) => Promise<"valid" | "expired">;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
 }): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
   const pages = authnScreens(i18n, { ...templates });
@@ -160,15 +193,38 @@ export const authenticateBoxFlow = async <T, I>({
   }: {
     userNumber: bigint;
   }): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
-    const pinIdentityMaterial = await retrievePinIdentityMaterial({
-      userNumber,
-    });
+    const pinIdentityMaterial = await withLoader(() =>
+      retrievePinIdentityMaterial({
+        userNumber,
+      })
+    );
 
-    if (pinIdentityMaterial === undefined) {
-      // this user number does not have a browser storage identity
+    const doLoginPasskey = async () => {
       const result = await withLoader(() => loginPasskey(userNumber));
       return { newAnchor: false, ...result };
+    };
+
+    if (isNullish(pinIdentityMaterial)) {
+      // this user number does not have a browser storage identity
+      return doLoginPasskey();
     }
+
+    // Here we ensure the PIN identity is still valid, i.e. the user did not explicitly delete
+    // that "passkey" (DeviceData).
+    // XXX: we don't actually delete the identity material, because the current implementation
+    // cannot certify the response from the node and a malicious node might pretend the PIN has
+    // been removed.
+    const isValid = await withLoader(() =>
+      verifyPinValidity({
+        pinIdentityMaterial,
+        userNumber,
+      })
+    );
+    if (isValid === "expired") {
+      // the PIN identity seems to have been expired
+      return doLoginPasskey();
+    }
+    isValid satisfies "valid";
 
     // Otherwise, attempt login with PIN
     const result = await usePin({
@@ -194,8 +250,7 @@ export const authenticateBoxFlow = async <T, I>({
 
     if (result.kind === "passkey") {
       // User still decided to use a passkey
-      const result = await withLoader(() => loginPasskey(userNumber));
-      return { newAnchor: false, ...result };
+      return doLoginPasskey();
     }
 
     result satisfies { kind: "pin" };
@@ -588,27 +643,12 @@ const asNewDevice = async (
   );
 };
 
-// Retrieve the PIN identity material from the browser storage and check that it is still valid for the given user number.
-const retrievePinIdentityWithCheck = async (
-  connection: Connection,
-  userNumber: bigint
-): Promise<PinIdentityMaterial | undefined> => {
-  const [pinIdentity, authenticators] = await Promise.all([
-    idbRetrievePinIdentityMaterial({ userNumber }),
-    connection.lookupAuthenticators(userNumber),
-  ]);
-  if (nonNullish(pinIdentity)) {
-    const pinPubkeyDer = await pinIdentityToDerPubkey(pinIdentity);
-    // Check that the authenticator is still present on the identity.
-    const authenticator = authenticators.find((authenticator) =>
-      bufferEqual(
-        new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
-        pinPubkeyDer
-      )
-    );
-    if (nonNullish(authenticator)) {
-      return pinIdentity;
-    }
-  }
-  return undefined;
+// Helper to convert PIN identity material to a Der public-key
+const pinIdentityToDerPubkey = async (
+  pinIdentity: PinIdentityMaterial
+): Promise<DerEncodedPublicKey> => {
+  return (await crypto.subtle.exportKey(
+    "spki",
+    pinIdentity.publicKey
+  )) as DerEncodedPublicKey;
 };
