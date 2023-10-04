@@ -71,9 +71,9 @@ pub async fn create_challenge() -> Challenge {
 /// Remove challenges older than CAPTCHA_CHALLENGE_LIFETIME from the inflight challenges map
 fn prune_expired_challenges(inflight_challenges: &mut HashMap<ChallengeKey, ChallengeInfo>) {
     // 5 mins
-    const CAPTCHA_CHALLENGE_LIFETIME: u64 = secs_to_nanos(300);
+    const CAPTCHA_CHALLENGE_LIFETIME_NS: u64 = secs_to_nanos(300);
 
-    inflight_challenges.retain(|_, v| v.created > time() - CAPTCHA_CHALLENGE_LIFETIME);
+    inflight_challenges.retain(|_, v| v.created > time() - CAPTCHA_CHALLENGE_LIFETIME_NS);
 }
 
 // Get a random number generator based on 'raw_rand'
