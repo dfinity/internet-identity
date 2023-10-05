@@ -244,7 +244,7 @@ pub fn create_verifiable_presentation_jwt(
 }
 
 pub fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, String> {
-    serde_json::from_str::<Presentation<Jwt>>(&vp_jwt)
+    serde_json::from_str::<Presentation<Jwt>>(vp_jwt)
         .map_err(|_| "failed vp jwt deserialization".to_string())
 }
 
