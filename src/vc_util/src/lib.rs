@@ -636,7 +636,7 @@ mod tests {
             id_dapp: dapp_principal(),
         };
         let bad_vp_jwt = "some badly formatted string";
-        let result = verify_idp_presentation_jwt(&bad_vp_jwt, &alias_tuple);
+        let result = verify_idp_presentation_jwt(bad_vp_jwt, &alias_tuple);
         assert_matches!(
             result,
             Err(PresentationVerificationError::InvalidPresentationJwt(_))
