@@ -2,9 +2,11 @@ use candid::Principal;
 use canister_sig_util::{verify_root_signature, CanisterSig, CanisterSigPublicKey};
 use ic_certification::{Certificate, LookupResult};
 use ic_certified_map::Hash;
+use identity_core::common::Url;
 use identity_core::convert::FromJson;
-use identity_credential::credential::Subject;
+use identity_credential::credential::{Jwt, Subject};
 use identity_credential::error::Error as JwtVcError;
+use identity_credential::presentation::{Presentation, PresentationBuilder};
 use identity_credential::validator::JwtValidationError;
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{
@@ -25,6 +27,14 @@ pub const II_ISSUER_URL: &str = "https://internetcomputer.org/issuers/internet-i
 pub struct AliasTuple {
     pub id_alias: Principal,
     pub id_dapp: Principal,
+}
+
+#[derive(Debug)]
+pub enum PresentationVerificationError {
+    InvalidPresentationJwt(String),
+    InvalidIdAliasCredential(CredentialVerificationError),
+    InvalidRequestedCredential(CredentialVerificationError),
+    Unknown(String),
 }
 
 #[derive(Debug)]
@@ -65,6 +75,50 @@ pub fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
 pub fn did_for_principal(principal: Principal) -> String {
     let prefix = String::from("did:icp:");
     prefix.add(&principal.to_string())
+}
+
+pub fn verify_idp_presentation_jwt(
+    vp_jwt: &str,
+    alias_tuple: &AliasTuple,
+) -> Result<(), PresentationVerificationError> {
+    let presentation = parse_verifiable_presentation_jwt(vp_jwt)
+        .map_err(PresentationVerificationError::InvalidPresentationJwt)?;
+    let expected_holder = Url::parse(did_for_principal(alias_tuple.id_dapp)).map_err(|_| {
+        PresentationVerificationError::Unknown("internal: bad id_dapp principal".to_string())
+    })?;
+    if presentation.holder != expected_holder {
+        return Err(PresentationVerificationError::InvalidPresentationJwt(
+            "incompatible holder".to_string(),
+        ));
+    }
+    if presentation.verifiable_credential.len() != 2 {
+        return Err(PresentationVerificationError::InvalidPresentationJwt(
+            "expected exactly two verifiable credentials".to_string(),
+        ));
+    }
+    let id_alias_vc_jws =
+        presentation
+            .verifiable_credential
+            .get(0)
+            .ok_or(PresentationVerificationError::Unknown(
+                "missing id_alias vc".to_string(),
+            ))?;
+    verify_id_alias_credential_jws(id_alias_vc_jws.as_str(), alias_tuple)
+        .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
+    let requested_vc_jws =
+        presentation
+            .verifiable_credential
+            .get(1)
+            .ok_or(PresentationVerificationError::Unknown(
+                "missing requested vc".to_string(),
+            ))?;
+    let _claims = verify_credential_jws(requested_vc_jws.as_str()).map_err(|e| {
+        PresentationVerificationError::InvalidRequestedCredential(
+            CredentialVerificationError::InvalidJws(e),
+        )
+    })?;
+    Ok(())
+    // TODO: add verification of _claims
 }
 
 /// Verifies the given JWS-credential as an id_alias-VC for the specified alias tuple.
@@ -168,6 +222,30 @@ pub fn verify_credential_jws(
     verify_root_signature(&ic_certificate, canister_sig_pk.signing_canister_id)
         .map_err(|e| invalid_signature_err(&e.to_string()))?;
     Ok(claims)
+}
+#[derive(Clone, Debug)]
+pub struct PresentationParams {
+    pub id_alias_vc_jws: String,
+    pub requested_vc_jws: String,
+}
+
+pub fn create_verifiable_presentation_jwt(
+    params: PresentationParams,
+    alias_tuple: &AliasTuple,
+) -> Result<String, String> {
+    let holder =
+        Url::parse(did_for_principal(alias_tuple.id_dapp)).map_err(|_| "Invalid holder")?;
+    let presentation: Presentation<Jwt> = PresentationBuilder::new(holder, Default::default())
+        .credential(Jwt::from(params.id_alias_vc_jws))
+        .credential(Jwt::from(params.requested_vc_jws))
+        .build()
+        .map_err(|_| "failed building presentation")?;
+    Ok(serde_json::to_string(&presentation).map_err(|_| "failed serializing presentation")?)
+}
+
+pub fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, String> {
+    serde_json::from_str::<Presentation<Jwt>>(&vp_jwt)
+        .map_err(|_| "failed vp jwt deserialization".to_string())
 }
 
 fn validate_credential_subject(
@@ -505,5 +583,88 @@ mod tests {
             },
         )
         .expect("JWS verification failed");
+    }
+
+    #[test]
+    fn should_create_and_parse_verifiable_presentation() {
+        let params = PresentationParams {
+            id_alias_vc_jws: "a dummy id_alias_vc_jws".to_string(),
+            requested_vc_jws: "a dummy requested_vc_jws".to_string(),
+        };
+        let alias_tuple = AliasTuple {
+            id_alias: principal_from_u64(1),
+            id_dapp: principal_from_u64(2),
+        };
+        let vp_jwt = create_verifiable_presentation_jwt(params.clone(), &alias_tuple)
+            .expect("vp-creation failed");
+        let presentation: Presentation<Jwt> =
+            parse_verifiable_presentation_jwt(&vp_jwt).expect("failed jwt parsing");
+
+        assert!(presentation
+            .verifiable_credential
+            .contains(&Jwt::from(params.id_alias_vc_jws)));
+        assert!(presentation
+            .verifiable_credential
+            .contains(&Jwt::from(params.requested_vc_jws)));
+        assert_eq!(
+            Url::parse(did_for_principal(alias_tuple.id_dapp)).expect("bad url"),
+            presentation.holder
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn should_verify_verifiable_presentation() {
+        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
+        let alias_tuple = AliasTuple {
+            id_alias: alias_principal(),
+            id_dapp: dapp_principal(),
+        };
+        let params = PresentationParams {
+            id_alias_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(),
+            requested_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(), // TODO: use different VC
+        };
+        let vp_jwt =
+            create_verifiable_presentation_jwt(params, &alias_tuple).expect("vp creation failed");
+        verify_idp_presentation_jwt(&vp_jwt, &alias_tuple).expect("vp verification failed");
+    }
+
+    #[test]
+    fn should_fail_verifying_verifiable_presentation_with_bad_jwt() {
+        let alias_tuple = AliasTuple {
+            id_alias: alias_principal(),
+            id_dapp: dapp_principal(),
+        };
+        let bad_vp_jwt = "some badly formatted string";
+        let result = verify_idp_presentation_jwt(&bad_vp_jwt, &alias_tuple);
+        assert_matches!(
+            result,
+            Err(PresentationVerificationError::InvalidPresentationJwt(_))
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn should_fail_verifying_verifiable_presentation_with_wrong_holder() {
+        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
+        let alias_tuple = AliasTuple {
+            id_alias: alias_principal(),
+            id_dapp: dapp_principal(),
+        };
+        let params = PresentationParams {
+            id_alias_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(),
+            requested_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(), // TODO: use different VC
+        };
+        let vp_jwt =
+            create_verifiable_presentation_jwt(params, &alias_tuple).expect("vp creation failed");
+        let wrong_alias_tuple = AliasTuple {
+            id_alias: alias_principal(),
+            id_dapp: alias_principal(),
+        };
+        let result = verify_idp_presentation_jwt(&vp_jwt, &wrong_alias_tuple);
+        assert_matches!(
+            result,
+            Err(PresentationVerificationError::InvalidPresentationJwt(_))
+        );
     }
 }
