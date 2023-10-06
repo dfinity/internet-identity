@@ -20,7 +20,10 @@ use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use serial_test::serial;
 use std::path::PathBuf;
-use vc_util::{verify_id_alias_credential_jws, AliasTuple};
+use vc_util::{
+    create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
+    PresentationParams,
+};
 
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
@@ -208,8 +211,17 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         },
     )?;
 
-    if let GetCredentialResponse::Ok(_data) = get_credential_response {
-        // OK
+    if let GetCredentialResponse::Ok(data) = get_credential_response {
+        let params = PresentationParams {
+            id_alias_vc_jws: id_alias_credentials.rp_id_alias_credential.credential_jws,
+            requested_vc_jws: data.vc_jws,
+        };
+        let alias_tuple = AliasTuple {
+            id_alias: id_alias_credentials.rp_id_alias_credential.id_alias,
+            id_dapp: id_alias_credentials.rp_id_alias_credential.id_dapp,
+        };
+        let _vp = create_verifiable_presentation_jwt(params, &alias_tuple)
+            .expect("failed creating presentation");
     } else {
         panic!("Get credential failed: {:?}", get_credential_response);
     };
