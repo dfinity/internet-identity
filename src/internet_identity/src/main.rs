@@ -290,7 +290,7 @@ fn stats() -> InternetIdentityStats {
                 .map(|latest_delegation_origins| {
                     latest_delegation_origins.keys().cloned().collect()
                 })
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
             (
                 origins,
                 persistent_state.max_num_latest_delegation_origins.unwrap(),

@@ -15,7 +15,6 @@ export const logoutSection = (
 </div>`;
 
 const logout = () => {
-  localStorage.clear();
   clearHash();
   window.location.reload();
 };
