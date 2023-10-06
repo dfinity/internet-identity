@@ -244,7 +244,7 @@ fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<Strin
         .map_err(|_| "failed serializing presentation")?;
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
         .map_err(|_| "internal error: JWS encoder failed")?;
-    Ok(encoder.into_jws(&vec![]))
+    Ok(encoder.into_jws(&[]))
 }
 
 pub fn create_verifiable_presentation_jwt(
