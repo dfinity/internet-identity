@@ -6,7 +6,9 @@ use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Jwt, Subject};
 use identity_credential::error::Error as JwtVcError;
-use identity_credential::presentation::{Presentation, PresentationBuilder};
+use identity_credential::presentation::{
+    JwtPresentationOptions, Presentation, PresentationBuilder, PresentationJwtClaims,
+};
 use identity_credential::validator::JwtValidationError;
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{
@@ -229,6 +231,22 @@ pub struct PresentationParams {
     pub requested_vc_jws: String,
 }
 
+fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<String, String> {
+    let mut header: JwsHeader = JwsHeader::new();
+    header.set_typ("JWT");
+    header.set_alg(JwsAlgorithm::NONE);
+    let vp_jwt = presentation
+        .serialize_jwt(&JwtPresentationOptions {
+            expiration_date: None,
+            issuance_date: None,
+            audience: None,
+        })
+        .map_err(|_| "failed serializing presentation")?;
+    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
+        .map_err(|_| "internal error: JWS encoder failed")?;
+    Ok(encoder.into_jws(&[]))
+}
+
 pub fn create_verifiable_presentation_jwt(
     params: PresentationParams,
     alias_tuple: &AliasTuple,
@@ -240,12 +258,19 @@ pub fn create_verifiable_presentation_jwt(
         .credential(Jwt::from(params.requested_vc_jws))
         .build()
         .map_err(|_| "failed building presentation")?;
-    Ok(serde_json::to_string(&presentation).map_err(|_| "failed serializing presentation")?)
+    presentation_to_compact_jwt(&presentation)
 }
 
 pub fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, String> {
-    serde_json::from_str::<Presentation<Jwt>>(vp_jwt)
-        .map_err(|_| "failed vp jwt deserialization".to_string())
+    let decoder = Decoder::new();
+    let jwt = decoder
+        .decode_compact_serialization(vp_jwt.as_ref(), None)
+        .map_err(|_| "failed decoding compact jwt serialization")?;
+    let presentation_claims = PresentationJwtClaims::from_json_slice(&jwt.claims())
+        .map_err(|_| "failed parsing presentation claims")?;
+    Ok(presentation_claims
+        .try_into_presentation()
+        .map_err(|_| "failed exporting presentation")?)
 }
 
 fn validate_credential_subject(
@@ -389,6 +414,7 @@ mod tests {
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
     const DAPP_PRINCIPAL: &str = "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe";
     const ID_ALIAS_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCamxUYzNvSzVRVU9SbUt0T3YyVXBhMnhlQW5vNEJ4RlFFYmY1VWRUSTZlYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJpc3MiOiJodHRwczovL2ludGVybmV0Y29tcHV0ZXIub3JnL2lzc3VlcnMvaW50ZXJuZXQtaWRlbnRpdHkiLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaW50ZXJuZXRjb21wdXRlci5vcmcvY3JlZGVudGlhbC9pbnRlcm5ldC1pZGVudGl0eS8xNjIwMzI4NjMwMDAwMDAwMDAwIiwic3ViIjoiZGlkOmljcDpjcGVocS01NGhlZi1vZGpqdC1ib2NrbC0zbGR0Zy1qcWxlNC15c2k1ci02YmZhaC12NmxzYS14cHJkdi1wcWUiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIkludGVybmV0SWRlbnRpdHlJZEFsaWFzIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7Imhhc19pZF9hbGlhcyI6ImRpZDppY3A6czMzcWMtY3RucDUtdWJ5ejQta3VicW8tcDJ0ZW0taGU0bHMtNmoyM2otaHd3YmEtMzd6YmwtdDJsdjMtcGFlIn19fQ.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIMlBo1U8rvfGFEAvZoEFZX0uFlOGZLwgNjaBiyazTjUsggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIBfmGXVF1WCWPapsKI5MoFLJ55x11hQqSb_sRnrp5hFVggRYIBNvlU5ah4f5OsbVrHPPSsAhJo91Mf_fFkAE813rttVaggRYIEfscybxhCV3H9WVS6yOWyrSfnoAvrk5mr3vaKZOwOZiggRYID_qjkmyX1ydMvjuG7MS1E4grrzurjpGjbvYR7-YHMXwgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwogHXOX8bnQxCHy8TOkAG2Xak_qb2Yx22j5c9R5WC-8ResKLfeGgkSWbadE92xqRRZHRyZWWDAYIEWCB1hhWALXUuzFwXrojqFkaSB6Yejid7LwgvbIj61MjIN4MCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBggRYIOxGloHVCCWojZGGGusUYkg0Q-v_podIYMUM-jvDBF62gwJYIP28vIabsWSa5kTsn1ypw6vHamcQnTcYFNsiRlZMNcbAggNA";
+    const REQUESTED_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCRW5ydW55RDN6Ty1pc29wNlRBOERkZWxxTEJmdkhLX1ZUeG5YZEl4bi1RZyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJpc3MiOiJodHRwczovL2lkZW50aXR5LmljMC5hcHAvIiwibmJmIjoxNjIwMzI4NjMwLCJqdGkiOiJodHRwczovL2V4YW1wbGUuZWR1L2NyZWRlbnRpYWxzLzM3MzIiLCJzdWIiOiJkaWQ6aWNwOm10cHBiLWtzY3ZhLTRoZHBsLXR4bWl0LWo3M3QzLWViZ2RpLWlybzRkLWtjZGZnLXVicm5oLW51bmE1LXpxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVW5pdmVyc2l0eURlZ3JlZUNyZWRlbnRpYWwiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiR1BBIjoiNC4wIiwiZGVncmVlIjp7Im5hbWUiOiJCYWNoZWxvciBvZiBTY2llbmNlIGFuZCBBcnRzIiwidHlwZSI6IkJhY2hlbG9yRGVncmVlIn0sIm5hbWUiOiJBbGljZSJ9fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggwsKW3qX8hPPdjOrA0R9YJgnTgdAn1nrgxIZZ_ebjZgeCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgglF8fe1owx2ekH6b_EzBZgU9L181hDdG2QX9bSIrGk7WCBFggiAQjCWS4p8OQjNKzyg73kXdTrJjDkDaF0g44WMAUruqCBFggV_MuZ9jXfsXICrVI40YLz5oaISN0_AX7bRJz6ZD5-3GCBFggpRekBB9l8QYhw2iKm1zHJJEmidbvuCTiajiT8KW4ci6CBFggkKkltZ_w0G1kjUDkcFOPeiQ8vdbJMRP03xe8a1r0ug6DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCX6F5eY5WIa6_M7URZ816ANTNIqLgUWQi_lpnaNaEks67cL1luT2P-TxNCQB7n5uBkdHJlZYMCQ3NpZ4MCWCC64yx6oN_cInVY4FG60mk166oCBahlGepSE7IgGwes5YMCWCAMlZQJ9smkQJwvDgHDSxs-uV5XzdyOQsMMst2oKgRfKIIDQA";
     const ID_ALIAS_CREDENTIAL_JWS_NO_JWK: &str = "eyJraWQiOiJkaWQ6aWM6aWktY2FuaXN0ZXIiLCJhbGciOiJJY0NzIn0.eyJpc3MiOiJodHRwczovL2ludGVybmV0Y29tcHV0ZXIub3JnL2lzc3VlcnMvaW50ZXJuZXQtaWRlbml0eSIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9pbnRlcm5ldGNvbXB1dGVyLm9yZy9jcmVkZW50aWFsL2ludGVybmV0LWlkZW5pdHkiLCJzdWIiOiJkaWQ6d2ViOmNwZWhxLTU0aGVmLW9kamp0LWJvY2tsLTNsZHRnLWpxbGU0LXlzaTVyLTZiZmFoLXY2bHNhLXhwcmR2LXBxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOndlYjpzMzNxYy1jdG5wNS11Ynl6NC1rdWJxby1wMnRlbS1oZTRscy02ajIzai1od3diYS0zN3pibC10Mmx2My1wYWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIG3uU_jutBtXB-of0uEA3RkCrcunK6D8QFPtX-gDSwDeggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIMULjwe1N6XomH10SEyc2r_uc7mGf1aSadeDaid9cUrkggRYIDw__VW2PgWMFp6mK-GmPG-7Fc90q58oK_wjcJ3IrkToggRYIAQTcQAtnxsa93zbfZEZV0f28OhiXL5Wp1OAyDHNI_x4ggRYINkQ8P9zGUvsVi3XbQ2bs6V_3kAiN8UNM6yPgeXfmArEgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwqHrYoUsNvSEaSShbW8barx0_ODXD5ZBEl9nKOdkNy_fBmGErE_C7ILbC91_fyZ7CZHRyZWWDAYIEWCB223o-sI97tc3LwJL3LRxQ4If6v_IvfC1fwIGYYQ9vroMCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBgwJYIHszMLDS2VadioIaHajRY5iJzroqMs63lVrs_Uj42j0sggNAggRYICm0w_XxGEw4fDPoYcojCILEi0qdH4-4Zw7klzdaPNOC";
 
     fn test_ic_root_pk_der() -> Vec<u8> {
@@ -622,7 +648,7 @@ mod tests {
         };
         let params = PresentationParams {
             id_alias_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(),
-            requested_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(), // TODO: use different VC
+            requested_vc_jws: REQUESTED_CREDENTIAL_JWS.to_string(),
         };
         let vp_jwt =
             create_verifiable_presentation_jwt(params, &alias_tuple).expect("vp creation failed");
@@ -653,7 +679,7 @@ mod tests {
         };
         let params = PresentationParams {
             id_alias_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(),
-            requested_vc_jws: ID_ALIAS_CREDENTIAL_JWS.to_string(), // TODO: use different VC
+            requested_vc_jws: REQUESTED_CREDENTIAL_JWS.to_string(),
         };
         let vp_jwt =
             create_verifiable_presentation_jwt(params, &alias_tuple).expect("vp creation failed");
