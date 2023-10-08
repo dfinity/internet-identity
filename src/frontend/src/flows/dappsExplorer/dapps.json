@@ -277,8 +277,8 @@
   },
   {
     "name": "Vibeverse",
-    "oneLiner": "A vibrant ecosystem where users can learn about new AI tools, AI content, AI Movies, and more",
-    "website": "https://h5fnl-4iaaa-aaaap-abddq-cai.icp0.io/",
+    "oneLiner": "Where AI magic meets creative play in a universe of endless possibilities",
+    "website": "https://vibeverse.xyz/",
     "logo": "vibeverse_logo.png"
   },
   {
@@ -340,5 +340,23 @@
     "website": "https://johndao.gg",
     "logo": "john-dao_logo.webp",
     "oneLiner": "A Twitter/X account controlled by a DAO on the Internet Computer"
+  },
+  {
+    "name": "aVa",
+    "website": "https://ksayv-myaaa-aaaan-qedxq-cai.icp0.io",
+    "logo": "ava_logo.webp",
+    "oneLiner": "aVa: Action-Based Decentralized Reputation Landscape."
+  },
+  {
+    "name": "Open Internet Metaverse",
+    "website": "https://vdfyi-uaaaa-aaaai-acptq-cai.ic0.app",
+    "logo": "open-internet-metaverse_logo.webp",
+    "oneLiner": "Create Your Virtual Space as a 3D-Website on the Internet Computer"
+  },
+  {
+    "name": "FishVerse",
+    "website": "https://thefishverse.com/",
+    "logo": "fishverse_logo.webp",
+    "oneLiner": "FishVerse is a W2E fishing game that is built on ICP technology"
   }
 ]
