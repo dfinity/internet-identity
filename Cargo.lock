@@ -1394,6 +1394,7 @@ dependencies = [
  "candid",
  "hex",
  "ic-cdk",
+ "rand",
  "reqwest",
  "serde",
  "serde_bytes",
