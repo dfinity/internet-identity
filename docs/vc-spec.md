@@ -183,7 +183,7 @@ After receiving the notification that II is ready, the relying party can request
     * `credentialId`: The ID of the credential that the relying party wants to request from the issuer.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
 
-_Example_
+#### Example
 
 ```json
 {
