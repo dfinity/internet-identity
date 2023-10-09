@@ -30,7 +30,8 @@ const readCanisterId = (): string => {
 };
 
 /**
- * Inject the II canister ID as a <script /> tag in index.html for local development.
+ * Inject the II canister ID as a <script /> tag in index.html for local development. Will process
+ * at most 1 script tag.
  */
 export const injectCanisterIdPlugin = (): {
   name: "html-transform";
@@ -38,28 +39,11 @@ export const injectCanisterIdPlugin = (): {
 } => ({
   name: "html-transform",
   transformIndexHtml(html): string {
-    return html.replace(
-      `<script id="setupJs"></script>`,
-      `<script data-canister-id="${readCanisterId()}" id="setupJs"></script>`
-    );
-  },
-});
+    const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
 
-/**
- * Remove the <script /> that loads the index.js for production build.
- * A script loader is injected by the backend.
- */
-export const stripInjectJsScript = (): {
-  name: "html-transform";
-  transformIndexHtml(html: string): string;
-} => ({
-  name: "html-transform",
-  transformIndexHtml(html): string {
-    const match = `<script type="module" crossorigin src="/index.js"></script>`;
-    if (!html.includes(match)) {
-      throw new Error("Expecting script tag to replace, found none");
-    }
-    return html.replace(match, ``);
+    return html.replace(rgx, (_match, src) => {
+      return `<script data-canister-id="${readCanisterId()}" type="module" src="${src}"></script>`;
+    });
   },
 });
 
