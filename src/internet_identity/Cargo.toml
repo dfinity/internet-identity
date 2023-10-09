@@ -19,7 +19,7 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 # Captcha deps
-lodepng = "3.7.2"
+lodepng = "*"
 base64 = "*"
 
 rand = { version ="*", default-features = false }
