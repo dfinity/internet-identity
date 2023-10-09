@@ -211,7 +211,7 @@ After the user has successfully completed the flow, Internet Identity will respo
     1. A verifiable credential issued by Internet Identity that relates the requested `credentialSubject` to another alias principal.
     2. A verifiable credential issued by on of the requested issuers issued to the alias principal.
 
-_Example_
+##### Example
 
 ```json
 {
@@ -232,7 +232,7 @@ For privacy protection, the error does not give any details on the root cause of
 (This may change in the future, as some failures can be reported to the relying
 party without impacting user's privacy.)
 
-_Example_
+##### Example
 
 ``` json
 {
@@ -240,7 +240,7 @@ _Example_
     "jsonrpc": "2.0",
     "error": {
         "version": "1",
-        "errorType": "UNKNOWN"
+        "code": "UNKNOWN"
     }
 }
 ```
