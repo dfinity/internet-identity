@@ -200,16 +200,18 @@ After receiving the notification that II is ready, the relying party can request
 }
 ```
 
-### 3: Receive Verifiable Presentation
+### 3: Get a Response
+
+
+#### Receive a Verifiable Presentation
 
 After the user has successfully completed the flow, Internet Identity will respond with the following JSON-RPC response:
 
-* Result:
   * `verifiablePresentation`: The JWT based verifiable presentation containing two credentials: 
     1. A verifiable credential issued by Internet Identity that relates the requested `credentialSubject` to another alias principal.
     2. A verifiable credential issued by on of the requested issuers issued to the alias principal.
 
-#### Example
+##### Example
 
 ```json
 {
@@ -222,6 +224,27 @@ After the user has successfully completed the flow, Internet Identity will respo
 ```
 
 An example of such a verifiable presentation can be found [here](https://www.w3.org/TR/vc-data-model/#example-jwt-payload-of-a-jwt-based-verifiable-presentation-non-normative).
+
+#### Receive an Error Message
+
+If the flow failed for any reason, Internet Identity returns an error.
+For privacy protection, the error does not give any details on the root cause of the failure.
+(This may change in the future, as some failures can be reported to the relying
+party without impacting user's privacy.)
+
+##### Example
+
+``` json
+{
+    "id": 1,
+    "jsonrpc": "2.0",
+    "error": {
+        "version": "1",
+        "code": "UNKNOWN"
+    }
+}
+```
+
 
 #### Interaction Model
 
