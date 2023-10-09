@@ -49,6 +49,7 @@ type SignedIdAlias = record {
     id_dapp : principal;
 };
 service : {
+    add_employee : (principal) -> (text);
     consent_message : (Icrc21ConsentMessageRequest) -> (
     Icrc21ConsentMessageResponse,
     );

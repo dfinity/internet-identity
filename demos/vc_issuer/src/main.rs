@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::trap;
+use std::collections::HashSet;
 use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
@@ -25,6 +26,7 @@ const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 
 thread_local! {
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
+    static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -40,7 +42,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
     let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
-    let credential = new_credential(subject_principal);
+    let credential = new_credential_dfinity_employment(subject_principal);
     let credential_jwt = credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure");
@@ -110,6 +112,13 @@ async fn consent_message(req: Icrc21ConsentMessageRequest) -> Icrc21ConsentMessa
     })
 }
 
+#[update]
+#[candid_method]
+fn add_employee(employee_id: Principal) -> String {
+    EMPLOYEES.with(|employees| employees.borrow_mut().insert(employee_id));
+    format!("Added employee {}", employee_id)
+}
+
 fn main() {}
 
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
@@ -163,7 +172,8 @@ fn calculate_seed(principal: &Principal) -> Hash {
     hash_bytes(bytes)
 }
 
-fn new_credential(subject_principal: Principal) -> Credential {
+#[allow(dead_code)]
+fn new_credential_bachelor_degree(subject_principal: Principal) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
       "name": "Alice",
@@ -185,10 +195,43 @@ fn new_credential(subject_principal: Principal) -> Credential {
         .unwrap()
 }
 
+fn new_credential_dfinity_employment(subject_principal: Principal) -> Credential {
+    let subject: Subject = Subject::from_json_value(json!({
+      "id": did_for_principal(subject_principal),
+      "employee_of": {
+            "employerId" : "did:web:dfinity.org",
+            "employerName": "DFINITY Foundation",
+      },
+    }))
+    .unwrap();
+
+    // Build credential using subject above and issuer.
+    CredentialBuilder::default()
+        .id(Url::parse("https://employment.info/credentials/42").unwrap())
+        .issuer(Url::parse("https://employment.info").unwrap())
+        .type_("VerifiedEmployee")
+        .subject(subject)
+        .build()
+        .unwrap()
+}
+
 fn verify_prepare_credential_request(
-    _req: &PrepareCredentialRequest,
+    req: &PrepareCredentialRequest,
 ) -> Result<(), IssueCredentialError> {
-    Ok(())
+    let is_employee =
+        EMPLOYEES.with(|employees| employees.borrow().contains(&req.signed_id_alias.id_dapp));
+    if is_employee {
+        Ok(())
+    } else {
+        println!(
+            "*** it is unknown whether {} is an employee",
+            req.signed_id_alias.id_dapp
+        );
+        Err(IssueCredentialError::UnauthorizedSubject(format!(
+            "unauthorized principal {}",
+            req.signed_id_alias.id_dapp
+        )))
+    }
 }
 
 fn verify_get_credential_request(_req: &GetCredentialRequest) -> Result<(), IssueCredentialError> {
