@@ -35,6 +35,7 @@ serial_test = "2"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 [dev-dependencies]
+assert_matches = "1.5.0"
 ic-test-state-machine-client = "3"
 canister_tests = { path = "../../src/canister_tests" }
 lazy_static = "1.4"

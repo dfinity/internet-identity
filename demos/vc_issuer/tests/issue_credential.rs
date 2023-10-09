@@ -1,10 +1,11 @@
 //! Tests related to issue_credential canister call.
 
+use assert_matches::assert_matches;
 use candid::Principal;
 use canister_sig_util::set_ic_root_public_key_for_testing;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
-use canister_tests::framework::{env, get_wasm_path, principal_1, II_WASM};
+use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
@@ -15,6 +16,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
@@ -64,6 +66,15 @@ mod api {
             (consent_message_request,),
         )
         .map(|(x,)| x)
+    }
+
+    pub fn add_employee(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: Principal,
+        employee_id: Principal,
+    ) -> Result<String, CallError> {
+        call_candid_as(env, canister_id, sender, "add_employee", (employee_id,)).map(|(x,)| x)
     }
 
     pub fn prepare_credential(
@@ -117,6 +128,59 @@ fn should_return_consent_message() -> Result<(), CallError> {
         api::consent_message(&env, canister_id, principal_1(), &consent_message_request)?
             .expect("Got 'None' from consent_message");
     Ok(())
+}
+
+#[test]
+fn should_fail_prepare_credential_for_unauthorized_principal() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let unauthorized_principal = principal_1();
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_2(),
+        id_dapp: unauthorized_principal,
+        credential_jws: "dummy jws".to_string(),
+    };
+    let response = api::prepare_credential(
+        &env,
+        issuer_id,
+        principal_2(),
+        &PrepareCredentialRequest {
+            credential_spec: CredentialSpec {
+                info: "foo".to_string(),
+            },
+            signed_id_alias,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+}
+
+#[test]
+fn should_prepare_credential_for_authorized_principal() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let authorized_principal = principal_1();
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_2(),
+        id_dapp: authorized_principal,
+        credential_jws: "dummy jws".to_string(),
+    };
+    let _add_employee_response =
+        api::add_employee(&env, issuer_id, principal_2(), authorized_principal)
+            .expect("API call failed");
+    let response = api::prepare_credential(
+        &env,
+        issuer_id,
+        principal_2(),
+        &PrepareCredentialRequest {
+            credential_spec: CredentialSpec {
+                info: "foo".to_string(),
+            },
+            signed_id_alias,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(response, PrepareCredentialResponse::Ok(_));
 }
 
 /// Verifies that a credential is being created including II interactions.
@@ -177,6 +241,12 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     )
     .expect("Invalid ID alias");
 
+    let _add_employee_response = api::add_employee(
+        &env,
+        issuer_id,
+        id_alias_credentials.issuer_id_alias_credential.id_dapp,
+        id_alias_credentials.issuer_id_alias_credential.id_dapp,
+    )?;
     let prepare_credential_response = api::prepare_credential(
         &env,
         issuer_id,
