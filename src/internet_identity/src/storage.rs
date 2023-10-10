@@ -492,8 +492,7 @@ impl<M: Memory + Clone> Storage<M> {
             .map_err(PersistentStateError::ReadError)?;
 
         let size = u64::from_le_bytes(size_buf);
-        let mut data_buf = Vec::new();
-        data_buf.resize(size as usize, 0);
+        let mut data_buf = vec![0; size as usize];
         reader
             .read_exact(data_buf.as_mut_slice())
             .map_err(PersistentStateError::ReadError)?;

@@ -65,7 +65,7 @@
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
     "ua-parser-js": "^1.0.35",
-    "zod": "^3.22.2"
+    "zod": "^3.22.3"
   },
   "engines": {
     "npm": ">=9.0.0 <10.0.0",
