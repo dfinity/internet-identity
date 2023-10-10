@@ -356,7 +356,7 @@ jobs:
           curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/pocket-ic.gz"
           gzip -d pocket-ic.gz
           chmod a+x pocket-ic
-          ./pocket-ic --help
+          ./pocket-ic --version
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3

@@ -1,6 +1,7 @@
 use crate::api;
 use crate::api::http_request;
 use candid::Principal;
+use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_representation_independent_hash::Value;
@@ -234,11 +235,13 @@ pub fn save_compressed_stable_memory(
 }
 
 pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId, path: &str) {
-    let mut file = File::open(path).expect("Failed to open stable memory file");
+    let file = File::open(path).expect("Failed to open stable memory file");
+    let mut decoder = GzDecoder::new(file);
     let mut buffer = vec![];
-    file.read_to_end(&mut buffer)
-        .expect("error while reading stable memory file");
-    env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
+    decoder
+        .read_to_end(&mut buffer)
+        .expect("error while decoding stable memory file");
+    env.set_stable_memory(canister_id, buffer, BlobCompression::NoCompression);
 }
 
 pub const PUBKEY_1: &str = "test";
