@@ -306,6 +306,13 @@
     "logo": "oisy_logo.svg"
   },
   {
+    "name": "Tswaanda",
+    "oneLiner": "Bridging farmers to profitable markets, empowering growth through trade and financing",
+    "website": "https://tswaanda.com",
+    "logo": "tswaanda_logo.webp",
+    "authOrigins": ["https://4qia7-eaaaa-aaaal-qb34a-cai.icp0.io"]
+  },
+  {
     "name": "D-VOTE",
     "website": "https://7y3zv-rqaaa-aaaag-abswa-cai.icp0.io",
     "logo": "d-vote_logo.webp",
