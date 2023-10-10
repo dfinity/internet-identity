@@ -1387,14 +1387,13 @@ dependencies = [
 
 [[package]]
 name = "pocket-ic"
-version = "0.0.1"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
  "candid",
  "hex",
  "ic-cdk",
- "rand",
  "reqwest",
  "serde",
  "serde_bytes",
