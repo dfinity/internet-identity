@@ -20,7 +20,6 @@ ic-stable-structures = "0.5"
 serde = "1"
 serde_bytes = "0.11"
 
-
 [dev-dependencies]
 candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
