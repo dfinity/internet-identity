@@ -511,7 +511,7 @@ pub fn assert_device_last_used(
 }
 
 pub fn time(env: &PocketIc) -> u64 {
-    env.time()
+    env.get_time()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_nanos() as u64

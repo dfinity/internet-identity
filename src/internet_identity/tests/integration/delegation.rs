@@ -32,7 +32,7 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
     )?;
     assert_eq!(
         expiration,
-        env.time()
+        env.get_time()
             .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -78,7 +78,7 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
     )?;
     assert_eq!(
         expiration,
-        env.time()
+        env.get_time()
             .add(Duration::from_secs(60 * 60)) // 1 hour
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -124,7 +124,7 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
     )?;
     assert_eq!(
         expiration,
-        env.time()
+        env.get_time()
             .add(Duration::from_secs(30 * 24 * 60 * 60)) // 30 days
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -203,7 +203,7 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 
                 assert_eq!(
                     expiration,
-                    env.time()
+                    env.get_time()
                         .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
@@ -256,7 +256,7 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
     )?;
     assert_eq!(
         expiration,
-        env.time()
+        env.get_time()
             .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
             .duration_since(UNIX_EPOCH)
             .unwrap()

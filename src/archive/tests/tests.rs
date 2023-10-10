@@ -537,7 +537,7 @@ mod metrics_tests {
             let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
             assert_eq!(
                 metric_timestamp,
-                env.time(),
+                env.get_time(),
                 "metric timestamp did not match PocketIC time"
             )
         }
@@ -553,7 +553,7 @@ mod metrics_tests {
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_last_upgrade_timestamp_seconds",
-            env.time()
+            env.get_time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs_f64(),
@@ -567,7 +567,7 @@ mod metrics_tests {
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_last_upgrade_timestamp_seconds",
-            env.time()
+            env.get_time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs_f64(),

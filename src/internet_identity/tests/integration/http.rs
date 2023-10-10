@@ -160,7 +160,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
         assert_eq!(
             metric_timestamp,
-            env.time(),
+            env.get_time(),
             "metric timestamp did not match PocketIC time"
         )
     }
@@ -299,7 +299,10 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_last_upgrade_timestamp",
-        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos() as f64,
+        env.get_time()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as f64,
     );
 
     env.advance_time(Duration::from_secs(300)); // PocketIC does not advance time on its own
@@ -308,7 +311,10 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_last_upgrade_timestamp",
-        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos() as f64,
+        env.get_time()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as f64,
     );
     Ok(())
 }

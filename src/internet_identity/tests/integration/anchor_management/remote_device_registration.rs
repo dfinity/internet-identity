@@ -30,7 +30,7 @@ fn can_enter_device_registration_mode() -> Result<(), CallError> {
 
     assert_eq!(
         result,
-        env.time()
+        env.get_time()
             .add(Duration::from_secs(900)) // 900 seconds -> 15 min
             .duration_since(UNIX_EPOCH)
             .unwrap()

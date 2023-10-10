@@ -621,7 +621,7 @@ mod pull_entries_tests {
         assert_metric(
             &get_metrics(&env, archive_canister),
             "ii_archive_last_successful_fetch_timestamp_seconds",
-            env.time()
+            env.get_time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs_f64(),
