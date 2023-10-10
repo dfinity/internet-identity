@@ -43,7 +43,7 @@ canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.9"
 ic-response-verification = "1.0"
-pocket-ic = { path = "/home/fxgst/ic/packages/pocket-ic" }
+pocket-ic = { git = "https://github.com/dfinity/ic", rev = "a5a38c9486cda57f53b1e247a824e637f9f6f2fa" }
 
 
 [features]
