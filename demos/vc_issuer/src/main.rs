@@ -107,7 +107,8 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 #[candid_method]
 async fn consent_message(req: Icrc21ConsentMessageRequest) -> Icrc21ConsentMessageResponse {
     Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
-        consent_message: "Do you want to get a verifiable credential?".to_string(),
+        consent_message: "Do you want to share that you are an employee of DFINITY Foundation?"
+            .to_string(),
         language: req.preferences.language,
     })
 }
