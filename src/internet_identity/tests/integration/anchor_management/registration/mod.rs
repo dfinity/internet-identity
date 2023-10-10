@@ -163,7 +163,6 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
 }
 
 /// Tests that there is a time limit for captchas.
-/// Currently only checked by create_challenge, see L2-766.
 #[test]
 fn should_not_allow_expired_captcha() -> Result<(), CallError> {
     let env = env();
@@ -172,8 +171,6 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
     let challenge = api::create_challenge(&env, canister_id)?;
     env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
 
-    // required because register does not check captcha expiry
-    api::create_challenge(&env, canister_id)?;
     let result = api::register(
         &env,
         canister_id,

@@ -95,16 +95,17 @@ pub enum ContentType {
 }
 
 // The <script> tag that loads the 'index.js'
-const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = 'index.js';document.head.appendChild(s);";
+const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
 
 // Fix up HTML pages, by injecting canister ID, script tag and CSP
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
     let setup_js: String = JS_SETUP_SCRIPT.to_string();
     let html = html.replace(
-        r#"<script id="setupJs"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" id="setupJs">{setup_js}</script>"#),
+        r#"<script type="module" crossorigin src="/index.js"></script>"#,
+        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js}</script>"#),
     );
+
     html.replace(
         "<meta replaceme-with-csp/>",
         &format!(
