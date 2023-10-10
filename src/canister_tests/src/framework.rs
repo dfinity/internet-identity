@@ -338,7 +338,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
         Ok(_) => panic!("expected error, got {result:?}"),
         Err(CallError::Reject(_)) => panic!("expected user error, got {result:?}"),
         Err(CallError::UserError(ref user_error)) => {
-            if !(user_error.code == error_code) {
+            if user_error.code != error_code {
                 panic!(
                     "expected error code {:?}, got {:?}",
                     error_code, user_error.code
