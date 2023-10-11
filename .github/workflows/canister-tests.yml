@@ -382,7 +382,7 @@ jobs:
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
           # even if tests are added or removed. The tradeoff is that the balancing might be slightly worse, but we have enough
           # tests that it should not be a big issue.
-          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
+          ./cargo-nextest nextest run should_restore_backup --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
 
