@@ -511,7 +511,6 @@ mod metrics_tests {
     /// Verifies that all metrics are present and have the correct timestamp.
     #[test]
     fn should_return_metrics() -> Result<(), CallError> {
-        println!("this test should die");
         let metrics = vec![
             "ii_archive_last_upgrade_timestamp_seconds",
             "ii_archive_entries_count{source=\"log\"}",
