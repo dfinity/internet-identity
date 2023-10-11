@@ -230,7 +230,7 @@ mod pull_entries_tests {
 
         ii_api::remove(&env, ii_canister, principal_1(), anchor, &pubkey)?;
         let timestamp = env
-            .time()
+            .get_time()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
@@ -342,7 +342,7 @@ mod pull_entries_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
         let timestamp = env
-            .time()
+            .get_time()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
@@ -393,7 +393,7 @@ mod pull_entries_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
         let timestamp = env
-            .time()
+            .get_time()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
@@ -463,7 +463,7 @@ mod pull_entries_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         );
         let timestamp = env
-            .time()
+            .get_time()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
@@ -572,7 +572,7 @@ mod pull_entries_tests {
             status.call_info.last_successful_fetch,
             Some(FetchInfo {
                 timestamp: env
-                    .time()
+                    .get_time()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
                     .as_nanos() as u64,
@@ -610,7 +610,7 @@ mod pull_entries_tests {
             status.call_info.last_successful_fetch,
             Some(FetchInfo {
                 timestamp: env
-                    .time()
+                    .get_time()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
                     .as_nanos() as u64,
@@ -703,7 +703,7 @@ mod pull_entries_tests {
 
         let expected_error = CallErrorInfo {
             time: env
-                .time()
+                .get_time()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64,

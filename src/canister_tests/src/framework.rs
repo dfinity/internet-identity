@@ -8,7 +8,7 @@ use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
-use pocket_ic::common::blob::BlobCompression;
+use pocket_ic::common::rest::BlobCompression;
 use pocket_ic::{CallError, ErrorCode, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
