@@ -389,6 +389,13 @@ jobs:
           POCKET_IC_LOG_DIR_LEVELS: trace
           POCKET_IC_LOG_DIR: /tmp/test-archive/pic
 
+      - name: PocketIC logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: pic-logs
+          path: /tmp/test-archive/pic/*_pocket_ic_*
+
 
 
   ######################
@@ -478,13 +485,6 @@ jobs:
         with:
           name: e2e-test-log-${{ matrix.device }}-${{ matrix.shard }}
           path: ./*.log
-
-      - name: PocketIC logs
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: pic-logs
-          path: /tmp/test-archive/pic/*_pocket_ic_*
 
       - name: Archive test failures
         if: ${{ always() }}
