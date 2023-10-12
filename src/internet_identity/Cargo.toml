@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 
+canister_sig_util = { path = "../canister_sig_util" }
 internet_identity_interface = { path = "../internet_identity_interface" }
 
 hex = "0.4"
