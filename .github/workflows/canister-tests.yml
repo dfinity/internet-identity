@@ -383,9 +383,9 @@ jobs:
           # even if tests are added or removed. The tradeoff is that the balancing might be slightly worse, but we have enough
           # tests that it should not be a big issue.
           mkdir -p /tmp/test-archive/pic/
-          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
+          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }} --no-capture
         env:
-          # RUST_BACKTRACE: 1
+          RUST_BACKTRACE: 1
           POCKET_IC_LOG_DIR_LEVELS: trace
           POCKET_IC_LOG_DIR: /tmp/test-archive/pic
 
@@ -393,7 +393,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: pic-logs
+          name: pocket-ic-logs
           path: /tmp/test-archive/pic/*_pocket_ic_*
 
 
