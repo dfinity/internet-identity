@@ -25,4 +25,4 @@ candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex = "0.4"
 regex = "1.9"
-pocket-ic = { git = "https://github.com/dfinity/ic", rev = "beb5c0482365efc576202bdfd04675e532492d19" }
+pocket-ic = "1.0"
