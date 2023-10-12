@@ -383,25 +383,18 @@ jobs:
           # even if tests are added or removed. The tradeoff is that the balancing might be slightly worse, but we have enough
           # tests that it should not be a big issue.
           mkdir -p /tmp/test-archive/pic/
-          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }} --no-capture
+          ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
           POCKET_IC_LOG_DIR_LEVELS: trace
           POCKET_IC_LOG_DIR: /tmp/test-archive/pic
       
-      - name: Install zip
-        uses: montudor/action-zip@v1
-
-      - name: Zip output
-        run: zip -qq -r pocket-ic-logs.zip *_pocket_ic_*
-        working-directory: /tmp/test-archive/pic
-
       - name: PocketIC logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: pocket-ic-logs.zip
-          path: /tmp/test-archive/pic/pocket-ic-logs.zip
+          name: pocket-ic-logs
+          path: /tmp/test-archive/pic/*_pocket_ic_*
 
 
 
