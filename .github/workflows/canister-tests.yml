@@ -386,15 +386,15 @@ jobs:
           ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
-          POCKET_IC_LOG_DIR_LEVELS: trace
-          POCKET_IC_LOG_DIR: /tmp/test-archive/pic
+      #     POCKET_IC_LOG_DIR_LEVELS: trace
+      #     POCKET_IC_LOG_DIR: /tmp/test-archive/pic
       
-      - name: PocketIC logs
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: pocket-ic-logs
-          path: /tmp/test-archive/pic/*_pocket_ic_*
+      # - name: PocketIC logs
+      #   if: ${{ always() }}
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: pocket-ic-logs
+      #     path: /tmp/test-archive/pic/*_pocket_ic_*
 
 
 
