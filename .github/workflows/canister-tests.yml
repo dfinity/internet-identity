@@ -388,13 +388,16 @@ jobs:
           RUST_BACKTRACE: 1
           POCKET_IC_LOG_DIR_LEVELS: trace
           POCKET_IC_LOG_DIR: /tmp/test-archive/pic
+      
+      - name: Tar PocketIC log files
+        run: tar -cvf pocket-ic-logs.tar /tmp/test-archive/pic
 
       - name: PocketIC logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: pocket-ic-logs
-          path: /tmp/test-archive/pic/*_pocket_ic_*
+          name: pocket-ic-logs.tar
+          path: pocket-ic-logs.tar
 
 
 
