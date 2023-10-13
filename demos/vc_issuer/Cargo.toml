@@ -8,9 +8,9 @@ edition = "2021"
 
 [dependencies]
 # local dependencies
-canister_sig_util = { path = "../../src/canister_sig_util" }
+canister_sig_util = { path = "../../src/canister_sig_util_br" }
 internet_identity_interface = { path = "../../src/internet_identity_interface" }
-vc_util = { path = "../../src/vc_util" }
+vc_util = { path = "../../src/vc_util_br" }
 # ic dependencies
 candid = "0.9"
 ic-cdk = "0.10"
