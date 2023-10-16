@@ -1131,6 +1131,9 @@ by all browsers (FF is missing) */
 }
 
 .c-toast-body__message {
+  /* Ensures the content doesn't grow out of the toast or push other items */
+  overflow-x: auto;
+
   flex: 1 1 auto;
   font-size: 0.8em;
   line-height: 1.2;
