@@ -57,7 +57,11 @@ const usePinTemplate = <T>({
   });
 };
 
-export const usePinPage = renderPage(usePinTemplate);
+export const usePinPage = <T>(
+  props: Parameters<typeof usePinTemplate<T>>[0],
+  container?: HTMLElement
+) => renderPage(usePinTemplate<T>)(props, container);
+
 export const usePin = <T>({
   verifyPin,
 }: {
@@ -66,7 +70,7 @@ export const usePin = <T>({
   { kind: "pin"; result: T } | { kind: "canceled" } | { kind: "passkey" }
 > => {
   return new Promise((resolve) =>
-    renderPage(usePinTemplate<T>)({
+    usePinPage<T>({
       i18n: new I18n(),
       onUsePasskey: () => resolve({ kind: "passkey" }),
       verify: verifyPin,

@@ -609,6 +609,9 @@ export const iiPages: Record<string, () => void> = {
     toast.error(
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
     );
+    toast.error(
+      "Loremipsumdolorsitamet,consecteturadipiscingelit.Donecvariustellusidmassalobortis,etluctusnullaconsequat.Phaselluslaciniavelitnonquamplaceratimperdiet.Inelementumorcisitametmalesuadaeleifend.Vestibulumultriciesfringillaloremsitametlaoreet.Suspendissealiquettinciduntrisus,sedpellentesquepurusporttitornec."
+    );
   },
   dappsExplorer: () => {
     dappsExplorerPage({ dapps, i18n, back: () => console.log("back") });
