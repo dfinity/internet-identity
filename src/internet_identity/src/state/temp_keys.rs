@@ -45,9 +45,8 @@ impl TempKeys {
         };
 
         self.expirations.push_back(TempKeyExpiration {
-            device_key: device_key.clone(),
+            key: (anchor, device_key.clone()),
             expiration: tmp_key.expiration,
-            anchor,
         });
         self.temp_keys.insert((anchor, device_key.clone()), tmp_key);
     }
@@ -97,8 +96,7 @@ impl TempKeys {
             if expiration.expiration > now {
                 break;
             }
-            self.temp_keys
-                .remove(&(expiration.anchor, expiration.device_key.clone()));
+            self.temp_keys.remove(&expiration.key);
             self.expirations.pop_front();
         }
     }
@@ -118,10 +116,8 @@ pub struct TempKey {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TempKeyExpiration {
-    /// The device key the temp key is linked to
-    pub device_key: DeviceKey,
+    /// Key with which to find the temp key in the `temp_keys` map
+    pub key: (AnchorNumber, DeviceKey),
     /// The expiration timestamp of the temp key
     pub expiration: Timestamp,
-    /// The anchor the temporary key is linked to
-    anchor: AnchorNumber,
 }
