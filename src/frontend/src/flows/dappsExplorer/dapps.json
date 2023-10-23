@@ -365,5 +365,23 @@
     "website": "https://thefishverse.com/",
     "logo": "fishverse_logo.webp",
     "oneLiner": "FishVerse is a W2E fishing game that is built on ICP technology"
+  },
+  {
+    "name": "dFlow",
+    "website": "https://dcentra.io/dflow",
+    "logo": "dflow_logo.png",
+    "oneLiner": "Automate interactions between organizations."
+  },
+  {
+    "name": "DooCoins",
+    "website": "https://www.doo.co",
+    "logo": "doocoins_logo.webp",
+    "oneLiner": "Kids rewards dApp"
+  },
+  {
+    "name": "IC WebSocket",
+    "website": "https://demo.icws.io",
+    "logo": "ic-websocket_logo.webp",
+    "oneLiner": "Send updates from canisters to your users"
   }
 ]
