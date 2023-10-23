@@ -1,5 +1,5 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
-use canister_sig_util::set_ic_root_public_key_for_testing;
+use canister_sig_util_br::set_ic_root_public_key_for_testing;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;

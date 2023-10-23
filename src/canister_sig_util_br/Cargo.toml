@@ -1,6 +1,6 @@
 [package]
-name = "canister_sig_util"
-description = "Utils for handling canister signatures"
+name = "canister_sig_util_br"
+description = "Utils for handling canister signatures (branch version)"
 version = "0.1.0"
 edition = "2021"
 

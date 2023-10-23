@@ -417,6 +417,23 @@ dependencies = [
 [[package]]
 name = "canister_sig_util"
 version = "0.1.0"
+source = "git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2#b14456729909534027a5007e2b3a0e28f27b237f"
+dependencies = [
+ "candid 0.9.7",
+ "ic-cdk",
+ "ic-certification 0.24.1",
+ "ic-certified-map",
+ "ic-verify-bls-signature",
+ "lazy_static",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "sha2 0.10.7",
+]
+
+[[package]]
+name = "canister_sig_util_br"
+version = "0.1.0"
 dependencies = [
  "candid 0.9.7",
  "hex",
@@ -426,23 +443,6 @@ dependencies = [
  "ic-verify-bls-signature",
  "lazy_static",
  "rand 0.8.5",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "sha2 0.10.7",
-]
-
-[[package]]
-name = "canister_sig_util"
-version = "0.1.0"
-source = "git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2#b14456729909534027a5007e2b3a0e28f27b237f"
-dependencies = [
- "candid 0.9.7",
- "ic-cdk",
- "ic-certification 0.24.1",
- "ic-certified-map",
- "ic-verify-bls-signature",
- "lazy_static",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -1983,7 +1983,7 @@ version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#83e24f17f3d65b070a90a95515824ebae0c47180"
 dependencies = [
  "candid 0.9.7",
- "canister_sig_util 0.1.0 (git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2)",
+ "canister_sig_util",
  "hex",
  "ic-certification 0.24.1",
  "ic-certified-map",
@@ -2081,7 +2081,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.21.4",
  "candid 0.9.7",
- "canister_sig_util 0.1.0",
+ "canister_sig_util_br",
  "canister_tests",
  "captcha",
  "getrandom",
@@ -3682,7 +3682,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "candid 0.9.7",
- "canister_sig_util 0.1.0",
+ "canister_sig_util_br",
  "canister_tests",
  "hex",
  "ic-cbor",

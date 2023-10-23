@@ -200,11 +200,11 @@ dependencies = [
 [[package]]
 name = "canister_sig_util"
 version = "0.1.0"
+source = "git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2#b14456729909534027a5007e2b3a0e28f27b237f"
 dependencies = [
  "candid",
- "hex",
  "ic-cdk",
- "ic-certification 1.2.0",
+ "ic-certification 0.24.1",
  "ic-certified-map",
  "ic-verify-bls-signature",
  "lazy_static",
@@ -215,13 +215,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "canister_sig_util"
+name = "canister_sig_util_br"
 version = "0.1.0"
-source = "git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2#b14456729909534027a5007e2b3a0e28f27b237f"
 dependencies = [
  "candid",
+ "hex",
  "ic-cdk",
- "ic-certification 0.24.1",
+ "ic-certification 1.2.0",
  "ic-certified-map",
  "ic-verify-bls-signature",
  "lazy_static",
@@ -942,7 +942,7 @@ version = "0.7.0-alpha.6"
 source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#83e24f17f3d65b070a90a95515824ebae0c47180"
 dependencies = [
  "candid",
- "canister_sig_util 0.1.0 (git+https://github.com/dfinity/internet-identity.git?branch=vc-mvp-2)",
+ "canister_sig_util",
  "hex",
  "ic-certification 0.24.1",
  "ic-certified-map",
@@ -1881,7 +1881,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "candid",
- "canister_sig_util 0.1.0",
+ "canister_sig_util_br",
  "canister_tests",
  "hex",
  "ic-cdk",
@@ -1908,7 +1908,7 @@ name = "vc_util"
 version = "0.1.0"
 dependencies = [
  "candid",
- "canister_sig_util 0.1.0",
+ "canister_sig_util_br",
  "hex",
  "ic-cdk",
  "ic-certification 1.2.0",
