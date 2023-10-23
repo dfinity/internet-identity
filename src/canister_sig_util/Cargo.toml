@@ -1,0 +1,12 @@
+[package]
+name = "canister_sig_util"
+description = "Utils for handling canister signatures"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ic-certified-map = "0.4"
+
+[dev-dependencies]
+rand = { version ="0.8.5" }
+sha2 = "^0.10" # set bound to match ic-certified-map bound

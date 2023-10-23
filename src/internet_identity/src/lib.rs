@@ -1,6 +1,3 @@
-//! Various APIs for managing internet identities.
-pub mod signature_map;
-
 /// A small module that makes get_random work on wasm32-unknown-unknown.
 /// The dependency on get_random comes from the captcha library.
 #[cfg(all(

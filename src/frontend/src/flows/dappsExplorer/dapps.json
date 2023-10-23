@@ -277,8 +277,8 @@
   },
   {
     "name": "Vibeverse",
-    "oneLiner": "A vibrant ecosystem where users can learn about new AI tools, AI content, AI Movies, and more",
-    "website": "https://h5fnl-4iaaa-aaaap-abddq-cai.icp0.io/",
+    "oneLiner": "Where AI magic meets creative play in a universe of endless possibilities",
+    "website": "https://vibeverse.xyz/",
     "logo": "vibeverse_logo.png"
   },
   {
@@ -304,6 +304,13 @@
     "oneLiner": "A novel Ethereum wallet hosted on the Internet Computer",
     "website": "https://oisy.com",
     "logo": "oisy_logo.svg"
+  },
+  {
+    "name": "Tswaanda",
+    "oneLiner": "Bridging farmers to profitable markets, empowering growth through trade and financing",
+    "website": "https://tswaanda.com",
+    "logo": "tswaanda_logo.webp",
+    "authOrigins": ["https://4qia7-eaaaa-aaaal-qb34a-cai.icp0.io"]
   },
   {
     "name": "D-VOTE",
@@ -340,5 +347,41 @@
     "website": "https://johndao.gg",
     "logo": "john-dao_logo.webp",
     "oneLiner": "A Twitter/X account controlled by a DAO on the Internet Computer"
+  },
+  {
+    "name": "aVa",
+    "website": "https://ksayv-myaaa-aaaan-qedxq-cai.icp0.io",
+    "logo": "ava_logo.webp",
+    "oneLiner": "aVa: Action-Based Decentralized Reputation Landscape."
+  },
+  {
+    "name": "Open Internet Metaverse",
+    "website": "https://vdfyi-uaaaa-aaaai-acptq-cai.ic0.app",
+    "logo": "open-internet-metaverse_logo.webp",
+    "oneLiner": "Create Your Virtual Space as a 3D-Website on the Internet Computer"
+  },
+  {
+    "name": "FishVerse",
+    "website": "https://thefishverse.com/",
+    "logo": "fishverse_logo.webp",
+    "oneLiner": "FishVerse is a W2E fishing game that is built on ICP technology"
+  },
+  {
+    "name": "dFlow",
+    "website": "https://dcentra.io/dflow",
+    "logo": "dflow_logo.png",
+    "oneLiner": "Automate interactions between organizations."
+  },
+  {
+    "name": "DooCoins",
+    "website": "https://www.doo.co",
+    "logo": "doocoins_logo.webp",
+    "oneLiner": "Kids rewards dApp"
+  },
+  {
+    "name": "IC WebSocket",
+    "website": "https://demo.icws.io",
+    "logo": "ic-websocket_logo.webp",
+    "oneLiner": "Send updates from canisters to your users"
   }
 ]

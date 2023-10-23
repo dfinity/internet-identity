@@ -28,7 +28,9 @@ globalThis.Buffer = Buffer;
  */
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
-  const setupJs = document.querySelector("#setupJs") as HTMLElement | null;
+  const setupJs = document.querySelector(
+    "[data-canister-id]"
+  ) as HTMLElement | null;
   if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
       title: "Canister ID not set",

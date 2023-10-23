@@ -2,6 +2,7 @@
 members = [
     "src/internet_identity",
     "src/canister_sig_util_br",
+    "src/canister_sig_util",
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",

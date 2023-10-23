@@ -4,7 +4,6 @@ import {
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
-  stripInjectJsScript,
 } from "./vite.plugins";
 
 export const aliasConfig: AliasOptions = {
@@ -58,11 +57,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     },
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
-      [
-        ...(mode === "production"
-          ? [stripInjectJsScript(), minifyHTML(), compression()]
-          : []),
-      ],
+      [...(mode === "production" ? [minifyHTML(), compression()] : [])],
     ],
     optimizeDeps: {
       esbuildOptions: {

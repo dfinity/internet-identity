@@ -10,7 +10,7 @@ use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 
-use internet_identity::signature_map::SignatureMap;
+use canister_sig_util::signature_map::SignatureMap;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
 };
