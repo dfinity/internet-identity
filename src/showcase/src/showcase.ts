@@ -58,8 +58,7 @@ import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
-import { promptPage } from "$src/flows/verifiableCredentials/prompt";
-import { selectPage } from "$src/flows/verifiableCredentials/select";
+import { allowPage } from "$src/flows/verifiableCredentials/allow";
 
 const identityBackground = loadIdentityBackground();
 
@@ -640,46 +639,12 @@ export const iiPages: Record<string, () => void> = {
       deviceAlias: chromeDevice.alias,
       onContinue: () => console.log("Continue"),
     }),
-  vcPrompt: () =>
-    promptPage({
-      _i18n: i18n,
-      userNumber: BigInt(1234),
-      knownDapp: openChat,
-      cancel: () => console.log("cancel"),
-    }),
-  vcSelect: () =>
-    selectPage({
-      _i18n: i18n,
-      userNumber: BigInt(1234),
-      relying: { dapp: openChat, reason: "you hold an 8 year neuron" },
-      verify: async (dapp) => {
-        console.log("Verifying through " + dapp.name + "...");
-
-        // Hacky button to resolve the fake promise
-        await new Promise<void>((resolve) => {
-          const closeBtn = document.createElement("button");
-          closeBtn.onclick = () => {
-            closeBtn.remove();
-            resolve();
-          };
-          closeBtn.classList.add("c-button");
-          closeBtn.style.position = "absolute";
-          closeBtn.style.inset = "0 0 auto auto";
-          closeBtn.style.width = "fit-content";
-          closeBtn.style.fontSize = "10px";
-          closeBtn.style.padding = "2px 4px";
-          closeBtn.style.marginTop = "0";
-          closeBtn.innerText = "done";
-          closeBtn.dataset.role = "done";
-          document.body.appendChild(closeBtn);
-        });
-        console.log("Done.");
-      },
-
-      providers: [nnsDapp, juno],
-      onContinue: (res) => {
-        console.log("Received result", res);
-      },
+  vcAllow: () =>
+    allowPage({
+      relyingOrigin: "https://oc.app",
+      providerOrigin: "https://nns.ic0.app",
+      onAllow: () => toast.info(html`Allowed`),
+      onCancel: () => toast.info(html`Canceled`),
     }),
 };
 
