@@ -117,6 +117,7 @@ function build_canister() {
         --manifest-path "$SRC_DIR/Cargo.toml"
         --target "$TARGET"
         --release
+        --locked
         -j1
         )
     # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
