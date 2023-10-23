@@ -10,7 +10,7 @@ candid = "0.9"
 ic-cdk = "0.10"
 ic-certification = { version = "1.2.0", features = ["serde", "serde_bytes"] }
 ic-certified-map = "0.4"
-canister_sig_util = { path = "../canister_sig_util_br" }
+canister_sig_util_br = { path = "../canister_sig_util_br" }
 
 # vc dependencies
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false }

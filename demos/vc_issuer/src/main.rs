@@ -1,5 +1,5 @@
 use candid::{candid_method, Principal};
-use canister_sig_util::{canister_sig_pk_der, hash_bytes};
+use canister_sig_util_br::{canister_sig_pk_der, hash_bytes};
 use ic_cdk_macros::{query, update};
 use ic_certified_map::{Hash, HashTree};
 use identity_core::common::Url;
@@ -15,7 +15,7 @@ use serde_bytes::ByteBuf;
 use serde_json::json;
 use std::cell::RefCell;
 
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
+use canister_sig_util_br::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::trap;
 use std::collections::HashSet;

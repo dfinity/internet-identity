@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-canister_sig_util = { path = "../canister_sig_util_br" }
+canister_sig_util_br = { path = "../canister_sig_util_br" }
 internet_identity_interface = { path = "../internet_identity_interface" }
 vc_util = { path = "../vc_util_br" }
 

@@ -2,7 +2,7 @@ use crate::assets::CertifiedAssets;
 use crate::delegation::check_frontend_length;
 use crate::{delegation, hash, state, update_root_hash, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::canister_sig_pk_der;
+use canister_sig_util_br::canister_sig_pk_der;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};

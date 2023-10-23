@@ -2,7 +2,7 @@
 
 use assert_matches::assert_matches;
 use candid::Principal;
-use canister_sig_util::set_ic_root_public_key_for_testing;
+use canister_sig_util_br::set_ic_root_public_key_for_testing;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};

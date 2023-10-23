@@ -1,5 +1,5 @@
 use candid::Principal;
-use canister_sig_util::{verify_root_signature, CanisterSig, CanisterSigPublicKey};
+use canister_sig_util_br::{verify_root_signature, CanisterSig, CanisterSigPublicKey};
 use ic_certification::{Certificate, LookupResult};
 use ic_certified_map::Hash;
 use identity_core::common::Url;
@@ -401,7 +401,7 @@ fn get_canister_sig_pk(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use canister_sig_util::{
+    use canister_sig_util_br::{
         set_ic_root_public_key_for_testing, CanisterSigVerificationError, IC_ROOT_KEY_DER_PREFIX,
     };
     use ic_cbor::CertificateToCbor;
