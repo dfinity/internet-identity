@@ -48,8 +48,12 @@
     "typescript": "5.2.2",
     "vite": "^4.2.1",
     "vite-plugin-compression": "^0.5.1",
+    "@vitejs/plugin-basic-ssl": "^1.0.1",
     "vitest": "^0.31.0",
-    "webdriverio": "^8.6.9"
+    "webdriverio": "^8.20.4",
+    "wdio-chromedriver-service": "^8.1.1",
+    "chromedriver": "^116.0.0",
+    "http-proxy": "^1.18.1"
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",

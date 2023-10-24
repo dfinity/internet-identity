@@ -16,7 +16,7 @@ dist/
 dist-showcase/
 .env
 lib
-wdio.log
+wdio-logs
 
 # Cargo build output
 target/

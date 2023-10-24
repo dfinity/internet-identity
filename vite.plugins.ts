@@ -1,9 +1,11 @@
-import { assertNonNullish } from "@dfinity/utils";
+import { assertNonNullish, isNullish } from "@dfinity/utils";
 import { readFileSync } from "fs";
 import { minify } from "html-minifier-terser";
+import httpProxy from "http-proxy";
 import { extname } from "path";
-import { Plugin } from "vite";
+import { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
+
 /**
  * Read a canister ID from dfx's local state
  */
@@ -77,5 +79,62 @@ export const minifyHTML = (): {
   name: "html-transform",
   async transformIndexHtml(html): Promise<string> {
     return minify(html, { collapseWhitespace: true });
+  },
+});
+
+/**
+ * Forwards requests to the local replica.
+ * Denies access to raw URLs.
+ *
+ * @param replicaOrigin Replica URL to forward requests to
+ * @param forwardRules List of rules (i.e. hostname to canisterId mappings)
+ *                     to forward requests to a specific canister
+ */
+export const replicaForwardPlugin = (
+  replicaOrigin: string,
+  forwardRules: { hosts: string[]; canisterId: string }[]
+) => ({
+  name: "replica-forward",
+  configureServer(server: ViteDevServer) {
+    const proxy = httpProxy.createProxyServer({
+      secure: false,
+    });
+
+    server.middlewares.use((req, res, next) => {
+      if (
+        req.headers["host"]?.endsWith(".raw.ic0.app") ||
+        req.headers["host"]?.endsWith(".raw.icp0.io")
+      ) {
+        console.log(
+          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`
+        );
+        res.statusCode = 400;
+        res.end("Raw IC URLs are not supported");
+        return;
+      }
+
+      let matchingRule = forwardRules.find((rule) => {
+        let host = req.headers["host"];
+        return isNullish(host) || rule.hosts.includes(host);
+      });
+
+      if (matchingRule !== undefined) {
+        console.log(
+          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${matchingRule.canisterId}`
+        );
+        req.headers["host"] = `${matchingRule.canisterId}.localhost`;
+        proxy.web(req, res, {
+          target: `http://${replicaOrigin}`,
+        });
+
+        proxy.on("error", (err: Error) => {
+          res.statusCode = 500;
+          res.end("Replica forwarding failed: " + err.message);
+        });
+      } else {
+        // default handling
+        next();
+      }
+    });
   },
 });
