@@ -12,8 +12,10 @@ import {
   DeviceKey,
   FrontendHostname,
   GetDelegationResponse,
+  IdAliasCredentials,
   IdentityAnchorInfo,
   KeyType,
+  PreparedIdAlias,
   PublicKey,
   Purpose,
   RegisterResponse,
@@ -469,6 +471,11 @@ export class AuthenticatedConnection extends Connection {
     return await actor.get_anchor_info(this.userNumber);
   };
 
+  getPrincipal = async ({ origin }: { origin: string }): Promise<Principal> => {
+    const actor = await this.getActor();
+    return await actor.get_principal(this.userNumber, origin);
+  };
+
   enterDeviceRegistrationMode = async (): Promise<Timestamp> => {
     const actor = await this.getActor();
     return await actor.enter_device_registration_mode(this.userNumber);
@@ -566,6 +573,72 @@ export class AuthenticatedConnection extends Connection {
       console.error(e);
       return { error: e };
     }
+  };
+
+  prepareIdAlias = async ({
+    issuerOrigin,
+    rpOrigin,
+  }: {
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<PreparedIdAlias | { error: string }> => {
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+    const [result] = await actor.prepare_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+    });
+
+    if (isNullish(result)) {
+      console.error("canister is drunk");
+      return { error: "canister is drunk" };
+    }
+
+    // TODO: proper error handling
+    if ("authentication_failed" in result) {
+      console.error("wops");
+      return { error: "wops" };
+    }
+
+    return result.ok;
+  };
+
+  getIdAlias = async ({
+    preparedIdAlias,
+    issuerOrigin,
+    rpOrigin,
+  }: {
+    preparedIdAlias: PreparedIdAlias;
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<IdAliasCredentials | { error: string }> => {
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+
+    const [result] = await actor.get_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+      ...preparedIdAlias,
+    });
+
+    if (isNullish(result)) {
+      console.error("canister is drunk");
+      return { error: "canister is drunk" };
+    }
+
+    // TODO: proper error handling
+    if ("authentication_failed" in result) {
+      console.error("wops");
+      return { error: "wops" };
+    }
+    if ("no_such_credentials" in result) {
+      console.error("wops");
+      return { error: "wops" };
+    }
+
+    return result.ok;
   };
 }
 

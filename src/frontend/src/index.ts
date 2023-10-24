@@ -6,6 +6,7 @@ import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerT
 import { authFlowAuthorize } from "./flows/authorize";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import { authFlowManage, renderManageWarmup } from "./flows/manage";
+import { vcFlow } from "./flows/verifiableCredentials";
 import "./styles/main.css";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { checkRequiredFeatures } from "./utils/featureDetection";
@@ -87,10 +88,12 @@ const init = async () => {
   // https://github.com/dfinity/internet-identity#build-features
   showWarningIfNecessary();
 
+  const [path] = window.location.pathname.split("/").filter(Boolean);
+
   // Redirect to the FAQ
   // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
   // measure.
-  if (window.location.pathname === "/faq") {
+  if (path === "faq") {
     const faqUrl = "https://identitysupport.dfinity.org/hc/en-us";
     window.location.replace(faqUrl);
   }
@@ -102,6 +105,11 @@ const init = async () => {
 
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
+
+  // Check for VC flow
+  if (path === "vc-flow") {
+    return vcFlow({ connection });
+  }
 
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
