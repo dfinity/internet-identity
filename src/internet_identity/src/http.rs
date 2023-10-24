@@ -180,7 +180,7 @@ pub fn security_headers() -> Vec<HeaderField> {
 /// Full content security policy delivered via HTTP response header.
 ///
 /// This policy also includes the `frame-ancestors` directive in addition to the policies included in the HTML `meta` tag.
-/// We deliver the CSP by header _and_ meta tag because the headers are not yet certified.
+/// We deliver the CSP by header
 fn content_security_policy_header() -> String {
     let meta_policy = content_security_policy_meta();
     format!("{meta_policy}frame-ancestors 'none';")
