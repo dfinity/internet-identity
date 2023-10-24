@@ -179,15 +179,6 @@ pub fn security_headers() -> Vec<HeaderField> {
 
 /// Full content security policy delivered via HTTP response header.
 ///
-/// This policy also includes the `frame-ancestors` directive in addition to the policies included in the HTML `meta` tag.
-/// We deliver the CSP by header
-fn content_security_policy_header() -> String {
-    let meta_policy = content_security_policy_meta();
-    format!("{meta_policy}frame-ancestors 'none';")
-}
-
-/// Stripped down content security policy for the HTML `meta` tag, where not all directives are supported.
-///
 /// The sha256 hash matches the inline script in index.html. This inline script is a workaround
 /// for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
 /// This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
@@ -218,7 +209,7 @@ fn content_security_policy_header() -> String {
 ///
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
-pub fn content_security_policy_meta() -> String {
+pub fn content_security_policy_header() -> String {
     let hash = assets::JS_SETUP_SCRIPT_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
@@ -229,7 +220,8 @@ pub fn content_security_policy_meta() -> String {
          form-action 'none';\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
-         font-src 'self';"
+         font-src 'self';\
+         frame-ancestors 'none';"
     );
     #[cfg(not(feature = "insecure_requests"))]
     let csp = format!("{csp}upgrade-insecure-requests;");
