@@ -5,7 +5,7 @@
 use crate::hash::{hash_of_map, Value};
 use crate::http::{security_headers, IC_CERTIFICATE_EXPRESSION_HEADER};
 use crate::nested_tree::NestedTree;
-use crate::{http, state};
+use crate::state;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
@@ -97,21 +97,13 @@ pub enum ContentType {
 // The <script> tag that loads the 'index.js'
 const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
 
-// Fix up HTML pages, by injecting canister ID, script tag and CSP
+// Fix up HTML pages, by injecting canister ID & script tag
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
     let setup_js: String = JS_SETUP_SCRIPT.to_string();
-    let html = html.replace(
+    html.replace(
         r#"<script type="module" crossorigin src="/index.js"></script>"#,
         &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js}</script>"#),
-    );
-
-    html.replace(
-        "<meta replaceme-with-csp/>",
-        &format!(
-            r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,
-            &http::content_security_policy_meta()
-        ),
     )
 }
 
