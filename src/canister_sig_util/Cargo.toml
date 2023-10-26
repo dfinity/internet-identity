@@ -26,4 +26,3 @@ rand = { version ="0.8.5" }
 ic-cbor = "1.2.0"
 ic-certification-testing = { git = "https://github.com/dfinity/response-verification.git" }
 ic-response-verification-test-utils = { git = "https://github.com/dfinity/response-verification.git" }
-serial_test = "2"

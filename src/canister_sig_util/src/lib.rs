@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::fmt::{Display, Formatter};
-use std::sync::RwLock;
 
 pub mod signature_map;
 
@@ -23,16 +22,9 @@ pub const CANISTER_SIG_PK_DER_OID: &[u8; 14] =
     b"\x30\x0C\x06\x0A\x2B\x06\x01\x04\x01\x83\xB8\x43\x01\x02";
 
 lazy_static! {
-    /// The root public key used when verifying canister signatures.
-    static ref IC_ROOT_PUBLIC_KEY: RwLock<Vec<u8>> = RwLock::new(
-        extract_ic_root_key_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.")
-    );
-}
-
-/// Resets the root public key to the given value, should be used for testing only.
-pub fn set_ic_root_public_key_for_testing(pk_der: Vec<u8>) {
-    let mut root_pk = IC_ROOT_PUBLIC_KEY.write().unwrap();
-    *root_pk = pk_der;
+    /// The IC root public key used when verifying canister signatures.
+    static ref IC_ROOT_PUBLIC_KEY: Vec<u8> =
+        extract_root_public_key_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.");
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,12 +125,19 @@ pub fn canister_sig_pk_der(canister_id: Principal, seed: &[u8]) -> Vec<u8> {
 /// Verifies the validity of `ic_certificate`.
 /// If `ic_certificate` contains a delegation, verifies the delegation as well, up to
 /// `IC_ROOT_PUBLIC_KEY`, which is required to contain the correct root public key.
-pub fn verify_root_signature(
+pub fn verify_signature_wrt_ic_root(
     ic_certificate: &Certificate,
     signing_canister_id: Principal,
 ) -> Result<(), CanisterSigVerificationError> {
-    let signing_pk_der = validate_delegation(&ic_certificate.delegation, signing_canister_id)?;
-    let signing_pk = extract_ic_root_key_from_der(&signing_pk_der)?;
+    verify_signature_wrt_root_pk(ic_certificate, signing_canister_id, &IC_ROOT_PUBLIC_KEY)
+}
+
+fn verify_signature_wrt_root_pk(
+    ic_certificate: &Certificate,
+    signing_canister_id: Principal,
+    root_pk: &[u8],
+) -> Result<(), CanisterSigVerificationError> {
+    let signing_pk = validate_delegation(&ic_certificate.delegation, signing_canister_id, root_pk)?;
     let root_hash = ic_certificate.tree.digest();
     let mut msg = vec![];
     msg.extend_from_slice(IC_STATE_ROOT_DOMAIN_SEPARATOR);
@@ -152,19 +151,13 @@ pub fn verify_root_signature(
 fn validate_delegation(
     delegation: &Option<Delegation>,
     signing_canister_id: Principal,
+    root_pk: &[u8],
 ) -> Result<Vec<u8>, CanisterSigVerificationError> {
     match delegation {
-        None => {
-            let root_pk = IC_ROOT_PUBLIC_KEY.read().map_err(|_| {
-                CanisterSigVerificationError::Unknown(String::from(
-                    "Internal error accessing IC root public key",
-                ))
-            })?;
-            Ok(root_pk.to_owned())
-        }
+        None => Ok(root_pk.to_owned()),
         Some(delegation) => {
             let cert: Certificate = serde_cbor::from_slice(&delegation.certificate).unwrap();
-            let _ = verify_root_signature(&cert, signing_canister_id);
+            let _ = verify_signature_wrt_root_pk(&cert, signing_canister_id, root_pk);
             let canister_range_path = [
                 b"subnet",
                 delegation.subnet_id.as_slice(),
@@ -181,15 +174,16 @@ fn validate_delegation(
             }
 
             let public_key_path = [b"subnet", delegation.subnet_id.as_slice(), b"public_key"];
-            let LookupResult::Found(pk) = cert.tree.lookup_path(&public_key_path) else {
+            let LookupResult::Found(pk_der) = cert.tree.lookup_path(&public_key_path) else {
                 return Err(CanisterSigVerificationError::InvalidDelegation);
             };
-            Ok(pk.to_vec())
+            let pk = extract_root_public_key_from_der(pk_der)?;
+            Ok(pk)
         }
     }
 }
 
-fn extract_ic_root_key_from_der(buf: &[u8]) -> Result<Vec<u8>, CanisterSigVerificationError> {
+fn extract_root_public_key_from_der(buf: &[u8]) -> Result<Vec<u8>, CanisterSigVerificationError> {
     let expected_length = IC_ROOT_PK_DER_PREFIX.len() + IC_ROOT_PK_LENGTH;
     if buf.len() != expected_length {
         return Err(CanisterSigVerificationError::Unknown(String::from(
@@ -228,7 +222,6 @@ mod tests {
     use ic_cbor::CertificateToCbor;
     use ic_certification_testing::CertificateBuilder;
     use ic_response_verification_test_utils::AssetTree;
-    use serial_test::serial;
 
     const TEST_SIGNING_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
     const TEST_SEED: [u8; 3] = [42, 72, 44];
@@ -287,28 +280,11 @@ mod tests {
 
     #[test]
     fn should_extract_root_pk_from_der() {
-        extract_ic_root_key_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.");
+        extract_root_public_key_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.");
     }
 
     #[test]
-    fn should_overwrite_root_pk_for_testing() {
-        let root_pk = IC_ROOT_PUBLIC_KEY
-            .read()
-            .expect("failed reading IC_ROOT_PUBLIC_KEY")
-            .to_vec();
-        let mut diffrent_root_pk_der = *IC_ROOT_PK_DER;
-        diffrent_root_pk_der[42] += 1;
-        set_ic_root_public_key_for_testing(diffrent_root_pk_der.to_vec());
-        let overwritten_root_pk = IC_ROOT_PUBLIC_KEY
-            .read()
-            .expect("failed reading IC_ROOT_PUBLIC_KEY")
-            .to_vec();
-        assert_ne!(root_pk, overwritten_root_pk);
-    }
-
-    #[test]
-    #[serial]
-    fn should_verify_root_signature_without_delegation() {
+    fn should_verify_signature_without_delegation() {
         let signing_canister_id =
             Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("failed parsing canister id");
 
@@ -319,17 +295,17 @@ mod tests {
         .expect("CertificateBuilder creation failed")
         .build()
         .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
         let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
             .expect("CBOR cert parsing failed");
 
-        verify_root_signature(&ic_certificate, signing_canister_id)
+        let root_pk = extract_root_public_key_from_der(&ic_cert_data.root_key)
+            .expect("Failed parsing root pk DER");
+        verify_signature_wrt_root_pk(&ic_certificate, signing_canister_id, root_pk.as_slice())
             .expect("Verification without delegation failed");
     }
 
     #[test]
-    #[serial]
-    fn should_verify_root_signature_with_delegation() {
+    fn should_verify_signature_with_delegation() {
         let signing_canister_id = principal_from_u64(5);
         let subnet_id = 123u64;
         let ic_cert_data = CertificateBuilder::new(
@@ -340,16 +316,16 @@ mod tests {
         .with_delegation(subnet_id, vec![(0, 10)])
         .build()
         .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
         let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
             .expect("CBOR cert parsing failed");
-        verify_root_signature(&ic_certificate, signing_canister_id)
+        let root_pk = extract_root_public_key_from_der(&ic_cert_data.root_key)
+            .expect("Failed parsing root pk DER");
+        verify_signature_wrt_root_pk(&ic_certificate, signing_canister_id, root_pk.as_slice())
             .expect("Verification with delegation failed");
     }
 
     #[test]
-    #[serial]
-    fn should_fail_verify_root_signature_with_delegation_if_canister_not_in_range() {
+    fn should_fail_verify_signature_with_delegation_if_canister_not_in_range() {
         let signing_canister_id = principal_from_u64(42);
         let subnet_id = 123u64;
         let ic_cert_data = CertificateBuilder::new(
@@ -360,11 +336,14 @@ mod tests {
         .with_delegation(subnet_id, vec![(0, 10)])
         .build()
         .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
         let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
             .expect("CBOR cert parsing failed");
 
-        let result = verify_root_signature(&ic_certificate, signing_canister_id);
+        let result = verify_signature_wrt_root_pk(
+            &ic_certificate,
+            signing_canister_id,
+            ic_cert_data.root_key.as_slice(),
+        );
         assert_matches!(
             result,
             Err(CanisterSigVerificationError::CertificateNotAuthorized)
@@ -372,8 +351,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
-    fn should_fail_verify_root_signature_with_delegation_if_invalid_signature() {
+    fn should_fail_verify_signature_with_delegation_if_invalid_signature() {
         let signing_canister_id = principal_from_u64(5);
         let subnet_id = 123u64;
         let ic_cert_data = CertificateBuilder::new(
@@ -385,11 +363,14 @@ mod tests {
         .with_invalid_signature()
         .build()
         .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
         let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
             .expect("CBOR cert parsing failed");
 
-        let result = verify_root_signature(&ic_certificate, signing_canister_id);
+        let result = verify_signature_wrt_root_pk(
+            &ic_certificate,
+            signing_canister_id,
+            ic_cert_data.root_key.as_slice(),
+        );
         assert_matches!(
             result,
             Err(CanisterSigVerificationError::InvalidBlsSignature)
