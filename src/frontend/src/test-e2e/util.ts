@@ -36,6 +36,7 @@ export async function runInBrowser(
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
+      "--headless",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
     ],
 
