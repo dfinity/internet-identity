@@ -4,24 +4,25 @@ import { minify } from "html-minifier-terser";
 import { extname } from "path";
 import { Plugin } from "vite";
 import viteCompression from "vite-plugin-compression";
-
 /**
- * Read the II canister ID from dfx's local state
+ * Read a canister ID from dfx's local state
  */
-const readCanisterId = (): string => {
-  const canisterIdsJsonFile = "./.dfx/local/canister_ids.json";
-
+export const readCanisterId = (
+  canisterName: string,
+  canisterIdsJsonFile: string
+): string => {
   try {
-    const {
-      internet_identity: { local: canisterId },
-    } = JSON.parse(readFileSync(canisterIdsJsonFile, "utf-8"));
-
+    const canisterIds: Record<string, { local: string }> = JSON.parse(
+      readFileSync(canisterIdsJsonFile, "utf-8")
+    );
+    const canisterId = canisterIds[canisterName]?.local;
     assertNonNullish(
       canisterId,
       `Could not get canister ID from ${canisterIdsJsonFile}`
     );
-
-    console.log("Read canister ID:", canisterId);
+    console.log(
+      `Read canister ID '${canisterId} for canister with name '${canisterName}'`
+    );
 
     return canisterId;
   } catch (e) {
@@ -42,7 +43,10 @@ export const injectCanisterIdPlugin = (): {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
 
     return html.replace(rgx, (_match, src) => {
-      return `<script data-canister-id="${readCanisterId()}" type="module" src="${src}"></script>`;
+      return `<script data-canister-id="${readCanisterId(
+        "internet_identity",
+        "./.dfx/local/canister_ids.json"
+      )}" type="module" src="${src}"></script>`;
     });
   },
 });
