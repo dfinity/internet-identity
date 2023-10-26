@@ -296,8 +296,8 @@ mod tests {
             .read()
             .expect("failed reading IC_ROOT_PUBLIC_KEY")
             .to_vec();
-        let mut diffrent_root_pk_der = IC_ROOT_PK_DER.clone();
-        diffrent_root_pk_der[42] = diffrent_root_pk_der[42] + 1;
+        let mut diffrent_root_pk_der = *IC_ROOT_PK_DER;
+        diffrent_root_pk_der[42] += 1;
         set_ic_root_public_key_for_testing(diffrent_root_pk_der.to_vec());
         let overwritten_root_pk = IC_ROOT_PUBLIC_KEY
             .read()
