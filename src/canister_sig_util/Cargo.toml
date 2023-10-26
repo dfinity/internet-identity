@@ -5,8 +5,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# ic dependencies
+candid = "0.9"
+ic-cdk = "0.10"
+ic-certification = "1.2.0"
 ic-certified-map = "0.4"
+ic-verify-bls-signature = "0.2"
+hex = "0.4.3"
+
+# other dependencies
+lazy_static = "1.4"
+serde = { version = "1", features = ["rc"] }
+serde_bytes = "0.11"
+serde_cbor = "0.11"
+sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 [dev-dependencies]
+assert_matches = "1.5.0"
 rand = { version ="0.8.5" }
-sha2 = "^0.10" # set bound to match ic-certified-map bound
+ic-cbor = "1.2.0"
+ic-certification-testing = { git = "https://github.com/dfinity/response-verification.git" }
+ic-response-verification-test-utils = { git = "https://github.com/dfinity/response-verification.git" }
+serial_test = "2"
