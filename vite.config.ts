@@ -1,3 +1,4 @@
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
 import { AliasOptions, defineConfig, UserConfig } from "vite";
 import {
@@ -58,6 +59,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     plugins: [
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
+      [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
     ],
     optimizeDeps: {
       esbuildOptions: {
@@ -67,6 +69,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     server: {
+      https: process.env.TLS_DEV_SERVER === "1",
       proxy: {
         "/api": "http://127.0.0.1:4943",
       },
