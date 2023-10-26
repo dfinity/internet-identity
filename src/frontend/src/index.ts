@@ -1,3 +1,4 @@
+import loaderUrl from "$src/components/loader.webp";
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
@@ -74,12 +75,25 @@ see more at https://github.com/dfinity/internet-identity#features
   }
 };
 
+// Ensure the loader/spinner assets are ready when called
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preload
+const preloadLoaderImage = () => {
+  const link = document.createElement("link");
+  link.setAttribute("rel", "preload");
+  link.setAttribute("href", loaderUrl);
+  link.setAttribute("as", "image");
+  document.head.append(link);
+};
+
 const init = async () => {
   try {
     printDevMessage();
   } catch (e) {
     console.warn("Error when printing version information:", e);
   }
+
+  // Preload the loader
+  preloadLoaderImage();
 
   const url = new URL(document.URL);
 

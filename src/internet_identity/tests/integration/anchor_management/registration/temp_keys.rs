@@ -145,6 +145,37 @@ fn should_not_allow_temp_key_for_different_anchor() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Tests that the same device can be used for multiple anchor registrations with different temp keys
+/// and that the temp keys are bound to their respective anchors.
+#[test]
+fn should_separate_temp_keys_by_anchor_for_same_device() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device = device_data_1();
+    let temp_key_1 = test_principal(1);
+    let temp_key_2 = test_principal(2);
+
+    let anchor1 = register_with_temp_key(&env, canister_id, temp_key_1, &device);
+    let anchor2 = register_with_temp_key(&env, canister_id, temp_key_2, &device);
+
+    // make an authenticate call to verify that the temp key is working
+    api::get_anchor_info(&env, canister_id, temp_key_1, anchor1)?;
+    api::get_anchor_info(&env, canister_id, temp_key_2, anchor2)?;
+
+    // make sure that the temp keys are not interchangeable
+    expect_user_error_with_message(
+        api::get_anchor_info(&env, canister_id, temp_key_1, anchor2),
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("[\\w-]+ could not be authenticated").unwrap(),
+    );
+    expect_user_error_with_message(
+        api::get_anchor_info(&env, canister_id, temp_key_2, anchor1),
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("[\\w-]+ could not be authenticated").unwrap(),
+    );
+    Ok(())
+}
+
 /// Tests that the number of temp keys is exposed as a metric.
 #[test]
 fn should_provide_temp_keys_metric() -> Result<(), CallError> {
