@@ -359,8 +359,7 @@ fn filepath_to_urlpaths(file_path: String) -> Vec<String> {
 
 #[test]
 fn test_filepath_urlpaths() {
-    fn assert_gen_paths(inp: String, exp: Vec<String>) {
-        let mut exp = exp.clone();
+    fn assert_gen_paths(inp: String, mut exp: Vec<String>) {
         exp.sort();
 
         let mut actual = filepath_to_urlpaths(inp);
