@@ -7,10 +7,13 @@ import viteCompression from "vite-plugin-compression";
 /**
  * Read a canister ID from dfx's local state
  */
-export const readCanisterId = (
-  canisterName: string,
-  canisterIdsJsonFile: string
-): string => {
+export const readCanisterId = ({
+  canisterName,
+  canisterIdsJsonFile,
+}: {
+  canisterName: string;
+  canisterIdsJsonFile: string;
+}): string => {
   try {
     const canisterIds: Record<string, { local: string }> = JSON.parse(
       readFileSync(canisterIdsJsonFile, "utf-8")
@@ -43,10 +46,10 @@ export const injectCanisterIdPlugin = (): {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
 
     return html.replace(rgx, (_match, src) => {
-      return `<script data-canister-id="${readCanisterId(
-        "internet_identity",
-        "./.dfx/local/canister_ids.json"
-      )}" type="module" src="${src}"></script>`;
+      return `<script data-canister-id="${readCanisterId({
+        canisterName: "internet_identity",
+        canisterIdsJsonFile: "./.dfx/local/canister_ids.json",
+      })}" type="module" src="${src}"></script>`;
     });
   },
 });
