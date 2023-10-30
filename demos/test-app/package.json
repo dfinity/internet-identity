@@ -2,12 +2,11 @@
   "name": "@dfinity/internet-identity-test-app",
   "private": true,
   "dependencies": {
-    "@dfinity/agent": "^0.12.1-beta.0",
-    "@dfinity/auth-client": "^0.12.1-beta.0",
-    "@dfinity/authentication": "^0.12.1-beta.0",
-    "@dfinity/candid": "^0.12.1-beta.0",
-    "@dfinity/identity": "^0.12.1-beta.0",
-    "@dfinity/principal": "^0.12.1-beta.0",
+    "@dfinity/agent": "^0.19.3",
+    "@dfinity/auth-client": "^0.19.3",
+    "@dfinity/candid": "^0.19.3",
+    "@dfinity/identity": "^0.19.3",
+    "@dfinity/principal": "^0.19.3",
     "buffer": "^6.0.3"
   },
   "scripts": {

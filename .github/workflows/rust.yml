@@ -46,3 +46,14 @@ jobs:
         run: |
           cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
           cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
+
+  check-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/bootstrap
+
+      - name: Cargo Lockfile Check
+        # fails if lockfile is out of date
+        # https://users.rust-lang.org/t/check-if-the-cargo-lock-is-up-to-date-without-building-anything/91048/5
+        run: cargo update --workspace --locked

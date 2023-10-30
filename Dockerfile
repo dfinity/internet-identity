@@ -85,9 +85,7 @@ ARG II_INSECURE_REQUESTS=
 # DFX specific metadata for dfx deps
 ARG DFX_METADATA=
 
-RUN touch src/internet_identity/src/lib.rs
-RUN touch src/internet_identity_interface/src/lib.rs
-RUN touch src/canister_tests/src/lib.rs
+RUN touch src/*/src/lib.rs
 RUN npm ci
 
 RUN ./scripts/build ${DFX_METADATA:+"--dfx-metadata" "$DFX_METADATA"}
@@ -97,9 +95,7 @@ FROM deps as build_archive
 
 COPY . .
 
-RUN touch src/internet_identity_interface/src/lib.rs
-RUN touch src/archive/src/lib.rs
-RUN touch src/canister_tests/src/lib.rs
+RUN touch src/*/src/lib.rs
 
 RUN ./scripts/build --archive
 RUN sha256sum /archive.wasm.gz

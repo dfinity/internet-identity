@@ -5,7 +5,7 @@
 use crate::hash::{hash_of_map, Value};
 use crate::http::{security_headers, IC_CERTIFICATE_EXPRESSION_HEADER};
 use crate::nested_tree::NestedTree;
-use crate::{http, state};
+use crate::state;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
@@ -97,21 +97,13 @@ pub enum ContentType {
 // The <script> tag that loads the 'index.js'
 const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
 
-// Fix up HTML pages, by injecting canister ID, script tag and CSP
+// Fix up HTML pages, by injecting canister ID & script tag
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
     let setup_js: String = JS_SETUP_SCRIPT.to_string();
-    let html = html.replace(
+    html.replace(
         r#"<script type="module" crossorigin src="/index.js"></script>"#,
         &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js}</script>"#),
-    );
-
-    html.replace(
-        "<meta replaceme-with-csp/>",
-        &format!(
-            r#"<meta http-equiv="Content-Security-Policy" content="{}" />"#,
-            &http::content_security_policy_meta()
-        ),
     )
 }
 
@@ -269,7 +261,17 @@ fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, 
             ),
         };
 
-        assets.push((file_to_asset_path(asset), content, encoding, content_type));
+        let urlpaths = filepath_to_urlpaths(asset.path().to_str().unwrap().to_string());
+        for urlpath in urlpaths {
+            // XXX: we clone the content for each asset instead of doing something smarter
+            // for simplicity & because the only assets that currently may be duplicated are
+            // small HTML files.
+            //
+            // XXX: the behavior is undefined for assets with overlapping URL paths (e.g. "foo.html" &
+            // "foo/index.html"). This assumes that the bundler creating the assets directory
+            // creates sensible assets.
+            assets.push((urlpath, content.clone(), encoding, content_type));
+        }
     }
     assets
 }
@@ -291,33 +293,126 @@ fn file_extension<'a>(asset: &'a File) -> &'a str {
         .1
 }
 
-/// Returns the asset path for a given file:
-/// * make relative path absolute
-/// * map **/index.html to **/
-/// * map **/<foo>.html to **/foo
-/// * map **/<foo>.js.gz to **/<foo>.js
-fn file_to_asset_path(asset: &File) -> String {
-    // make path absolute
-    let mut file_path = "/".to_string() + asset.path().to_str().unwrap();
-
-    if file_path.ends_with("index.html") {
-        // drop index.html filename (i.e. maps **/index.html to **/)
-        file_path = file_path
-            .chars()
-            .take(file_path.len() - "index.html".len())
-            .collect()
-    } else if file_path.ends_with(".html") {
-        // drop .html file endings (i.e. maps **/<foo>.html to **/foo)
-        file_path = file_path
-            .chars()
-            .take(file_path.len() - ".html".len())
-            .collect()
-    } else if file_path.ends_with(".gz") {
-        // drop .gz for .foo.gz files (i.e. maps **/<foo>.js.gz to **/<foo>.js)
-        file_path = file_path
-            .chars()
-            .take(file_path.len() - ".gz".len())
-            .collect()
+/// Returns the URL paths for a given asset filepath. For instance:
+///
+/// * "index.html" -> "/", "/index.html"
+/// * "foo/bar.html" -> "/foo/bar", "/foo/bar/", "foo/bar/index.html"
+///
+/// NOTE: The behavior is undefined if the argument is NOT relative, i.e. if
+/// the filepath has a leading slash.
+///
+/// NOTE: The returned paths will always start with a slash.
+fn filepath_to_urlpaths(file_path: String) -> Vec<String> {
+    // Create paths, WITHOUT leading slash (leading lash is prepended later)
+    fn inner(elements: Vec<&str>, last: &str) -> Vec<String> {
+        if elements.is_empty() && last == "index.html" {
+            // The special case of the root index.html, which we serve
+            // on both "/" and "/index.html"
+            vec!["".to_string(), "index.html".to_string()]
+        } else if last == "index.html" {
+            // An index.html in a subpath
+            let page = elements.join("/").to_string();
+            vec![
+                format!("{page}"),
+                format!("{page}/"),
+                format!("{page}/index.html"),
+            ]
+        } else if let Some(page) = last.strip_suffix(".html") {
+            // A (non-index) HTML page
+            let mut elements = elements.to_vec();
+            elements.push(page);
+            let page = elements.join("/").to_string();
+            vec![
+                format!("{page}"),
+                format!("{page}/"),
+                format!("{page}/index.html"),
+            ]
+        } else if let Some(file) = last.strip_suffix(".gz") {
+            // A gzipped asset; remove suffix and retry
+            // XXX: this recursion is safe (i.e. not infinite) because
+            // we always reduce the argument (remove ".gz")
+            inner(elements, file)
+        } else {
+            // The default cases for any asset
+            // XXX: here we could create an iterator and `intersperse`
+            // the element but this feature is unstable at the time
+            // of writing: https://github.com/rust-lang/rust/issues/79524
+            let mut elements = elements.clone();
+            elements.push(last);
+            let asset = elements.join("/").to_string();
+            vec![asset]
+        }
     }
-    file_path
+
+    let paths = match file_path.split('/').collect::<Vec<&str>>().split_last() {
+        None => {
+            // The argument was an empty string
+            // We can't really do much about this, so we fail explicitly
+            panic!("Expected non-empty filepath for asset");
+        }
+        Some((last, elements)) => inner(elements.to_vec(), last),
+    };
+
+    // Prefix everything with "/"
+    paths.into_iter().map(|path| format!("/{path}")).collect()
+}
+
+#[test]
+fn test_filepath_urlpaths() {
+    fn assert_gen_paths(inp: String, mut exp: Vec<String>) {
+        exp.sort();
+
+        let mut actual = filepath_to_urlpaths(inp);
+        actual.sort();
+        assert_eq!(exp, actual);
+    }
+
+    assert_gen_paths(
+        "index.html".to_string(),
+        vec!["/".to_string(), "/index.html".to_string()],
+    );
+
+    assert_gen_paths(
+        "foo.html".to_string(),
+        vec![
+            "/foo".to_string(),
+            "/foo/".to_string(),
+            "/foo/index.html".to_string(),
+        ],
+    );
+
+    assert_gen_paths(
+        "foo/index.html".to_string(),
+        vec![
+            "/foo".to_string(),
+            "/foo/".to_string(),
+            "/foo/index.html".to_string(),
+        ],
+    );
+
+    assert_gen_paths("index.css".to_string(), vec!["/index.css".to_string()]);
+    assert_gen_paths("foo.bar.gz".to_string(), vec!["/foo.bar".to_string()]);
+
+    assert_gen_paths(
+        "sub/foo.bar.gz".to_string(),
+        vec!["/sub/foo.bar".to_string()],
+    );
+
+    assert_gen_paths(
+        "foo.html.gz".to_string(),
+        vec![
+            "/foo".to_string(),
+            "/foo/".to_string(),
+            "/foo/index.html".to_string(),
+        ],
+    );
+
+    assert_gen_paths(
+        "sub/foo.html.gz".to_string(),
+        vec![
+            "/sub/foo".to_string(),
+            "/sub/foo/".to_string(),
+            "/sub/foo/index.html".to_string(),
+        ],
+    );
 }

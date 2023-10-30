@@ -43,7 +43,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       rollupOptions: {
         // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
-        input: ["src/frontend/index.html", "src/frontend/vc-flow/index.html"],
+        input: [
+          "src/frontend/index.html",
+          "src/frontend/faq.html",
+          "src/frontend/vc-flow/index.html",
+        ],
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
