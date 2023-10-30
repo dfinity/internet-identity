@@ -80,10 +80,11 @@ function update() {
         | jq \
             --arg portal_logo_prefix "$portal_logo_prefix" \
         '[ .[]
-            | select(.usesInternetIdentity == true)
-            | select(.name != "Internet Identity")
-            | .logo |= sub("^/" + $portal_logo_prefix + "/"; "")
-            | with_entries(
+            | select(.usesInternetIdentity == true) # ensure the dapp actually uses II
+            | select(.name != "Internet Identity") # skip II itself
+            | select(.logo != null) # only use dapps with logo
+            | .logo |= sub("^/" + $portal_logo_prefix + "/"; "") # swap the logo for our prefix
+            | with_entries( # drop entries we do not care about to reduce size
                 select(
                     [.key]
                     | inside(["name", "website", "oneLiner", "logo", "authOrigins"])

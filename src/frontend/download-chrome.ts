@@ -66,8 +66,8 @@ function getConfig(): Config {
 
   // Follow steps here to update: https://www.chromium.org/getting-involved/download-chromium/
   // (or use the cypress helper: https://chromium.cypress.io)
-  // This corresponds to version 106
-  const revision = platform === "darwin" ? "1036822" : "1036826";
+  // This corresponds to version 116
+  const revision = "1160321";
 
   return { platform, revision };
 }

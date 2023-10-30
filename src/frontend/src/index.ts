@@ -1,3 +1,4 @@
+import loaderUrl from "$src/components/loader.webp";
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
@@ -75,6 +76,16 @@ see more at https://github.com/dfinity/internet-identity#features
   }
 };
 
+// Ensure the loader/spinner assets are ready when called
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preload
+const preloadLoaderImage = () => {
+  const link = document.createElement("link");
+  link.setAttribute("rel", "preload");
+  link.setAttribute("href", loaderUrl);
+  link.setAttribute("as", "image");
+  document.head.append(link);
+};
+
 const init = async () => {
   try {
     printDevMessage();
@@ -82,21 +93,14 @@ const init = async () => {
     console.warn("Error when printing version information:", e);
   }
 
+  // Preload the loader
+  preloadLoaderImage();
+
   const url = new URL(document.URL);
 
   // If the build is not "official", show a warning
   // https://github.com/dfinity/internet-identity#build-features
   showWarningIfNecessary();
-
-  const [path] = window.location.pathname.split("/").filter(Boolean);
-
-  // Redirect to the FAQ
-  // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
-  // measure.
-  if (path === "faq") {
-    const faqUrl = "https://identitysupport.dfinity.org/hc/en-us";
-    window.location.replace(faqUrl);
-  }
 
   const okOrReason = await checkRequiredFeatures(url);
   if (okOrReason !== true) {
@@ -105,6 +109,8 @@ const init = async () => {
 
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
+
+  const [path] = window.location.pathname.split("/").filter(Boolean);
 
   // Check for VC flow
   if (path === "vc-flow") {
