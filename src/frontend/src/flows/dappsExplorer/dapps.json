@@ -84,7 +84,7 @@
   },
   {
     "name": "Juno",
-    "oneLiner": "Build Web3 dApps like Web2",
+    "oneLiner": "Build Web3 dapps like Web2",
     "website": "https://juno.build",
     "authOrigins": ["https://console.juno.build"],
     "logo": "juno_logo.svg"
@@ -376,7 +376,7 @@
     "name": "DooCoins",
     "website": "https://www.doo.co",
     "logo": "doocoins_logo.webp",
-    "oneLiner": "Kids rewards dApp"
+    "oneLiner": "Kids rewards dapp"
   },
   {
     "name": "IC WebSocket",
