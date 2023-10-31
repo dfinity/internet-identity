@@ -54,6 +54,20 @@ import Layout from "../layouts/Layout.astro";
           toast.error("No principal set; cannot send request ");
           return;
         }
+
+        const issuerOrigin = withRef(issuerInput, (issuerInput) => {
+          const value = issuerInput.value;
+          if (value === "") {
+            return undefined;
+          }
+
+          return value;
+        });
+        if (isNullish(issuerOrigin)) {
+          toast.error("No issuer set; cannot send request ");
+          return;
+        }
+
         ii.latest?.win.postMessage(
           {
             id: ii.latest.flowId,
@@ -61,7 +75,7 @@ import Layout from "../layouts/Layout.astro";
             method: "request_credential",
             params: {
               issuer: {
-                issuerOrigin: "employment.info",
+                issuerOrigin,
                 credentialId: "someCred",
               },
               credentialSubject: principal,
@@ -89,6 +103,7 @@ import Layout from "../layouts/Layout.astro";
     window.addEventListener("message", evntHandler);
     const nextId = new Chan<number>(0);
     const urlInput = createRef<HTMLInputElement>();
+    const issuerInput = createRef<HTMLInputElement>();
     const principalInput = createRef<HTMLInputElement>();
 
     const template = () => {
@@ -133,6 +148,11 @@ import Layout from "../layouts/Layout.astro";
           ${ref(urlInput)}
         class="c-input c-input--stack c-input--fullwidth"
         value=${inferDefaultIIURL()}
+          ></input>
+          <input
+          ${ref(issuerInput)}
+        class="c-input c-input--stack c-input--fullwidth"
+        value="http://issuer.localhost:5173"
           ></input>
           <button
             class="c-button"

@@ -8,6 +8,7 @@ import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage } from "$src/flows/manage";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import { isNullish } from "@dfinity/utils";
 import { base64url } from "jose";
 import { allow } from "./allow";
 import { VcVerifiablePresentation, vcProtocol } from "./postMessageInterface";
@@ -89,20 +90,25 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
       allowed satisfies "allowed";
 
       // Grab the credentials from the issuer
-      const [issuedCredential, pAlias] = await withLoader(async () => {
-        const issuerCanisterId = lookupCanister({ origin: issuerOrigin });
-        const pAlias = await pAliasPending;
+      const [issuedCredential, pAlias, issuerCanisterId] = await withLoader(
+        async () => {
+          const issuerCanisterId = await lookupCanister({
+            origin: issuerOrigin,
+          });
+          const pAlias = await pAliasPending;
 
-        const issuedCredential = await issueCredential({
-          issuerCanisterId,
-          issuerAliasCredential: pAlias.issuerAliasCredential,
-          credentialId,
-        });
-        return [issuedCredential, pAlias];
-      });
+          const issuedCredential = await issueCredential({
+            issuerCanisterId,
+            issuerAliasCredential: pAlias.issuerAliasCredential,
+            credentialId,
+          });
+          return [issuedCredential, pAlias, issuerCanisterId];
+        }
+      );
 
       // Create the presentation and return it to the RP
       return createPresentation({
+        issuerCanisterId,
         rpAliasCredential: pAlias.rpAliasCredential,
         issuedCredential,
       });
@@ -110,11 +116,33 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
   });
 };
 
-const issuerCanisterId: string = "bw4dl-smaaa-aaaaa-qaacq-cai";
+const lookupCanister = async ({
+  origin,
+}: {
+  origin: string;
+}): Promise<string> => {
+  const response = await fetch(
+    origin,
+    // fail on redirects
+    {
+      redirect: "error",
+      method: "HEAD",
+      // do not send cookies or other credentials
+      credentials: "omit",
+    }
+  );
 
-const lookupCanister = ({ origin: _origin }: { origin: string }): string => {
-  // XXX: my locally installed issuer
-  return issuerCanisterId;
+  if (response.status !== 200) {
+    throw new Error(`Response wasn't A-OK ${response}`);
+  }
+
+  const canisterId = response.headers.get("x-ic-canister-id");
+
+  if (isNullish(canisterId)) {
+    throw new Error(`Canister ID header was not set ${response.headers}`);
+  }
+
+  return canisterId;
 };
 
 const getAliasCredentials = async ({
@@ -190,9 +218,11 @@ const issueCredential = async ({
 };
 
 const createPresentation = ({
+  issuerCanisterId,
   rpAliasCredential,
   issuedCredential,
 }: {
+  issuerCanisterId: string;
   rpAliasCredential: SignedIdAlias;
   issuedCredential: IssuedCredentialData;
 }): VcVerifiablePresentation["result"] => {
