@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
+import { isNullish } from "@dfinity/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import { existsSync, mkdirSync } from "fs";
 import { remote } from "webdriverio";
-import { downloadChrome } from "./download-chrome";
 
 const SCREENSHOTS_DIR =
   process.env["SCREENSHOTS_DIR"] ?? "./screenshots/custom";
@@ -91,7 +91,6 @@ async function withChrome<T>(
 ): Promise<T> {
   // Screenshot image dimension, if specified
   const { mobileEmulation } = readScreenshotsConfig();
-  const chromePath = await downloadChrome();
 
   const chromeOptions: ChromeOptions = {
     // font-render-hinting causing broken kerning on headless chrome seems to be a
@@ -104,15 +103,20 @@ async function withChrome<T>(
       "hide-scrollbars",
     ],
     mobileEmulation,
-    binary: chromePath,
   };
 
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
+      browserVersion: "119.0.6045.105",
       "goog:chromeOptions": chromeOptions,
     },
+    automationProtocol: "webdriver",
   });
+
+  if (isNullish(mobileEmulation)) {
+    await browser.setWindowSize(1200, 900);
+  }
 
   const res = await cb(browser);
   await browser.deleteSession();
@@ -206,7 +210,7 @@ function readScreenshotsConfig(): {
           deviceMetrics: {
             width: 360,
             height: 640,
-            pixelRatio: 4,
+            pixelRatio: 1,
             touch: true,
           },
         },
