@@ -1,6 +1,7 @@
 import { resolve } from "path";
 import { AliasOptions, defineConfig, UserConfig } from "vite";
 import {
+  canisterLookupPlugin,
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
@@ -61,7 +62,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     plugins: [
-      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
+      [
+        ...(mode === "development"
+          ? [injectCanisterIdPlugin(), canisterLookupPlugin()]
+          : []),
+      ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
     ],
     optimizeDeps: {
