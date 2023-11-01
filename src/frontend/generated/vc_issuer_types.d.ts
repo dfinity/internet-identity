@@ -7,8 +7,8 @@ export interface GetCredentialRequest {
   'prepared_context' : [] | [Uint8Array | number[]],
   'credential_spec' : CredentialSpec,
 }
-export type GetCredentialResponse = { 'Ok' : IssuedCredentialData } |
-  { 'Err' : IssueCredentialError };
+export type GetCredentialResponse = { 'ok' : IssuedCredentialData } |
+  { 'err' : IssueCredentialError };
 export interface Icrc21ConsentInfo {
   'consent_message' : string,
   'language' : string,
@@ -18,29 +18,29 @@ export interface Icrc21ConsentMessageRequest {
   'method' : string,
   'preferences' : Icrc21ConsentPreferences,
 }
-export type Icrc21ConsentMessageResponse = { 'Ok' : Icrc21ConsentInfo } |
-  { 'Err' : Icrc21Error };
+export type Icrc21ConsentMessageResponse = { 'ok' : Icrc21ConsentInfo } |
+  { 'err' : Icrc21Error };
 export interface Icrc21ConsentPreferences { 'language' : string }
-export type Icrc21Error = { 'GenericError' : Icrc21ErrorInfo } |
-  { 'MalformedCall' : Icrc21ErrorInfo } |
-  { 'NotSupported' : Icrc21ErrorInfo } |
-  { 'Forbidden' : Icrc21ErrorInfo };
+export type Icrc21Error = { 'generic_error' : Icrc21ErrorInfo } |
+  { 'forbidden' : Icrc21ErrorInfo } |
+  { 'not_supported' : Icrc21ErrorInfo } |
+  { 'malformed_call' : Icrc21ErrorInfo };
 export interface Icrc21ErrorInfo {
   'description' : string,
   'error_code' : bigint,
 }
-export type IssueCredentialError = { 'Internal' : string } |
-  { 'SignatureNotFound' : string } |
-  { 'InvalidIdAlias' : string } |
-  { 'UnauthorizedSubject' : string } |
-  { 'UnknownSubject' : string };
+export type IssueCredentialError = { 'unauthorized_subject' : string } |
+  { 'internal' : string } |
+  { 'signature_not_found' : string } |
+  { 'unknown_subject' : string } |
+  { 'invalid_id_alias' : string };
 export interface IssuedCredentialData { 'vc_jws' : string }
 export interface PrepareCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'credential_spec' : CredentialSpec,
 }
-export type PrepareCredentialResponse = { 'Ok' : PreparedCredentialData } |
-  { 'Err' : IssueCredentialError };
+export type PrepareCredentialResponse = { 'ok' : PreparedCredentialData } |
+  { 'err' : IssueCredentialError };
 export interface PreparedCredentialData {
   'prepared_context' : [] | [Uint8Array | number[]],
 }

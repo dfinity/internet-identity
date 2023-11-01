@@ -1,12 +1,12 @@
 type CredentialSpec = record { info : text };
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    prepared_context : opt blob;
+    prepared_context : opt vec nat8;
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError;
+    ok : IssuedCredentialData;
+    err : IssueCredentialError;
 };
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentMessageRequest = record {
@@ -15,23 +15,23 @@ type Icrc21ConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
 };
 type Icrc21ConsentMessageResponse = variant {
-    Ok : Icrc21ConsentInfo;
-    Err : Icrc21Error;
+    ok : Icrc21ConsentInfo;
+    err : Icrc21Error;
 };
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
-    GenericError : Icrc21ErrorInfo;
-    MalformedCall : Icrc21ErrorInfo;
-    NotSupported : Icrc21ErrorInfo;
-    Forbidden : Icrc21ErrorInfo;
+    generic_error : Icrc21ErrorInfo;
+    forbidden : Icrc21ErrorInfo;
+    not_supported : Icrc21ErrorInfo;
+    malformed_call : Icrc21ErrorInfo;
 };
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type IssueCredentialError = variant {
-    Internal : text;
-    SignatureNotFound : text;
-    InvalidIdAlias : text;
-    UnauthorizedSubject : text;
-    UnknownSubject : text;
+    unauthorized_subject : text;
+    internal : text;
+    signature_not_found : text;
+    unknown_subject : text;
+    invalid_id_alias : text;
 };
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
@@ -39,10 +39,10 @@ type PrepareCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type PrepareCredentialResponse = variant {
-    Ok : PreparedCredentialData;
-    Err : IssueCredentialError;
+    ok : PreparedCredentialData;
+    err : IssueCredentialError;
 };
-type PreparedCredentialData = record { prepared_context : opt blob };
+type PreparedCredentialData = record { prepared_context : opt vec nat8 };
 type SignedIdAlias = record {
     credential_jws : text;
     id_alias : principal;

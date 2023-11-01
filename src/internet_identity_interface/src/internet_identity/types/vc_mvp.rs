@@ -78,16 +78,23 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum PrepareCredentialResponse {
+        #[serde(rename = "ok")]
         Ok(PreparedCredentialData),
+        #[serde(rename = "err")]
         Err(IssueCredentialError),
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum IssueCredentialError {
+        #[serde(rename = "unknown_subject")]
         UnknownSubject(String),
+        #[serde(rename = "unauthorized_subject")]
         UnauthorizedSubject(String),
+        #[serde(rename = "invalid_id_alias")]
         InvalidIdAlias(String),
+        #[serde(rename = "signature_not_found")]
         SignatureNotFound(String),
+        #[serde(rename = "internal")]
         Internal(String),
     }
 
@@ -100,7 +107,9 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum GetCredentialResponse {
+        #[serde(rename = "ok")]
         Ok(IssuedCredentialData),
+        #[serde(rename = "err")]
         Err(IssueCredentialError),
     }
 
@@ -124,7 +133,9 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum ManifestResponse {
+        #[serde(rename = "ok")]
         Ok(ManifestData),
+        #[serde(rename = "err")]
         Err(String),
     }
 
@@ -151,9 +162,13 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum Icrc21Error {
+        #[serde(rename = "forbidden")]
         Forbidden(Icrc21ErrorInfo),
+        #[serde(rename = "malformed_call")]
         MalformedCall(Icrc21ErrorInfo),
+        #[serde(rename = "not_supported")]
         NotSupported(Icrc21ErrorInfo),
+        #[serde(rename = "generic_error")]
         GenericError(Icrc21ErrorInfo),
     }
 
@@ -165,7 +180,9 @@ pub mod issuer {
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub enum Icrc21ConsentMessageResponse {
+        #[serde(rename = "ok")]
         Ok(Icrc21ConsentInfo),
+        #[serde(rename = "err")]
         Err(Icrc21Error),
     }
 }
