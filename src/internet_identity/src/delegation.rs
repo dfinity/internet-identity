@@ -3,6 +3,7 @@ use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
+use canister_sig_util::get_canister_sig_pk_der;
 use canister_sig_util::signature_map::SignatureMap;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
@@ -175,28 +176,8 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
 }
 
 fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
-    let my_canister_id: Vec<u8> = id().as_ref().to_vec();
-
-    let mut bitstring: Vec<u8> = vec![];
-    bitstring.push(my_canister_id.len() as u8);
-    bitstring.extend(my_canister_id);
-    bitstring.extend(seed);
-
-    let mut der: Vec<u8> = vec![];
-    // sequence of length 17 + the bit string length
-    der.push(0x30);
-    der.push(17 + bitstring.len() as u8);
-    der.extend(vec![
-        // sequence of length 12 for the OID
-        0x30, 0x0C, // OID 1.3.6.1.4.1.56387.1.2
-        0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
-    ]);
-    // BIT string of given length
-    der.push(0x03);
-    der.push(1 + bitstring.len() as u8);
-    der.push(0x00);
-    der.extend(bitstring);
-    der
+    let my_canister_id = id();
+    get_canister_sig_pk_der(my_canister_id, &seed)
 }
 
 fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
