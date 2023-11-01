@@ -52,7 +52,7 @@ export class VcIssuer {
       return { error: "wops" };
     }
 
-    return result.Ok;
+    return result.ok;
   };
 
   getCredential = async ({
@@ -78,6 +78,6 @@ export class VcIssuer {
       return { error: "wops" };
     }
 
-    return result.Ok;
+    return result.ok;
   };
 }
