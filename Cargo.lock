@@ -314,7 +314,10 @@ dependencies = [
 name = "canister_sig_util"
 version = "0.1.0"
 dependencies = [
+ "assert_matches",
+ "candid",
  "ic-certified-map",
+ "lazy_static",
  "rand",
  "sha2 0.10.8",
 ]
