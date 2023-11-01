@@ -14,14 +14,14 @@ export const idlFactory = ({ IDL }) => {
     'error_code' : IDL.Nat64,
   });
   const Icrc21Error = IDL.Variant({
-    'GenericError' : Icrc21ErrorInfo,
-    'MalformedCall' : Icrc21ErrorInfo,
-    'NotSupported' : Icrc21ErrorInfo,
-    'Forbidden' : Icrc21ErrorInfo,
+    'generic_error' : Icrc21ErrorInfo,
+    'forbidden' : Icrc21ErrorInfo,
+    'not_supported' : Icrc21ErrorInfo,
+    'malformed_call' : Icrc21ErrorInfo,
   });
   const Icrc21ConsentMessageResponse = IDL.Variant({
-    'Ok' : Icrc21ConsentInfo,
-    'Err' : Icrc21Error,
+    'ok' : Icrc21ConsentInfo,
+    'err' : Icrc21Error,
   });
   const SignedIdAlias = IDL.Record({
     'credential_jws' : IDL.Text,
@@ -36,15 +36,15 @@ export const idlFactory = ({ IDL }) => {
   });
   const IssuedCredentialData = IDL.Record({ 'vc_jws' : IDL.Text });
   const IssueCredentialError = IDL.Variant({
-    'Internal' : IDL.Text,
-    'SignatureNotFound' : IDL.Text,
-    'InvalidIdAlias' : IDL.Text,
-    'UnauthorizedSubject' : IDL.Text,
-    'UnknownSubject' : IDL.Text,
+    'unauthorized_subject' : IDL.Text,
+    'internal' : IDL.Text,
+    'signature_not_found' : IDL.Text,
+    'unknown_subject' : IDL.Text,
+    'invalid_id_alias' : IDL.Text,
   });
   const GetCredentialResponse = IDL.Variant({
-    'Ok' : IssuedCredentialData,
-    'Err' : IssueCredentialError,
+    'ok' : IssuedCredentialData,
+    'err' : IssueCredentialError,
   });
   const PrepareCredentialRequest = IDL.Record({
     'signed_id_alias' : SignedIdAlias,
@@ -54,8 +54,8 @@ export const idlFactory = ({ IDL }) => {
     'prepared_context' : IDL.Opt(IDL.Vec(IDL.Nat8)),
   });
   const PrepareCredentialResponse = IDL.Variant({
-    'Ok' : PreparedCredentialData,
-    'Err' : IssueCredentialError,
+    'ok' : PreparedCredentialData,
+    'err' : IssueCredentialError,
   });
   return IDL.Service({
     'add_employee' : IDL.Func([IDL.Principal], [IDL.Text], []),
