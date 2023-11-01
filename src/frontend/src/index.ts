@@ -101,14 +101,6 @@ const init = async () => {
   // https://github.com/dfinity/internet-identity#build-features
   showWarningIfNecessary();
 
-  // Redirect to the FAQ
-  // The canister should already be handling this with a 301 when serving "/faq", this is just a safety
-  // measure.
-  if (window.location.pathname === "/faq") {
-    const faqUrl = "https://identitysupport.dfinity.org/hc/en-us";
-    window.location.replace(faqUrl);
-  }
-
   const okOrReason = await checkRequiredFeatures(url);
   if (okOrReason !== true) {
     return compatibilityNotice(okOrReason);
