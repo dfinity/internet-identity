@@ -101,13 +101,13 @@ mod tests {
             .expect("Wrong DER canister sig pk");
         assert_eq!(
             raw_pk.as_slice(),
-            &CANISTER_SIG_PK_DER.clone()[CANISTER_SIG_PK_DER_PREFIX_LENGTH..]
+            &(*CANISTER_SIG_PK_DER)[CANISTER_SIG_PK_DER_PREFIX_LENGTH..]
         )
     }
 
     #[test]
     fn should_fail_extract_raw_canister_sig_pk_from_bad_oid_der() {
-        let mut bad_oid_der = CANISTER_SIG_PK_DER.clone();
+        let mut bad_oid_der = *CANISTER_SIG_PK_DER;
         bad_oid_der[2] += 42;
         let result = extract_raw_canister_sig_pk_from_der(&bad_oid_der);
         assert_matches!(result, Err(e) if e.contains("invalid OID"));
@@ -126,13 +126,13 @@ mod tests {
         assert_eq!(IC_ROOT_PK_LENGTH, raw_pk.len());
         assert_eq!(
             raw_pk.as_slice(),
-            &IC_ROOT_PK_DER.clone()[IC_ROOT_PK_DER_PREFIX.len()..]
+            &(*IC_ROOT_PK_DER)[IC_ROOT_PK_DER_PREFIX.len()..]
         )
     }
 
     #[test]
     fn should_fail_extract_raw_root_pk_from_bad_oid_der() {
-        let mut bad_oid_der = IC_ROOT_PK_DER.clone();
+        let mut bad_oid_der = *IC_ROOT_PK_DER;
         bad_oid_der[2] += 42;
         let result = extract_raw_root_pk_from_der(&bad_oid_der);
         assert_matches!(result, Err(e) if e.contains("invalid OID"));
