@@ -47,12 +47,12 @@ export class VcIssuer {
     });
 
     // TODO: proper error handling
-    if ("Err" in result) {
+    if ("err" in result) {
       console.error("wops");
       return { error: "wops" };
     }
 
-    return result.ok;
+    return result.Ok;
   };
 
   getCredential = async ({
@@ -73,11 +73,11 @@ export class VcIssuer {
     });
 
     // TODO: proper error handling
-    if ("Err" in result) {
+    if ("err" in result) {
       console.error("wops");
       return { error: "wops" };
     }
 
-    return result.ok;
+    return result.Ok;
   };
 }
