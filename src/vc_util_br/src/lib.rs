@@ -1,7 +1,8 @@
 use candid::Principal;
-use canister_sig_util_br::{verify_root_signature, CanisterSig, CanisterSigPublicKey};
-use ic_certification::{Certificate, LookupResult};
+use canister_sig_util_br::canister_sig_pk_raw;
 use ic_certified_map::Hash;
+use ic_crypto_standalone_sig_verifier::verify_canister_sig;
+use ic_types::crypto::threshold_sig::IcRootOfTrust;
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Jwt, Subject};
@@ -17,14 +18,14 @@ use identity_jose::jws::{
 };
 use identity_jose::jwt::JwtClaims;
 use identity_jose::jwu::{decode_b64, encode_b64};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::ops::{Add, Deref, DerefMut};
-
-use serde_json::Value;
 
 pub const II_CREDENTIAL_URL_PREFIX: &str =
     "https://internetcomputer.org/credential/internet-identity/";
 pub const II_ISSUER_URL: &str = "https://internetcomputer.org/issuers/internet-identity";
+pub const VC_SIGNING_INPUT_DOMAIN: &[u8; 26] = b"iccs_verifiable_credential";
 
 pub struct AliasTuple {
     pub id_alias: Principal,
@@ -65,13 +66,19 @@ pub fn vc_jwt_to_jws(
 }
 
 pub fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
-    let sep = b"iccs_verifiable_credential";
     let mut hasher = Sha256::new();
-    let buf = [sep.len() as u8];
+    let buf = [VC_SIGNING_INPUT_DOMAIN.len() as u8];
     hasher.update(buf);
-    hasher.update(sep);
+    hasher.update(VC_SIGNING_INPUT_DOMAIN);
     hasher.update(signing_input);
     hasher.finalize().into()
+}
+
+pub fn signing_input_with_prefix(signing_input: &[u8]) -> Vec<u8> {
+    let mut result = Vec::from([VC_SIGNING_INPUT_DOMAIN.len() as u8]);
+    result.extend_from_slice(VC_SIGNING_INPUT_DOMAIN);
+    result.extend_from_slice(signing_input);
+    result
 }
 
 pub fn did_for_principal(principal: Principal) -> String {
@@ -82,6 +89,7 @@ pub fn did_for_principal(principal: Principal) -> String {
 pub fn verify_idp_presentation_jwt(
     vp_jwt: &str,
     alias_tuple: &AliasTuple,
+    root_pk_raw: &[u8],
 ) -> Result<(), PresentationVerificationError> {
     let presentation = parse_verifiable_presentation_jwt(vp_jwt)
         .map_err(PresentationVerificationError::InvalidPresentationJwt)?;
@@ -105,7 +113,7 @@ pub fn verify_idp_presentation_jwt(
             .ok_or(PresentationVerificationError::Unknown(
                 "missing id_alias vc".to_string(),
             ))?;
-    verify_id_alias_credential_jws(id_alias_vc_jws.as_str(), alias_tuple)
+    verify_id_alias_credential_jws(id_alias_vc_jws.as_str(), alias_tuple, root_pk_raw)
         .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
     let requested_vc_jws =
         presentation
@@ -114,7 +122,7 @@ pub fn verify_idp_presentation_jwt(
             .ok_or(PresentationVerificationError::Unknown(
                 "missing requested vc".to_string(),
             ))?;
-    let _claims = verify_credential_jws(requested_vc_jws.as_str()).map_err(|e| {
+    let _claims = verify_credential_jws(requested_vc_jws.as_str(), root_pk_raw).map_err(|e| {
         PresentationVerificationError::InvalidRequestedCredential(
             CredentialVerificationError::InvalidJws(e),
         )
@@ -129,9 +137,10 @@ pub fn verify_idp_presentation_jwt(
 pub fn verify_id_alias_credential_jws(
     credential_jws: &str,
     alias_tuple: &AliasTuple,
+    root_pk_raw: &[u8],
 ) -> Result<(), CredentialVerificationError> {
-    let claims =
-        verify_credential_jws(credential_jws).map_err(CredentialVerificationError::InvalidJws)?;
+    let claims = verify_credential_jws(credential_jws, root_pk_raw)
+        .map_err(CredentialVerificationError::InvalidJws)?;
     validate_id_alias_claims(claims, alias_tuple)
         .map_err(CredentialVerificationError::InvalidClaims)
 }
@@ -164,65 +173,29 @@ pub fn validate_id_alias_claims(
 /// DOES NOT perform semantic validation of the claims in the credential.
 pub fn verify_credential_jws(
     credential_jws: &str,
+    root_pk_raw: &[u8],
 ) -> Result<JwtClaims<Value>, SignatureVerificationError> {
     ///// Decode JWS.
     let decoder: Decoder = Decoder::new();
     let jws = decoder
         .decode_compact_serialization(credential_jws.as_ref(), None)
         .map_err(|e| invalid_signature_err(&format!("credential JWS parsing error: {}", e)))?;
-    let canister_sig: CanisterSig = serde_cbor::from_slice(jws.decoded_signature())
-        .map_err(|e| invalid_signature_err(&format!("signature parsing error: {}", e)))?;
-    let ic_certificate: Certificate = serde_cbor::from_slice(canister_sig.certificate.as_ref())
-        .map_err(|e| invalid_signature_err(&format!("certificate parsing error: {}", e)))?;
+    let signature = jws.decoded_signature();
+    let message = signing_input_with_prefix(jws.signing_input());
     let jws_header = jws
         .protected_header()
         .ok_or(invalid_signature_err("missing JWS header"))?;
-    let canister_sig_pk = get_canister_sig_pk(jws_header)?;
+    let canister_sig_pk = get_canister_sig_pk_bytes(jws_header)?;
+    let root_pk_bytes: [u8; 96] = root_pk_raw
+        .try_into()
+        .map_err(|e| key_decoding_err(&format!("invalid root public key: {}", e)))?;
+    let root_pk = IcRootOfTrust::from(root_pk_bytes);
+    verify_canister_sig(&message, signature, canister_sig_pk.as_slice(), root_pk)
+        .map_err(|e| invalid_signature_err(&format!("signature verification error: {}", e)))?;
+
     let claims: JwtClaims<Value> = serde_json::from_slice(jws.claims())
         .map_err(|e| invalid_signature_err(&format!("failed parsing JSON JWT claims: {}", e)))?;
 
-    ///// Check if root hash of the signatures hash tree matches the certified data in the certificate
-    let certified_data_path = [
-        b"canister",
-        canister_sig_pk.signing_canister_id.as_slice(),
-        b"certified_data",
-    ];
-    // Get value of the certified data in the certificate
-    let witness = match ic_certificate.tree.lookup_path(&certified_data_path) {
-        LookupResult::Found(witness) => witness,
-        _ => {
-            return Err(invalid_signature_err(&format!(
-                "certificate tree has no certified data witness for canister {} (0x{})",
-                canister_sig_pk.signing_canister_id.to_text(),
-                hex::encode(canister_sig_pk.signing_canister_id.as_slice())
-            )))
-        }
-    };
-    // Recompute the root hash of the signatures hash tree
-    let digest = canister_sig.tree.digest();
-
-    if witness != digest {
-        return Err(invalid_signature_err(
-            "certificate tree witness doesn't match signature tree digest",
-        ));
-    }
-
-    ///// Check the certification path.
-    let seed_hash = hash_bytes_sha256(&canister_sig_pk.seed);
-    let signing_input_hash = verifiable_credential_signing_input_hash(jws.signing_input());
-    let cert_sig_path = [b"sig", &seed_hash[..], &signing_input_hash[..]];
-    match canister_sig.tree.lookup_path(&cert_sig_path) {
-        LookupResult::Found(_) => {}
-        _ => {
-            return Err(invalid_signature_err(
-                "missing signature path in canister's certified data",
-            ))
-        }
-    }
-
-    ///// Verify root signature (with delegation, if any).
-    verify_root_signature(&ic_certificate, canister_sig_pk.signing_canister_id)
-        .map_err(|e| invalid_signature_err(&e.to_string()))?;
     Ok(claims)
 }
 #[derive(Clone, Debug)]
@@ -358,25 +331,9 @@ fn invalid_signature_err(custom_message: &str) -> SignatureVerificationError {
     err.with_custom_message(custom_message.to_string())
 }
 
-fn hash_bytes_sha256(bytes: &[u8]) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    hasher.finalize().into()
-}
-
-fn verifiable_credential_signing_input_hash(signing_input: &[u8]) -> Hash {
-    let sep = b"iccs_verifiable_credential";
-    let mut hasher = Sha256::new();
-    let buf = [sep.len() as u8];
-    hasher.update(buf);
-    hasher.update(sep);
-    hasher.update(signing_input);
-    hasher.finalize().into()
-}
-
-fn get_canister_sig_pk(
+fn get_canister_sig_pk_bytes(
     jws_header: &JwsHeader,
-) -> Result<CanisterSigPublicKey, SignatureVerificationError> {
+) -> Result<Vec<u8>, SignatureVerificationError> {
     let jwk = jws_header
         .deref()
         .jwk()
@@ -394,22 +351,17 @@ fn get_canister_sig_pk(
         .map_err(|_| key_decoding_err("missing JWK oct params"))?;
     let pk_der = decode_b64(jwk_params.k.as_bytes())
         .map_err(|_| key_decoding_err("invalid base64url encoding"))?;
-    CanisterSigPublicKey::try_from(pk_der.as_slice()).map_err(|e| key_decoding_err(&e.to_string()))
+    let pk_raw =
+        canister_sig_pk_raw(pk_der.as_slice()).map_err(|e| key_decoding_err(&e.to_string()))?;
+    Ok(pk_raw)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use canister_sig_util_br::{
-        set_ic_root_public_key_for_testing, CanisterSigVerificationError, IC_ROOT_KEY_DER_PREFIX,
-    };
-    use ic_cbor::CertificateToCbor;
-    use ic_certification_testing::CertificateBuilder;
-    use ic_response_verification_test_utils::AssetTree;
-    use serial_test::serial;
+    use canister_sig_util_br::{extract_ic_root_key_from_der, IC_ROOT_KEY_DER_PREFIX};
 
-    const TEST_SIGNING_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
     const DAPP_PRINCIPAL: &str = "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe";
@@ -417,8 +369,10 @@ mod tests {
     const REQUESTED_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCRW5ydW55RDN6Ty1pc29wNlRBOERkZWxxTEJmdkhLX1ZUeG5YZEl4bi1RZyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJpc3MiOiJodHRwczovL2lkZW50aXR5LmljMC5hcHAvIiwibmJmIjoxNjIwMzI4NjMwLCJqdGkiOiJodHRwczovL2V4YW1wbGUuZWR1L2NyZWRlbnRpYWxzLzM3MzIiLCJzdWIiOiJkaWQ6aWNwOm10cHBiLWtzY3ZhLTRoZHBsLXR4bWl0LWo3M3QzLWViZ2RpLWlybzRkLWtjZGZnLXVicm5oLW51bmE1LXpxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVW5pdmVyc2l0eURlZ3JlZUNyZWRlbnRpYWwiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiR1BBIjoiNC4wIiwiZGVncmVlIjp7Im5hbWUiOiJCYWNoZWxvciBvZiBTY2llbmNlIGFuZCBBcnRzIiwidHlwZSI6IkJhY2hlbG9yRGVncmVlIn0sIm5hbWUiOiJBbGljZSJ9fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggwsKW3qX8hPPdjOrA0R9YJgnTgdAn1nrgxIZZ_ebjZgeCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgglF8fe1owx2ekH6b_EzBZgU9L181hDdG2QX9bSIrGk7WCBFggiAQjCWS4p8OQjNKzyg73kXdTrJjDkDaF0g44WMAUruqCBFggV_MuZ9jXfsXICrVI40YLz5oaISN0_AX7bRJz6ZD5-3GCBFggpRekBB9l8QYhw2iKm1zHJJEmidbvuCTiajiT8KW4ci6CBFggkKkltZ_w0G1kjUDkcFOPeiQ8vdbJMRP03xe8a1r0ug6DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCX6F5eY5WIa6_M7URZ816ANTNIqLgUWQi_lpnaNaEks67cL1luT2P-TxNCQB7n5uBkdHJlZYMCQ3NpZ4MCWCC64yx6oN_cInVY4FG60mk166oCBahlGepSE7IgGwes5YMCWCAMlZQJ9smkQJwvDgHDSxs-uV5XzdyOQsMMst2oKgRfKIIDQA";
     const ID_ALIAS_CREDENTIAL_JWS_NO_JWK: &str = "eyJraWQiOiJkaWQ6aWM6aWktY2FuaXN0ZXIiLCJhbGciOiJJY0NzIn0.eyJpc3MiOiJodHRwczovL2ludGVybmV0Y29tcHV0ZXIub3JnL2lzc3VlcnMvaW50ZXJuZXQtaWRlbml0eSIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9pbnRlcm5ldGNvbXB1dGVyLm9yZy9jcmVkZW50aWFsL2ludGVybmV0LWlkZW5pdHkiLCJzdWIiOiJkaWQ6d2ViOmNwZWhxLTU0aGVmLW9kamp0LWJvY2tsLTNsZHRnLWpxbGU0LXlzaTVyLTZiZmFoLXY2bHNhLXhwcmR2LXBxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOndlYjpzMzNxYy1jdG5wNS11Ynl6NC1rdWJxby1wMnRlbS1oZTRscy02ajIzai1od3diYS0zN3pibC10Mmx2My1wYWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIG3uU_jutBtXB-of0uEA3RkCrcunK6D8QFPtX-gDSwDeggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIMULjwe1N6XomH10SEyc2r_uc7mGf1aSadeDaid9cUrkggRYIDw__VW2PgWMFp6mK-GmPG-7Fc90q58oK_wjcJ3IrkToggRYIAQTcQAtnxsa93zbfZEZV0f28OhiXL5Wp1OAyDHNI_x4ggRYINkQ8P9zGUvsVi3XbQ2bs6V_3kAiN8UNM6yPgeXfmArEgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwqHrYoUsNvSEaSShbW8barx0_ODXD5ZBEl9nKOdkNy_fBmGErE_C7ILbC91_fyZ7CZHRyZWWDAYIEWCB223o-sI97tc3LwJL3LRxQ4If6v_IvfC1fwIGYYQ9vroMCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBgwJYIHszMLDS2VadioIaHajRY5iJzroqMs63lVrs_Uj42j0sggNAggRYICm0w_XxGEw4fDPoYcojCILEi0qdH4-4Zw7klzdaPNOC";
 
-    fn test_ic_root_pk_der() -> Vec<u8> {
-        decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk")
+    fn test_ic_root_pk_raw() -> Vec<u8> {
+        let pk_der = decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk");
+        extract_ic_root_key_from_der(pk_der.as_slice())
+            .expect("failure extracting root pk from DER")
     }
 
     fn alias_principal() -> Principal {
@@ -484,129 +438,36 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn should_verify_id_alias_vc_jws() {
-        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
-        verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS).expect("JWS verification failed");
+        verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS, &test_ic_root_pk_raw())
+            .expect("JWS verification failed");
     }
 
     #[test]
     fn should_fail_verify_id_alias_vc_jws_without_canister_pk() {
-        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS_NO_JWK);
+        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS_NO_JWK, &test_ic_root_pk_raw());
         assert_matches!(result, Err(e) if e.to_string().contains("missing JWK in JWS header"));
     }
 
     #[test]
-    #[serial]
     fn should_fail_verify_id_alias_vc_jws_with_wrong_root_pk() {
-        let mut ic_root_pk_der = test_ic_root_pk_der();
-        ic_root_pk_der[IC_ROOT_KEY_DER_PREFIX.len()] =
-            ic_root_pk_der[IC_ROOT_KEY_DER_PREFIX.len()] + 1; // change the root pk value
-        set_ic_root_public_key_for_testing(ic_root_pk_der);
-        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS);
-        assert_matches!(result, Err(e) if e.to_string().contains("InvalidBlsSignature"));
+        let mut ic_root_pk = test_ic_root_pk_raw();
+        ic_root_pk[IC_ROOT_KEY_DER_PREFIX.len()] = ic_root_pk[IC_ROOT_KEY_DER_PREFIX.len()] + 1; // change the root pk value
+        let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS, &ic_root_pk);
+        assert_matches!(result, Err(e) if  { let err_msg = e.to_string();
+            err_msg.contains("invalid signature") &&
+            err_msg.contains("Malformed ThresBls12_381 public key") });
     }
 
     #[test]
-    #[serial]
-    fn should_verify_root_signature_without_delegation() {
-        let signing_canister_id =
-            Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("failed parsing canister id");
-
-        let ic_cert_data = CertificateBuilder::new(
-            &signing_canister_id.to_string(),
-            &AssetTree::new().get_certified_data(),
-        )
-        .expect("CertificateBuilder creation failed")
-        .build()
-        .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
-        let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
-            .expect("CBOR cert parsing failed");
-
-        verify_root_signature(&ic_certificate, signing_canister_id)
-            .expect("Verification without delegation failed");
-    }
-
-    #[test]
-    #[serial]
-    fn should_verify_root_signature_with_delegation() {
-        let signing_canister_id = principal_from_u64(5);
-        let subnet_id = 123u64;
-        let ic_cert_data = CertificateBuilder::new(
-            &signing_canister_id.to_string(),
-            &AssetTree::new().get_certified_data(),
-        )
-        .expect("CertificateBuilder creation failed")
-        .with_delegation(subnet_id, vec![(0, 10)])
-        .build()
-        .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
-        let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
-            .expect("CBOR cert parsing failed");
-        verify_root_signature(&ic_certificate, signing_canister_id)
-            .expect("Verification with delegation failed");
-    }
-
-    #[test]
-    #[serial]
-    fn should_fail_verify_root_signature_with_delegation_if_canister_not_in_range() {
-        let signing_canister_id = principal_from_u64(42);
-        let subnet_id = 123u64;
-        let ic_cert_data = CertificateBuilder::new(
-            &signing_canister_id.to_string(),
-            &AssetTree::new().get_certified_data(),
-        )
-        .expect("CertificateBuilder creation failed")
-        .with_delegation(subnet_id, vec![(0, 10)])
-        .build()
-        .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
-        let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
-            .expect("CBOR cert parsing failed");
-
-        let result = verify_root_signature(&ic_certificate, signing_canister_id);
-        assert_matches!(
-            result,
-            Err(CanisterSigVerificationError::CertificateNotAuthorized)
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn should_fail_verify_root_signature_with_delegation_if_invalid_signature() {
-        let signing_canister_id = principal_from_u64(5);
-        let subnet_id = 123u64;
-        let ic_cert_data = CertificateBuilder::new(
-            &signing_canister_id.to_string(),
-            &AssetTree::new().get_certified_data(),
-        )
-        .expect("CertificateBuilder creation failed")
-        .with_delegation(subnet_id, vec![(0, 10)])
-        .with_invalid_signature()
-        .build()
-        .expect("Certificate creation failed");
-        set_ic_root_public_key_for_testing(ic_cert_data.root_key);
-        let ic_certificate = Certificate::from_cbor(&ic_cert_data.cbor_encoded_certificate)
-            .expect("CBOR cert parsing failed");
-
-        let result = verify_root_signature(&ic_certificate, signing_canister_id);
-        assert_matches!(
-            result,
-            Err(CanisterSigVerificationError::InvalidBlsSignature)
-        );
-    }
-
-    #[test]
-    #[serial]
     fn should_verify_id_alias_credential_jws() {
-        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
         verify_id_alias_credential_jws(
             ID_ALIAS_CREDENTIAL_JWS,
             &AliasTuple {
                 id_alias: alias_principal(),
                 id_dapp: dapp_principal(),
             },
+            &test_ic_root_pk_raw(),
         )
         .expect("JWS verification failed");
     }
@@ -639,9 +500,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn should_verify_verifiable_presentation() {
-        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
         let alias_tuple = AliasTuple {
             id_alias: alias_principal(),
             id_dapp: dapp_principal(),
@@ -652,7 +511,8 @@ mod tests {
         };
         let vp_jwt =
             create_verifiable_presentation_jwt(params, &alias_tuple).expect("vp creation failed");
-        verify_idp_presentation_jwt(&vp_jwt, &alias_tuple).expect("vp verification failed");
+        verify_idp_presentation_jwt(&vp_jwt, &alias_tuple, &test_ic_root_pk_raw())
+            .expect("vp verification failed");
     }
 
     #[test]
@@ -662,7 +522,7 @@ mod tests {
             id_dapp: dapp_principal(),
         };
         let bad_vp_jwt = "some badly formatted string";
-        let result = verify_idp_presentation_jwt(bad_vp_jwt, &alias_tuple);
+        let result = verify_idp_presentation_jwt(bad_vp_jwt, &alias_tuple, &test_ic_root_pk_raw());
         assert_matches!(
             result,
             Err(PresentationVerificationError::InvalidPresentationJwt(_))
@@ -670,9 +530,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn should_fail_verifying_verifiable_presentation_with_wrong_holder() {
-        set_ic_root_public_key_for_testing(test_ic_root_pk_der());
         let alias_tuple = AliasTuple {
             id_alias: alias_principal(),
             id_dapp: dapp_principal(),
@@ -687,7 +545,8 @@ mod tests {
             id_alias: alias_principal(),
             id_dapp: alias_principal(),
         };
-        let result = verify_idp_presentation_jwt(&vp_jwt, &wrong_alias_tuple);
+        let result =
+            verify_idp_presentation_jwt(&vp_jwt, &wrong_alias_tuple, &test_ic_root_pk_raw());
         assert_matches!(
             result,
             Err(PresentationVerificationError::InvalidPresentationJwt(_))

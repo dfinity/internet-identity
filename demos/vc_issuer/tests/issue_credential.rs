@@ -2,7 +2,7 @@
 
 use assert_matches::assert_matches;
 use candid::Principal;
-use canister_sig_util_br::set_ic_root_public_key_for_testing;
+use canister_sig_util_br::extract_ic_root_key_from_der;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};
@@ -20,7 +20,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
-use serial_test::serial;
 use std::path::PathBuf;
 use vc_util::{
     create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
@@ -185,7 +184,6 @@ fn should_prepare_credential_for_authorized_principal() {
 
 /// Verifies that a credential is being created including II interactions.
 #[test]
-#[serial]
 fn should_issue_credential_e2e() -> Result<(), CallError> {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
@@ -229,7 +227,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 panic!("{}", format!("failed authentication: {}", err))
             }
         };
-    set_ic_root_public_key_for_testing(env.root_key());
+    let root_pk_raw =
+        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_id_alias_credential_jws(
         &id_alias_credentials
             .issuer_id_alias_credential
@@ -238,6 +237,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
             id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
         },
+        &root_pk_raw,
     )
     .expect("Invalid ID alias");
 
