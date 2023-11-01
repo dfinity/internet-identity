@@ -31,11 +31,7 @@ pub fn get_canister_sig_pk_der(canister_id: Principal, seed: &[u8]) -> Vec<u8> {
     // sequence of length 17 + the bit string length
     der.push(0x30);
     der.push(17 + bitstring.len() as u8);
-    der.extend(vec![
-        // sequence of length 12 for the OID
-        0x30, 0x0C, // OID 1.3.6.1.4.1.56387.1.2
-        0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x83, 0xB8, 0x43, 0x01, 0x02,
-    ]);
+    der.extend(CANISTER_SIG_PK_DER_OID);
     // BIT string of given length
     der.push(0x03);
     der.push(1 + bitstring.len() as u8);
