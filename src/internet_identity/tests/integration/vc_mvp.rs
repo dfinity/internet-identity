@@ -1,5 +1,5 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
-use canister_sig_util_br::set_ic_root_public_key_for_testing;
+use canister_sig_util_br::extract_ic_root_key_from_der;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -11,7 +11,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
-use serial_test::serial;
 use std::ops::Deref;
 use vc_util::verify_credential_jws;
 
@@ -30,7 +29,6 @@ fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
 
 // Verifies that a valid id_alias is created.
 #[test]
-#[serial]
 fn should_get_valid_id_alias() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -91,15 +89,19 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     );
 
     // Verify the credentials in two ways: via env and via external function.
-    set_ic_root_public_key_for_testing(env.root_key());
+    let root_pk_raw =
+        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_id_alias_credential(
         &env,
         prepared_id_alias.canister_sig_pk.clone(),
         &id_alias_credentials.rp_id_alias_credential,
         &env.root_key(),
     );
-    verify_credential_jws(&id_alias_credentials.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    verify_credential_jws(
+        &id_alias_credentials.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_id_alias_credential(
         &env,
         prepared_id_alias.canister_sig_pk.clone(),
@@ -110,13 +112,13 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
     Ok(())
 }
 
 #[test]
-#[serial]
 fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -220,28 +222,36 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    let root_pk_raw =
+        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    verify_credential_jws(
+        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
-    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    verify_credential_jws(
+        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
     Ok(())
 }
 
 #[test]
-#[serial]
 fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -348,21 +358,30 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    let root_pk_raw =
+        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    verify_credential_jws(
+        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
-    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    verify_credential_jws(
+        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
 
@@ -370,7 +389,6 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
 }
 
 #[test]
-#[serial]
 fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -477,21 +495,30 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    set_ic_root_public_key_for_testing(env.root_key());
-    verify_credential_jws(&id_alias_credentials_1.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    let root_pk_raw =
+        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    verify_credential_jws(
+        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_1
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
-    verify_credential_jws(&id_alias_credentials_2.rp_id_alias_credential.credential_jws)
-        .expect("external verification failed");
+    verify_credential_jws(
+        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
+        &root_pk_raw,
+    )
+    .expect("external verification failed");
     verify_credential_jws(
         &id_alias_credentials_2
             .issuer_id_alias_credential
             .credential_jws,
+        &root_pk_raw,
     )
     .expect("external verification failed");
 
