@@ -13,19 +13,10 @@ runs:
         path: |
           /usr/local/bin/dfx
         key: dfx-cache-${{ inputs.dfx-version }}-5
-    - name: Install DFX
-      shell: bash
-      run: |
-        if command -v dfx
-        then
-          echo "DFX restored from cache"
-        else
-          echo "DFX not restored from cache, running install script:"
-          DFX_VERSION=${{ inputs.dfx-version }} sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
-        fi
-        echo "DFX version"
-        dfx --version
-
+    - name: Install dfx
+      uses: dfinity/setup-dfx@main
+      with:
+        dfx-version: ${{ inputs.dfx-version }}
     - name: Configure network
       shell: bash
       run: |
