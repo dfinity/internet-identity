@@ -5,8 +5,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# ic dependencies
+candid = "0.9"
 ic-certified-map = "0.4"
 
-[dev-dependencies]
-rand = { version ="0.8.5" }
+# other dependencies
+lazy_static = "1.4"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+rand = { version ="0.8.5" }
