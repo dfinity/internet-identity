@@ -6,9 +6,10 @@ use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo, Icrc21ConsentMessageRequest,
-    Icrc21ConsentMessageResponse, IssueCredentialError, IssuedCredentialData,
-    PrepareCredentialRequest, PrepareCredentialResponse, PreparedCredentialData,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
+    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
+    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
+    PrepareCredentialResponse, PreparedCredentialData,
 };
 use serde::Serialize;
 use serde_bytes::ByteBuf;
@@ -18,7 +19,7 @@ use std::cell::RefCell;
 use canister_sig_util_br::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::trap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
@@ -105,12 +106,50 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 
 #[update]
 #[candid_method]
-async fn consent_message(req: Icrc21ConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+    if let Err(err) = verify_credential_spec(&req.credential_spec) {
+        return Icrc21ConsentMessageResponse::Err(err);
+    }
     Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
-        consent_message: "Do you want to share that you are an employee of DFINITY Foundation?"
-            .to_string(),
-        language: req.preferences.language,
+        consent_message: get_vc_consent_message(&req),
+        language: "en-US".to_string(),
     })
+}
+
+fn verify_credential_spec(spec: &CredentialSpec) -> Result<(), Icrc21Error> {
+    if spec.credential_name != "VerifiedEmployee" {
+        return Err(Icrc21Error::NotSupported(Icrc21ErrorInfo {
+            error_code: 0,
+            description: format!("Credential {} is not supported", spec.credential_name),
+        }));
+    }
+    let arg_key = "employerName";
+    if spec.arguments.is_none() || !spec.arguments.as_ref().unwrap().contains_key(arg_key) {
+        return Err(Icrc21Error::MalformedCall(Icrc21ErrorInfo {
+            error_code: 0,
+            description: format!(
+                "Missing argument '{}' for credential {}",
+                arg_key, spec.credential_name
+            ),
+        }));
+    }
+    Ok(())
+}
+fn get_vc_consent_message(req: &Icrc21VcConsentMessageRequest) -> String {
+    format!(
+        "Issue credential '{}' with arguments:{}",
+        req.credential_spec.credential_name,
+        arguments_as_string(&req.credential_spec.arguments)
+    )
+}
+fn arguments_as_string(maybe_args: &Option<HashMap<String, ArgumentValue>>) -> String {
+    let mut arg_str = String::new();
+    let empty_args = HashMap::new();
+    let args = maybe_args.as_ref().unwrap_or(&empty_args);
+    for (key, value) in args {
+        arg_str.push_str(&format!("\n\t{}: {}", key, value));
+    }
+    arg_str
 }
 
 #[update]

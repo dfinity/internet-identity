@@ -10,9 +10,9 @@ use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentMessageRequest,
-    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, PrepareCredentialRequest,
-    PrepareCredentialResponse,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
+    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
+    Icrc21VcConsentMessageRequest, PrepareCredentialRequest, PrepareCredentialResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
@@ -20,6 +20,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use vc_util::{
     create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
@@ -51,17 +52,17 @@ pub fn install_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
 mod api {
     use super::*;
 
-    pub fn consent_message(
+    pub fn vc_consent_message(
         env: &StateMachine,
         canister_id: CanisterId,
         sender: Principal,
-        consent_message_request: &Icrc21ConsentMessageRequest,
+        consent_message_request: &Icrc21VcConsentMessageRequest,
     ) -> Result<Option<Icrc21ConsentMessageResponse>, CallError> {
         call_candid_as(
             env,
             canister_id,
             sender,
-            "consent_message",
+            "vc_consent_message",
             (consent_message_request,),
         )
         .map(|(x,)| x)
@@ -111,24 +112,128 @@ mod api {
 
 /// Verifies that the consent message can be requested.
 #[test]
-fn should_return_consent_message() -> Result<(), CallError> {
+fn should_return_vc_consent_message() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
-    let consent_message_request = Icrc21ConsentMessageRequest {
-        method: "dummy_method".to_string(),
-        arg: Default::default(),
+    let mut args = HashMap::new();
+    args.insert(
+        "employerName".to_string(),
+        ArgumentValue::String("DFINITY Foundation".to_string()),
+    );
+    let consent_message_request = Icrc21VcConsentMessageRequest {
+        credential_spec: CredentialSpec {
+            credential_name: "VerifiedEmployee".to_string(),
+            arguments: Some(args),
+        },
         preferences: Icrc21ConsentPreferences {
-            language: "en".to_string(),
+            language: "en-US".to_string(),
         },
     };
 
-    let _consent_message_response =
-        api::consent_message(&env, canister_id, principal_1(), &consent_message_request)?
-            .expect("Got 'None' from consent_message");
-    Ok(())
+    let response =
+        api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+            .expect("API call failed")
+            .expect("Got 'None' from vc_consent_message");
+    assert_matches!(response, Icrc21ConsentMessageResponse::Ok(_));
+    if let Icrc21ConsentMessageResponse::Ok(info) = response {
+        assert_eq!(info.language, "en-US");
+        assert!(info
+            .consent_message
+            .contains("Issue credential 'VerifiedEmployee'"));
+        assert!(info.consent_message.contains("employerName"));
+        assert!(info.consent_message.contains("DFINITY Foundation"));
+    }
 }
 
+#[test]
+fn should_fail_vc_consent_message_if_not_supported() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    let consent_message_request = Icrc21VcConsentMessageRequest {
+        credential_spec: CredentialSpec {
+            credential_name: "VerifiedAdult".to_string(),
+            arguments: None,
+        },
+        preferences: Icrc21ConsentPreferences {
+            language: "en-US".to_string(),
+        },
+    };
+
+    let response =
+        api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+            .expect("API call failed")
+            .expect("Got 'None' from vc_consent_message");
+    assert_matches!(
+        response,
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
+    );
+}
+
+#[test]
+fn should_fail_vc_consent_message_if_missing_arguments() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    let consent_message_request = Icrc21VcConsentMessageRequest {
+        credential_spec: CredentialSpec {
+            credential_name: "VerifiedEmployee".to_string(),
+            arguments: None,
+        },
+        preferences: Icrc21ConsentPreferences {
+            language: "en-US".to_string(),
+        },
+    };
+
+    let response =
+        api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+            .expect("API call failed")
+            .expect("Got 'None' from vc_consent_message");
+    assert_matches!(
+        response,
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::MalformedCall(_))
+    );
+}
+
+#[test]
+fn should_fail_vc_consent_message_if_missing_required_argument() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    let mut args = HashMap::new();
+    args.insert("wrongArgument".to_string(), ArgumentValue::Int(42));
+
+    let consent_message_request = Icrc21VcConsentMessageRequest {
+        credential_spec: CredentialSpec {
+            credential_name: "VerifiedEmployee".to_string(),
+            arguments: None,
+        },
+        preferences: Icrc21ConsentPreferences {
+            language: "en-US".to_string(),
+        },
+    };
+
+    let response =
+        api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+            .expect("API call failed")
+            .expect("Got 'None' from vc_consent_message");
+    assert_matches!(
+        response,
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::MalformedCall(_))
+    );
+}
+fn employee_credential_spec() -> CredentialSpec {
+    let mut args = HashMap::new();
+    args.insert(
+        "employeeName".to_string(),
+        ArgumentValue::String("DFINITY Foundation".to_string()),
+    );
+    CredentialSpec {
+        credential_name: "VerifiedEmployee".to_string(),
+        arguments: Some(args),
+    }
+}
 #[test]
 fn should_fail_prepare_credential_for_unauthorized_principal() {
     let env = env();
@@ -144,9 +249,7 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
         issuer_id,
         principal_2(),
         &PrepareCredentialRequest {
-            credential_spec: CredentialSpec {
-                info: "foo".to_string(),
-            },
+            credential_spec: employee_credential_spec(),
             signed_id_alias,
         },
     )
@@ -172,9 +275,7 @@ fn should_prepare_credential_for_authorized_principal() {
         issuer_id,
         principal_2(),
         &PrepareCredentialRequest {
-            credential_spec: CredentialSpec {
-                info: "foo".to_string(),
-            },
+            credential_spec: employee_credential_spec(),
             signed_id_alias,
         },
     )
@@ -252,9 +353,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         issuer_id,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &PrepareCredentialRequest {
-            credential_spec: CredentialSpec {
-                info: "foo".to_string(),
-            },
+            credential_spec: employee_credential_spec(),
             signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
         },
     )?;
@@ -273,9 +372,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         issuer_id,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &GetCredentialRequest {
-            credential_spec: CredentialSpec {
-                info: "foo".to_string(),
-            },
+            credential_spec: employee_credential_spec(),
             signed_id_alias: id_alias_credentials.issuer_id_alias_credential,
             prepared_context: prepared_credential.prepared_context,
         },

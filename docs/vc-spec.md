@@ -220,7 +220,10 @@ After receiving the notification that II is ready, the relying party can request
         "canisterId": "rdmx6-jaaaa-aaaaa-aaadq-cai"
     },
     "credentialSpec": {
-        "credentialName": "VerifiedAdult"
+        "credentialName": "VerifiedAdult",
+        "arguments": {
+            "minAge": 21
+        }
     },
     "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae"
   }
