@@ -3,6 +3,7 @@ use ic_certified_map::{leaf_hash, AsHashTree, Hash, HashTree, RbTree};
 use std::borrow::Cow;
 use std::collections::BinaryHeap;
 
+pub const LABEL_SIG: &[u8] = b"sig";
 #[derive(Default)]
 struct Unit;
 
