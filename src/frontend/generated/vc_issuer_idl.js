@@ -1,34 +1,14 @@
 export const idlFactory = ({ IDL }) => {
-  const Icrc21ConsentPreferences = IDL.Record({ 'language' : IDL.Text });
-  const Icrc21ConsentMessageRequest = IDL.Record({
-    'arg' : IDL.Vec(IDL.Nat8),
-    'method' : IDL.Text,
-    'preferences' : Icrc21ConsentPreferences,
-  });
-  const Icrc21ConsentInfo = IDL.Record({
-    'consent_message' : IDL.Text,
-    'language' : IDL.Text,
-  });
-  const Icrc21ErrorInfo = IDL.Record({
-    'description' : IDL.Text,
-    'error_code' : IDL.Nat64,
-  });
-  const Icrc21Error = IDL.Variant({
-    'generic_error' : Icrc21ErrorInfo,
-    'forbidden' : Icrc21ErrorInfo,
-    'not_supported' : Icrc21ErrorInfo,
-    'malformed_call' : Icrc21ErrorInfo,
-  });
-  const Icrc21ConsentMessageResponse = IDL.Variant({
-    'ok' : Icrc21ConsentInfo,
-    'err' : Icrc21Error,
-  });
   const SignedIdAlias = IDL.Record({
     'credential_jws' : IDL.Text,
     'id_alias' : IDL.Principal,
     'id_dapp' : IDL.Principal,
   });
-  const CredentialSpec = IDL.Record({ 'info' : IDL.Text });
+  const ArgumentValue = IDL.Variant({ 'int' : IDL.Int32, 'string' : IDL.Text });
+  const CredentialSpec = IDL.Record({
+    'arguments' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, ArgumentValue))),
+    'credential_name' : IDL.Text,
+  });
   const GetCredentialRequest = IDL.Record({
     'signed_id_alias' : SignedIdAlias,
     'prepared_context' : IDL.Opt(IDL.Vec(IDL.Nat8)),
@@ -57,13 +37,31 @@ export const idlFactory = ({ IDL }) => {
     'ok' : PreparedCredentialData,
     'err' : IssueCredentialError,
   });
+  const Icrc21ConsentPreferences = IDL.Record({ 'language' : IDL.Text });
+  const Icrc21VcConsentMessageRequest = IDL.Record({
+    'preferences' : Icrc21ConsentPreferences,
+    'credential_spec' : CredentialSpec,
+  });
+  const Icrc21ConsentInfo = IDL.Record({
+    'consent_message' : IDL.Text,
+    'language' : IDL.Text,
+  });
+  const Icrc21ErrorInfo = IDL.Record({
+    'description' : IDL.Text,
+    'error_code' : IDL.Nat64,
+  });
+  const Icrc21Error = IDL.Variant({
+    'generic_error' : Icrc21ErrorInfo,
+    'forbidden' : Icrc21ErrorInfo,
+    'not_supported' : Icrc21ErrorInfo,
+    'malformed_call' : Icrc21ErrorInfo,
+  });
+  const Icrc21ConsentMessageResponse = IDL.Variant({
+    'ok' : Icrc21ConsentInfo,
+    'err' : Icrc21Error,
+  });
   return IDL.Service({
     'add_employee' : IDL.Func([IDL.Principal], [IDL.Text], []),
-    'consent_message' : IDL.Func(
-        [Icrc21ConsentMessageRequest],
-        [Icrc21ConsentMessageResponse],
-        [],
-      ),
     'get_credential' : IDL.Func(
         [GetCredentialRequest],
         [GetCredentialResponse],
@@ -72,6 +70,11 @@ export const idlFactory = ({ IDL }) => {
     'prepare_credential' : IDL.Func(
         [PrepareCredentialRequest],
         [PrepareCredentialResponse],
+        [],
+      ),
+    'vc_consent_message' : IDL.Func(
+        [Icrc21VcConsentMessageRequest],
+        [Icrc21ConsentMessageResponse],
         [],
       ),
   });
