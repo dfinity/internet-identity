@@ -10,7 +10,7 @@ export function getStaticPaths() {
 const { flow } = Astro.params;
 ---
 
-<Layout>
+<Layout title={flow ?? "flows"}>
   <main id="pageContent" aria-live="polite" data-flow-name={flow}></main>
   <div id="loaderContainer"></div>
   <script>
