@@ -285,18 +285,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "canister_sig_util_br"
+name = "canister_sig_util"
 version = "0.1.0"
 dependencies = [
  "candid",
- "hex",
- "ic-cdk",
- "ic-certification 1.2.0",
  "ic-certified-map",
  "lazy_static",
- "serde",
- "serde_bytes",
- "serde_cbor",
  "sha2 0.10.8",
 ]
 
@@ -1093,18 +1087,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ic-certification"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a59dc342d11b2067e19d0f146bdec3674de921303ffc762f114d201ebbe0e68a"
-dependencies = [
- "hex",
- "serde",
- "serde_bytes",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "ic-certified-map"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1256,7 +1238,7 @@ source = "git+https://github.com/dfinity/ic?rev=bf9bc00b032a18d2dbcfcfcfb7a76a56
 dependencies = [
  "base64 0.13.1",
  "hex",
- "ic-certification 0.8.0",
+ "ic-certification",
  "ic-crypto-internal-basic-sig-der-utils",
  "ic-crypto-internal-types",
  "ic-crypto-sha2",
@@ -3016,7 +2998,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "candid",
- "canister_sig_util_br",
+ "canister_sig_util",
  "canister_tests",
  "hex",
  "ic-cdk",
@@ -3041,7 +3023,7 @@ name = "vc_util"
 version = "0.1.0"
 dependencies = [
  "candid",
- "canister_sig_util_br",
+ "canister_sig_util",
  "ic-certified-map",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
