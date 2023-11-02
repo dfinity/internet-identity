@@ -1,8 +1,9 @@
 use crate::assets::{ContentType, EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
 use crate::http::metrics::metrics;
-use crate::{assets, state, LABEL_SIG};
+use crate::{assets, state};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
+use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::data_certificate;
 use ic_cdk::trap;
 use ic_certified_map::HashTree;
