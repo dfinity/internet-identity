@@ -41,7 +41,7 @@ pub fn get_canister_sig_pk_der(canister_id: Principal, seed: &[u8]) -> Vec<u8> {
 }
 
 /// Verifies the structure given public key in DER-format, and returns raw bytes of the key.
-fn extract_raw_root_pk_from_der(pk_der: &[u8]) -> Result<Vec<u8>, String> {
+pub fn extract_raw_root_pk_from_der(pk_der: &[u8]) -> Result<Vec<u8>, String> {
     let expected_length = IC_ROOT_PK_DER_PREFIX.len() + IC_ROOT_PK_LENGTH;
     if pk_der.len() != expected_length {
         return Err(String::from("invalid root pk length"));

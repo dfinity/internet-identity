@@ -323,23 +323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "canister_sig_util_br"
-version = "0.1.0"
-dependencies = [
- "candid",
- "hex",
- "ic-cdk",
- "ic-certification 1.2.0",
- "ic-certified-map",
- "lazy_static",
- "rand",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "canister_tests"
 version = "0.1.0"
 dependencies = [
@@ -1339,8 +1322,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a59dc342d11b2067e19d0f146bdec3674de921303ffc762f114d201ebbe0e68a"
 dependencies = [
  "hex",
- "serde",
- "serde_bytes",
  "sha2 0.10.8",
 ]
 
@@ -2051,7 +2032,6 @@ dependencies = [
  "base64 0.21.5",
  "candid",
  "canister_sig_util",
- "canister_sig_util_br",
  "canister_tests",
  "captcha",
  "getrandom 0.2.10",
@@ -3481,7 +3461,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "candid",
- "canister_sig_util_br",
+ "canister_sig_util",
  "ic-certified-map",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
