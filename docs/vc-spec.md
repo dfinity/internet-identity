@@ -179,11 +179,14 @@ After receiving the notification that II is ready, the relying party can request
 * Method: `request_credential`
 * Params:
   * `issuer`: An issuer that the relying party trusts. It has the following properties:
-    * `issuerOrigin`: The origin of the issuer.
-    * `credentialId`: The ID of the credential that the relying party wants to request from the issuer.
+    * `origin`: The origin of the issuer.
+    * `canisterId`: (optional) The canister id of the issuer, if applicable/known.
+  * `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
+    * `credentialName`: The name of the requested credential.
+    * `arguments`: (optional) A map with arguments (specific to the requested credentials).
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
 
-#### Example
+#### Examples
 
 ```json
 {
@@ -192,10 +195,55 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
-        "issuerOrigin": "https://example-issuer.com",
-        "credentialId": "age_credential"
+        "origin": "https://employment-info.com",
+        "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedEmployee",
+        "arguments": {
+          "employerName": "XYZ Ltd."
+        }
     },
     "credentialSubject": "2mdal-aedsb-hlpnv-qu3zl-ae6on-72bt5-fwha5-xzs74-5dkaz-dfywi-aqe"
+  }
+}
+```
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "request_credential",
+  "params": {
+    "issuer": {
+        "origin": "https://kyc-star.com",
+        "canisterId": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedAdult"
+    },
+    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae"
+  }
+}
+```
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "request_credential",
+  "params": {
+    "issuer": {
+        "origin": "https://kyc-resident-info.org"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedResident",
+        "arguments": {
+            "countryName": "Panama",
+            "countryAlpha2": "PA"
+        }
+    },
+    "credentialSubject": "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe"
   }
 }
 ```
