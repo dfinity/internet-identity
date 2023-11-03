@@ -1,5 +1,5 @@
 use candid::{candid_method, Principal};
-use canister_sig_util_br::{canister_sig_pk_der, hash_bytes};
+use canister_sig_util::get_canister_sig_pk_der;
 use ic_cdk_macros::{query, update};
 use ic_certified_map::{Hash, HashTree};
 use identity_core::common::Url;
@@ -16,9 +16,10 @@ use serde_bytes::ByteBuf;
 use serde_json::json;
 use std::cell::RefCell;
 
-use canister_sig_util_br::signature_map::{SignatureMap, LABEL_SIG};
+use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, set_certified_data, time};
 use ic_cdk::trap;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use vc_util::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
@@ -42,7 +43,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
+    let canister_sig_pk_der = get_canister_sig_pk_der(canister_id, &seed);
     let credential = new_credential_dfinity_employment(subject_principal);
     let credential_jwt = credential
         .serialize_jwt()
@@ -78,7 +79,7 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = canister_sig_pk_der(canister_id, &seed);
+    let canister_sig_pk_der = get_canister_sig_pk_der(canister_id, &seed);
     let prepared_context = match req.prepared_context {
         Some(context) => context,
         None => return GetCredentialResponse::Err(internal_error("missing prepared_context")),
@@ -280,6 +281,12 @@ fn verify_get_credential_request(_req: &GetCredentialRequest) -> Result<(), Issu
 
 fn internal_error(msg: &str) -> IssueCredentialError {
     IssueCredentialError::Internal(String::from(msg))
+}
+
+fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_ref());
+    hasher.finalize().into()
 }
 
 // Order dependent: do not move above any function annotated with #[candid_method]!

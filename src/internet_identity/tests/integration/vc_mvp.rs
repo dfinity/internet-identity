@@ -1,5 +1,5 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
-use canister_sig_util_br::extract_ic_root_key_from_der;
+use canister_sig_util::extract_raw_root_pk_from_der;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -90,7 +90,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
 
     // Verify the credentials in two ways: via env and via external function.
     let root_pk_raw =
-        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_id_alias_credential(
         &env,
         prepared_id_alias.canister_sig_pk.clone(),
@@ -223,7 +223,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
     );
 
     let root_pk_raw =
-        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_credential_jws(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &root_pk_raw,
@@ -359,7 +359,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
     );
 
     let root_pk_raw =
-        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_credential_jws(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &root_pk_raw,
@@ -496,7 +496,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
     );
 
     let root_pk_raw =
-        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_credential_jws(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &root_pk_raw,

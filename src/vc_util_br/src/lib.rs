@@ -1,5 +1,5 @@
 use candid::Principal;
-use canister_sig_util_br::canister_sig_pk_raw;
+use canister_sig_util::extract_raw_canister_sig_pk_from_der;
 use ic_certified_map::Hash;
 use ic_crypto_standalone_sig_verifier::verify_canister_sig;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
@@ -351,8 +351,8 @@ fn get_canister_sig_pk_bytes(
         .map_err(|_| key_decoding_err("missing JWK oct params"))?;
     let pk_der = decode_b64(jwk_params.k.as_bytes())
         .map_err(|_| key_decoding_err("invalid base64url encoding"))?;
-    let pk_raw =
-        canister_sig_pk_raw(pk_der.as_slice()).map_err(|e| key_decoding_err(&e.to_string()))?;
+    let pk_raw = extract_raw_canister_sig_pk_from_der(pk_der.as_slice())
+        .map_err(|e| key_decoding_err(&e.to_string()))?;
     Ok(pk_raw)
 }
 
@@ -360,7 +360,7 @@ fn get_canister_sig_pk_bytes(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use canister_sig_util_br::{extract_ic_root_key_from_der, IC_ROOT_KEY_DER_PREFIX};
+    use canister_sig_util::{extract_raw_root_pk_from_der, IC_ROOT_PK_DER_PREFIX};
 
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
@@ -371,7 +371,7 @@ mod tests {
 
     fn test_ic_root_pk_raw() -> Vec<u8> {
         let pk_der = decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk");
-        extract_ic_root_key_from_der(pk_der.as_slice())
+        extract_raw_root_pk_from_der(pk_der.as_slice())
             .expect("failure extracting root pk from DER")
     }
 
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn should_fail_verify_id_alias_vc_jws_with_wrong_root_pk() {
         let mut ic_root_pk = test_ic_root_pk_raw();
-        ic_root_pk[IC_ROOT_KEY_DER_PREFIX.len()] = ic_root_pk[IC_ROOT_KEY_DER_PREFIX.len()] + 1; // change the root pk value
+        ic_root_pk[IC_ROOT_PK_DER_PREFIX.len()] += 1; // change the root pk value
         let result = verify_credential_jws(ID_ALIAS_CREDENTIAL_JWS, &ic_root_pk);
         assert_matches!(result, Err(e) if  { let err_msg = e.to_string();
             err_msg.contains("invalid signature") &&

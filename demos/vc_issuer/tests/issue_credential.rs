@@ -2,7 +2,7 @@
 
 use assert_matches::assert_matches;
 use candid::Principal;
-use canister_sig_util_br::extract_ic_root_key_from_der;
+use canister_sig_util::extract_raw_root_pk_from_der;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};
@@ -329,7 +329,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             }
         };
     let root_pk_raw =
-        extract_ic_root_key_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
     verify_id_alias_credential_jws(
         &id_alias_credentials
             .issuer_id_alias_credential
