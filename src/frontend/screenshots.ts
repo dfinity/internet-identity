@@ -2,7 +2,7 @@
 
 import { isNullish } from "@dfinity/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
-import fs, { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { remote } from "webdriverio";
 
 const SCREENSHOTS_DIR =
@@ -89,10 +89,6 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
 async function withChrome<T>(
   cb: (browser: WebdriverIO.Browser) => T
 ): Promise<T> {
-  if (!fs.existsSync("mini-dumps")) {
-    fs.mkdirSync("mini-dumps");
-  }
-
   // Screenshot image dimension, if specified
   const { mobileEmulation } = readScreenshotsConfig();
 
@@ -107,7 +103,6 @@ async function withChrome<T>(
       "hide-scrollbars",
     ],
     mobileEmulation,
-    minidumpPath: "./mini-dumps",
   };
 
   const browser = await remote({
@@ -116,7 +111,7 @@ async function withChrome<T>(
       browserVersion: "119.0.6045.105",
       "goog:chromeOptions": chromeOptions,
     },
-    logLevel: "debug",
+    logLevel: "silent",
   });
 
   if (isNullish(mobileEmulation)) {
