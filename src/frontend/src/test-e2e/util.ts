@@ -37,6 +37,7 @@ export async function runInBrowser(
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
+      "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
