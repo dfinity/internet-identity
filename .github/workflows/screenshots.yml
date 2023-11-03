@@ -60,12 +60,6 @@ jobs:
         with:
           name: e2e-screenshots-${{ matrix.ref }}-${{ matrix.device }}
           path: screenshots/${{ matrix.device }}/*.png
-      - name: Archive mini-dumps
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: mini-dumps-${{ matrix.device }}-${{ matrix.ref }}
-          path: ./mini-dumps/*
 
   notify:
     runs-on: ubuntu-latest

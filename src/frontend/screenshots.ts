@@ -108,10 +108,9 @@ async function withChrome<T>(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "119.0.6045.105",
+      browserVersion: "118.0.5993.70",
       "goog:chromeOptions": chromeOptions,
     },
-    logLevel: "silent",
   });
 
   if (isNullish(mobileEmulation)) {
