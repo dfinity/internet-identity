@@ -128,7 +128,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
   await browser.url(url);
   // Wait for the html body to be present otherwise chrome is prone to crashing
   // when operating on the page
-  await browser.$("//body").waitForExist();
+  await browser.pause(1000);
 
   /* Disable transitions and animations to make sure we screenshot the (final) actual state */
   await browser.execute(() => {
