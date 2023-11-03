@@ -1,5 +1,11 @@
 ---
 import "$src/styles/main.css";
+
+interface Props {
+  title: string;
+}
+
+const { title }: { title: string } = Astro.props;
 ---
 
 <html lang="en">
@@ -7,7 +13,7 @@ import "$src/styles/main.css";
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Showcase - Internet Identity</title>
+    <title>II - {title}</title>
     <link rel="shortcut icon" href="/favicon.ico" />
   </head>
   <body>

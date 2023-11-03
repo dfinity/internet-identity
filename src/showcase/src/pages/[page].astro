@@ -63,7 +63,7 @@ export function getStaticPaths() {
 const { page } = Astro.params;
 ---
 
-<Layout>
+<Layout title={page ?? "showcase"}>
   <main id="pageContent" aria-live="polite" data-page-name={page}></main>
   <div id="loaderContainer"></div>
   <script>
