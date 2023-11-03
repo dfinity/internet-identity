@@ -116,7 +116,7 @@ async function withChrome<T>(
       browserVersion: "119.0.6045.105",
       "goog:chromeOptions": chromeOptions,
     },
-    logLevel: "silent",
+    logLevel: "debug",
   });
 
   if (isNullish(mobileEmulation)) {
