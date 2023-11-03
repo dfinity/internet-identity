@@ -111,7 +111,6 @@ async function withChrome<T>(
       browserVersion: "119.0.6045.105",
       "goog:chromeOptions": chromeOptions,
     },
-    automationProtocol: "webdriver",
   });
 
   if (isNullish(mobileEmulation)) {
