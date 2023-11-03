@@ -126,6 +126,7 @@ async function withChrome<T>(
 /** Visit page and wait until loaded */
 async function visit(browser: WebdriverIO.Browser, url: string) {
   await browser.url(url);
+  await browser.pause(1000);
 
   /* Disable transitions and animations to make sure we screenshot the (final) actual state */
   await browser.execute(() => {
