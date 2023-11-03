@@ -1,0 +1,79 @@
+<toast-example></toast-example>
+
+<script>
+  import { LitComponent } from "./lit";
+  import { TemplateResult, html } from "lit-html";
+  import { toast } from "$src/components/toast";
+  import { withRef } from "$src/utils/lit-html";
+  import { createRef, ref } from "lit-html/directives/ref.js";
+
+  class ToastExample extends LitComponent {
+    render(): TemplateResult {
+      const toastMessage = () => {
+        // Potentially create a big message
+        const big =
+          withRef(bigInputElem, (bigInputElem) => bigInputElem.checked) ??
+          false;
+
+        return big
+          ? html`Lorem <strong class="t-strong">ipsum dolor sit amet</strong>,
+              consectetur adipiscing elit. Donec varius tellus id massa
+              lobortis, et luctus nulla consequat. Phasellus lacinia velit non
+              quam placerat imperdiet. In elementum orci sit amet malesuada
+              eleifend.Vestibulumultriciesfringillaloremsitametlaoreet.Suspendissealiquettinciduntrisus,sedpellentesquepurus
+              porttitor nec.`
+          : html`This is a <strong class="t-strong">new</strong> message`;
+      };
+
+      const bigInputElem = createRef<HTMLInputElement>();
+
+      // The various kinds of toasts we display
+      const kinds = ["info", "success", "error"] as const;
+
+      // A function to populate the page with some toasts
+      const populate = () => {
+        kinds.forEach((kind) => {
+          const btn = document.querySelector(
+            `button[data-kind="${kind}"]`
+          ) as HTMLButtonElement;
+
+          withRef(bigInputElem, (checkbox) => {
+            checkbox.checked = false;
+          });
+          btn?.click();
+          withRef(bigInputElem, (checkbox) => {
+            checkbox.checked = true;
+          });
+          btn?.click();
+        });
+      };
+
+      return html`<div
+        class="c-card"
+        style="max-width: 30em; margin: 40px auto;"
+      >
+        <h2 class="t-title t-title--sub">Toasts</h2>
+        <input ${ref(bigInputElem)} type="checkbox">Big</input>
+        <div class="c-button-group">
+          ${kinds.map(
+            (kind) =>
+              html`<button
+                data-kind=${kind}
+                @click=${() => toast[kind](toastMessage())}
+                class="c-button c-input--stack"
+              >
+                ${kind}
+              </button>`
+          )}
+        </div>
+        <button
+            data-action="populate"
+            @click=${() => populate()} class="c-button">
+        Populate
+
+        </button>
+      </div>`;
+    }
+  }
+  customElements.define("toast-example", ToastExample);
+</script>

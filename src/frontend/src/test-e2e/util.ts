@@ -5,7 +5,6 @@ import * as fs from "fs";
 import * as fsasync from "fs/promises";
 import { command } from "webdriver";
 import { remote } from "webdriverio";
-import { downloadChrome } from "../../download-chrome";
 import { WebAuthnCredential } from "../../test-setup";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
@@ -32,19 +31,11 @@ export async function runInBrowser(
 ): Promise<void> {
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
-  const chromePath = await downloadChrome();
-
-  // create logs directory if it does not exist
-  if (!fs.existsSync("wdio-logs")) {
-    fs.mkdirSync("wdio-logs");
-  }
 
   const chromeOptions: ChromeOptions = {
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
-      "--headless",
-      "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
     ],
 
@@ -56,7 +47,6 @@ export async function runInBrowser(
         "*": { last_modified: Date.now(), setting: 1 },
       },
     },
-    binary: chromePath,
   };
 
   if (runConfig.screenConfiguration.screenType === "mobile") {
@@ -74,12 +64,6 @@ export async function runInBrowser(
       browserName: "chrome",
       "goog:chromeOptions": chromeOptions,
     },
-    logLevel: "info",
-    services: ["chromedriver"],
-    automationProtocol: "webdriver",
-    // outputDir pipes all webdriver log output into ./wdio-logs/wdio-chromedriver-<sessionId>.log
-    // stdout only contains errors on test failures
-    outputDir: "./wdio-logs",
   });
 
   // setup test suite

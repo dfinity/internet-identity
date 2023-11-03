@@ -1,0 +1,57 @@
+<pick-anchor></pick-anchor>
+
+<script>
+  import { asyncReplace } from "lit-html/directives/async-replace.js";
+  import { Ref, createRef, ref } from "lit-html/directives/ref.js";
+  import { Chan, NonEmptyArray, asNonEmptyArray } from "$src/utils/utils";
+  import { LitComponent } from "./lit";
+  import { withRef } from "$src/utils/lit-html";
+  import { TemplateResult, html } from "lit-html";
+  import { mkAnchorPicker } from "$src/components/anchorPicker";
+
+  class PickAnchor extends LitComponent {
+    render() {
+      const showSelected: Chan<string> = new Chan("Please pick anchor");
+      const savedAnchors: Ref<HTMLInputElement> = createRef();
+      const updateSavedAnchors: Ref<HTMLButtonElement> = createRef();
+
+      const mk = (anchors: NonEmptyArray<bigint>): TemplateResult =>
+        mkAnchorPicker({
+          savedAnchors: anchors,
+          pick: (anchor: bigint) => showSelected.send(anchor.toString()),
+          moreOptions: () => console.log("More options requested"),
+          focus: false,
+        }).template;
+
+      const chan = new Chan<TemplateResult>(
+        mk([BigInt(10055), BigInt(1669234)])
+      );
+      const update = () =>
+        withRef(savedAnchors, (savedAnchors) => {
+          const value = savedAnchors.value;
+          if (value !== "") {
+            const values = value.split(",").map((x) => BigInt(x));
+            const anchors = asNonEmptyArray(values);
+            if (anchors !== undefined) {
+              chan.send(mk(anchors));
+            }
+          }
+        });
+
+      return html`
+    <div class="c-card" style="margin: 40px;">
+        <input class="c-input c-input--fullwidth" ${ref(
+          savedAnchors
+        )} placeholder="stored anchors: anchor1, anchor2, ..." ></input>
+        <button class="c-button c-input--stack" ${ref(
+          updateSavedAnchors
+        )} @click="${update}">update</button>
+        <div>${asyncReplace(chan)}</div>
+        <div class="c-input c-input--stack c-input--readonly">${asyncReplace(
+          showSelected
+        )} </div>
+    </div>`;
+    }
+  }
+  customElements.define("pick-anchor", PickAnchor);
+</script>
