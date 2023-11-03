@@ -63,6 +63,7 @@ export async function runInBrowser(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
+      browserVersion: "119.0.6045.105", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
