@@ -75,8 +75,11 @@ import Layout from "../layouts/Layout.astro";
             method: "request_credential",
             params: {
               issuer: {
-                issuerOrigin,
-                credentialId: "someCred",
+                origin: issuerOrigin,
+              },
+              credentialSpec: {
+                credentialName: "some cred",
+                arguments: undefined,
               },
               credentialSubject: principal,
             },

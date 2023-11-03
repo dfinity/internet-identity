@@ -11,7 +11,11 @@ The Candid interface is as follows, and the subsequent sections describe the
 services and the corresponding messages in more detail.
 
 ```candid
-type CredentialSpec = record { info : text };
+type ArgumentValue = variant { "int" : int32; string : text };
+type CredentialSpec = record {
+    arguments : opt vec record { text; ArgumentValue };
+    credential_name : text;
+};
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     prepared_context : opt blob;
@@ -22,10 +26,9 @@ type GetCredentialResponse = variant {
     Err : IssueCredentialError
 };
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
-type Icrc21ConsentMessageRequest = record {
-    arg : vec nat8;
-    method : text;
+type Icrc21VcConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
+    credential_spec : CredentialSpec;
 };
 type Icrc21ConsentMessageResponse = variant {
     Ok : Icrc21ConsentInfo;
@@ -62,9 +65,9 @@ type SignedIdAlias = record {
     id_dapp : principal;
 };
 service : {
-    consent_message : (Icrc21ConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
     prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
+    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
 }
 ```
 
@@ -74,8 +77,8 @@ In the attribute sharing flow a user must approve the issuance of a verifiable
 credential by an issuer, and this happens by approving a human-readable consent message from the issuer.
 See [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md) for more detail.
 
-Identity provider requests the consent message via `Icrc21ConsentMessageRequest`,
-and upon successful response displays the consent message from `Icrc21ConsentInfo` to the user.
+Identity provider uses a VC-extension of  [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md), and requests the consent message via `Icrc21VcConsentMessageRequest`,
+Upon successful response idenity provider displays the consent message from `Icrc21ConsentInfo` to the user.
 
 ### 2: Prepare Credential
 
@@ -179,11 +182,14 @@ After receiving the notification that II is ready, the relying party can request
 * Method: `request_credential`
 * Params:
   * `issuer`: An issuer that the relying party trusts. It has the following properties:
-    * `issuerOrigin`: The origin of the issuer.
-    * `credentialId`: The ID of the credential that the relying party wants to request from the issuer.
+    * `origin`: The origin of the issuer.
+    * `canisterId`: (optional) The canister id of the issuer, if applicable/known.
+  * `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
+    * `credentialName`: The name of the requested credential.
+    * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
 
-#### Example
+#### Examples
 
 ```json
 {
@@ -192,10 +198,58 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
-        "issuerOrigin": "https://example-issuer.com",
-        "credentialId": "age_credential"
+        "origin": "https://employment-info.com",
+        "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedEmployee",
+        "arguments": {
+          "employerName": "XYZ Ltd."
+        }
     },
     "credentialSubject": "2mdal-aedsb-hlpnv-qu3zl-ae6on-72bt5-fwha5-xzs74-5dkaz-dfywi-aqe"
+  }
+}
+```
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "request_credential",
+  "params": {
+    "issuer": {
+        "origin": "https://kyc-star.com",
+        "canisterId": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedAdult",
+        "arguments": {
+            "minAge": 21
+        }
+    },
+    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae"
+  }
+}
+```
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "request_credential",
+  "params": {
+    "issuer": {
+        "origin": "https://kyc-resident-info.org"
+    },
+    "credentialSpec": {
+        "credentialName": "VerifiedResident",
+        "arguments": {
+            "countryName": "Panama",
+            "countryAlpha2": "PA"
+        }
+    },
+    "credentialSubject": "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe"
   }
 }
 ```

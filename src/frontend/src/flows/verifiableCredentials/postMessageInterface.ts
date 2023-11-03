@@ -1,5 +1,7 @@
+import { ArgumentValue } from "$generated/vc_issuer_types";
 import { toast } from "$src/components/toast";
 import { Principal } from "@dfinity/principal";
+import { isNullish } from "@dfinity/utils";
 import { z } from "zod";
 
 export const VcFlowReady = {
@@ -19,6 +21,38 @@ const zodPrincipal = z.string().transform((val, ctx) => {
   return principal;
 });
 
+// Parse & validate a CredentialSpec
+const zodCredentialSpec = z
+  /* The input object */
+  .object({
+    credentialName: z.string(),
+    arguments: z.optional(
+      z.record(z.string(), z.union([z.string(), z.number()]))
+    ),
+  })
+  /* Transform to make the type easier to use:
+   *    - transform the arguments to whatever the did spec expects
+   *    - work around the JS type gen weirdness for optionals
+   * XXX: TS needs the type annotation or it gets slightly confused
+   */
+  .transform<{
+    credential_name: string;
+    arguments: [] | [Array<[string, ArgumentValue]>];
+  }>(({ credentialName, arguments: args }) => ({
+    credential_name: credentialName,
+    arguments: isNullish(args) ? [] : [fixupArgs(args)],
+  }));
+
+/* Convert the JSON map/record into what the did spec expects */
+const fixupArgs = (
+  arg: Record<string, string | number>
+): Array<[string, ArgumentValue]> => {
+  return Object.entries(arg).map(([k, v]) => [
+    k,
+    typeof v === "string" ? { string: v } : { int: v },
+  ]);
+};
+
 // https://www.jsonrpc.org/specification
 // https://github.com/dfinity/internet-identity/blob/vc-mvp/docs/vc-spec.md#identity-provider-api
 export const VcFlowRequest = z.object({
@@ -30,11 +64,12 @@ export const VcFlowRequest = z.object({
   method: z.literal("request_credential"),
   params: z.object({
     issuer: z.object({
-      issuerOrigin: z
+      origin: z
         .string()
         .url() /* XXX: we limit to URLs, but in practice should even be an origin */,
-      credentialId: z.string(),
+      canisterId: z.optional(zodPrincipal),
     }),
+    credentialSpec: zodCredentialSpec,
     credentialSubject: zodPrincipal,
   }),
 });

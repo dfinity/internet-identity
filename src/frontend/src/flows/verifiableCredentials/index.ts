@@ -1,5 +1,8 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
-import { IssuedCredentialData } from "$generated/vc_issuer_types";
+import {
+  CredentialSpec,
+  IssuedCredentialData,
+} from "$generated/vc_issuer_types";
 import { authenticateBox } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showSpinner } from "$src/components/spinner";
@@ -48,7 +51,8 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
     verifyCredentials: async ({
       request: {
         credentialSubject: givenP_RP,
-        issuer: { issuerOrigin, credentialId },
+        issuer: { origin: issuerOrigin, canisterId: issuerCanisterId_ },
+        credentialSpec,
       },
       rpOrigin,
     }) => {
@@ -92,15 +96,17 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
       // Grab the credentials from the issuer
       const [issuedCredential, pAlias, issuerCanisterId] = await withLoader(
         async () => {
-          const issuerCanisterId = await lookupCanister({
-            origin: issuerOrigin,
-          });
+          const issuerCanisterId =
+            issuerCanisterId_?.toText() ??
+            (await lookupCanister({
+              origin: issuerOrigin,
+            }));
           const pAlias = await pAliasPending;
 
           const issuedCredential = await issueCredential({
             issuerCanisterId,
             issuerAliasCredential: pAlias.issuerAliasCredential,
-            credentialId,
+            credentialSpec,
           });
           return [issuedCredential, pAlias, issuerCanisterId];
         }
@@ -187,16 +193,17 @@ const getAliasCredentials = async ({
 const issueCredential = async ({
   issuerCanisterId,
   issuerAliasCredential,
-  credentialId,
+  credentialSpec,
 }: {
   issuerCanisterId: string;
   issuerAliasCredential: SignedIdAlias;
-  credentialId: string;
+  credentialSpec: CredentialSpec;
 }): Promise<IssuedCredentialData> => {
   const vcIssuer = new VcIssuer(issuerCanisterId);
+
   const args = {
     signedIdAlias: issuerAliasCredential,
-    credentialSpec: { info: credentialId },
+    credentialSpec,
   };
 
   const preparedCredential = await vcIssuer.prepareCredential(args);

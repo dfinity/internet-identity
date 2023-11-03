@@ -1,7 +1,12 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 
-export interface CredentialSpec { 'info' : string }
+export type ArgumentValue = { 'int' : number } |
+  { 'string' : string };
+export interface CredentialSpec {
+  'arguments' : [] | [Array<[string, ArgumentValue]>],
+  'credential_name' : string,
+}
 export interface GetCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'prepared_context' : [] | [Uint8Array | number[]],
@@ -13,11 +18,6 @@ export interface Icrc21ConsentInfo {
   'consent_message' : string,
   'language' : string,
 }
-export interface Icrc21ConsentMessageRequest {
-  'arg' : Uint8Array | number[],
-  'method' : string,
-  'preferences' : Icrc21ConsentPreferences,
-}
 export type Icrc21ConsentMessageResponse = { 'ok' : Icrc21ConsentInfo } |
   { 'err' : Icrc21Error };
 export interface Icrc21ConsentPreferences { 'language' : string }
@@ -28,6 +28,10 @@ export type Icrc21Error = { 'generic_error' : Icrc21ErrorInfo } |
 export interface Icrc21ErrorInfo {
   'description' : string,
   'error_code' : bigint,
+}
+export interface Icrc21VcConsentMessageRequest {
+  'preferences' : Icrc21ConsentPreferences,
+  'credential_spec' : CredentialSpec,
 }
 export type IssueCredentialError = { 'unauthorized_subject' : string } |
   { 'internal' : string } |
@@ -51,13 +55,13 @@ export interface SignedIdAlias {
 }
 export interface _SERVICE {
   'add_employee' : ActorMethod<[Principal], string>,
-  'consent_message' : ActorMethod<
-    [Icrc21ConsentMessageRequest],
-    Icrc21ConsentMessageResponse
-  >,
   'get_credential' : ActorMethod<[GetCredentialRequest], GetCredentialResponse>,
   'prepare_credential' : ActorMethod<
     [PrepareCredentialRequest],
     PrepareCredentialResponse
+  >,
+  'vc_consent_message' : ActorMethod<
+    [Icrc21VcConsentMessageRequest],
+    Icrc21ConsentMessageResponse
   >,
 }

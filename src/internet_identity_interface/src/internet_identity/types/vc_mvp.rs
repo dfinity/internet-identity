@@ -69,6 +69,8 @@ pub enum GetIdAliasResponse {
 pub mod issuer {
     use super::*;
     use serde_bytes::ByteBuf;
+    use std::collections::HashMap;
+    use std::fmt::{Display, Formatter};
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct PrepareCredentialRequest {
@@ -123,9 +125,27 @@ pub mod issuer {
         pub vc_jws: String,
     }
 
+    #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+    pub enum ArgumentValue {
+        #[serde(rename = "string")]
+        String(String),
+        #[serde(rename = "int")]
+        Int(i32),
+    }
+
+    impl Display for ArgumentValue {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match &self {
+                ArgumentValue::String(s) => write!(f, "'{}'", s),
+                ArgumentValue::Int(i) => write!(f, "{}", i),
+            }
+        }
+    }
+
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
     pub struct CredentialSpec {
-        pub info: String,
+        pub credential_name: String,
+        pub arguments: Option<HashMap<String, ArgumentValue>>,
     }
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -143,9 +163,8 @@ pub mod issuer {
     pub struct ManifestData {}
 
     #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-    pub struct Icrc21ConsentMessageRequest {
-        pub method: String,
-        pub arg: ByteBuf,
+    pub struct Icrc21VcConsentMessageRequest {
+        pub credential_spec: CredentialSpec,
         pub preferences: Icrc21ConsentPreferences,
     }
 
