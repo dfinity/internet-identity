@@ -101,6 +101,7 @@ async function withChrome<T>(
       "disable-gpu",
       "font-render-hinting=none",
       "hide-scrollbars",
+      "disable-dev-shm-usage",
     ],
     mobileEmulation,
   };
@@ -108,7 +109,7 @@ async function withChrome<T>(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "118.0.5993.70",
+      browserVersion: "119.0.6045.105",
       "goog:chromeOptions": chromeOptions,
     },
   });
