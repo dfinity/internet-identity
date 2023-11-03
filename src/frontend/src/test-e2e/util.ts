@@ -65,6 +65,9 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
     automationProtocol: "webdriver",
+    // explicitly set host and port, because otherwise webdriverio will start their own chromedriver
+    hostname: "127.0.0.1",
+    port: 4444,
     path: "/wd/hub",
     logLevel: "info",
     // outputDir pipes all webdriver log output into ./wdio.log
