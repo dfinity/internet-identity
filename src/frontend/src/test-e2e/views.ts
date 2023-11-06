@@ -191,12 +191,12 @@ export class RecoveryMethodSelectorView extends View {
     // shortcuts when run in headless mode (which is the only mode accepted by CI).
     // For the lack of a better solution, we read the seed phrase from the DOM.
 
-    const seedPhrase = (await this.browser.execute(`
-      let phrase = "";
-      for (elem of document.getElementsByClassName("c-list--recovery-word")) {
-        phrase += " " + elem.innerText;
-      }
-      return phrase.trim();`)) as string;
+    const seedPhrase = (await this.browser.execute(() =>
+      document
+        .querySelectorAll(".c-list--recovery-word")
+        .map((e) => e.innerText)
+        .join(" ")
+    )) as string;
 
     assert(seedPhrase?.length > 0, "Seed phrase is empty!");
     return seedPhrase;
