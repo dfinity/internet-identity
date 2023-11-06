@@ -90,10 +90,13 @@ export const minifyHTML = (): {
  * @param forwardRules List of rules (i.e. hostname to canisterId mappings)
  *                     to forward requests to a specific canister
  */
-export const replicaForwardPlugin = (
-  replicaOrigin: string,
-  forwardRules: Array<{ canisterId: string; hosts: string[] }>
-) => ({
+export const replicaForwardPlugin = ({
+  replicaOrigin,
+  forwardRules,
+}: {
+  replicaOrigin: string;
+  forwardRules: Array<{ canisterId: string; hosts: string[] }>;
+}) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
     const proxy = httpProxy.createProxyServer({

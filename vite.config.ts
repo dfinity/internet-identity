@@ -74,31 +74,34 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
-      replicaForwardPlugin("127.0.0.1:4943", [
-        ...(nonNullish(testAppCanisterId)
-          ? [
-              {
-                hosts: [
-                  "nice-name.com",
-                  `${testAppCanisterId}.ic0.app`,
-                  `${testAppCanisterId}.icp0.io`,
-                ],
-                canisterId: testAppCanisterId,
-              },
-            ]
-          : []),
-        ...(process.env.NO_HOT_RELOAD === "1"
-          ? [
-              {
-                hosts: ["identity.ic0.app", "identity.internetcomputer.org"],
-                canisterId: readCanisterId({
-                  canisterName: "internet_identity",
-                  canisterIdsJsonFile: ".dfx/local/canister_ids.json",
-                }),
-              },
-            ]
-          : []),
-      ]),
+      replicaForwardPlugin({
+        replicaOrigin: "127.0.0.1:4943",
+        forwardRules: [
+          ...(nonNullish(testAppCanisterId)
+            ? [
+                {
+                  hosts: [
+                    "nice-name.com",
+                    `${testAppCanisterId}.ic0.app`,
+                    `${testAppCanisterId}.icp0.io`,
+                  ],
+                  canisterId: testAppCanisterId,
+                },
+              ]
+            : []),
+          ...(process.env.NO_HOT_RELOAD === "1"
+            ? [
+                {
+                  hosts: ["identity.ic0.app", "identity.internetcomputer.org"],
+                  canisterId: readCanisterId({
+                    canisterName: "internet_identity",
+                    canisterIdsJsonFile: ".dfx/local/canister_ids.json",
+                  }),
+                },
+              ]
+            : []),
+        ],
+      }),
     ],
     optimizeDeps: {
       esbuildOptions: {
