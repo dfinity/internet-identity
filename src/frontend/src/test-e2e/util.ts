@@ -38,6 +38,9 @@ export async function runInBrowser(
       "--disable-gpu",
       "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
       "--headless",
+      // Map all hosts to localhost:5173 (which is the vite dev server) in the context of DNS resolution.
+      // The dev server will then terminate TLS and either forward the request to the local replica or serve
+      // assets directly.
       "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
     ],
