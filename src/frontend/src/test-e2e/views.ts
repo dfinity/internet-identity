@@ -192,8 +192,10 @@ export class RecoveryMethodSelectorView extends View {
     // For the lack of a better solution, we read the seed phrase from the DOM.
 
     const seedPhrase = (await this.browser.execute(() =>
+      // @ts-ignore
       document
         .querySelectorAll(".c-list--recovery-word")
+        // @ts-ignore
         .map((e) => e.innerText)
         .join(" ")
     )) as string;
