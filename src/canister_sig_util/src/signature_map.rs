@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use std::collections::BinaryHeap;
 
 pub const LABEL_SIG: &[u8] = b"sig";
-
 #[derive(Default)]
 struct Unit;
 
