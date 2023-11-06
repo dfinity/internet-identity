@@ -1,10 +1,10 @@
 use crate::assets::CertifiedAssets;
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
-use crate::{hash, state, update_root_hash, DAY_NS, LABEL_SIG, MINUTE_NS};
+use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::get_canister_sig_pk_der;
-use canister_sig_util::signature_map::SignatureMap;
+use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
 use ic_certified_map::{Hash, HashTree};

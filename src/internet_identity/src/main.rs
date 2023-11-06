@@ -4,6 +4,7 @@ use crate::assets::init_assets;
 use crate::ii_domain::IIDomain;
 use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
+use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -37,8 +38,6 @@ const fn secs_to_nanos(secs: u64) -> u64 {
 const MINUTE_NS: u64 = secs_to_nanos(60);
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 const DAY_NS: u64 = 24 * HOUR_NS;
-
-const LABEL_SIG: &[u8] = b"sig";
 
 // Note: concatenating const &str is a hassle in rust. It seemed easiest to just repeat.
 const IC0_APP_DOMAIN: &str = "identity.ic0.app";
