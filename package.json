@@ -22,7 +22,7 @@
     "preview:showcase": "astro preview --root ./src/showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "vitest --config ./vitest.config.ts",
-    "test:e2e": "vitest --mode e2e --config ./vitest.config.ts",
+    "test:e2e": "vitest --mode e2e --config ./vitest.config.ts --threads=false",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
