@@ -118,24 +118,23 @@ export const replicaForwardPlugin = (
         let host = req.headers["host"];
         return isNullish(host) || rule.hosts.includes(host);
       });
-
-      if (matchingRule !== undefined) {
-        console.log(
-          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${matchingRule.canisterId}`
-        );
-        req.headers["host"] = `${matchingRule.canisterId}.localhost`;
-        proxy.web(req, res, {
-          target: `http://${replicaOrigin}`,
-        });
-
-        proxy.on("error", (err: Error) => {
-          res.statusCode = 500;
-          res.end("Replica forwarding failed: " + err.message);
-        });
-      } else {
+      if (isNullish(matchingRule)) {
         // default handling
-        next();
+        return next();
       }
+
+      console.log(
+        `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${matchingRule.canisterId}`
+      );
+      req.headers["host"] = `${matchingRule.canisterId}.localhost`;
+      proxy.web(req, res, {
+        target: `http://${replicaOrigin}`,
+      });
+
+      proxy.on("error", (err: Error) => {
+        res.statusCode = 500;
+        res.end("Replica forwarding failed: " + err.message);
+      });
     });
   },
 });
