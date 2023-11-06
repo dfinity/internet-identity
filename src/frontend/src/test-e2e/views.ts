@@ -188,7 +188,7 @@ export class RecoveryMethodSelectorView extends View {
     // policy.
     // The alternative solution of simulating key presses does not work either,
     // since chromium does not allow to interact with the clipboard via keyboard
-    // shortcuts when run in headless mode.
+    // shortcuts when run in headless mode (which is the only mode accepted by CI).
     // For the lack of a better solution, we read the seed phrase from the DOM.
 
     const seedPhrase = (await this.browser.execute(`

@@ -92,7 +92,7 @@ export const minifyHTML = (): {
  */
 export const replicaForwardPlugin = (
   replicaOrigin: string,
-  forwardRules: { hosts: string[]; canisterId: string }[]
+  forwardRules: Array<{ canisterId: string; hosts: string[]; }>
 ) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
@@ -102,6 +102,7 @@ export const replicaForwardPlugin = (
 
     server.middlewares.use((req, res, next) => {
       if (
+        /* deny requests to raw URLs */ 
         req.headers["host"]?.endsWith(".raw.ic0.app") ||
         req.headers["host"]?.endsWith(".raw.icp0.io")
       ) {
@@ -113,7 +114,7 @@ export const replicaForwardPlugin = (
         return;
       }
 
-      let matchingRule = forwardRules.find((rule) => {
+      const matchingRule = forwardRules.find((rule) => {
         let host = req.headers["host"];
         return isNullish(host) || rule.hosts.includes(host);
       });
