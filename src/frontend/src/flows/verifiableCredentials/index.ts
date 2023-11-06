@@ -67,12 +67,6 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
       const computedP_RP = await authenticatedConnection.getPrincipal({
         origin: rpOrigin,
       });
-
-      const pAliasPending = getAliasCredentials({
-        rpOrigin,
-        issuerOrigin,
-        authenticatedConnection,
-      });
       if (computedP_RP.compareTo(givenP_RP) !== "eq") {
         return giveUp(
           [
@@ -83,10 +77,33 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
         );
       }
 
+      // Figure out the canister ID of the issuer
+      const issuerCanisterId =
+        issuerCanisterId_?.toText() ??
+        (await lookupCanister({
+          origin: issuerOrigin,
+        }));
+
+      const vcIssuer = new VcIssuer(issuerCanisterId);
+      // XXX: We don't check that the language matches the user's language. We need
+      // to figure what to do UX-wise first.
+      const consentInfo = await vcIssuer.getConsentMessage({ credentialSpec });
+
+      if ("error" in consentInfo) {
+        return giveUp("Could not prepare consent message");
+      }
+
+      const pAliasPending = getAliasCredentials({
+        rpOrigin,
+        issuerOrigin,
+        authenticatedConnection,
+      });
+
       // Ask user to confirm the verification of credentials
       const allowed = await allow({
         relyingOrigin: rpOrigin,
         providerOrigin: issuerOrigin,
+        consentMessage: consentInfo.consent_message,
       });
       if (allowed === "canceled") {
         return giveUp("canceled");
@@ -94,23 +111,16 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
       allowed satisfies "allowed";
 
       // Grab the credentials from the issuer
-      const [issuedCredential, pAlias, issuerCanisterId] = await withLoader(
-        async () => {
-          const issuerCanisterId =
-            issuerCanisterId_?.toText() ??
-            (await lookupCanister({
-              origin: issuerOrigin,
-            }));
-          const pAlias = await pAliasPending;
+      const [issuedCredential, pAlias] = await withLoader(async () => {
+        const pAlias = await pAliasPending;
 
-          const issuedCredential = await issueCredential({
-            issuerCanisterId,
-            issuerAliasCredential: pAlias.issuerAliasCredential,
-            credentialSpec,
-          });
-          return [issuedCredential, pAlias, issuerCanisterId];
-        }
-      );
+        const issuedCredential = await issueCredential({
+          vcIssuer,
+          issuerAliasCredential: pAlias.issuerAliasCredential,
+          credentialSpec,
+        });
+        return [issuedCredential, pAlias];
+      });
 
       // Create the presentation and return it to the RP
       return createPresentation({
@@ -191,16 +201,14 @@ const getAliasCredentials = async ({
 };
 
 const issueCredential = async ({
-  issuerCanisterId,
+  vcIssuer,
   issuerAliasCredential,
   credentialSpec,
 }: {
-  issuerCanisterId: string;
+  vcIssuer: VcIssuer;
   issuerAliasCredential: SignedIdAlias;
   credentialSpec: CredentialSpec;
 }): Promise<IssuedCredentialData> => {
-  const vcIssuer = new VcIssuer(issuerCanisterId);
-
   const args = {
     signedIdAlias: issuerAliasCredential,
     credentialSpec,

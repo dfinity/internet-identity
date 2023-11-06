@@ -643,6 +643,7 @@ export const iiPages: Record<string, () => void> = {
     allowPage({
       relyingOrigin: "https://oc.app",
       providerOrigin: "https://nns.ic0.app",
+      consentMessage: "DFINITY Employee",
       onAllow: () => toast.info(html`Allowed`),
       onCancel: () => toast.info(html`Canceled`),
     }),

@@ -7,12 +7,14 @@ import { TemplateResult, html } from "lit-html";
 const allowTemplate = ({
   relyingOrigin,
   providerOrigin,
+  consentMessage,
   onAllow,
   onCancel,
   scrollToTop = false,
 }: {
   relyingOrigin: string;
   providerOrigin: string;
+  consentMessage: string;
   onAllow: () => void;
   onCancel: () => void;
   /* put the page into view */
@@ -27,6 +29,8 @@ const allowTemplate = ({
       <strong class="t-strong">${providerOrigin}</strong> with
       <strong class="t-strong">${relyingOrigin}</strong>?
     </p>
+
+    <div class="l-stack c-input c-input--readonly">${consentMessage}</div>
 
     <div class="c-button-group">
       <button
@@ -55,14 +59,17 @@ export const allowPage = renderPage(allowTemplate);
 export const allow = ({
   relyingOrigin,
   providerOrigin,
+  consentMessage,
 }: {
   relyingOrigin: string;
   providerOrigin: string;
+  consentMessage: string;
 }): Promise<"allowed" | "canceled"> => {
   return new Promise((resolve) =>
     allowPage({
       relyingOrigin,
       providerOrigin,
+      consentMessage,
       onAllow: () => resolve("allowed"),
       onCancel: () => resolve("canceled"),
       scrollToTop: true,

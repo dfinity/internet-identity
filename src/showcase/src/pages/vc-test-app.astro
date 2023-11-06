@@ -78,8 +78,8 @@ import Layout from "../layouts/Layout.astro";
                 origin: issuerOrigin,
               },
               credentialSpec: {
-                credentialName: "some cred",
-                arguments: undefined,
+                credentialName: "VerifiedEmployee",
+                arguments: { employerName: "DFINITY" },
               },
               credentialSubject: principal,
             },

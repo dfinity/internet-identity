@@ -2,6 +2,7 @@ import { SignedIdAlias } from "$generated/internet_identity_types";
 import { idlFactory as vc_issuer_idl } from "$generated/vc_issuer_idl";
 import {
   CredentialSpec,
+  Icrc21ConsentInfo,
   IssuedCredentialData,
   PreparedCredentialData,
   _SERVICE,
@@ -48,7 +49,7 @@ export class VcIssuer {
 
     // TODO: proper error handling
     if ("err" in result) {
-      console.error("wops");
+      console.error("wops", result);
       return { error: "wops" };
     }
 
@@ -75,6 +76,27 @@ export class VcIssuer {
     // TODO: proper error handling
     if ("err" in result) {
       console.error("wops");
+      return { error: "wops" };
+    }
+
+    return result.ok;
+  };
+
+  getConsentMessage = async ({
+    credentialSpec,
+  }: {
+    credentialSpec: CredentialSpec;
+  }): Promise<Icrc21ConsentInfo | { error: string }> => {
+    const actor = await this.createActor();
+
+    const result = await actor.vc_consent_message({
+      preferences: { language: "en-US" },
+      credential_spec: credentialSpec,
+    });
+
+    // TODO: proper error handling
+    if ("err" in result) {
+      console.error("wops", result);
       return { error: "wops" };
     }
 
