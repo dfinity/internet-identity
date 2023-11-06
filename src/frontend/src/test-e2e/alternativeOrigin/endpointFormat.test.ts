@@ -140,7 +140,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     );
 
     let logs = (await browser.getLogs("browser")) as { message: string }[];
-    expect(logs[logs.length - 1].message).toContain(`Failed to load resource`);
+    expect(logs.at(-1).message).toContain(`Failed to load resource`);
 
     // This works anyway --> fetched using non-raw
     const authenticateView = new AuthenticateView(browser);
