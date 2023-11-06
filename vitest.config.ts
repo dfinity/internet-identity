@@ -9,9 +9,6 @@ export default defineConfig(
     },
     test: {
       environment: "jsdom",
-      env: {
-        npm_package_json: process.env.npm_package_json ?? "./package.json",
-      },
       exclude: [
         ...configDefaults.exclude,
         ...(mode === "test" ? ["src/frontend/src/test-e2e/**"] : []),
