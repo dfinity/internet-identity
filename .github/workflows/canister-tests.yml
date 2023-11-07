@@ -465,13 +465,6 @@ jobs:
         if: ${{ always() }}
         run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
 
-      - name: Archive test logs
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: e2e-test-logs-${{ matrix.device }}-${{ matrix.shard }}
-          path: wdio-logs/*.log
-
       - name: Archive test failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
