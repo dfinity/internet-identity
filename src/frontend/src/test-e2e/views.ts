@@ -598,7 +598,13 @@ export class DemoAppView extends View {
     );
   }
 
-  async getPrincipal(): Promise<string> {
+  async getPrincipal(opts?: { waitForNonAnonymous: boolean }): Promise<string> {
+    if (opts?.waitForNonAnonymous) {
+      await this.browser.waitUntil(
+        async () =>
+          (await this.browser.$("#principal").getText()) !== "2vxsx-fae"
+      );
+    }
     return await this.browser.$("#principal").getText();
   }
 

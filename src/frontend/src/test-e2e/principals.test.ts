@@ -51,7 +51,9 @@ test("Should issue the same principal to nice url and canonical url", async () =
     await authenticateView.pickAnchor(userNumber);
     await waitToClose(browser);
 
-    const principal1 = await canonicalDemoAppView.getPrincipal();
+    const principal1 = await canonicalDemoAppView.getPrincipal({
+      waitForNonAnonymous: true,
+    });
 
     const niceDemoAppView = new DemoAppView(browser);
     await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
@@ -78,7 +80,9 @@ test("Should issue the same principal to nice url and canonical url", async () =
     await authenticateView.pickAnchor(userNumber);
     await waitToClose(browser);
 
-    const principal2 = await niceDemoAppView.getPrincipal();
+    const principal2 = await niceDemoAppView.getPrincipal({
+      waitForNonAnonymous: true,
+    });
     expect(principal1).toEqual(principal2);
   });
 }, 300_000);
@@ -118,7 +122,9 @@ test("Should issue the same principal to dapps on legacy & official domains", as
       await authenticateView.pickAnchor(userNumber);
       await waitToClose(browser);
 
-      return await canonicalDemoAppView.getPrincipal();
+      return await canonicalDemoAppView.getPrincipal({
+        waitForNonAnonymous: true,
+      });
     };
 
     // Compare that principals issues for ic0.app & icp0.io are the same
