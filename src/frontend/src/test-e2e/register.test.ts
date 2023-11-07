@@ -6,7 +6,6 @@ import {
   originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
-  waitToClose,
 } from "./util";
 import { AuthenticateView, DemoAppView, MainView } from "./views";
 
@@ -67,11 +66,7 @@ test("Log into client application, after registration", async () => {
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
-    await waitToClose(browser);
-    await demoAppView.waitForDisplay();
-    const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe("2vxsx-fae");
-
+    const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
       principal
     );
@@ -113,11 +108,7 @@ test("Register first then log into client application", async () => {
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
     await FLOWS.skipRecoveryNag(browser);
-    await waitToClose(browser);
-    await demoAppView.waitForDisplay();
-    const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe("2vxsx-fae");
-
+    const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
       principal
     );

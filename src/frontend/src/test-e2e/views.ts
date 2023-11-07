@@ -1,5 +1,7 @@
 import { zip } from "$src/utils/utils";
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { waitToClose } from "./util";
 
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
@@ -598,18 +600,25 @@ export class DemoAppView extends View {
     );
   }
 
-  async getPrincipal(opts?: { waitForNonAnonymous: boolean }): Promise<string> {
-    if (opts?.waitForNonAnonymous) {
-      await this.browser.waitUntil(
-        async () =>
-          (await this.browser.$("#principal").getText()) !== "2vxsx-fae"
-      );
-    }
+  async getPrincipal(): Promise<string> {
     return await this.browser.$("#principal").getText();
   }
 
   async signin(): Promise<void> {
     await this.browser.$("#signinBtn").click();
+  }
+
+  /** Waits for the authentication to finish, the window to close and the principal to update.
+   * Returns the principal after the user has been authenticated.
+   */
+  async waitForAuthenticated(): Promise<string> {
+    // wait for the demo app to close the II window
+    await waitToClose(this.browser);
+    // wait for the demo app to update the principal
+    await this.browser.waitUntil(
+      async () => (await this.getPrincipal()) !== Principal.anonymous().toText()
+    );
+    return this.getPrincipal();
   }
 
   async signout(): Promise<void> {

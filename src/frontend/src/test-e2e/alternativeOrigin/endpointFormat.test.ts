@@ -6,7 +6,6 @@ import {
   originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
-  waitToClose,
 } from "../util";
 import { AuthenticateView, DemoAppView, ErrorView } from "../views";
 
@@ -147,8 +146,6 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    await waitToClose(browser);
-
-    expect(await niceDemoAppView.getPrincipal()).not.toBe("2vxsx-fae");
+    await niceDemoAppView.waitForAuthenticated();
   });
 }, 300_000);
