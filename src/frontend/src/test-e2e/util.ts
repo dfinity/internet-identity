@@ -69,10 +69,6 @@ export async function runInBrowser(
     hostname: "127.0.0.1",
     port: 4444,
     path: "/wd/hub",
-    logLevel: "info",
-    // outputDir pipes all webdriver log output into ./wdio.log
-    // stdout only contains errors on test failures
-    outputDir: "./",
   });
 
   // setup test suite
