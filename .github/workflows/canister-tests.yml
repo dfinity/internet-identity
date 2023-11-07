@@ -420,8 +420,6 @@ jobs:
           dfx --version
           echo node --version
           node --version
-          echo docker --version
-          docker --version
 
       - name: 'Run dfx'
         run: dfx start --background
@@ -449,30 +447,23 @@ jobs:
           dfx canister create --all
           dfx canister install test_app --wasm test_app.wasm
 
-      - name: Start docker compose
-        run: scripts/start-selenium-env --no-hot-reload
-
       - run: npm ci
       - run: npm test
+      - name: Run dev server
+        id: dev-server-start
+        run: |
+          TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev&
+          dev_server_pid=$!
+          echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
       - run: "II_URL=${{ matrix.domain }} SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
-      - name: Collect docker logs
-        working-directory: docker-test-env
-        if: ${{ always() }}
-        run: docker compose logs > ../docker-compose.log
 
       - name: Stop dfx
+        if: ${{ always() }}
         run: dfx stop
 
-      - name: Shut down docker services
-        working-directory: docker-test-env
-        run: docker compose down
-
-      - name: Archive test logs
+      - name: Stop dev server
         if: ${{ always() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: e2e-test-log-${{ matrix.device }}-${{ matrix.shard }}
-          path: ./*.log
+        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
 
       - name: Archive test failures
         if: ${{ always() }}

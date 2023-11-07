@@ -36,6 +36,12 @@ export async function runInBrowser(
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
+      "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
+      "--headless",
+      // Map all hosts to localhost:5173 (which is the vite dev server) in the context of DNS resolution.
+      // The dev server will then terminate TLS and either forward the request to the local replica or serve
+      // assets directly.
+      "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
     ],
 
@@ -62,13 +68,9 @@ export async function runInBrowser(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
+      browserVersion: "119.0.6045.105", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
-    automationProtocol: "webdriver",
-    // explicitly set host and port, because otherwise webdriverio will start their own chromedriver
-    hostname: "127.0.0.1",
-    port: 4444,
-    path: "/wd/hub",
   });
 
   // setup test suite

@@ -134,13 +134,13 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     );
 
     // Selenium has _no_ connectivity to the raw url
+    // We want accessing raw urls to fail because it would be a security issue on mainnet
     await browser.execute(
-      `console.log(await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins"))`
+      `try{await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins")}catch(e){e.message}`
     );
+
     let logs = (await browser.getLogs("browser")) as { message: string }[];
-    expect(logs[logs.length - 1].message).toEqual(
-      `https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins - Failed to load resource: the server responded with a status of 400 (Bad Request)`
-    );
+    expect(logs.at(-1)?.message).toContain(`Failed to load resource`);
 
     // This works anyway --> fetched using non-raw
     const authenticateView = new AuthenticateView(browser);
