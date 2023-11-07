@@ -1,6 +1,7 @@
 import { zip } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { TEST_APP_CANONICAL_URL } from "./constants";
 import { waitToClose } from "./util";
 
 class View {
@@ -185,20 +186,19 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async getSeedPhrase(): Promise<string> {
-    // Ideally, we could press the copy button on the page and the read the
-    // clipboard. However, this is not possible due to the content security
-    // policy.
-    // The alternative solution of simulating key presses does not work either,
-    // since chromium does not allow to interact with the clipboard via keyboard
-    // shortcuts when run in headless mode (which is the only mode accepted by CI).
-    // For the lack of a better solution, we read the seed phrase from the DOM.
+    await this.copySeedPhrase();
 
-    const seedPhrase = (await this.browser.execute(() =>
-      Array.from(document.querySelectorAll(".c-list--recovery-word"))
-        .map((e) => (e as HTMLElement).innerText)
-        .join(" ")
-    )) as string;
-
+    const puppeteer = await this.browser.getPuppeteer();
+    const page = await puppeteer.newPage();
+    await page.goto(TEST_APP_CANONICAL_URL);
+    await page.bringToFront();
+    await puppeteer
+      .defaultBrowserContext()
+      .overridePermissions(TEST_APP_CANONICAL_URL, ["clipboard-read"]);
+    const seedPhrase = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    await page.close();
     assert(seedPhrase?.length > 0, "Seed phrase is empty!");
     return seedPhrase;
   }
