@@ -105,7 +105,8 @@ export const replicaForwardPlugin = ({
 
     server.middlewares.use((req, res, next) => {
       if (
-        /* deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app */
+        /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
+         * to verify the alternative origins. */
         req.headers["host"]?.includes(".raw.")
       ) {
         console.log(

@@ -135,6 +135,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     );
 
     // Selenium has _no_ connectivity to the raw url
+    // We want accessing raw urls to fail because it would be a security issue on mainnet
     await browser.execute(
       `try{await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins")}catch(e){e.message}`
     );
