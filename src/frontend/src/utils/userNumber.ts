@@ -10,7 +10,7 @@ const Anchor = z
     /** Timestamp (mills since epoch) of when anchor was last used */
     lastUsedTimestamp: z.number(),
   })
-  .passthrough(); /* ensures keys listed in schema are kept during parse */
+  .passthrough(); /* ensures keys not listed in schema are kept during parse */
 
 /** The type of all anchors in local storage. Because we deal with local storage we only
  * care about 'string's and not 'bigint's. */
@@ -142,7 +142,9 @@ const readAnchors = (): Anchors => {
   // Actually parse the JSON object
   const parsed = Anchors.safeParse(item);
   if (parsed.success !== true) {
-    const message = `ignoring malformed localstorage data: ` + parsed.error;
+    const message =
+      `could not read saved identities: ignoring malformed localstorage data: ` +
+      parsed.error;
     console.warn(message);
     return {};
   }
