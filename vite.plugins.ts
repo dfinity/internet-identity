@@ -117,10 +117,17 @@ export const replicaForwardPlugin = ({
         return;
       }
 
-      const matchingRule = forwardRules.find((rule) => {
-        let host = req.headers["host"];
-        return isNullish(host) || rule.hosts.includes(host);
-      });
+      let host = req.headers["host"];
+      if (isNullish(host)) {
+        // default handling
+        return next();
+      }
+
+      const matchingRule = forwardRules.find(
+        // the TS compiler doesn't get that due to the isNullish check above, host can't be undefined
+        // (which is why the explicit cast is there)
+        (rule) => rule.hosts.includes(host as string)
+      );
       if (isNullish(matchingRule)) {
         // default handling
         return next();
