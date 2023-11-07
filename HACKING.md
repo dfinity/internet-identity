@@ -103,7 +103,15 @@ into the following issues:
 
 #### Test suites
 
-We have a set of Selenium tests that run through the various flows. To set up a local deployment follow the steps in [docker-test-env/README.md](docker-test-env/README.md).
+We have a set of Selenium tests that run through the various flows. To set up a local deployment follow these steps:
+1. Start a local replica with `dfx start`
+2. Deploy the [`Test` flavour](https://github.com/dfinity/internet-identity/tree/main#flavors) of II by running: `II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 dfx deploy internet_identity`
+3. Deploy the test app by running `dfx deploy` from the `demos/test-app` directory
+4. Start the vite dev server with TLS enabled: `TLS_DEV_SERVER=1 npm run dev`
+
+To watch the tests run in the browser remove the `headless` option from `src/frontend/src/test-e2e/util.ts`.
+
+```bash
 The tests can be executed by running:
 
 ```bash
