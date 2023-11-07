@@ -1,17 +1,21 @@
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { unknownToRecord } from "./utils";
+import { nonNullish } from "@dfinity/utils";
+import { z } from "zod";
 
 /** The Anchor type as stored in local storage, including hint of the frequency
  * at which the anchor is used.
  * If you change this type, please add a migration */
-type Anchor = {
-  /** Timestamp (mills since epoch) of when anchor was last used */
-  lastUsedTimestamp: number;
-};
+type Anchor = z.infer<typeof Anchor>;
+const Anchor = z
+  .object({
+    /** Timestamp (mills since epoch) of when anchor was last used */
+    lastUsedTimestamp: z.number(),
+  })
+  .passthrough(); /* ensures keys not listed in schema are kept during parse */
 
 /** The type of all anchors in local storage. Because we deal with local storage we only
  * care about 'string's and not 'bigint's. */
-type Anchors = Record<string, Anchor>;
+type Anchors = z.infer<typeof Anchors>;
+const Anchors = z.record(Anchor);
 
 /** We keep as many anchors as possible for two reasons:
  *  - we should design the app to discourage having many many anchors, but shouldn't prevent it
@@ -121,7 +125,7 @@ const mostUnused = (anchors: Anchors): string | undefined => {
 
 const readAnchors = (): Anchors => {
   const raw = localStorage.getItem("anchors");
-
+  // Fail if the key is not set
   if (raw === null) {
     return {};
   }
@@ -135,40 +139,17 @@ const readAnchors = (): Anchors => {
     item = {};
   }
 
-  if (typeof item !== "object") {
-    console.warn("bad identity", item, "type is", typeof item);
+  // Actually parse the JSON object
+  const parsed = Anchors.safeParse(item);
+  if (parsed.success !== true) {
+    const message =
+      `could not read saved identities: ignoring malformed localstorage data: ` +
+      parsed.error;
+    console.warn(message);
     return {};
   }
 
-  // eslint-disable-next-line
-  const tmp: {} = item;
-  const objects: Record<string, unknown> = tmp;
-
-  const anchors: Anchors = {};
-
-  for (const ix in objects) {
-    const anchor = asAnchor(objects[ix]);
-    if (isNullish(anchor)) {
-      console.warn("Could not read Internet Identity", objects[ix]);
-      continue;
-    }
-
-    anchors[ix] = anchor;
-  }
-
-  return anchors;
-};
-
-/** Try to interpret an unknown value as an anchor */
-const asAnchor = (msg: unknown): Anchor | undefined => {
-  const obj: Record<string, unknown> | undefined = unknownToRecord(msg);
-  if (isNullish(obj)) {
-    return undefined;
-  }
-
-  if ("lastUsedTimestamp" in obj && typeof obj.lastUsedTimestamp === "number") {
-    return { ...obj, lastUsedTimestamp: obj.lastUsedTimestamp };
-  }
+  return parsed.data;
 };
 
 const writeAnchors = (anchors: Anchors) => {
