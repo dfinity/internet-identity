@@ -122,8 +122,8 @@ export const replicaForwardPlugin = ({
         return next();
       }
 
-      const matchingRule = forwardRules.find(
-        (rule) => rule.hosts.includes(host)
+      const matchingRule = forwardRules.find((rule) =>
+        rule.hosts.includes(host)
       );
       if (isNullish(matchingRule)) {
         // default handling
