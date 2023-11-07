@@ -105,9 +105,8 @@ export const replicaForwardPlugin = ({
 
     server.middlewares.use((req, res, next) => {
       if (
-        /* deny requests to raw URLs */
-        req.headers["host"]?.endsWith(".raw.ic0.app") ||
-        req.headers["host"]?.endsWith(".raw.icp0.io")
+        /* deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app */
+        req.headers["host"]?.includes(".raw.")
       ) {
         console.log(
           `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`
