@@ -32,7 +32,7 @@ impl TryFrom<&[u8]> for CanisterSigPublicKey {
 
     fn try_from(pk_der: &[u8]) -> Result<Self, Self::Error> {
         let pk_raw = extract_raw_canister_sig_pk_from_der(pk_der)?;
-        let canister_id_len: usize = if pk_raw.len() > 0 {
+        let canister_id_len: usize = if !pk_raw.is_empty() {
             usize::from(pk_der[0])
         } else {
             return Err("empty raw canister sig pk".to_string());
@@ -45,7 +45,7 @@ impl TryFrom<&[u8]> for CanisterSigPublicKey {
         let canister_id = Principal::try_from_slice(canister_id_raw)
             .map_err(|e| format!("invalid canister id in canister sig pk: {}", e))?;
         Ok(CanisterSigPublicKey {
-            canister_id: canister_id,
+            canister_id,
             seed: seed.to_vec(),
         })
     }
