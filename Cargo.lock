@@ -2060,7 +2060,7 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "sha2 0.10.8",
- "vc_util",
+ "vc_util_br",
 ]
 
 [[package]]
@@ -3456,7 +3456,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5190c9442dcdaf0ddd50f37420417d219ae5261bbf5db120d0f9bab996c9cba1"
 
 [[package]]
-name = "vc_util"
+name = "vc_util_br"
 version = "0.1.0"
 dependencies = [
  "assert_matches",

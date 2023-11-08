@@ -1,5 +1,5 @@
 [package]
-name = "vc_util"
+name = "vc_util_br"
 description = "Utils for verifiable credentials on the IC"
 version = "0.1.0"
 edition = "2021"

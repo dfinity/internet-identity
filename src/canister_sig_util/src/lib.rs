@@ -19,6 +19,50 @@ lazy_static! {
         extract_raw_root_pk_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.");
 }
 
+/// A public key of canister signatures,
+/// see https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct CanisterSigPublicKey {
+    pub canister_id: Principal,
+    pub seed: Vec<u8>,
+}
+
+impl TryFrom<&[u8]> for CanisterSigPublicKey {
+    type Error = String;
+
+    fn try_from(pk_der: &[u8]) -> Result<Self, Self::Error> {
+        let pk_raw = extract_raw_canister_sig_pk_from_der(pk_der)?;
+        let canister_id_len: usize = if !pk_raw.is_empty() {
+            usize::from(pk_der[0])
+        } else {
+            return Err("empty raw canister sig pk".to_string());
+        };
+        if pk_raw.len() < (1 + canister_id_len) {
+            return Err("canister sig pk too short".to_string());
+        }
+        let canister_id_raw = &pk_der[1..(1 + canister_id_len)];
+        let seed = &pk_der[canister_id_len + 1..];
+        let canister_id = Principal::try_from_slice(canister_id_raw)
+            .map_err(|e| format!("invalid canister id in canister sig pk: {}", e))?;
+        Ok(CanisterSigPublicKey {
+            canister_id,
+            seed: seed.to_vec(),
+        })
+    }
+}
+
+impl CanisterSigPublicKey {
+    /// Constructs a new canister signatures public key.
+    pub fn new(canister_id: Principal, seed: Vec<u8>) -> Self {
+        CanisterSigPublicKey { canister_id, seed }
+    }
+
+    /// Returns a byte vector with DER-encoding of this key.
+    pub fn to_der(&self) -> Vec<u8> {
+        get_canister_sig_pk_der(self.canister_id, &self.seed)
+    }
+}
+
 /// Returns (DER-encoded) public key of the canister signatures for the given canister_id and seed.
 /// (cf. https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures))
 pub fn get_canister_sig_pk_der(canister_id: Principal, seed: &[u8]) -> Vec<u8> {

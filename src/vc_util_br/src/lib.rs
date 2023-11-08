@@ -1,5 +1,5 @@
 use candid::Principal;
-use canister_sig_util::extract_raw_canister_sig_pk_from_der;
+use canister_sig_util::{extract_raw_canister_sig_pk_from_der, CanisterSigPublicKey};
 use ic_certified_map::Hash;
 use ic_crypto_standalone_sig_verifier::verify_canister_sig;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
@@ -46,22 +46,17 @@ pub enum CredentialVerificationError {
     InvalidClaims(JwtValidationError),
 }
 
-pub fn vc_signing_input(
-    credential_jwt: &str,
-    canister_sig_pk_der: &[u8],
-    canister_id: Principal,
-) -> Vec<u8> {
-    let encoder = jws_encoder(credential_jwt, canister_sig_pk_der, canister_id);
+pub fn vc_signing_input(credential_jwt: &str, canister_sig_pk: &CanisterSigPublicKey) -> Vec<u8> {
+    let encoder = jws_encoder(credential_jwt, canister_sig_pk);
     encoder.signing_input().to_vec()
 }
 
 pub fn vc_jwt_to_jws(
     credential_jwt: &str,
-    canister_sig_pk_der: &[u8],
+    canister_sig_pk: &CanisterSigPublicKey,
     sig: &[u8],
-    canister_id: Principal,
 ) -> String {
-    let encoder = jws_encoder(credential_jwt, canister_sig_pk_der, canister_id);
+    let encoder = jws_encoder(credential_jwt, canister_sig_pk);
     encoder.into_jws(sig)
 }
 
@@ -300,16 +295,15 @@ fn inconsistent_jwt_claims(custom_message: &'static str) -> JwtValidationError {
 
 fn jws_encoder<'a>(
     credential_jwt: &'a str,
-    canister_sig_pk_der: &[u8],
-    canister_id: Principal,
+    canister_sig_pk: &CanisterSigPublicKey,
 ) -> CompactJwsEncoder<'a> {
     let mut header: JwsHeader = JwsHeader::new();
     header.set_alg(JwsAlgorithm::IcCs);
-    let kid = did_for_principal(canister_id);
+    let kid = did_for_principal(canister_sig_pk.canister_id);
     header.set_kid(kid);
     header
         .deref_mut()
-        .set_jwk(canister_sig_pk_jwk(canister_sig_pk_der));
+        .set_jwk(canister_sig_pk_jwk(&canister_sig_pk.to_der()));
 
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(credential_jwt.as_ref(), &header)
         .expect("internal error: JWS encoder failed");

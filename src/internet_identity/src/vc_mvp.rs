@@ -2,7 +2,7 @@ use crate::assets::CertifiedAssets;
 use crate::delegation::check_frontend_length;
 use crate::{delegation, hash, state, update_root_hash, LABEL_SIG, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::get_canister_sig_pk_der;
+use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};
@@ -20,7 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use vc_util::{
+use vc_util_br::{
     did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash, AliasTuple,
     II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
 };
@@ -45,7 +45,7 @@ pub async fn prepare_id_alias(
     let id_alias_principal = get_id_alias_principal(identity_number, &dapps);
     let seed = calculate_id_alias_seed(identity_number, &dapps);
     let canister_id = ic_cdk::id();
-    let canister_sig_pk_der = get_canister_sig_pk_der(canister_id, &seed);
+    let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
 
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
@@ -56,10 +56,9 @@ pub async fn prepare_id_alias(
         id_dapp: delegation::get_principal(identity_number, dapps.issuer.clone()),
     };
 
-    let (rp_id_alias_jwt, rp_msg_hash) =
-        id_alias_jwt_and_msg_hash(&rp_tuple, &canister_sig_pk_der, canister_id);
+    let (rp_id_alias_jwt, rp_msg_hash) = id_alias_jwt_and_msg_hash(&rp_tuple, &canister_sig_pk);
     let (issuer_id_alias_jwt, issuer_msg_hash) =
-        id_alias_jwt_and_msg_hash(&issuer_tuple, &canister_sig_pk_der, canister_id);
+        id_alias_jwt_and_msg_hash(&issuer_tuple, &canister_sig_pk);
 
     state::signature_map_mut(|sigs| {
         add_signature(sigs, rp_msg_hash, seed);
@@ -67,7 +66,7 @@ pub async fn prepare_id_alias(
     });
     update_root_hash();
     PreparedIdAlias {
-        canister_sig_pk: ByteBuf::from(canister_sig_pk_der),
+        canister_sig_pk: ByteBuf::from(canister_sig_pk.to_der()),
         rp_id_alias_jwt,
         issuer_id_alias_jwt,
     }
@@ -75,11 +74,10 @@ pub async fn prepare_id_alias(
 
 fn id_alias_jwt_and_msg_hash(
     alias_tuple: &AliasTuple,
-    canister_sig_pk_der: &[u8],
-    canister_id: Principal,
+    canister_sig_pk: &CanisterSigPublicKey,
 ) -> (String, Hash) {
     let credential_jwt = prepare_id_alias_jwt(alias_tuple);
-    let signing_input = vc_signing_input(&credential_jwt, canister_sig_pk_der, canister_id);
+    let signing_input = vc_signing_input(&credential_jwt, canister_sig_pk);
     let msg_hash = vc_signing_input_hash(&signing_input);
     (credential_jwt, msg_hash)
 }
@@ -99,9 +97,9 @@ pub fn get_id_alias(
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
         let canister_id = ic_cdk::id();
-        let canister_sig_pk_der = get_canister_sig_pk_der(canister_id, &seed);
+        let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
 
-        let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk_der, canister_id);
+        let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk);
         let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let rp_sig = if let Some(sig) = maybe_sig {
@@ -109,10 +107,9 @@ pub fn get_id_alias(
         } else {
             return GetIdAliasResponse::NoSuchCredentials("rp_sig not found".to_string());
         };
-        let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk_der, &rp_sig, canister_id);
+        let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk, &rp_sig);
 
-        let signing_input =
-            vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk_der, canister_id);
+        let signing_input = vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk);
         let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let issuer_sig = if let Some(sig) = maybe_sig {
@@ -120,12 +117,7 @@ pub fn get_id_alias(
         } else {
             return GetIdAliasResponse::NoSuchCredentials("issuer_sig not found".to_string());
         };
-        let issuer_jws = vc_jwt_to_jws(
-            issuer_id_alias_jwt,
-            &canister_sig_pk_der,
-            &issuer_sig,
-            canister_id,
-        );
+        let issuer_jws = vc_jwt_to_jws(issuer_id_alias_jwt, &canister_sig_pk, &issuer_sig);
 
         GetIdAliasResponse::Ok(IdAliasCredentials {
             rp_id_alias_credential: SignedIdAlias {
