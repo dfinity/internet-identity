@@ -5,6 +5,7 @@ members = [
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",
+    "src/vc_util"
 ]
 resolver = "2"
 
