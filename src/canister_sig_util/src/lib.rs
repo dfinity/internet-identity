@@ -33,15 +33,15 @@ impl TryFrom<&[u8]> for CanisterSigPublicKey {
     fn try_from(pk_der: &[u8]) -> Result<Self, Self::Error> {
         let pk_raw = extract_raw_canister_sig_pk_from_der(pk_der)?;
         let canister_id_len: usize = if !pk_raw.is_empty() {
-            usize::from(pk_der[0])
+            usize::from(pk_raw[0])
         } else {
             return Err("empty raw canister sig pk".to_string());
         };
         if pk_raw.len() < (1 + canister_id_len) {
             return Err("canister sig pk too short".to_string());
         }
-        let canister_id_raw = &pk_der[1..(1 + canister_id_len)];
-        let seed = &pk_der[canister_id_len + 1..];
+        let canister_id_raw = &pk_raw[1..(1 + canister_id_len)];
+        let seed = &pk_raw[canister_id_len + 1..];
         let canister_id = Principal::try_from_slice(canister_id_raw)
             .map_err(|e| format!("invalid canister id in canister sig pk: {}", e))?;
         Ok(CanisterSigPublicKey {
@@ -131,8 +131,34 @@ mod tests {
     #[test]
     fn should_der_encode_canister_sig_pk() {
         let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
-        let cs_pk_der = get_canister_sig_pk_der(canister_id, &TEST_SEED);
+        let cs_pk = CanisterSigPublicKey::new(canister_id, TEST_SEED.to_vec());
+        let cs_pk_der = cs_pk.to_der();
         assert_eq!(CANISTER_SIG_PK_DER.as_slice(), cs_pk_der.as_slice());
+    }
+
+    #[test]
+    fn should_parse_canister_sig_pk_from_der() {
+        let cs_pk = CanisterSigPublicKey::try_from(CANISTER_SIG_PK_DER.as_slice())
+            .expect("Failed parsing canister sig pk DER");
+        let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
+
+        assert_eq!(cs_pk.canister_id, canister_id);
+        assert_eq!(cs_pk.seed.as_slice(), TEST_SEED.as_slice());
+        assert_eq!(cs_pk.to_der().as_slice(), CANISTER_SIG_PK_DER.as_slice());
+    }
+
+    #[test]
+    fn should_fail_parsing_canister_sig_pk_from_bad_oid_der() {
+        let mut bad_oid_der = *CANISTER_SIG_PK_DER;
+        bad_oid_der[2] += 42;
+        let result = CanisterSigPublicKey::try_from(bad_oid_der.as_slice());
+        assert_matches!(result, Err(e) if e.contains("invalid OID"));
+    }
+
+    #[test]
+    fn should_fail_parsing_canister_sig_pk_from_short_der() {
+        let result = CanisterSigPublicKey::try_from(CANISTER_SIG_PK_DER[..25].to_vec().as_slice());
+        assert_matches!(result, Err(e) if e.contains("pk too short"));
     }
 
     #[test]
