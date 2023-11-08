@@ -12,7 +12,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use std::ops::Deref;
-use vc_util::verify_credential_jws;
+use vc_util_br::verify_credential_jws;
 
 fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
     let decoder: Decoder = Decoder::new();

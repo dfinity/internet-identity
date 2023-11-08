@@ -22,7 +22,7 @@ use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use vc_util::{
+use vc_util_br::{
     create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
     PresentationParams,
 };
@@ -255,6 +255,28 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
     )
     .expect("API call failed");
     assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+}
+
+#[test]
+fn should_fail_prepare_credential_for_anonymous_caller() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_1(),
+        id_dapp: principal_2(),
+        credential_jws: "dummy jws".to_string(),
+    };
+    let response = api::prepare_credential(
+        &env,
+        issuer_id,
+        Principal::anonymous(),
+        &PrepareCredentialRequest {
+            credential_spec: employee_credential_spec(),
+            signed_id_alias,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("Anonymous principal not allowed"));
 }
 
 #[test]

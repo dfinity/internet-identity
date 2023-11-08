@@ -119,6 +119,7 @@ side can be identified using `id_alias` for the purpose of attribute sharing, an
 described by `credential_spec` does apply to the user.  When these checks are successful, the issuer
 prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then 
 passed back to the issuer in a subsequent `get_credential`-call (see below).
+This call must be authenticated (i.e. it is not available for the anonymous sender).
 
 **NOTE:** 
 The value of `prepared_context` is basically used to transfer information between `prepare_credential`
@@ -153,6 +154,7 @@ type IssuedCredentialData = record { vc_jws : text };
 `prepared_context`-value  returned by `prepare_credential`, if any.
 The issuer performs the same checks as during the `prepare_credential`-call,
 plus verify that `prepared_context` is consistent with the other parameters.
+This call must be authenticated (i.e. it is not available for the anonymous sender).
 
 Upon successful checks, issuer returns the signed credential in JWS-format.
 

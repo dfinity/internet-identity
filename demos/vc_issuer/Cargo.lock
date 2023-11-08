@@ -3015,11 +3015,11 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "sha2 0.10.8",
- "vc_util",
+ "vc_util_br",
 ]
 
 [[package]]
-name = "vc_util"
+name = "vc_util_br"
 version = "0.1.0"
 dependencies = [
  "candid",
