@@ -16,7 +16,7 @@
     "@wdio/local-runner": "^8.6.9",
     "@wdio/mocha-framework": "^8.6.8",
     "@wdio/spec-reporter": "^8.6.8",
-    "chromedriver": "^117.0.1",
+    "chromedriver": "^119.0.1",
     "prettier": "^2.7.1",
     "prettier-plugin-organize-imports": "^3.2.2",
     "proxy": "git+https://github.com/nmattia/dfx-proxy",
