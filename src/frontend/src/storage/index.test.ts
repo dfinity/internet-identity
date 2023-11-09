@@ -14,6 +14,26 @@ testStorage(
   { localStorage: { before: { userNumber: "123456" } } }
 );
 
+testStorage(
+  "reading old userNumber migrates anchors",
+  () => {
+    vi.useFakeTimers().setSystemTime(new Date(20));
+    getAnchors();
+    vi.useRealTimers();
+  },
+  {
+    localStorage: {
+      before: { userNumber: "123456" },
+      after: {
+        anchors: JSON.stringify({
+          "123456": { lastUsedTimestamp: 20 },
+        }),
+        userNumber: "123456",
+      },
+    },
+  }
+);
+
 testStorage("one anchor can be stored", () => {
   setAnchorUsed(BigInt(10000));
   expect(getAnchors()).toStrictEqual([BigInt(10000)]);
