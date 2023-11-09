@@ -11,10 +11,8 @@ export {
 /* IndexedDB-specific storage for browser identities
  * (indexed by user number) */
 
-export const idbIdentitiesStore = createStore(
-  "browser-identities",
-  "identities"
-);
+export const idbIdentitiesStore = () =>
+  createStore("browser-identities", "identities");
 
 export const idbStorePinIdentityMaterial = async ({
   userNumber,
@@ -23,7 +21,7 @@ export const idbStorePinIdentityMaterial = async ({
   userNumber: bigint;
   pinIdentityMaterial: PinIdentityMaterial;
 }): Promise<void> => {
-  await set(userNumber.toString(), pinIdentityMaterial, idbIdentitiesStore);
+  await set(userNumber.toString(), pinIdentityMaterial, idbIdentitiesStore());
 };
 
 export const idbRetrievePinIdentityMaterial = async ({
@@ -31,7 +29,7 @@ export const idbRetrievePinIdentityMaterial = async ({
 }: {
   userNumber: bigint;
 }): Promise<PinIdentityMaterial | undefined> => {
-  const retrieved = await get(userNumber.toString(), idbIdentitiesStore);
+  const retrieved = await get(userNumber.toString(), idbIdentitiesStore());
 
   if (retrieved === undefined) {
     return undefined;
