@@ -5,10 +5,10 @@ import {
 import { displayError } from "$src/components/displayError";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
+import { setAnchorUsed } from "$src/storage";
 import { AsyncCountdown } from "$src/utils/countdown";
 import { Connection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
-import { setAnchorUsed } from "$src/utils/userNumber";
 import { delayMillis, unknownToString } from "$src/utils/utils";
 import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";

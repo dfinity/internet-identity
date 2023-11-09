@@ -1,10 +1,10 @@
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowResult } from "$src/utils/flowResult";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import {

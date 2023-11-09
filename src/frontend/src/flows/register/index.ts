@@ -15,6 +15,7 @@ import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
+import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
@@ -23,7 +24,6 @@ import {
   IIWebAuthnIdentity,
   RegisterResult,
 } from "$src/utils/iiConnection";
-import { setAnchorUsed } from "$src/utils/userNumber";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
