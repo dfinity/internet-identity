@@ -20,9 +20,8 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
-    await waitToClose(browser);
-    await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
+    await demoAppView.waitForAuthenticated();
+
     const exp = await browser.$("#expiration").getText();
     // compare only up to one decimal place for the 1min test
     expect(Number(exp) / 60_000_000_000).toBeCloseTo(1, 0);
@@ -58,8 +57,7 @@ test("Delegation maxTimeToLive: 2 months", async () => {
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
-    await waitToClose(browser);
-    expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
+    await demoAppView.waitForAuthenticated();
     const exp = await browser.$("#expiration").getText();
     // NB: Max out at 30 days
     expect(Number(exp) / 2_592_000_000_000_000).toBeCloseTo(1);

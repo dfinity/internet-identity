@@ -2,12 +2,12 @@ import { DeviceData } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
+import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
   creationOptions,
 } from "$src/utils/iiConnection";
-import { setAnchorUsed } from "$src/utils/userNumber";
 import {
   displayCancelError,
   displayDuplicateDeviceError,

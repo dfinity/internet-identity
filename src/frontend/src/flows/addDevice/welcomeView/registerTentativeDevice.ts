@@ -6,9 +6,9 @@ import {
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
+import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { Connection, creationOptions } from "$src/utils/iiConnection";
-import { setAnchorUsed } from "$src/utils/userNumber";
 import { unknownToString, unreachable, unreachableLax } from "$src/utils/utils";
 import {
   displayCancelError,

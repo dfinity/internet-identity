@@ -1,5 +1,7 @@
 import { zip } from "$src/utils/utils";
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { waitToClose } from "./util";
 
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
@@ -183,37 +185,21 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async getSeedPhrase(): Promise<string> {
-    // This tries to read the recovery phrase by first copying it to the clipboard.
+    // Ideally, we could press the copy button on the page and the read the
+    // clipboard. However, this is not possible due to the content security
+    // policy.
+    // The alternative solution of simulating key presses does not work either,
+    // since chromium does not allow to interact with the clipboard via keyboard
+    // shortcuts when run in headless mode (which is the only mode accepted by CI).
+    // For the lack of a better solution, we read the seed phrase from the DOM.
 
-    await this.copySeedPhrase();
+    const seedPhrase = (await this.browser.execute(() =>
+      Array.from(document.querySelectorAll(".c-list--recovery-word"))
+        .map((e) => (e as HTMLElement).innerText)
+        .join(" ")
+    )) as string;
 
-    // Our CSP policy prevents us from directly reading the clipboard.
-    // Instead, we mock user input to paste the clipboard content in textarea element and
-    // read the element's value.
-
-    // First, create a new textarea element where the phrase will be pasted
-    await this.browser.execute(() => {
-      const elem = document.createElement("textarea");
-      elem.setAttribute("id", "my-paste-area");
-      document.body.prepend(elem);
-    });
-
-    // Select the element and mock "Ctrl + V" for pasting the clipboard content into said element
-    await this.browser.$("#my-paste-area").click();
-    await this.browser.keys(["Control", "v"]);
-
-    // Read the element's value and clean up
-    const seedPhrase = await this.browser.execute(() => {
-      const elem = document.querySelector(
-        "#my-paste-area"
-      ) as HTMLTextAreaElement;
-      // NOTE: we could also query the value with wdio's $(..).getValue(), but since we have
-      // the element here might as well.
-      const seedPhrase = elem.value!;
-      elem.remove();
-      return seedPhrase;
-    });
-
+    assert(seedPhrase?.length > 0, "Seed phrase is empty!");
     return seedPhrase;
   }
 
@@ -606,6 +592,19 @@ export class DemoAppView extends View {
     await this.browser.$("#signinBtn").click();
   }
 
+  /** Waits for the authentication to finish, the window to close and the principal to update.
+   * Returns the principal after the user has been authenticated.
+   */
+  async waitForAuthenticated(): Promise<string> {
+    // wait for the demo app to close the II window
+    await waitToClose(this.browser);
+    // wait for the demo app to update the principal
+    await this.browser.waitUntil(
+      async () => (await this.getPrincipal()) !== Principal.anonymous().toText()
+    );
+    return this.getPrincipal();
+  }
+
   async signout(): Promise<void> {
     await this.browser.$("#signoutBtn").click();
   }
@@ -683,7 +682,7 @@ export class DemoAppView extends View {
   }
 
   async openIiTab(): Promise<void> {
-    await this.browser.$("#openIiWindowAuthBtn").click();
+    await this.browser.$("#openIiWindowBtn").click();
   }
 
   async sendInvalidData(): Promise<void> {
@@ -695,7 +694,7 @@ export class DemoAppView extends View {
   }
 
   async sendValidMessage(): Promise<void> {
-    await this.browser.$("#validAuthMessageBtn").click();
+    await this.browser.$("#validMessageBtn").click();
   }
 }
 

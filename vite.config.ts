@@ -1,10 +1,15 @@
+import { nonNullish } from "@dfinity/utils";
+import basicSsl from "@vitejs/plugin-basic-ssl";
+import { existsSync } from "fs";
 import { resolve } from "path";
-import { AliasOptions, defineConfig, UserConfig } from "vite";
+import { AliasOptions, UserConfig, defineConfig } from "vite";
 import {
   canisterLookupPlugin,
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
+  readCanisterId,
+  replicaForwardPlugin,
 } from "./vite.plugins";
 
 export const aliasConfig: AliasOptions = {
@@ -25,6 +30,15 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
+
+  const testAppCanisterId = existsSync(
+    "demos/test-app/.dfx/local/canister_ids.json"
+  )
+    ? readCanisterId({
+        canisterName: "test_app",
+        canisterIdsJsonFile: "demos/test-app/.dfx/local/canister_ids.json",
+      })
+    : undefined;
 
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
@@ -68,6 +82,35 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
           : []),
       ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
+      [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
+      replicaForwardPlugin({
+        replicaOrigin: "127.0.0.1:4943",
+        forwardRules: [
+          ...(nonNullish(testAppCanisterId)
+            ? [
+                {
+                  hosts: [
+                    "nice-name.com",
+                    `${testAppCanisterId}.ic0.app`,
+                    `${testAppCanisterId}.icp0.io`,
+                  ],
+                  canisterId: testAppCanisterId,
+                },
+              ]
+            : []),
+          ...(process.env.NO_HOT_RELOAD === "1"
+            ? [
+                {
+                  hosts: ["identity.ic0.app", "identity.internetcomputer.org"],
+                  canisterId: readCanisterId({
+                    canisterName: "internet_identity",
+                    canisterIdsJsonFile: ".dfx/local/canister_ids.json",
+                  }),
+                },
+              ]
+            : []),
+        ],
+      }),
     ],
     optimizeDeps: {
       esbuildOptions: {
@@ -77,6 +120,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     server: {
+      https: process.env.TLS_DEV_SERVER === "1",
       proxy: {
         "/api": "http://127.0.0.1:4943",
       },

@@ -9,6 +9,7 @@ import { usePin } from "$src/flows/pin/usePin";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
 import { getRegisterFlowOpts, registerFlow } from "$src/flows/register";
 import { I18n } from "$src/i18n";
+import { getAnchors, setAnchorUsed } from "$src/storage";
 import {
   LoginData,
   LoginFlowError,
@@ -23,11 +24,7 @@ import {
   bufferEqual,
 } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
-import {
-  getAnchors,
-  parseUserNumber,
-  setAnchorUsed,
-} from "$src/utils/userNumber";
+import { parseUserNumber } from "$src/utils/userNumber";
 import { NonEmptyArray, isNonEmptyArray, unreachable } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";

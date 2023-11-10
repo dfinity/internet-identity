@@ -63,6 +63,14 @@ export default defineConfig(
       // replica; the rest we serve from here.
       proxy: {
         "/api": replicaHost,
+        "/": {
+          target: replicaHost,
+          rewrite: rewriteRoute,
+        },
+        "/index.html": {
+          target: replicaHost,
+          rewrite: rewriteRoute,
+        },
         "/.well-known/ii-alternative-origins": {
           target: replicaHost,
           rewrite: rewriteRoute,
