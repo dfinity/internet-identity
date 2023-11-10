@@ -23,7 +23,7 @@ This app is used by the Internet Identity Selenium tests. It contains additional
 
 ## Development
 
-Note: These steps are intended to do development on the test-app. To simply run selenium tests against the test-app follow [these instructions](../../docker-test-env/README.md) instead.
+Note: These steps are intended to do development on the test-app. To simply run selenium tests against the test-app follow [these instructions](../../HACKING.md) instead.
 
 1. Ensure all dependencies are installed: `npm ci`
 2. Run the local replica `dfx start --clean`
