@@ -15,14 +15,14 @@ export const config: WebdriverIO.Config = {
   capabilities: [
     {
       browserName: "chrome",
+      browserVersion: "119.0.6045.105", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": {
-        args: ["headless", "disable-gpu"],
+        args: ["headless", "disable-gpu", "disable-dev-shm-usage"],
       },
       acceptInsecureCerts: true,
     },
   ],
   logLevel: "info",
-  services: ["chromedriver"],
 
   framework: "mocha",
   reporters: ["spec"],
