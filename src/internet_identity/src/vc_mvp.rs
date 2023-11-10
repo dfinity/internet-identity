@@ -77,7 +77,8 @@ fn id_alias_jwt_and_msg_hash(
     canister_sig_pk: &CanisterSigPublicKey,
 ) -> (String, Hash) {
     let credential_jwt = prepare_id_alias_jwt(alias_tuple);
-    let signing_input = vc_signing_input(&credential_jwt, canister_sig_pk);
+    let signing_input =
+        vc_signing_input(&credential_jwt, canister_sig_pk).expect("failed getting signing_input");
     let msg_hash = vc_signing_input_hash(&signing_input);
     (credential_jwt, msg_hash)
 }
@@ -99,7 +100,8 @@ pub fn get_id_alias(
         let canister_id = ic_cdk::id();
         let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
 
-        let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk);
+        let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk)
+            .expect("failed getting signing_input");
         let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let rp_sig = if let Some(sig) = maybe_sig {
@@ -107,9 +109,11 @@ pub fn get_id_alias(
         } else {
             return GetIdAliasResponse::NoSuchCredentials("rp_sig not found".to_string());
         };
-        let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk, &rp_sig);
+        let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk, &rp_sig)
+            .expect("failed constructing JWS");
 
-        let signing_input = vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk);
+        let signing_input = vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk)
+            .expect("failed getting signing_input");
         let msg_hash = vc_signing_input_hash(&signing_input);
         let maybe_sig = get_signature(cert_assets, sigs, seed, msg_hash);
         let issuer_sig = if let Some(sig) = maybe_sig {
@@ -117,7 +121,8 @@ pub fn get_id_alias(
         } else {
             return GetIdAliasResponse::NoSuchCredentials("issuer_sig not found".to_string());
         };
-        let issuer_jws = vc_jwt_to_jws(issuer_id_alias_jwt, &canister_sig_pk, &issuer_sig);
+        let issuer_jws = vc_jwt_to_jws(issuer_id_alias_jwt, &canister_sig_pk, &issuer_sig)
+            .expect("failed constructing JWS");
 
         GetIdAliasResponse::Ok(IdAliasCredentials {
             rp_id_alias_credential: SignedIdAlias {

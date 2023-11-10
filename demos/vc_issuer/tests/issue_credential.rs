@@ -2,7 +2,7 @@
 
 use assert_matches::assert_matches;
 use candid::Principal;
-use canister_sig_util::extract_raw_root_pk_from_der;
+use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};
@@ -330,6 +330,9 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     } else {
         panic!("prepare id_alias failed")
     };
+    let canister_sig_pk =
+        CanisterSigPublicKey::try_from(prepared_id_alias.canister_sig_pk.as_ref())
+            .expect("failed parsing canister sig pk");
 
     let get_id_alias_req = GetIdAliasRequest {
         identity_number,
@@ -360,6 +363,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
             id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
         },
+        &canister_sig_pk,
         &root_pk_raw,
     )
     .expect("Invalid ID alias");
