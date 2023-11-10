@@ -63,7 +63,8 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
     let credential_jwt = credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure");
-    let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk);
+    let signing_input =
+        vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
     let msg_hash = vc_signing_input_hash(&signing_input);
 
     SIGNATURES.with(|sigs| {
@@ -107,7 +108,8 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
         Ok(s) => s,
         Err(_) => return GetCredentialResponse::Err(internal_error("invalid prepared_context")),
     };
-    let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk);
+    let signing_input =
+        vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
     let msg_hash = vc_signing_input_hash(&signing_input);
     let maybe_sig = SIGNATURES.with(|sigs| {
         let sigs = sigs.borrow();
@@ -120,7 +122,8 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
             "signature not prepared or expired",
         )));
     };
-    let vc_jws = vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig);
+    let vc_jws =
+        vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig).expect("failed constructing JWS");
     GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
 }
 
