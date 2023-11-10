@@ -3,8 +3,8 @@ use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::get_canister_sig_pk_der;
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
+use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
 use ic_certified_map::{Hash, HashTree};
@@ -177,7 +177,7 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
 
 fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     let my_canister_id = id();
-    get_canister_sig_pk_der(my_canister_id, &seed)
+    CanisterSigPublicKey::new(my_canister_id, seed).to_der()
 }
 
 fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
