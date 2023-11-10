@@ -32,6 +32,17 @@ impl TryFrom<&[u8]> for CanisterSigPublicKey {
 
     fn try_from(pk_der: &[u8]) -> Result<Self, Self::Error> {
         let pk_raw = extract_raw_canister_sig_pk_from_der(pk_der)?;
+        Self::try_from_raw(pk_raw.as_slice())
+    }
+}
+
+impl CanisterSigPublicKey {
+    /// Constructs a new canister signatures public key.
+    pub fn new(canister_id: Principal, seed: Vec<u8>) -> Self {
+        CanisterSigPublicKey { canister_id, seed }
+    }
+
+    pub fn try_from_raw(pk_raw: &[u8]) -> Result<Self, String> {
         let canister_id_len: usize = if !pk_raw.is_empty() {
             usize::from(pk_raw[0])
         } else {
@@ -49,39 +60,35 @@ impl TryFrom<&[u8]> for CanisterSigPublicKey {
             seed: seed.to_vec(),
         })
     }
-}
 
-impl CanisterSigPublicKey {
-    /// Constructs a new canister signatures public key.
-    pub fn new(canister_id: Principal, seed: Vec<u8>) -> Self {
-        CanisterSigPublicKey { canister_id, seed }
-    }
-
-    /// Returns a byte vector with DER-encoding of this key.
+    /// Returns a byte vector with DER-encoding of this key, see
+    /// https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures
     pub fn to_der(&self) -> Vec<u8> {
-        get_canister_sig_pk_der(self.canister_id, &self.seed)
+        let raw_pk = self.to_raw();
+
+        let mut der_pk: Vec<u8> = vec![];
+        // sequence of length 17 + the bit string length
+        der_pk.push(0x30);
+        der_pk.push(17 + raw_pk.len() as u8);
+        der_pk.extend(CANISTER_SIG_PK_DER_OID);
+        // BIT string of given length
+        der_pk.push(0x03);
+        der_pk.push(1 + raw_pk.len() as u8);
+        der_pk.push(0x00);
+        der_pk.extend(raw_pk);
+        der_pk
     }
-}
 
-/// Returns (DER-encoded) public key of the canister signatures for the given canister_id and seed.
-/// (cf. https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures))
-pub fn get_canister_sig_pk_der(canister_id: Principal, seed: &[u8]) -> Vec<u8> {
-    let mut bitstring: Vec<u8> = vec![];
-    bitstring.push(canister_id.as_ref().len() as u8);
-    bitstring.extend(canister_id.as_ref());
-    bitstring.extend(seed);
-
-    let mut der: Vec<u8> = vec![];
-    // sequence of length 17 + the bit string length
-    der.push(0x30);
-    der.push(17 + bitstring.len() as u8);
-    der.extend(CANISTER_SIG_PK_DER_OID);
-    // BIT string of given length
-    der.push(0x03);
-    der.push(1 + bitstring.len() as u8);
-    der.push(0x00);
-    der.extend(bitstring);
-    der
+    /// Returns a byte vector with raw encoding of this key (i.e. a bit string with
+    /// canister id length, canister id, and seed, without the DER-envelope)
+    /// https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures
+    pub fn to_raw(&self) -> Vec<u8> {
+        let mut raw_pk: Vec<u8> = vec![];
+        raw_pk.push(self.canister_id.as_ref().len() as u8);
+        raw_pk.extend(self.canister_id.as_ref());
+        raw_pk.extend(self.seed.as_slice());
+        raw_pk
+    }
 }
 
 /// Verifies the structure given public key in DER-format, and returns raw bytes of the key.
@@ -137,6 +144,17 @@ mod tests {
     }
 
     #[test]
+    fn should_raw_encode_canister_sig_pk() {
+        let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
+        let cs_pk = CanisterSigPublicKey::new(canister_id, TEST_SEED.to_vec());
+        let cs_pk_raw = cs_pk.to_raw();
+        assert_eq!(
+            &CANISTER_SIG_PK_DER.as_slice()[CANISTER_SIG_PK_DER_PREFIX_LENGTH..],
+            cs_pk_raw.as_slice()
+        );
+    }
+
+    #[test]
     fn should_parse_canister_sig_pk_from_der() {
         let cs_pk = CanisterSigPublicKey::try_from(CANISTER_SIG_PK_DER.as_slice())
             .expect("Failed parsing canister sig pk DER");
@@ -158,6 +176,28 @@ mod tests {
     #[test]
     fn should_fail_parsing_canister_sig_pk_from_short_der() {
         let result = CanisterSigPublicKey::try_from(CANISTER_SIG_PK_DER[..25].to_vec().as_slice());
+        assert_matches!(result, Err(e) if e.contains("pk too short"));
+    }
+
+    #[test]
+    fn should_parse_canister_sig_pk_from_raw() {
+        let cs_pk = CanisterSigPublicKey::try_from_raw(
+            &CANISTER_SIG_PK_DER.as_slice()[CANISTER_SIG_PK_DER_PREFIX_LENGTH..],
+        )
+        .expect("Failed parsing canister sig pk DER");
+        let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
+
+        assert_eq!(cs_pk.canister_id, canister_id);
+        assert_eq!(cs_pk.seed.as_slice(), TEST_SEED.as_slice());
+        assert_eq!(cs_pk.to_der().as_slice(), CANISTER_SIG_PK_DER.as_slice());
+    }
+
+    #[test]
+    fn should_fail_parsing_canister_sig_pk_from_short_raw() {
+        let result = CanisterSigPublicKey::try_from_raw(
+            &CANISTER_SIG_PK_DER.as_slice()
+                [CANISTER_SIG_PK_DER_PREFIX_LENGTH..(CANISTER_SIG_PK_DER_PREFIX_LENGTH + 10)],
+        );
         assert_matches!(result, Err(e) if e.contains("pk too short"));
     }
 
