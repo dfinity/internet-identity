@@ -16,9 +16,6 @@
       .sent {
         background-color: lightgreen;
       }
-      button {
-        margin: 0.5rem;
-      }
     </style>
     <div>
       <h1>Identity</h1>
@@ -106,41 +103,22 @@
           type="text"
           id="redirectLocation"
           value="/.well-known/evil-alternative-origins"
-          style="width: 400px"
         />
       </div>
-      <input type="text" id="newAlternativeOrigins" style="width: 400px" />
+      <input type="text" id="newAlternativeOrigins" />
       <button id="updateNewAlternativeOrigins">Update Value</button>
     </div>
     <h1>Protocol Tests</h1>
-    <div>
-      <label for="issuers" style="display: inline-block; width: 200px"
-        >Issuers (comma separated):
-      </label>
-      <input
-        type="text"
-        id="issuers"
-        value="https://nns.ic0.app/"
-        style="width: 400px"
-      />
-      <br />
-      <label for="rpPrincipal" style="display: inline-block; width: 200px"
-        >Relying Party Principal:
-      </label>
-      <input type="text" id="rpPrincipal" style="width: 400px" />
-    </div>
-    <button id="openIiWindowAuthBtn">Open II tab for auth</button>
-    <button id="openIiWindowVCBtn">Open II tab for VC flow</button>
+    <button id="openIiWindowBtn">Open II tab</button>
     <button id="invalidDataBtn">Send Invalid Data</button>
     <button id="incompleteMessageBtn">Send incomplete message</button>
-    <button id="validAuthMessageBtn">Send valid auth message</button>
-    <button id="validVcMessageBtn">Send valid VC message</button>
+    <button id="validMessageBtn">Send valid message</button>
     <button id="closeIIWindowBtn">Close II tab</button>
     <div>
       <label for="customMessage" style="display: inline-block">
         Send custom message:
       </label>
-      <input type="text" id="customMessage" style="width: 400px" />
+      <input type="text" id="customMessage" />
       <button id="customMessageBtn">Send Message</button>
     </div>
     <h3>WindowPostMessages:</h3>

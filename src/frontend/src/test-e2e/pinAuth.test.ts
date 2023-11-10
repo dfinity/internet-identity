@@ -7,12 +7,7 @@ import {
   TEST_APP_NICE_URL,
 } from "./constants";
 import { FLOWS } from "./flows";
-import {
-  addVirtualAuthenticator,
-  runInBrowser,
-  switchToPopup,
-  waitToClose,
-} from "./util";
+import { addVirtualAuthenticator, runInBrowser, switchToPopup } from "./util";
 import {
   AuthenticateView,
   DemoAppView,
@@ -142,11 +137,8 @@ test("Log into client application using PIN registration flow", async () => {
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerPinNewIdentityAuthenticateView(pin, browser);
-    await waitToClose(browser);
-    await demoAppView.waitForDisplay();
-    const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe(Principal.anonymous().toText());
 
+    const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
       principal
     );
@@ -175,10 +167,6 @@ test("Register with PIN then log into client application", async () => {
     await switchToPopup(browser);
 
     await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
-    await waitToClose(browser);
-
-    await demoAppView.waitForDisplay();
-    const principal = await demoAppView.getPrincipal();
-    expect(principal).not.toBe(Principal.anonymous().toText());
+    await demoAppView.waitForAuthenticated();
   }, APPLE_USER_AGENT);
 }, 300_000);

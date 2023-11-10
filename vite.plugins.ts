@@ -1,9 +1,9 @@
-import { assertNonNullish } from "@dfinity/utils";
-import express from "express";
+import { assertNonNullish, isNullish } from "@dfinity/utils";
 import { readFileSync } from "fs";
 import { minify } from "html-minifier-terser";
+import httpProxy from "http-proxy";
 import { extname } from "path";
-import { Plugin } from "vite";
+import { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
 /**
  * Read a canister ID from dfx's local state
@@ -85,38 +85,99 @@ export const minifyHTML = (): {
  * Lookup local canister IDs
  */
 export const canisterLookupPlugin = () => {
-  // An express app that looks up canister IDs by canister names
+  // Look up canister IDs by canister names
   //
   // Effectively responds to "foo.localhost" with the canister ID of
   // the "foo" canister installed in demos/vc_issuer/.dfx
-  const app = express();
-  app.get("*", (req, res, next) => {
-    const ISSUER_HOSTNAME = "issuer.localhost";
-    const hostnameParts = req.hostname.split(".");
-    if (hostnameParts.length !== 2 || hostnameParts[1] !== "localhost") {
-      return next();
-    }
-
-    const canisterId = readCanisterId({
-      canisterName: hostnameParts[0],
-      canisterIdsJsonFile: "demos/vc_issuer/.dfx/local/canister_ids.json",
-    });
-
-    // Set the canister ID
-    res.append("x-ic-canister-id", canisterId);
-
-    // Ignore CORS
-    res.append("access-control-allow-origin", "*");
-    res.append("access-control-expose-headers", "*");
-    res.append("access-control-allow-headers", "*");
-
-    res.end();
-  });
-
   return {
     name: "canister-lookup",
     configureServer(server) {
-      server.middlewares.use(app);
+      server.middlewares.use((req, res, next) => {
+        const ISSUER_HOSTNAME = "issuer.localhost";
+        if (req.hostname !== ISSUER_HOSTNAME) {
+          return next();
+        }
+
+        const canisterId = readCanisterId({
+          canisterName: hostnameParts[0],
+          canisterIdsJsonFile: "demos/vc_issuer/.dfx/local/canister_ids.json",
+        });
+
+        // Set the canister ID
+        res.append("x-ic-canister-id", canisterId);
+
+        // Ignore CORS
+        res.append("access-control-allow-origin", "*");
+        res.append("access-control-expose-headers", "*");
+        res.append("access-control-allow-headers", "*");
+
+        res.end();
+      });
     },
   };
 };
+
+/**
+ * Forwards requests to the local replica.
+ * Denies access to raw URLs.
+ *
+ * @param replicaOrigin Replica URL to forward requests to
+ * @param forwardRules List of rules (i.e. hostname to canisterId mappings)
+ *                     to forward requests to a specific canister
+ */
+export const replicaForwardPlugin = ({
+  replicaOrigin,
+  forwardRules,
+}: {
+  replicaOrigin: string;
+  forwardRules: Array<{ canisterId: string; hosts: string[] }>;
+}) => ({
+  name: "replica-forward",
+  configureServer(server: ViteDevServer) {
+    const proxy = httpProxy.createProxyServer({
+      secure: false,
+    });
+
+    server.middlewares.use((req, res, next) => {
+      if (
+        /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
+         * to verify the alternative origins. */
+        req.headers["host"]?.includes(".raw.")
+      ) {
+        console.log(
+          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`
+        );
+        res.statusCode = 400;
+        res.end("Raw IC URLs are not supported");
+        return;
+      }
+
+      const host = req.headers["host"];
+      if (isNullish(host)) {
+        // default handling
+        return next();
+      }
+
+      const matchingRule = forwardRules.find((rule) =>
+        rule.hosts.includes(host)
+      );
+      if (isNullish(matchingRule)) {
+        // default handling
+        return next();
+      }
+
+      console.log(
+        `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${matchingRule.canisterId}`
+      );
+      req.headers["host"] = `${matchingRule.canisterId}.localhost`;
+      proxy.web(req, res, {
+        target: `http://${replicaOrigin}`,
+      });
+
+      proxy.on("error", (err: Error) => {
+        res.statusCode = 500;
+        res.end("Replica forwarding failed: " + err.message);
+      });
+    });
+  },
+});

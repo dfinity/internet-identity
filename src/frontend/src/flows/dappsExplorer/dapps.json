@@ -47,7 +47,7 @@
     "name": "Hot or Not",
     "oneLiner": "Token rewards for both content creators and lurkers",
     "website": "https://hotornot.wtf/",
-    "logo": "hot_or_not_logo.webp"
+    "logo": "hot_or_not_logo.png"
   },
   {
     "name": "Yumi",
@@ -84,7 +84,7 @@
   },
   {
     "name": "Juno",
-    "oneLiner": "Build Web3 dapps like Web2",
+    "oneLiner": "Build Web3 dApps like Web2",
     "website": "https://juno.build",
     "authOrigins": ["https://console.juno.build"],
     "logo": "juno_logo.svg"
@@ -359,6 +359,12 @@
     "website": "https://vdfyi-uaaaa-aaaai-acptq-cai.ic0.app",
     "logo": "open-internet-metaverse_logo.webp",
     "oneLiner": "Create Your Virtual Space as a 3D-Website on the Internet Computer"
+  },
+  {
+    "name": "Faceless Project",
+    "oneLiner": "An infrastructure that brings Web 2.0 user experience to Web 3.0",
+    "logo": "faceless_logo.png",
+    "website": "https://faceless.live/"
   },
   {
     "name": "FishVerse",

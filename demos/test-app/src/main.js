@@ -14,13 +14,11 @@ const whoamiBtn = document.getElementById("whoamiBtn");
 const updateAlternativeOriginsBtn = document.getElementById(
   "updateNewAlternativeOrigins"
 );
-const openIiWindowAuthBtn = document.getElementById("openIiWindowAuthBtn");
-const openIiWindowVCBtn = document.getElementById("openIiWindowVCBtn");
+const openIiWindowBtn = document.getElementById("openIiWindowBtn");
 const closeIiWindowBtn = document.getElementById("closeIIWindowBtn");
 const invalidDataBtn = document.getElementById("invalidDataBtn");
 const incompleteMessageBtn = document.getElementById("incompleteMessageBtn");
-const validAuthMessageBtn = document.getElementById("validAuthMessageBtn");
-const validVcMessageBtn = document.getElementById("validVcMessageBtn");
+const validMessageBtn = document.getElementById("validMessageBtn");
 const customMessageEl = document.getElementById("customMessage");
 const customMessageBtn = document.getElementById("customMessageBtn");
 const messagesEl = document.getElementById("messages");
@@ -37,13 +35,10 @@ const expirationEl = document.getElementById("expiration");
 const iiUrlEl = document.getElementById("iiUrl");
 const maxTimeToLiveEl = document.getElementById("maxTimeToLive");
 const derivationOriginEl = document.getElementById("derivationOrigin");
-const issuersEl = document.getElementById("issuers");
-const rpPrincipalEl = document.getElementById("rpPrincipal");
 
 let authClient;
 let iiProtocolTestWindow;
 let localIdentity;
-let jsonRpcId = 0;
 
 const idlFactory = ({ IDL }) => {
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
@@ -73,14 +68,6 @@ const idlFactory = ({ IDL }) => {
     whoami: IDL.Func([], [IDL.Principal], ["query"]),
   });
 };
-
-// Open a new window with the IDP provider.
-function openWindowWithUrlSuffix(suffix) {
-  if (iiProtocolTestWindow === undefined) {
-    iiProtocolTestWindow =
-      window.open(iiUrlEl.value + suffix, "iiWindow") ?? undefined;
-  }
-}
 
 const updateDelegationView = (identity) => {
   principalEl.innerText = identity.getPrincipal();
@@ -159,23 +146,24 @@ const init = async () => {
   authClient = await AuthClient.create();
   updateDelegationView(authClient.getIdentity());
   await updateAlternativeOriginsView();
-  canisterIdEl.value = canisterId ?? "";
+  canisterIdEl.value = canisterId;
   signInBtn.onclick = async () => {
     let derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
-    const loginOptions = {
-      identityProvider: iiUrlEl.value,
-      derivationOrigin,
-      onSuccess: () => {
-        updateDelegationView(authClient.getIdentity());
-        iiProtocolTestWindow = undefined;
-      },
-      onError: () => (iiProtocolTestWindow = undefined),
-    };
     if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
-      loginOptions.maxTimeToLive = BigInt(maxTimeToLiveEl.value);
+      authClient.login({
+        identityProvider: iiUrlEl.value,
+        maxTimeToLive: BigInt(maxTimeToLive.value),
+        derivationOrigin,
+        onSuccess: () => updateDelegationView(authClient.getIdentity()),
+      });
+    } else {
+      authClient.login({
+        identityProvider: iiUrlEl.value,
+        derivationOrigin,
+        onSuccess: () => updateDelegationView(authClient.getIdentity()),
+      });
     }
-    authClient.login(loginOptions);
   };
 
   signOutBtn.onclick = async () => {
@@ -183,12 +171,12 @@ const init = async () => {
     updateDelegationView(authClient.getIdentity());
   };
 
-  openIiWindowAuthBtn.onclick = () => {
-    openWindowWithUrlSuffix("#authorize");
-  };
-
-  openIiWindowVCBtn.onclick = () => {
-    openWindowWithUrlSuffix("vc-flow");
+  openIiWindowBtn.onclick = () => {
+    // Open a new window with the IDP provider.
+    if (iiProtocolTestWindow === undefined) {
+      iiProtocolTestWindow =
+        window.open(iiUrlEl.value + "#authorize", "iiWindow") ?? undefined;
+    }
   };
 
   closeIiWindowBtn.onclick = () => {
@@ -218,7 +206,7 @@ const init = async () => {
     iiProtocolTestWindow.postMessage(incompleteMessage, iiUrlEl.value);
   };
 
-  validAuthMessageBtn.onclick = () => {
+  validMessageBtn.onclick = () => {
     if (!iiProtocolTestWindow) {
       alert("Open II tab first");
       return;
@@ -236,46 +224,6 @@ const init = async () => {
       derivationOrigin,
       maxTimeToLive,
     };
-    addMessageElement(validMessage, false);
-    iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
-  };
-
-  validVcMessageBtn.onclick = async () => {
-    if (!iiProtocolTestWindow) {
-      alert("Open II tab first");
-      return;
-    }
-    if (
-      rpPrincipalEl.value === "" &&
-      authClient &&
-      !(await authClient.isAuthenticated())
-    ) {
-      alert("Sign in first or provide a relying party principal");
-      return;
-    }
-
-    let principal = rpPrincipalEl.value;
-    if (principal === "") {
-      principal = authClient.getIdentity().getPrincipal().toText();
-    }
-
-    let issuers = [];
-    issuersEl.value.split(",").forEach((issuer) => {
-      issuers.push({ issuerOrigin: issuer, credentialId: "credential1" });
-    });
-
-    const validMessage = {
-      id: jsonRpcId,
-      jsonrpc: "2.0",
-      method: "request_credential",
-      params: {
-        issuers: issuers,
-        credentialSubject: principal,
-      },
-    };
-    // send the next request with a different id
-    jsonRpcId++;
-
     addMessageElement(validMessage, false);
     iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
   };

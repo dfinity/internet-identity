@@ -1,4 +1,3 @@
-import indexeddb from "fake-indexeddb";
 import { TextEncoder } from "util";
 import { vi } from "vitest";
 
@@ -51,4 +50,3 @@ global.crypto = require("crypto").webcrypto;
 // eslint-disable-next-line
 global.CryptoKey = require("crypto").webcrypto.CryptoKey;
 global.TextEncoder = TextEncoder;
-global.indexedDB = indexeddb;

@@ -24,7 +24,7 @@ import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showV
 import { authnTemplateAuthorize } from "$src/flows/authorize";
 import { compatibilityNotice } from "$src/flows/compatibilityNotice";
 import { dappsExplorerPage } from "$src/flows/dappsExplorer";
-import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
+import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage, displayManagePage } from "$src/flows/manage";
 import {
   protectDeviceInfoPage,
@@ -123,13 +123,6 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
 
   knownDapp: dapps.find((dapp) => dapp.name === "NNS Dapp"),
 });
-
-// eslint-disable-next-line
-const openChat: KnownDapp = dapps.find((dapp) => dapp.name === "OpenChat")!;
-// eslint-disable-next-line
-const nnsDapp: KnownDapp = dapps.find((dapp) => dapp.name === "NNS Dapp")!;
-// eslint-disable-next-line
-const juno: KnownDapp = dapps.find((dapp) => dapp.name === "Juno")!;
 
 const authzTemplatesKnown = authnTemplateAuthorize({
   origin: "https://oc.app",
