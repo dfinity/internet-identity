@@ -16,9 +16,6 @@ canister_sig_util = { path = "../canister_sig_util" }
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false }
 identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false , features = ["validator"] }
 identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
-# identity_core = { path = "../../../identity.rs/identity_core" }
-# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential", "validator"]}
-# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 
 # other dependencies
 serde = { version = "1", features = ["rc"] }

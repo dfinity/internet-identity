@@ -50,7 +50,8 @@ pub fn vc_signing_input(
 
 /// Computes and returns SHA-256 hash of the given `signing_input` prefixed with
 ///      length(VC_SIGNING_INPUT_DOMAIN) || VC_SIGNING_INPUT_DOMAIN
-/// (for domain separation).
+/// (for domain separation), where `length(a)` is the length of byte-array `a`,
+/// and || denotes concatenation of bytes.
 pub fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     let buf = [VC_SIGNING_INPUT_DOMAIN.len() as u8];
@@ -138,12 +139,6 @@ fn validate_id_alias_claims(
 ) -> Result<(), JwtValidationError> {
     validate_claim("sub", did_for_principal(alias_tuple.id_dapp), claims.sub())?;
     validate_claim("iss", II_ISSUER_URL, claims.iss())?;
-    let jti = claims.jti().ok_or(inconsistent_jwt_claims(
-        "missing jti in id_alias JWT claims",
-    ))?;
-    if !jti.starts_with(II_CREDENTIAL_URL_PREFIX) {
-        return Err(inconsistent_jwt_claims("wrong jti in id_alias JWT claims"));
-    }
     let vc = claims
         .vc()
         .ok_or(inconsistent_jwt_claims("missing vc in id_alias JWT claims"))?;
