@@ -7,7 +7,12 @@ import {
   TEST_APP_NICE_URL,
 } from "./constants";
 import { FLOWS } from "./flows";
-import { addVirtualAuthenticator, runInBrowser, switchToPopup } from "./util";
+import {
+  addVirtualAuthenticator,
+  runInBrowser,
+  switchToPopup,
+  wipeStorage,
+} from "./util";
 import {
   AuthenticateView,
   DemoAppView,
@@ -63,8 +68,8 @@ test("Register with PIN and login without prefilled identity number", async () =
     const mainView = new MainView(browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
 
-    // clear local storage, so that the identity number is not prefilled
-    await browser.execute("localStorage.clear()");
+    // clear storage, so that the identity number is not prefilled
+    await wipeStorage(browser);
 
     // load the II page again
     await browser.url(II_URL);

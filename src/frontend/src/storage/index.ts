@@ -2,6 +2,7 @@
 
 import { parseUserNumber } from "$src/utils/userNumber";
 import { nonNullish } from "@dfinity/utils";
+import * as idb from "idb-keyval";
 import { z } from "zod";
 
 /** The Anchor type as stored in storage, including hint of the frequency at which the anchor is used.
@@ -27,8 +28,8 @@ const Anchors = z.record(Anchor);
 export const MAX_SAVED_ANCHORS = 10;
 
 /** Read saved anchors, sorted */
-export const getAnchors = (): bigint[] => {
-  const data = readAnchors();
+export const getAnchors = async (): Promise<bigint[]> => {
+  const data = await readAnchors();
   const anchors = Object.keys(data).map((ix) => BigInt(ix));
 
   // NOTE: This sort here is only used to ensure users see a stable ordering of anchors.
@@ -38,8 +39,8 @@ export const getAnchors = (): bigint[] => {
 };
 
 /** Set the specified anchor as used "just now" */
-export const setAnchorUsed = (userNumber: bigint) => {
-  void withAnchors((anchors) => {
+export const setAnchorUsed = async (userNumber: bigint) => {
+  await withAnchors((anchors) => {
     const ix = userNumber.toString();
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
@@ -52,14 +53,14 @@ export const setAnchorUsed = (userNumber: bigint) => {
 /** Accessing functions */
 
 // Simply read the storage without updating it
-const readAnchors = (): Anchors => {
+const readAnchors = (): Promise<Anchors> => {
   return updateStorage((anchors) => {
     return { ret: anchors, updated: false };
   });
 };
 
 // Read & update the storage
-const withAnchors = (op: (anchors: Anchors) => Anchors): Anchors => {
+const withAnchors = (op: (anchors: Anchors) => Anchors): Promise<Anchors> => {
   return updateStorage((anchors) => {
     const newAnchors = op(anchors);
     return { ret: newAnchors, updated: true };
@@ -69,15 +70,15 @@ const withAnchors = (op: (anchors: Anchors) => Anchors): Anchors => {
 /** Building block for reading or updating anchors, ensuring anchors
  * are read correctly (found, migrated, or have a sensible default) and pruned
  * before being written back (if updated) */
-const updateStorage = (
+const updateStorage = async (
   op: (anchors: Anchors) => {
     ret: Anchors;
     updated: boolean /* iff true, anchors are updated in storage */;
   }
-): Anchors => {
+): Promise<Anchors> => {
   let doWrite = false;
 
-  const storedAnchors = readLocalStorage();
+  const storedAnchors = await readIndexedDB();
 
   const { ret: migratedAnchors, didMigrate } = nonNullish(storedAnchors)
     ? { ret: storedAnchors, didMigrate: false }
@@ -91,6 +92,8 @@ const updateStorage = (
   doWrite ||= pruned;
 
   if (doWrite) {
+    await writeIndexedDB(prunedAnchors);
+    // NOTE: we keep local storage up to date in case of rollback
     writeLocalStorage(prunedAnchors);
   }
 
@@ -135,6 +138,27 @@ const mostUnused = (anchors: Anchors): string | undefined => {
 /** Best effort to migrate potentially old localStorage data to
  * the latest format */
 const migrated = (): Anchors | undefined => {
+  // Try to read the "v1" (localStorage.anchors) storage and return that if found
+  const v1 = migratedV1();
+  if (nonNullish(v1)) {
+    return v1;
+  }
+
+  // Try to read the "v0" (localStorage.userNumber) storage and return that if found
+  const v0 = migratedV0();
+  if (nonNullish(v0)) {
+    return v0;
+  }
+};
+
+/* Read localStorage data as ls["anchors"] = { "10000": {...}} */
+const migratedV1 = (): Anchors | undefined => {
+  // NOTE: we do not wipe local storage but keep it around in case of rollback
+  return readLocalStorage();
+};
+
+/* Read localStorage data as ls["userNumber"] = "10000" */
+const migratedV0 = (): Anchors | undefined => {
   // Nothing to do if no 'userNumber's are stored
   const userNumberString = localStorage.getItem("userNumber");
   if (userNumberString === null) {
@@ -154,6 +178,32 @@ const migrated = (): Anchors | undefined => {
   const anchors = { [ix]: { lastUsedTimestamp: nowMillis() } };
 
   return anchors;
+};
+
+/** "Low-level" functions to read anchors from and write anchors to IndexedDB */
+
+const readIndexedDB = async (): Promise<Anchors | undefined> => {
+  const item: unknown = await idb.get("anchors");
+
+  if (item === undefined) {
+    return;
+  }
+
+  // Read the object
+  const parsed = Anchors.safeParse(item);
+  if (parsed.success !== true) {
+    const message =
+      `could not read saved identities: ignoring malformed IndexedDB data: ` +
+      parsed.error;
+    console.warn(message);
+    return {};
+  }
+
+  return parsed.data;
+};
+
+const writeIndexedDB = async (anchors: Anchors) => {
+  await idb.set("anchors", anchors);
 };
 
 /** "Low-level" serialization functions to read and write anchors to local storage */

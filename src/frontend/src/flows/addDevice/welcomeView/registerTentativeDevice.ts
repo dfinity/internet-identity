@@ -40,7 +40,7 @@ export const registerTentativeDevice = async (
     if (isWebAuthnDuplicateDevice(result)) {
       // Given that this is a remote device where we get the result that authentication should work,
       // let's help the user and fill in their anchor number.
-      setAnchorUsed(userNumber);
+      await setAnchorUsed(userNumber);
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
     } else if (isWebAuthnCancel(result)) {
       await displayCancelError({ primaryButton: "Ok" });
