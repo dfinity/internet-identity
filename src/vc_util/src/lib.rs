@@ -83,20 +83,22 @@ pub fn did_for_principal(principal: Principal) -> String {
 pub fn verify_id_alias_credential_jws(
     credential_jws: &str,
     alias_tuple: &AliasTuple,
-    canister_sig_pk: &CanisterSigPublicKey,
+    signing_canister_id: &Principal,
     root_pk_raw: &[u8],
 ) -> Result<(), CredentialVerificationError> {
-    let claims = verify_credential_jws(credential_jws, canister_sig_pk, root_pk_raw)
-        .map_err(CredentialVerificationError::InvalidJws)?;
+    let claims =
+        verify_credential_jws_with_canister_id(credential_jws, signing_canister_id, root_pk_raw)
+            .map_err(CredentialVerificationError::InvalidJws)?;
     validate_id_alias_claims(claims, alias_tuple)
         .map_err(CredentialVerificationError::InvalidClaims)
 }
 
-/// Verifies the specified JWS credential cryptographically.
+/// Verifies the specified JWS credential cryptographically and checks that the signature was
+/// created by the provided canister.
 /// DOES NOT perform semantic validation of the claims in the credential.
-pub fn verify_credential_jws(
+pub fn verify_credential_jws_with_canister_id(
     credential_jws: &str,
-    canister_sig_pk: &CanisterSigPublicKey,
+    signing_canister_id: &Principal,
     root_pk_raw: &[u8],
 ) -> Result<JwtClaims<Value>, SignatureVerificationError> {
     ///// Decode JWS.
@@ -110,12 +112,17 @@ pub fn verify_credential_jws(
         .protected_header()
         .ok_or(invalid_signature_err("missing JWS header"))?;
     let canister_sig_pk_raw = get_canister_sig_pk_raw(jws_header)?;
-    if canister_sig_pk_raw != canister_sig_pk.to_raw() {
+    let canister_sig_pk = CanisterSigPublicKey::try_from_raw(canister_sig_pk_raw.as_slice())
+        .map_err(|e| key_decoding_err(&format!("invalid canister sig public key: {}", e)))?;
+
+    if signing_canister_id != &canister_sig_pk.canister_id {
         return Err(invalid_signature_err(&format!(
-            "wrong public key in JWS header, expected: {:?}",
-            canister_sig_pk
+            "canister sig canister id does not match provided canister id: expected {}, got {}",
+            signing_canister_id.to_text(),
+            canister_sig_pk.canister_id.to_text()
         )));
     }
+
     let root_pk_bytes: [u8; 96] = root_pk_raw
         .try_into()
         .map_err(|e| key_decoding_err(&format!("invalid root public key: {}", e)))?;
@@ -399,9 +406,9 @@ mod tests {
 
     #[test]
     fn should_verify_credential_jws() {
-        verify_credential_jws(
+        verify_credential_jws_with_canister_id(
             ID_ALIAS_CREDENTIAL_JWS,
-            &test_canister_sig_pk(),
+            &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
         )
         .expect("JWS verification failed");
@@ -409,9 +416,9 @@ mod tests {
 
     #[test]
     fn should_fail_verify_credential_jws_without_canister_pk() {
-        let result = verify_credential_jws(
+        let result = verify_credential_jws_with_canister_id(
             ID_ALIAS_CREDENTIAL_JWS_NO_JWK,
-            &test_canister_sig_pk(),
+            &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
         );
         assert_matches!(result, Err(e) if e.to_string().contains("missing JWK in JWS header"));
@@ -420,21 +427,21 @@ mod tests {
     #[test]
     fn should_fail_verify_credential_jws_with_wrong_canister_sig_pk() {
         let wrong_canister_sig_pk = CanisterSigPublicKey::new(alias_principal(), vec![1, 2, 3]);
-        let result = verify_credential_jws(
+        let result = verify_credential_jws_with_canister_id(
             ID_ALIAS_CREDENTIAL_JWS,
-            &wrong_canister_sig_pk,
+            &wrong_canister_sig_pk.canister_id,
             &test_ic_root_pk_raw(),
         );
-        assert_matches!(result, Err(e) if e.to_string().contains("wrong public key in JWS header"));
+        assert_matches!(result, Err(e) if e.to_string().contains("canister sig canister id does not match provided canister id"));
     }
 
     #[test]
     fn should_fail_verify_credential_jws_with_wrong_root_pk() {
         let mut ic_root_pk = test_ic_root_pk_raw();
         ic_root_pk[IC_ROOT_PK_DER_PREFIX.len()] += 1; // change the root pk value
-        let result = verify_credential_jws(
+        let result = verify_credential_jws_with_canister_id(
             ID_ALIAS_CREDENTIAL_JWS,
-            &test_canister_sig_pk(),
+            &test_canister_sig_pk().canister_id,
             &ic_root_pk,
         );
         assert_matches!(result, Err(e) if  { let err_msg = e.to_string();
@@ -450,7 +457,7 @@ mod tests {
                 id_alias: alias_principal(),
                 id_dapp: dapp_principal(),
             },
-            &test_canister_sig_pk(),
+            &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
         )
         .expect("JWS verification failed");
