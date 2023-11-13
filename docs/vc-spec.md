@@ -4,8 +4,8 @@
 ## Issuer API
 
 This section describes the (Candid) interface to be implemented by an issuer of verifiable credentials on the IC.
-This interface is used by the II-canister during attribute sharing flow (cf. [flow description](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/attribute-sharing.md))
-An example implementation of the interface is given in [demos/vc_issuer](../demos/vc_issuer).
+This interface is used by the II-canister during attribute sharing flow (cf. [flow description](https://github.com/dfinity/wg-identity-authentication/blob/d2664795afe9cea40386804bdb1259a47e34540d/topics/attribute-sharing.md))
+An example implementation of the interface is given in [demos/vc_issuer](https://github.com/dfinity/internet-identity/tree/vc-mvp/demos/vc_issuer).
 
 The Candid interface is as follows, and the subsequent sections describe the
 services and the corresponding messages in more detail.
@@ -22,8 +22,8 @@ type GetCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError
+    ok : IssuedCredentialData;
+    err : IssueCredentialError;
 };
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21VcConsentMessageRequest = record {
@@ -31,8 +31,8 @@ type Icrc21VcConsentMessageRequest = record {
     credential_spec : CredentialSpec;
 };
 type Icrc21ConsentMessageResponse = variant {
-    Ok : Icrc21ConsentInfo;
-    Err : Icrc21Error;
+    ok : Icrc21ConsentInfo;
+    err : Icrc21Error;
 };
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
@@ -55,8 +55,8 @@ type PrepareCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type PrepareCredentialResponse = variant {
-    Ok : PreparedCredentialData;
-    Err : IssueCredentialError;
+    ok : PreparedCredentialData;
+    err : IssueCredentialError;
 };
 type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
@@ -75,7 +75,6 @@ service : {
 
 In the attribute sharing flow a user must approve the issuance of a verifiable
 credential by an issuer, and this happens by approving a human-readable consent message from the issuer.
-See [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md) for more detail.
 
 Identity provider uses a VC-extension of  [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md), and requests the consent message via `Icrc21VcConsentMessageRequest`,
 Upon successful response idenity provider displays the consent message from `Icrc21ConsentInfo` to the user.
@@ -107,8 +106,8 @@ type PrepareCredentialRequest = record {
 };
 
 type PrepareCredentialResponse = variant {
-    Ok : PreparedCredentialData;
-    Err : IssueCredentialError;
+    ok : PreparedCredentialData;
+    err : IssueCredentialError;
 };
 
 type PreparedCredentialData = record { prepared_context : opt blob };
@@ -143,8 +142,8 @@ type GetCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError;
+    ok : IssuedCredentialData;
+    err : IssueCredentialError;
 };
 type IssuedCredentialData = record { vc_jws : text };
 
@@ -265,7 +264,10 @@ After the user has successfully completed the flow, Internet Identity will respo
 
   * `verifiablePresentation`: The JWT based verifiable presentation containing two credentials: 
     1. A verifiable credential issued by Internet Identity that relates the requested `credentialSubject` to another alias principal.
-    2. A verifiable credential issued by on of the requested issuers issued to the alias principal.
+    2. A verifiable credential issued by the requested issuer to the alias principal.
+
+**NOTE:** the order of the credentials in the presentation should match the list above,
+i.e. the credential that relates the subject to alias principal should come first.
 
 ##### Example
 
