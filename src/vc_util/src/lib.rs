@@ -83,11 +83,12 @@ pub fn did_for_principal(principal: Principal) -> String {
 pub fn verify_id_alias_credential_jws(
     credential_jws: &str,
     alias_tuple: &AliasTuple,
-    canister_id: &Principal,
+    signing_canister_id: &Principal,
     root_pk_raw: &[u8],
 ) -> Result<(), CredentialVerificationError> {
-    let claims = verify_credential_jws_with_canister_id(credential_jws, canister_id, root_pk_raw)
-        .map_err(CredentialVerificationError::InvalidJws)?;
+    let claims =
+        verify_credential_jws_with_canister_id(credential_jws, signing_canister_id, root_pk_raw)
+            .map_err(CredentialVerificationError::InvalidJws)?;
     validate_id_alias_claims(claims, alias_tuple)
         .map_err(CredentialVerificationError::InvalidClaims)
 }
@@ -97,7 +98,7 @@ pub fn verify_id_alias_credential_jws(
 /// DOES NOT perform semantic validation of the claims in the credential.
 pub fn verify_credential_jws_with_canister_id(
     credential_jws: &str,
-    canister_id: &Principal,
+    signing_canister_id: &Principal,
     root_pk_raw: &[u8],
 ) -> Result<JwtClaims<Value>, SignatureVerificationError> {
     ///// Decode JWS.
@@ -114,10 +115,10 @@ pub fn verify_credential_jws_with_canister_id(
     let canister_sig_pk = CanisterSigPublicKey::try_from_raw(canister_sig_pk_raw.as_slice())
         .map_err(|e| key_decoding_err(&format!("invalid canister sig public key: {}", e)))?;
 
-    if canister_id != &canister_sig_pk.canister_id {
+    if signing_canister_id != &canister_sig_pk.canister_id {
         return Err(invalid_signature_err(&format!(
             "canister sig canister id does not match provided canister id: expected {}, got {}",
-            canister_id.to_text(),
+            signing_canister_id.to_text(),
             canister_sig_pk.canister_id.to_text()
         )));
     }
