@@ -1,7 +1,6 @@
 use crate::internet_identity::types::{CanisterSigPublicKeyDer, FrontendHostname, IdentityNumber};
 use candid::{CandidType, Deserialize, Principal};
 
-
 /// Types for requesting ID-alias credentials, used for attribute sharing feature.
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -68,4 +67,3 @@ pub enum GetIdAliasResponse {
     #[serde(rename = "no_such_credentials")]
     NoSuchCredentials(String),
 }
-
