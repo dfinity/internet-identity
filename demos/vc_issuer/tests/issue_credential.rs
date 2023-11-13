@@ -77,6 +77,15 @@ mod api {
         call_candid_as(env, canister_id, sender, "add_employee", (employee_id,)).map(|(x,)| x)
     }
 
+    pub fn add_graduate(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: Principal,
+        employee_id: Principal,
+    ) -> Result<String, CallError> {
+        call_candid_as(env, canister_id, sender, "add_graduate", (employee_id,)).map(|(x,)| x)
+    }
+
     pub fn prepare_credential(
         env: &StateMachine,
         canister_id: CanisterId,
@@ -192,7 +201,7 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
             .expect("Got 'None' from vc_consent_message");
     assert_matches!(
         response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::MalformedCall(_))
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
     );
 }
 
@@ -220,17 +229,29 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
             .expect("Got 'None' from vc_consent_message");
     assert_matches!(
         response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::MalformedCall(_))
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
     );
 }
 fn employee_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
     args.insert(
-        "employeeName".to_string(),
+        "employerName".to_string(),
         ArgumentValue::String("DFINITY Foundation".to_string()),
     );
     CredentialSpec {
         credential_name: "VerifiedEmployee".to_string(),
+        arguments: Some(args),
+    }
+}
+
+fn degree_credential_spec() -> CredentialSpec {
+    let mut args = HashMap::new();
+    args.insert(
+        "institutionName".to_string(),
+        ArgumentValue::String("DFINITY College of Engineering".to_string()),
+    );
+    CredentialSpec {
+        credential_name: "UniversityDegreeCredential".to_string(),
         arguments: Some(args),
     }
 }
@@ -280,7 +301,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
 }
 
 #[test]
-fn should_prepare_credential_for_authorized_principal() {
+fn should_prepare_employee_credential_for_authorized_principal() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let authorized_principal = principal_1();
@@ -305,16 +326,42 @@ fn should_prepare_credential_for_authorized_principal() {
     assert_matches!(response, PrepareCredentialResponse::Ok(_));
 }
 
-/// Verifies that a credential is being created including II interactions.
+#[test]
+fn should_prepare_degree_credential_for_authorized_principal() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let authorized_principal = principal_1();
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_2(),
+        id_dapp: authorized_principal,
+        credential_jws: "dummy jws".to_string(),
+    };
+    let _add_employee_response =
+        api::add_graduate(&env, issuer_id, principal_2(), authorized_principal)
+            .expect("API call failed");
+    let response = api::prepare_credential(
+        &env,
+        issuer_id,
+        principal_2(),
+        &PrepareCredentialRequest {
+            credential_spec: degree_credential_spec(),
+            signed_id_alias,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(response, PrepareCredentialResponse::Ok(_));
+}
+
+/// Verifies that different credentials are being created including II interactions.
 #[test]
 fn should_issue_credential_e2e() -> Result<(), CallError> {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let ii_id = install_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, ii_id);
-
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
+
     let prepare_id_alias_req = PrepareIdAliasRequest {
         identity_number,
         relying_party: relying_party.clone(),
@@ -368,55 +415,74 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     )
     .expect("Invalid ID alias");
 
-    let _add_employee_response = api::add_employee(
+    api::add_employee(
         &env,
         issuer_id,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
     )?;
-    let prepare_credential_response = api::prepare_credential(
+    api::add_graduate(
         &env,
         issuer_id,
         id_alias_credentials.issuer_id_alias_credential.id_dapp,
-        &PrepareCredentialRequest {
-            credential_spec: employee_credential_spec(),
-            signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
-        },
+        id_alias_credentials.issuer_id_alias_credential.id_dapp,
     )?;
-    let prepared_credential =
-        if let PrepareCredentialResponse::Ok(data) = prepare_credential_response {
-            data
+
+    for credential_spec in vec![employee_credential_spec(), degree_credential_spec()] {
+        let prepare_credential_response = api::prepare_credential(
+            &env,
+            issuer_id,
+            id_alias_credentials
+                .issuer_id_alias_credential
+                .id_dapp
+                .clone(),
+            &PrepareCredentialRequest {
+                credential_spec: credential_spec.clone(),
+                signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
+            },
+        )?;
+        let prepared_credential =
+            if let PrepareCredentialResponse::Ok(data) = prepare_credential_response {
+                data
+            } else {
+                panic!(
+                    "Prepare credential failed: {:?}",
+                    prepare_credential_response
+                );
+            };
+
+        let get_credential_response = api::get_credential(
+            &env,
+            issuer_id,
+            id_alias_credentials
+                .issuer_id_alias_credential
+                .id_dapp
+                .clone(),
+            &GetCredentialRequest {
+                credential_spec,
+                signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
+                prepared_context: prepared_credential.prepared_context,
+            },
+        )?;
+
+        if let GetCredentialResponse::Ok(data) = get_credential_response {
+            let params = PresentationParams {
+                id_alias_vc_jws: id_alias_credentials
+                    .rp_id_alias_credential
+                    .credential_jws
+                    .clone(),
+                requested_vc_jws: data.vc_jws,
+            };
+            let alias_tuple = AliasTuple {
+                id_alias: id_alias_credentials.rp_id_alias_credential.id_alias,
+                id_dapp: id_alias_credentials.rp_id_alias_credential.id_dapp,
+            };
+            let _vp = create_verifiable_presentation_jwt(params, &alias_tuple)
+                .expect("failed creating presentation");
         } else {
-            panic!(
-                "Prepare credential failed: {:?}",
-                prepare_credential_response
-            );
+            panic!("Get credential failed: {:?}", get_credential_response);
         };
+    }
 
-    let get_credential_response = api::get_credential(
-        &env,
-        issuer_id,
-        id_alias_credentials.issuer_id_alias_credential.id_dapp,
-        &GetCredentialRequest {
-            credential_spec: employee_credential_spec(),
-            signed_id_alias: id_alias_credentials.issuer_id_alias_credential,
-            prepared_context: prepared_credential.prepared_context,
-        },
-    )?;
-
-    if let GetCredentialResponse::Ok(data) = get_credential_response {
-        let params = PresentationParams {
-            id_alias_vc_jws: id_alias_credentials.rp_id_alias_credential.credential_jws,
-            requested_vc_jws: data.vc_jws,
-        };
-        let alias_tuple = AliasTuple {
-            id_alias: id_alias_credentials.rp_id_alias_credential.id_alias,
-            id_dapp: id_alias_credentials.rp_id_alias_credential.id_dapp,
-        };
-        let _vp = create_verifiable_presentation_jwt(params, &alias_tuple)
-            .expect("failed creating presentation");
-    } else {
-        panic!("Get credential failed: {:?}", get_credential_response);
-    };
     Ok(())
 }

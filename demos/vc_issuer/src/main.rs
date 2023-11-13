@@ -29,37 +29,41 @@ const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 thread_local! {
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
+    static GRADUATES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 }
 
 #[cfg(target_arch = "wasm32")]
 use ic_cdk::println;
 
-fn check_caller_not_anonymous() -> Result<Principal, String> {
+fn check_caller_not_anonymous() -> Result<(), String> {
     let caller = cdk_caller();
     // The anonymous principal is not allowed to request credentials.
     if caller == Principal::anonymous() {
         return Err("Anonymous principal not allowed to request credentials.".to_string());
     }
-    Ok(caller)
+    Ok(())
 }
 
 #[update]
 #[candid_method]
 async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    let _caller = match check_caller_not_anonymous() {
-        Ok(caller) => caller,
-        Err(e) => {
-            return PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e))
-        }
+    if let Err(e) = check_caller_not_anonymous() {
+        return PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
     };
-    if let Err(err) = verify_prepare_credential_request(&req) {
+    if let Err(err) = verify_credential_spec(&req.credential_spec) {
+        return PrepareCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(
+            err,
+        ));
+    }
+
+    if let Err(err) = prepare_credential_payload(&req) {
         return PrepareCredentialResponse::Err(err);
     }
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
-    let credential = new_credential_dfinity_employment(subject_principal);
+    let credential = dfinity_employment_credential(subject_principal);
     let credential_jwt = credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure");
@@ -89,12 +93,11 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    let _caller = match check_caller_not_anonymous() {
-        Ok(caller) => caller,
-        Err(e) => return GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)),
+    if let Err(e) = check_caller_not_anonymous() {
+        return GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
     };
-    if let Err(err) = verify_get_credential_request(&req) {
-        return GetCredentialResponse::Err(err);
+    if let Err(err) = verify_credential_spec(&req.credential_spec) {
+        return GetCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(err));
     }
     let subject_principal = req.signed_id_alias.id_alias;
     let seed = calculate_seed(&subject_principal);
@@ -131,7 +134,10 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 #[candid_method]
 async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
-        return Icrc21ConsentMessageResponse::Err(err);
+        return Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(Icrc21ErrorInfo {
+            description: err,
+            error_code: 0,
+        }));
     }
     Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
         consent_message: get_vc_consent_message(&req),
@@ -139,25 +145,65 @@ async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21Consent
     })
 }
 
-fn verify_credential_spec(spec: &CredentialSpec) -> Result<(), Icrc21Error> {
-    if spec.credential_name != "VerifiedEmployee" {
-        return Err(Icrc21Error::NotSupported(Icrc21ErrorInfo {
-            error_code: 0,
-            description: format!("Credential {} is not supported", spec.credential_name),
-        }));
+fn verify_credential_spec(spec: &CredentialSpec) -> Result<(), String> {
+    match spec.credential_name.as_str() {
+        "VerifiedEmployee" => verify_single_argument(
+            spec,
+            "employerName",
+            ArgumentValue::String("DFINITY Foundation".to_string()),
+        ),
+        "UniversityDegreeCredential" => verify_single_argument(
+            spec,
+            "institutionName",
+            ArgumentValue::String("DFINITY College of Engineering".to_string()),
+        ),
+        other => Err(format!("Credential {} is not supported", other)),
     }
-    let arg_key = "employerName";
-    if spec.arguments.is_none() || !spec.arguments.as_ref().unwrap().contains_key(arg_key) {
-        return Err(Icrc21Error::MalformedCall(Icrc21ErrorInfo {
-            error_code: 0,
-            description: format!(
-                "Missing argument '{}' for credential {}",
-                arg_key, spec.credential_name
-            ),
-        }));
+}
+
+fn verify_single_argument(
+    spec: &CredentialSpec,
+    expected_argument: &str,
+    expected_value: ArgumentValue,
+) -> Result<(), String> {
+    fn missing_argument_error(
+        spec: &CredentialSpec,
+        expected_argument: &str,
+    ) -> Result<(), String> {
+        Err(format!(
+            "Missing argument '{}' for credential {}",
+            expected_argument, spec.credential_name
+        ))
+    }
+
+    let Some(arguments) = &spec.arguments else {
+        return missing_argument_error(spec, expected_argument);
+    };
+    let Some(value) = arguments.get(expected_argument) else {
+        return missing_argument_error(spec, expected_argument);
+    };
+
+    if value != &expected_value {
+        return Err(format!(
+            "Unsupported value for argument '{}': expected '{}', got '{}'",
+            expected_argument, expected_value, value
+        ));
+    }
+
+    let unexpected_arguments: Vec<&String> = arguments
+        .keys()
+        .into_iter()
+        .filter(|k| k.as_str() != expected_argument)
+        .collect();
+    if !unexpected_arguments.is_empty() {
+        return Err(format!(
+            "Unexpected arguments for credential {}: {:?}",
+            spec.credential_name, unexpected_arguments
+        ));
     }
     Ok(())
 }
+
 fn get_vc_consent_message(req: &Icrc21VcConsentMessageRequest) -> String {
     format!(
         "Issue credential '{}' with arguments:{}",
@@ -178,8 +224,15 @@ fn arguments_as_string(maybe_args: &Option<HashMap<String, ArgumentValue>>) -> S
 #[update]
 #[candid_method]
 fn add_employee(employee_id: Principal) -> String {
-    EMPLOYEES.with(|employees| employees.borrow_mut().insert(employee_id));
+    EMPLOYEES.with_borrow_mut(|employees| employees.insert(employee_id));
     format!("Added employee {}", employee_id)
+}
+
+#[update]
+#[candid_method]
+fn add_graduate(graduate_id: Principal) -> String {
+    GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
+    format!("Added graduate {}", graduate_id)
 }
 
 fn main() {}
@@ -235,30 +288,28 @@ fn calculate_seed(principal: &Principal) -> Hash {
     hash_bytes(bytes)
 }
 
-#[allow(dead_code)]
-fn new_credential_bachelor_degree(subject_principal: Principal) -> Credential {
+fn bachelor_degree_credential(subject_principal: Principal) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
-      "name": "Alice",
       "degree": {
         "type": "BachelorDegree",
-        "name": "Bachelor of Science and Arts",
+        "name": "Bachelor of Engineering",
+        "institutionName": "DFINITY College of Engineering",
       },
-      "GPA": "4.0",
     }))
     .unwrap();
 
     // Build credential using subject above and issuer.
     CredentialBuilder::default()
         .id(Url::parse("https://example.edu/credentials/3732").unwrap())
-        .issuer(Url::parse("https://identity.ic0.app").unwrap())
+        .issuer(Url::parse("https://example.edu").unwrap())
         .type_("UniversityDegreeCredential")
         .subject(subject)
         .build()
         .unwrap()
 }
 
-fn new_credential_dfinity_employment(subject_principal: Principal) -> Credential {
+fn dfinity_employment_credential(subject_principal: Principal) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
       "employee_of": {
@@ -278,27 +329,42 @@ fn new_credential_dfinity_employment(subject_principal: Principal) -> Credential
         .unwrap()
 }
 
-fn verify_prepare_credential_request(
+fn prepare_credential_payload(
     req: &PrepareCredentialRequest,
-) -> Result<(), IssueCredentialError> {
-    let is_employee =
-        EMPLOYEES.with(|employees| employees.borrow().contains(&req.signed_id_alias.id_dapp));
-    if is_employee {
-        Ok(())
-    } else {
-        println!(
-            "*** it is unknown whether {} is an employee",
-            req.signed_id_alias.id_dapp
-        );
-        Err(IssueCredentialError::UnauthorizedSubject(format!(
-            "unauthorized principal {}",
-            req.signed_id_alias.id_dapp
-        )))
+) -> Result<Credential, IssueCredentialError> {
+    match req.credential_spec.credential_name.as_str() {
+        "VerifiedEmployee" => {
+            EMPLOYEES.with_borrow(|employees| verify_authorized_principal(req, employees))?;
+            Ok(dfinity_employment_credential(req.signed_id_alias.id_alias))
+        }
+        "UniversityDegreeCredential" => {
+            GRADUATES.with_borrow(|graduates| verify_authorized_principal(req, graduates))?;
+            Ok(bachelor_degree_credential(req.signed_id_alias.id_alias))
+        }
+        other => Err(IssueCredentialError::UnsupportedCredentialSpec(format!(
+            "credential {} is not supported",
+            other
+        ))),
     }
 }
 
-fn verify_get_credential_request(_req: &GetCredentialRequest) -> Result<(), IssueCredentialError> {
-    Ok(())
+fn verify_authorized_principal(
+    req: &PrepareCredentialRequest,
+    authorized_principals: &HashSet<Principal>,
+) -> Result<(), IssueCredentialError> {
+    if authorized_principals.contains(&req.signed_id_alias.id_dapp) {
+        Ok(())
+    } else {
+        println!(
+            "*** principal {} it is not authorized for credential {}",
+            req.signed_id_alias.id_dapp.to_text(),
+            req.credential_spec.credential_name
+        );
+        Err(IssueCredentialError::UnauthorizedSubject(format!(
+            "unauthorized principal {}",
+            req.signed_id_alias.id_dapp.to_text()
+        )))
+    }
 }
 
 fn internal_error(msg: &str) -> IssueCredentialError {

@@ -35,6 +35,7 @@ type IssueCredentialError = variant {
     signature_not_found : text;
     unknown_subject : text;
     invalid_id_alias : text;
+    invalid_credential_spec : text;
 };
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
@@ -53,11 +54,8 @@ type SignedIdAlias = record {
 };
 service : {
     add_employee : (principal) -> (text);
+    add_graduate : (principal) -> (text);
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
-    prepare_credential : (PrepareCredentialRequest) -> (
-    PrepareCredentialResponse,
-    );
-    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (
-    Icrc21ConsentMessageResponse,
-    );
+    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
+    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
 }
