@@ -3457,6 +3457,7 @@ dependencies = [
  "assert_matches",
  "candid",
  "canister_sig_util",
+ "ic-cdk",
  "ic-certified-map",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",

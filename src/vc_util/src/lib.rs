@@ -39,7 +39,7 @@ pub enum CredentialVerificationError {
 }
 
 /// Returns the effective bytes that will be signed when computing a canister signature for
-/// the given JWT-credential, verfiable via the specified public key.
+/// the given JWT-credential, verifiable via the specified public key.
 pub fn vc_signing_input(
     credential_jwt: &str,
     canister_sig_pk: &CanisterSigPublicKey,
@@ -185,14 +185,16 @@ fn validate_claim<T: std::cmp::PartialEq<S> + std::fmt::Display, S: std::fmt::Di
         if expected == actual {
             Ok(())
         } else {
-            println!(
+            ic_cdk::println!(
                 "inconsistent claim [{}] in id_alias VC::  expected: {}, actual: {}",
-                label, expected, actual
+                label,
+                expected,
+                actual
             );
             Err(inconsistent_jwt_claims("inconsistent claim in id_alias VC"))
         }
     } else {
-        println!("missing claim [{}] in id_alias VC", label);
+        ic_cdk::println!("missing claim [{}] in id_alias VC", label);
         Err(inconsistent_jwt_claims("missing claim in id_alias VC"))
     }
 }
