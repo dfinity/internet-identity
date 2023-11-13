@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 /// API to be implemented by an issuer of verifiable credentials.
-/// (cf. https://github.com/dfinity/internet-identity/blob/vc-mvp/docs/vc-spec.md)
+/// (cf. https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md)
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SignedIdAlias {
@@ -149,7 +149,7 @@ pub enum Icrc21ConsentMessageResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn should_display_argument_values() {
         assert_eq!("42", format!("{}", ArgumentValue::Int(42)));
