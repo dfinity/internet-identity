@@ -156,6 +156,9 @@ mod tests {
         assert_eq!("0", format!("{}", ArgumentValue::Int(0)));
         assert_eq!("-7", format!("{}", ArgumentValue::Int(-7)));
         assert_eq!("''", format!("{}", ArgumentValue::String("".to_string())));
-        assert_eq!("'some string'", format!("{}", ArgumentValue::String("some string".to_string())));
+        assert_eq!(
+            "'some string'",
+            format!("{}", ArgumentValue::String("some string".to_string()))
+        );
     }
 }
