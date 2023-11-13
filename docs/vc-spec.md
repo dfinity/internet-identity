@@ -116,13 +116,13 @@ type PreparedCredentialData = record { prepared_context : opt blob };
 Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified via `id_dapp` on the issuer
 side can be identified using `id_alias` for the purpose of attribute sharing, and that the credential
 described by `credential_spec` does apply to the user.  When these checks are successful, the issuer
-prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then 
+prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then
 passed back to the issuer in a subsequent `get_credential`-call (see below).
 This call must be authenticated (i.e. it is not available for the anonymous sender).
 
-**NOTE:** 
+**NOTE:**
 The value of `prepared_context` is basically used to transfer information between `prepare_credential`
-and `get_credential` steps, and it is totally up to the issuer to decide on the content of 
+and `get_credential` steps, and it is totally up to the issuer to decide on the content of
 that field.  That is, the issuer creates `prepared_context`, and is the only entity that
 consumes it.
 
@@ -158,14 +158,14 @@ This call must be authenticated (i.e. it is not available for the anonymous send
 Upon successful checks, issuer returns the signed credential in JWS-format.
 
 
-##  Identity Provider API 
+##  Identity Provider API
 
-This section describes the _Window Post Message_-interface implemented by the identity provider (Internet Idenity).
+This section describes the [_`window.postMessage()`_](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage)-interface implemented by the identity provider (Internet Identity).
 This interface is used by a Relying Party during attribute sharing flow (cf. [flow description](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/attribute-sharing.md))
 
 ### 1: Load II in a new window
 
-The II window needs to be opened with the subpath `/vc-flow`.
+The II window needs to be opened with the URL path `/vc-flow`.
 
 After opening the II window, II will load and notify `window.opener` with the following JSON-RPC notification:
 
@@ -179,7 +179,6 @@ After opening the II window, II will load and notify `window.opener` with the fo
 ### 2: Request a VC
 
 After receiving the notification that II is ready, the relying party can request a VC by sending the following JSON-RPC request:
- 
 * Method: `request_credential`
 * Params:
   * `issuer`: An issuer that the relying party trusts. It has the following properties:
@@ -262,7 +261,7 @@ After receiving the notification that II is ready, the relying party can request
 
 After the user has successfully completed the flow, Internet Identity will respond with the following JSON-RPC response:
 
-  * `verifiablePresentation`: The JWT based verifiable presentation containing two credentials: 
+  * `verifiablePresentation`: The JWT based verifiable presentation containing two credentials:
     1. A verifiable credential issued by Internet Identity that relates the requested `credentialSubject` to another alias principal.
     2. A verifiable credential issued by the requested issuer to the alias principal.
 
