@@ -24,7 +24,6 @@
     "src/**/*.test.ts",
     "src/frontend/src/test-e2e/*.ts",
     "src/frontend/generated/*",
-    "src/frontend/jest-custom-sequencer.ts",
     "vite.config.ts",
     "vite.plugins.ts"
   ]
