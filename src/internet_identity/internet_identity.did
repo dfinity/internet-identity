@@ -386,7 +386,7 @@ type PrepareIdAliasResponse = variant {
 };
 
 type PreparedIdAlias = record {
-    canister_sig_pk : vec nat8;
+    canister_sig_pk_der : vec nat8;
     rp_id_alias_jwt : text;
     issuer_id_alias_jwt : text;
 };
