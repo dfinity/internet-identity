@@ -175,9 +175,9 @@ export interface PrepareIdAliasRequest {
 export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
   { 'authentication_failed' : string };
 export interface PreparedIdAlias {
-  'canister_sig_pk' : Uint8Array | number[],
   'rp_id_alias_jwt' : string,
   'issuer_id_alias_jwt' : string,
+  'canister_sig_pk_der' : Uint8Array | number[],
 }
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }

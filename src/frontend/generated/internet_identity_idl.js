@@ -222,9 +222,9 @@ export const idlFactory = ({ IDL }) => {
     'identity_number' : IDL.Nat64,
   });
   const PreparedIdAlias = IDL.Record({
-    'canister_sig_pk' : IDL.Vec(IDL.Nat8),
     'rp_id_alias_jwt' : IDL.Text,
     'issuer_id_alias_jwt' : IDL.Text,
+    'canister_sig_pk_der' : IDL.Vec(IDL.Nat8),
   });
   const PrepareIdAliasResponse = IDL.Variant({
     'ok' : PreparedIdAlias,
