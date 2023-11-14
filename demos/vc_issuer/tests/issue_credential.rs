@@ -4,15 +4,18 @@ use assert_matches::assert_matches;
 use candid::Principal;
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
-use canister_tests::flows;
-use canister_tests::framework::{env, get_wasm_path, principal_1, principal_2, II_WASM};
+use canister_tests::framework::{
+    env, get_wasm_path, principal_1, principal_2, test_principal, II_WASM,
+};
+use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::call_candid_as;
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
     Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21VcConsentMessageRequest, PrepareCredentialRequest, PrepareCredentialResponse,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
+    PrepareCredentialResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
@@ -232,6 +235,7 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
         Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
     );
 }
+
 fn employee_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
     args.insert(
@@ -255,6 +259,7 @@ fn degree_credential_spec() -> CredentialSpec {
         arguments: Some(args),
     }
 }
+
 #[test]
 fn should_fail_prepare_credential_for_unauthorized_principal() {
     let env = env();
@@ -276,6 +281,81 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
     )
     .expect("API call failed");
     assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+}
+
+#[test]
+fn should_fail_prepare_credential_for_wrong_sender() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    api::add_employee(&env, issuer_id, Principal::anonymous(), test_principal(1))
+        .expect("failed to add employee");
+    let unauthorized_principal = test_principal(2);
+
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_2(),
+        id_dapp: test_principal(1),
+        credential_jws: "dummy jws".to_string(),
+    };
+
+    let response = api::prepare_credential(
+        &env,
+        issuer_id,
+        unauthorized_principal,
+        &PrepareCredentialRequest {
+            credential_spec: employee_credential_spec(),
+            signed_id_alias,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(response, 
+        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller sl5og-mycaa-aaaaa-aaaap-4 does not match id alias dapp principal vn357-5qbaa-aaaaa-aaaap-4."));
+}
+
+#[test]
+fn should_fail_get_credential_for_wrong_sender() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let authorized_prinzipal = test_principal(1);
+    api::add_employee(
+        &env,
+        issuer_id,
+        Principal::anonymous(),
+        authorized_prinzipal,
+    )
+    .expect("failed to add employee");
+    let unauthorized_principal = test_principal(2);
+
+    let signed_id_alias = SignedIdAlias {
+        id_alias: principal_2(),
+        id_dapp: authorized_prinzipal,
+        credential_jws: "dummy jws".to_string(),
+    };
+
+    match_value!(
+        api::prepare_credential(
+            &env,
+            issuer_id,
+            authorized_prinzipal,
+            &PrepareCredentialRequest {
+                credential_spec: employee_credential_spec(),
+                signed_id_alias: signed_id_alias.clone(),
+            },
+        ),
+        Ok(PrepareCredentialResponse::Ok(prepare_credential_response))
+    );
+    let get_credential_response = api::get_credential(
+        &env,
+        issuer_id,
+        unauthorized_principal,
+        &GetCredentialRequest {
+            credential_spec: employee_credential_spec(),
+            signed_id_alias,
+            prepared_context: prepare_credential_response.prepared_context,
+        },
+    )
+    .expect("API call failed");
+    assert_matches!(get_credential_response, 
+        GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller sl5og-mycaa-aaaaa-aaaap-4 does not match id alias dapp principal vn357-5qbaa-aaaaa-aaaap-4."));
 }
 
 #[test]
