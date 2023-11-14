@@ -225,7 +225,7 @@ function withStorage(
       setLocalStorage(lsBefore);
     }
 
-    await idb.delMany(await idb.keys());
+    await idb.clear();
     const idbBefore = opts?.indexeddb?.before;
     if (nonNullish(idbBefore)) {
       await setIndexedDB(idbBefore);
@@ -249,7 +249,7 @@ function withStorage(
 
     // Remove all entries
     // (cannot just reset global.indexeddb because idb-keyval stores a pointer to the DB)
-    await idb.delMany(await idb.keys());
+    await idb.clear();
 
     // Check the localStorage "after"
 
