@@ -19,6 +19,7 @@ const recoveryPhrase: DeviceData = {
   alias: "Recovery Phrase",
   origin: [],
   protection: { unprotected: null },
+  // eslint-disable-next-line
   pubkey: undefined as any,
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
@@ -30,6 +31,7 @@ const authenticator: DeviceData = {
   alias: "My Authenticator",
   origin: [],
   protection: { unprotected: null },
+  // eslint-disable-next-line
   pubkey: undefined as any,
   key_type: { unknown: null },
   purpose: { authentication: null },

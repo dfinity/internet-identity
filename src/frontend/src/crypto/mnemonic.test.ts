@@ -10,9 +10,8 @@ const expectLeadingUserNumberToBe = (
   expected: number | null
 ) => {
   const parsed = parseRecoveryPhrase(received);
-  const lun = parsed.leadingUserNumber
-    ? Number(parsed.leadingUserNumber)
-    : null;
+  const lun =
+    parsed.leadingUserNumber !== null ? Number(parsed.leadingUserNumber) : null;
   expect(lun).toBe(expected);
 };
 

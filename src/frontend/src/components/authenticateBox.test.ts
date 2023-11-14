@@ -9,7 +9,7 @@ beforeEach(() => {
   global.indexedDB = new IDBFactory();
 });
 
-test("anchors are forwarded", async () => {
+test("anchors are forwarded", () => {
   const addDevice: (anchor?: bigint) => void = vi.fn();
   const recover: (anchor?: bigint) => void = vi.fn();
   const pages = authnTemplates(new I18n("en"), {

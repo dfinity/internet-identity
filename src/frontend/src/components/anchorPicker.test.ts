@@ -1,7 +1,7 @@
 import { render } from "lit-html";
 import { mkAnchorPicker } from "./anchorPicker";
 
-test("first anchor is focused", async () => {
+test("first anchor is focused", () => {
   const picker = mkAnchorPicker({
     savedAnchors: [BigInt(10000), BigInt(9990042)],
     pick: () => {},

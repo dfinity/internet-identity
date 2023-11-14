@@ -110,7 +110,7 @@ test("Should issue the same principal to dapps on legacy & official domains", as
         credentials[0],
         originToRelyingPartyId(II_URL)
       );
-      let authenticateView = new AuthenticateView(browser);
+      const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();
       await authenticateView.pickAnchor(userNumber);
 

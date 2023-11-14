@@ -65,12 +65,12 @@ const testVectorsSLIP10 = [
 
 test("derive Ed25519 via SLIP 0010", async () => {
   await Promise.all(
-    testVectorsSLIP10.map(async (testVector: TestVector, i) => {
+    testVectorsSLIP10.map(async (testVector: TestVector) => {
       const seedBlob = fromHexString(testVector.seed);
       const expectedPrivateKey = fromHexString(testVector.privateKey);
       const expectedPublicKey = fromHexString(testVector.publicKey);
 
-      let identity = await ed25519.fromSeedWithSlip0010(
+      const identity = await ed25519.fromSeedWithSlip0010(
         new Uint8Array(seedBlob),
         testVector.derivationPath
       );

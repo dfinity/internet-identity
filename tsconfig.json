@@ -25,10 +25,5 @@
       "$showcase/*": ["./src/showcase/src/*"]
     }
   },
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/frontend/src/test-e2e/*.ts",
-    "src/frontend/generated/*",
-    "src/frontend/jest-custom-sequencer.ts"
-  ]
+  "exclude": ["src/frontend/generated/*"]
 }
