@@ -118,13 +118,15 @@ side can be identified using `id_alias` for the purpose of attribute sharing, an
 described by `credential_spec` does apply to the user.  When these checks are successful, the issuer
 prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then
 passed back to the issuer in a subsequent `get_credential`-call (see below).
-This call must be authenticated (i.e. it is not available for the anonymous sender).
+This call must be authenticated, i.e. the sender must match the principal for which the credential is requested.
 
 **NOTE:**
 The value of `prepared_context` is basically used to transfer information between `prepare_credential`
 and `get_credential` steps, and it is totally up to the issuer to decide on the content of
 that field.  That is, the issuer creates `prepared_context`, and is the only entity that
-consumes it.
+consumes it.  For example, when using [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures)
+the context contains a time-stamped yet unsigned VC, for which the canister signature will be
+available only at `get_credential`-call.
 
 
 ### 3: Get Credential
@@ -153,7 +155,7 @@ type IssuedCredentialData = record { vc_jws : text };
 `prepared_context`-value  returned by `prepare_credential`, if any.
 The issuer performs the same checks as during the `prepare_credential`-call,
 plus verify that `prepared_context` is consistent with the other parameters.
-This call must be authenticated (i.e. it is not available for the anonymous sender).
+This call must be authenticated, i.e. the sender must match the principal for which the credential is requested.
 
 Upon successful checks, issuer returns the signed credential in JWS-format.
 
@@ -183,7 +185,8 @@ After receiving the notification that II is ready, the relying party can request
 * Params:
   * `issuer`: An issuer that the relying party trusts. It has the following properties:
     * `origin`: The origin of the issuer.
-    * `canisterId`: (optional) The canister id of the issuer, if applicable/known.
+    * `canisterId`: (optional) The canister id of the issuer, if applicable/known. If specified and not the same
+       as the one reported by a boundary node for `origin`, this is an error.
   * `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
     * `credentialName`: The name of the requested credential.
     * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
