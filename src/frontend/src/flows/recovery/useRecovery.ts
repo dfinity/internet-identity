@@ -170,6 +170,6 @@ const enrollAuthenticator = async ({
     return "error";
   }
 
-  setAnchorUsed(userNumber);
+  await setAnchorUsed(userNumber);
   return "enrolled";
 };

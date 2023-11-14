@@ -174,7 +174,7 @@ export const registerFlow = async <T>({
   if (result.kind === "loginSuccess") {
     const userNumber = result.userNumber;
     await finalizeIdentity?.(userNumber);
-    setAnchorUsed(userNumber);
+    await setAnchorUsed(userNumber);
     await displayUserNumber({
       userNumber,
       stepper: finishStepper,

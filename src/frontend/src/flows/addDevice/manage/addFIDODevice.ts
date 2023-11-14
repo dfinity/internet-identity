@@ -85,7 +85,7 @@ export const addFIDODevice = async (
     );
   }
 
-  setAnchorUsed(userNumber);
+  await setAnchorUsed(userNumber);
 };
 
 const unknownError = (): Error => {
