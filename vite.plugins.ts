@@ -91,25 +91,27 @@ export const canisterLookupPlugin = () => {
   // the "foo" canister installed in demos/vc_issuer/.dfx
   return {
     name: "canister-lookup",
-    configureServer(server) {
+    configureServer(server: ViteDevServer) {
       server.middlewares.use((req, res, next) => {
-        const ISSUER_HOSTNAME = "issuer.localhost";
-        if (req.hostname !== ISSUER_HOSTNAME) {
+        const ISSUER_CANISTER_NAME = "issuer";
+        const ISSUER_HOSTNAME = `${ISSUER_CANISTER_NAME}.localhost`;
+        const host = req.headers["host"];
+        if (host === undefined || !host.includes(ISSUER_HOSTNAME)) {
           return next();
         }
 
         const canisterId = readCanisterId({
-          canisterName: hostnameParts[0],
-          canisterIdsJsonFile: "demos/vc_issuer/.dfx/local/canister_ids.json",
+          canisterName: ISSUER_CANISTER_NAME,
+          canisterIdsJsonFile: ".dfx/local/canister_ids.json",
         });
 
         // Set the canister ID
-        res.append("x-ic-canister-id", canisterId);
+        res.setHeader("x-ic-canister-id", canisterId);
 
         // Ignore CORS
-        res.append("access-control-allow-origin", "*");
-        res.append("access-control-expose-headers", "*");
-        res.append("access-control-allow-headers", "*");
+        res.setHeader("access-control-allow-origin", "*");
+        res.setHeader("access-control-expose-headers", "*");
+        res.setHeader("access-control-allow-headers", "*");
 
         res.end();
       });
