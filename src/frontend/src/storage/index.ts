@@ -2,7 +2,7 @@
 
 import { parseUserNumber } from "$src/utils/userNumber";
 import { nonNullish } from "@dfinity/utils";
-import * as idb from "idb-keyval";
+import { get as idbGet, set as idbSet } from "idb-keyval";
 import { z } from "zod";
 
 /** The Anchor type as stored in storage, including hint of the frequency at which the anchor is used.
@@ -183,7 +183,7 @@ const migratedV0 = (): Anchors | undefined => {
 /** "Low-level" functions to read anchors from and write anchors to IndexedDB */
 
 const readIndexedDB = async (): Promise<Anchors | undefined> => {
-  const item: unknown = await idb.get("anchors");
+  const item: unknown = await idbGet("anchors");
 
   if (item === undefined) {
     return;
@@ -203,7 +203,7 @@ const readIndexedDB = async (): Promise<Anchors | undefined> => {
 };
 
 const writeIndexedDB = async (anchors: Anchors) => {
-  await idb.set("anchors", anchors);
+  await idbSet("anchors", anchors);
 };
 
 /** "Low-level" serialization functions to read and write anchors to local storage */

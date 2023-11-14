@@ -1,6 +1,11 @@
 import { nonNullish } from "@dfinity/utils";
 import { IDBFactory } from "fake-indexeddb";
-import * as idb from "idb-keyval";
+import {
+  clear as idbClear,
+  get as idbGet,
+  keys as idbKeys,
+  set as idbSet,
+} from "idb-keyval";
 import { MAX_SAVED_ANCHORS, getAnchors, setAnchorUsed } from ".";
 
 beforeAll(() => {
@@ -225,7 +230,7 @@ function withStorage(
       setLocalStorage(lsBefore);
     }
 
-    await idb.clear();
+    await idbClear();
     const idbBefore = opts?.indexeddb?.before;
     if (nonNullish(idbBefore)) {
       await setIndexedDB(idbBefore);
@@ -249,7 +254,7 @@ function withStorage(
 
     // Remove all entries
     // (cannot just reset global.indexeddb because idb-keyval stores a pointer to the DB)
-    await idb.clear();
+    await idbClear();
 
     // Check the localStorage "after"
 
@@ -296,18 +301,18 @@ type IndexedDB = Record<string, unknown>;
 
 const setIndexedDB = async (db: IndexedDB) => {
   for (const key in db) {
-    await idb.set(key, db[key]);
+    await idbSet(key, db[key]);
   }
 };
 
 const readIndexedDB = async (): Promise<IndexedDB> => {
   const db: IndexedDB = {};
 
-  for (const k of await idb.keys()) {
+  for (const k of await idbKeys()) {
     if (typeof k !== "string") {
       throw new Error("Bad type");
     }
-    db[k] = await idb.get(k);
+    db[k] = await idbGet(k);
   }
   return db;
 };
