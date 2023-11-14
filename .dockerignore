@@ -25,3 +25,6 @@ Dockerfile
 scripts/
 !scripts/build
 !scripts/bootstrap
+
+# docker build doesn't depend on the docker-compose setup
+docker-test-env/

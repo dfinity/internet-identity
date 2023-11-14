@@ -12,16 +12,18 @@
     "proxy": "ts-node --esm ./test.ts --no-run"
   },
   "devDependencies": {
-    "@wdio/cli": "^8.22.1",
-    "@wdio/local-runner": "^8.22.1",
-    "@wdio/mocha-framework": "^8.22.0",
-    "@wdio/spec-reporter": "^8.21.0",
+    "@wdio/cli": "^8.6.9",
+    "@wdio/local-runner": "^8.6.9",
+    "@wdio/mocha-framework": "^8.6.8",
+    "@wdio/spec-reporter": "^8.6.8",
+    "chromedriver": "^117.0.1",
     "prettier": "^2.7.1",
     "prettier-plugin-organize-imports": "^3.2.2",
     "proxy": "git+https://github.com/nmattia/dfx-proxy",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4",
-    "vite": "^4.3.9"
+    "vite": "^4.3.9",
+    "wdio-chromedriver-service": "^8.1.1"
   },
   "dependencies": {
     "@dfinity/auth-client": "^0.15.5"

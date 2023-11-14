@@ -1,0 +1,63 @@
+type ArgumentValue = variant { "int" : int32; string : text };
+type CredentialSpec = record {
+    arguments : opt vec record { text; ArgumentValue };
+    credential_name : text;
+};
+type GetCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    prepared_context : opt vec nat8;
+    credential_spec : CredentialSpec;
+};
+type GetCredentialResponse = variant {
+    ok : IssuedCredentialData;
+    err : IssueCredentialError;
+};
+type Icrc21ConsentInfo = record { consent_message : text; language : text };
+type Icrc21ConsentMessageResponse = variant {
+    ok : Icrc21ConsentInfo;
+    err : Icrc21Error;
+};
+type Icrc21ConsentPreferences = record { language : text };
+type Icrc21Error = variant {
+    generic_error : Icrc21ErrorInfo;
+    forbidden : Icrc21ErrorInfo;
+    not_supported : Icrc21ErrorInfo;
+    malformed_call : Icrc21ErrorInfo;
+};
+type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
+type Icrc21VcConsentMessageRequest = record {
+    preferences : Icrc21ConsentPreferences;
+    credential_spec : CredentialSpec;
+};
+type IssueCredentialError = variant {
+    unauthorized_subject : text;
+    internal : text;
+    signature_not_found : text;
+    unknown_subject : text;
+    invalid_id_alias : text;
+};
+type IssuedCredentialData = record { vc_jws : text };
+type PrepareCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    credential_spec : CredentialSpec;
+};
+type PrepareCredentialResponse = variant {
+    ok : PreparedCredentialData;
+    err : IssueCredentialError;
+};
+type PreparedCredentialData = record { prepared_context : opt vec nat8 };
+type SignedIdAlias = record {
+    credential_jws : text;
+    id_alias : principal;
+    id_dapp : principal;
+};
+service : {
+    add_employee : (principal) -> (text);
+    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
+    prepare_credential : (PrepareCredentialRequest) -> (
+    PrepareCredentialResponse,
+    );
+    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (
+    Icrc21ConsentMessageResponse,
+    );
+}

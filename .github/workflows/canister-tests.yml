@@ -227,6 +227,30 @@ jobs:
             exit 1
           fi
 
+  vc-issuer-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            demos/vc_issuer/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
+      - uses: ./.github/actions/bootstrap
+      - name: "Build VC issuer canister"
+        working-directory: demos/vc_issuer
+        run: ./build.sh
+      - name: 'Upload VC issuer'
+        uses: actions/upload-artifact@v3
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: vc_issuer.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ./demos/vc_issuer/vc_issuer.wasm.gz
+
   test-app-build:
     runs-on: ubuntu-latest
     steps:
@@ -392,7 +416,7 @@ jobs:
 
   selenium:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, test-app-build]
+    needs: [docker-build-ii, test-app-build, vc-issuer-build]
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
@@ -436,6 +460,12 @@ jobs:
           name: test_app.wasm
           path: demos/test-app
 
+      - name: 'Download VC issuer wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: vc_issuer.wasm.gz
+          path: demos/vc_issuer
+
       - name: Deploy Internet Identity
         run: |
           dfx canister create --all
@@ -446,6 +476,12 @@ jobs:
         run: |
           dfx canister create --all
           dfx canister install test_app --wasm test_app.wasm
+
+      - name: Deploy VC issuer
+        working-directory: demos/vc_issuer
+        run: |
+          dfx canister create issuer
+          dfx canister install issuer --wasm vc_issuer.wasm.gz
 
       - run: npm ci
       - run: npm test

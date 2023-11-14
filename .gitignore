@@ -20,7 +20,8 @@ lib
 # Cargo build output
 target/
 
-# End-to-end test artifacts
+# selenium docker environment files
+docker-test-env/dfx-docker/canisters/
 test-failures/
 
 # built canisters

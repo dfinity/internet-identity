@@ -5,7 +5,6 @@ import httpProxy from "http-proxy";
 import { extname } from "path";
 import { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-
 /**
  * Read a canister ID from dfx's local state
  */
@@ -81,6 +80,42 @@ export const minifyHTML = (): {
     return minify(html, { collapseWhitespace: true });
   },
 });
+
+/**
+ * Lookup local canister IDs
+ */
+export const canisterLookupPlugin = () => {
+  // Look up canister IDs by canister names
+  //
+  // Effectively responds to "foo.localhost" with the canister ID of
+  // the "foo" canister installed in demos/vc_issuer/.dfx
+  return {
+    name: "canister-lookup",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const ISSUER_HOSTNAME = "issuer.localhost";
+        if (req.hostname !== ISSUER_HOSTNAME) {
+          return next();
+        }
+
+        const canisterId = readCanisterId({
+          canisterName: hostnameParts[0],
+          canisterIdsJsonFile: "demos/vc_issuer/.dfx/local/canister_ids.json",
+        });
+
+        // Set the canister ID
+        res.append("x-ic-canister-id", canisterId);
+
+        // Ignore CORS
+        res.append("access-control-allow-origin", "*");
+        res.append("access-control-expose-headers", "*");
+        res.append("access-control-allow-headers", "*");
+
+        res.end();
+      });
+    },
+  };
+};
 
 /**
  * Forwards requests to the local replica.

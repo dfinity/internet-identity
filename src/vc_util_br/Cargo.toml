@@ -1,5 +1,5 @@
 [package]
-name = "vc_util"
+name = "vc_util_br"
 description = "Utils for verifiable credentials on the IC"
 version = "0.1.0"
 edition = "2021"
@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 # ic dependencies
 candid = "0.9"
-ic-cdk = "0.10"
 ic-certified-map = "0.4"
 ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "bf9bc00b032a18d2dbcfcfcfb7a76a562f350c9e" }
 ic-types = { git = "https://github.com/dfinity/ic", rev = "bf9bc00b032a18d2dbcfcfcfb7a76a562f350c9e" }
@@ -17,6 +16,9 @@ canister_sig_util = { path = "../canister_sig_util" }
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false }
 identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false , features = ["validator"] }
 identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
+# identity_core = { path = "../../../identity.rs/identity_core" }
+# identity_credential = { path = "../../../identity.rs/identity_credential", default-features = false, features = ["credential", "validator"]}
+# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 
 # other dependencies
 serde = { version = "1", features = ["rc"] }

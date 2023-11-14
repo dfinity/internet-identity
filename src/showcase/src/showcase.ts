@@ -58,6 +58,8 @@ import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
+import { allowPage } from "$src/flows/verifiableCredentials/allow";
+
 const identityBackground = loadIdentityBackground();
 
 const userNumber = BigInt(10000);
@@ -629,6 +631,14 @@ export const iiPages: Record<string, () => void> = {
       i18n,
       deviceAlias: chromeDevice.alias,
       onContinue: () => console.log("Continue"),
+    }),
+  vcAllow: () =>
+    allowPage({
+      relyingOrigin: "https://oc.app",
+      providerOrigin: "https://nns.ic0.app",
+      consentMessage: "DFINITY Employee",
+      onAllow: () => toast.info(html`Allowed`),
+      onCancel: () => toast.info(html`Canceled`),
     }),
 };
 
