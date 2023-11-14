@@ -35,6 +35,7 @@ export interface Icrc21VcConsentMessageRequest {
 }
 export type IssueCredentialError = { 'unauthorized_subject' : string } |
   { 'internal' : string } |
+  { 'invalid_credential_spec' : string } |
   { 'signature_not_found' : string } |
   { 'unknown_subject' : string } |
   { 'invalid_id_alias' : string };
@@ -55,6 +56,7 @@ export interface SignedIdAlias {
 }
 export interface _SERVICE {
   'add_employee' : ActorMethod<[Principal], string>,
+  'add_graduate' : ActorMethod<[Principal], string>,
   'get_credential' : ActorMethod<[GetCredentialRequest], GetCredentialResponse>,
   'prepare_credential' : ActorMethod<
     [PrepareCredentialRequest],
