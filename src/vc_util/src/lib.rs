@@ -18,6 +18,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::ops::{Add, Deref, DerefMut};
 
+pub mod issuer_api;
+
 pub const II_CREDENTIAL_URL_PREFIX: &str =
     "https://internetcomputer.org/credential/internet-identity/";
 pub const II_ISSUER_URL: &str = "https://internetcomputer.org/issuers/internet-identity";
