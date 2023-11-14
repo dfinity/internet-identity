@@ -12,10 +12,7 @@ import {
 } from "./views";
 
 export const FLOWS = {
-  register: async function (
-    browser: WebdriverIO.Browser,
-    deviceName: string
-  ): Promise<string> {
+  register: async function (browser: WebdriverIO.Browser): Promise<string> {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
     await registerView.create();
@@ -33,7 +30,7 @@ export const FLOWS = {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
     await welcomeView.register();
-    return await FLOWS.register(browser, deviceName);
+    return await FLOWS.register(browser);
   },
   registerNewIdentityAuthenticateView: async (
     deviceName: string,
@@ -42,7 +39,7 @@ export const FLOWS = {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.register();
-    return await FLOWS.register(browser, deviceName);
+    return await FLOWS.register(browser);
   },
   registerPin: async function (
     browser: WebdriverIO.Browser,

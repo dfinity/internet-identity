@@ -16,6 +16,7 @@ function dispatchInput(elem: HTMLInputElement, text: string) {
 
 // Dispatch an "ClipboardEvent"-ish event that works in jsdom
 function dispatchPaste(elem: HTMLInputElement, text: string) {
+  // eslint-disable-next-line
   const evnt: any = new Event("paste", { bubbles: true, cancelable: true });
   evnt.clipboardData = {
     getData() {

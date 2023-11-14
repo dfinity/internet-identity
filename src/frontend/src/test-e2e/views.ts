@@ -657,7 +657,7 @@ export class DemoAppView extends View {
     return await alternativeOriginsElem.getText();
   }
 
-  async resetAlternativeOrigins(
+  resetAlternativeOrigins(
     replicaUrl: string,
     testCanister: string
   ): Promise<string> {
@@ -736,7 +736,7 @@ export class ErrorView extends View {
       .waitForDisplayed({ timeout: 5_000 });
   }
 
-  async getErrorMessage(): Promise<string> {
+  getErrorMessage(): Promise<string> {
     return this.browser.$("[data-role='warning-message']").getText();
   }
 

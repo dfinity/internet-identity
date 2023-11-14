@@ -22,7 +22,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
     );

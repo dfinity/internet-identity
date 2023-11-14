@@ -186,7 +186,7 @@ function setLocalStorage(ls: LocalStorage) {
 }
 
 function readLocalStorage(): LocalStorage {
-  let ls: LocalStorage = {};
+  const ls: LocalStorage = {};
   for (let i = 0, len = localStorage.length; i < len; ++i) {
     const key = localStorage.key(i);
     if (key !== null) {

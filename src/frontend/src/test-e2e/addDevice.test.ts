@@ -24,10 +24,6 @@ export const test_app_canister_ids = JSON.parse(
   readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
 );
 
-const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
-const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
-const TEST_APP_NICE_URL = "https://nice-name.com";
-
 test("Add device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
@@ -60,7 +56,7 @@ test("Add remote device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
     );
@@ -112,8 +108,6 @@ test("Add remote device", async () => {
       await addDeviceSuccessView2.waitForDisplay();
       await addDeviceSuccessView2.continue();
 
-      // main page signed-in
-      const mainView2 = new MainView(browser2);
       // Expect a second device with the default name
       await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
     });
