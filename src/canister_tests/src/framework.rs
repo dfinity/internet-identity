@@ -4,16 +4,18 @@ use candid::Principal;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
 use ic_cdk::api::management_canister::main::CanisterId;
+use ic_certified_map::Hash;
 use ic_representation_independent_hash::Value;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
+use identity_jose::jws::Decoder;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
+use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use sha2::Digest;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -91,7 +93,7 @@ lazy_static! {
  * The `env_var` environment variable is also read for custom location; if the variable is set
  * _but_ the Wasm module is not present, we simply panic (i.e. we don't return None)
  */
-fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
+pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
     match env::var_os(env_var.clone()) {
         None => {
             if !default_path.exists() {
@@ -551,6 +553,38 @@ pub fn verify_delegation(
         root_key.to_vec(),
     )
     .expect("delegation signature invalid");
+}
+
+pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_ref());
+    hasher.finalize().into()
+}
+
+pub fn verify_id_alias_credential(
+    env: &StateMachine,
+    canister_key: CanisterSigKey,
+    signed_id_alias: &SignedIdAlias,
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"iccs_verifiable_credential";
+
+    let decoder: Decoder = Decoder::new();
+    let jws = decoder
+        .decode_compact_serialization(signed_id_alias.credential_jws.as_bytes(), None)
+        .expect("Failure decoding JWS credential");
+    let sig = jws.decoded_signature();
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(jws.signing_input());
+
+    env.verify_canister_signature(
+        msg.to_vec(),
+        sig.to_vec(),
+        canister_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("id_alias signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {

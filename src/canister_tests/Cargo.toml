@@ -7,7 +7,10 @@ edition = "2021"
 base64 = "0.21"
 flate2 = "1.0"
 hex = "0.4"
+ic-certified-map = "0.4"
 ic-test-state-machine-client = "3"
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
+# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 lazy_static = "1.4"
 regex = "1.9"
 serde = "1"

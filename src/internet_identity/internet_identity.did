@@ -374,6 +374,52 @@ type IdentityMetadataReplaceResponse = variant {
     ok;
 };
 
+type PrepareIdAliasRequest = record {
+    issuer : text;
+    relying_party : text;
+    identity_number : nat64;
+};
+
+type PrepareIdAliasResponse = variant {
+    ok : PreparedIdAlias;
+    authentication_failed : text;
+};
+
+type PreparedIdAlias = record {
+    canister_sig_pk : vec nat8;
+    rp_id_alias_jwt : text;
+    issuer_id_alias_jwt : text;
+};
+
+type GetIdAliasRequest = record {
+    rp_id_alias_jwt : text;
+    issuer : text;
+    issuer_id_alias_jwt : text;
+    relying_party : text;
+    identity_number : nat64;
+};
+
+type GetIdAliasResponse = variant {
+    ok : IdAliasCredentials;
+    authentication_failed : text;
+    no_such_credentials : text;
+};
+
+type IdAliasCredentials = record {
+    // Verifiable credential that provides an alias for the relying party identity.
+    // The alias identity is equal to the alias provided to the issuer (see below).
+    rp_id_alias_credential : SignedIdAlias;
+    // Verifiable credential that provides an alias for the issuer identity.
+    // The alias identity is equal to the alias provided to the relying party (see above).
+    issuer_id_alias_credential : SignedIdAlias;
+};
+
+type SignedIdAlias = record {
+    credential_jws : text;
+    id_alias : principal;
+    id_dapp : principal;
+};
+
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
     create_challenge : () -> (Challenge);
@@ -430,6 +476,25 @@ service : (opt InternetIdentityInit) -> {
     // Adds a new authentication method to the identity.
     // Requires authentication.
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (opt AuthnMethodAddResponse);
+
+    // Attribute sharing MVP
+    //
+    // Note: the responses of attribute sharing MVP API calls are `opt` for compatibility reasons
+    // with future variant extensions.
+    // A client decoding a response as `null` indicates outdated type information
+    // and should be treated as an error.
+
+    // Prepares verifiable credentials that provide a common alias to the issuer and the relying party.
+    // The alias credentials are issued by Internet Identity.
+    // This call is used in the attribute sharing flow where the common identity alias is used to issue
+    // a verifiable credential that is understood in both the relying party and the issuer context.
+    // This call can be called multiple times. Only the latest credentials are returned by `get_id_alias`.
+    // Requires authentication.
+    prepare_id_alias : (PrepareIdAliasRequest) -> (opt PrepareIdAliasResponse);
+
+    // Returns the verifiable credentials that were prepared by `prepare_id_alias`, if any.
+    // Requires authentication.
+    get_id_alias : (GetIdAliasRequest) -> (opt GetIdAliasResponse) query;
 
     // Removes the authentication method associated with the public key from the identity.
     // Requires authentication.

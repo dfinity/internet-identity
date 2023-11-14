@@ -7,6 +7,7 @@ pub type CredentialId = ByteBuf;
 pub type PublicKey = ByteBuf;
 pub type DeviceKey = PublicKey;
 pub type UserKey = PublicKey;
+pub type CanisterSigKey = PublicKey;
 pub type SessionKey = PublicKey;
 pub type CanisterSigPublicKeyDer = PublicKey;
 pub type FrontendHostname = String;
@@ -16,7 +17,7 @@ pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
 
 mod api_v2;
-mod vc_mvp;
+pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients

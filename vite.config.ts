@@ -4,6 +4,7 @@ import { existsSync } from "fs";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
 import {
+  canisterLookupPlugin,
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
@@ -57,7 +58,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       rollupOptions: {
         // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
-        input: ["src/frontend/index.html", "src/frontend/faq.html"],
+        input: [
+          "src/frontend/index.html",
+          "src/frontend/faq.html",
+          "src/frontend/vc-flow/index.html",
+        ],
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
@@ -71,7 +76,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     plugins: [
-      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
+      [
+        ...(mode === "development"
+          ? [injectCanisterIdPlugin(), canisterLookupPlugin()]
+          : []),
+      ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       replicaForwardPlugin({

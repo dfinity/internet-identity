@@ -96,6 +96,16 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export interface GetIdAliasRequest {
+  'rp_id_alias_jwt' : string,
+  'issuer' : string,
+  'issuer_id_alias_jwt' : string,
+  'relying_party' : string,
+  'identity_number' : bigint,
+}
+export type GetIdAliasResponse = { 'ok' : IdAliasCredentials } |
+  { 'authentication_failed' : string } |
+  { 'no_such_credentials' : string };
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -110,6 +120,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
+}
+export interface IdAliasCredentials {
+  'rp_id_alias_credential' : SignedIdAlias,
+  'issuer_id_alias_credential' : SignedIdAlias,
 }
 export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
@@ -153,6 +167,18 @@ export type MetadataMap = Array<
       { 'bytes' : Uint8Array | number[] },
   ]
 >;
+export interface PrepareIdAliasRequest {
+  'issuer' : string,
+  'relying_party' : string,
+  'identity_number' : bigint,
+}
+export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
+  { 'authentication_failed' : string };
+export interface PreparedIdAlias {
+  'canister_sig_pk' : Uint8Array | number[],
+  'rp_id_alias_jwt' : string,
+  'issuer_id_alias_jwt' : string,
+}
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
@@ -168,6 +194,11 @@ export type SessionKey = PublicKey;
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
   'delegation' : Delegation,
+}
+export interface SignedIdAlias {
+  'credential_jws' : string,
+  'id_alias' : Principal,
+  'id_dapp' : Principal,
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
@@ -220,6 +251,7 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
+  'get_id_alias' : ActorMethod<[GetIdAliasRequest], [] | [GetIdAliasResponse]>,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -233,6 +265,10 @@ export interface _SERVICE {
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
+  >,
+  'prepare_id_alias' : ActorMethod<
+    [PrepareIdAliasRequest],
+    [] | [PrepareIdAliasResponse]
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

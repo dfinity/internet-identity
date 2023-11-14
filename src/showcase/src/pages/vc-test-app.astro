@@ -1,0 +1,208 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="VC test app">
+  <main id="pageContent" aria-live="polite"></main>
+
+  <script>
+    import { html } from "lit-html";
+    import { AuthClient } from "@dfinity/auth-client";
+    import { renderPage } from "$src/utils/lit-html";
+    import { nonNullish, isNullish } from "@dfinity/utils";
+    import { Chan } from "$src/utils/utils";
+    import { asyncReplace } from "lit-html/directives/async-replace.js";
+    import { toast } from "$src/components/toast";
+    import { createRef, ref } from "lit-html/directives/ref.js";
+    import { withRef } from "$src/utils/lit-html";
+    import { VcFlowRequestWire } from "$src/flows/verifiableCredentials/postMessageInterface";
+    import { decodeJwt } from "jose";
+
+    const inferDefaultIIURL = () => {
+      if (window.location.hostname === "localhost") {
+        return (
+          window.location.protocol + "//" + window.location.hostname + ":5173/"
+        );
+      }
+
+      return "https://identity.ic0.app/";
+    };
+
+    const latestPres = new Chan<string | undefined>(undefined);
+    const ii = new Chan<
+      { win: Window; origin: string; flowId: number } | undefined
+    >(undefined);
+    const evntHandler = (evnt: MessageEvent) => {
+      toast.info(
+        html`Got:
+        ${JSON.stringify(evnt.data, (_key, value) =>
+          typeof value === "bigint" ? value.toString() : value
+        )}`
+      );
+
+      if (evnt.data?.method === "vc-flow-ready" && nonNullish(ii.latest)) {
+        const principal = withRef(principalInput, (principalInput) => {
+          const value = principalInput.value;
+          if (value === "") {
+            return undefined;
+          }
+
+          return value;
+        });
+
+        if (isNullish(principal)) {
+          toast.error("No principal set; cannot send request ");
+          return;
+        }
+
+        const issuerOrigin = withRef(issuerInput, (issuerInput) => {
+          const value = issuerInput.value;
+          if (value === "") {
+            return undefined;
+          }
+
+          return value;
+        });
+        if (isNullish(issuerOrigin)) {
+          toast.error("No issuer set; cannot send request ");
+          return;
+        }
+
+        ii.latest?.win.postMessage(
+          {
+            id: ii.latest.flowId,
+            jsonrpc: "2.0",
+            method: "request_credential",
+            params: {
+              issuer: {
+                origin: issuerOrigin,
+              },
+              credentialSpec: {
+                credentialName: "VerifiedEmployee",
+                arguments: { employerName: "DFINITY" },
+              },
+              credentialSubject: principal,
+            },
+          } satisfies VcFlowRequestWire,
+          ii.latest.origin
+        );
+      }
+
+      const verifiablePresentation = evnt.data?.result?.verifiablePresentation;
+      if (nonNullish(verifiablePresentation)) {
+        const ver = decodeJwt(verifiablePresentation) as any;
+        const creds = ver.vp.verifiableCredential;
+
+        const pretty = creds.map((cred: string) =>
+          JSON.stringify(decodeJwt(cred), null, 2)
+        );
+        latestPres.send(pretty.join("\n"));
+
+        ii.latest?.win?.close();
+      }
+    };
+
+    // TODO: we should wait for ready
+    window.addEventListener("message", evntHandler);
+    const nextId = new Chan<number>(0);
+    const urlInput = createRef<HTMLInputElement>();
+    const issuerInput = createRef<HTMLInputElement>();
+    const principalInput = createRef<HTMLInputElement>();
+
+    const template = () => {
+      return html`
+        <div class="l-wrap">
+          <hgroup>
+            <h1 class="t-title">Relying Party</h1>
+          </hgroup>
+          <input
+          ${ref(principalInput)}
+
+                class="c-input c-input--stack c-input--fullwidth"
+                placeholder="principal (ID_RP)"
+                ></input>
+          <button
+            class="c-button"
+            @click=${async () => {
+              const authClient = await AuthClient.create();
+
+              const iiUrl = withRef(urlInput, (i) => i.value);
+
+              const loginOptions = {
+                identityProvider: iiUrl,
+                onSuccess: () => {
+                  withRef(principalInput, (principalInput) => {
+                    principalInput.value = authClient
+                      .getIdentity()
+                      .getPrincipal()
+                      .toString();
+                  });
+                },
+                onError: () => {
+                  console.log("error");
+                },
+              };
+
+              authClient.login(loginOptions);
+            }}
+            >Login to Relying Party </button>
+
+          <input
+          ${ref(urlInput)}
+        class="c-input c-input--stack c-input--fullwidth"
+        value=${inferDefaultIIURL()}
+          ></input>
+          <input
+          ${ref(issuerInput)}
+        class="c-input c-input--stack c-input--fullwidth"
+        value="http://issuer.localhost:5173"
+          ></input>
+          <button
+            class="c-button"
+            @click=${() => {
+              const urlRaw = withRef(urlInput, (urlInput) => urlInput.value);
+              if (isNullish(urlRaw)) {
+                toast.error("Could not read URL");
+                return;
+              }
+
+              const urlParsed = new URL(urlRaw);
+              urlParsed.pathname = "vc-flow/";
+
+              const iiWindow = window.open(urlParsed.toString());
+              if (isNullish(iiWindow)) {
+                toast.error("Could not open window");
+                return;
+              }
+
+              const flowId = nextId.latest;
+              ii.send({ win: iiWindow, origin: urlParsed.toString(), flowId });
+
+              nextId.send(flowId + 1);
+            }}
+          >
+            Use a service for employees only
+          </button>
+          ${asyncReplace(
+            latestPres.map((latestPres) =>
+              isNullish(latestPres)
+                ? undefined
+                : html`
+                    <aside
+                      style="max-width: 100%;"
+                      class="l-stack c-card c-card--narrow"
+                    >
+                      <pre>    ${latestPres}</pre>
+                    </aside>
+                  `
+            )
+          )}
+        </div>
+      `;
+    };
+
+    const page = renderPage(template);
+
+    page(undefined);
+  </script>
+</Layout>
