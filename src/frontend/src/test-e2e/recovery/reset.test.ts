@@ -29,7 +29,7 @@ test("Recover access, after reset", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
     );
@@ -61,7 +61,7 @@ test("Canceling reset keeps old phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
     );
@@ -94,7 +94,7 @@ test("Reset unprotected recovery phrase, when authenticated with phrase", async 
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
       DEVICE_NAME1,
       browser
     );

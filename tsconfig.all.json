@@ -1,8 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "include": ["src", "./*.ts"],
-  "exclude": [
-    "src/frontend/generated/*",
-    "src/frontend/jest-custom-sequencer.ts"
-  ]
+  "exclude": [ "src/frontend/generated/*" ]
 }

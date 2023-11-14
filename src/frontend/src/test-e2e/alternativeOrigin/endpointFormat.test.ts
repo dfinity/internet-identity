@@ -139,7 +139,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       `try{await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins")}catch(e){e.message}`
     );
 
-    let logs = (await browser.getLogs("browser")) as { message: string }[];
+    const logs = (await browser.getLogs("browser")) as { message: string }[];
     expect(logs.at(-1)?.message).toContain(`Failed to load resource`);
 
     // This works anyway --> fetched using non-raw
