@@ -1,7 +1,7 @@
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk::api::{caller as cdk_caller, data_certificate, set_certified_data, time};
+use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
+use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
 use ic_cdk::trap;
 use ic_cdk_macros::{init, query, update};
 use ic_certified_map::{Hash, HashTree};
@@ -24,7 +24,10 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use vc_util_br::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
+use vc_util::{
+    did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash,
+    verify_id_alias_credential_jws, AliasTuple,
+};
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
 /// and the managed memory for the archived data & indices.
@@ -51,10 +54,10 @@ fn config_memory() -> Memory {
 #[cfg(target_arch = "wasm32")]
 use ic_cdk::println;
 
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(CandidType, Deserialize)]
 struct IssuerConfig {
     /// Root of trust for checking canister signatures.
-    ic_root_key_der: Vec<u8>,
+    ic_root_key_raw: Vec<u8>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
 }
@@ -72,41 +75,88 @@ impl Storable for IssuerConfig {
 impl Default for IssuerConfig {
     fn default() -> Self {
         Self {
-            ic_root_key_der: canister_sig_util::IC_ROOT_PK_DER.to_vec(),
+            ic_root_key_raw: extract_raw_root_pk_from_der(IC_ROOT_PK_DER)
+                .expect("failed to extract raw root pk from der"),
             idp_canister_ids: vec![Principal::from_text(PROD_II_CANISTER_ID).unwrap()],
         }
     }
 }
 
+impl From<IssuerInit> for IssuerConfig {
+    fn from(init: IssuerInit) -> Self {
+        Self {
+            ic_root_key_raw: extract_raw_root_pk_from_der(&init.ic_root_key_der)
+                .expect("failed to extract raw root pk from der"),
+            idp_canister_ids: init.idp_canister_ids,
+        }
+    }
+}
+
+#[derive(CandidType, Deserialize)]
+struct IssuerInit {
+    /// Root of trust for checking canister signatures.
+    ic_root_key_der: Vec<u8>,
+    /// List of canister ids that are allowed to provide id alias credentials.
+    idp_canister_ids: Vec<Principal>,
+}
+
 #[init]
 #[candid_method(init)]
-fn init(init_arg: Option<IssuerConfig>) {
-    let Some(config) = init_arg else {
+fn init(init_arg: Option<IssuerInit>) {
+    let Some(init) = init_arg else {
         // nothing to do
         return;
     };
     CONFIG
-        .with_borrow_mut(|config_cell| config_cell.set(config))
+        .with_borrow_mut(|config_cell| config_cell.set(IssuerConfig::from(init)))
         .expect("failed to apply issuer config");
 }
 
-fn authorize_caller(alias: &SignedIdAlias) -> Result<(), String> {
-    let caller = cdk_caller();
-    // The anonymous principal is not allowed to request credentials.
-    if caller != alias.id_dapp {
-        return Err(format!(
+fn authorize_vc_request(alias: &SignedIdAlias) -> Result<(), IssueCredentialError> {
+    verify_id_alias(&alias)?;
+
+    if caller() != alias.id_dapp {
+        return Err(IssueCredentialError::UnauthorizedSubject(format!(
             "Caller {} does not match id alias dapp principal {}.",
-            caller, alias.id_dapp
-        ));
+            caller(),
+            alias.id_dapp
+        )));
     }
     Ok(())
+}
+
+fn verify_id_alias(alias: &SignedIdAlias) -> Result<(), IssueCredentialError> {
+    let alias_tuple = AliasTuple {
+        id_alias: alias.id_alias,
+        id_dapp: alias.id_dapp,
+    };
+
+    CONFIG.with_borrow(|config| {
+        let config = config.get();
+
+        for idp_canister_id in &config.idp_canister_ids {
+            if verify_id_alias_credential_jws(
+                &alias.credential_jws,
+                &alias_tuple,
+                idp_canister_id,
+                &config.ic_root_key_raw,
+            )
+            .is_ok()
+            {
+                return Ok(());
+            }
+        }
+        Err(IssueCredentialError::InvalidIdAlias(
+            "id alias could not be verified".to_string(),
+        ))
+    })
 }
 
 #[update]
 #[candid_method]
 async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    if let Err(e) = authorize_caller(&req.signed_id_alias) {
-        return PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
+    if let Err(e) = authorize_vc_request(&req.signed_id_alias) {
+        return PrepareCredentialResponse::Err(e);
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
         return PrepareCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(
@@ -151,8 +201,8 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    if let Err(e) = authorize_caller(&req.signed_id_alias) {
-        return GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
+    if let Err(e) = authorize_vc_request(&req.signed_id_alias) {
+        return GetCredentialResponse::Err(e);
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
         return GetCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(err));
