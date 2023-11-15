@@ -16,6 +16,8 @@ serde_bytes = "0.11"
 sha2 = "0.10"
 
 internet_identity_interface = { path = "../internet_identity_interface" }
+vc_util = { path = "../vc_util"}
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
 
 # All IC deps
 candid = "0.9"

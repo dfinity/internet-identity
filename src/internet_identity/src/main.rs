@@ -10,6 +10,9 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::*;
+use internet_identity_interface::internet_identity::types::vc_mvp::{
+    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
@@ -26,6 +29,7 @@ mod ii_domain;
 mod nested_tree;
 mod state;
 mod storage;
+mod vc_mvp;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -568,6 +572,52 @@ mod v2_api {
             ))
         });
         Some(result)
+    }
+}
+
+/// API for the attribute sharing mvp
+mod attribute_sharing_mvp {
+    use super::*;
+
+    #[update]
+    #[candid_method]
+    async fn prepare_id_alias(req: PrepareIdAliasRequest) -> Option<PrepareIdAliasResponse> {
+        let Ok(_) = check_authentication(req.identity_number) else {
+            return Some(PrepareIdAliasResponse::AuthenticationFailed(format!(
+                "{} could not be authenticated.",
+                caller()
+            )));
+        };
+        let prepared_id_alias = vc_mvp::prepare_id_alias(
+            req.identity_number,
+            vc_mvp::InvolvedDapps {
+                relying_party: req.relying_party.clone(),
+                issuer: req.issuer.clone(),
+            },
+        )
+            .await;
+        Some(PrepareIdAliasResponse::Ok(prepared_id_alias))
+    }
+
+    #[query]
+    #[candid_method(query)]
+    fn get_id_alias(req: GetIdAliasRequest) -> Option<GetIdAliasResponse> {
+        let Ok(_) = check_authentication(req.identity_number) else {
+            return Some(GetIdAliasResponse::AuthenticationFailed(format!(
+                "{} could not be authenticated.",
+                caller()
+            )));
+        };
+        let response = vc_mvp::get_id_alias(
+            req.identity_number,
+            vc_mvp::InvolvedDapps {
+                relying_party: req.relying_party,
+                issuer: req.issuer,
+            },
+            &req.rp_id_alias_jwt,
+            &req.issuer_id_alias_jwt,
+        );
+        Some(response)
     }
 }
 

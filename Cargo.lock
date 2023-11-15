@@ -333,6 +333,7 @@ dependencies = [
  "ic-cdk",
  "ic-representation-independent-hash",
  "ic-test-state-machine-client",
+ "identity_jose",
  "internet_identity_interface",
  "lazy_static",
  "regex",
@@ -340,6 +341,7 @@ dependencies = [
  "serde_bytes",
  "serde_cbor",
  "sha2 0.10.8",
+ "vc_util",
 ]
 
 [[package]]
@@ -2042,6 +2044,9 @@ dependencies = [
  "ic-response-verification",
  "ic-stable-structures",
  "ic-test-state-machine-client",
+ "identity_core",
+ "identity_credential",
+ "identity_jose",
  "include_dir",
  "internet_identity_interface",
  "lazy_static",
@@ -2053,7 +2058,9 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_cbor",
+ "serde_json",
  "sha2 0.10.8",
+ "vc_util",
 ]
 
 [[package]]

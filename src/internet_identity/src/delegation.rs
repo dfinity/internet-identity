@@ -175,7 +175,7 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
     hash::hash_bytes(blob)
 }
 
-fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
+pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     let my_canister_id = id();
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()
 }
@@ -269,7 +269,7 @@ pub fn prune_expired_signatures() {
     }
 }
 
-fn check_frontend_length(frontend: &FrontendHostname) {
+pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
     const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 
     let n = frontend.len();
