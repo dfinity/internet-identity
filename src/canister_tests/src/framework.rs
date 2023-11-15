@@ -578,7 +578,7 @@ pub fn verify_id_alias_credential_via_env(
         canister_sig_pk_der.into_vec(),
         root_key.to_vec(),
     )
-        .expect("id_alias signature invalid");
+    .expect("id_alias signature invalid");
 }
 
 pub fn deploy_archive_via_ii(env: &StateMachine, ii_canister: CanisterId) -> CanisterId {
