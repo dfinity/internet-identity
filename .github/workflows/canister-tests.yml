@@ -276,6 +276,48 @@ jobs:
           # downloaded file
           path: ./demos/test-app/test_app.wasm
 
+  #####################################
+  # The Rust vc issuer canister tests #
+  #####################################
+
+  vc-issuer-test:
+    runs-on: ubuntu-latest
+    needs: [docker-build-ii, vc-issuer-build]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            demos/vc_issuer/target
+          key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
+      - uses: ./.github/actions/bootstrap
+      - name: 'Download VC issuer wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: vc_issuer.wasm.gz
+          path: demos/vc_issuer
+      - name: 'Download II wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: internet_identity_test.wasm.gz
+          path: .
+      - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
+      - name: Download ic-test-state-machine binary
+        run: |
+          uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
+          echo "uname_sys: $uname_sys"
+          commit_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
+          echo "commit sha: $commit_sha"
+          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
+          gzip -d ic-test-state-machine.gz
+          chmod a+x ic-test-state-machine
+          ./ic-test-state-machine --version
+      - name: "Run VC issuer canister tests"
+        working-directory: demos/vc_issuer
+        run: cargo test
+
   ###########################
   # The Rust canister tests #
   ###########################
