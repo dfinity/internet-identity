@@ -427,3 +427,12 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   expect(handles.length).toBe(1);
   await browser.switchToWindow(handles[0]);
 }
+
+export async function wipeStorage(browser: WebdriverIO.Browser): Promise<void> {
+  // clear storage
+  await browser.execute(async () => {
+    localStorage.clear();
+    // Clears the default database used by idb-keyval
+    await indexedDB.deleteDatabase("keyval-store");
+  });
+}
