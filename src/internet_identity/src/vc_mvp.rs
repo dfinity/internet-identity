@@ -79,9 +79,8 @@ pub async fn prepare_id_alias(
 
 fn vc_jwt_signing_input_hash(credential_jwt: &str, canister_sig_pk: &CanisterSigPublicKey) -> Hash {
     let signing_input =
-        vc_signing_input(&credential_jwt, canister_sig_pk).expect("failed getting signing_input");
-    let msg_hash = vc_signing_input_hash(&signing_input);
-    msg_hash
+        vc_signing_input(credential_jwt, canister_sig_pk).expect("failed getting signing_input");
+    vc_signing_input_hash(&signing_input)
 }
 
 pub fn get_id_alias(
