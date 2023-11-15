@@ -26,8 +26,7 @@ use vc_util::{
 };
 
 // The expiration used for signatures
-#[allow(clippy::identity_op)]
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
+const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 10 * MINUTE_NS;
 
 pub struct InvolvedDapps {
     pub(crate) relying_party: FrontendHostname,
