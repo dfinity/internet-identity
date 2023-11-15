@@ -10,7 +10,7 @@ edition = "2021"
 # local dependencies
 canister_sig_util = { path = "../../src/canister_sig_util" }
 internet_identity_interface = { path = "../../src/internet_identity_interface" }
-vc_util_br = { path = "../../src/vc_util_br" }
+vc_util = { path = "../../src/vc_util" }
 # ic dependencies
 candid = "0.9"
 ic-cdk = "0.10"
@@ -38,3 +38,4 @@ assert_matches = "1.5.0"
 ic-test-state-machine-client = "3"
 canister_tests = { path = "../../src/canister_tests" }
 lazy_static = "1.4"
+vc_util_br = { path = "../../src/vc_util_br" }

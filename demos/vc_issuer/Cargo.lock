@@ -3022,7 +3022,28 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "sha2 0.10.8",
+ "vc_util",
  "vc_util_br",
+]
+
+[[package]]
+name = "vc_util"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "canister_sig_util",
+ "ic-cdk",
+ "ic-certified-map",
+ "ic-crypto-standalone-sig-verifier",
+ "ic-types",
+ "identity_core",
+ "identity_credential",
+ "identity_jose",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "serde_json",
+ "sha2 0.10.8",
 ]
 
 [[package]]
