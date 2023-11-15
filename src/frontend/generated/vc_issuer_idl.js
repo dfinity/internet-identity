@@ -1,4 +1,8 @@
 export const idlFactory = ({ IDL }) => {
+  const IssuerConfig = IDL.Record({
+    'idp_canister_ids' : IDL.Vec(IDL.Principal),
+    'ic_root_key_der' : IDL.Vec(IDL.Nat8),
+  });
   const SignedIdAlias = IDL.Record({
     'credential_jws' : IDL.Text,
     'id_alias' : IDL.Principal,
@@ -81,4 +85,10 @@ export const idlFactory = ({ IDL }) => {
       ),
   });
 };
-export const init = ({ IDL }) => { return []; };
+export const init = ({ IDL }) => {
+  const IssuerConfig = IDL.Record({
+    'idp_canister_ids' : IDL.Vec(IDL.Principal),
+    'ic_root_key_der' : IDL.Vec(IDL.Nat8),
+  });
+  return [IDL.Opt(IssuerConfig)];
+};
