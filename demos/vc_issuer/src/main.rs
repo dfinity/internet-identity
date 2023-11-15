@@ -387,10 +387,23 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
+    use candid::utils::{service_equal, CandidSource};
+    use std::path::Path;
 
+    /// Checks candid interface type equality by making sure that the service in the did file is
+    /// equal to the generated interface.
     #[test]
-    fn print_candid_interface() {
+    fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
-        println!("{}", canister_interface);
+        service_equal(
+            CandidSource::Text(&canister_interface),
+            CandidSource::File(Path::new("vc_issuer.did")),
+        )
+        .unwrap_or_else(|e| {
+            panic!(
+                "the canister code interface is not equal to the did file: {:?}",
+                e
+            )
+        });
     }
 }
