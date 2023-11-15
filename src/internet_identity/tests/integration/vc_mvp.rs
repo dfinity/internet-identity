@@ -712,12 +712,11 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
     };
     let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
         .expect("Got 'None' from get_id_alias");
-
-    if let GetIdAliasResponse::NoSuchCredentials(_err) = response {
-        Ok(())
-    } else {
-        panic!("Expected that credentials not found, got {:?}", response);
-    }
+    assert!(matches!(
+        response,
+        GetIdAliasResponse::NoSuchCredentials(_err)
+    ));
+    Ok(())
 }
 
 #[test]
