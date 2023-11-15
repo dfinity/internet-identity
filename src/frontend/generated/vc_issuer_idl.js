@@ -18,10 +18,10 @@ export const idlFactory = ({ IDL }) => {
   const IssueCredentialError = IDL.Variant({
     'unauthorized_subject' : IDL.Text,
     'internal' : IDL.Text,
-    'invalid_credential_spec' : IDL.Text,
     'signature_not_found' : IDL.Text,
     'unknown_subject' : IDL.Text,
     'invalid_id_alias' : IDL.Text,
+    'unsupported_credential_spec' : IDL.Text,
   });
   const GetCredentialResponse = IDL.Variant({
     'ok' : IssuedCredentialData,

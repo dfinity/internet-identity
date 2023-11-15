@@ -35,10 +35,10 @@ export interface Icrc21VcConsentMessageRequest {
 }
 export type IssueCredentialError = { 'unauthorized_subject' : string } |
   { 'internal' : string } |
-  { 'invalid_credential_spec' : string } |
   { 'signature_not_found' : string } |
   { 'unknown_subject' : string } |
-  { 'invalid_id_alias' : string };
+  { 'invalid_id_alias' : string } |
+  { 'unsupported_credential_spec' : string };
 export interface IssuedCredentialData { 'vc_jws' : string }
 export interface PrepareCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
