@@ -35,7 +35,7 @@ type IssueCredentialError = variant {
     signature_not_found : text;
     unknown_subject : text;
     invalid_id_alias : text;
-    invalid_credential_spec : text;
+    unsupported_credential_spec : text;
 };
 type IssuedCredentialData = record { vc_jws : text };
 type PrepareCredentialRequest = record {
