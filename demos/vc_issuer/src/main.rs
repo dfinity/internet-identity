@@ -11,6 +11,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
     PrepareCredentialResponse, PreparedCredentialData,
 };
+use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
@@ -35,11 +36,14 @@ thread_local! {
 #[cfg(target_arch = "wasm32")]
 use ic_cdk::println;
 
-fn check_caller_not_anonymous() -> Result<(), String> {
+fn authorize_caller(alias: &SignedIdAlias) -> Result<(), String> {
     let caller = cdk_caller();
     // The anonymous principal is not allowed to request credentials.
-    if caller == Principal::anonymous() {
-        return Err("Anonymous principal not allowed to request credentials.".to_string());
+    if caller != alias.id_dapp {
+        return Err(format!(
+            "Caller {} does not match id alias dapp principal {}.",
+            caller, alias.id_dapp
+        ));
     }
     Ok(())
 }
@@ -47,7 +51,7 @@ fn check_caller_not_anonymous() -> Result<(), String> {
 #[update]
 #[candid_method]
 async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    if let Err(e) = check_caller_not_anonymous() {
+    if let Err(e) = authorize_caller(&req.signed_id_alias) {
         return PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
@@ -93,7 +97,7 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    if let Err(e) = check_caller_not_anonymous() {
+    if let Err(e) = authorize_caller(&req.signed_id_alias) {
         return GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e));
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
