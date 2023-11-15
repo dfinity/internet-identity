@@ -567,14 +567,15 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
 }
 
 #[test]
-fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
+#[should_panic(expected = "could not be authenticated")]
+fn should_not_prepare_id_alias_for_different_user() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
 
-    let response = api::vc_mvp::prepare_id_alias(
+    let _ = api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_2(),
@@ -583,14 +584,8 @@ fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
             relying_party,
             issuer,
         },
-    )?
+    )
     .expect("Got 'None' from prepare_id_alias");
-
-    if let PrepareIdAliasResponse::AuthenticationFailed(_err) = response {
-        Ok(())
-    } else {
-        panic!("Expected a failed authentication, got {:?}", response);
-    }
 }
 
 #[test]
