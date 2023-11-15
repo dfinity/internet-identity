@@ -1,7 +1,12 @@
-use candid::{candid_method, Principal};
+use candid::{candid_method, CandidType, Deserialize, Principal};
+use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk_macros::{query, update};
+use ic_cdk::api::{caller as cdk_caller, data_certificate, set_certified_data, time};
+use ic_cdk::trap;
+use ic_cdk_macros::{init, query, update};
 use ic_certified_map::{Hash, HashTree};
+use ic_stable_structures::storable::Bound;
+use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -15,26 +20,75 @@ use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use std::cell::RefCell;
-
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use ic_cdk::api::{caller as cdk_caller, data_certificate, set_certified_data, time};
-use ic_cdk::trap;
 use sha2::{Digest, Sha256};
+use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use vc_util_br::{did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash};
 
+/// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
+/// and the managed memory for the archived data & indices.
+type Memory = RestrictedMemory<DefaultMemoryImpl>;
+type ConfigCell = StableCell<IssuerConfig, Memory>;
+
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
 const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
+const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
 
 thread_local! {
+    /// Static configuration of the archive set by init() or post_upgrade().
+    static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), IssuerConfig::default()).expect("failed to initialize stable cell"));
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
     static GRADUATES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 }
 
+/// Reserve the first stable memory page for the configuration stable cell.
+fn config_memory() -> Memory {
+    RestrictedMemory::new(DefaultMemoryImpl::default(), 0..1)
+}
+
 #[cfg(target_arch = "wasm32")]
 use ic_cdk::println;
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+struct IssuerConfig {
+    /// Root of trust for checking canister signatures.
+    ic_root_key_der: Vec<u8>,
+    /// List of canister ids that are allowed to provide id alias credentials.
+    idp_canister_ids: Vec<Principal>,
+}
+
+impl Storable for IssuerConfig {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).expect("failed to encode IssuerConfig"))
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).expect("failed to decode IssuerConfig")
+    }
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+impl Default for IssuerConfig {
+    fn default() -> Self {
+        Self {
+            ic_root_key_der: canister_sig_util::IC_ROOT_PK_DER.to_vec(),
+            idp_canister_ids: vec![Principal::from_text(PROD_II_CANISTER_ID).unwrap()],
+        }
+    }
+}
+
+#[init]
+#[candid_method(init)]
+fn init(init_arg: Option<IssuerConfig>) {
+    let Some(config) = init_arg else {
+        // nothing to do
+        return;
+    };
+    CONFIG
+        .with_borrow_mut(|config_cell| config_cell.set(config))
+        .expect("failed to apply issuer config");
+}
 
 fn authorize_caller(alias: &SignedIdAlias) -> Result<(), String> {
     let caller = cdk_caller();

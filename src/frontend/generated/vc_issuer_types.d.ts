@@ -40,6 +40,10 @@ export type IssueCredentialError = { 'unauthorized_subject' : string } |
   { 'invalid_id_alias' : string } |
   { 'unsupported_credential_spec' : string };
 export interface IssuedCredentialData { 'vc_jws' : string }
+export interface IssuerConfig {
+  'idp_canister_ids' : Array<Principal>,
+  'ic_root_key_der' : Uint8Array | number[],
+}
 export interface PrepareCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'credential_spec' : CredentialSpec,

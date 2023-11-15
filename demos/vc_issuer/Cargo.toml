@@ -16,6 +16,7 @@ candid = "0.9"
 ic-cdk = "0.10"
 ic-cdk-macros = "0.7"
 ic-certified-map = "0.4"
+ic-stable-structures = "0.6.0"
 # vc dependencies
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false}
 identity_credential = {git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
