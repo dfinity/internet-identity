@@ -52,7 +52,11 @@ type SignedIdAlias = record {
     id_alias : principal;
     id_dapp : principal;
 };
-service : {
+type IssuerConfig = record {
+    ic_root_key_der : blob;
+    idp_canister_ids : vec principal;
+};
+service: (opt IssuerConfig) -> {
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
