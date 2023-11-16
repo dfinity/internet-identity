@@ -61,6 +61,7 @@ export interface SignedIdAlias {
 export interface _SERVICE {
   'add_employee' : ActorMethod<[Principal], string>,
   'add_graduate' : ActorMethod<[Principal], string>,
+  'configure' : ActorMethod<[IssuerConfig], undefined>,
   'get_credential' : ActorMethod<[GetCredentialRequest], GetCredentialResponse>,
   'prepare_credential' : ActorMethod<
     [PrepareCredentialRequest],

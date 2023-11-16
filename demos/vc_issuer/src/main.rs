@@ -107,6 +107,16 @@ fn init(init_arg: Option<IssuerInit>) {
         // nothing to do
         return;
     };
+    apply_config(init);
+}
+
+#[update]
+#[candid_method]
+fn configure(config: IssuerInit) {
+    apply_config(config);
+}
+
+fn apply_config(init: IssuerInit) {
     CONFIG
         .with_borrow_mut(|config_cell| config_cell.set(IssuerConfig::from(init)))
         .expect("failed to apply issuer config");

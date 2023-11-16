@@ -57,6 +57,7 @@ type IssuerConfig = record {
     idp_canister_ids : vec principal;
 };
 service: (opt IssuerConfig) -> {
+    configure: (IssuerConfig) -> ();
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;

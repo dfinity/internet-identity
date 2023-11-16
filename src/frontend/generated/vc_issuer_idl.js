@@ -68,6 +68,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'add_employee' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'add_graduate' : IDL.Func([IDL.Principal], [IDL.Text], []),
+    'configure' : IDL.Func([IssuerConfig], [], []),
     'get_credential' : IDL.Func(
         [GetCredentialRequest],
         [GetCredentialResponse],
