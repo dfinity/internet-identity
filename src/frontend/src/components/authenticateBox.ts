@@ -289,7 +289,7 @@ export const authenticateBoxFlow = async <T, I>({
 
   // If there _are_ some anchors, then we show the "pick" screen, otherwise
   // we assume a new user and show the "firstTime" screen.
-  const anchors = getAnchors();
+  const anchors = await getAnchors();
   if (isNonEmptyArray(anchors)) {
     const result = await pages.pick({ anchors });
 
@@ -316,7 +316,7 @@ export const handleLoginFlowResult = async <T>(
 ): Promise<LoginData<T> | undefined> => {
   switch (result.tag) {
     case "ok":
-      setAnchorUsed(result.userNumber);
+      await setAnchorUsed(result.userNumber);
       return result;
     case "err":
       await displayError({

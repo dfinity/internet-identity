@@ -2,6 +2,7 @@
 // applications that want to authenticate the user using Internet Identity
 import { LoginData } from "$src/utils/flowResult";
 import { unknownToRecord } from "$src/utils/utils";
+import { Signature } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
 import { fetchDelegation } from "./fetchDelegation";
@@ -13,7 +14,7 @@ export interface Delegation {
     expiration: bigint;
     targets?: Principal[];
   };
-  signature: Uint8Array;
+  signature: Signature;
 }
 
 /**
@@ -154,11 +155,16 @@ export async function authenticationProtocol({
 
   onProgress("fetching delegation");
 
-  const result = await fetchDelegation(
-    authSuccess.userNumber,
-    authSuccess.connection,
-    authContext
-  );
+  // at this point, derivationOrigin is either validated or undefined
+  const derivationOrigin =
+    authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
+
+  const result = await fetchDelegation({
+    connection: authSuccess.connection,
+    derivationOrigin,
+    publicKey: authContext.authRequest.sessionPublicKey,
+    maxTimeToLive: authContext.authRequest.maxTimeToLive,
+  });
 
   if ("error" in result) {
     window.opener.postMessage(

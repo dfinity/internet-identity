@@ -9,8 +9,6 @@ flate2 = "1.0"
 hex = "0.4"
 ic-certified-map = "0.4"
 ic-test-state-machine-client = "3"
-identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
-# identity_jose = { path = "../../../identity.rs/identity_jose", default-features = false, features = ["iccs"]}
 lazy_static = "1.4"
 regex = "1.9"
 serde = "1"
@@ -19,6 +17,8 @@ serde_bytes = "0.11"
 sha2 = "0.10"
 
 internet_identity_interface = { path = "../internet_identity_interface" }
+vc_util = { path = "../vc_util"}
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
 
 # All IC deps
 candid = "0.9"

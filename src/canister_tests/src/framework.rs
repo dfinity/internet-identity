@@ -4,7 +4,6 @@ use candid::Principal;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_certified_map::Hash;
 use ic_representation_independent_hash::Value;
 use ic_test_state_machine_client::{CallError, ErrorCode, StateMachine};
 use identity_jose::jws::Decoder;
@@ -15,7 +14,8 @@ use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -93,7 +93,7 @@ lazy_static! {
  * The `env_var` environment variable is also read for custom location; if the variable is set
  * _but_ the Wasm module is not present, we simply panic (i.e. we don't return None)
  */
-pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
+fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
     match env::var_os(env_var.clone()) {
         None => {
             if !default_path.exists() {
@@ -555,15 +555,9 @@ pub fn verify_delegation(
     .expect("delegation signature invalid");
 }
 
-pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(value.as_ref());
-    hasher.finalize().into()
-}
-
-pub fn verify_id_alias_credential(
+pub fn verify_id_alias_credential_via_env(
     env: &StateMachine,
-    canister_key: CanisterSigKey,
+    canister_sig_pk_der: CanisterSigPublicKeyDer,
     signed_id_alias: &SignedIdAlias,
     root_key: &[u8],
 ) {
@@ -581,7 +575,7 @@ pub fn verify_id_alias_credential(
     env.verify_canister_signature(
         msg.to_vec(),
         sig.to_vec(),
-        canister_key.into_vec(),
+        canister_sig_pk_der.into_vec(),
         root_key.to_vec(),
     )
     .expect("id_alias signature invalid");

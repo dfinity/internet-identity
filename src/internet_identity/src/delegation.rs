@@ -174,6 +174,7 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
 
     hash::hash_bytes(blob)
 }
+
 pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     let my_canister_id = id();
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()

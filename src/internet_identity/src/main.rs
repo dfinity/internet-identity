@@ -578,19 +578,11 @@ mod v2_api {
 /// API for the attribute sharing mvp
 mod attribute_sharing_mvp {
     use super::*;
-    use internet_identity_interface::internet_identity::types::vc_mvp::{
-        GetIdAliasRequest, PrepareIdAliasRequest,
-    };
 
     #[update]
     #[candid_method]
     async fn prepare_id_alias(req: PrepareIdAliasRequest) -> Option<PrepareIdAliasResponse> {
-        let Ok(_) = check_authentication(req.identity_number) else {
-            return Some(PrepareIdAliasResponse::AuthenticationFailed(format!(
-                "{} could not be authenticated.",
-                caller()
-            )));
-        };
+        let _maybe_ii_domain = authenticate_and_record_activity(req.identity_number);
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {

@@ -155,10 +155,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const GetIdAliasRequest = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
-    'issuer' : IDL.Text,
+    'issuer' : FrontendHostname,
     'issuer_id_alias_jwt' : IDL.Text,
-    'relying_party' : IDL.Text,
-    'identity_number' : IDL.Nat64,
+    'relying_party' : FrontendHostname,
+    'identity_number' : IdentityNumber,
   });
   const SignedIdAlias = IDL.Record({
     'credential_jws' : IDL.Text,
@@ -217,14 +217,14 @@ export const idlFactory = ({ IDL }) => {
   const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
   const UserKey = PublicKey;
   const PrepareIdAliasRequest = IDL.Record({
-    'issuer' : IDL.Text,
-    'relying_party' : IDL.Text,
-    'identity_number' : IDL.Nat64,
+    'issuer' : FrontendHostname,
+    'relying_party' : FrontendHostname,
+    'identity_number' : IdentityNumber,
   });
   const PreparedIdAlias = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
     'issuer_id_alias_jwt' : IDL.Text,
-    'canister_sig_pk_der' : IDL.Vec(IDL.Nat8),
+    'canister_sig_pk_der' : PublicKey,
   });
   const PrepareIdAliasResponse = IDL.Variant({
     'ok' : PreparedIdAlias,

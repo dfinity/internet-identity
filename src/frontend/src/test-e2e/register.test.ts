@@ -6,6 +6,7 @@ import {
   originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
+  wipeStorage,
 } from "./util";
 import { AuthenticateView, DemoAppView, MainView } from "./views";
 
@@ -46,8 +47,8 @@ test("Register new identity and login without prefilled identity number", async 
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
 
-    // clear local storage, so that the identity number is not prefilled
-    await browser.execute("localStorage.clear()");
+    // clear storage, so that the identity number is not prefilled
+    await wipeStorage(browser);
 
     // load the II page again
     await browser.url(II_URL);

@@ -168,7 +168,7 @@ const handlePollResult = async ({
   result: "match" | "canceled" | typeof AsyncCountdown.timeout;
 }): Promise<"ok"> => {
   if (result === "match") {
-    setAnchorUsed(userNumber);
+    await setAnchorUsed(userNumber);
     return "ok";
   } else if (result === AsyncCountdown.timeout) {
     await displayError({
