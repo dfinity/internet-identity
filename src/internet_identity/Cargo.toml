@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-
-canister_sig_util = { path = "../canister_sig_util" }
 internet_identity_interface = { path = "../internet_identity_interface" }
 
 hex = "0.4"
@@ -14,6 +12,7 @@ lazy_static = "1.4"
 serde = { version = "1", features = ["rc"] }
 serde_bytes = "0.11"
 serde_cbor = "0.11"
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 
 # Captcha deps
@@ -33,6 +32,14 @@ ic-cdk-macros = "0.7"
 ic-certified-map = "0.4"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
+
+# VC deps
+canister_sig_util = { path = "../canister_sig_util" }
+vc_util = { path = "../vc_util" }
+identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test" }
+identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
+
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }

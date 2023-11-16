@@ -374,6 +374,62 @@ type IdentityMetadataReplaceResponse = variant {
     ok;
 };
 
+type PrepareIdAliasRequest = record {
+    /// Origin of the issuer in the attribute sharing flow.
+    issuer : FrontendHostname;
+    /// Origin of the relying party in the attribute sharing flow.
+    relying_party : FrontendHostname;
+    /// Identity for which the IdAlias should be generated.
+    identity_number : IdentityNumber;
+};
+
+type PrepareIdAliasResponse = variant {
+    /// Credentials prepared successfully, can be retrieved via `get_id_alias`
+    ok : PreparedIdAlias;
+    /// Caller authentication failed.
+    authentication_failed : text;
+};
+
+/// The prepared id alias contains two (still unsigned) credentials in JWT format,
+/// certifying the id alias for the issuer resp. the relying party.
+type PreparedIdAlias = record {
+    rp_id_alias_jwt : text;
+    issuer_id_alias_jwt : text;
+    canister_sig_pk_der : PublicKey;
+};
+
+/// The request to retrieve the actual signed id alias credentials.
+/// The field values should be equal to the values of corresponding
+/// fields from the preceding `PrepareIdAliasRequest` and `PrepareIdAliasResponse`.
+type GetIdAliasRequest = record {
+    rp_id_alias_jwt : text;
+    issuer : FrontendHostname;
+    issuer_id_alias_jwt : text;
+    relying_party : FrontendHostname;
+    identity_number : IdentityNumber;
+};
+
+type GetIdAliasResponse = variant {
+    /// The signed id alias credentials
+    ok : IdAliasCredentials;
+    /// Caller authentication failed.
+    authentication_failed : text;
+    /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
+    no_such_credentials : text;
+};
+
+/// The signed id alias credentials for each involved party.
+type IdAliasCredentials = record {
+    rp_id_alias_credential : SignedIdAlias;
+    issuer_id_alias_credential : SignedIdAlias;
+};
+
+type SignedIdAlias = record {
+    credential_jws : text;
+    id_alias : principal;
+    id_dapp : principal;
+};
+
 service : (opt InternetIdentityInit) -> {
     init_salt: () -> ();
     create_challenge : () -> (Challenge);
@@ -434,4 +490,9 @@ service : (opt InternetIdentityInit) -> {
     // Removes the authentication method associated with the public key from the identity.
     // Requires authentication.
     authn_method_remove: (IdentityNumber, PublicKey) -> (opt AuthnMethodRemoveResponse);
+
+    // Attribute Sharing MVP API
+    // The methods below are used to generate ID-alias credentials during attribute sharing flow.
+    prepare_id_alias : (PrepareIdAliasRequest) -> (opt PrepareIdAliasResponse);
+    get_id_alias : (GetIdAliasRequest) -> (opt GetIdAliasResponse) query;
 }
