@@ -8,7 +8,7 @@ import {
   _SERVICE,
 } from "$generated/vc_issuer_types";
 import { features } from "$src/features";
-import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent, Identity } from "@dfinity/agent";
 
 import { inferHost } from "$src/utils/iiConnection";
 
@@ -16,10 +16,12 @@ export class VcIssuer {
   public constructor(readonly canisterId: string) {}
 
   // Create an actor representing the backend
-  createActor = async (): Promise<ActorSubclass<_SERVICE>> => {
+  createActor = async (
+    identity?: Identity
+  ): Promise<ActorSubclass<_SERVICE>> => {
     const agent = new HttpAgent({
-      // TODO: should the agent ever be authenticated?
       host: inferHost(),
+      identity,
     });
 
     // Only fetch the root key when we're not in prod
@@ -36,11 +38,13 @@ export class VcIssuer {
   prepareCredential = async ({
     signedIdAlias,
     credentialSpec,
+    identity,
   }: {
     signedIdAlias: SignedIdAlias;
     credentialSpec: CredentialSpec;
+    identity: Identity;
   }): Promise<PreparedCredentialData | { error: string }> => {
-    const actor = await this.createActor();
+    const actor = await this.createActor(identity);
 
     const result = await actor.prepare_credential({
       signed_id_alias: signedIdAlias,
@@ -60,12 +64,14 @@ export class VcIssuer {
     signedIdAlias,
     preparedCredential,
     credentialSpec,
+    identity,
   }: {
     signedIdAlias: SignedIdAlias;
     credentialSpec: CredentialSpec;
     preparedCredential: PreparedCredentialData;
+    identity: Identity;
   }): Promise<IssuedCredentialData | { error: string }> => {
-    const actor = await this.createActor();
+    const actor = await this.createActor(identity);
 
     const result = await actor.get_credential({
       signed_id_alias: signedIdAlias,
