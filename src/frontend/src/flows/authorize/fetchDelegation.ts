@@ -5,28 +5,31 @@ import {
 import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { unknownToString } from "$src/utils/utils";
+import { Signature } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
-import { AuthContext, Delegation } from "./postMessageInterface";
+import { Delegation } from "./postMessageInterface";
 
 /**
- * Prepares and fetches a delegation valid for the authenticated user and the application information contained in
- * authContext.
- * @param userNumber User number resulting from successful authentication.
+ * Prepares and fetches a delegation valid for the authenticated user and the derivation.
  * @param connection authenticated II connection resulting from successful authentication.
- * @param authContext Information about the authentication request received from the application via window post message.
+ * @param derivationOrigin the origin for which to create the delegation
+ * @param publicKey the key to delegate to
+ * @param maxTimeToLive until when the delegation is valid (nanoseconds since now)
  * @return Tuple of PublicKey and matching delegation.
  */
-export const fetchDelegation = async (
-  userNumber: bigint,
-  connection: AuthenticatedConnection,
-  authContext: AuthContext
-): Promise<[PublicKey, Delegation] | { error: unknown }> => {
-  const sessionKey = Array.from(authContext.authRequest.sessionPublicKey);
-
+export const fetchDelegation = async ({
+  connection,
+  derivationOrigin: derivationOrigin_,
+  publicKey,
+  maxTimeToLive,
+}: {
+  connection: AuthenticatedConnection;
+  derivationOrigin: string;
+  publicKey: Uint8Array;
+  maxTimeToLive?: bigint;
+}): Promise<[PublicKey, Delegation] | { error: unknown }> => {
   // at this point, derivationOrigin is either validated or undefined
-  let derivationOrigin = nonNullish(authContext.authRequest.derivationOrigin)
-    ? authContext.authRequest.derivationOrigin
-    : authContext.requestOrigin;
+  let derivationOrigin = derivationOrigin_;
 
   // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
   // we map back the derivation origin to the ic0.app domain.
@@ -40,8 +43,8 @@ export const fetchDelegation = async (
 
   const result = await connection.prepareDelegation(
     derivationOrigin,
-    sessionKey,
-    authContext.authRequest.maxTimeToLive
+    publicKey,
+    maxTimeToLive
   );
 
   if ("error" in result) {
@@ -52,9 +55,8 @@ export const fetchDelegation = async (
 
   const signed_delegation = await retryGetDelegation(
     connection,
-    userNumber,
     derivationOrigin,
-    sessionKey,
+    publicKey,
     timestamp
   );
 
@@ -67,16 +69,17 @@ export const fetchDelegation = async (
         expiration: BigInt(signed_delegation.delegation.expiration),
         targets: undefined,
       },
-      signature: Uint8Array.from(signed_delegation.signature),
+      signature: Uint8Array.from(
+        signed_delegation.signature
+      ) as unknown as Signature,
     },
   ];
 };
 
 const retryGetDelegation = async (
   connection: AuthenticatedConnection,
-  userNumber: bigint,
   hostname: string,
-  sessionKey: PublicKey,
+  publicKey: PublicKey,
   timestamp: bigint,
   maxRetries = 5
 ): Promise<SignedDelegation> => {
@@ -85,7 +88,7 @@ const retryGetDelegation = async (
     await new Promise((resolve) => {
       setInterval(resolve, 1000 * i);
     });
-    const res = await connection.getDelegation(hostname, sessionKey, timestamp);
+    const res = await connection.getDelegation(hostname, publicKey, timestamp);
     if ("no_such_delegation" in res) {
       continue;
     }
