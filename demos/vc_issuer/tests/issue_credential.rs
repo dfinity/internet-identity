@@ -9,7 +9,7 @@ use canister_tests::framework::{
 };
 use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
-use ic_test_state_machine_client::call_candid_as;
+use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
@@ -88,6 +88,14 @@ pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
 
 mod api {
     use super::*;
+
+    pub fn configure(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        config: &IssuerInit,
+    ) -> Result<(), CallError> {
+        call_candid(env, canister_id, "configure", (config,))
+    }
 
     pub fn vc_consent_message(
         env: &StateMachine,
@@ -624,4 +632,11 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     }
 
     Ok(())
+}
+
+#[test]
+fn should_configure() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
 }
