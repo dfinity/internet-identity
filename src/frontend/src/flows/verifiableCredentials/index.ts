@@ -7,10 +7,17 @@ import { authenticateBox } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showSpinner } from "$src/components/spinner";
 import { toast } from "$src/components/toast";
+import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage } from "$src/flows/manage";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import {
+  Delegation,
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+} from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import { base64url } from "jose";
 import { allow } from "./allow";
@@ -116,8 +123,10 @@ export const vcFlow = async ({ connection }: { connection: Connection }) => {
 
         const issuedCredential = await issueCredential({
           vcIssuer,
+          issuerOrigin,
           issuerAliasCredential: pAlias.issuerAliasCredential,
           credentialSpec,
+          authenticatedConnection,
         });
         return [issuedCredential, pAlias];
       });
@@ -202,16 +211,26 @@ const getAliasCredentials = async ({
 
 const issueCredential = async ({
   vcIssuer,
+  issuerOrigin,
   issuerAliasCredential,
   credentialSpec,
+  authenticatedConnection,
 }: {
   vcIssuer: VcIssuer;
+  issuerOrigin: string;
   issuerAliasCredential: SignedIdAlias;
   credentialSpec: CredentialSpec;
+  authenticatedConnection: AuthenticatedConnection;
 }): Promise<IssuedCredentialData> => {
+  const issuerIdentity = await authenticateForIssuer({
+    authenticatedConnection,
+    issuerOrigin,
+  });
+
   const args = {
     signedIdAlias: issuerAliasCredential,
     credentialSpec,
+    identity: issuerIdentity,
   };
 
   const preparedCredential = await vcIssuer.prepareCredential(args);
@@ -223,6 +242,7 @@ const issueCredential = async ({
   const issuedCredential = await vcIssuer.getCredential({
     ...args,
     preparedCredential,
+    identity: issuerIdentity,
   });
 
   if ("error" in issuedCredential) {
@@ -230,6 +250,43 @@ const issueCredential = async ({
   }
 
   return issuedCredential;
+};
+
+const authenticateForIssuer = async ({
+  authenticatedConnection,
+  issuerOrigin,
+}: {
+  authenticatedConnection: AuthenticatedConnection;
+  issuerOrigin: string;
+}): Promise<DelegationIdentity> => {
+  const tempIdentity: ECDSAKeyIdentity = await ECDSAKeyIdentity.generate({
+    extractable: false,
+  });
+  const delegation = await fetchDelegation({
+    connection: authenticatedConnection,
+    derivationOrigin: issuerOrigin,
+    publicKey: new Uint8Array(tempIdentity.getPublicKey().toDer()),
+    maxTimeToLive: BigInt(5 * 60 * 1000_000_000) /* 5 minutes */,
+  });
+
+  if ("error" in delegation) {
+    return giveUp("Could not create delegation");
+  }
+
+  const [userKey, parsed_signed_delegation] = delegation;
+  const degs = {
+    delegation: new Delegation(
+      parsed_signed_delegation.delegation.pubkey,
+      parsed_signed_delegation.delegation.expiration,
+      parsed_signed_delegation.delegation.targets
+    ),
+    signature: parsed_signed_delegation.signature,
+  };
+  const delegations = DelegationChain.fromDelegations(
+    [degs],
+    Uint8Array.from(userKey).buffer
+  );
+  return DelegationIdentity.fromDelegation(tempIdentity, delegations);
 };
 
 const createPresentation = ({
