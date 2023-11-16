@@ -11,20 +11,19 @@ use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
-use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
-    PrepareCredentialResponse,
-};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
-    SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use vc_util::issuer_api::{
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
+    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
+    PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
+};
 use vc_util_br::{
     create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
     PresentationParams,
@@ -57,7 +56,7 @@ lazy_static! {
         idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
     };
 
-    pub static ref DUMMY_SIGNED_ID_ALIAS: SignedIdAlias = SignedIdAlias {
+    pub static ref DUMMY_SIGNED_ID_ALIAS: SignedIssuerIdAlias = SignedIssuerIdAlias {
         id_alias: Principal::from_text("vhbib-m4hm6-hpvyc-7prd2-siivo-nbd7r-67o5x-n3awh-qsmqz-wznjf-tqe").unwrap(),
         id_dapp: Principal::from_text("nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe").unwrap(),
         credential_jws: DUMMY_ALIAS_JWS.to_string(),
@@ -585,7 +584,14 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 .clone(),
             &PrepareCredentialRequest {
                 credential_spec: credential_spec.clone(),
-                signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
+                signed_id_alias: SignedIssuerIdAlias {
+                    id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
+                    id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
+                    credential_jws: id_alias_credentials
+                        .issuer_id_alias_credential
+                        .credential_jws
+                        .clone(),
+                },
             },
         )?;
         let prepared_credential =
@@ -607,7 +613,14 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 .clone(),
             &GetCredentialRequest {
                 credential_spec,
-                signed_id_alias: id_alias_credentials.issuer_id_alias_credential.clone(),
+                signed_id_alias: SignedIssuerIdAlias {
+                    id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
+                    id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
+                    credential_jws: id_alias_credentials
+                        .issuer_id_alias_credential
+                        .credential_jws
+                        .clone(),
+                },
                 prepared_context: prepared_credential.prepared_context,
             },
         )?;

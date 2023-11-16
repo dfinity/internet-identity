@@ -10,13 +10,6 @@ use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Stor
 use identity_core::common::Url;
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
-use internet_identity_interface::internet_identity::types::vc_mvp::issuer::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
-    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
-    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
-    PrepareCredentialResponse, PreparedCredentialData,
-};
-use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
@@ -24,6 +17,12 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use vc_util::issuer_api::{
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
+    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
+    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
+    PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
+};
 use vc_util::{
     did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash,
     verify_id_alias_credential_jws, AliasTuple,
