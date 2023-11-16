@@ -155,6 +155,7 @@ export async function authenticationProtocol({
 
   onProgress("fetching delegation");
 
+  // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 

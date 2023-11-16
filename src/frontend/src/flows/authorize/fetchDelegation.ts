@@ -19,7 +19,7 @@ import { Delegation } from "./postMessageInterface";
  */
 export const fetchDelegation = async ({
   connection,
-  derivationOrigin: derivationOrigin_,
+  derivationOrigin,
   publicKey,
   maxTimeToLive,
 }: {
@@ -28,9 +28,6 @@ export const fetchDelegation = async ({
   publicKey: Uint8Array;
   maxTimeToLive?: bigint;
 }): Promise<[PublicKey, Delegation] | { error: unknown }> => {
-  // at this point, derivationOrigin is either validated or undefined
-  let derivationOrigin = derivationOrigin_;
-
   // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
   // we map back the derivation origin to the ic0.app domain.
   const ORIGIN_MAPPING_REGEX =
