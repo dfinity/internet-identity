@@ -1,8 +1,8 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity as api;
-use canister_tests::flows;
 use canister_tests::framework::*;
+use canister_tests::{flows, match_value};
 use ic_test_state_machine_client::CallError;
 use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
@@ -737,12 +737,10 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
     .expect("Result of prepare_id_alias is not Ok")
     .expect("Got 'None' from prepare_id_alias");
 
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared_id_alias) = prepare_response
-    {
-        prepared_id_alias
-    } else {
-        panic!("prepare id_alias failed")
-    };
+    match_value!(
+        prepare_response,
+        PrepareIdAliasResponse::Ok(prepared_id_alias)
+    );
 
     let get_id_alias_req = GetIdAliasRequest {
         identity_number,

@@ -6,7 +6,7 @@ use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
 use ic_certified_map::{Hash, HashTree};
-use identity_core::common::Url;
+use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 
@@ -25,9 +25,12 @@ use vc_util::{
     II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
 };
 
-// The expiration used for signatures
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 10 * MINUTE_NS;
+// The expiration used for signatures.
+#[allow(clippy::identity_op)]
+const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
 
+// The expiration of id_alias verfiable credentials.
+const ID_ALIAS_VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
 pub struct InvolvedDapps {
     pub(crate) relying_party: FrontendHostname,
     pub(crate) issuer: FrontendHostname,
@@ -207,12 +210,16 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
         "has_id_alias": did_for_principal(alias_tuple.id_alias),
     }))
     .expect("internal: failed building id_alias subject");
+    let exp_timestamp_sec =
+        Timestamp::from_unix(((time() + ID_ALIAS_VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as i64)
+            .expect("internal: failed computing expiration timestamp");
 
     let credential: Credential = CredentialBuilder::default()
         .id(prepare_credential_id())
         .issuer(Url::parse(II_ISSUER_URL).expect("internal: bad issuer url"))
         .type_("InternetIdentityIdAlias")
         .subject(subject)
+        .expiration_date(exp_timestamp_sec)
         .build()
         .expect("internal: failed building id_alias credential");
     credential
