@@ -24,10 +24,7 @@ use vc_util::issuer_api::{
     Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
     PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
 };
-use vc_util_br::{
-    create_verifiable_presentation_jwt, verify_id_alias_credential_jws, AliasTuple,
-    PresentationParams,
-};
+use vc_util::{verify_id_alias_credential_jws, AliasTuple};
 
 const DUMMY_ROOT_KEY: &str ="308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c05030201036100adf65638a53056b2222c91bb2457b0274bca95198a5acbdadfe7fd72178f069bdea8d99e9479d8087a2686fc81bf3c4b11fe275570d481f1698f79d468afe0e57acc1e298f8b69798da7a891bbec197093ec5f475909923d48bfed6843dbed1f";
 const DUMMY_II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
@@ -556,7 +553,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             id_alias: id_alias_credentials.issuer_id_alias_credential.id_alias,
             id_dapp: id_alias_credentials.issuer_id_alias_credential.id_dapp,
         },
-        &canister_sig_pk,
+        &canister_sig_pk.canister_id,
         &root_pk_raw,
     )
     .expect("Invalid ID alias");
@@ -624,24 +621,10 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 prepared_context: prepared_credential.prepared_context,
             },
         )?;
-
-        if let GetCredentialResponse::Ok(data) = get_credential_response {
-            let params = PresentationParams {
-                id_alias_vc_jws: id_alias_credentials
-                    .rp_id_alias_credential
-                    .credential_jws
-                    .clone(),
-                requested_vc_jws: data.vc_jws,
-            };
-            let alias_tuple = AliasTuple {
-                id_alias: id_alias_credentials.rp_id_alias_credential.id_alias,
-                id_dapp: id_alias_credentials.rp_id_alias_credential.id_dapp,
-            };
-            let _vp = create_verifiable_presentation_jwt(params, &alias_tuple)
-                .expect("failed creating presentation");
-        } else {
-            panic!("Get credential failed: {:?}", get_credential_response);
-        };
+        assert!(matches!(
+            get_credential_response,
+            GetCredentialResponse::Ok(data)
+        ));
     }
 
     Ok(())
