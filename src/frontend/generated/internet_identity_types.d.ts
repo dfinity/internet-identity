@@ -98,10 +98,10 @@ export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
-  'issuer' : string,
+  'issuer' : FrontendHostname,
   'issuer_id_alias_jwt' : string,
-  'relying_party' : string,
-  'identity_number' : bigint,
+  'relying_party' : FrontendHostname,
+  'identity_number' : IdentityNumber,
 }
 export type GetIdAliasResponse = { 'ok' : IdAliasCredentials } |
   { 'authentication_failed' : string } |
@@ -168,16 +168,16 @@ export type MetadataMap = Array<
   ]
 >;
 export interface PrepareIdAliasRequest {
-  'issuer' : string,
-  'relying_party' : string,
-  'identity_number' : bigint,
+  'issuer' : FrontendHostname,
+  'relying_party' : FrontendHostname,
+  'identity_number' : IdentityNumber,
 }
 export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
   { 'authentication_failed' : string };
 export interface PreparedIdAlias {
   'rp_id_alias_jwt' : string,
   'issuer_id_alias_jwt' : string,
-  'canister_sig_pk_der' : Uint8Array | number[],
+  'canister_sig_pk_der' : PublicKey,
 }
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
