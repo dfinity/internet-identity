@@ -39,6 +39,8 @@ pub enum IssueCredentialError {
     SignatureNotFound(String),
     #[serde(rename = "internal")]
     Internal(String),
+    #[serde(rename = "unsupported_credential_spec")]
+    UnsupportedCredentialSpec(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

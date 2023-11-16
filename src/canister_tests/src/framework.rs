@@ -93,7 +93,7 @@ lazy_static! {
  * The `env_var` environment variable is also read for custom location; if the variable is set
  * _but_ the Wasm module is not present, we simply panic (i.e. we don't return None)
  */
-fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
+pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Vec<u8>> {
     match env::var_os(env_var.clone()) {
         None => {
             if !default_path.exists() {
