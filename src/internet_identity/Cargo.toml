@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-canister_sig_util = { path = "../canister_sig_util" }
 internet_identity_interface = { path = "../internet_identity_interface" }
 vc_util_br = { path = "../vc_util_br" }
 
@@ -29,7 +28,8 @@ rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/nmattia/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 
 # VC Deps
-
+canister_sig_util = { path = "../canister_sig_util" }
+vc_util = { path = "../vc_util" }
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test" }
 identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
 identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
