@@ -29,7 +29,7 @@ use vc_util::{
 };
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
-/// and the managed memory for the archived data & indices.
+/// and the managed memory for potential other data of the canister.
 type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type ConfigCell = StableCell<IssuerConfig, Memory>;
 
@@ -38,7 +38,7 @@ const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
 
 thread_local! {
-    /// Static configuration of the archive set by init() or post_upgrade().
+    /// Static configuration of the canister set by init() or post_upgrade().
     static CONFIG: RefCell<ConfigCell> = RefCell::new(ConfigCell::init(config_memory(), IssuerConfig::default()).expect("failed to initialize stable cell"));
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
@@ -277,6 +277,8 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<(), String> {
     }
 }
 
+// Verifies that the credential spec `spec` contains an argument `expected_argument`
+// with the value `expected_value`.
 fn verify_single_argument(
     spec: &CredentialSpec,
     expected_argument: &str,
@@ -392,6 +394,7 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
 }
 
 fn calculate_seed(principal: &Principal) -> Hash {
+    // IMPORTANT: In a real dapp the salt should be set to a random value.
     let dummy_salt = [5u8; 32];
 
     let mut bytes: Vec<u8> = vec![];

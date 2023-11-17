@@ -1,3 +1,8 @@
+/// Candid interface of the example VC issuer canister.
+/// The interface contains both the functionality required by the VC-spec
+/// (https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md)
+/// and additional APIs for configuring the canister and using it for testing.
+
 /// Specification of a requested credential.
 type CredentialSpec = record {
     credential_name : text;
