@@ -1,17 +1,13 @@
-type ArgumentValue = variant { "int" : int32; string : text };
+/// Specification of a requested credential.
 type CredentialSpec = record {
-    arguments : opt vec record { text; ArgumentValue };
     credential_name : text;
+    /// arguments are optional, and specific to the credential_name
+    arguments : opt vec record { text; ArgumentValue };
 };
-type GetCredentialRequest = record {
-    signed_id_alias : SignedIdAlias;
-    prepared_context : opt vec nat8;
-    credential_spec : CredentialSpec;
-};
-type GetCredentialResponse = variant {
-    ok : IssuedCredentialData;
-    err : IssueCredentialError;
-};
+type ArgumentValue = variant { "int" : int32; string : text };
+
+/// Messages for ICRC-21 consent message, cf.
+/// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentMessageResponse = variant {
     ok : Icrc21ConsentInfo;
@@ -29,15 +25,16 @@ type Icrc21VcConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
     credential_spec : CredentialSpec;
 };
-type IssueCredentialError = variant {
-    unauthorized_subject : text;
-    internal : text;
-    signature_not_found : text;
-    unknown_subject : text;
-    invalid_id_alias : text;
-    unsupported_credential_spec : text;
-};
-type IssuedCredentialData = record { vc_jws : text };
+
+/// Messages for requesting issuance of a credential.
+/// The issuance proceeds in two steps:
+///  - `prepare_credential`, and
+///  - `get_credential`
+/// where the split of work between the two steps depends on the specifics of the issuer,
+/// and the second second step returns the actual credential (if any).
+/// The two steps can use `prepared_context`-value to transfer information between them.
+
+/// Messages for `prepare_credential`.
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
@@ -47,20 +44,59 @@ type PrepareCredentialResponse = variant {
     err : IssueCredentialError;
 };
 type PreparedCredentialData = record { prepared_context : opt vec nat8 };
+
+/// Messages for `get_credential`.
+type GetCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    credential_spec : CredentialSpec;
+    prepared_context : opt vec nat8;
+};
+type GetCredentialResponse = variant {
+    ok : IssuedCredentialData;
+    err : IssueCredentialError;
+};
+
 type SignedIdAlias = record {
     credential_jws : text;
     id_alias : principal;
     id_dapp : principal;
 };
+type IssuedCredentialData = record { vc_jws : text };
+type IssueCredentialError = variant {
+    /// The caller is not known to the issuer.  Caller should register first with the issuer before retrying.
+    unknown_subject : text;
+    /// The caller is not authorized to obtain the requested credential.  Caller requested a credential
+    /// for a different principal, or the issuer does not have sufficient knowledge about the caller
+    /// to issue the requested credential.
+    unauthorized_subject : text;
+    /// The id_alias credential provided by the identity provider is invalid.
+    invalid_id_alias : text;
+    /// The issuer does not issue credentials described in the credential spec.
+    unsupported_credential_spec : text;
+    /// Internal errors, indicate malfunctioning of the issuer.
+    signature_not_found : text;
+    internal : text;
+};
+
+/// Configuration specific to this issuer.
 type IssuerConfig = record {
+    /// Root of trust for checking canister signatures.
     ic_root_key_der : blob;
+    /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids : vec principal;
 };
+
 service: (opt IssuerConfig) -> {
+    /// VC-flow API.
+    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
+    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
+    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
+
+    /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();
+
+    /// API for obtaining information about users, for testing only.
+    /// In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
-    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
-    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
-    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
 }
