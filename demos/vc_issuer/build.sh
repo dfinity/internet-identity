@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Try to run from the script location
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+
+# Make sure we always run from the issuer root
+VC_ISSUER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$VC_ISSUER_DIR/.."
 
 cargo build --release --target wasm32-unknown-unknown --manifest-path ./Cargo.toml -j1
 ic-wasm "target/wasm32-unknown-unknown/release/vc_issuer.wasm" -o "./vc_issuer.wasm" shrink
