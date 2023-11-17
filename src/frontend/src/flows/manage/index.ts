@@ -122,7 +122,7 @@ export const authFlowManage = async (connection: Connection) => {
     await recoveryWizard(userNumber, authenticatedConnection);
   }
   // From here on, the user is authenticated to II.
-  void renderManage({
+  return renderManage({
     userNumber,
     connection: authenticatedConnection,
     identityBackground,
