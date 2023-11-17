@@ -349,7 +349,7 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 fn should_read_previously_stored_persistent_state() {
     const NUM_ANCHORS: u64 = 3;
     const EXPECTED_ADDRESS: u64 = RESERVED_HEADER_BYTES + NUM_ANCHORS * 4096;
-    let persistent_state_bytes = candid::encode_one(&sample_persistent_state()).unwrap();
+    let persistent_state_bytes = candid::encode_one(sample_persistent_state()).unwrap();
     let memory = VectorMemory::default();
     // allocate space for the writes
     memory.grow(3);
