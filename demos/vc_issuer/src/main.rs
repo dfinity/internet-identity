@@ -173,14 +173,13 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
         ));
     }
 
-    if let Err(err) = prepare_credential_payload(&req) {
-        return PrepareCredentialResponse::Err(err);
-    }
-    let subject_principal = req.signed_id_alias.id_alias;
-    let seed = calculate_seed(&subject_principal);
+    let credential = match prepare_credential_payload(&req) {
+        Ok(credential) => credential,
+        Err(err) => return PrepareCredentialResponse::Err(err),
+    };
+    let seed = calculate_seed(&req.signed_id_alias.id_alias);
     let canister_id = ic_cdk::id();
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
-    let credential = dfinity_employment_credential(subject_principal);
     let credential_jwt = credential
         .serialize_jwt()
         .expect("internal: JWT serialization failure");
