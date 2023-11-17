@@ -5,7 +5,7 @@
 
 This section describes the (Candid) interface to be implemented by an issuer of verifiable credentials on the IC.
 This interface is used by the II-canister during attribute sharing flow (cf. [flow description](https://github.com/dfinity/wg-identity-authentication/blob/d2664795afe9cea40386804bdb1259a47e34540d/topics/attribute-sharing.md))
-An example implementation of the interface is given in [demos/vc_issuer](https://github.com/dfinity/internet-identity/tree/vc-mvp/demos/vc_issuer).
+An example implementation of the interface is given in [demos/vc_issuer](../demos/vc_issuer).
 
 The Candid interface is as follows, and the subsequent sections describe the
 services and the corresponding messages in more detail.
