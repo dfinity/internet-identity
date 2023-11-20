@@ -61,8 +61,6 @@ type PrepareCredentialResponse = variant {
 type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
     credential_jws : text;
-    id_alias : principal;
-    id_dapp : principal;
 };
 service : {
     get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
@@ -96,8 +94,6 @@ type PrepareCredentialRequest = record {
 
 type SignedIdAlias = record {
     credential_jws : text;
-    id_alias : principal;
-    id_dapp : principal;
 };
 
 type PrepareCredentialRequest = record {
@@ -113,9 +109,9 @@ type PrepareCredentialResponse = variant {
 type PreparedCredentialData = record { prepared_context : opt blob };
 ```
 
-Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified via `id_dapp` on the issuer
-side can be identified using `id_alias` for the purpose of attribute sharing, and that the credential
-described by `credential_spec` does apply to the user.  When these checks are successful, the issuer
+Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified by its `sub` claim on the
+issuer side has a valid `has_id_alias` principal for the purpose of attribute sharing, and that the credential
+described by `credential_spec` does apply to the `caller`.  When these checks are successful, the issuer
 prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then
 passed back to the issuer in a subsequent `get_credential`-call (see below).
 This call must be authenticated, i.e. the sender must match the principal for which the credential is requested.
