@@ -4,7 +4,7 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_R
 use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
 use ic_cdk::trap;
 use ic_cdk_macros::{init, query, update};
-use ic_certified_map::{Hash, HashTree};
+use ic_certification::{Hash, HashTree};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::Url;
@@ -198,7 +198,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
 }
 
 fn update_root_hash() {
-    use ic_certified_map::labeled_hash;
+    use ic_certification::labeled_hash;
     SIGNATURES.with(|sigs| {
         let sigs = sigs.borrow();
         let prefixed_root_hash = &labeled_hash(LABEL_SIG, &sigs.root_hash());
@@ -366,7 +366,7 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
     });
     let witness = sigs.witness(hash_bytes(seed), msg_hash)?;
 
-    let witness_hash = witness.reconstruct();
+    let witness_hash = witness.digest();
     let root_hash = sigs.root_hash();
     if witness_hash != root_hash {
         trap(&format!(
@@ -375,11 +375,11 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
             hex::encode(root_hash)
         ));
     }
-    let tree = ic_certified_map::labeled(LABEL_SIG, witness);
+    let tree = ic_certification::labeled(LABEL_SIG, witness);
     #[derive(Serialize)]
-    struct Sig<'a> {
+    struct Sig {
         certificate: ByteBuf,
-        tree: HashTree<'a>,
+        tree: HashTree,
     }
 
     let sig = Sig {

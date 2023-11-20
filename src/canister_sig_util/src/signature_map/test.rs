@@ -1,5 +1,5 @@
 use super::*;
-use ic_certified_map::Hash;
+use ic_certification::Hash;
 use sha2::{Digest, Sha256};
 
 fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
@@ -23,7 +23,7 @@ fn test_signature_lookup() {
     assert_eq!(
         map.witness(seed(1), message(1))
             .expect("failed to get a witness")
-            .reconstruct(),
+            .digest(),
         map.root_hash()
     );
     assert!(map.witness(seed(1), message(2)).is_none());
@@ -99,7 +99,7 @@ fn test_random_modifications() {
         for (k, v) in pairs.iter() {
             if let Some(witness) = map.witness(*k, *v) {
                 assert_eq!(
-                    witness.reconstruct(),
+                    witness.digest(),
                     map.root_hash(),
                     "produced a bad witness: {witness:?}"
                 );

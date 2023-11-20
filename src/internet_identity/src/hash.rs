@@ -1,6 +1,6 @@
 //! Provides helper functions to calculate the representation independent hash
 //! of structured data.
-use ic_certified_map::Hash;
+use ic_certification::Hash;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;

@@ -29,7 +29,7 @@ captcha = { git = "https://github.com/nmattia/captcha", rev = "9c0d2dd9bf519e255
 candid = "0.9"
 ic-cdk = "0.10"
 ic-cdk-macros = "0.7"
-ic-certified-map = "0.4"
+ic-certification = "1.3"
 ic-metrics-encoder = "1"
 ic-stable-structures = "0.5"
 
@@ -50,7 +50,7 @@ candid = { version = "0.9", features = ["parser"] }
 canister_tests = { path = "../canister_tests" }
 hex-literal = "0.4"
 regex = "1.9"
-ic-response-verification = "1.0"
+ic-response-verification = "1.3"
 
 
 [features]

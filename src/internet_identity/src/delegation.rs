@@ -7,7 +7,7 @@ use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::{id, trap};
-use ic_certified_map::{Hash, HashTree};
+use ic_certification::{fork, labeled, pruned, Hash, HashTree};
 use internet_identity_interface::internet_identity::types::*;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
@@ -214,7 +214,7 @@ fn get_signature(
     });
     let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
 
-    let witness_hash = witness.reconstruct();
+    let witness_hash = witness.digest();
     let root_hash = sigs.root_hash();
     if witness_hash != root_hash {
         trap(&format!(
@@ -224,15 +224,12 @@ fn get_signature(
         ));
     }
 
-    let tree = ic_certified_map::fork(
-        HashTree::Pruned(assets.root_hash()),
-        ic_certified_map::labeled(LABEL_SIG, witness),
-    );
+    let tree = fork(pruned(assets.root_hash()), labeled(LABEL_SIG, witness));
 
     #[derive(Serialize)]
-    struct Sig<'a> {
+    struct Sig {
         certificate: ByteBuf,
-        tree: HashTree<'a>,
+        tree: HashTree,
     }
 
     let sig = Sig {
