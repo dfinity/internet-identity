@@ -28,7 +28,6 @@ const alternativeOriginsEl = document.getElementById("alternativeOrigins");
 const newAlternativeOriginsEl = document.getElementById(
   "newAlternativeOrigins"
 );
-const canisterIdEl = document.getElementById("canisterId");
 const principalEl = document.getElementById("principal");
 const delegationEl = document.getElementById("delegation");
 const expirationEl = document.getElementById("expiration");
@@ -142,11 +141,14 @@ window.addEventListener("message", (event) => {
   }
 });
 
+const readCanisterId = () => {
+  return document.querySelector("[data-canister-id]").dataset.canisterId;
+};
+
 const init = async () => {
   authClient = await AuthClient.create();
   updateDelegationView(authClient.getIdentity());
   await updateAlternativeOriginsView();
-  canisterIdEl.value = canisterId;
   signInBtn.onclick = async () => {
     let derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
@@ -239,7 +241,7 @@ const init = async () => {
   };
 
   updateAlternativeOriginsBtn.onclick = async () => {
-    const canisterId = Principal.fromText(canisterIdEl.value);
+    const canisterId = Principal.fromText(readCanisterId());
     const httpAgent = new HttpAgent({ host: hostUrlEl.value });
     await httpAgent.fetchRootKey();
     const actor = Actor.createActor(idlFactory, {
@@ -265,7 +267,7 @@ init();
 
 whoamiBtn.addEventListener("click", async () => {
   const identity = await authClient.getIdentity();
-  const canisterId = Principal.fromText(canisterIdEl.value);
+  const canisterId = Principal.fromText(readCanisterId());
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
       host: hostUrlEl.value,

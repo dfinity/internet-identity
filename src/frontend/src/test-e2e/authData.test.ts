@@ -2,7 +2,7 @@ import { FLOWS } from "./flows";
 import { addVirtualAuthenticator, runInBrowser, switchToPopup } from "./util";
 import { DemoAppView } from "./views";
 
-import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
+import { II_URL, TEST_APP_NICE_URL } from "./constants";
 
 test("Authorize ready message should be sent immediately", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -29,7 +29,7 @@ test("Should allow valid message", async () => {
     await demoAppView.sendValidMessage(); // message 2: authorize-client
 
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityAuthenticateView(browser);
     await browser
       .$("[data-role=notify-auth-success]")
       .waitForDisplayed({ timeout: 15_000 });
@@ -61,7 +61,7 @@ test("Should ignore invalid data and allow second valid message", async () => {
     await demoAppView.sendValidMessage(); // message 3
 
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityAuthenticateView(browser);
     await browser
       .$("[data-role=notify-auth-success]")
       .waitForDisplayed({ timeout: 15_000 });

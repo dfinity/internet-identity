@@ -569,6 +569,13 @@ export class AboutView extends View {
 }
 
 export class DemoAppView extends View {
+  replicaUrl: string;
+
+  public constructor(browser: WebdriverIO.Browser) {
+    super(browser);
+    this.replicaUrl = "https://icp-api.io";
+  }
+
   async open(demoAppUrl: string, iiUrl: string): Promise<void> {
     await this.browser.url(demoAppUrl);
     await fillText(this.browser, "iiUrl", iiUrl);
@@ -616,9 +623,8 @@ export class DemoAppView extends View {
     await fillText(this.browser, "derivationOrigin", derivationOrigin);
   }
 
-  async whoami(replicaUrl: string, testCanister: string): Promise<string> {
-    await fillText(this.browser, "hostUrl", replicaUrl);
-    await fillText(this.browser, "canisterId", testCanister);
+  async whoami(): Promise<string> {
+    await fillText(this.browser, "hostUrl", this.replicaUrl);
     await this.browser.$("#whoamiBtn").click();
     const whoamiResponseElem = await this.browser.$("#whoamiResponse");
     await whoamiResponseElem.waitUntil(
@@ -634,13 +640,10 @@ export class DemoAppView extends View {
   }
 
   async updateAlternativeOrigins(
-    replicaUrl: string,
-    testCanister: string,
     alternativeOrigins: string,
     mode: "certified" | "uncertified" | "redirect"
   ): Promise<string> {
-    await fillText(this.browser, "hostUrl", replicaUrl);
-    await fillText(this.browser, "canisterId", testCanister);
+    await fillText(this.browser, "hostUrl", this.replicaUrl);
     await fillText(this.browser, "newAlternativeOrigins", alternativeOrigins);
     await this.browser.$(`#${mode}`).click();
     await this.browser.$("#updateNewAlternativeOrigins").click();
@@ -657,13 +660,8 @@ export class DemoAppView extends View {
     return await alternativeOriginsElem.getText();
   }
 
-  resetAlternativeOrigins(
-    replicaUrl: string,
-    testCanister: string
-  ): Promise<string> {
+  resetAlternativeOrigins(): Promise<string> {
     return this.updateAlternativeOrigins(
-      replicaUrl,
-      testCanister,
       '{"alternativeOrigins":[]}',
       "certified"
     );
