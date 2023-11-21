@@ -508,22 +508,14 @@ jobs:
           name: vc_issuer.wasm.gz
           path: demos/vc_issuer
 
-      - name: Deploy Internet Identity
+      - name: Create Canisters
+        run: dfx canister create --all
+
+      - name: Deploy canisters
         run: |
-          dfx canister create --all
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
-
-      - name: Deploy test app
-        working-directory: demos/test-app
-        run: |
-          dfx canister create --all
-          dfx canister install test_app --wasm test_app.wasm
-
-      - name: Deploy VC issuer
-        working-directory: demos/vc_issuer
-        run: |
-          dfx canister create issuer
-          dfx canister install issuer --wasm vc_issuer.wasm.gz
+          dfx canister install test_app --wasm demos/test-app/test_app.wasm
+          dfx canister install issuer --wasm demos/vc_issuer/vc_issuer.wasm.gz
 
       - run: npm ci
       - run: npm test
@@ -533,7 +525,14 @@ jobs:
           TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev&
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
-      - run: "II_URL=${{ matrix.domain }} SCREEN=${{ matrix.device }} npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)" # replace 1_N with 1/N
+
+      # NOTE: we run chrome in headless mode because that's the only thing that works in GHA
+      # NOTE: the last bit (tr) replaces 1_N with 1/N
+      - run: |
+          II_URL=${{ matrix.domain }} \
+            SCREEN=${{ matrix.device }} \
+            II_E2E_CHROME_OPTS="--headless" \
+            npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
 
       - name: Stop dfx
         if: ${{ always() }}

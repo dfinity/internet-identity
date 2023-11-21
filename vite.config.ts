@@ -30,12 +30,10 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
 
-  const testAppCanisterId = existsSync(
-    "demos/test-app/.dfx/local/canister_ids.json"
-  )
+  const testAppCanisterId = existsSync(".dfx/local/canister_ids.json")
     ? readCanisterId({
         canisterName: "test_app",
-        canisterIdsJsonFile: "demos/test-app/.dfx/local/canister_ids.json",
+        canisterIdsJsonFile: ".dfx/local/canister_ids.json",
       })
     : undefined;
 

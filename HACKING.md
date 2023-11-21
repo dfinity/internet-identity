@@ -20,7 +20,7 @@ The build requires the following dependencies:
 
 ## Running Locally
 
-To run the internet_identity canisters, proceed as follows after cloning the repository
+To run the Internet Identity canister, proceed as follows after cloning the repository
 
 ```bash
 npm ci
@@ -30,16 +30,22 @@ dfx start [--clean] [--background]
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
+dfx deploy internet_identity --no-wallet
 ```
+
+> [!NOTE]\
+> By default, a dummy (fixed) CAPTCHA is used. If you want to use the real (random) CAPTCHA, set
+> `II_DUMMY_CAPTCHA` to `0`:\
+> `II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet`
+
 
 Then the canister can be used as
 
 ```bash
-$ dfx canister call internet_identity init_salt
-()
-$ echo $?
-0
+$ dfx canister call internet_identity stats
+(
+  record { ... }
+)
 ```
 
 See `dfx canister call --help` and [the documentation](https://sdk.dfinity.org/docs/developers-guide/cli-reference/dfx-canister.html#_examples) for more information.
@@ -57,7 +63,7 @@ The fastest workflow to get the development environment running is to deploy onc
 ```bash
 npm ci
 dfx start [--clean] [--background]
-II_FETCH_ROOT_KEY=1 dfx deploy --no-wallet
+dfx deploy internet_identity --no-wallet
 ```
 
 To serve the frontend locally (recommended during development), run
@@ -67,24 +73,7 @@ the following:
 npm run dev
 ```
 
-Then open `http://localhost:5173` in your browser. The page is reloaded whenever you save changes to files. To ensure your changes pass our formatting and linter checks, run the following command:
-
-```bash
-npm run format && npm run lint
-```
-
-Finally, to test workflows like authentication from a client application, you start the Selenium test app:
-
-```bash
-cd demos/selenium-test-app
-npm ci
-npm run dev
-```
-
-Then open `http://localhost:8081` in your browser.
-
-Make sure that the "Identity Provider" is set to "http://localhost:5173" if you
-serve the Internet Identity frontend locally.
+Then open `http://localhost:5173` in your browser. The page is reloaded whenever you save changes to files.
 
 **NOTE on testing on LAN:**
 
@@ -105,28 +94,21 @@ into the following issues:
 
 We have a set of Selenium tests that run through the various flows. To set up a local deployment follow these steps:
 1. Start a local replica with `dfx start`
-2. Deploy the [`Test` flavour](https://github.com/dfinity/internet-identity/tree/main#flavors) of II by running: `II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 dfx deploy internet_identity`
-3. Deploy the test app by running `dfx deploy` from the `demos/test-app` directory
-4. Start the vite dev server with TLS enabled: `TLS_DEV_SERVER=1 npm run dev`
+1. Deploy II and the other test canisters with `dfx deploy --no-wallet`
+1. Start the vite dev server with TLS enabled: `TLS_DEV_SERVER=1 npm run dev`
 
 To watch the tests run in the browser remove the `headless` option from `src/frontend/src/test-e2e/util.ts`.
 
-```bash
 The tests can be executed by running:
 
 ```bash
 npm run test:e2e
 ```
 
-Or with a specific screen size e.g.:
-```bash
-npm run test:e2e-desktop
-```
-
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
 
-We use `eslint` to check the frontend code. You can run it with `npm run lint`, or set up your editor to do it for you.
+We use `eslint` to check the frontend code. You can run it with `npm run lint`.
 
 
 ### Building the backend

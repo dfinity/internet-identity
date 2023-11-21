@@ -4,8 +4,20 @@
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm.gz",
-      "build": "scripts/build",
+      "build": "bash -c 'II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build'",
       "shrink" : false
+    },
+    "test_app": {
+      "type": "custom",
+      "candid": "demos/test-app/test_app.did",
+      "wasm": "demos/test-app/test_app.wasm",
+      "build": "demos/test-app/build.sh"
+    },
+    "issuer": {
+      "type": "custom",
+      "candid": "demos/vc_issuer/vc_issuer.did",
+      "wasm": "demos/vc_issuer/vc_issuer.wasm.gz",
+      "build": "demos/vc_issuer/build.sh"
     }
   },
   "defaults": {

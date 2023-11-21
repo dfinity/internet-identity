@@ -21,7 +21,7 @@ import {
 import { readFileSync } from "fs";
 import { DEVICE_NAME1, II_URL } from "./constants";
 export const test_app_canister_ids = JSON.parse(
-  readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
+  readFileSync(".dfx/local/canister_ids.json", "utf-8")
 );
 
 test("Add device", async () => {
