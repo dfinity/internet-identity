@@ -25,8 +25,6 @@ mod delegation;
 mod hash;
 mod http;
 mod ii_domain;
-/// Infrastructure to help building nested certification trees.
-mod nested_tree;
 mod state;
 mod storage;
 mod vc_mvp;
@@ -409,7 +407,7 @@ fn save_persistent_state() {
 }
 
 fn update_root_hash() {
-    use ic_certified_map::{fork_hash, labeled_hash};
+    use ic_certification::{fork_hash, labeled_hash};
     state::assets_and_signatures(|assets, sigs| {
         let prefixed_root_hash = fork_hash(
             &assets.root_hash(),

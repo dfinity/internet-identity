@@ -6,7 +6,7 @@ use base64::Engine;
 use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::data_certificate;
 use ic_cdk::trap;
-use ic_certified_map::HashTree;
+use ic_certification::{fork, labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
@@ -234,9 +234,9 @@ fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
         trap("data certificate is only available in query calls");
     });
     state::assets_and_signatures(|assets, sigs| {
-        let tree = ic_certified_map::fork(
+        let tree = fork(
             assets.witness_v1(asset_name),
-            HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
         );
         let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
         serializer.self_describe().unwrap();
@@ -266,9 +266,9 @@ fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
     path.push(EXACT_MATCH_TERMINATOR.to_string());
 
     state::assets_and_signatures(|assets, sigs| {
-        let tree = ic_certified_map::fork(
+        let tree = fork(
             assets.witness_v2(absolute_path),
-            HashTree::Pruned(ic_certified_map::labeled_hash(LABEL_SIG, &sigs.root_hash())),
+            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
         );
 
         let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);

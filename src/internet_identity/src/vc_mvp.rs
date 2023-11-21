@@ -5,7 +5,7 @@ use candid::Principal;
 use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::{data_certificate, time};
 use ic_cdk::trap;
-use ic_certified_map::{Hash, HashTree};
+use ic_certification::{fork, labeled, pruned, Hash, HashTree};
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -146,7 +146,7 @@ fn get_signature(
     });
     let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
 
-    let witness_hash = witness.reconstruct();
+    let witness_hash = witness.digest();
     let root_hash = sigs.root_hash();
     if witness_hash != root_hash {
         trap(&format!(
@@ -156,15 +156,12 @@ fn get_signature(
         ));
     }
 
-    let tree = ic_certified_map::fork(
-        HashTree::Pruned(cert_assets.root_hash()),
-        ic_certified_map::labeled(LABEL_SIG, witness),
-    );
+    let tree = fork(pruned(cert_assets.root_hash()), labeled(LABEL_SIG, witness));
 
     #[derive(Serialize)]
-    struct Sig<'a> {
+    struct Sig {
         certificate: ByteBuf,
-        tree: HashTree<'a>,
+        tree: HashTree,
     }
 
     let sig = Sig {

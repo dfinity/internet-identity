@@ -316,7 +316,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "candid",
- "ic-certified-map",
+ "ic-certification 1.3.0",
  "lazy_static",
  "rand",
  "sha2 0.10.8",
@@ -1233,12 +1233,12 @@ dependencies = [
 
 [[package]]
 name = "ic-cbor"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "767fe244224c02f2adad1d43909de93d35d5caada28eed3f270d89735ba5bdd0"
+checksum = "10633e3e4f112f370be0d5458cd0bbb5b42a89fd7aaec71da7ba60e659fa0a83"
 dependencies = [
  "candid",
- "ic-certification 1.2.0",
+ "ic-certification 1.3.0",
  "leb128",
  "nom",
  "thiserror",
@@ -1287,13 +1287,13 @@ dependencies = [
 
 [[package]]
 name = "ic-certificate-verification"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07bc3fa76751b637bb0c0e37f4089d7f5a3fbacfed3c5fbcfef0d6797a54d63f"
+checksum = "e6f369eef7b7e6691afb9f33510d9cabc91eb36a0cb8a1fbc699221b3686c5c6"
 dependencies = [
  "candid",
  "ic-cbor",
- "ic-certification 1.2.0",
+ "ic-certification 1.3.0",
  "leb128",
  "miracl_core_bls12381",
  "nom",
@@ -1317,20 +1317,11 @@ dependencies = [
 
 [[package]]
 name = "ic-certification"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a59dc342d11b2067e19d0f146bdec3674de921303ffc762f114d201ebbe0e68a"
+checksum = "e8c04340437a32c8b9c80d36f09715909c1e0a755327503a2e2906dcd662ba4e"
 dependencies = [
  "hex",
- "sha2 0.10.8",
-]
-
-[[package]]
-name = "ic-certified-map"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "197524aecec47db0b6c0c9f8821aad47272c2bd762c7a0ffe9715eaca0364061"
-dependencies = [
  "serde",
  "serde_bytes",
  "sha2 0.10.8",
@@ -1724,9 +1715,9 @@ dependencies = [
 
 [[package]]
 name = "ic-representation-independent-hash"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "410e3ccb16b86e8c4bca7270981370f6961492f1921f29f5dd1de621efb869ea"
+checksum = "9182ea4781cb21b5ada5ef74da44bbc04849bdb67cceac63d6b09d474fb33f1d"
 dependencies = [
  "leb128",
  "sha2 0.10.8",
@@ -1734,9 +1725,9 @@ dependencies = [
 
 [[package]]
 name = "ic-response-verification"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc87254b89cea2b84fb2e3101527e457d01da1bdfdbf8b8699dcbc40ad11dcea"
+checksum = "dc617be90b43f31195c86226d1c7df0b1a5cc0d0bcfe737a5611649f360eed52"
 dependencies = [
  "base64 0.21.5",
  "candid",
@@ -1745,7 +1736,7 @@ dependencies = [
  "http",
  "ic-cbor",
  "ic-certificate-verification",
- "ic-certification 1.2.0",
+ "ic-certification 1.3.0",
  "ic-representation-independent-hash",
  "leb128",
  "log",
@@ -2039,7 +2030,7 @@ dependencies = [
  "hex-literal",
  "ic-cdk",
  "ic-cdk-macros",
- "ic-certified-map",
+ "ic-certification 1.3.0",
  "ic-metrics-encoder",
  "ic-response-verification",
  "ic-stable-structures",
@@ -3465,7 +3456,7 @@ dependencies = [
  "candid",
  "canister_sig_util",
  "ic-cdk",
- "ic-certified-map",
+ "ic-certification 1.3.0",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
  "identity_core",

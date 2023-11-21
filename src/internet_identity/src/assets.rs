@@ -4,13 +4,12 @@
 
 use crate::hash::{hash_of_map, Value};
 use crate::http::{security_headers, IC_CERTIFICATE_EXPRESSION_HEADER};
-use crate::nested_tree::NestedTree;
 use crate::state;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
-use ic_certified_map::{
-    fork, fork_hash, labeled, labeled_hash, AsHashTree, Hash, HashTree, RbTree,
+use ic_certification::{
+    fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, NestedTree, RbTree,
 };
 use include_dir::{include_dir, Dir, File};
 use internet_identity_interface::http_gateway::HeaderField;
@@ -47,7 +46,7 @@ impl CertifiedAssets {
         let witness = self.certification_v1.witness(path.as_bytes());
         fork(
             labeled(LABEL_ASSETS_V1, witness),
-            HashTree::Pruned(labeled_hash(
+            pruned(labeled_hash(
                 LABEL_ASSETS_V2,
                 &self.certification_v2.root_hash(),
             )),
@@ -64,7 +63,7 @@ impl CertifiedAssets {
         let witness = self.certification_v2.witness(&path_bytes);
 
         fork(
-            HashTree::Pruned(labeled_hash(
+            pruned(labeled_hash(
                 LABEL_ASSETS_V1,
                 &self.certification_v1.root_hash(),
             )),

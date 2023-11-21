@@ -1,6 +1,6 @@
 use candid::Principal;
 use canister_sig_util::{extract_raw_canister_sig_pk_from_der, CanisterSigPublicKey};
-use ic_certified_map::Hash;
+use ic_certification::Hash;
 use ic_crypto_standalone_sig_verifier::verify_canister_sig;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
 use identity_core::convert::FromJson;

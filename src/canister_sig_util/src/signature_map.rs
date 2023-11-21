@@ -1,5 +1,5 @@
 //! Maintains anchor signatures and expirations.
-use ic_certified_map::{leaf_hash, AsHashTree, Hash, HashTree, RbTree};
+use ic_certification::{leaf, leaf_hash, AsHashTree, Hash, HashTree, RbTree};
 use std::borrow::Cow;
 use std::collections::BinaryHeap;
 
@@ -11,8 +11,8 @@ impl AsHashTree for Unit {
     fn root_hash(&self) -> Hash {
         leaf_hash(&b""[..])
     }
-    fn as_hash_tree(&self) -> HashTree<'_> {
-        HashTree::Leaf(Cow::from(&b""[..]))
+    fn as_hash_tree(&self) -> HashTree {
+        leaf(Cow::from(&b""[..]))
     }
 }
 
@@ -102,7 +102,7 @@ impl SignatureMap {
         self.certified_map.root_hash()
     }
 
-    pub fn witness(&self, seed: Hash, message: Hash) -> Option<HashTree<'_>> {
+    pub fn witness(&self, seed: Hash, message: Hash) -> Option<HashTree> {
         self.certified_map.get(&seed[..])?.get(&message[..])?;
         let witness = self
             .certified_map
