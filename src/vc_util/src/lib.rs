@@ -23,9 +23,11 @@ pub mod issuer_api;
 pub const II_CREDENTIAL_URL_PREFIX: &str = "https://identity.ic0.app/credential/";
 pub const II_ISSUER_URL: &str = "https://identity.ic0.app/";
 pub const VC_SIGNING_INPUT_DOMAIN: &[u8; 26] = b"iccs_verifiable_credential";
+pub const DID_ICP_PREFIX: &str = "did:icp:";
 
 /// A pair of identities, that denote the same user.
 /// Used in attribute sharing flow to maintain II's unlinkability of identities.
+#[derive(Debug, Eq, PartialEq)]
 pub struct AliasTuple {
     /// A temporary identity, used in attribute sharing flow.
     pub id_alias: Principal,
@@ -74,24 +76,34 @@ pub fn vc_jwt_to_jws(
 
 /// Returns a DID for the given `principal`.
 pub fn did_for_principal(principal: Principal) -> String {
-    let prefix = String::from("did:icp:");
-    prefix.add(&principal.to_string())
+    DID_ICP_PREFIX.to_string().add(&principal.to_string())
 }
 
-/// Verifies the given JWS-credential as an id_alias-VC for the specified alias tuple.
-/// Performs both the cryptographic verification of the credential, and the semantic
-/// validation of the id_alias-claims.
-pub fn verify_id_alias_credential_jws(
+/// Returns a `principal` for the given DID.
+pub fn principal_for_did(did: &str) -> Result<Principal, String> {
+    if !did.starts_with(DID_ICP_PREFIX) {
+        return Err(format!(
+            "invalid DID: {}, expected prefix {}",
+            did, DID_ICP_PREFIX
+        ));
+    }
+    Principal::from_text(did.trim_start_matches(DID_ICP_PREFIX))
+        .map_err(|e| format!("failed to parse DID: {}", e))
+}
+
+/// Verifies the given JWS-credential as an id_alias-VC and extracts the alias tuple.
+/// Performs both the cryptographic verification of the credential.
+pub fn get_verified_id_alias_from_jws(
     credential_jws: &str,
-    alias_tuple: &AliasTuple,
     signing_canister_id: &Principal,
     root_pk_raw: &[u8],
-) -> Result<(), CredentialVerificationError> {
+) -> Result<AliasTuple, CredentialVerificationError> {
     let claims =
         verify_credential_jws_with_canister_id(credential_jws, signing_canister_id, root_pk_raw)
             .map_err(CredentialVerificationError::InvalidJws)?;
-    validate_id_alias_claims(claims, alias_tuple)
-        .map_err(CredentialVerificationError::InvalidClaims)
+    validate_claim("iss", II_ISSUER_URL, claims.iss())
+        .map_err(CredentialVerificationError::InvalidClaims)?;
+    extract_id_alias(&claims).map_err(CredentialVerificationError::InvalidClaims)
 }
 
 /// Verifies the specified JWS credential cryptographically and checks that the signature was
@@ -147,37 +159,35 @@ fn signing_input_with_prefix(signing_input: &[u8]) -> Vec<u8> {
     result
 }
 
-/// Validates that the given claims are consistent with id_alias-credential
-/// for the given alias tuple.
-fn validate_id_alias_claims(
-    claims: JwtClaims<Value>,
-    alias_tuple: &AliasTuple,
-) -> Result<(), JwtValidationError> {
-    validate_claim("sub", did_for_principal(alias_tuple.id_dapp), claims.sub())?;
-    validate_claim("iss", II_ISSUER_URL, claims.iss())?;
-    let vc = claims
-        .vc()
-        .ok_or(inconsistent_jwt_claims("missing vc in id_alias JWT claims"))?;
-    let subject_value = vc.get("credentialSubject").ok_or(inconsistent_jwt_claims(
-        "missing credentialSubject in id_alias JWT vc",
+fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidationError> {
+    let Some(sub) = claims.sub() else {
+        return Err(JwtValidationError::CredentialStructure(
+            JwtVcError::MissingSubject,
+        ));
+    };
+    let id_dapp = principal_for_did(sub)
+        .map_err(|_| JwtValidationError::CredentialStructure(JwtVcError::InvalidSubject))?;
+    let vc = claims.vc().ok_or(inconsistent_jwt_claims(
+        "missing \"vc\" claim in id_alias JWT claims",
     ))?;
-    validate_credential_subject(subject_value, alias_tuple)?;
-    Ok(())
+    let subject_value = vc.get("credentialSubject").ok_or(inconsistent_jwt_claims(
+        "missing \"credentialSubject\" claim in id_alias JWT vc",
+    ))?;
+    let subject = Subject::from_json_value(subject_value.clone()).map_err(|_| {
+        inconsistent_jwt_claims("malformed \"credentialSubject\" claim in id_alias JWT vc")
+    })?;
+    let Value::String(ref alias) = subject.properties["has_id_alias"] else {
+        return Err(inconsistent_jwt_claims(
+            "missing \"has_id_alias\" claim in id_alias JWT vc",
+        ));
+    };
+    let id_alias = principal_for_did(alias).map_err(|_| {
+        inconsistent_jwt_claims("malformed \"has_id_alias\" claim in id_alias JWT vc")
+    })?;
+    Ok(AliasTuple { id_alias, id_dapp })
 }
 
-fn validate_credential_subject(
-    subject_value: &Value,
-    alias_tuple: &AliasTuple,
-) -> Result<(), JwtValidationError> {
-    let subject = Subject::from_json_value(subject_value.clone())
-        .map_err(|_| inconsistent_jwt_claims("missing credentialSubject in id_alias JWT vc"))?;
-    if subject.properties["has_id_alias"] != did_for_principal(alias_tuple.id_alias) {
-        return Err(inconsistent_jwt_claims("wrong id_alias"));
-    }
-    Ok(())
-}
-
-fn validate_claim<T: std::cmp::PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
+fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
     label: &str,
     expected: T,
     actual: Option<S>,
@@ -373,38 +383,9 @@ mod tests {
 
     #[test]
     fn should_validate_id_alias_claims() {
-        validate_id_alias_claims(
-            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
-            &AliasTuple {
-                id_alias: alias_principal(),
-                id_dapp: dapp_principal(),
-            },
-        )
-        .expect("Failed validating id_alias claims");
-    }
-
-    #[test]
-    fn should_fail_validate_id_alias_claims_if_wrong_id_alias() {
-        let result = validate_id_alias_claims(
-            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
-            &AliasTuple {
-                id_alias: dapp_principal(),
-                id_dapp: dapp_principal(),
-            },
-        );
-        assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong id_alias"));
-    }
-
-    #[test]
-    fn should_fail_validate_id_alias_claims_if_wrong_id_dapp() {
-        let result = validate_id_alias_claims(
-            claims_from_jws(ID_ALIAS_CREDENTIAL_JWS),
-            &AliasTuple {
-                id_alias: dapp_principal(),
-                id_dapp: dapp_principal(),
-            },
-        );
-        assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong id_alias"));
+        let claims = claims_from_jws(ID_ALIAS_CREDENTIAL_JWS);
+        validate_claim("iss", II_ISSUER_URL, claims.iss())
+            .expect("Failed validating id_alias claims");
     }
 
     #[test]
@@ -453,16 +434,19 @@ mod tests {
     }
 
     #[test]
-    fn should_verify_id_alias_credential_jws() {
-        verify_id_alias_credential_jws(
+    fn should_verify_and_extract_id_alias_credential_jws() {
+        let alias_tuple = get_verified_id_alias_from_jws(
             ID_ALIAS_CREDENTIAL_JWS,
-            &AliasTuple {
-                id_alias: alias_principal(),
-                id_dapp: dapp_principal(),
-            },
             &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
         )
         .expect("JWS verification failed");
+        assert_eq!(
+            alias_tuple,
+            AliasTuple {
+                id_alias: alias_principal(),
+                id_dapp: dapp_principal(),
+            }
+        )
     }
 }

@@ -1,15 +1,12 @@
-use candid::{CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 /// API to be implemented by an issuer of verifiable credentials.
 /// (cf. https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md)
-
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SignedIdAlias {
-    pub id_alias: Principal,
-    pub id_dapp: Principal,
     pub credential_jws: String,
 }
 

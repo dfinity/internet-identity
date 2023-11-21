@@ -24,8 +24,8 @@ use vc_util::issuer_api::{
     PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
-    did_for_principal, vc_jwt_to_jws, vc_signing_input, vc_signing_input_hash,
-    verify_id_alias_credential_jws, AliasTuple,
+    did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
+    vc_signing_input_hash, AliasTuple,
 };
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
@@ -121,38 +121,30 @@ fn apply_config(init: IssuerInit) {
         .expect("failed to apply issuer config");
 }
 
-fn authorize_vc_request(alias: &SignedIdAlias) -> Result<(), IssueCredentialError> {
-    verify_id_alias(&alias)?;
+fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
+    let alias_tuple = extract_id_alias(&alias)?;
 
-    if caller() != alias.id_dapp {
+    if caller() != alias_tuple.id_dapp {
         return Err(IssueCredentialError::UnauthorizedSubject(format!(
             "Caller {} does not match id alias dapp principal {}.",
             caller(),
-            alias.id_dapp
+            alias_tuple.id_dapp
         )));
     }
-    Ok(())
+    Ok(alias_tuple)
 }
 
-fn verify_id_alias(alias: &SignedIdAlias) -> Result<(), IssueCredentialError> {
-    let alias_tuple = AliasTuple {
-        id_alias: alias.id_alias,
-        id_dapp: alias.id_dapp,
-    };
-
+fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
 
         for idp_canister_id in &config.idp_canister_ids {
-            if verify_id_alias_credential_jws(
+            if let Ok(alias_tuple) = get_verified_id_alias_from_jws(
                 &alias.credential_jws,
-                &alias_tuple,
                 idp_canister_id,
                 &config.ic_root_key_raw,
-            )
-            .is_ok()
-            {
-                return Ok(());
+            ) {
+                return Ok(alias_tuple);
             }
         }
         Err(IssueCredentialError::InvalidIdAlias(
@@ -164,8 +156,9 @@ fn verify_id_alias(alias: &SignedIdAlias) -> Result<(), IssueCredentialError> {
 #[update]
 #[candid_method]
 async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    if let Err(e) = authorize_vc_request(&req.signed_id_alias) {
-        return PrepareCredentialResponse::Err(e);
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+        Ok(alias_tuple) => alias_tuple,
+        Err(err) => return PrepareCredentialResponse::Err(err),
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
         return PrepareCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(
@@ -173,11 +166,11 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
         ));
     }
 
-    let credential = match prepare_credential_payload(&req) {
+    let credential = match prepare_credential_payload(&req, &alias_tuple) {
         Ok(credential) => credential,
         Err(err) => return PrepareCredentialResponse::Err(err),
     };
-    let seed = calculate_seed(&req.signed_id_alias.id_alias);
+    let seed = calculate_seed(&alias_tuple.id_alias);
     let canister_id = ic_cdk::id();
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
     let credential_jwt = credential
@@ -209,13 +202,14 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    if let Err(e) = authorize_vc_request(&req.signed_id_alias) {
-        return GetCredentialResponse::Err(e);
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+        Ok(alias_tuple) => alias_tuple,
+        Err(err) => return GetCredentialResponse::Err(err),
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
         return GetCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(err));
     }
-    let subject_principal = req.signed_id_alias.id_alias;
+    let subject_principal = alias_tuple.id_alias;
     let seed = calculate_seed(&subject_principal);
     let canister_id = ic_cdk::id();
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
@@ -450,15 +444,20 @@ fn dfinity_employment_credential(subject_principal: Principal) -> Credential {
 
 fn prepare_credential_payload(
     req: &PrepareCredentialRequest,
+    alias_tuple: &AliasTuple,
 ) -> Result<Credential, IssueCredentialError> {
     match req.credential_spec.credential_name.as_str() {
         "VerifiedEmployee" => {
-            EMPLOYEES.with_borrow(|employees| verify_authorized_principal(req, employees))?;
-            Ok(dfinity_employment_credential(req.signed_id_alias.id_alias))
+            EMPLOYEES.with_borrow(|employees| {
+                verify_authorized_principal(&req.credential_spec, alias_tuple, employees)
+            })?;
+            Ok(dfinity_employment_credential(alias_tuple.id_alias))
         }
         "UniversityDegreeCredential" => {
-            GRADUATES.with_borrow(|graduates| verify_authorized_principal(req, graduates))?;
-            Ok(bachelor_degree_credential(req.signed_id_alias.id_alias))
+            GRADUATES.with_borrow(|graduates| {
+                verify_authorized_principal(&req.credential_spec, alias_tuple, graduates)
+            })?;
+            Ok(bachelor_degree_credential(alias_tuple.id_alias))
         }
         other => Err(IssueCredentialError::UnsupportedCredentialSpec(format!(
             "credential {} is not supported",
@@ -468,20 +467,21 @@ fn prepare_credential_payload(
 }
 
 fn verify_authorized_principal(
-    req: &PrepareCredentialRequest,
+    credential_spec: &CredentialSpec,
+    alias_tuple: &AliasTuple,
     authorized_principals: &HashSet<Principal>,
 ) -> Result<(), IssueCredentialError> {
-    if authorized_principals.contains(&req.signed_id_alias.id_dapp) {
+    if authorized_principals.contains(&alias_tuple.id_dapp) {
         Ok(())
     } else {
         println!(
             "*** principal {} it is not authorized for credential {}",
-            req.signed_id_alias.id_dapp.to_text(),
-            req.credential_spec.credential_name
+            alias_tuple.id_dapp.to_text(),
+            credential_spec.credential_name
         );
         Err(IssueCredentialError::UnauthorizedSubject(format!(
             "unauthorized principal {}",
-            req.signed_id_alias.id_dapp.to_text()
+            alias_tuple.id_dapp.to_text()
         )))
     }
 }
