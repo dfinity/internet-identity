@@ -50,8 +50,8 @@ Use the Internet Identity canister in your local dfx project by adding the follo
   "canisters": {
     "internet_identity": {
       "type": "custom",
-      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2023-11-17/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2023-11-17/internet_identity_dev.wasm.gz",
       "remote": {
         "id": {
           "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
@@ -61,30 +61,6 @@ Use the Internet Identity canister in your local dfx project by adding the follo
     }
   }
 }
-```
-
-Alternatively, you can use the [`dfx deps`](https://internetcomputer.org/blog/features/dfx-deps) subcommand to manage a
-local Internet Identity canister. 
-
-Add the following to your `dfx.json` file:
-
-```json
-{
-  "canisters": {
-    "internet_identity": {
-      "type": "pull",
-      "id": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-    }
-  },
-}
-```
-
-Next, run the following commands:
-
-```sh
-dfx deps pull
-dfx deps init rdmx6-jaaaa-aaaaa-aaadq-cai --argument '(null)'
-dfx deps deploy
 ```
 
 ### Architecture Overview
