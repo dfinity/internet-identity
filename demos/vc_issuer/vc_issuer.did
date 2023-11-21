@@ -63,8 +63,6 @@ type GetCredentialResponse = variant {
 
 type SignedIdAlias = record {
     credential_jws : text;
-    id_alias : principal;
-    id_dapp : principal;
 };
 type IssuedCredentialData = record { vc_jws : text };
 type IssueCredentialError = variant {
