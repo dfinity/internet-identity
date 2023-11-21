@@ -11,12 +11,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "dev": "vite",
-    "lint:fix": "npm run lint -- --fix",
-    "make:docs/reference": "",
-    "publish:release": "",
-    "test:coverage": "",
-    "test": ""
+    "dev": "vite"
   },
   "devDependencies": {
     "vite": "^4.3.9"

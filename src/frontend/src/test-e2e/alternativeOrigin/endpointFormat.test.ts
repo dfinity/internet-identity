@@ -10,11 +10,9 @@ import {
 import { AuthenticateView, DemoAppView, ErrorView } from "../views";
 
 import {
-  DEVICE_NAME1,
   II_URL,
-  REPLICA_URL,
-  TEST_APP_CANISTER_ID,
   TEST_APP_CANONICAL_URL,
+  TEST_APP_CANONICAL_URL_RAW,
   TEST_APP_NICE_URL,
 } from "../constants";
 
@@ -22,7 +20,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
@@ -31,8 +29,6 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
-      REPLICA_URL,
-      TEST_APP_CANISTER_ID,
       '{"alternativeOrigins":["https://a0.com", "https://a1.com", "https://a2.com", "https://a3.com", "https://a4.com", "https://a5.com", "https://a6.com", "https://a7.com", "https://a8.com", "https://a9.com", "https://a10.com"]}',
       "certified"
     );
@@ -50,7 +46,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
       `Resource ${TEST_APP_CANONICAL_URL}/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed.`
@@ -62,7 +58,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
@@ -71,8 +67,6 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
-      REPLICA_URL,
-      TEST_APP_CANISTER_ID,
       '{"alternativeOrigins":["https://evil.com"]}',
       "redirect"
     );
@@ -90,7 +84,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "https://nice-name.com"`
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
       `An error occurred while validating the derivationOrigin "${TEST_APP_CANONICAL_URL}": Failed to fetch`
@@ -102,10 +96,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
@@ -114,14 +105,10 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
-      REPLICA_URL,
-      TEST_APP_CANISTER_ID,
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
       "certified"
     );
-    await niceDemoAppView.setDerivationOrigin(
-      `https://${TEST_APP_CANISTER_ID}.raw.icp0.io`
-    );
+    await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL_RAW);
     expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
     await niceDemoAppView.signin();
 
@@ -136,7 +123,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     // Selenium has _no_ connectivity to the raw url
     // We want accessing raw urls to fail because it would be a security issue on mainnet
     await browser.execute(
-      `try{await fetch("https://${TEST_APP_CANISTER_ID}.raw.icp0.io/.well-known/ii-alternative-origins")}catch(e){e.message}`
+      `try{await fetch("${TEST_APP_CANONICAL_URL_RAW}/.well-known/ii-alternative-origins")}catch(e){e.message}`
     );
 
     const logs = (await browser.getLogs("browser")) as { message: string }[];

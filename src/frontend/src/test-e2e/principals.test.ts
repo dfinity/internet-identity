@@ -10,10 +10,7 @@ import {
 import { AuthenticateView, DemoAppView } from "./views";
 
 import {
-  DEVICE_NAME1,
   II_URL,
-  REPLICA_URL,
-  TEST_APP_CANISTER_ID,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
   TEST_APP_NICE_URL,
@@ -23,10 +20,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
@@ -55,8 +49,6 @@ test("Should issue the same principal to nice url and canonical url", async () =
     await niceDemoAppView.open(TEST_APP_NICE_URL, II_URL);
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
-      REPLICA_URL,
-      TEST_APP_CANISTER_ID,
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
       "certified"
     );
@@ -85,10 +77,7 @@ test("Should issue the same principal to dapps on legacy & official domains", as
     // create a new anchor
     const registrationAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     await FLOWS.addRecoveryMechanismSeedPhrase(browser); // avoids being prompted later during authz
     const credentials = await getWebAuthnCredentials(
       browser,

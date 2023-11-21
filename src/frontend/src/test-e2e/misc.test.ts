@@ -8,7 +8,7 @@ test("Device can be renamed", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const newName = DEVICE_NAME1 + "-new";

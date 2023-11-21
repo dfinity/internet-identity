@@ -7,7 +7,7 @@ import {
 } from "./util";
 import { DemoAppView } from "./views";
 
-import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
+import { II_URL, TEST_APP_NICE_URL } from "./constants";
 
 test("Delegation maxTimeToLive: 1 min", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -19,7 +19,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(60_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityAuthenticateView(browser);
     await demoAppView.waitForAuthenticated();
 
     const exp = await browser.$("#expiration").getText();
@@ -38,7 +38,7 @@ test("Delegation maxTimeToLive: 1 day", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(86400_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityAuthenticateView(browser);
     await waitToClose(browser);
     expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
     const exp = await browser.$("#expiration").getText();
@@ -56,7 +56,7 @@ test("Delegation maxTimeToLive: 2 months", async () => {
     await demoAppView.setMaxTimeToLive(BigInt(5_184_000_000_000_000)); // 60 days
     await demoAppView.signin();
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityAuthenticateView(browser);
     await demoAppView.waitForAuthenticated();
     const exp = await browser.$("#expiration").getText();
     // NB: Max out at 30 days

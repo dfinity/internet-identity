@@ -8,10 +8,7 @@ test("Recover with phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(
-      DEVICE_NAME1,
-      browser
-    );
+    const _userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);

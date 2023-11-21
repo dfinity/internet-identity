@@ -219,7 +219,7 @@ lazy_static! {
         // the string we are replacing here is inserted by vite during the front-end build
         let index_html = index_html.replace(
             r#"<script type="module" crossorigin src="/index.js"></script>"#,
-            &format!(r#"<script>var canisterId = '{canister_id}';</script><script type="module" crossorigin src="/index.js"></script>"#).to_string()
+            &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string()
         );
         index_html
     };

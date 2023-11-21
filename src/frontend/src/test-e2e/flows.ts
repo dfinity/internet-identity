@@ -24,7 +24,6 @@ export const FLOWS = {
     return userNumber;
   },
   registerNewIdentityWelcomeView: async (
-    deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<string> => {
     const welcomeView = new WelcomeView(browser);
@@ -33,7 +32,6 @@ export const FLOWS = {
     return await FLOWS.register(browser);
   },
   registerNewIdentityAuthenticateView: async (
-    deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<string> => {
     const authenticateView = new AuthenticateView(browser);

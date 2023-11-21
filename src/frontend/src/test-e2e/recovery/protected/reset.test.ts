@@ -8,7 +8,7 @@ test("Reset protected recovery phrase", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
@@ -37,7 +37,7 @@ test("Reset protected recovery phrase, confirm with incorrect seed phrase", asyn
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    await FLOWS.registerNewIdentityWelcomeView(DEVICE_NAME1, browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);

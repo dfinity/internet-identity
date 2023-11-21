@@ -1,11 +1,5 @@
 import { Principal } from "@dfinity/principal";
-import {
-  DEVICE_NAME1,
-  II_URL,
-  REPLICA_URL,
-  TEST_APP_CANISTER_ID,
-  TEST_APP_NICE_URL,
-} from "./constants";
+import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
@@ -144,9 +138,7 @@ test("Log into client application using PIN registration flow", async () => {
     await FLOWS.registerPinNewIdentityAuthenticateView(pin, browser);
 
     const principal = await demoAppView.waitForAuthenticated();
-    expect(await demoAppView.whoami(REPLICA_URL, TEST_APP_CANISTER_ID)).toBe(
-      principal
-    );
+    expect(await demoAppView.whoami()).toBe(principal);
 
     // default value
     const exp = await browser.$("#expiration").getText();
