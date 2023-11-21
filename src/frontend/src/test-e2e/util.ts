@@ -32,17 +32,22 @@ export async function runInBrowser(
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
 
+  // Read potential extra chrome opts from the env
+  const extraChromeOptions = (process.env["II_E2E_CHROME_OPTS"] ?? "")
+    .split(",")
+    .filter(Boolean);
+
   const chromeOptions: ChromeOptions = {
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
       "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
-      "--headless",
       // Map all hosts to localhost:5173 (which is the vite dev server) in the context of DNS resolution.
       // The dev server will then terminate TLS and either forward the request to the local replica or serve
       // assets directly.
       "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
+      ...extraChromeOptions,
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,

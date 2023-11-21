@@ -2,7 +2,7 @@
 // This assumes that they have been successfully dfx-deployed
 import { readFileSync } from "fs";
 export const test_app_canister_ids = JSON.parse(
-  readFileSync("./demos/test-app/.dfx/local/canister_ids.json", "utf-8")
+  readFileSync(".dfx/local/canister_ids.json", "utf-8")
 );
 
 const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
