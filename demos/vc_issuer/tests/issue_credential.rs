@@ -163,36 +163,41 @@ mod api {
 /// Verifies that the consent message can be requested.
 #[test]
 fn should_return_vc_consent_message() {
+    let test_cases = [
+        ("en-US", "en", "# DFINITY Foundation Employment Credential"),
+        ("de-DE", "de", "# Beschäftigungsausweis DFINITY Stiftung"),
+        ("ja_JP", "en", "# DFINITY Foundation Employment Credential"), // test fallback language
+    ];
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
-    let mut args = HashMap::new();
-    args.insert(
-        "employerName".to_string(),
-        ArgumentValue::String("DFINITY Foundation".to_string()),
-    );
-    let consent_message_request = Icrc21VcConsentMessageRequest {
-        credential_spec: CredentialSpec {
-            credential_name: "VerifiedEmployee".to_string(),
-            arguments: Some(args),
-        },
-        preferences: Icrc21ConsentPreferences {
-            language: "en-US".to_string(),
-        },
-    };
+    for (requested_language, actual_language, consent_message_snippet) in test_cases {
+        let mut args = HashMap::new();
+        args.insert(
+            "employerName".to_string(),
+            ArgumentValue::String("DFINITY Foundation".to_string()),
+        );
+        let consent_message_request = Icrc21VcConsentMessageRequest {
+            credential_spec: CredentialSpec {
+                credential_name: "VerifiedEmployee".to_string(),
+                arguments: Some(args),
+            },
+            preferences: Icrc21ConsentPreferences {
+                language: requested_language.to_string(),
+            },
+        };
 
-    let response =
-        api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(response, Icrc21ConsentMessageResponse::Ok(_));
-    if let Icrc21ConsentMessageResponse::Ok(info) = response {
-        assert_eq!(info.language, "en-US");
-        assert!(info
-            .consent_message
-            .contains("Issue credential 'VerifiedEmployee'"));
-        assert!(info.consent_message.contains("employerName"));
-        assert!(info.consent_message.contains("DFINITY Foundation"));
+        let response =
+            api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+                .expect("API call failed")
+                .expect("Got 'None' from vc_consent_message");
+        assert_matches!(response, Icrc21ConsentMessageResponse::Ok(_));
+        if let Icrc21ConsentMessageResponse::Ok(info) = response {
+            assert_eq!(info.language, actual_language);
+            assert!(info
+                .consent_message
+                .starts_with(consent_message_snippet));
+        }
     }
 }
 
@@ -217,7 +222,7 @@ fn should_fail_vc_consent_message_if_not_supported() {
             .expect("Got 'None' from vc_consent_message");
     assert_matches!(
         response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
     );
 }
 
@@ -240,10 +245,7 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
             .expect("API call failed")
             .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
-    );
+    assert_matches!(response,Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 #[test]
@@ -268,10 +270,7 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
             .expect("API call failed")
             .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(_))
-    );
+    assert_matches!(response,Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 fn employee_credential_spec() -> CredentialSpec {
@@ -331,8 +330,7 @@ fn should_fail_prepare_credential_for_wrong_sender() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, 
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 6epth-hmqup-wz4mv-svl2m-mhcbb-24skq-tbdhq-2txct-2qugv-xuzva-eqe does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(response, PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 6epth-hmqup-wz4mv-svl2m-mhcbb-24skq-tbdhq-2txct-2qugv-xuzva-eqe does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
 }
 
 #[test]
