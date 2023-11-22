@@ -562,14 +562,13 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         alias_tuple.id_dapp,
     )?;
 
-    for credential_spec in vec![employee_credential_spec(), degree_credential_spec()] {
+    for credential_spec in [employee_credential_spec(), degree_credential_spec()] {
         let prepare_credential_response = api::prepare_credential(
             &env,
             issuer_id,
             id_alias_credentials
                 .issuer_id_alias_credential
-                .id_dapp
-                .clone(),
+                .id_dapp,
             &PrepareCredentialRequest {
                 credential_spec: credential_spec.clone(),
                 signed_id_alias: SignedIssuerIdAlias {
@@ -595,8 +594,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             issuer_id,
             id_alias_credentials
                 .issuer_id_alias_credential
-                .id_dapp
-                .clone(),
+                .id_dapp,
             &GetCredentialRequest {
                 credential_spec: credential_spec.clone(),
                 signed_id_alias: SignedIssuerIdAlias {

@@ -122,7 +122,7 @@ fn apply_config(init: IssuerInit) {
 }
 
 fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(&alias)?;
+    let alias_tuple = extract_id_alias(alias)?;
 
     if caller() != alias_tuple.id_dapp {
         return Err(IssueCredentialError::UnauthorizedSubject(format!(
@@ -304,7 +304,6 @@ fn verify_single_argument(
 
     let unexpected_arguments: Vec<&String> = arguments
         .keys()
-        .into_iter()
         .filter(|k| k.as_str() != expected_argument)
         .collect();
     if !unexpected_arguments.is_empty() {
