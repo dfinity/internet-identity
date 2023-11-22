@@ -27,6 +27,7 @@ use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
     vc_signing_input_hash, AliasTuple,
 };
+use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
 /// and the managed memory for potential other data of the canister.
@@ -36,6 +37,12 @@ type ConfigCell = StableCell<IssuerConfig, Memory>;
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
 const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
+
+#[derive(Debug)]
+enum SupportedCredentialType {
+    VerifiedEmployee,
+    UniversityDegreeCredential,
+}
 
 thread_local! {
     /// Static configuration of the canister set by init() or post_upgrade().
@@ -165,8 +172,16 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
             err,
         ));
     }
+    let credential_type = match verify_credential_spec(&req.credential_spec) {
+        Ok(credential_type) => credential_type,
+        Err(err) => {
+            return PrepareCredentialResponse::Err(
+                IssueCredentialError::UnsupportedCredentialSpec(err),
+            );
+        }
+    };
 
-    let credential = match prepare_credential_payload(&req, &alias_tuple) {
+    let credential = match prepare_credential_payload(&credential_type, &alias_tuple) {
         Ok(credential) => credential,
         Err(err) => return PrepareCredentialResponse::Err(err),
     };
@@ -255,18 +270,24 @@ async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21Consent
     })
 }
 
-fn verify_credential_spec(spec: &CredentialSpec) -> Result<(), String> {
+fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
     match spec.credential_name.as_str() {
-        "VerifiedEmployee" => verify_single_argument(
-            spec,
-            "employerName",
-            ArgumentValue::String("DFINITY Foundation".to_string()),
-        ),
-        "UniversityDegreeCredential" => verify_single_argument(
-            spec,
-            "institutionName",
-            ArgumentValue::String("DFINITY College of Engineering".to_string()),
-        ),
+        "VerifiedEmployee" => {
+            verify_single_argument(
+                spec,
+                "employerName",
+                ArgumentValue::String("DFINITY Foundation".to_string()),
+            )?;
+            Ok(VerifiedEmployee)
+        }
+        "UniversityDegreeCredential" => {
+            verify_single_argument(
+                spec,
+                "institutionName",
+                ArgumentValue::String("DFINITY College of Engineering".to_string()),
+            )?;
+            Ok(UniversityDegreeCredential)
+        }
         other => Err(format!("Credential {} is not supported", other)),
     }
 }
@@ -443,31 +464,27 @@ fn dfinity_employment_credential(subject_principal: Principal) -> Credential {
 }
 
 fn prepare_credential_payload(
-    req: &PrepareCredentialRequest,
+    credential_type: &SupportedCredentialType,
     alias_tuple: &AliasTuple,
 ) -> Result<Credential, IssueCredentialError> {
-    match req.credential_spec.credential_name.as_str() {
-        "VerifiedEmployee" => {
+    match credential_type {
+        VerifiedEmployee => {
             EMPLOYEES.with_borrow(|employees| {
-                verify_authorized_principal(&req.credential_spec, alias_tuple, employees)
+                verify_authorized_principal(&credential_type, alias_tuple, employees)
             })?;
             Ok(dfinity_employment_credential(alias_tuple.id_alias))
         }
-        "UniversityDegreeCredential" => {
+        UniversityDegreeCredential => {
             GRADUATES.with_borrow(|graduates| {
-                verify_authorized_principal(&req.credential_spec, alias_tuple, graduates)
+                verify_authorized_principal(&credential_type, alias_tuple, graduates)
             })?;
             Ok(bachelor_degree_credential(alias_tuple.id_alias))
         }
-        other => Err(IssueCredentialError::UnsupportedCredentialSpec(format!(
-            "credential {} is not supported",
-            other
-        ))),
     }
 }
 
 fn verify_authorized_principal(
-    credential_spec: &CredentialSpec,
+    credential_type: &SupportedCredentialType,
     alias_tuple: &AliasTuple,
     authorized_principals: &HashSet<Principal>,
 ) -> Result<(), IssueCredentialError> {
@@ -475,9 +492,9 @@ fn verify_authorized_principal(
         Ok(())
     } else {
         println!(
-            "*** principal {} it is not authorized for credential {}",
+            "*** principal {} it is not authorized for credential type {:?}",
             alias_tuple.id_dapp.to_text(),
-            credential_spec.credential_name
+            credential_type
         );
         Err(IssueCredentialError::UnauthorizedSubject(format!(
             "unauthorized principal {}",
