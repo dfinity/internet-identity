@@ -4,9 +4,7 @@ use assert_matches::assert_matches;
 use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
-use canister_tests::framework::{
-    env, get_wasm_path, principal_1, test_principal, II_WASM,
-};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, II_WASM};
 use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
@@ -26,7 +24,9 @@ use vc_util::issuer_api::{
     Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
     PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
 };
-use vc_util::{did_for_principal, verify_credential_jws_with_canister_id, get_verified_id_alias_from_jws};
+use vc_util::{
+    did_for_principal, get_verified_id_alias_from_jws, verify_credential_jws_with_canister_id,
+};
 
 const DUMMY_ROOT_KEY: &str ="308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c05030201036100adf65638a53056b2222c91bb2457b0274bca95198a5acbdadfe7fd72178f069bdea8d99e9479d8087a2686fc81bf3c4b11fe275570d481f1698f79d468afe0e57acc1e298f8b69798da7a891bbec197093ec5f475909923d48bfed6843dbed1f";
 const DUMMY_II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
@@ -35,7 +35,8 @@ const DUMMY_II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
 /// id dapp: nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe
 /// id alias: vhbib-m4hm6-hpvyc-7prd2-siivo-nbd7r-67o5x-n3awh-qsmqz-wznjf-tqe
 const DUMMY_ALIAS_JWS: &str ="eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCRVNzWHp2bTEzd1BkRTVZSndvLTBCYkdBTHdCN0J2bW1LZUxramFUUTdkQSJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOm51Z3ZhLXM3YzZ2LTR5c3p0LWtveWN2LTViNjIzLWFuN3E2LWhhMm56LWt6NnJzLWhhd2dsLW56bmJlLXJxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDp2aGJpYi1tNGhtNi1ocHZ5Yy03cHJkMi1zaWl2by1uYmQ3ci02N281eC1uM2F3aC1xc21xei13em5qZi10cWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggnk2d-80NLXpxOs-YszCLd4yvrGBtLEGqe6rp6khNthCCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggaAMB9TDaAhXeQPY8DCCUq90vqJJDqpDAVwU-0WdA9OmCBFgghh7VsiTOqTlAiY8hcsbF1pFnG5t1x4kQ7rt2bae_6iGCBFgggcqzMKDpDQKcyRl6xrGy4SIYEtgVJgSLlHGFvHN6zuSCBFggBNxwNVuf0_gTaiM6hbpNNCcEIBfxLHoor0N1mpX-uNeCBFggICEcda6JC5WRFIbzoGGJdJINoas-EWtoCU0lysCe3OGDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCY_kVxXw7Wk8HlA0FqOpX-3WMdI0mmxAtY9DJv8xEkfitcTOR0FcE412IftkdH48hkdHJlZYMBggRYIPKxlnFAySvK4ahA_Q0IkEopYPh8H4_IRCFRGb2i23QRgwJDc2lngwJYIFcsa4eb-HMrTnmGWNje_RfErQYi0wNCJvGDrzqazq0OgwGCBFggg7ijRBePgPVau7zffNEvAXThew-FqcBH_cB-fF7722eDAlgg3ikzXLDphmWB8YbAxZDjZfLFd6bDS-sLAPzmVj0nlvSCA0A";
-const DUMMY_ALIAS_ID_DAPP_PRINCIPAL: &str ="nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe";
+const DUMMY_ALIAS_ID_DAPP_PRINCIPAL: &str =
+    "nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe";
 
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
@@ -115,7 +116,7 @@ mod api {
         canister_id: CanisterId,
         employee_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id,  "add_employee", (employee_id,)).map(|(x,)| x)
+        call_candid(env, canister_id, "add_employee", (employee_id,)).map(|(x,)| x)
     }
 
     pub fn add_graduate(
@@ -123,7 +124,7 @@ mod api {
         canister_id: CanisterId,
         employee_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id,  "add_graduate", (employee_id,)).map(|(x,)| x)
+        call_candid(env, canister_id, "add_graduate", (employee_id,)).map(|(x,)| x)
     }
 
     pub fn prepare_credential(
@@ -340,12 +341,7 @@ fn should_fail_get_credential_for_wrong_sender() {
     let issuer_id = install_issuer(&env, &DUMMY_ISSUER_INIT);
     let signed_id_alias = DUMMY_SIGNED_ID_ALIAS.clone();
     let authorized_principal = Principal::from_text(DUMMY_ALIAS_ID_DAPP_PRINCIPAL).unwrap();
-    api::add_employee(
-        &env,
-        issuer_id,
-        authorized_principal,
-    )
-    .expect("failed to add employee");
+    api::add_employee(&env, issuer_id, authorized_principal).expect("failed to add employee");
     let unauthorized_principal = test_principal(2);
 
     match_value!(
@@ -371,8 +367,7 @@ fn should_fail_get_credential_for_wrong_sender() {
         },
     )
     .expect("API call failed");
-    assert_matches!(get_credential_response, 
-        GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller sl5og-mycaa-aaaaa-aaaap-4 does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(get_credential_response, GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller sl5og-mycaa-aaaaa-aaaap-4 does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
 }
 
 #[test]
@@ -389,8 +384,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, 
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 2vxsx-fae does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(response, PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 2vxsx-fae does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
 }
 
 #[test]
@@ -450,8 +444,7 @@ fn should_prepare_employee_credential_for_authorized_principal() {
     let env = env();
     let issuer_id = install_issuer(&env, &DUMMY_ISSUER_INIT);
     let authorized_principal = Principal::from_text(DUMMY_ALIAS_ID_DAPP_PRINCIPAL).unwrap();
-    api::add_employee(&env, issuer_id, authorized_principal)
-        .expect("API call failed");
+    api::add_employee(&env, issuer_id, authorized_principal).expect("API call failed");
     let response = api::prepare_credential(
         &env,
         issuer_id,
@@ -470,8 +463,7 @@ fn should_prepare_degree_credential_for_authorized_principal() {
     let env = env();
     let issuer_id = install_issuer(&env, &DUMMY_ISSUER_INIT);
     let authorized_principal = Principal::from_text(DUMMY_ALIAS_ID_DAPP_PRINCIPAL).unwrap();
-    api::add_graduate(&env, issuer_id, authorized_principal)
-        .expect("API call failed");
+    api::add_graduate(&env, issuer_id, authorized_principal).expect("API call failed");
     let response = api::prepare_credential(
         &env,
         issuer_id,
@@ -549,27 +541,16 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &canister_sig_pk.canister_id,
         &root_pk_raw,
     )
-        .expect("Invalid ID alias");
+    .expect("Invalid ID alias");
 
-    api::add_employee(
-        &env,
-        issuer_id,
-        alias_tuple.id_dapp,
-    )?;
-    api::add_graduate(
-        &env,
-        issuer_id,
-        alias_tuple.id_dapp,
-    )?;
+    api::add_employee(&env, issuer_id, alias_tuple.id_dapp)?;
+    api::add_graduate(&env, issuer_id, alias_tuple.id_dapp)?;
 
-    for credential_spec in vec![employee_credential_spec(), degree_credential_spec()] {
+    for credential_spec in [employee_credential_spec(), degree_credential_spec()] {
         let prepare_credential_response = api::prepare_credential(
             &env,
             issuer_id,
-            id_alias_credentials
-                .issuer_id_alias_credential
-                .id_dapp
-                .clone(),
+            id_alias_credentials.issuer_id_alias_credential.id_dapp,
             &PrepareCredentialRequest {
                 credential_spec: credential_spec.clone(),
                 signed_id_alias: SignedIssuerIdAlias {
@@ -593,10 +574,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         let get_credential_response = api::get_credential(
             &env,
             issuer_id,
-            id_alias_credentials
-                .issuer_id_alias_credential
-                .id_dapp
-                .clone(),
+            id_alias_credentials.issuer_id_alias_credential.id_dapp,
             &GetCredentialRequest {
                 credential_spec: credential_spec.clone(),
                 signed_id_alias: SignedIssuerIdAlias {
