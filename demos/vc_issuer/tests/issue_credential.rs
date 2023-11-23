@@ -166,7 +166,7 @@ fn should_return_vc_consent_message() {
     let test_cases = [
         ("en-US", "en", "# DFINITY Foundation Employment Credential"),
         ("de-DE", "de", "# Beschäftigungsausweis DFINITY Stiftung"),
-        ("ja_JP", "en", "# DFINITY Foundation Employment Credential"), // test fallback language
+        ("ja-JP", "en", "# DFINITY Foundation Employment Credential"), // test fallback language
     ];
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
