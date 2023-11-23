@@ -7,7 +7,7 @@ use ic_cdk_macros::{init, query, update};
 use ic_certification::{Hash, HashTree};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
-use identity_core::common::Url;
+use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use serde::Serialize;
@@ -36,6 +36,8 @@ type ConfigCell = StableCell<IssuerConfig, Memory>;
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
 const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
+// The expiration of issued verifiable credentials.
+const VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
 
 thread_local! {
     /// Static configuration of the canister set by init() or post_upgrade().
@@ -417,6 +419,7 @@ fn bachelor_degree_credential(subject_principal: Principal) -> Credential {
         .issuer(Url::parse("https://example.edu").unwrap())
         .type_("UniversityDegreeCredential")
         .subject(subject)
+        .expiration_date(exp_timestamp())
         .build()
         .unwrap()
 }
@@ -437,8 +440,14 @@ fn dfinity_employment_credential(subject_principal: Principal) -> Credential {
         .issuer(Url::parse("https://employment.info").unwrap())
         .type_("VerifiedEmployee")
         .subject(subject)
+        .expiration_date(exp_timestamp())
         .build()
         .unwrap()
+}
+
+fn exp_timestamp() -> Timestamp {
+    Timestamp::from_unix(((time() + VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as i64)
+        .expect("internal: failed computing expiration timestamp")
 }
 
 fn prepare_credential_payload(
