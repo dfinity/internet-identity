@@ -8,14 +8,14 @@ use vc_util::issuer_api::{
 use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
 use SupportedLanguage::{English, German};
 
-const EMPLOYMENT_VC_DESCRIPTION_ENG: &str = r###"# DFINITY Foundation Employment Credential
+const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# DFINITY Foundation Employment Credential
 
 Credential that states that the holder is employed by the DFINITY Foundation at the time of issuance."###;
-const DEGREE_VC_DESCRIPTION_ENG: &str = r###"# Bachelor of Engineering, DFINITY College of Engineering
+const DEGREE_VC_DESCRIPTION_EN: &str = r###"# Bachelor of Engineering, DFINITY College of Engineering
 
 Credential that states that the holder has a degree in engineering from the DFINITY College of Engineering."###;
-const VALIDITY_INFO_ENG: &str = "The credential is valid for 15 minutes.";
-const ANONYMITY_DISCLAIMER_ENG: &str = "This credential does **not** contain any additional personal information. It is issued to an ephemeral identity that is created for the sole purpose of issuing this credential.";
+const VALIDITY_INFO_EN: &str = "The credential is valid for 15 minutes.";
+const ANONYMITY_DISCLAIMER_EN: &str = "This credential does **not** contain any additional personal information. It is issued to an ephemeral identity that is created for the sole purpose of issuing this credential.";
 
 const EMPLOYMENT_VC_DESCRIPTION_DE: &str = r###"# Beschäftigungsausweis DFINITY Stiftung
 
@@ -69,9 +69,9 @@ pub fn get_vc_consent_message(
 
 fn employment_consent_msg_eng() -> String {
     format_message(
-        EMPLOYMENT_VC_DESCRIPTION_ENG,
-        VALIDITY_INFO_ENG,
-        ANONYMITY_DISCLAIMER_ENG,
+        EMPLOYMENT_VC_DESCRIPTION_EN,
+        VALIDITY_INFO_EN,
+        ANONYMITY_DISCLAIMER_EN,
     )
 }
 
@@ -85,9 +85,9 @@ fn employment_consent_msg_de() -> String {
 
 fn degree_consent_msg_eng() -> String {
     format_message(
-        DEGREE_VC_DESCRIPTION_ENG,
-        VALIDITY_INFO_ENG,
-        ANONYMITY_DISCLAIMER_ENG,
+        DEGREE_VC_DESCRIPTION_EN,
+        VALIDITY_INFO_EN,
+        ANONYMITY_DISCLAIMER_EN,
     )
 }
 
