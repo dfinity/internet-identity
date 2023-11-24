@@ -1,10 +1,13 @@
 //! This module contains the various consent messages that is displayed to the user when they are asked to consent to the issuance of a credential.
 
-use std::collections::HashMap;
 use crate::SupportedCredentialType;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use strfmt::strfmt;
-use vc_util::issuer_api::{Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo};
+use vc_util::issuer_api::{
+    Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
+    Icrc21ErrorInfo,
+};
 use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
 use SupportedLanguage::{English, German};
 
@@ -65,33 +68,45 @@ pub fn get_vc_consent_message(
 }
 
 fn employment_consent_msg_eng(employer: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(EMPLOYMENT_VC_DESCRIPTION_EN, &HashMap::from([("employer".to_string(), employer)]))
-        .map_err(|e| Icrc21ErrorInfo {
-            error_code: 0,
-            description: e.to_string(),
-        })
+    strfmt(
+        EMPLOYMENT_VC_DESCRIPTION_EN,
+        &HashMap::from([("employer".to_string(), employer)]),
+    )
+    .map_err(|e| Icrc21ErrorInfo {
+        error_code: 0,
+        description: e.to_string(),
+    })
 }
 
 fn employment_consent_msg_de(employer: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(EMPLOYMENT_VC_DESCRIPTION_DE, &HashMap::from([("employer".to_string(), employer)]))
-        .map_err(|e| Icrc21ErrorInfo {
-            error_code: 0,
-            description: e.to_string(),
-        })
+    strfmt(
+        EMPLOYMENT_VC_DESCRIPTION_DE,
+        &HashMap::from([("employer".to_string(), employer)]),
+    )
+    .map_err(|e| Icrc21ErrorInfo {
+        error_code: 0,
+        description: e.to_string(),
+    })
 }
 
 fn degree_consent_msg_eng(institute: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(DEGREE_VC_DESCRIPTION_EN, &HashMap::from([("institute".to_string(), institute)]))
-        .map_err(|e| Icrc21ErrorInfo {
-            error_code: 0,
-            description: e.to_string(),
-        })
+    strfmt(
+        DEGREE_VC_DESCRIPTION_EN,
+        &HashMap::from([("institute".to_string(), institute)]),
+    )
+    .map_err(|e| Icrc21ErrorInfo {
+        error_code: 0,
+        description: e.to_string(),
+    })
 }
 
 fn degree_consent_msg_de(institute: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(DEGREE_VC_DESCRIPTION_DE, &HashMap::from([("institute".to_string(), institute)]))
-        .map_err(|e| Icrc21ErrorInfo {
-            error_code: 0,
-            description: e.to_string(),
-        })
+    strfmt(
+        DEGREE_VC_DESCRIPTION_DE,
+        &HashMap::from([("institute".to_string(), institute)]),
+    )
+    .map_err(|e| Icrc21ErrorInfo {
+        error_code: 0,
+        description: e.to_string(),
+    })
 }
