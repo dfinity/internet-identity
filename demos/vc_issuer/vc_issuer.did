@@ -15,14 +15,14 @@ type ArgumentValue = variant { "int" : int32; string : text };
 /// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentMessageResponse = variant {
-    Ok : Icrc21ConsentInfo;
-    Err : Icrc21Error;
+    ok : Icrc21ConsentInfo;
+    err : Icrc21Error;
 };
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
-    GenericError : Icrc21ErrorInfo;
-    UnsupportedCanisterCall : Icrc21ErrorInfo;
-    ConsentMessageUnavailable : Icrc21ErrorInfo;
+    generic_error : Icrc21ErrorInfo;
+    unsupported_canister_call : Icrc21ErrorInfo;
+    consent_message_unavailable : Icrc21ErrorInfo;
 };
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type Icrc21VcConsentMessageRequest = record {
