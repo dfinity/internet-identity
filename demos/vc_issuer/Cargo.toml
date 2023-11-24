@@ -29,6 +29,7 @@ serde_bytes = "0.11"
 serde_cbor = "0.11"
 serde_json = "1"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
+strfmt = "0.2"
 
 [dev-dependencies]
 assert_matches = "1.5.0"

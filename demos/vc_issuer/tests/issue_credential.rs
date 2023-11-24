@@ -165,7 +165,7 @@ mod api {
 fn should_return_vc_consent_message() {
     let test_cases = [
         ("en-US", "en", "# DFINITY Foundation Employment Credential"),
-        ("de-DE", "de", "# Beschäftigungsausweis DFINITY Stiftung"),
+        ("de-DE", "de", "# Beschäftigungsausweis DFINITY Foundation"),
         ("ja-JP", "en", "# DFINITY Foundation Employment Credential"), // test fallback language
     ];
     let env = env();

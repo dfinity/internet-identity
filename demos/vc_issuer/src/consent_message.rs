@@ -1,32 +1,25 @@
 //! This module contains the various consent messages that is displayed to the user when they are asked to consent to the issuance of a credential.
 
+use std::collections::HashMap;
 use crate::SupportedCredentialType;
 use std::fmt::{Display, Formatter};
-use vc_util::issuer_api::{
-    Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences,
-};
+use strfmt::strfmt;
+use vc_util::issuer_api::{Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo};
 use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
 use SupportedLanguage::{English, German};
 
-const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# DFINITY Foundation Employment Credential
+const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# {employer} Employment Credential
 
-Credential that states that the holder is employed by the DFINITY Foundation at the time of issuance."###;
-const EMPLOYMENT_VC_DESCRIPTION_DE: &str = r###"# Beschäftigungsausweis DFINITY Stiftung
+Credential that states that the holder is employed by the {employer} at the time of issuance."###;
+const EMPLOYMENT_VC_DESCRIPTION_DE: &str = r###"# Beschäftigungsausweis {employer}
 
-Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin zum Zeitpunkt der Austellung bei der DFINITY Stiftung beschäftigt ist."###;
-const DEGREE_VC_DESCRIPTION_EN: &str = r###"# Bachelor of Engineering, DFINITY College of Engineering
+Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin zum Zeitpunkt der Austellung bei der {employer} beschäftigt ist."###;
+const DEGREE_VC_DESCRIPTION_EN: &str = r###"# Bachelor of Engineering, {institute}
 
-Credential that states that the holder has a degree in engineering from the DFINITY College of Engineering."###;
-const DEGREE_VC_DESCRIPTION_DE: &str = r###"# Bachelor of Engineering, DFINITY Hochschule für Ingenieurwissenschaften
+Credential that states that the holder has a degree in engineering from the {institute}."###;
+const DEGREE_VC_DESCRIPTION_DE: &str = r###"# Bachelor of Engineering, {institute}
 
-Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabschluss in einer Ingenieurwissenschaft der DFINITY Hochschule für Ingenieurwissenschaften besitzt."###;
-
-const VALIDITY_INFO_EN: &str = "The credential is valid for 15 minutes.";
-const VALIDITY_INFO_DE: &str = "Dieser Ausweis ist gültig für 15 Minuten.";
-
-const ANONYMITY_DISCLAIMER_EN: &str = "This credential does **not** contain any additional personal information. It is issued to an ephemeral identity that is created for the sole purpose of issuing this credential.";
-const ANONYMITY_DISCLAIMER_DE: &str =
-    "Dieser Ausweis enthält **keine** zusätzlichen persönlichen Daten. Er wird auf eine kurzlebige Identität lautend ausgestellt, die für den alleinigen Verwendungszweck der Austellung dieses Ausweises erzeugt wird.";
+Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabschluss in einer Ingenieurwissenschaft des {institute} besitzt."###;
 
 pub enum SupportedLanguage {
     English,
@@ -55,53 +48,50 @@ pub fn get_vc_consent_message(
     credential_type: &SupportedCredentialType,
     language: &SupportedLanguage,
 ) -> Icrc21ConsentMessageResponse {
-    let message = match (credential_type, language) {
-        (VerifiedEmployee(_), English) => employment_consent_msg_eng(),
-        (VerifiedEmployee(_), German) => employment_consent_msg_de(),
-        (UniversityDegreeCredential(_), English) => degree_consent_msg_eng(),
-        (UniversityDegreeCredential(_), German) => degree_consent_msg_de(),
+    let template_result = match (credential_type, language) {
+        (VerifiedEmployee(employer), English) => employment_consent_msg_eng(employer),
+        (VerifiedEmployee(employer), German) => employment_consent_msg_de(employer),
+        (UniversityDegreeCredential(institute), English) => degree_consent_msg_eng(institute),
+        (UniversityDegreeCredential(institute), German) => degree_consent_msg_de(institute),
     };
-    Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
-        consent_message: message,
-        language: format!("{}", language),
-    })
+
+    match template_result {
+        Ok(message) => Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
+            consent_message: message,
+            language: format!("{}", language),
+        }),
+        Err(err) => Icrc21ConsentMessageResponse::Err(Icrc21Error::GenericError(err)),
+    }
 }
 
-fn employment_consent_msg_eng() -> String {
-    format_message(
-        EMPLOYMENT_VC_DESCRIPTION_EN,
-        VALIDITY_INFO_EN,
-        ANONYMITY_DISCLAIMER_EN,
-    )
+fn employment_consent_msg_eng(employer: &str) -> Result<String, Icrc21ErrorInfo> {
+    strfmt(EMPLOYMENT_VC_DESCRIPTION_EN, &HashMap::from([("employer".to_string(), employer)]))
+        .map_err(|e| Icrc21ErrorInfo {
+            error_code: 0,
+            description: e.to_string(),
+        })
 }
 
-fn employment_consent_msg_de() -> String {
-    format_message(
-        EMPLOYMENT_VC_DESCRIPTION_DE,
-        VALIDITY_INFO_DE,
-        ANONYMITY_DISCLAIMER_DE,
-    )
+fn employment_consent_msg_de(employer: &str) -> Result<String, Icrc21ErrorInfo> {
+    strfmt(EMPLOYMENT_VC_DESCRIPTION_DE, &HashMap::from([("employer".to_string(), employer)]))
+        .map_err(|e| Icrc21ErrorInfo {
+            error_code: 0,
+            description: e.to_string(),
+        })
 }
 
-fn degree_consent_msg_eng() -> String {
-    format_message(
-        DEGREE_VC_DESCRIPTION_EN,
-        VALIDITY_INFO_EN,
-        ANONYMITY_DISCLAIMER_EN,
-    )
+fn degree_consent_msg_eng(institute: &str) -> Result<String, Icrc21ErrorInfo> {
+    strfmt(DEGREE_VC_DESCRIPTION_EN, &HashMap::from([("institute".to_string(), institute)]))
+        .map_err(|e| Icrc21ErrorInfo {
+            error_code: 0,
+            description: e.to_string(),
+        })
 }
 
-fn degree_consent_msg_de() -> String {
-    format_message(
-        DEGREE_VC_DESCRIPTION_DE,
-        VALIDITY_INFO_DE,
-        ANONYMITY_DISCLAIMER_DE,
-    )
-}
-
-fn format_message(description: &str, validity_info: &str, anonymity_disclaimer: &str) -> String {
-    format!(
-        "{} {}\n\n{}",
-        description, validity_info, anonymity_disclaimer
-    )
+fn degree_consent_msg_de(institute: &str) -> Result<String, Icrc21ErrorInfo> {
+    strfmt(DEGREE_VC_DESCRIPTION_DE, &HashMap::from([("institute".to_string(), institute)]))
+        .map_err(|e| Icrc21ErrorInfo {
+            error_code: 0,
+            description: e.to_string(),
+        })
 }
