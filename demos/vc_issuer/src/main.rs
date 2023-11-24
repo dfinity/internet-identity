@@ -482,13 +482,19 @@ fn prepare_credential_payload(
             EMPLOYEES.with_borrow(|employees| {
                 verify_authorized_principal(credential_type, alias_tuple, employees)
             })?;
-            Ok(dfinity_employment_credential(alias_tuple.id_alias, employer_name.as_str()))
+            Ok(dfinity_employment_credential(
+                alias_tuple.id_alias,
+                employer_name.as_str(),
+            ))
         }
         UniversityDegreeCredential(institution_name) => {
             GRADUATES.with_borrow(|graduates| {
                 verify_authorized_principal(credential_type, alias_tuple, graduates)
             })?;
-            Ok(bachelor_degree_credential(alias_tuple.id_alias, institution_name.as_str()))
+            Ok(bachelor_degree_credential(
+                alias_tuple.id_alias,
+                institution_name.as_str(),
+            ))
         }
     }
 }
