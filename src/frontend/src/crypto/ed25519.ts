@@ -85,7 +85,7 @@ async function derive(
     ["sign"]
   );
 
-  const h = await window.crypto.subtle.sign("HMAC", key, data.buffer);
+  const h = await window.crypto.subtle.sign("HMAC", key, data);
   const slipSeed = new Uint8Array(h.slice(0, 32));
   const chainCode = new Uint8Array(h.slice(32));
   return [slipSeed, chainCode];
