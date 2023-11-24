@@ -63,7 +63,7 @@ export const minifyHTML = (): {
  */
 export const replicaForwardPlugin = ({
   replicaOrigin,
-  forwardDomains /* note: only exact match, i.e. not 'raw'*/,
+  forwardDomains /* note: will match exactly on <canister>.<domain> */,
   forwardRules,
 }: {
   replicaOrigin: string;
@@ -128,7 +128,7 @@ export const replicaForwardPlugin = ({
       const domain = domain_.join(".");
 
       if (
-        forwardDomains !== undefined &&
+        !isNullish(forwardDomains) &&
         forwardDomains.includes(domain) &&
         /([a-z0-9])+(-[a-z0-9]+)+/.test(
           subdomain

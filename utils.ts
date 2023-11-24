@@ -15,6 +15,6 @@ export const readCanisterId = ({
     const stdout = execSync(command);
     return stdout.toString().trim();
   } catch (e) {
-    throw Error(`Could not get canister ID with command '${command}': ${e}`);
+    throw Error(`Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`);
   }
 };

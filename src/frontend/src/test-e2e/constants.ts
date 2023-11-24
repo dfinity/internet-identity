@@ -1,7 +1,7 @@
 import { readCanisterId } from "../../../../utils";
 
 // XXX: this is not exactly a constant (since it might change on every node eval) but in
-// practice is very stable, and is much easier to use as "constants" then as a lookup function.
+// practice is very stable, and is much easier to use as "constants" than as a lookup function.
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
