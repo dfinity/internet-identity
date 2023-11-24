@@ -243,6 +243,7 @@ jobs:
         working-directory: demos/vc_issuer
         run: ./build.sh
       - run: sha256sum vc_issuer.wasm.gz
+        working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
         uses: actions/upload-artifact@v3
         with:
