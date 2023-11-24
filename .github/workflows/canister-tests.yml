@@ -242,6 +242,8 @@ jobs:
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
         run: ./build.sh
+      - run: sha256sum vc_issuer.wasm.gz
+        working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
         uses: actions/upload-artifact@v3
         with:
@@ -693,6 +695,12 @@ jobs:
           name: archive.wasm.gz
           path: .
 
+      - name: 'Download wasm.gz'
+        uses: actions/download-artifact@v3
+        with:
+          name: vc_issuer.wasm.gz
+          path: .
+
       - uses: actions/github-script@v6
         id: pipeline-jobs
         with:
@@ -740,6 +748,7 @@ jobs:
             internet_identity_dev.wasm.gz
             internet_identity_test.wasm.gz
             archive.wasm.gz
+            vc_issuer.wasm.gz
           production_asset: internet_identity_production.wasm.gz
           changelog: ${{ steps.changelog.outputs.result }}
           workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
