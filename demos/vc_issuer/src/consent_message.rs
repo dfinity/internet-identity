@@ -1,6 +1,7 @@
 //! This module contains the various consent messages that is displayed to the user when they are asked to consent to the issuance of a credential.
 
 use crate::SupportedCredentialType;
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use strfmt::strfmt;
@@ -8,7 +9,6 @@ use vc_util::issuer_api::{
     Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
     Icrc21ErrorInfo,
 };
-use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
 use SupportedLanguage::{English, German};
 
 const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# {employer} Employment Credential
@@ -24,9 +24,65 @@ const DEGREE_VC_DESCRIPTION_DE: &str = r###"# Bachelor of Engineering, {institut
 
 Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabschluss in einer Ingenieurwissenschaft des {institute} besitzt."###;
 
+lazy_static! {
+    static ref CONSENT_MESSAGE_TEMPLATES: HashMap<(CredentialTemplateType, SupportedLanguage), &'static str> =
+        HashMap::from([
+            (
+                (CredentialTemplateType::VerifiedEmployee, English),
+                EMPLOYMENT_VC_DESCRIPTION_EN
+            ),
+            (
+                (CredentialTemplateType::VerifiedEmployee, German),
+                EMPLOYMENT_VC_DESCRIPTION_DE
+            ),
+            (
+                (CredentialTemplateType::UniversityDegree, English),
+                DEGREE_VC_DESCRIPTION_EN
+            ),
+            (
+                (CredentialTemplateType::UniversityDegree, German),
+                DEGREE_VC_DESCRIPTION_DE
+            )
+        ]);
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub enum CredentialTemplateType {
+    VerifiedEmployee,
+    UniversityDegree,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum SupportedLanguage {
     English,
     German,
+}
+
+impl From<&SupportedCredentialType> for CredentialTemplateType {
+    fn from(value: &SupportedCredentialType) -> Self {
+        match value {
+            SupportedCredentialType::VerifiedEmployee(_) => {
+                CredentialTemplateType::VerifiedEmployee
+            }
+            SupportedCredentialType::UniversityDegree(_) => {
+                CredentialTemplateType::UniversityDegree
+            }
+        }
+    }
+}
+
+impl SupportedCredentialType {
+    /// Re-expands a known credential type back into its parameters, which can be used for consent message templating.
+    fn to_param_tuple(&self) -> (String, String) {
+        match self {
+            SupportedCredentialType::VerifiedEmployee(employer) => {
+                ("employer".to_string(), employer.to_string())
+            }
+            SupportedCredentialType::UniversityDegree(institute) => {
+                ("institute".to_string(), institute.to_string())
+            }
+        }
+    }
 }
 
 impl From<Icrc21ConsentPreferences> for SupportedLanguage {
@@ -51,14 +107,7 @@ pub fn get_vc_consent_message(
     credential_type: &SupportedCredentialType,
     language: &SupportedLanguage,
 ) -> Icrc21ConsentMessageResponse {
-    let template_result = match (credential_type, language) {
-        (VerifiedEmployee(employer), English) => employment_consent_msg_eng(employer),
-        (VerifiedEmployee(employer), German) => employment_consent_msg_de(employer),
-        (UniversityDegreeCredential(institute), English) => degree_consent_msg_eng(institute),
-        (UniversityDegreeCredential(institute), German) => degree_consent_msg_de(institute),
-    };
-
-    match template_result {
+    match render_consent_message(credential_type, language) {
         Ok(message) => Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
             consent_message: message,
             language: format!("{}", language),
@@ -67,45 +116,18 @@ pub fn get_vc_consent_message(
     }
 }
 
-fn employment_consent_msg_eng(employer: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(
-        EMPLOYMENT_VC_DESCRIPTION_EN,
-        &HashMap::from([("employer".to_string(), employer)]),
-    )
-    .map_err(|e| Icrc21ErrorInfo {
-        error_code: 0,
-        description: e.to_string(),
-    })
-}
+fn render_consent_message(
+    credential: &SupportedCredentialType,
+    language: &SupportedLanguage,
+) -> Result<String, Icrc21ErrorInfo> {
+    let template = CONSENT_MESSAGE_TEMPLATES
+        .get(&(CredentialTemplateType::from(credential), language.clone()))
+        .ok_or(Icrc21ErrorInfo {
+            error_code: 0,
+            description: "Consent message template not found".to_string(),
+        })?;
 
-fn employment_consent_msg_de(employer: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(
-        EMPLOYMENT_VC_DESCRIPTION_DE,
-        &HashMap::from([("employer".to_string(), employer)]),
-    )
-    .map_err(|e| Icrc21ErrorInfo {
-        error_code: 0,
-        description: e.to_string(),
-    })
-}
-
-fn degree_consent_msg_eng(institute: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(
-        DEGREE_VC_DESCRIPTION_EN,
-        &HashMap::from([("institute".to_string(), institute)]),
-    )
-    .map_err(|e| Icrc21ErrorInfo {
-        error_code: 0,
-        description: e.to_string(),
-    })
-}
-
-fn degree_consent_msg_de(institute: &str) -> Result<String, Icrc21ErrorInfo> {
-    strfmt(
-        DEGREE_VC_DESCRIPTION_DE,
-        &HashMap::from([("institute".to_string(), institute)]),
-    )
-    .map_err(|e| Icrc21ErrorInfo {
+    strfmt(template, &HashMap::from([credential.to_param_tuple()])).map_err(|e| Icrc21ErrorInfo {
         error_code: 0,
         description: e.to_string(),
     })

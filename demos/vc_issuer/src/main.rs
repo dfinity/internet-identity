@@ -28,7 +28,7 @@ use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
     vc_signing_input_hash, AliasTuple,
 };
-use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
+use SupportedCredentialType::{UniversityDegree, VerifiedEmployee};
 
 mod consent_message;
 
@@ -48,7 +48,7 @@ const VC_INSTITUTION_NAME: &str = "DFINITY College of Engineering";
 #[derive(Debug)]
 enum SupportedCredentialType {
     VerifiedEmployee(String),
-    UniversityDegreeCredential(String),
+    UniversityDegree(String),
 }
 
 thread_local! {
@@ -290,7 +290,7 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialTy
                 "institutionName",
                 ArgumentValue::String(VC_INSTITUTION_NAME.to_string()),
             )?;
-            Ok(UniversityDegreeCredential(VC_INSTITUTION_NAME.to_string()))
+            Ok(UniversityDegree(VC_INSTITUTION_NAME.to_string()))
         }
         other => Err(format!("Credential {} is not supported", other)),
     }
@@ -470,7 +470,7 @@ fn prepare_credential_payload(
                 employer_name.as_str(),
             ))
         }
-        UniversityDegreeCredential(institution_name) => {
+        UniversityDegree(institution_name) => {
             GRADUATES.with_borrow(|graduates| {
                 verify_authorized_principal(credential_type, alias_tuple, graduates)
             })?;
