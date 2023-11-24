@@ -1,4 +1,7 @@
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
+import { AuthClient } from "@dfinity/auth-client";
+import { Principal } from "@dfinity/principal";
+
 import { idlFactory as vc_issuer_idl } from "./generated/vc_issuer_idl";
 import { _SERVICE } from "./generated/vc_issuer_types";
 
@@ -18,6 +21,16 @@ export class VcIssuer {
       canisterId,
     });
     return actor;
+  };
+
+  addEmployee = async ({
+    principal,
+  }: {
+    principal: string;
+  }): Promise<string> => {
+    const actor = await this.createActor();
+    const result = await actor.add_employee(Principal.fromText(principal));
+    return result;
   };
 
   getConsentMessage = async (): Promise<string> => {
@@ -54,31 +67,50 @@ const readCanisterId = (): string => {
   return setupJs.dataset.canisterId;
 };
 
-const main = async () => {
-  console.log("Ok issuer");
-  const vcIssuer = new VcIssuer();
-
-  const msg = await vcIssuer.getConsentMessage();
-  console.log(msg);
-};
-
 const App = () => {
   const [consentMessage, setConsentMessage] = useState<string | undefined>(
     undefined
   );
+  const [principal, setPrincipal] = useState<string | undefined>(undefined);
   const [dsbld, setDsbld] = useState<boolean>(false);
 
-  const getAndShowMessage = async () => {
+  const withDisabled = async <A, _>(fn: () => Promise<A>): Promise<A> => {
     setDsbld(true);
-
     try {
-      const vcIssuer = new VcIssuer();
-      const msg = await vcIssuer.getConsentMessage();
-      setConsentMessage(msg);
+      return await fn();
     } finally {
       setDsbld(false);
     }
   };
+
+  const getAndShowMessage = () =>
+    withDisabled(async () => {
+      const vcIssuer = new VcIssuer();
+      const msg = await vcIssuer.getConsentMessage();
+      setConsentMessage(msg);
+    });
+
+  const authAndShow = () =>
+    withDisabled(async () => {
+      const authClient = await AuthClient.create();
+
+      await new Promise<void>((resolve, reject) => {
+        authClient.login({
+          identityProvider: "http://localhost:5173",
+          onSuccess: () => resolve(),
+          onError: reject,
+        });
+      });
+
+      setPrincipal(authClient.getIdentity().getPrincipal().toText());
+    });
+
+  const addEmployee = (principal: string) =>
+    withDisabled(async () => {
+      const vcIssuer = new VcIssuer();
+      const res = await vcIssuer.addEmployee({ principal });
+      console.log("Canister says: ", res);
+    });
 
   return (
     <main>
@@ -86,10 +118,18 @@ const App = () => {
       <button disabled={dsbld} onClick={() => getAndShowMessage()}>
         Get consent message
       </button>
+      <div>{principal ? principal : "not authed"}</div>
+      <button disabled={dsbld} onClick={() => authAndShow()}>
+        Authenticate
+      </button>
+      {principal ? (
+        <button onClick={() => addEmployee(principal)}>Add employee</button>
+      ) : (
+        <button disabled={!principal}>Add employee</button>
+      )}
     </main>
   );
 };
-// main();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

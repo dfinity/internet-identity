@@ -5,6 +5,7 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
+    "@dfinity/auth-client": "^0.20.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "vite": "^4.2.1"
