@@ -50,7 +50,7 @@
     "typescript": "5.2.2",
     "vite": "^4.2.1",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^0.31.0",
+    "vitest": "^0.34.0",
     "webdriverio": "^8.21.0"
   },
   "dependencies": {

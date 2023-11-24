@@ -1,39 +1,10 @@
-import { assertNonNullish, isNullish } from "@dfinity/utils";
-import { readFileSync } from "fs";
+import { isNullish } from "@dfinity/utils";
 import { minify } from "html-minifier-terser";
 import httpProxy from "http-proxy";
 import { extname } from "path";
 import { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-
-/**
- * Read a canister ID from dfx's local state
- */
-export const readCanisterId = ({
-  canisterName,
-  canisterIdsJsonFile,
-}: {
-  canisterName: string;
-  canisterIdsJsonFile: string;
-}): string => {
-  try {
-    const canisterIds: Record<string, { local: string }> = JSON.parse(
-      readFileSync(canisterIdsJsonFile, "utf-8")
-    );
-    const canisterId = canisterIds[canisterName]?.local;
-    assertNonNullish(
-      canisterId,
-      `Could not get canister ID from ${canisterIdsJsonFile}`
-    );
-    console.log(
-      `Read canister ID '${canisterId} for canister with name '${canisterName}'`
-    );
-
-    return canisterId;
-  } catch (e) {
-    throw Error(`Could not get canister ID from ${canisterIdsJsonFile}: ${e}`);
-  }
-};
+import { readCanisterId } from "./utils";
 
 /**
  * Inject the II canister ID as a <script /> tag in index.html for local development. Will process
@@ -46,12 +17,12 @@ export const injectCanisterIdPlugin = (): {
   name: "html-transform",
   transformIndexHtml(html): string {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
+    const canisterId = readCanisterId({
+      canisterName: "internet_identity",
+    });
 
     return html.replace(rgx, (_match, src) => {
-      return `<script data-canister-id="${readCanisterId({
-        canisterName: "internet_identity",
-        canisterIdsJsonFile: "./.dfx/local/canister_ids.json",
-      })}" type="module" src="${src}"></script>`;
+      return `<script data-canister-id="${canisterId}" type="module" src="${src}"></script>`;
     });
   },
 });
@@ -92,10 +63,12 @@ export const minifyHTML = (): {
  */
 export const replicaForwardPlugin = ({
   replicaOrigin,
+  forwardDomains /* note: will match exactly on <canister>.<domain> */,
   forwardRules,
 }: {
   replicaOrigin: string;
-  forwardRules: Array<{ canisterId: string; hosts: string[] }>;
+  forwardDomains?: string[];
+  forwardRules: Array<{ canisterName: string; hosts: string[] }>;
 }) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
@@ -123,26 +96,49 @@ export const replicaForwardPlugin = ({
         return next();
       }
 
+      // forward to the specified canister (served by the replica)
+      const forwardToReplica = ({ canisterId }: { canisterId: string }) => {
+        console.log(
+          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId}`
+        );
+        req.headers["host"] = `${canisterId}.localhost`;
+        proxy.web(req, res, {
+          target: `http://${replicaOrigin}`,
+        });
+
+        proxy.on("error", (err: Error) => {
+          res.statusCode = 500;
+          res.end("Replica forwarding failed: " + err.message);
+        });
+      };
+
       const matchingRule = forwardRules.find((rule) =>
         rule.hosts.includes(host)
       );
-      if (isNullish(matchingRule)) {
-        // default handling
-        return next();
+
+      if (!isNullish(matchingRule)) {
+        const canisterId = readCanisterId({
+          canisterName: matchingRule.canisterName,
+        });
+        return forwardToReplica({ canisterId });
       }
 
-      console.log(
-        `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${matchingRule.canisterId}`
-      );
-      req.headers["host"] = `${matchingRule.canisterId}.localhost`;
-      proxy.web(req, res, {
-        target: `http://${replicaOrigin}`,
-      });
+      // split the subdomain & domain by splitting on the first dot
+      const [subdomain, ...domain_] = host.split(".");
+      const domain = domain_.join(".");
 
-      proxy.on("error", (err: Error) => {
-        res.statusCode = 500;
-        res.end("Replica forwarding failed: " + err.message);
-      });
+      if (
+        !isNullish(forwardDomains) &&
+        forwardDomains.includes(domain) &&
+        /([a-z0-9])+(-[a-z0-9]+)+/.test(
+          subdomain
+        ) /* fast check for principal-ish */
+      ) {
+        // Assume the principal-ish thing is a canister ID
+        return forwardToReplica({ canisterId: subdomain });
+      }
+
+      return next();
     });
   },
 });
