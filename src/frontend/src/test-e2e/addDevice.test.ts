@@ -18,11 +18,7 @@ import {
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
-import { readFileSync } from "fs";
 import { DEVICE_NAME1, II_URL } from "./constants";
-export const test_app_canister_ids = JSON.parse(
-  readFileSync(".dfx/local/canister_ids.json", "utf-8")
-);
 
 test("Add device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

@@ -1,15 +1,12 @@
-// Read canister ids from the corresponding dfx files.
-// This assumes that they have been successfully dfx-deployed
-import { readFileSync } from "fs";
-export const test_app_canister_ids = JSON.parse(
-  readFileSync(".dfx/local/canister_ids.json", "utf-8")
-);
+import { readCanisterId } from "../../../../utils";
 
-const TEST_APP_CANISTER_ID = test_app_canister_ids.test_app.local;
+// XXX: this is not exactly a constant (since it might change on every node eval) but in
+// practice is very stable, and is much easier to use as "constants" then as a lookup function.
+const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 
-export const TEST_APP_CANONICAL_URL = `https://${TEST_APP_CANISTER_ID}.icp0.io`;
-export const TEST_APP_CANONICAL_URL_RAW = `https://${TEST_APP_CANISTER_ID}.raw.icp0.io`;
-export const TEST_APP_CANONICAL_URL_LEGACY = `https://${TEST_APP_CANISTER_ID}.ic0.app`;
+export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
+export const TEST_APP_CANONICAL_URL_RAW = `https://${testAppCanisterId}.raw.icp0.io`;
+export const TEST_APP_CANONICAL_URL_LEGACY = `https://${testAppCanisterId}.ic0.app`;
 export const TEST_APP_NICE_URL = "https://nice-name.com";
 export const II_URL =
   process.env.II_URL ?? "https://identity.internetcomputer.org";

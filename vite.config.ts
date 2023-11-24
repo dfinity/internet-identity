@@ -1,13 +1,10 @@
-import { nonNullish } from "@dfinity/utils";
 import basicSsl from "@vitejs/plugin-basic-ssl";
-import { existsSync } from "fs";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
 import {
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
-  readCanisterId,
   replicaForwardPlugin,
 } from "./vite.plugins";
 
@@ -29,13 +26,6 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
-
-  const testAppCanisterId = existsSync(".dfx/local/canister_ids.json")
-    ? readCanisterId({
-        canisterName: "test_app",
-        canisterIdsJsonFile: ".dfx/local/canister_ids.json",
-      })
-    : undefined;
 
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
@@ -74,27 +64,17 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       replicaForwardPlugin({
         replicaOrigin: "127.0.0.1:4943",
+        forwardDomains: ["icp0.io", "ic0.app"],
         forwardRules: [
-          ...(nonNullish(testAppCanisterId)
-            ? [
-                {
-                  hosts: [
-                    "nice-name.com",
-                    `${testAppCanisterId}.ic0.app`,
-                    `${testAppCanisterId}.icp0.io`,
-                  ],
-                  canisterId: testAppCanisterId,
-                },
-              ]
-            : []),
+          {
+            hosts: ["nice-name.com"],
+            canisterName: "test_app",
+          },
           ...(process.env.NO_HOT_RELOAD === "1"
             ? [
                 {
                   hosts: ["identity.ic0.app", "identity.internetcomputer.org"],
-                  canisterId: readCanisterId({
-                    canisterName: "internet_identity",
-                    canisterIdsJsonFile: ".dfx/local/canister_ids.json",
-                  }),
+                  canisterName: "internet_identity",
                 },
               ]
             : []),
