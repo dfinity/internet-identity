@@ -194,9 +194,7 @@ fn should_return_vc_consent_message() {
 
         match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
         assert_eq!(info.language, actual_language);
-        assert!(info
-            .consent_message
-            .starts_with(consent_message_snippet));
+        assert!(info.consent_message.starts_with(consent_message_snippet));
     }
 }
 
@@ -244,7 +242,10 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
             .expect("API call failed")
             .expect("Got 'None' from vc_consent_message");
-    assert_matches!(response,Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_)));
+    assert_matches!(
+        response,
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
+    );
 }
 
 #[test]
@@ -269,7 +270,10 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
             .expect("API call failed")
             .expect("Got 'None' from vc_consent_message");
-    assert_matches!(response,Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_)));
+    assert_matches!(
+        response,
+        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
+    );
 }
 
 fn employee_credential_spec() -> CredentialSpec {
