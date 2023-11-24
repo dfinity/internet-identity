@@ -333,7 +333,9 @@ fn should_fail_prepare_credential_for_wrong_sender() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 6epth-hmqup-wz4mv-svl2m-mhcbb-24skq-tbdhq-2txct-2qugv-xuzva-eqe does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(response,
+        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+    );
 }
 
 #[test]
