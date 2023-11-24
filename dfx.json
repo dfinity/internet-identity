@@ -17,7 +17,9 @@
       "type": "custom",
       "candid": "demos/vc_issuer/vc_issuer.did",
       "wasm": "demos/vc_issuer/vc_issuer.wasm.gz",
-      "build": "demos/vc_issuer/build.sh"
+      "build": "demos/vc_issuer/build.sh",
+      "post_install": "demos/vc_issuer/provision",
+      "dependencies": [ "internet_identity" ]
     }
   },
   "defaults": {
