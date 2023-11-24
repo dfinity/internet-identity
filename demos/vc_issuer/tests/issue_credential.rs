@@ -191,13 +191,12 @@ fn should_return_vc_consent_message() {
             api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
                 .expect("API call failed")
                 .expect("Got 'None' from vc_consent_message");
-        assert_matches!(response, Icrc21ConsentMessageResponse::Ok(_));
-        if let Icrc21ConsentMessageResponse::Ok(info) = response {
-            assert_eq!(info.language, actual_language);
-            assert!(info
-                .consent_message
-                .starts_with(consent_message_snippet));
-        }
+
+        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
+        assert_eq!(info.language, actual_language);
+        assert!(info
+            .consent_message
+            .starts_with(consent_message_snippet));
     }
 }
 
