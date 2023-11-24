@@ -44,6 +44,9 @@ rest="${BASH_REMATCH[2]}"
 # trim to size (double the size because each byte is written as two chars)
 rootkey_hex="${rest:0:$((2*size))}"
 
+# NOTE: while theoretically candid supports `hex` blobs, `dfx` fails to parse them
+# so we have to convert this into a byte array.
+
 # new regex for matching pairs of chars (i.e. bytes)
 regex="([0-9a-z][0-9a-z])"
 arr="" # where we'll hold the resulting candid array
