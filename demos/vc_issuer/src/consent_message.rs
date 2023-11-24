@@ -11,20 +11,20 @@ use SupportedLanguage::{English, German};
 const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# DFINITY Foundation Employment Credential
 
 Credential that states that the holder is employed by the DFINITY Foundation at the time of issuance."###;
-const DEGREE_VC_DESCRIPTION_EN: &str = r###"# Bachelor of Engineering, DFINITY College of Engineering
-
-Credential that states that the holder has a degree in engineering from the DFINITY College of Engineering."###;
-const VALIDITY_INFO_EN: &str = "The credential is valid for 15 minutes.";
-const ANONYMITY_DISCLAIMER_EN: &str = "This credential does **not** contain any additional personal information. It is issued to an ephemeral identity that is created for the sole purpose of issuing this credential.";
-
 const EMPLOYMENT_VC_DESCRIPTION_DE: &str = r###"# Beschäftigungsausweis DFINITY Stiftung
 
 Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin zum Zeitpunkt der Austellung bei der DFINITY Stiftung beschäftigt ist."###;
+const DEGREE_VC_DESCRIPTION_EN: &str = r###"# Bachelor of Engineering, DFINITY College of Engineering
+
+Credential that states that the holder has a degree in engineering from the DFINITY College of Engineering."###;
 const DEGREE_VC_DESCRIPTION_DE: &str = r###"# Bachelor of Engineering, DFINITY Hochschule für Ingenieurwissenschaften
 
 Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabschluss in einer Ingenieurwissenschaft der DFINITY Hochschule für Ingenieurwissenschaften besitzt."###;
 
+const VALIDITY_INFO_EN: &str = "The credential is valid for 15 minutes.";
 const VALIDITY_INFO_DE: &str = "Dieser Ausweis ist gültig für 15 Minuten.";
+
+const ANONYMITY_DISCLAIMER_EN: &str = "This credential does **not** contain any additional personal information. It is issued to an ephemeral identity that is created for the sole purpose of issuing this credential.";
 const ANONYMITY_DISCLAIMER_DE: &str =
     "Dieser Ausweis enthält **keine** zusätzlichen persönlichen Daten. Er wird auf eine kurzlebige Identität lautend ausgestellt, die für den alleinigen Verwendungszweck der Austellung dieses Ausweises erzeugt wird.";
 
