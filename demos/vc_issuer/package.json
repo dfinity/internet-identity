@@ -5,14 +5,21 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "vite": "^4.2.1"
   },
-  "devDependencies": {},
   "scripts": {
     "dev": "vite --config ./vite.config.ts",
     "build": "vite --config ./vite.config.ts build",
     "vite": "vite",
-    "pwd": "pwd"
+    "generate": "npm run generate:types && npm run generate:js",
+    "generate:types": "didc bind ./vc_issuer.did -t ts > generated/vc_issuer_types.d.ts",
+    "generate:js": "didc bind ./vc_issuer.did -t js > ./generated/vc_issuer_idl.js"
   },
-  "author": ""
+  "devDependencies": {
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.0"
+  }
 }

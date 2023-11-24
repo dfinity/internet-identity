@@ -18,3 +18,15 @@ export const readCanisterId = ({
     throw Error(`Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`);
   }
 };
+
+export const getReplicaHost = (): string => {
+  const command = `dfx info webserver-port`;
+  try {
+    const stdout = execSync(command);
+    const port = stdout.toString().trim();
+    return `http://127.0.0.1:${port}`;
+  } catch (e) {
+    throw Error(`Could not get replica port '${command}', is the replica running? ${e}`);
+  }
+
+}

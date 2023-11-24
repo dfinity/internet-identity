@@ -59,7 +59,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     plugins: [
-      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
+      [
+        ...(mode === "development"
+          ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]
+          : []),
+      ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       replicaForwardPlugin({

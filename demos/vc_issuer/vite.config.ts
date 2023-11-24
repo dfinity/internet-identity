@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
-import {} from "../../vite.plugins";
+import { getReplicaHost } from "../../utils";
+import { injectCanisterIdPlugin } from "../../vite.plugins";
 
 export default defineConfig({
   root: ".",
@@ -8,6 +9,7 @@ export default defineConfig({
       input: ["index.html"],
     },
   },
+  plugins: [injectCanisterIdPlugin({ canisterName: "issuer" })],
   optimizeDeps: {
     esbuildOptions: {
       define: {
@@ -17,5 +19,8 @@ export default defineConfig({
   },
   server: {
     port: 5175,
+    proxy: {
+      "/api": getReplicaHost(),
+    },
   },
 });
