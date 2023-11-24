@@ -365,7 +365,9 @@ fn should_fail_get_credential_for_wrong_sender() {
         },
     )
     .expect("API call failed");
-    assert_matches!(get_credential_response, GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller sl5og-mycaa-aaaaa-aaaap-4 does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(get_credential_response,
+        GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
+    );
 }
 
 #[test]
@@ -382,7 +384,9 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("Caller 2vxsx-fae does not match id alias dapp principal nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe."));
+    assert_matches!(response,
+        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+    );
 }
 
 #[test]
