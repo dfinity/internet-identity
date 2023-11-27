@@ -239,6 +239,8 @@ jobs:
             demos/vc_issuer/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-dfx
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
         run: ./build.sh
