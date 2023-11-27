@@ -242,7 +242,8 @@ fn update_root_hash() {
                 }
                 let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
 
-                let prefixed_root_hash = fork_hash(sigs_root_hash, assets_root_hash);
+                // TODO: note about fork lexicographically
+                let prefixed_root_hash = fork_hash(assets_root_hash, sigs_root_hash);
 
                 set_certified_data(&prefixed_root_hash[..]);
             })
