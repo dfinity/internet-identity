@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde_bytes = "0.11"
-candid = "0.9"
-serde = "1"
-ic-cdk = "0.10"
+serde_bytes.workspace = true
+candid.workspace = true
+serde.workspace = true
+ic-cdk.workspace = true
