@@ -18,25 +18,17 @@ pub struct PrepareCredentialRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum PrepareCredentialResponse {
-    #[serde(rename = "ok")]
     Ok(PreparedCredentialData),
-    #[serde(rename = "err")]
     Err(IssueCredentialError),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IssueCredentialError {
-    #[serde(rename = "unknown_subject")]
     UnknownSubject(String),
-    #[serde(rename = "unauthorized_subject")]
     UnauthorizedSubject(String),
-    #[serde(rename = "invalid_id_alias")]
     InvalidIdAlias(String),
-    #[serde(rename = "signature_not_found")]
     SignatureNotFound(String),
-    #[serde(rename = "internal")]
     Internal(String),
-    #[serde(rename = "unsupported_credential_spec")]
     UnsupportedCredentialSpec(String),
 }
 
@@ -49,9 +41,7 @@ pub struct GetCredentialRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetCredentialResponse {
-    #[serde(rename = "ok")]
     Ok(IssuedCredentialData),
-    #[serde(rename = "err")]
     Err(IssueCredentialError),
 }
 
@@ -67,9 +57,7 @@ pub struct IssuedCredentialData {
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum ArgumentValue {
-    #[serde(rename = "string")]
     String(String),
-    #[serde(rename = "int")]
     Int(i32),
 }
 
@@ -84,7 +72,7 @@ impl Display for ArgumentValue {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct CredentialSpec {
-    pub credential_name: String,
+    pub credential_type: String,
     pub arguments: Option<HashMap<String, ArgumentValue>>,
 }
 
@@ -93,9 +81,7 @@ pub struct ManifestRequest {}
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum ManifestResponse {
-    #[serde(rename = "ok")]
     Ok(ManifestData),
-    #[serde(rename = "err")]
     Err(String),
 }
 
@@ -121,11 +107,8 @@ pub struct Icrc21ErrorInfo {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum Icrc21Error {
-    #[serde(rename = "unsupported_canister_call")]
     UnsupportedCanisterCall(Icrc21ErrorInfo),
-    #[serde(rename = "consent_message_unavailable")]
     ConsentMessageUnavailable(Icrc21ErrorInfo),
-    #[serde(rename = "generic_error")]
     GenericError(Icrc21ErrorInfo),
 }
 
@@ -137,9 +120,7 @@ pub struct Icrc21ConsentInfo {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum Icrc21ConsentMessageResponse {
-    #[serde(rename = "ok")]
     Ok(Icrc21ConsentInfo),
-    #[serde(rename = "err")]
     Err(Icrc21Error),
 }
 
