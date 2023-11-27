@@ -30,6 +30,15 @@ use vc_util::{
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedEmployee};
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
+use ic_cdk::api;
+use ic_cdk_macros::{post_upgrade};
+use ic_certified_map::{AsHashTree, RbTree};
+use lazy_static::lazy_static;
+use serde_bytes::{Bytes};
+use std::collections::HashMap;
+
 mod consent_message;
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
@@ -57,6 +66,10 @@ thread_local! {
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
     static GRADUATES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
+
+    // Assets for the management app
+    static ASSETS: RefCell<HashMap<&'static str, (Vec<(String, String)>, Vec<u8>)>> = RefCell::new(HashMap::default());
+    static ASSET_HASHES: RefCell<RbTree<&'static str, [u8; 32]>> = RefCell::new(RbTree::default());
 }
 
 /// Reserve the first stable memory page for the configuration stable cell.
@@ -114,13 +127,14 @@ struct IssuerInit {
 }
 
 #[init]
+#[post_upgrade]
 #[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
-    let Some(init) = init_arg else {
-        // nothing to do
-        return;
+    if let Some(init) = init_arg {
+        apply_config(init);
     };
-    apply_config(init);
+
+    init_assets();
 }
 
 #[update]
@@ -208,11 +222,35 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
 }
 
 fn update_root_hash() {
-    use ic_certification::labeled_hash;
+    use ic_certification::{labeled_hash, fork_hash};
     SIGNATURES.with(|sigs| {
-        let sigs = sigs.borrow();
-        let prefixed_root_hash = &labeled_hash(LABEL_SIG, &sigs.root_hash());
-        set_certified_data(&prefixed_root_hash[..]);
+        ASSETS.with(|a| {
+            ASSET_HASHES.with(|ah| {
+                let sigs = sigs.borrow();
+                let sigs_root_hash = &labeled_hash(LABEL_SIG, &sigs.root_hash());
+
+                let mut assets = a.borrow_mut();
+                let mut asset_hashes = ah.borrow_mut();
+                for (path, content, content_type) in get_assets() {
+                    asset_hashes.insert(path, sha2::Sha256::digest(content).into());
+                    let mut headers = vec![];
+                    headers.push((
+                        "Content-Type".to_string(),
+                        content_type.to_mime_type_string(),
+                    ));
+                    assets.insert(path, (headers, content.to_vec()));
+                }
+                let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
+
+                let prefixed_root_hash = fork_hash(
+                    &sigs_root_hash,
+                    &assets_root_hash,
+                    );
+
+                set_certified_data(&prefixed_root_hash[..]);
+            })
+        }
+        )
     })
 }
 
@@ -352,6 +390,39 @@ fn add_employee(employee_id: Principal) -> String {
 fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
     format!("Added graduate {}", graduate_id)
+}
+
+
+#[query]
+pub fn http_request(req: HttpRequest) -> HttpResponse {
+    let parts: Vec<&str> = req.url.split('?').collect();
+    let path = parts[0];
+    let mut headers = vec![];
+    headers.push(("Access-Control-Allow-Origin".to_string(), "*".to_string()));
+    let certificate_header =
+        ASSET_HASHES.with(|a| make_asset_certificate_header(&a.borrow(), path));
+
+    match path {
+        _ => {
+            headers.push(certificate_header);
+            ASSETS.with(|a| match a.borrow().get(path) {
+                Some((asset_headers, value)) => {
+                    headers.append(&mut asset_headers.clone());
+
+                    HttpResponse {
+                        status_code: 200,
+                        headers,
+                        body: Cow::Owned(ByteBuf::from(value.clone())),
+                    }
+                }
+                None => HttpResponse {
+                    status_code: 404,
+                    headers,
+                    body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
+                },
+            })
+        }
+    }
 }
 
 fn main() {}
@@ -537,4 +608,118 @@ mod test {
             )
         });
     }
+}
+
+
+// Assets
+
+pub fn init_assets() {
+    ASSETS.with(|a| {
+        ASSET_HASHES.with(|ah| {
+            let mut assets = a.borrow_mut();
+            let mut asset_hashes = ah.borrow_mut();
+            for (path, content, content_type) in get_assets() {
+                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
+                let mut headers = vec![];
+                headers.push((
+                    "Content-Type".to_string(),
+                    content_type.to_mime_type_string(),
+                ));
+                assets.insert(path, (headers, content.to_vec()));
+            }
+        });
+    });
+
+    update_root_hash()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ContentType {
+    HTML,
+    JS,
+    JSON,
+}
+
+impl ContentType {
+    pub fn to_mime_type_string(&self) -> String {
+        match self {
+            ContentType::HTML => "text/html".to_string(),
+            ContentType::JS => "text/javascript".to_string(),
+            ContentType::JSON => "application/json".to_string(),
+        }
+    }
+}
+
+pub type HeaderField = (String, String);
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct HttpRequest {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct HttpResponse {
+    pub status_code: u16,
+    pub headers: Vec<HeaderField>,
+    pub body: Cow<'static, Bytes>,
+}
+
+//
+lazy_static! {
+    // The full content of the index.html, after the canister ID (and script tag) have been
+    // injected
+    static ref INDEX_HTML_STR: String = {
+        let canister_id = api::id();
+        let index_html = include_str!("../dist/index.html");
+
+        // the string we are replacing here is inserted by vite during the front-end build
+        let index_html = index_html.replace(
+            r#"<script type="module" crossorigin src="/index.js"></script>"#,
+            &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string()
+        );
+        index_html
+    };
+}
+
+// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
+// prepared only once (like injecting the canister ID).
+fn get_assets() -> [(&'static str, &'static [u8], ContentType); 3] {
+    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
+    [
+        ("/", index_html, ContentType::HTML),
+        ("/index.html", index_html, ContentType::HTML),
+        (
+            "/index.js",
+            include_bytes!("../dist/index.js"),
+            ContentType::JS,
+        ),
+    ]
+}
+
+
+
+fn make_asset_certificate_header(
+    asset_hashes: &RbTree<&'static str, Hash>,
+    asset_name: &str,
+) -> (String, String) {
+    let certificate = api::data_certificate().unwrap_or_else(|| {
+        api::trap("data certificate is only available in query calls");
+    });
+    let witness = asset_hashes.witness(asset_name.as_bytes());
+    let tree = ic_certified_map::labeled(b"http_assets", witness);
+    let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
+    serializer.self_describe().unwrap();
+    tree.serialize(&mut serializer)
+        .unwrap_or_else(|e| api::trap(&format!("failed to serialize a hash tree: {}", e)));
+    (
+        "IC-Certificate".to_string(),
+        format!(
+            "certificate=:{}:, tree=:{}:",
+            BASE64.encode(&certificate),
+            BASE64.encode(&serializer.into_inner())
+        ),
+    )
 }

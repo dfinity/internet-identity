@@ -7,6 +7,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: ["index.html"],
+      /* The issuer canister needs stable names */
+      output: {
+        entryFileNames: `[name].js`,
+        chunkFileNames: `[name].js`,
+        assetFileNames: `[name].[ext]`,
+      },
     },
   },
   plugins: [injectCanisterIdPlugin({ canisterName: "issuer" })],
