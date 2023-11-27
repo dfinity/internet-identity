@@ -184,7 +184,7 @@ After receiving the notification that II is ready, the relying party can request
     * `canisterId`: (optional) The canister id of the issuer, if applicable/known. If specified and not the same
        as the one reported by a boundary node for `origin`, this is an error.
   * `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
-    * `credentialName`: The name of the requested credential.
+    * `credentialType`: The type of the requested credential.
     * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
 
@@ -201,7 +201,7 @@ After receiving the notification that II is ready, the relying party can request
         "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
     },
     "credentialSpec": {
-        "credentialName": "VerifiedEmployee",
+        "credentialType": "VerifiedEmployee",
         "arguments": {
           "employerName": "XYZ Ltd."
         }
@@ -222,7 +222,7 @@ After receiving the notification that II is ready, the relying party can request
         "canisterId": "rdmx6-jaaaa-aaaaa-aaadq-cai"
     },
     "credentialSpec": {
-        "credentialName": "VerifiedAdult",
+        "credentialType": "VerifiedAdult",
         "arguments": {
             "minAge": 21
         }
@@ -242,7 +242,7 @@ After receiving the notification that II is ready, the relying party can request
         "origin": "https://kyc-resident-info.org"
     },
     "credentialSpec": {
-        "credentialName": "VerifiedResident",
+        "credentialType": "VerifiedResident",
         "arguments": {
             "countryName": "Panama",
             "countryAlpha2": "PA"
