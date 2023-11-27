@@ -397,23 +397,23 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     let certificate_header =
         ASSET_HASHES.with(|a| make_asset_certificate_header(&a.borrow(), path));
 
-            headers.push(certificate_header);
-            ASSETS.with(|a| match a.borrow().get(path) {
-                Some((asset_headers, value)) => {
-                    headers.append(&mut asset_headers.clone());
+    headers.push(certificate_header);
+    ASSETS.with(|a| match a.borrow().get(path) {
+        Some((asset_headers, value)) => {
+            headers.append(&mut asset_headers.clone());
 
-                    HttpResponse {
-                        status_code: 200,
-                        headers,
-                        body: Cow::Owned(ByteBuf::from(value.clone())),
-                    }
-                }
-                None => HttpResponse {
-                    status_code: 404,
-                    headers,
-                    body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
-                },
-            })
+            HttpResponse {
+                status_code: 200,
+                headers,
+                body: Cow::Owned(ByteBuf::from(value.clone())),
+            }
+        }
+        None => HttpResponse {
+            status_code: 404,
+            headers,
+            body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
+        },
+    })
 }
 
 fn main() {}
@@ -613,8 +613,7 @@ pub fn init_assets() {
                 let headers = vec![(
                     "Content-Type".to_string(),
                     content_type.to_mime_type_string(),
-                )
-                ];
+                )];
                 assets.insert(path, (headers, content.to_vec()));
             }
         });
