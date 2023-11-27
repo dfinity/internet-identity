@@ -179,7 +179,7 @@ fn should_return_vc_consent_message() {
         );
         let consent_message_request = Icrc21VcConsentMessageRequest {
             credential_spec: CredentialSpec {
-                credential_name: "VerifiedEmployee".to_string(),
+                credential_type: "VerifiedEmployee".to_string(),
                 arguments: Some(args),
             },
             preferences: Icrc21ConsentPreferences {
@@ -205,7 +205,7 @@ fn should_fail_vc_consent_message_if_not_supported() {
 
     let consent_message_request = Icrc21VcConsentMessageRequest {
         credential_spec: CredentialSpec {
-            credential_name: "VerifiedAdult".to_string(),
+            credential_type: "VerifiedAdult".to_string(),
             arguments: None,
         },
         preferences: Icrc21ConsentPreferences {
@@ -230,7 +230,7 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
 
     let consent_message_request = Icrc21VcConsentMessageRequest {
         credential_spec: CredentialSpec {
-            credential_name: "VerifiedEmployee".to_string(),
+            credential_type: "VerifiedEmployee".to_string(),
             arguments: None,
         },
         preferences: Icrc21ConsentPreferences {
@@ -258,7 +258,7 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
 
     let consent_message_request = Icrc21VcConsentMessageRequest {
         credential_spec: CredentialSpec {
-            credential_name: "VerifiedEmployee".to_string(),
+            credential_type: "VerifiedEmployee".to_string(),
             arguments: None,
         },
         preferences: Icrc21ConsentPreferences {
@@ -283,7 +283,7 @@ fn employee_credential_spec() -> CredentialSpec {
         ArgumentValue::String("DFINITY Foundation".to_string()),
     );
     CredentialSpec {
-        credential_name: "VerifiedEmployee".to_string(),
+        credential_type: "VerifiedEmployee".to_string(),
         arguments: Some(args),
     }
 }
@@ -295,7 +295,7 @@ fn degree_credential_spec() -> CredentialSpec {
         ArgumentValue::String("DFINITY College of Engineering".to_string()),
     );
     CredentialSpec {
-        credential_name: "UniversityDegreeCredential".to_string(),
+        credential_type: "UniversityDegreeCredential".to_string(),
         arguments: Some(args),
     }
 }
@@ -629,7 +629,7 @@ fn validate_vc_claims(
         vc.get("type"),
         Some(Value::Array(vec![
             Value::String("VerifiableCredential".to_string()),
-            Value::String(credential_spec.credential_name.clone())
+            Value::String(credential_spec.credential_type.clone())
         ]))
         .as_ref()
     );
