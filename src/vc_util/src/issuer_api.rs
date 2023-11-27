@@ -72,7 +72,7 @@ impl Display for ArgumentValue {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct CredentialSpec {
-    pub credential_name: String,
+    pub credential_type: String,
     pub arguments: Option<HashMap<String, ArgumentValue>>,
 }
 

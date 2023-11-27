@@ -5,7 +5,7 @@
 
 /// Specification of a requested credential.
 type CredentialSpec = record {
-    credential_name : text;
+    credential_type : text;
     /// arguments are optional, and specific to the credential_name
     arguments : opt vec record { text; ArgumentValue };
 };

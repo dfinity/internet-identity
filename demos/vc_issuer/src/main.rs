@@ -275,7 +275,7 @@ async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21Consent
 }
 
 fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
-    match spec.credential_name.as_str() {
+    match spec.credential_type.as_str() {
         "VerifiedEmployee" => {
             verify_single_argument(
                 spec,
@@ -309,7 +309,7 @@ fn verify_single_argument(
     ) -> Result<(), String> {
         Err(format!(
             "Missing argument '{}' for credential {}",
-            expected_argument, spec.credential_name
+            expected_argument, spec.credential_type
         ))
     }
 
@@ -334,7 +334,7 @@ fn verify_single_argument(
     if !unexpected_arguments.is_empty() {
         return Err(format!(
             "Unexpected arguments for credential {}: {:?}",
-            spec.credential_name, unexpected_arguments
+            spec.credential_type, unexpected_arguments
         ));
     }
     Ok(())
