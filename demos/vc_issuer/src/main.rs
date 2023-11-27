@@ -5,7 +5,7 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_R
 use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
 use ic_cdk::trap;
 use ic_cdk_macros::{init, query, update};
-use ic_certification::{Hash, HashTree};
+use ic_certification::{AsHashTree, fork, fork_hash, Hash, HashTree, labeled, labeled_hash, pruned, RbTree};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::{Timestamp, Url};
@@ -34,7 +34,6 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
 use ic_cdk_macros::post_upgrade;
-use ic_certified_map::{AsHashTree, RbTree};
 use lazy_static::lazy_static;
 use serde_bytes::Bytes;
 use std::collections::HashMap;
@@ -223,7 +222,6 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
 }
 
 fn update_root_hash() {
-    use ic_certification::{fork_hash, labeled_hash};
     SIGNATURES.with(|sigs| {
         ASSET_HASHES.with(|ah| {
             let prefixed_root_hash = fork_hash(
@@ -413,6 +411,7 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
     let certificate = data_certificate().unwrap_or_else(|| {
         trap("data certificate is only available in query calls");
     });
+    let asset_root_hash = ASSET_HASHES.with_borrow(|asset_hashes| asset_hashes.root_hash());
     let witness = sigs.witness(hash_bytes(seed), msg_hash)?;
 
     let witness_hash = witness.digest();
@@ -424,7 +423,7 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
             hex::encode(root_hash)
         ));
     }
-    let tree = ic_certification::labeled(LABEL_SIG, witness);
+    let tree =  fork(pruned(labeled_hash(b"http_assets", &asset_root_hash)), labeled(LABEL_SIG, witness));
     #[derive(Serialize)]
     struct Sig {
         certificate: ByteBuf,
@@ -657,7 +656,9 @@ fn make_asset_certificate_header(
         api::trap("data certificate is only available in query calls");
     });
     let witness = asset_hashes.witness(asset_name.as_bytes());
-    let tree = ic_certified_map::labeled(b"http_assets", witness);
+    let sigs_root_hash = SIGNATURES.with_borrow(|signatures| signatures.root_hash());
+    let tree = fork(labeled(b"http_assets", witness), pruned(labeled_hash(LABEL_SIG, &sigs_root_hash)));
+
     let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
     serializer.self_describe().unwrap();
     tree.serialize(&mut serializer)
