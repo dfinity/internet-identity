@@ -33,10 +33,10 @@ use SupportedCredentialType::{UniversityDegree, VerifiedEmployee};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
-use ic_cdk_macros::{post_upgrade};
+use ic_cdk_macros::post_upgrade;
 use ic_certified_map::{AsHashTree, RbTree};
 use lazy_static::lazy_static;
-use serde_bytes::{Bytes};
+use serde_bytes::Bytes;
 use std::collections::HashMap;
 
 mod consent_message;
@@ -222,7 +222,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
 }
 
 fn update_root_hash() {
-    use ic_certification::{labeled_hash, fork_hash};
+    use ic_certification::{fork_hash, labeled_hash};
     SIGNATURES.with(|sigs| {
         ASSETS.with(|a| {
             ASSET_HASHES.with(|ah| {
@@ -242,15 +242,11 @@ fn update_root_hash() {
                 }
                 let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
 
-                let prefixed_root_hash = fork_hash(
-                    &sigs_root_hash,
-                    &assets_root_hash,
-                    );
+                let prefixed_root_hash = fork_hash(&sigs_root_hash, &assets_root_hash);
 
                 set_certified_data(&prefixed_root_hash[..]);
             })
-        }
-        )
+        })
     })
 }
 
@@ -391,7 +387,6 @@ fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
     format!("Added graduate {}", graduate_id)
 }
-
 
 #[query]
 pub fn http_request(req: HttpRequest) -> HttpResponse {
@@ -610,7 +605,6 @@ mod test {
     }
 }
 
-
 // Assets
 
 pub fn init_assets() {
@@ -698,8 +692,6 @@ fn get_assets() -> [(&'static str, &'static [u8], ContentType); 3] {
         ),
     ]
 }
-
-
 
 fn make_asset_certificate_header(
     asset_hashes: &RbTree<&'static str, Hash>,
