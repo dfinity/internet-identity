@@ -225,29 +225,15 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
 fn update_root_hash() {
     use ic_certification::{fork_hash, labeled_hash};
     SIGNATURES.with(|sigs| {
-        ASSETS.with(|a| {
             ASSET_HASHES.with(|ah| {
-                let sigs = sigs.borrow();
-                let sigs_root_hash = &labeled_hash(LABEL_SIG, &sigs.root_hash());
-
-                let mut assets = a.borrow_mut();
-                let mut asset_hashes = ah.borrow_mut();
-                for (path, content, content_type) in get_assets() {
-                    asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                    let headers = vec![(
-                        "Content-Type".to_string(),
-                        content_type.to_mime_type_string(),
-                    )];
-                    assets.insert(path, (headers, content.to_vec()));
-                }
-                let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
-
-                // TODO: note about fork lexicographically
-                let prefixed_root_hash = fork_hash(assets_root_hash, sigs_root_hash);
+                let prefixed_root_hash = fork_hash(
+                        // NB: Labels added in lexicographic order.
+                        &labeled_hash(b"http_assets", &ah.borrow().root_hash()),
+                        &labeled_hash(LABEL_SIG, &sigs.borrow().root_hash())
+                    );
 
                 set_certified_data(&prefixed_root_hash[..]);
             })
-        })
     })
 }
 
