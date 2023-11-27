@@ -5,7 +5,9 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_R
 use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
 use ic_cdk::trap;
 use ic_cdk_macros::{init, query, update};
-use ic_certification::{AsHashTree, fork, fork_hash, Hash, HashTree, labeled, labeled_hash, pruned, RbTree};
+use ic_certification::{
+    fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, RbTree,
+};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::{Timestamp, Url};
@@ -423,7 +425,10 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
             hex::encode(root_hash)
         ));
     }
-    let tree =  fork(pruned(labeled_hash(b"http_assets", &asset_root_hash)), labeled(LABEL_SIG, witness));
+    let tree = fork(
+        pruned(labeled_hash(b"http_assets", &asset_root_hash)),
+        labeled(LABEL_SIG, witness),
+    );
     #[derive(Serialize)]
     struct Sig {
         certificate: ByteBuf,
@@ -657,7 +662,10 @@ fn make_asset_certificate_header(
     });
     let witness = asset_hashes.witness(asset_name.as_bytes());
     let sigs_root_hash = SIGNATURES.with_borrow(|signatures| signatures.root_hash());
-    let tree = fork(labeled(b"http_assets", witness), pruned(labeled_hash(LABEL_SIG, &sigs_root_hash)));
+    let tree = fork(
+        labeled(b"http_assets", witness),
+        pruned(labeled_hash(LABEL_SIG, &sigs_root_hash)),
+    );
 
     let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
     serializer.self_describe().unwrap();
