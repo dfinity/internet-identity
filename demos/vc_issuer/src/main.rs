@@ -234,11 +234,13 @@ fn update_root_hash() {
                 let mut asset_hashes = ah.borrow_mut();
                 for (path, content, content_type) in get_assets() {
                     asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                    let mut headers = vec![];
-                    headers.push((
+                    let headers = vec![
+(
                         "Content-Type".to_string(),
                         content_type.to_mime_type_string(),
-                    ));
+                    )
+
+                    ];
                     assets.insert(path, (headers, content.to_vec()));
                 }
                 let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
