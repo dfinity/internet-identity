@@ -37,7 +37,9 @@ jobs:
         # We don't want to commit automatic changes to main
         if: ${{ github.ref != 'refs/heads/main' }}
         with:
-          add: src/frontend/generated
+          add: |
+            src/frontend/generated
+            demos/vc_issuer/generated
           default_author: github_actions
           message: "🤖 npm run generate auto-update"
 
