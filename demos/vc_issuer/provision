@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Provision the issuer canister
+# The issuer canister needs some info to operate correctly. This
+# reads data from the local replica & canisters to ensure the issuer
+# is provisioned correctly.
+
+echo "Provisioning issuer canister" >&2
+
+# At the time of writing dfx outputs incorrect JSON with dfx ping (commas between object 
+# entries are missing).
+# In order to read the root key we grab the array from the '"root_key": [...]' bit, the brackets
+# to match what candid expects ({}) and replace the commas between array entries to match
+# what candid expects (semicolon).
+rootkey_did=$(dfx ping  | sed -n 's/.*"root_key": \[\(.*\)\].*/{\1}/p' | sed 's/,/;/g')
+
+echo "Parsed rootkey: ${rootkey_did:0:20}..." >&2
+
+ii_canister_id="$(dfx canister id internet_identity)"
+
+dfx canister call issuer configure '(record { idp_canister_ids = vec{ principal "'"$ii_canister_id"'" }; ic_root_key_der = vec '"$rootkey_did"' })'
