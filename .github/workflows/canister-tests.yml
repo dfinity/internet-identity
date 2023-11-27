@@ -322,7 +322,11 @@ jobs:
           ./ic-test-state-machine --version
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
-        run: cargo test
+        run:
+          mkdir dist
+          touch dist/index.html
+          touch dist/index.js
+          cargo test
 
   ###########################
   # The Rust canister tests #
