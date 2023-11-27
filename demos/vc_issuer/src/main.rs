@@ -1,3 +1,4 @@
+use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
@@ -16,9 +17,9 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
     Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
     IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
     PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
@@ -27,7 +28,9 @@ use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
     vc_signing_input_hash, AliasTuple,
 };
-use SupportedCredentialType::{UniversityDegreeCredential, VerifiedEmployee};
+use SupportedCredentialType::{UniversityDegree, VerifiedEmployee};
+
+mod consent_message;
 
 /// We use restricted memory in order to ensure the separation between non-managed config memory (first page)
 /// and the managed memory for potential other data of the canister.
@@ -45,7 +48,7 @@ const VC_INSTITUTION_NAME: &str = "DFINITY College of Engineering";
 #[derive(Debug)]
 enum SupportedCredentialType {
     VerifiedEmployee(String),
-    UniversityDegreeCredential(String),
+    UniversityDegree(String),
 }
 
 thread_local! {
@@ -171,11 +174,6 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return PrepareCredentialResponse::Err(err),
     };
-    if let Err(err) = verify_credential_spec(&req.credential_spec) {
-        return PrepareCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(
-            err,
-        ));
-    }
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
@@ -262,16 +260,18 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 #[update]
 #[candid_method]
 async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
-    if let Err(err) = verify_credential_spec(&req.credential_spec) {
-        return Icrc21ConsentMessageResponse::Err(Icrc21Error::NotSupported(Icrc21ErrorInfo {
-            description: err,
-            error_code: 0,
-        }));
-    }
-    Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
-        consent_message: get_vc_consent_message(&req),
-        language: "en-US".to_string(),
-    })
+    let credential_type = match verify_credential_spec(&req.credential_spec) {
+        Ok(credential_type) => credential_type,
+        Err(err) => {
+            return Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(
+                Icrc21ErrorInfo {
+                    error_code: 0,
+                    description: err,
+                },
+            ));
+        }
+    };
+    get_vc_consent_message(&credential_type, &SupportedLanguage::from(req.preferences))
 }
 
 fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
@@ -290,7 +290,7 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialTy
                 "institutionName",
                 ArgumentValue::String(VC_INSTITUTION_NAME.to_string()),
             )?;
-            Ok(UniversityDegreeCredential(VC_INSTITUTION_NAME.to_string()))
+            Ok(UniversityDegree(VC_INSTITUTION_NAME.to_string()))
         }
         other => Err(format!("Credential {} is not supported", other)),
     }
@@ -338,23 +338,6 @@ fn verify_single_argument(
         ));
     }
     Ok(())
-}
-
-fn get_vc_consent_message(req: &Icrc21VcConsentMessageRequest) -> String {
-    format!(
-        "Issue credential '{}' with arguments:{}",
-        req.credential_spec.credential_name,
-        arguments_as_string(&req.credential_spec.arguments)
-    )
-}
-fn arguments_as_string(maybe_args: &Option<HashMap<String, ArgumentValue>>) -> String {
-    let mut arg_str = String::new();
-    let empty_args = HashMap::new();
-    let args = maybe_args.as_ref().unwrap_or(&empty_args);
-    for (key, value) in args {
-        arg_str.push_str(&format!("\n\t{}: {}", key, value));
-    }
-    arg_str
 }
 
 #[update]
@@ -487,7 +470,7 @@ fn prepare_credential_payload(
                 employer_name.as_str(),
             ))
         }
-        UniversityDegreeCredential(institution_name) => {
+        UniversityDegree(institution_name) => {
             GRADUATES.with_borrow(|graduates| {
                 verify_authorized_principal(credential_type, alias_tuple, graduates)
             })?;

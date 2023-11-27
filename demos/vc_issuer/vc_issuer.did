@@ -21,9 +21,8 @@ type Icrc21ConsentMessageResponse = variant {
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
     generic_error : Icrc21ErrorInfo;
-    forbidden : Icrc21ErrorInfo;
-    not_supported : Icrc21ErrorInfo;
-    malformed_call : Icrc21ErrorInfo;
+    unsupported_canister_call : Icrc21ErrorInfo;
+    consent_message_unavailable : Icrc21ErrorInfo;
 };
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type Icrc21VcConsentMessageRequest = record {

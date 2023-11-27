@@ -121,12 +121,10 @@ pub struct Icrc21ErrorInfo {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum Icrc21Error {
-    #[serde(rename = "forbidden")]
-    Forbidden(Icrc21ErrorInfo),
-    #[serde(rename = "malformed_call")]
-    MalformedCall(Icrc21ErrorInfo),
-    #[serde(rename = "not_supported")]
-    NotSupported(Icrc21ErrorInfo),
+    #[serde(rename = "unsupported_canister_call")]
+    UnsupportedCanisterCall(Icrc21ErrorInfo),
+    #[serde(rename = "consent_message_unavailable")]
+    ConsentMessageUnavailable(Icrc21ErrorInfo),
     #[serde(rename = "generic_error")]
     GenericError(Icrc21ErrorInfo),
 }
