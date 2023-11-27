@@ -11,7 +11,7 @@ The Candid interface is as follows, and the subsequent sections describe the
 services and the corresponding messages in more detail.
 
 ```candid
-type ArgumentValue = variant { "int" : int32; string : text };
+type ArgumentValue = variant { "Int" : int32; String : text };
 type CredentialSpec = record {
     arguments : opt vec record { text; ArgumentValue };
     credential_name : text;
@@ -22,8 +22,8 @@ type GetCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
-    ok : IssuedCredentialData;
-    err : IssueCredentialError;
+    Ok : IssuedCredentialData;
+    Err : IssueCredentialError;
 };
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21VcConsentMessageRequest = record {
@@ -31,15 +31,14 @@ type Icrc21VcConsentMessageRequest = record {
     credential_spec : CredentialSpec;
 };
 type Icrc21ConsentMessageResponse = variant {
-    ok : Icrc21ConsentInfo;
-    err : Icrc21Error;
+    Ok : Icrc21ConsentInfo;
+    Err : Icrc21Error;
 };
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
     GenericError : Icrc21ErrorInfo;
-    MalformedCall : Icrc21ErrorInfo;
-    NotSupported : Icrc21ErrorInfo;
-    Forbidden : Icrc21ErrorInfo;
+    UnsupportedCanisterCall : Icrc21ErrorInfo;
+    ConsentMessageUnavailable : Icrc21ErrorInfo;
 };
 type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
 type IssueCredentialError = variant {
@@ -55,8 +54,8 @@ type PrepareCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type PrepareCredentialResponse = variant {
-    ok : PreparedCredentialData;
-    err : IssueCredentialError;
+    Ok : PreparedCredentialData;
+    Err : IssueCredentialError;
 };
 type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
@@ -140,8 +139,8 @@ type GetCredentialRequest = record {
     credential_spec : CredentialSpec;
 };
 type GetCredentialResponse = variant {
-    ok : IssuedCredentialData;
-    err : IssueCredentialError;
+    Ok : IssuedCredentialData;
+    Err : IssueCredentialError;
 };
 type IssuedCredentialData = record { vc_jws : text };
 
