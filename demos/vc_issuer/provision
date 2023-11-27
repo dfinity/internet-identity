@@ -6,62 +6,16 @@ set -euo pipefail
 # The issuer canister needs some info to operate correctly. This
 # reads data from the local replica & canisters to ensure the issuer
 # is provisioned correctly.
-#
-# We avoid 3rd party tools to keep the list of system dependencies low.
 
 echo "Provisioning issuer canister" >&2
 
-port=$(dfx info webserver-port)
-replica_url="http://localhost:$port"
+# At the time of writing dfx outputs incorrect JSON with dfx ping (commas between object 
+# entries are missing).
+# In order to read the root key we grab the array from the '"root_key": [...]' bit, the brackets
+# to match what candid expects ({}) and replace the commas between array entries to match
+# what candid expects (semicolon).
+rootkey_did=$(dfx ping  | sed -n 's/.*"root_key": \[\(.*\)\].*/{\1}/p' | sed 's/,/;/g')
 
-echo "Fetching info from replica $replica_url" >&2
-
-# grab the status and pipe through xxd to have it in human readable format
-ascii=$(curl -s "$replica_url/api/v2/status" | xxd -p -c 256)
-
-echo "Parsing root key" >&2
-# Several parts:
-#   * match "726f...79" for "root_key" in ascii/hex (726f...79) (the key of the array)
-#   * match "58" for the major type of the array (0b010_11000 -> major type 2 + 24 meaning 1 extra byte for array size)
-#           -> https://www.rfc-editor.org/rfc/rfc7049#section-2.1
-#   * match two chars (one byte) for the size
-#   * match the rest (will be trimmed to size later)
-regex="726f6f745f6b657958([0-9a-z][0-9a-z])([0-9a-z]+)"
-
-if ! [[ $ascii =~ $regex ]]
-then
-    echo "$ascii doesn't match" >&2
-    exit 1
-fi
-
-# Grab the size, still in hex, and convert it to decimal
-size_hex="${BASH_REMATCH[1]}"
-size="$((16#$size_hex))"
-
-# Grab the untrimmed rest bytes
-rest="${BASH_REMATCH[2]}"
-
-# trim to size (double the size because each byte is written as two chars)
-rootkey_hex="${rest:0:$((2*size))}"
-
-# NOTE: while theoretically candid supports `hex` blobs, `dfx` fails to parse them
-# so we have to convert this into a byte array.
-
-# new regex for matching pairs of chars (i.e. bytes)
-regex="([0-9a-z][0-9a-z])"
-arr="" # where we'll hold the resulting candid array
-while [[ $rootkey_hex =~ $regex ]]
-do
-    # For each byte, convert from hex and append to array (with ; being the candid array delim.)
-    byt_hex="${BASH_REMATCH[0]}"
-    byt="$((16#$byt_hex))"
-    arr="$arr;$byt"
-    # Drop the size of the match and continue
-    i=${#BASH_REMATCH}
-    rootkey_hex=${rootkey_hex:i}
-done
-
-rootkey_did="{${arr:1}}" # drop one char (the first ';') and wrap with {}
 echo "Parsed rootkey: ${rootkey_did:0:20}..." >&2
 
 ii_canister_id="$(dfx canister id internet_identity)"
