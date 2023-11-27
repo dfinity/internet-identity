@@ -1,8 +1,8 @@
-import { UserConfig, defineConfig } from "vite";
+import { defineConfig } from "vite";
 import { getReplicaHost } from "../../utils";
 import { injectCanisterIdPlugin } from "../../vite.plugins";
 
-export default defineConfig(({mode}) => ({
+export default defineConfig(({ mode }) => ({
   root: ".",
   build: {
     rollupOptions: {
