@@ -50,9 +50,6 @@ const readCanisterId = (): string => {
 };
 
 const App = () => {
-  const [consentMessage, setConsentMessage] = useState<string | undefined>(
-    undefined
-  );
   const [principal, setPrincipal] = useState<string | undefined>(undefined);
   const [dsbld, setDsbld] = useState<boolean>(false);
 
@@ -64,13 +61,6 @@ const App = () => {
       setDsbld(false);
     }
   };
-
-  const getAndShowMessage = () =>
-    withDisabled(async () => {
-      const vcIssuer = new VcIssuer();
-      const msg = await vcIssuer.getConsentMessage();
-      setConsentMessage(msg);
-    });
 
   const authAndShow = () =>
     withDisabled(async () => {
@@ -96,10 +86,6 @@ const App = () => {
 
   return (
     <main>
-      <div>{consentMessage ? consentMessage : "no consent message"}</div>
-      <button disabled={dsbld} onClick={() => getAndShowMessage()}>
-        Get consent message
-      </button>
       <div>{principal ? principal : "not authed"}</div>
       <button disabled={dsbld} onClick={() => authAndShow()}>
         Authenticate
