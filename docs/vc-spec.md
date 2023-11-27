@@ -14,7 +14,7 @@ services and the corresponding messages in more detail.
 type ArgumentValue = variant { "Int" : int32; String : text };
 type CredentialSpec = record {
     arguments : opt vec record { text; ArgumentValue };
-    credential_name : text;
+    credential_type : text;
 };
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
