@@ -576,29 +576,6 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 // Order dependent: do not move above any function annotated with #[candid_method]!
 candid::export_service!();
 
-#[cfg(test)]
-mod test {
-    use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
-    use std::path::Path;
-
-    /// Checks candid interface type equality by making sure that the service in the did file is
-    /// equal to the generated interface.
-    #[test]
-    fn check_candid_interface_compatibility() {
-        let canister_interface = __export_service();
-        service_equal(
-            CandidSource::Text(&canister_interface),
-            CandidSource::File(Path::new("vc_issuer.did")),
-        )
-        .unwrap_or_else(|e| {
-            panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
-            )
-        });
-    }
-}
 
 // Assets
 
@@ -707,4 +684,28 @@ fn make_asset_certificate_header(
             BASE64.encode(serializer.into_inner())
         ),
     )
+}
+
+#[cfg(test)]
+mod test {
+    use crate::__export_service;
+    use candid::utils::{service_equal, CandidSource};
+    use std::path::Path;
+
+    /// Checks candid interface type equality by making sure that the service in the did file is
+    /// equal to the generated interface.
+    #[test]
+    fn check_candid_interface_compatibility() {
+        let canister_interface = __export_service();
+        service_equal(
+            CandidSource::Text(&canister_interface),
+            CandidSource::File(Path::new("vc_issuer.did")),
+        )
+        .unwrap_or_else(|e| {
+            panic!(
+                "the canister code interface is not equal to the did file: {:?}",
+                e
+            )
+        });
+    }
 }
