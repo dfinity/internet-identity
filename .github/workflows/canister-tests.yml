@@ -241,6 +241,8 @@ jobs:
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
       - uses: ./.github/actions/setup-dfx
+      - run: npm ci
+
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
         run: ./build.sh
