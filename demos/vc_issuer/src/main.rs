@@ -576,7 +576,6 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 // Order dependent: do not move above any function annotated with #[candid_method]!
 candid::export_service!();
 
-
 // Assets
 
 pub fn init_assets() {
