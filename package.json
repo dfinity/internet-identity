@@ -15,7 +15,7 @@
     "watch:showcase": "astro check --root ./src/showcase --watch",
     "watch": "npm run check -- --watch",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
-    "generate": "npm run generate:types && npm run generate:js",
+    "generate": "npm run generate:types && npm run generate:js && npm -w vc_issuer run generate",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "build:showcase": "tsc --noEmit && astro check --root ./src/showcase && astro build --root ./src/showcase",

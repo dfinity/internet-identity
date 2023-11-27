@@ -13,7 +13,6 @@ export class VcIssuer {
     const agent = new HttpAgent();
 
     await agent.fetchRootKey();
-    // TODO: fetch root key?
 
     const canisterId = readCanisterId();
     const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
@@ -31,23 +30,6 @@ export class VcIssuer {
     const actor = await this.createActor();
     const result = await actor.add_employee(Principal.fromText(principal));
     return result;
-  };
-
-  getConsentMessage = async (): Promise<string> => {
-    const actor = await this.createActor();
-    const result = await actor.vc_consent_message({
-      preferences: { language: "en_US" },
-      credential_spec: {
-        credential_name: "VerifiedEmployee",
-        arguments: [[["employerName", { string: "DFINITY Foundation" }]]],
-      },
-    });
-
-    if ("err" in result) {
-      throw new Error(`err: ${JSON.stringify(result)}`);
-    }
-
-    return result.ok.consent_message;
   };
 }
 
