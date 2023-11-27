@@ -7,7 +7,7 @@ import viteCompression from "vite-plugin-compression";
 import { readCanisterId } from "./utils";
 
 /**
- * Inject the II canister ID as a <script /> tag in index.html for local development. Will process
+ * Inject the canister ID of 'canisterName' as a <script /> tag in index.html for local development. Will process
  * at most 1 script tag.
  */
 export const injectCanisterIdPlugin = ({

@@ -1,9 +1,8 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { defineConfig, type UserConfig } from "vite";
-import { getReplicaHost } from "../../utils";
 
-const replicaHost = getReplicaHost();
+const replicaHost = "http://127.0.0.1:4943" as const;
 
 const rewriteRoute = (pathAndParams: string): string => {
   const readCanisterId = (): string => {
