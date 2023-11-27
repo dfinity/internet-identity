@@ -1,8 +1,8 @@
-import { defineConfig } from "vite";
+import { UserConfig, defineConfig } from "vite";
 import { getReplicaHost } from "../../utils";
 import { injectCanisterIdPlugin } from "../../vite.plugins";
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
   root: ".",
   build: {
     rollupOptions: {
@@ -15,7 +15,11 @@ export default defineConfig({
       },
     },
   },
-  plugins: [injectCanisterIdPlugin({ canisterName: "issuer" })],
+  plugins: [
+    ...(mode === "development"
+      ? [injectCanisterIdPlugin({ canisterName: "issuer" })]
+      : []),
+  ],
   optimizeDeps: {
     esbuildOptions: {
       define: {
@@ -29,4 +33,4 @@ export default defineConfig({
       "/api": getReplicaHost(),
     },
   },
-});
+}));
