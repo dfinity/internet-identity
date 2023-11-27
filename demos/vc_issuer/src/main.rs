@@ -68,6 +68,7 @@ thread_local! {
     static GRADUATES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 
     // Assets for the management app
+    #[allow(clippy::type_complexity)]
     static ASSETS: RefCell<HashMap<&'static str, (Vec<(String, String)>, Vec<u8>)>> = RefCell::new(HashMap::default());
     static ASSET_HASHES: RefCell<RbTree<&'static str, [u8; 32]>> = RefCell::new(RbTree::default());
 }
@@ -242,7 +243,7 @@ fn update_root_hash() {
                 }
                 let assets_root_hash = &labeled_hash(b"http_assets", &asset_hashes.root_hash());
 
-                let prefixed_root_hash = fork_hash(&sigs_root_hash, &assets_root_hash);
+                let prefixed_root_hash = fork_hash(sigs_root_hash, assets_root_hash);
 
                 set_certified_data(&prefixed_root_hash[..]);
             })
@@ -392,13 +393,10 @@ fn add_graduate(graduate_id: Principal) -> String {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
-    let mut headers = vec![];
-    headers.push(("Access-Control-Allow-Origin".to_string(), "*".to_string()));
+    let mut headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
     let certificate_header =
         ASSET_HASHES.with(|a| make_asset_certificate_header(&a.borrow(), path));
 
-    match path {
-        _ => {
             headers.push(certificate_header);
             ASSETS.with(|a| match a.borrow().get(path) {
                 Some((asset_headers, value)) => {
@@ -416,8 +414,6 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
                 },
             })
-        }
-    }
 }
 
 fn main() {}
@@ -614,11 +610,11 @@ pub fn init_assets() {
             let mut asset_hashes = ah.borrow_mut();
             for (path, content, content_type) in get_assets() {
                 asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                let mut headers = vec![];
-                headers.push((
+                let headers = vec![(
                     "Content-Type".to_string(),
                     content_type.to_mime_type_string(),
-                ));
+                )
+                ];
                 assets.insert(path, (headers, content.to_vec()));
             }
         });
@@ -670,11 +666,10 @@ lazy_static! {
         let index_html = include_str!("../dist/index.html");
 
         // the string we are replacing here is inserted by vite during the front-end build
-        let index_html = index_html.replace(
+        index_html.replace(
             r#"<script type="module" crossorigin src="/index.js"></script>"#,
             &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string()
-        );
-        index_html
+        )
     };
 }
 
@@ -710,8 +705,8 @@ fn make_asset_certificate_header(
         "IC-Certificate".to_string(),
         format!(
             "certificate=:{}:, tree=:{}:",
-            BASE64.encode(&certificate),
-            BASE64.encode(&serializer.into_inner())
+            BASE64.encode(certificate),
+            BASE64.encode(serializer.into_inner())
         ),
     )
 }
