@@ -7,9 +7,7 @@ VC_ISSUER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$VC_ISSUER_DIR"
 
 # Build the app
-pushd ../../
-npm run -w vc_issuer build
-popd
+npm run build
 
 cargo build --release --target wasm32-unknown-unknown --manifest-path ./Cargo.toml -j1
 ic-wasm "target/wasm32-unknown-unknown/release/vc_issuer.wasm" -o "./vc_issuer.wasm" shrink
