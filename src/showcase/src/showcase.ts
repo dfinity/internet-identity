@@ -58,6 +58,8 @@ import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
+import { allowCredentialsPage } from "$src/flows/verifiableCredentials/allowCredentials";
+
 const identityBackground = loadIdentityBackground();
 
 const userNumber = BigInt(10000);
@@ -629,6 +631,19 @@ export const iiPages: Record<string, () => void> = {
       i18n,
       deviceAlias: chromeDevice.alias,
       onContinue: () => console.log("Continue"),
+    }),
+  allowCredentials: () =>
+    allowCredentialsPage({
+      i18n,
+      relyingOrigin: "https://oc.app",
+      providerOrigin: "https://nns.ic0.app",
+      consentMessage: `
+# ACME Inc Employment Credential
+
+Credential that states that the holder is employed by the ACME Inc at the time of issuance.
+      `,
+      onAllow: () => toast.info(html`Allowed`),
+      onCancel: () => toast.info(html`Canceled`),
     }),
 };
 
