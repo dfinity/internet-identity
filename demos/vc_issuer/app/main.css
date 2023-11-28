@@ -88,5 +88,5 @@ button {
 
 /* Add a message on no logs */
 [data-role="canister-logs"][data-unset]::after {
-  content: "No logs yet";
+  content: "Nothing yet";
 }

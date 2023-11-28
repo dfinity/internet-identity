@@ -376,6 +376,7 @@ fn add_graduate(graduate_id: Principal) -> String {
 }
 
 #[query]
+#[candid_method]
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];

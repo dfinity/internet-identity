@@ -91,7 +91,7 @@ const App = () => {
       </section>
       <section>
         <label>
-          Canister Logs:
+          Canister Replies:
           {canisterLogs.length === 0 ? (
             <output data-unset data-role="canister-logs"></output>
           ) : (
