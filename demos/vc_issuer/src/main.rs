@@ -376,7 +376,7 @@ fn add_graduate(graduate_id: Principal) -> String {
 }
 
 #[query]
-#[candid_method]
+#[candid_method(query)]
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
@@ -614,7 +614,7 @@ pub type HeaderField = (String, String);
 pub struct HttpRequest {
     pub method: String,
     pub url: String,
-    pub headers: Vec<(String, String)>,
+    pub headers: Vec<HeaderField>,
     pub body: ByteBuf,
 }
 
