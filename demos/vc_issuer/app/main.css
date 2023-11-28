@@ -55,9 +55,11 @@ output[data-unset] {
 }
 
 input {
+  /* Prevent padding from growing the element */
+  box-sizing: border-box;
+
   min-width: 100%;
   font-size: 1.2rem;
-  padding: 0;
   border: 0;
   border-bottom: 1px solid black;
 }
