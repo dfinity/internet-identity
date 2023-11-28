@@ -1,0 +1,38 @@
+{
+  "name": "vc_issuer",
+  "type": "module",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "dependencies": {
+    "@dfinity/agent": "^0.19.3",
+    "@dfinity/auth-client": "^0.19.3",
+    "@dfinity/candid": "^0.19.3",
+    "@dfinity/identity": "^0.19.3",
+    "@dfinity/principal": "^0.19.3",
+    "@dfinity/utils": "^0.0.20",
+    "buffer": "^6.0.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "http-proxy": "^1.18.1",
+    "vite-plugin-compression": "^0.5.1",
+    "html-minifier-terser": "^7.2.0"
+  },
+  "scripts": {
+    "dev": "vite --config ./vite.config.ts",
+    "check": "tsc --noEmit",
+    "watch": "npm run check -- --watch",
+    "build": "npm run check && vite --config ./vite.config.ts build",
+    "generate": "npm run generate:types && npm run generate:js",
+    "generate:types": "didc bind ./vc_issuer.did -t ts > ./app/generated/vc_issuer_types.d.ts",
+    "generate:js": "didc bind ./vc_issuer.did -t js > ./app/generated/vc_issuer_idl.js"
+  },
+  "devDependencies": {
+    "@types/html-minifier-terser": "^7.0.0",
+    "@types/http-proxy": "^1.17.14",
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.0",
+    "vite": "^4.3.9",
+    "typescript": "5.2.2"
+  }
+}

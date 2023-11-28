@@ -16,6 +16,7 @@ src/frontend/generated/
 dist/
 .env
 lib
+demos/vc_issuer/app/generated/
 
 # Cargo build output
 target/

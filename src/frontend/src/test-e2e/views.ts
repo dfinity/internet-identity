@@ -568,6 +568,91 @@ export class AboutView extends View {
   }
 }
 
+export class IssuerAppView extends View {
+  async open({
+    issuerAppUrl,
+    iiUrl,
+  }: {
+    issuerAppUrl: string;
+    iiUrl: string;
+  }): Promise<void> {
+    await this.browser.url(issuerAppUrl);
+    const iiUrlInput = await this.browser.$('[data-role="ii-url"]');
+    await iiUrlInput.clearValue();
+    await iiUrlInput.setValue(iiUrl);
+  }
+
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="add-employee"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    return (await this.getPrincipal()) !== undefined;
+  }
+
+  async authenticate(): Promise<void> {
+    await this.browser.$('[data-action="authenticate"]').click();
+  }
+
+  async getPrincipal(): Promise<string | undefined> {
+    const principalElem = await this.browser.$('[data-role="principal"]');
+    // An attr without value will have the string 'true'; an attr not set will be null
+    const isUnset = (await principalElem.getAttribute(
+      "data-unset"
+    )) as unknown as string | null;
+    if (isUnset === "true") {
+      return undefined;
+    }
+
+    return principalElem.getText();
+  }
+
+  /** Waits for the principal to update.
+   * Returns the principal after the user has been authenticated.
+   */
+  async waitForAuthenticated(): Promise<string> {
+    let principal = await this.getPrincipal();
+    // wait for the demo app to update the principal
+    await this.browser.waitUntil(async () => {
+      if (nonNullish(principal)) {
+        return true;
+      }
+
+      principal = await this.getPrincipal();
+      return false;
+    });
+
+    // XXX: If we get here, it means we returned "true" above and the principal
+    // is non nullish.
+    return principal as string;
+  }
+
+  async canisterLogs(): Promise<string[]> {
+    const logs = await this.browser.$('[data-role="canister-logs"]').getText();
+    return logs.split("\n").filter(Boolean);
+  }
+
+  // Returns the canister log
+  async addEmployee(): Promise<string> {
+    const logLinesBefore = await this.canisterLogs();
+    await this.browser.$('[data-action="add-employee"]').click();
+
+    // wait for the demo app to update the principal
+    await this.browser.waitUntil(async () => {
+      const logLinesNow = await this.canisterLogs();
+
+      return logLinesNow.length > logLinesBefore.length;
+    });
+
+    // Here we know there at least one more log lines than before,
+    // meaning there is at least one log line, so -1 cannot be undefined.
+    const logLinesNow = await this.canisterLogs();
+    return logLinesNow.at(-1) as string;
+  }
+}
+
 export class DemoAppView extends View {
   replicaUrl: string;
 

@@ -21,7 +21,10 @@ jobs:
         run: npm run format-check
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
-        run: npm run generate
+        run: |
+          npm run generate
+          cd demos/vc_issuer
+          npm run generate
       - name: Check for dapp logos
         run: |
           while read -r logo
@@ -37,7 +40,9 @@ jobs:
         # We don't want to commit automatic changes to main
         if: ${{ github.ref != 'refs/heads/main' }}
         with:
-          add: src/frontend/generated
+          add: |
+            src/frontend/generated
+            demos/vc_issuer/app/generated
           default_author: github_actions
           message: "🤖 npm run generate auto-update"
 
