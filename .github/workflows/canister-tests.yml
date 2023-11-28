@@ -239,9 +239,13 @@ jobs:
             demos/vc_issuer/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
+      - uses: ./.github/actions/setup-node
+
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
-        run: ./build.sh
+        run: |
+          npm ci
+          ./build.sh
       - run: sha256sum vc_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
@@ -318,7 +322,12 @@ jobs:
           ./ic-test-state-machine --version
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
-        run: cargo test
+        run: |
+          # create dummy assets
+          mkdir dist
+          touch dist/index.{html,css,js}
+          touch dist/index2.js
+          cargo test
 
   ###########################
   # The Rust canister tests #

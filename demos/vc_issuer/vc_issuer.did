@@ -88,6 +88,26 @@ type IssuerConfig = record {
     idp_canister_ids : vec principal;
 };
 
+/// Options related to HTTP handling
+
+type HeaderField = record {
+    text;
+    text;
+};
+
+type HttpRequest = record {
+    method: text;
+    url: text;
+    headers: vec HeaderField;
+    body: blob;
+};
+
+type HttpResponse = record {
+    status_code: nat16;
+    headers: vec HeaderField;
+    body: blob;
+};
+
 service: (opt IssuerConfig) -> {
     /// VC-flow API.
     vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
@@ -101,4 +121,8 @@ service: (opt IssuerConfig) -> {
     /// In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
+
+
+    /// Serve the app
+    http_request: (request: HttpRequest) -> (HttpResponse) query;
 }
