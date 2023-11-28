@@ -15,6 +15,18 @@ export interface GetCredentialRequest {
 }
 export type GetCredentialResponse = { 'Ok' : IssuedCredentialData } |
   { 'Err' : IssueCredentialError };
+export type HeaderField = [string, string];
+export interface HttpRequest {
+  'url' : string,
+  'method' : string,
+  'body' : Uint8Array | number[],
+  'headers' : Array<HeaderField>,
+}
+export interface HttpResponse {
+  'body' : Uint8Array | number[],
+  'headers' : Array<HeaderField>,
+  'status_code' : number,
+}
 export interface Icrc21ConsentInfo {
   'consent_message' : string,
   'language' : string,
@@ -59,6 +71,7 @@ export interface _SERVICE {
   'add_graduate' : ActorMethod<[Principal], string>,
   'configure' : ActorMethod<[IssuerConfig], undefined>,
   'get_credential' : ActorMethod<[GetCredentialRequest], GetCredentialResponse>,
+  'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'prepare_credential' : ActorMethod<
     [PrepareCredentialRequest],
     PrepareCredentialResponse

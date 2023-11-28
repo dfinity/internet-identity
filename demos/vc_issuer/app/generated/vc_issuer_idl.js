@@ -27,6 +27,18 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IssuedCredentialData,
     'Err' : IssueCredentialError,
   });
+  const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
+  const HttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(HeaderField),
+  });
+  const HttpResponse = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(HeaderField),
+    'status_code' : IDL.Nat16,
+  });
   const PrepareCredentialRequest = IDL.Record({
     'signed_id_alias' : SignedIdAlias,
     'credential_spec' : CredentialSpec,
@@ -69,6 +81,7 @@ export const idlFactory = ({ IDL }) => {
         [GetCredentialResponse],
         ['query'],
       ),
+    'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'prepare_credential' : IDL.Func(
         [PrepareCredentialRequest],
         [PrepareCredentialResponse],
