@@ -99,6 +99,7 @@ export const idlFactory = ({ IDL }) => {
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
   });
+  const CaptchaCreateResponse = IDL.Variant({ 'ok' : Challenge });
   const DeployArchiveResult = IDL.Variant({
     'creation_in_progress' : IDL.Null,
     'success' : IDL.Principal,
@@ -215,6 +216,17 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
   const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
+  const ChallengeResult = IDL.Record({
+    'key' : ChallengeKey,
+    'chars' : IDL.Text,
+  });
+  const CaptchaResult = ChallengeResult;
+  const IdentityRegisterResponse = IDL.Variant({
+    'ok' : IdentityNumber,
+    'invalid_metadata' : IDL.Text,
+    'bad_captcha' : IDL.Null,
+    'canister_full' : IDL.Null,
+  });
   const UserKey = PublicKey;
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
@@ -229,10 +241,6 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasResponse = IDL.Variant({
     'ok' : PreparedIdAlias,
     'authentication_failed' : IDL.Text,
-  });
-  const ChallengeResult = IDL.Record({
-    'key' : ChallengeKey,
-    'chars' : IDL.Text,
   });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
@@ -276,6 +284,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(AuthnMethodRemoveResponse)],
         [],
       ),
+    'captcha_create' : IDL.Func([], [IDL.Opt(CaptchaCreateResponse)], []),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -312,6 +321,11 @@ export const idlFactory = ({ IDL }) => {
     'identity_metadata_replace' : IDL.Func(
         [IdentityNumber, MetadataMap],
         [IDL.Opt(IdentityMetadataReplaceResponse)],
+        [],
+      ),
+    'identity_register' : IDL.Func(
+        [AuthnMethodData, CaptchaResult, IDL.Opt(IDL.Principal)],
+        [IDL.Opt(IdentityRegisterResponse)],
         [],
       ),
     'init_salt' : IDL.Func([], [], []),

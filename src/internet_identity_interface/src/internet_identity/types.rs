@@ -104,7 +104,7 @@ pub enum MetadataEntry {
     Map(HashMap<String, MetadataEntry>),
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Challenge {
     pub png_base64: String,
     pub challenge_key: ChallengeKey,

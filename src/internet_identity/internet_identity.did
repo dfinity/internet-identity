@@ -241,6 +241,7 @@ type ChallengeResult = record {
     key : ChallengeKey;
     chars : text;
 };
+type CaptchaResult = ChallengeResult;
 
 // Extra information about registration status for new devices
 type DeviceRegistrationInfo = record {
@@ -355,6 +356,21 @@ type IdentityInfo = record {
     authn_method_registration: opt AuthnMethodRegistrationInfo;
     // Authentication method independent metadata
     metadata: MetadataMap;
+};
+
+type CaptchaCreateResponse = variant {
+    ok: Challenge;
+};
+
+type IdentityRegisterResponse = variant {
+    // Registration successful.
+    ok: IdentityNumber;
+    // No more registrations are possible in this instance of the II service canister.
+    canister_full;
+    // The captcha check was not successful.
+    bad_captcha;
+    // The metadata of the provided authentication method contains invalid entries.
+    invalid_metadata: text;
 };
 
 type IdentityInfoResponse = variant {
@@ -473,6 +489,16 @@ service : (opt InternetIdentityInit) -> {
     // with future variant extensions.
     // A client decoding a response as `null` indicates outdated type information
     // and should be treated as an error.
+
+
+    // Creates a new captcha. The solution needs to be submitted using the
+    // `identity_register` call.
+    captcha_create: () -> (opt CaptchaCreateResponse);
+
+    // Registers a new identity with the given authn_method.
+    // A valid captcha solution to a previously generated captcha (using create_captcha) must be provided.
+    // The sender needs to match the supplied authn_method.
+    identity_register: (AuthnMethodData, CaptchaResult, opt principal) -> (opt IdentityRegisterResponse);
 
     // Returns information about the identity with the given number.
     // Requires authentication.
