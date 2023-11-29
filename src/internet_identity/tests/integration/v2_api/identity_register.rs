@@ -120,7 +120,7 @@ fn should_not_allow_wrong_captcha() {
             },
             None,
         ),
-        Ok(Some(IdentityRegisterResponse::BadChallenge))
+        Ok(Some(IdentityRegisterResponse::BadCaptcha))
     );
 }
 
@@ -149,7 +149,7 @@ fn should_not_allow_expired_captcha() {
             },
             None,
         ),
-        Ok(Some(IdentityRegisterResponse::BadChallenge))
+        Ok(Some(IdentityRegisterResponse::BadCaptcha))
     );
 }
 
