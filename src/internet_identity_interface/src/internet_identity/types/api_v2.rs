@@ -73,8 +73,8 @@ pub enum IdentityRegisterResponse {
     Ok(IdentityNumber),
     #[serde(rename = "canister_full")]
     CanisterFull,
-    #[serde(rename = "bad_challenge")]
-    BadChallenge,
+    #[serde(rename = "bad_captcha")]
+    BadCaptcha,
     #[serde(rename = "invalid_metadata")]
     InvalidMetadata(String),
 }
