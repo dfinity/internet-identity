@@ -258,7 +258,7 @@ impl From<RegisterResponse> for IdentityRegisterResponse {
                 IdentityRegisterResponse::Ok(user_number)
             }
             RegisterResponse::CanisterFull => IdentityRegisterResponse::CanisterFull,
-            RegisterResponse::BadChallenge => IdentityRegisterResponse::BadChallenge,
+            RegisterResponse::BadChallenge => IdentityRegisterResponse::BadCaptcha,
         }
     }
 }
