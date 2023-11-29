@@ -320,12 +320,6 @@
     "oneLiner": "Transparent, tamper-proof voting on blockchain."
   },
   {
-    "name": "Joined Africa",
-    "oneLiner": "Joined Africa is a marketplace where sellers advertise products in crypto currency, connecting buyers directly with sellers within Africa.",
-    "website": "https://joinedafrica.com",
-    "logo": "joined-africa_logo.webp"
-  },
-  {
     "name": "IC HUB",
     "oneLiner": "Your gateway to web3 apps: connect, chat and explore all in one place",
     "website": "https://md7ke-jyaaa-aaaak-qbrya-cai.ic0.app/",
@@ -390,5 +384,10 @@
     "website": "https://demo.icws.io",
     "logo": "ic-websocket_logo.webp",
     "oneLiner": "Send updates from canisters to your users"
+  },
+  {
+    "name": "ReBlock",
+    "website": "https://www.reblock.finance/",
+    "logo": "reblock_logo.png"
   }
 ]
