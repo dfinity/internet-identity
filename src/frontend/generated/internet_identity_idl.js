@@ -220,10 +220,11 @@ export const idlFactory = ({ IDL }) => {
     'key' : ChallengeKey,
     'chars' : IDL.Text,
   });
+  const CaptchaResult = ChallengeResult;
   const IdentityRegisterResponse = IDL.Variant({
     'ok' : IdentityNumber,
     'invalid_metadata' : IDL.Text,
-    'bad_challenge' : IDL.Null,
+    'bad_captcha' : IDL.Null,
     'canister_full' : IDL.Null,
   });
   const UserKey = PublicKey;
@@ -323,7 +324,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'identity_register' : IDL.Func(
-        [AuthnMethodData, ChallengeResult, IDL.Opt(IDL.Principal)],
+        [AuthnMethodData, CaptchaResult, IDL.Opt(IDL.Principal)],
         [IDL.Opt(IdentityRegisterResponse)],
         [],
       ),

@@ -52,6 +52,7 @@ export interface BufferedArchiveEntry {
   'timestamp' : Timestamp,
 }
 export type CaptchaCreateResponse = { 'ok' : Challenge };
+export type CaptchaResult = ChallengeResult;
 export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
@@ -141,7 +142,7 @@ export type IdentityMetadataReplaceResponse = { 'ok' : null };
 export type IdentityNumber = bigint;
 export type IdentityRegisterResponse = { 'ok' : IdentityNumber } |
   { 'invalid_metadata' : string } |
-  { 'bad_challenge' : null } |
+  { 'bad_captcha' : null } |
   { 'canister_full' : null };
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
@@ -268,7 +269,7 @@ export interface _SERVICE {
     [] | [IdentityMetadataReplaceResponse]
   >,
   'identity_register' : ActorMethod<
-    [AuthnMethodData, ChallengeResult, [] | [Principal]],
+    [AuthnMethodData, CaptchaResult, [] | [Principal]],
     [] | [IdentityRegisterResponse]
   >,
   'init_salt' : ActorMethod<[], undefined>,
