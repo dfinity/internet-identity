@@ -40,7 +40,9 @@ const customMessageBtn = document.getElementById(
 ) as HTMLButtonElement;
 const messagesEl = document.getElementById("messages") as HTMLElement;
 const hostUrlEl = document.getElementById("hostUrl") as HTMLInputElement;
-const whoAmIResponseEl = document.getElementById("whoamiResponse");
+const whoAmIResponseEl = document.getElementById(
+  "whoamiResponse"
+) as HTMLDivElement;
 const alternativeOriginsEl = document.getElementById(
   "alternativeOrigins"
 ) as HTMLDivElement;
@@ -216,7 +218,7 @@ const init = async () => {
     }
   };
 
-  invalidDataBtn!.onclick = () => {
+  invalidDataBtn.onclick = () => {
     if (!iiProtocolTestWindow) {
       alert("Open II tab first");
       return;
@@ -300,24 +302,24 @@ const init = async () => {
 
 init();
 
-whoamiBtn!.addEventListener("click", async () => {
+whoamiBtn.addEventListener("click", async () => {
   const identity = await authClient.getIdentity();
   const canisterId = Principal.fromText(readCanisterId());
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
-      host: (hostUrlEl as HTMLInputElement).value,
+      host: hostUrlEl.value,
       identity,
     }),
     canisterId,
   });
 
-  whoAmIResponseEl!.innerText = "Loading...";
+  whoAmIResponseEl.innerText = "Loading...";
 
   // Similar to the sample project on dfx new:
   actor
     .whoami()
     .then((principal: any) => {
-      whoAmIResponseEl!.innerText = principal.toText();
+      whoAmIResponseEl.innerText = principal.toText();
     })
     .catch((err) => {
       console.error("Failed to fetch whoami", err);
