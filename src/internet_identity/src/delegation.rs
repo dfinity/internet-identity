@@ -1,7 +1,7 @@
-use crate::assets::CertifiedAssets;
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
+use asset_util::CertifiedAssets;
 use candid::Principal;
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
 use canister_sig_util::CanisterSigPublicKey;

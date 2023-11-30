@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+asset_util.workspace = true
 internet_identity_interface.workspace = true
 
 hex.workspace = true
