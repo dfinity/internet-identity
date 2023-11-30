@@ -10,10 +10,14 @@
     "buffer": "^6.0.3"
   },
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "dev": "vite --config ./vite.config.ts",
+    "check": "tsc --noEmit",
+    "watch": "npm run check -- --watch",
+    "build": "npm run check && vite --config ./vite.config.ts build"
   },
   "devDependencies": {
+    "@types/node": "^20.10.1",
+    "typescript": "5.2.2",
     "vite": "^4.3.9"
   }
 }

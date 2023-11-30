@@ -24,6 +24,7 @@ pub enum ContentType {
     HTML,
     JS,
     JSON,
+    CSS,
 }
 
 impl ContentType {
@@ -32,6 +33,7 @@ impl ContentType {
             ContentType::HTML => "text/html".to_string(),
             ContentType::JS => "text/javascript".to_string(),
             ContentType::JSON => "application/json".to_string(),
+            ContentType::CSS => "text/css".to_string(),
         }
     }
 }
@@ -227,14 +229,24 @@ lazy_static! {
 
 // Get all the assets. Duplicated assets like index.html are shared and generally all assets are
 // prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentType); 5] {
+fn get_assets() -> [(&'static str, &'static [u8], ContentType); 7] {
     let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
     [
         ("/", index_html, ContentType::HTML),
         ("/index.html", index_html, ContentType::HTML),
         (
+            "/index.css",
+            include_bytes!("dist/index.css"),
+            ContentType::CSS,
+        ),
+        (
             "/index.js",
             include_bytes!("dist/index.js"),
+            ContentType::JS,
+        ),
+        (
+            "/index2.js",
+            include_bytes!("dist/index2.js"),
             ContentType::JS,
         ),
         // initially empty alternative origins, but can be populated using the update_alternative_origins call

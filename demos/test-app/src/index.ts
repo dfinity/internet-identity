@@ -1,3 +1,4 @@
+import type { Identity, SignIdentity } from "@dfinity/agent";
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { AuthClient } from "@dfinity/auth-client";
 import {
@@ -8,38 +9,60 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 
-const signInBtn = document.getElementById("signinBtn");
-const signOutBtn = document.getElementById("signoutBtn");
-const whoamiBtn = document.getElementById("whoamiBtn");
+import "./main.css";
+
+const signInBtn = document.getElementById("signinBtn") as HTMLButtonElement;
+const signOutBtn = document.getElementById("signoutBtn") as HTMLButtonElement;
+const whoamiBtn = document.getElementById("whoamiBtn") as HTMLButtonElement;
 const updateAlternativeOriginsBtn = document.getElementById(
   "updateNewAlternativeOrigins"
-);
-const openIiWindowBtn = document.getElementById("openIiWindowBtn");
-const closeIiWindowBtn = document.getElementById("closeIIWindowBtn");
-const invalidDataBtn = document.getElementById("invalidDataBtn");
-const incompleteMessageBtn = document.getElementById("incompleteMessageBtn");
-const validMessageBtn = document.getElementById("validMessageBtn");
-const customMessageEl = document.getElementById("customMessage");
-const customMessageBtn = document.getElementById("customMessageBtn");
-const messagesEl = document.getElementById("messages");
-const hostUrlEl = document.getElementById("hostUrl");
+) as HTMLButtonElement;
+const openIiWindowBtn = document.getElementById(
+  "openIiWindowBtn"
+) as HTMLButtonElement;
+const closeIiWindowBtn = document.getElementById(
+  "closeIIWindowBtn"
+) as HTMLButtonElement;
+const invalidDataBtn = document.getElementById(
+  "invalidDataBtn"
+) as HTMLButtonElement;
+const incompleteMessageBtn = document.getElementById(
+  "incompleteMessageBtn"
+) as HTMLButtonElement;
+const validMessageBtn = document.getElementById(
+  "validMessageBtn"
+) as HTMLButtonElement;
+const customMessageEl = document.getElementById(
+  "customMessage"
+) as HTMLInputElement;
+const customMessageBtn = document.getElementById(
+  "customMessageBtn"
+) as HTMLButtonElement;
+const messagesEl = document.getElementById("messages") as HTMLElement;
+const hostUrlEl = document.getElementById("hostUrl") as HTMLInputElement;
 const whoAmIResponseEl = document.getElementById("whoamiResponse");
-const alternativeOriginsEl = document.getElementById("alternativeOrigins");
+const alternativeOriginsEl = document.getElementById(
+  "alternativeOrigins"
+) as HTMLDivElement;
 const newAlternativeOriginsEl = document.getElementById(
   "newAlternativeOrigins"
-);
-const principalEl = document.getElementById("principal");
-const delegationEl = document.getElementById("delegation");
-const expirationEl = document.getElementById("expiration");
-const iiUrlEl = document.getElementById("iiUrl");
-const maxTimeToLiveEl = document.getElementById("maxTimeToLive");
-const derivationOriginEl = document.getElementById("derivationOrigin");
+) as HTMLInputElement;
+const principalEl = document.getElementById("principal") as HTMLDivElement;
+const delegationEl = document.getElementById("delegation") as HTMLPreElement;
+const expirationEl = document.getElementById("expiration") as HTMLDivElement;
+const iiUrlEl = document.getElementById("iiUrl") as HTMLInputElement;
+const maxTimeToLiveEl = document.getElementById(
+  "maxTimeToLive"
+) as HTMLInputElement;
+const derivationOriginEl = document.getElementById(
+  "derivationOrigin"
+) as HTMLInputElement;
 
-let authClient;
-let iiProtocolTestWindow;
-let localIdentity;
+let authClient: AuthClient;
+let iiProtocolTestWindow: Window | undefined;
+let localIdentity: SignIdentity;
 
-const idlFactory = ({ IDL }) => {
+const idlFactory = ({ IDL }: { IDL: any }) => {
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     url: IDL.Text,
@@ -68,8 +91,8 @@ const idlFactory = ({ IDL }) => {
   });
 };
 
-const updateDelegationView = (identity) => {
-  principalEl.innerText = identity.getPrincipal();
+const updateDelegationView = (identity: Identity) => {
+  principalEl.innerText = identity.getPrincipal().toText();
   if (identity instanceof DelegationIdentity) {
     delegationEl.innerText = JSON.stringify(
       identity.getDelegation().toJSON(),
@@ -82,8 +105,10 @@ const updateDelegationView = (identity) => {
       .getDelegation()
       .delegations.map((d) => d.delegation.expiration)
       .reduce((current, next) => (next < current ? next : current));
-    expirationEl.innerText =
-      nextExpiration - BigInt(Date.now()) * BigInt(1000_000);
+    expirationEl.innerText = (
+      nextExpiration -
+      BigInt(Date.now()) * BigInt(1000_000)
+    ).toString();
   } else {
     delegationEl.innerText = "Current identity is not a DelegationIdentity";
     expirationEl.innerText = "N/A";
@@ -95,7 +120,7 @@ const updateAlternativeOriginsView = async () => {
   alternativeOriginsEl.innerText = await response.text();
 };
 
-function addMessageElement(message, received) {
+function addMessageElement(message: unknown, received: boolean) {
   const messageContainer = document.createElement("div");
   messageContainer.classList.add("postMessage");
   const messageTitle = document.createElement("div");
@@ -120,16 +145,18 @@ window.addEventListener("message", (event) => {
   if (event.source === iiProtocolTestWindow) {
     addMessageElement(event.data, true);
     if (event?.data?.kind === "authorize-client-success") {
-      const delegations = event.data.delegations.map((signedDelegation) => {
-        return {
-          delegation: new Delegation(
-            signedDelegation.delegation.pubkey,
-            signedDelegation.delegation.expiration,
-            signedDelegation.delegation.targets
-          ),
-          signature: signedDelegation.signature.buffer,
-        };
-      });
+      const delegations = event.data.delegations.map(
+        (signedDelegation: any) => {
+          return {
+            delegation: new Delegation(
+              signedDelegation.delegation.pubkey,
+              signedDelegation.delegation.expiration,
+              signedDelegation.delegation.targets
+            ),
+            signature: signedDelegation.signature.buffer,
+          };
+        }
+      );
       const delegationChain = DelegationChain.fromDelegations(
         delegations,
         event.data.userPublicKey.buffer
@@ -141,8 +168,9 @@ window.addEventListener("message", (event) => {
   }
 });
 
-const readCanisterId = () => {
-  return document.querySelector("[data-canister-id]").dataset.canisterId;
+const readCanisterId = (): string => {
+  const canIdEl = document.querySelector("[data-canister-id]") as HTMLElement;
+  return canIdEl.dataset.canisterId!;
 };
 
 const init = async () => {
@@ -155,7 +183,7 @@ const init = async () => {
     if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
       authClient.login({
         identityProvider: iiUrlEl.value,
-        maxTimeToLive: BigInt(maxTimeToLive.value),
+        maxTimeToLive: BigInt(maxTimeToLiveEl.value),
         derivationOrigin,
         onSuccess: () => updateDelegationView(authClient.getIdentity()),
       });
@@ -188,7 +216,7 @@ const init = async () => {
     }
   };
 
-  invalidDataBtn.onclick = () => {
+  invalidDataBtn!.onclick = () => {
     if (!iiProtocolTestWindow) {
       alert("Open II tab first");
       return;
@@ -248,14 +276,21 @@ const init = async () => {
       agent: httpAgent,
       canisterId,
     });
-    const modeSelection = document.querySelector(
-      'input[name="alternativeOriginsMode"]:checked'
+    const modeSelection = (
+      document.querySelector(
+        'input[name="alternativeOriginsMode"]:checked'
+      ) as HTMLInputElement
     ).value;
-    let mode = { CertifiedContent: null };
+    let mode:
+      | { Redirect: { location: string } }
+      | { CertifiedContent: null }
+      | { UncertifiedContent: null } = { CertifiedContent: null };
     if (modeSelection === "uncertified") {
       mode = { UncertifiedContent: null };
     } else if (modeSelection === "redirect") {
-      let location = document.getElementById("redirectLocation").value;
+      let location = (
+        document.getElementById("redirectLocation") as HTMLInputElement
+      ).value;
       mode = { Redirect: { location: location } };
     }
     await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
@@ -265,24 +300,24 @@ const init = async () => {
 
 init();
 
-whoamiBtn.addEventListener("click", async () => {
+whoamiBtn!.addEventListener("click", async () => {
   const identity = await authClient.getIdentity();
   const canisterId = Principal.fromText(readCanisterId());
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
-      host: hostUrlEl.value,
+      host: (hostUrlEl as HTMLInputElement).value,
       identity,
     }),
     canisterId,
   });
 
-  whoAmIResponseEl.innerText = "Loading...";
+  whoAmIResponseEl!.innerText = "Loading...";
 
   // Similar to the sample project on dfx new:
   actor
     .whoami()
-    .then((principal) => {
-      whoAmIResponseEl.innerText = principal.toText();
+    .then((principal: any) => {
+      whoAmIResponseEl!.innerText = principal.toText();
     })
     .catch((err) => {
       console.error("Failed to fetch whoami", err);
