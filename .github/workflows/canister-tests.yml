@@ -272,7 +272,9 @@ jobs:
       - uses: ./.github/actions/setup-node
       - name: "Build test app canister"
         working-directory: demos/test-app
-        run: ./build.sh
+        run: |
+          npm ci
+          ./build.sh
       - name: 'Upload test app'
         uses: actions/upload-artifact@v3
         with:

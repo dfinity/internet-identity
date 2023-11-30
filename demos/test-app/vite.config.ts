@@ -1,28 +1,39 @@
-import { readFileSync } from "fs";
-import { join } from "path";
-import { defineConfig, type UserConfig } from "vite";
+import { execSync } from "child_process";
+import { defineConfig } from "vite";
 
-const replicaHost = "http://127.0.0.1:4943" as const;
+/**
+ * Read a canister ID from dfx's local state
+ */
+export const readCanisterId = ({
+  canisterName,
+}: {
+  canisterName: string;
+}): string => {
+  const command = `dfx canister id ${canisterName}`;
+  try {
+    const stdout = execSync(command);
+    return stdout.toString().trim();
+  } catch (e) {
+    throw Error(
+      `Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`
+    );
+  }
+};
+
+export const getReplicaHost = (): string => {
+  const command = `dfx info webserver-port`;
+  try {
+    const stdout = execSync(command);
+    const port = stdout.toString().trim();
+    return `http://127.0.0.1:${port}`;
+  } catch (e) {
+    throw Error(
+      `Could not get replica port '${command}', is the replica running? ${e}`
+    );
+  }
+};
 
 const rewriteRoute = (pathAndParams: string): string => {
-  const readCanisterId = (): string => {
-    const canisterIdsJson = join(
-      process.cwd(),
-      ".dfx",
-      "local",
-      "canister_ids.json"
-    );
-    try {
-      const buffer = readFileSync(canisterIdsJson);
-      const {
-        test_app: { local },
-      } = JSON.parse(buffer.toString("utf-8"));
-      return local;
-    } catch (e: unknown) {
-      throw Error(`Could get canister ID from ${canisterIdsJson}: ${e}`);
-    }
-  };
-
   let queryParamsString = `?`;
 
   const [path, params] = pathAndParams.split("?");
@@ -31,55 +42,50 @@ const rewriteRoute = (pathAndParams: string): string => {
     queryParamsString += `${params}&`;
   }
 
-  queryParamsString += `canisterId=${readCanisterId()}`;
+  queryParamsString += `canisterId=${readCanisterId({
+    canisterName: "test_app",
+  })}`;
 
   return path + queryParamsString;
 };
 
-export default defineConfig(
-  ({ mode }: UserConfig): UserConfig => ({
-    root: "src",
-    build: {
-      outDir: "../dist",
-      emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          entryFileNames: `[name].js`,
-          chunkFileNames: `[name].js`,
-          assetFileNames: `[name].[ext]`,
-        },
+export default defineConfig(({ command, mode }) => ({
+  root: "./src",
+  build: {
+    outDir: "../dist",
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: `[name].js`,
+        chunkFileNames: `[name].js`,
+        assetFileNames: `[name].[ext]`,
       },
     },
-    optimizeDeps: {
-      esbuildOptions: {
-        define: {
-          global: "globalThis",
-        },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: "globalThis",
       },
     },
-    server: {
-      port: 8081,
-      // Set up a proxy that redirects API calls and /index.html to the
-      // replica; the rest we serve from here.
-      proxy: {
-        "/api": replicaHost,
-        "/": {
-          target: replicaHost,
-          rewrite: rewriteRoute,
+  },
+  server:
+    command !== "serve"
+      ? undefined
+      : {
+          port: 8081,
+          // Set up a proxy that redirects API calls and /index.html to the
+          // replica; the rest we serve from here.
+          proxy: {
+            "/api": getReplicaHost(),
+            "/.well-known/ii-alternative-origins": {
+              target: getReplicaHost(),
+              rewrite: rewriteRoute,
+            },
+            "/.well-known/evil-alternative-origins": {
+              target: getReplicaHost(),
+              rewrite: rewriteRoute,
+            },
+          },
         },
-        "/index.html": {
-          target: replicaHost,
-          rewrite: rewriteRoute,
-        },
-        "/.well-known/ii-alternative-origins": {
-          target: replicaHost,
-          rewrite: rewriteRoute,
-        },
-        "/.well-known/evil-alternative-origins": {
-          target: replicaHost,
-          rewrite: rewriteRoute,
-        },
-      },
-    },
-  })
-);
+}));
