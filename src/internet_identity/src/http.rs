@@ -1,6 +1,7 @@
+use crate::assets::JS_SETUP_SCRIPT_SRI_HASH;
 use crate::http::metrics::metrics;
 use crate::state;
-use asset_util::{EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION, JS_SETUP_SCRIPT_SRI_HASH};
+use asset_util::{EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use canister_sig_util::signature_map::LABEL_SIG;

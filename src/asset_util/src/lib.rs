@@ -1,6 +1,3 @@
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
-use ic_cdk::api;
 use ic_certification::{
     fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, NestedTree, RbTree,
 };
@@ -109,29 +106,8 @@ impl ContentType {
     }
 }
 
-// The <script> tag that loads the 'index.js'
-const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
-
-// Fix up HTML pages, by injecting canister ID & script tag
-fn fixup_html(html: &str) -> String {
-    let canister_id = api::id();
-    let setup_js: String = JS_SETUP_SCRIPT.to_string();
-    html.replace(
-        r#"<script type="module" crossorigin src="/index.js"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js}</script>"#),
-    )
-}
-
 lazy_static! {
-    // The SRI sha256 hash of the script tag, used by the CSP policy.
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
-    pub static ref JS_SETUP_SCRIPT_SRI_HASH: String = {
-        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT.as_bytes());
-        let hash = BASE64.encode(hash);
-        format!("sha256-{hash}")
-    };
-
-     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
+    pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
 /// Takes a list of assets and returns a [CertifiedAssets] struct containing the assets and their
@@ -227,22 +203,28 @@ fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
     response_hash
 }
 
-pub fn collect_assets_recursive(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
-    let mut assets = collect_assets_from_dir(dir);
+pub fn collect_assets_recursive(
+    dir: &Dir,
+    html_transformer: fn(&str) -> String,
+) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+    let mut assets = collect_assets_from_dir(dir, html_transformer);
     for subdir in dir.dirs() {
-        assets.extend(collect_assets_recursive(subdir).into_iter());
+        assets.extend(collect_assets_recursive(subdir, html_transformer).into_iter());
     }
     assets
 }
 
-pub fn collect_assets_from_dir(dir: &Dir) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+pub fn collect_assets_from_dir(
+    dir: &Dir,
+    html_transformer: fn(&str) -> String,
+) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
     let mut assets: Vec<(String, Vec<u8>, ContentEncoding, ContentType)> = vec![];
     for asset in dir.files() {
         let file_bytes = asset.contents().to_vec();
         let (content, encoding, content_type) = match file_extension(asset) {
             "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
             "html" => (
-                fixup_html(String::from_utf8_lossy(&file_bytes).as_ref())
+                html_transformer(String::from_utf8_lossy(&file_bytes).as_ref())
                     .as_bytes()
                     .to_vec(),
                 ContentEncoding::Identity,
