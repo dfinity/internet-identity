@@ -177,6 +177,14 @@ fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, 
         .map_err(|_| "failed exporting presentation")?)
 }
 
+/// Verifies the specified JWT presentation cryptographically, which should contain exactly
+/// two verifiable credentials (in the order specifed):
+///   1. An id_alias credential which links the holder of the VP to a temporary id_alias.
+///      This credential should be signed by canister vc_flow_parties.ii_canister_id.
+///   2. An actual credential requested by a user.  The subject of this credential is id_alias,
+///      and it should be signed by canister vc_flow_parties.issuer_canister_id
+/// Returns holder's identity together with id_alias, and the claims from the requested credential.
+/// DOES NOT perform semantic validation of the returned claims.
 pub fn verify_ii_presentation_jwt_with_canister_ids(
     vp_jwt: &str,
     vc_flow_parties: &VcFlowParties,
@@ -785,5 +793,76 @@ mod tests {
             &test_ic_root_pk_raw(),
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("InvalidSignature"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_wrong_ii_canister_id() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_issuer_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("canister id does not match"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_wrong_issuer_canister_id() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("canister id does not match"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_wrong_order_of_vcs() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+
+        // Swap the order of the VCs
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                // Swap also the order of the canister ids, so that they match the VCs
+                ii_canister_id: test_issuer_canister_sig_pk().canister_id,
+                issuer_canister_id: test_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("inconsistent claim in id_alias VC"));
     }
 }
