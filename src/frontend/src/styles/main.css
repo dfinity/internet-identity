@@ -2735,14 +2735,32 @@ input[type="checkbox"] {
   background: var(--rc-overlay-backdrop);
 }
 
+/* Pretend the astronaut is moving in space */
+@keyframes astrodance {
+  0% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) rotate(10deg);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+}
+
 .c-loader__image {
-  width: 125px;
+  width: 64px;
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
   user-select: none;
+  animation-name: astrodance;
+  animation-duration: 5s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
 }
 
 /* Wrap QR codes in a white square (for legibility) and prettify a bit */

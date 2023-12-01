@@ -1,5 +1,5 @@
 import { html, render } from "lit-html";
-import loaderUrl from "./loader.webp";
+import loaderUrl from "./loader.svg";
 
 const loader = () => html` <div id="loader" class="c-loader">
   <img class="c-loader__image" src=${loaderUrl} alt="loading" />
