@@ -296,10 +296,6 @@ fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidati
     let id_alias = principal_for_did(alias).map_err(|_| {
         inconsistent_jwt_claims("malformed \"has_id_alias\" claim in id_alias JWT vc")
     })?;
-    println!(
-        "*** id_alias tuple from claims: id_alias: {}, id_dapp: {}",
-        id_alias, id_dapp
-    );
     Ok(AliasTuple { id_alias, id_dapp })
 }
 
