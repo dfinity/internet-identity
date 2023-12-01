@@ -109,6 +109,8 @@ dependencies = [
  "include_dir",
  "internet_identity_interface",
  "lazy_static",
+ "serde",
+ "serde_cbor",
  "sha2 0.10.8",
 ]
 

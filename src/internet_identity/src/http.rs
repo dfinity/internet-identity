@@ -1,22 +1,13 @@
 use crate::assets::JS_SETUP_SCRIPT_SRI_HASH;
 use crate::http::metrics::metrics;
 use crate::state;
-use asset_util::{EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
 use canister_sig_util::signature_map::LABEL_SIG;
-use ic_cdk::api::data_certificate;
 use ic_cdk::trap;
-use ic_certification::{fork, labeled_hash, pruned};
+use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 
 mod metrics;
-
-pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
-pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
-const LABEL_HTTP_EXPR: &str = "http_expr";
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
@@ -214,71 +205,19 @@ pub fn content_security_policy_header() -> String {
 }
 
 fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
     state::assets_and_signatures(|assets, sigs| {
-        let tree = fork(
-            assets.witness_v1(asset_name),
+        assets.certificate_headers_v1(
+            asset_name,
             pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
-        );
-        let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
-        serializer.self_describe().unwrap();
-        tree.serialize(&mut serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
-        vec![(
-            IC_CERTIFICATE_HEADER.to_string(),
-            format!(
-                "certificate=:{}:, tree=:{}:",
-                BASE64.encode(&certificate),
-                BASE64.encode(serializer.into_inner())
-            ),
-        )]
+        )
     })
 }
 
 fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
-    assert!(absolute_path.starts_with('/'));
-
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-
-    let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
-    // replace the first empty split segment (due to absolute path) with "http_expr"
-    *path.get_mut(0).unwrap() = LABEL_HTTP_EXPR.to_string();
-    path.push(EXACT_MATCH_TERMINATOR.to_string());
-
     state::assets_and_signatures(|assets, sigs| {
-        let tree = fork(
-            assets.witness_v2(absolute_path),
+        assets.certificate_headers_v2(
+            absolute_path,
             pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
-        );
-
-        let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);
-        tree_serializer.self_describe().unwrap();
-        tree.serialize(&mut tree_serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
-
-        let mut expr_path_serializer = serde_cbor::ser::Serializer::new(vec![]);
-        expr_path_serializer.self_describe().unwrap();
-        path.serialize(&mut expr_path_serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a expr_path: {e}")));
-
-        vec![
-            (
-                IC_CERTIFICATE_HEADER.to_string(),
-                format!(
-                    "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
-                    BASE64.encode(&certificate),
-                    BASE64.encode(tree_serializer.into_inner()),
-                    BASE64.encode(expr_path_serializer.into_inner())
-                ),
-            ),
-            (
-                IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
-                IC_CERTIFICATE_EXPRESSION.to_string(),
-            ),
-        ]
+        )
     })
 }

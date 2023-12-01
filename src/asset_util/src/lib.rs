@@ -1,3 +1,7 @@
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
+use ic_cdk::api::data_certificate;
+use ic_cdk::trap;
 use ic_certification::{
     fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, NestedTree, RbTree,
 };
@@ -5,13 +9,14 @@ use ic_representation_independent_hash::{representation_independent_hash, Value}
 use include_dir::{Dir, File};
 use internet_identity_interface::http_gateway::HeaderField;
 use lazy_static::lazy_static;
+use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
-pub const LABEL_ASSETS_V1: &[u8] = b"http_assets";
-pub const LABEL_ASSETS_V2: &[u8] = b"http_expr";
+pub const LABEL_ASSETS_V1: &str = "http_assets";
+pub const LABEL_ASSETS_V2: &str = "http_expr";
 pub const STATUS_CODE_PSEUDO_HEADER: &str = ":ic-cert-status";
 pub const EXACT_MATCH_TERMINATOR: &str = "<$>";
 pub const IC_CERTIFICATE_EXPRESSION: &str =
@@ -33,23 +38,29 @@ impl CertifiedAssets {
     pub fn root_hash(&self) -> Hash {
         fork_hash(
             // NB: Labels added in lexicographic order.
-            &labeled_hash(LABEL_ASSETS_V1, &self.certification_v1.root_hash()),
-            &labeled_hash(LABEL_ASSETS_V2, &self.certification_v2.root_hash()),
+            &labeled_hash(
+                LABEL_ASSETS_V1.as_bytes(),
+                &self.certification_v1.root_hash(),
+            ),
+            &labeled_hash(
+                LABEL_ASSETS_V2.as_bytes(),
+                &self.certification_v2.root_hash(),
+            ),
         )
     }
 
-    pub fn witness_v1(&self, path: &str) -> HashTree {
+    fn witness_v1(&self, path: &str) -> HashTree {
         let witness = self.certification_v1.witness(path.as_bytes());
         fork(
             labeled(LABEL_ASSETS_V1, witness),
             pruned(labeled_hash(
-                LABEL_ASSETS_V2,
+                LABEL_ASSETS_V2.as_bytes(),
                 &self.certification_v2.root_hash(),
             )),
         )
     }
 
-    pub fn witness_v2(&self, absolute_path: &str) -> HashTree {
+    fn witness_v2(&self, absolute_path: &str) -> HashTree {
         assert!(absolute_path.starts_with('/'));
 
         let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
@@ -60,11 +71,79 @@ impl CertifiedAssets {
 
         fork(
             pruned(labeled_hash(
-                LABEL_ASSETS_V1,
+                LABEL_ASSETS_V1.as_bytes(),
                 &self.certification_v1.root_hash(),
             )),
-            labeled(LABEL_ASSETS_V2, witness),
+            labeled(LABEL_ASSETS_V2.as_bytes(), witness),
         )
+    }
+
+    pub fn certificate_headers_v1(
+        &self,
+        asset_name: &str,
+        sigs_tree: HashTree,
+    ) -> Vec<(String, String)> {
+        let certificate = data_certificate().unwrap_or_else(|| {
+            trap("data certificate is only available in query calls");
+        });
+
+        let tree = fork(self.witness_v1(asset_name), sigs_tree);
+        let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
+        serializer.self_describe().unwrap();
+        tree.serialize(&mut serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
+        vec![(
+            IC_CERTIFICATE_HEADER.to_string(),
+            format!(
+                "certificate=:{}:, tree=:{}:",
+                BASE64.encode(certificate),
+                BASE64.encode(serializer.into_inner())
+            ),
+        )]
+    }
+
+    pub fn certificate_headers_v2(
+        &self,
+        absolute_path: &str,
+        sigs_tree: HashTree,
+    ) -> Vec<(String, String)> {
+        assert!(absolute_path.starts_with('/'));
+        let certificate = data_certificate().unwrap_or_else(|| {
+            trap("data certificate is only available in query calls");
+        });
+
+        let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
+        // replace the first empty split segment (due to absolute path) with "http_expr"
+        *path.get_mut(0).unwrap() = LABEL_ASSETS_V2.to_string();
+        path.push(EXACT_MATCH_TERMINATOR.to_string());
+
+        let tree = fork(self.witness_v2(absolute_path), sigs_tree);
+
+        let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);
+        tree_serializer.self_describe().unwrap();
+        tree.serialize(&mut tree_serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
+
+        let mut expr_path_serializer = serde_cbor::ser::Serializer::new(vec![]);
+        expr_path_serializer.self_describe().unwrap();
+        path.serialize(&mut expr_path_serializer)
+            .unwrap_or_else(|e| trap(&format!("failed to serialize a expr_path: {e}")));
+
+        vec![
+            (
+                IC_CERTIFICATE_HEADER.to_string(),
+                format!(
+                    "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
+                    BASE64.encode(certificate),
+                    BASE64.encode(tree_serializer.into_inner()),
+                    BASE64.encode(expr_path_serializer.into_inner())
+                ),
+            ),
+            (
+                IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
+                IC_CERTIFICATE_EXPRESSION.to_string(),
+            ),
+        ]
     }
 }
 
