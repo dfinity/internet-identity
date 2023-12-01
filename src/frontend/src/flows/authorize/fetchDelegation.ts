@@ -6,7 +6,6 @@ import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { unknownToString } from "$src/utils/utils";
 import { Signature } from "@dfinity/agent";
-import { nonNullish } from "@dfinity/utils";
 import { Delegation } from "./postMessageInterface";
 
 /**
@@ -28,16 +27,6 @@ export const fetchDelegation = async ({
   publicKey: Uint8Array;
   maxTimeToLive?: bigint;
 }): Promise<[PublicKey, Delegation] | { error: unknown }> => {
-  // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
-  // we map back the derivation origin to the ic0.app domain.
-  const ORIGIN_MAPPING_REGEX =
-    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
-  const match = derivationOrigin.match(ORIGIN_MAPPING_REGEX);
-  const subdomain = match?.groups?.subdomain;
-  if (nonNullish(subdomain)) {
-    derivationOrigin = `https://${subdomain}.ic0.app`;
-  }
-
   const result = await connection.prepareDelegation(
     derivationOrigin,
     publicKey,
