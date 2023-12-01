@@ -3,11 +3,11 @@ use crate::activity_stats::activity_counter::authn_method_counter::AuthnMethodCo
 use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
 use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
-use crate::assets::CertifiedAssets;
 use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
 use crate::{Salt, Storage};
+use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::SignatureMap;
 use ic_cdk::api::time;

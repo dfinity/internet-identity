@@ -1,6 +1,7 @@
-use crate::assets::{ContentType, EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
+use crate::assets::JS_SETUP_SCRIPT_SRI_HASH;
 use crate::http::metrics::metrics;
-use crate::{assets, state};
+use crate::state;
+use asset_util::{EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use canister_sig_util::signature_map::LABEL_SIG;
@@ -16,23 +17,6 @@ mod metrics;
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
 const LABEL_HTTP_EXPR: &str = "http_expr";
-
-impl ContentType {
-    pub fn to_mime_type_string(self) -> String {
-        match self {
-            ContentType::HTML => "text/html".to_string(),
-            ContentType::JS => "text/javascript".to_string(),
-            ContentType::JSON => "application/json".to_string(),
-            ContentType::CSS => "text/css".to_string(),
-            ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
-            ContentType::WEBP => "image/webp".to_string(),
-            ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
-            ContentType::PNG => "image/png".to_string(),
-            ContentType::SVG => "image/svg+xml".to_string(),
-            ContentType::WOFF2 => "application/font-woff2".to_string(),
-        }
-    }
-}
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
@@ -211,7 +195,7 @@ pub fn security_headers() -> Vec<HeaderField> {
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
 pub fn content_security_policy_header() -> String {
-    let hash = assets::JS_SETUP_SCRIPT_SRI_HASH.to_string();
+    let hash = JS_SETUP_SCRIPT_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
          connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\

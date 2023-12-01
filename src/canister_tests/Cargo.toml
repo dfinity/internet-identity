@@ -22,4 +22,4 @@ identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git
 # All IC deps
 candid.workspace = true
 ic-cdk.workspace = true
-ic-representation-independent-hash = "1.0"
+ic-representation-independent-hash.workspace = true

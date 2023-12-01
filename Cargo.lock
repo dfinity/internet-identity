@@ -97,6 +97,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
 
 [[package]]
+name = "asset_util"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.5",
+ "candid",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "ic-certification 1.3.0",
+ "ic-representation-independent-hash",
+ "include_dir",
+ "internet_identity_interface",
+ "lazy_static",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2020,6 +2036,7 @@ dependencies = [
 name = "internet_identity"
 version = "0.1.0"
 dependencies = [
+ "asset_util",
  "base64 0.21.5",
  "candid",
  "canister_sig_util",
