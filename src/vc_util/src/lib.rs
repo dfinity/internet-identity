@@ -4,8 +4,9 @@ use ic_certification::Hash;
 use ic_crypto_standalone_sig_verifier::verify_canister_sig;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
 use identity_core::convert::FromJson;
-use identity_credential::credential::Subject;
+use identity_credential::credential::{Jwt, Subject};
 use identity_credential::error::Error as JwtVcError;
+use identity_credential::presentation::{Presentation, PresentationJwtClaims};
 use identity_credential::validator::JwtValidationError;
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{
@@ -35,10 +36,25 @@ pub struct AliasTuple {
     pub id_dapp: Principal,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct VcFlowParties {
+    /// Ids of canisters that issued credentials contained in a verifiable presentation.
+    pub ii_canister_id: Principal,
+    pub issuer_canister_id: Principal,
+}
+
 #[derive(Debug)]
 pub enum CredentialVerificationError {
     InvalidJws(SignatureVerificationError),
     InvalidClaims(JwtValidationError),
+}
+
+#[derive(Debug)]
+pub enum PresentationVerificationError {
+    InvalidPresentationJwt(String),
+    InvalidIdAliasCredential(CredentialVerificationError),
+    InvalidRequestedCredential(CredentialVerificationError),
+    Unknown(String),
 }
 
 /// Returns the effective bytes that will be signed when computing a canister signature for
@@ -149,6 +165,89 @@ pub fn verify_credential_jws_with_canister_id(
     Ok(claims)
 }
 
+fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, String> {
+    let decoder = Decoder::new();
+    let jwt = decoder
+        .decode_compact_serialization(vp_jwt.as_ref(), None)
+        .map_err(|_| "failed decoding compact jwt serialization")?;
+    let presentation_claims = PresentationJwtClaims::from_json_slice(&jwt.claims())
+        .map_err(|_| "failed parsing presentation claims")?;
+    Ok(presentation_claims
+        .try_into_presentation()
+        .map_err(|_| "failed exporting presentation")?)
+}
+
+pub fn verify_ii_presentation_jwt_with_canister_ids(
+    vp_jwt: &str,
+    vc_flow_parties: &VcFlowParties,
+    root_pk_raw: &[u8],
+) -> Result<(AliasTuple, JwtClaims<Value>), PresentationVerificationError> {
+    let presentation = parse_verifiable_presentation_jwt(vp_jwt)
+        .map_err(PresentationVerificationError::InvalidPresentationJwt)?;
+    if presentation.verifiable_credential.len() != 2 {
+        return Err(PresentationVerificationError::InvalidPresentationJwt(
+            "expected exactly two verifiable credentials".to_string(),
+        ));
+    }
+    let id_alias_vc_jws =
+        presentation
+            .verifiable_credential
+            .get(0)
+            .ok_or(PresentationVerificationError::Unknown(
+                "missing id_alias vc".to_string(),
+            ))?;
+    let alias_tuple = get_verified_id_alias_from_jws(
+        id_alias_vc_jws.as_str(),
+        &vc_flow_parties.ii_canister_id,
+        root_pk_raw,
+    )
+    .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
+    let holder = principal_for_did(&presentation.holder.to_string()).map_err(|e| {
+        PresentationVerificationError::Unknown(format!("error parsing holder: {}", e))
+    })?;
+    if holder != alias_tuple.id_dapp {
+        return Err(PresentationVerificationError::InvalidPresentationJwt(
+            format!(
+                "holder does not match subject: expected {}, got {}",
+                holder, alias_tuple.id_dapp
+            )
+            .to_string(),
+        ));
+    }
+    let requested_vc_jws =
+        presentation
+            .verifiable_credential
+            .get(1)
+            .ok_or(PresentationVerificationError::Unknown(
+                "missing requested vc".to_string(),
+            ))?;
+    let claims = verify_credential_jws_with_canister_id(
+        requested_vc_jws.as_str(),
+        &vc_flow_parties.issuer_canister_id,
+        root_pk_raw,
+    )
+    .map_err(|e| {
+        PresentationVerificationError::InvalidRequestedCredential(
+            CredentialVerificationError::InvalidJws(e),
+        )
+    })?;
+    let requested_vc_subject = extract_subject(&claims).map_err(|e| {
+        PresentationVerificationError::InvalidRequestedCredential(
+            CredentialVerificationError::InvalidClaims(e),
+        )
+    })?;
+    if requested_vc_subject != alias_tuple.id_alias {
+        return Err(PresentationVerificationError::InvalidPresentationJwt(
+            format!(
+                "subject does not match id_alias: expected {}, got {}",
+                alias_tuple.id_alias, requested_vc_subject
+            )
+            .to_string(),
+        ));
+    }
+    Ok((alias_tuple, claims))
+}
+
 /// Returns the given `signing_input` prefixed with
 ///      length(VC_SIGNING_INPUT_DOMAIN) || VC_SIGNING_INPUT_DOMAIN
 /// (for domain separation).
@@ -159,14 +258,19 @@ fn signing_input_with_prefix(signing_input: &[u8]) -> Vec<u8> {
     result
 }
 
-fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidationError> {
+fn extract_subject(claims: &JwtClaims<Value>) -> Result<Principal, JwtValidationError> {
     let Some(sub) = claims.sub() else {
         return Err(JwtValidationError::CredentialStructure(
             JwtVcError::MissingSubject,
         ));
     };
-    let id_dapp = principal_for_did(sub)
+    let subject = principal_for_did(sub)
         .map_err(|_| JwtValidationError::CredentialStructure(JwtVcError::InvalidSubject))?;
+    Ok(subject)
+}
+
+fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidationError> {
+    let id_dapp = extract_subject(claims)?;
     let vc = claims.vc().ok_or(inconsistent_jwt_claims(
         "missing \"vc\" claim in id_alias JWT claims",
     ))?;
@@ -184,6 +288,10 @@ fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidati
     let id_alias = principal_for_did(alias).map_err(|_| {
         inconsistent_jwt_claims("malformed \"has_id_alias\" claim in id_alias JWT vc")
     })?;
+    println!(
+        "*** id_alias tuple from claims: id_alias: {}, id_dapp: {}",
+        id_alias, id_dapp
+    );
     Ok(AliasTuple { id_alias, id_dapp })
 }
 
@@ -289,6 +397,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use canister_sig_util::{extract_raw_root_pk_from_der, IC_ROOT_PK_DER_PREFIX};
+    use identity_core::common::Url;
+    use identity_credential::presentation::{JwtPresentationOptions, PresentationBuilder};
 
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
@@ -302,6 +412,13 @@ mod tests {
     ];
     const TEST_CREDENTIAL_JWT: &str = r#"{"iss":"https://employment.info/","nbf":1620328630,"jti":"https://employment.info/credentials/42","sub":"did:icp:igfpm-3fhrp-syqme-4i4xk-o4pgd-5xdh4-fbbgw-jnxm5-bvou4-ljt52-kqe","vc":{"@context":"https://www.w3.org/2018/credentials/v1","type":["VerifiableCredential","VerifiedEmployee"],"credentialSubject":{"employee_of":{"employerId":"did:web:dfinity.org","employerName":"DFINITY Foundation"}}}}"#;
 
+    // Test data used for verifiable presentation tests.
+    const TEST_ISSUER_SIGNING_CANISTER_ID: &str = "rrkah-fqaaa-aaaaa-aaaaq-cai";
+    const ID_ALIAS_FOR_VP: &str = "vhbib-m4hm6-hpvyc-7prd2-siivo-nbd7r-67o5x-n3awh-qsmqz-wznjf-tqe";
+    const ID_RP_FOR_VP: &str = "p2nlc-3s5ul-lcu74-t6pn2-ui5im-i4a5f-a4tga-e6znf-tnvlh-wkmjs-dqe";
+    const ID_ALIAS_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCRVNzWHp2bTEzd1BkRTVZSndvLTBCYkdBTHdCN0J2bW1LZUxramFUUTdkQSJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOnAybmxjLTNzNXVsLWxjdTc0LXQ2cG4yLXVpNWltLWk0YTVmLWE0dGdhLWU2em5mLXRudmxoLXdrbWpzLWRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDp2aGJpYi1tNGhtNi1ocHZ5Yy03cHJkMi1zaWl2by1uYmQ3ci02N281eC1uM2F3aC1xc21xei13em5qZi10cWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1gg_I-cV8ZPkoVyh_WcilMFKcpT5cH2-oyCoRTh7llUZeyCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggkzS0s8W3-LMHUd6MNFx8vCZvWiTSFRorIEMWhTwPnnmCBFggnrchOFTbl4uvnyde_cSNSJyYA1bRSyy00Wc9euCSodyCBFggIujS7mOdXhfJUJZBqbtLm22ZyONdyVFbAnpVPc30ZBCCBFggQkuzJEh6pJ0g-QNG7IbT7mnxW4XJSKdeWGVTxAw3jiaCBFggwQi-CzFufoFsQD0tmyYIhiaRNWLbADbGQmT6CchuXqSDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDC5hBVS08Sf6LMHt1w84qtUQ_ELlYt494xOwPQ9_a45cQ2YbpXovT2OohCzC0Rtfk5kdHJlZYMBggRYIDUbro13tGgB_Yqf9JhMW8pvpzCvCBJY_J0CfFMPNBthgwJDc2lngwJYIFcsa4eb-HMrTnmGWNje_RfErQYi0wNCJvGDrzqazq0OgwGDAlggltI_YbE4mukz0q2BJuH-cIbYTjmBOZbpwqiCPgURrdqCA0CCBFggq2BLsFnxNQd_gswt0oE2oBJO-Cwaey9RhEs4XhsPT2w";
+    const REQUESTED_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCeUk3dlEyOGVybHFnVjVMck03dTNIOUlaeGVwcUxzQkdnSjFyTldaX0tfQSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvLyIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9lbXBsb3ltZW50LmluZm8vY3JlZGVudGlhbHMvNDIiLCJzdWIiOiJkaWQ6aWNwOnZoYmliLW00aG02LWhwdnljLTdwcmQyLXNpaXZvLW5iZDdyLTY3bzV4LW4zYXdoLXFzbXF6LXd6bmpmLXRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVmVyaWZpZWRFbXBsb3llZSJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJlbXBsb3llZV9vZiI6eyJlbXBsb3llcklkIjoiZGlkOndlYjpkZmluaXR5Lm9yZyIsImVtcGxveWVyTmFtZSI6IkRGSU5JVFkgRm91bmRhdGlvbiJ9fX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggqJgFhbOSOgOY-buXQFiOROH05grMrWl8vT4tcEIPiq6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggQ4oRC4U7Lky7wzOfBg9VDx119qT8VxNIS_--J9EL4o6CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggxZtR4JD8cPLlnq01PLx8CEHFa79R67oIdK_dBGpq6mmCBFggdUc130tu5B34n_1cMDNiJCbEamgKPeRmzOso7AmvmWqCBFggs_FSiRZluL8IU_a-voSJLAO8z2nvX1MmJCq_Tz0e1amCBFggqSI6U4ChzjO4YJ_NvOqGukyHIfX-3UYcYgkyTLgF9D6DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDC0pP0klDiTh8fvUkKDDcrCjECDHalcBWLYKVzYy6Sm2rMZ2tsXvCbtf2fraClWVipkdHJlZYMBggRYICk5fdPgBGT68fKT0kj59h1zod2tut7mB0DAKhosc6-igwJDc2lngwJYIHGZW4y0kE1oq6oGYkhXj36h1sNPmG2jwFX6tPGiRkfXgwJYIOHTIYnxMIa4fJPR4CTYus-9YPlhsgAYJwpj0j9Jx3NcggNA";
+
     fn test_ic_root_pk_raw() -> Vec<u8> {
         let pk_der = decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk");
         extract_raw_root_pk_from_der(pk_der.as_slice())
@@ -311,6 +428,13 @@ mod tests {
     fn test_canister_sig_pk() -> CanisterSigPublicKey {
         CanisterSigPublicKey::new(
             Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal"),
+            TEST_SEED.to_vec(),
+        )
+    }
+
+    fn test_issuer_canister_sig_pk() -> CanisterSigPublicKey {
+        CanisterSigPublicKey::new(
+            Principal::from_text(TEST_ISSUER_SIGNING_CANISTER_ID).expect("wrong principal"),
             TEST_SEED.to_vec(),
         )
     }
@@ -331,6 +455,37 @@ mod tests {
         let claims: JwtClaims<Value> =
             serde_json::from_slice(jws.claims()).expect("failed parsing JSON JWT claims");
         claims
+    }
+
+    fn create_verifiable_presentation_jwt_for_test(
+        holder: Principal,
+        vcs_jws: Vec<String>,
+    ) -> Result<String, String> {
+        let holder_url = Url::parse(did_for_principal(holder)).map_err(|_| "Invalid holder")?;
+        let mut builder = PresentationBuilder::new(holder_url, Default::default());
+        for vc in vcs_jws {
+            builder = builder.credential(Jwt::from(vc));
+        }
+        let presentation: Presentation<Jwt> = builder
+            .build()
+            .map_err(|_| "failed building presentation")?;
+        presentation_to_compact_jwt(&presentation)
+    }
+
+    fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<String, String> {
+        let mut header: JwsHeader = JwsHeader::new();
+        header.set_typ("JWT");
+        header.set_alg(JwsAlgorithm::NONE);
+        let vp_jwt = presentation
+            .serialize_jwt(&JwtPresentationOptions {
+                expiration_date: None,
+                issuance_date: None,
+                audience: None,
+            })
+            .map_err(|_| "failed serializing presentation")?;
+        let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
+            .map_err(|_| "internal error: JWS encoder failed")?;
+        Ok(encoder.into_jws(&[]))
     }
 
     #[test]
@@ -448,5 +603,187 @@ mod tests {
                 id_dapp: dapp_principal(),
             }
         )
+    }
+
+    #[test]
+    fn should_parse_verifiable_presentation() {
+        let id_alias_vc_jws = "a dummy id_alias_vc_jws".to_string();
+        let requested_vc_jws = "a dummy requested_vc_jws".to_string();
+        let holder = dapp_principal();
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![id_alias_vc_jws.clone(), requested_vc_jws.clone()],
+        )
+        .expect("vp-creation failed");
+        let presentation: Presentation<Jwt> =
+            parse_verifiable_presentation_jwt(&vp_jwt).expect("failed jwt parsing");
+
+        assert!(presentation
+            .verifiable_credential
+            .contains(&Jwt::from(id_alias_vc_jws)));
+        assert!(presentation
+            .verifiable_credential
+            .contains(&Jwt::from(requested_vc_jws)));
+        assert_eq!(
+            Url::parse(did_for_principal(holder)).expect("bad url"),
+            presentation.holder
+        );
+    }
+
+    #[test]
+    fn should_verify_ii_presentation() {
+        let id_alias = Principal::from_text(ID_ALIAS_FOR_VP).expect("wrong principal");
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let (alias_tuple_from_jws, _claims) = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        )
+        .expect("vp verification failed");
+        assert_eq!(id_alias, alias_tuple_from_jws.id_alias);
+        assert_eq!(id_dapp, alias_tuple_from_jws.id_dapp);
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_extra_vc() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                "an extra vc".to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("expected exactly two verifiable credentials"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_missing_vc() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![ID_ALIAS_VC_FOR_VP_JWS.to_string()],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("expected exactly two verifiable credentials"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_wrong_holder() {
+        let wrong_holder = dapp_principal(); // does not match ID_ALIAS_VC_FOR_VP_JWS
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            wrong_holder,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("holder does not match subject"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_non_matching_id_alias_in_vcs() {
+        let holder = dapp_principal(); // does match ID_ALIAS_CREDENTIAL_JWS
+
+        // ID_ALIAS_CREDENTIAL_JWS does not match REQUESTED_VC_FOR_VP_JWS
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![
+                ID_ALIAS_CREDENTIAL_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("subject does not match id_alias"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_invalid_id_alias_vc() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+
+        let mut bad_id_alias_vc = ID_ALIAS_VC_FOR_VP_JWS.to_string();
+        bad_id_alias_vc.insert(42, 'a');
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![bad_id_alias_vc, REQUESTED_VC_FOR_VP_JWS.to_string()],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("InvalidSignature"));
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_with_invalid_requested_vc() {
+        let holder = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+
+        let mut bad_requested_vc = REQUESTED_VC_FOR_VP_JWS.to_string();
+        bad_requested_vc.insert(42, 'a');
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            holder,
+            vec![ID_ALIAS_VC_FOR_VP_JWS.to_string(), bad_requested_vc],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("InvalidSignature"));
     }
 }
