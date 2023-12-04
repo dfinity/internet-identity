@@ -1,8 +1,8 @@
 use crate::assets::JS_SETUP_SCRIPT_SRI_HASH;
 use crate::http::metrics::metrics;
 use crate::state;
+use asset_util::CertifiedAsset;
 use canister_sig_util::signature_map::LABEL_SIG;
-use ic_cdk::trap;
 use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde_bytes::ByteBuf;
@@ -53,37 +53,28 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 streaming_strategy: None,
             },
         },
-        probably_an_asset => {
-            state::assets(
-                |certified_assets| match certified_assets.assets.get(probably_an_asset) {
-                    Some((asset_headers, data)) => {
-                        let mut headers = security_headers();
-                        let mut certificate_headers = match req.certificate_version {
-                            None | Some(1) => asset_certificate_headers_v1(probably_an_asset),
-                            Some(2) => asset_certificate_headers_v2(probably_an_asset),
-                            _ => trap("Unsupported certificate version."),
-                        };
-                        headers.append(&mut certificate_headers);
-                        headers.append(&mut asset_headers.clone());
-
-                        HttpResponse {
-                            status_code: 200,
-                            headers,
-                            body: ByteBuf::from(data.clone()),
-                            upgrade: None,
-                            streaming_strategy: None,
-                        }
-                    }
-                    None => HttpResponse {
-                        status_code: 404,
-                        headers: security_headers(),
-                        body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
-                        upgrade: None,
-                        streaming_strategy: None,
-                    },
-                },
-            )
-        }
+        probably_an_asset => match certified_asset(probably_an_asset, req.certificate_version) {
+            Some(CertifiedAsset {
+                mut headers,
+                content,
+            }) => {
+                headers.append(&mut security_headers());
+                HttpResponse {
+                    status_code: 200,
+                    headers,
+                    body: ByteBuf::from(content),
+                    upgrade: None,
+                    streaming_strategy: None,
+                }
+            }
+            None => HttpResponse {
+                status_code: 404,
+                headers: security_headers(),
+                body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
+                upgrade: None,
+                streaming_strategy: None,
+            },
+        },
     }
 }
 
@@ -204,20 +195,12 @@ pub fn content_security_policy_header() -> String {
     csp
 }
 
-fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
+fn certified_asset(asset_name: &str, certificate_version: Option<u16>) -> Option<CertifiedAsset> {
     state::assets_and_signatures(|assets, sigs| {
-        assets.certificate_headers_v1(
+        assets.certified_asset(
             asset_name,
-            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
-        )
-    })
-}
-
-fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
-    state::assets_and_signatures(|assets, sigs| {
-        assets.certificate_headers_v2(
-            absolute_path,
-            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
+            certificate_version,
+            Some(pruned(labeled_hash(LABEL_SIG, &sigs.root_hash()))),
         )
     })
 }
