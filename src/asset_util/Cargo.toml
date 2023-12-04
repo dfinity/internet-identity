@@ -16,4 +16,6 @@ ic-representation-independent-hash.workspace = true
 include_dir = "0.7"
 internet_identity_interface.workspace = true
 lazy_static.workspace = true
+serde.workspace = true
+serde_cbor.workspace = true
 sha2.workspace = true
