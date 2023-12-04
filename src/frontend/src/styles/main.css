@@ -2774,6 +2774,12 @@ input[type="checkbox"] {
   image-rendering: pixelated;
 }
 
+/* A consent message for verifiable credentials */
+.c-consent-message {
+  font-size: 0.7em;
+  font-family: monospace;
+}
+
 /*
   Marquee
 
