@@ -14,7 +14,8 @@ export type AbortReason =
   | "auth_failed_issuer"
   | "issuer_api_error"
   | "bad_principal_rp"
-  | "no_canister_id";
+  | "no_canister_id"
+  | "bad_canister_id";
 
 /* A screen telling the user the flow was aborted and giving information
  * on why it was aborted and what they can do about it. */

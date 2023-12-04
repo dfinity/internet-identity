@@ -15,7 +15,7 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@dfinity/identity";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { base64url } from "jose";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
@@ -67,25 +67,26 @@ const verifyCredentials = async ({
   connection,
   request: {
     credentialSubject: givenP_RP,
-    issuer: { origin: issuerOrigin, canisterId: issuerCanisterId_ },
+    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId_ },
     credentialSpec,
   },
   rpOrigin,
 }: { connection: Connection } & VerifyCredentialsArgs) => {
-  // Use the issuer canister ID provided by the RP, or look it up
-  // from the issuer origin if no canister ID was provided.
-  // NOTE: we do _not_ check the origin's canister ID if a canister ID was provided explicitly.
-  let issuerCanisterId = issuerCanisterId_?.toText();
+  // Look up the canister ID from the origin
+  const lookedUp = await withLoader(() =>
+    lookupCanister({ origin: issuerOrigin })
+  );
+  if (lookedUp === "not_found") {
+    return abortedCredentials({ reason: "no_canister_id" });
+  }
+  const issuerCanisterId = lookedUp.ok;
 
-  if (isNullish(issuerCanisterId)) {
-    const lookedUp = await withLoader(() =>
-      lookupCanister({ origin: issuerOrigin })
-    );
-    if (lookedUp === "not_found") {
-      return abortedCredentials({ reason: "no_canister_id" });
+  // If the RP provided a canister ID, check that it matches what we got
+  if (nonNullish(expectedIssuerCanisterId_)) {
+    const expectedCanisterId = expectedIssuerCanisterId_?.toText();
+    if (expectedCanisterId !== issuerCanisterId) {
+      return abortedCredentials({ reason: "bad_canister_id" });
     }
-
-    issuerCanisterId = lookedUp.ok;
   }
 
   const vcIssuer = new VcIssuer(issuerCanisterId);
