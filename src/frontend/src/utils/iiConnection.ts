@@ -12,8 +12,10 @@ import {
   DeviceKey,
   FrontendHostname,
   GetDelegationResponse,
+  IdAliasCredentials,
   IdentityAnchorInfo,
   KeyType,
+  PreparedIdAlias,
   PublicKey,
   Purpose,
   RegisterResponse,
@@ -579,6 +581,84 @@ export class AuthenticatedConnection extends Connection {
       console.error(e);
       return { error: e };
     }
+  };
+
+  prepareIdAlias = async ({
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<
+    | PreparedIdAlias
+    | { error: "internal_error" }
+    | { error: "authentication_failed" }
+  > => {
+    const issuerOrigin = remapToLegacyDomain(issuerOrigin_);
+    const rpOrigin = remapToLegacyDomain(rpOrigin_);
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+    const [result] = await actor.prepare_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+    });
+
+    if (isNullish(result)) {
+      console.error("Canister did not send a response");
+      return { error: "internal_error" };
+    }
+
+    if ("authentication_failed" in result) {
+      console.error(
+        ["Authentication failed", result.authentication_failed].join(": ")
+      );
+      return { error: "authentication_failed" };
+    }
+
+    return result.ok;
+  };
+
+  getIdAlias = async ({
+    preparedIdAlias,
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
+    preparedIdAlias: PreparedIdAlias;
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<
+    | IdAliasCredentials
+    | { error: "internal_error" }
+    | { error: "authentication_failed" }
+  > => {
+    const issuerOrigin = remapToLegacyDomain(issuerOrigin_);
+    const rpOrigin = remapToLegacyDomain(rpOrigin_);
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+
+    const [result] = await actor.get_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+      ...preparedIdAlias,
+    });
+
+    if (isNullish(result)) {
+      console.error("Canister did not send a response");
+      return { error: "internal_error" };
+    }
+
+    if ("no_such_credentials" in result) {
+      console.error(["No credentials", result.no_such_credentials].join(": "));
+      return { error: "internal_error" };
+    }
+
+    if ("authentication_failed" in result) {
+      return { error: "authentication_failed" };
+    }
+
+    return result.ok;
   };
 }
 

@@ -110,6 +110,16 @@ export const replicaForwardPlugin = ({
           res.statusCode = 500;
           res.end("Replica forwarding failed: " + err.message);
         });
+
+        /* Add a 'x-ic-canister-id' header like the BNs do */
+        proxy.on("proxyRes", (res) => {
+          res.headers["x-ic-canister-id"] = canisterId;
+
+          // Ensure the browser accepts the response
+          res.headers["access-control-allow-origin"] = "*";
+          res.headers["access-control-expose-headers"] = "*";
+          res.headers["access-control-allow-headers"] = "*";
+        });
       };
 
       const matchingRule = forwardRules.find((rule) =>
