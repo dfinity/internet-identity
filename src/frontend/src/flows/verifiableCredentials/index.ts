@@ -132,15 +132,7 @@ const verifyCredentials = async ({
     })
   );
   if (computedP_RP.compareTo(givenP_RP) !== "eq") {
-    console.error(
-      [
-        "bad principals for user number/origin",
-        userNumber,
-        rpOrigin,
-        computedP_RP.toString(),
-        givenP_RP.toString(),
-      ].join(", ")
-    );
+    console.error("Principal did not match that expected by RP");
     return abortedCredentials({ reason: "bad_principal_rp" });
   }
 
