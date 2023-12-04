@@ -74,12 +74,6 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
             hosts: ["nice-name.com"],
             canisterName: "test_app",
           },
-          {
-            /* nice for deploying locally without having
-             * to look up & type the canister ID */
-            hosts: ["issuer.localhost:5173"],
-            canisterName: "issuer",
-          },
           ...(process.env.NO_HOT_RELOAD === "1"
             ? [
                 {
