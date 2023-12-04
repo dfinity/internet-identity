@@ -710,7 +710,7 @@ mod pull_entries_tests {
             canister: ii_canister,
             method: "fetch_entries".to_string(),
             argument: ByteBuf::from(candid::encode_one(()).unwrap()),
-            rejection_code: 4,
+            rejection_code: 5,
             message: format!("Canister {} is stopped", ii_canister.to_text()),
         };
         assert_eq!(
