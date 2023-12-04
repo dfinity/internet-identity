@@ -74,7 +74,10 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/bootstrap
 
-      - name: Cargo Lockfile Check
         # fails if lockfile is out of date
         # https://users.rust-lang.org/t/check-if-the-cargo-lock-is-up-to-date-without-building-anything/91048/5
+      - name: Cargo Lockfile Check
+        run: cargo update --workspace --locked
+      - name: Cargo Issuer Lockfile Check
+        working-directory: demos/vc_issuer
         run: cargo update --workspace --locked
