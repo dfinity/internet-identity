@@ -633,11 +633,12 @@ jobs:
         run: |
           dfx stop
 
-  # This deploys the production build to mainnet, to a canister that we use for release testing.
+  # This deploys the production build to mainnet (to a canister that we use for release testing) alongside
+  # some other canisters useful for testing & playing with II.
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-internet_identity_production, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive, test-app-build, vc-issuer-build]
     steps:
       - uses: actions/checkout@v3
 
@@ -672,6 +673,36 @@ jobs:
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             --wasm internet_identity_production.wasm.gz \
             fgte5-ciaaa-aaaad-aaatq-cai
+
+      - name: 'Download test app wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: test_app.wasm
+          path: .
+
+      - name: "Deploy test app"
+        run: |
+          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --wasm ./test_app.wasm \
+            vt36r-2qaaa-aaaad-aad5a-cai
+
+      - name: 'Download VC issuer wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: vc_issuer.wasm.gz
+          path: .
+
+      - name: "Deploy Issuer"
+        run: |
+          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --wasm vc_issuer.wasm.gz \
+            v2yvn-myaaa-aaaad-aad4q-cai
+          ./demos/vc_issuer/provision \
+            --ii-canister-id fgte5-ciaaa-aaaad-aaatq-cai \
+            --dfx-network ic \
+            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai
 
       - name: "Deploy archive"
         run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic
