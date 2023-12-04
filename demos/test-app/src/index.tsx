@@ -415,6 +415,16 @@ function handleFlowReady(evnt: MessageEvent) {
 }
 
 function handleFlowFinished(evnt: MessageEvent) {
+  if (latestOpts === undefined) {
+    // no inflight requests, so we don't expect a response.
+    return;
+  }
+
+  if (evnt.data?.id.toString() !== latestOpts.flowId.toString()) {
+    // If this is not a response to a flow we started, ignore it
+    return;
+  }
+
   try {
     // Make the presentation presentable
     const verifiablePresentation = evnt.data?.result?.verifiablePresentation;
