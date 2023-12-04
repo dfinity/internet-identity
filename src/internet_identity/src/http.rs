@@ -1,4 +1,4 @@
-use crate::assets::JS_SETUP_SCRIPT_SRI_HASH;
+use crate::assets::{JS_SETUP_SCRIPT1_SRI_HASH, JS_SETUP_SCRIPT2_SRI_HASH};
 use crate::http::metrics::metrics;
 use crate::state;
 use asset_util::{EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
@@ -195,12 +195,13 @@ pub fn security_headers() -> Vec<HeaderField> {
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
 pub fn content_security_policy_header() -> String {
-    let hash = JS_SETUP_SCRIPT_SRI_HASH.to_string();
+    let hash1 = JS_SETUP_SCRIPT1_SRI_HASH.to_string();
+    let hash2 = JS_SETUP_SCRIPT2_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
          connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
          img-src 'self' data:;\
-         script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+         script-src '{hash1}' '{hash2}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
          base-uri 'none';\
          form-action 'none';\
          style-src 'self' 'unsafe-inline';\

@@ -19,23 +19,35 @@ pub fn init_assets() {
 }
 
 // The <script> tag that loads the 'index.js'
-const JS_SETUP_SCRIPT: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
+pub const JS_SETUP_SCRIPT1: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
+pub const JS_SETUP_SCRIPT2: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index2.js';document.head.appendChild(s);";
 
 // Fix up HTML pages, by injecting canister ID & script tag
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
-    let setup_js: String = JS_SETUP_SCRIPT.to_string();
-    html.replace(
+    let setup_js1: String = JS_SETUP_SCRIPT1.to_string();
+    let html = html.replace(
         r#"<script type="module" crossorigin src="/index.js"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js}</script>"#),
+        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js1}</script>"#),
+    );
+
+    let setup_js2: String = JS_SETUP_SCRIPT2.to_string();
+    html.replace(
+        r#"<script type="module" crossorigin src="/index2.js"></script>"#,
+        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js2}</script>"#),
     )
 }
 
 lazy_static! {
     // The SRI sha256 hash of the script tag, used by the CSP policy.
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
-    pub static ref JS_SETUP_SCRIPT_SRI_HASH: String = {
-        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT.as_bytes());
+    pub static ref JS_SETUP_SCRIPT1_SRI_HASH: String = {
+        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT1.as_bytes());
+        let hash = BASE64.encode(hash);
+        format!("sha256-{hash}")
+    };
+    pub static ref JS_SETUP_SCRIPT2_SRI_HASH: String = {
+        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT2.as_bytes());
         let hash = BASE64.encode(hash);
         format!("sha256-{hash}")
     };
