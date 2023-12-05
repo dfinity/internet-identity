@@ -24,8 +24,8 @@ pub const IC_CERTIFICATE_EXPRESSION: &str =
     response_certification:ResponseCertification{response_header_exclusions:ResponseHeaderList{headers:[]}}}})";
 
 /// Struct to hold assets together with the necessary certification trees.
-/// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
-/// certification to be valid.
+/// The [CertifiedAssets::root_hash] must be included in the canisters [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
+/// for the certification to be valid.
 #[derive(Debug, Default, Clone)]
 pub struct CertifiedAssets {
     assets: HashMap<String, (Vec<HeaderField>, Vec<u8>)>,
@@ -58,7 +58,8 @@ impl CertifiedAssets {
     }
 
     /// Returns the [CertifiedAsset] for the given URL path and certificate version, if it exists.
-    /// If the canister also uses the `certified_data` to issue canister signatures, the caller
+    /// If the canister also uses the [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
+    /// to issue [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures), the caller
     /// should provide the (pruned) signature (`sigs`) subtree.
     pub fn certified_asset(
         &self,
