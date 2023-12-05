@@ -41,7 +41,7 @@ const DUMMY_ALIAS_ID_DAPP_PRINCIPAL: &str =
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
     pub static ref VC_ISSUER_WASM: Vec<u8> = {
-        let def_path = PathBuf::from("./").join("vc_issuer.wasm.gz");
+        let def_path = PathBuf::from("./").join("vc_demo_issuer.wasm.gz");
         let err = format!("
         Could not find VC Issuer Wasm module for current build.
         I will look for it at {:?} (note that I run from {:?}).

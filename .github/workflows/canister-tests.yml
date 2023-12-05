@@ -246,16 +246,16 @@ jobs:
         run: |
           npm ci
           ./build.sh
-      - run: sha256sum vc_issuer.wasm.gz
+      - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
         uses: actions/upload-artifact@v3
         with:
           # name is the name used to display and retrieve the artifact
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           # path is the name used as the file to upload and the name of the
           # downloaded file
-          path: ./demos/vc_issuer/vc_issuer.wasm.gz
+          path: ./demos/vc_issuer/vc_demo_issuer.wasm.gz
 
   test-app-build:
     runs-on: ubuntu-latest
@@ -304,7 +304,7 @@ jobs:
       - name: 'Download VC issuer wasm'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
@@ -522,7 +522,7 @@ jobs:
       - name: 'Download VC issuer wasm'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
 
       - name: Create Canisters
@@ -532,7 +532,7 @@ jobs:
         run: |
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
-          dfx canister install issuer --wasm demos/vc_issuer/vc_issuer.wasm.gz
+          dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
 
       - name: Provision issuer canister
         run: ./demos/vc_issuer/provision
@@ -690,14 +690,14 @@ jobs:
       - name: 'Download VC issuer wasm'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: .
 
       - name: "Deploy Issuer"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --wasm vc_issuer.wasm.gz \
+            --wasm vc_demo_issuer.wasm.gz \
             v2yvn-myaaa-aaaad-aad4q-cai
           ./demos/vc_issuer/provision \
             --ii-canister-id fgte5-ciaaa-aaaad-aaatq-cai \
@@ -744,7 +744,7 @@ jobs:
       - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: .
 
       - uses: actions/github-script@v6
@@ -794,7 +794,7 @@ jobs:
             internet_identity_dev.wasm.gz
             internet_identity_test.wasm.gz
             archive.wasm.gz
-            vc_issuer.wasm.gz
+            vc_demo_issuer.wasm.gz
           production_asset: internet_identity_production.wasm.gz
           changelog: ${{ steps.changelog.outputs.result }}
           workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
