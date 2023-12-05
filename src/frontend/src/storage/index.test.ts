@@ -18,7 +18,7 @@ test("anchors default to nothing", async () => {
 });
 
 test(
-  "old userNumber is recovered",
+  "old userNumber V0 is recovered",
   withStorage(
     async () => {
       expect(await getAnchors()).toStrictEqual([BigInt(123456)]);
@@ -76,20 +76,18 @@ test(
     {
       localStorage: {
         before: { userNumber: "123456" },
-        after: (storage) => {
-          const value = storage["anchors"];
-          expect(value).toBeDefined();
-          const anchors = JSON.parse(value);
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["123456"]).toBeDefined();
-        },
       },
       indexeddb: {
         after: (storage) => {
+          // Written to V3
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchors: any = storage["anchors"];
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["123456"]).toBeDefined();
+          const storageV3: any = storage["ii-storage-v3"];
+          expect(storageV3).toBeTypeOf("object");
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anchorsV3: any = storageV3["anchors"];
+          expect(anchorsV3).toBeTypeOf("object");
+          expect(anchorsV3["123456"]).toBeDefined();
         },
       },
     }
@@ -117,7 +115,30 @@ test(
 );
 
 test(
-  "anchors are also written to localstorage",
+  "V2 anchors are migrated",
+  withStorage(
+    async () => {
+      expect(await getAnchors()).toContain(BigInt(10000));
+      expect(await getAnchors()).toContain(BigInt(10001));
+      expect(await getAnchors()).toContain(BigInt(10003));
+    },
+    {
+      indexeddb: {
+        before: {
+          /* V2 layout */
+          anchors: {
+            "10000": { lastUsedTimestamp: 0 },
+            "10001": { lastUsedTimestamp: 0 },
+            "10003": { lastUsedTimestamp: 0 },
+          },
+        },
+      },
+    }
+  )
+);
+
+test(
+  "anchors are also written to V2",
   withStorage(
     async () => {
       await setAnchorUsed(BigInt(10000));
@@ -125,15 +146,15 @@ test(
       await setAnchorUsed(BigInt(10003));
     },
     {
-      localStorage: {
+      indexeddb: {
         after: (storage) => {
-          const value = storage["anchors"];
-          expect(value).toBeDefined();
-          const anchors = JSON.parse(value);
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["10000"]).toBeDefined();
-          expect(anchors["10001"]).toBeDefined();
-          expect(anchors["10003"]).toBeDefined();
+          // Written to V2
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anchorsV2: any = storage["anchors"];
+          expect(anchorsV2).toBeTypeOf("object");
+          expect(anchorsV2["10000"]).toBeDefined();
+          expect(anchorsV2["10001"]).toBeDefined();
+          expect(anchorsV2["10003"]).toBeDefined();
         },
       },
     }
@@ -177,31 +198,6 @@ test(
     expect(await getAnchors()).not.toContain(BigInt(203000));
     vi.useRealTimers();
   })
-);
-
-test(
-  "unknown fields are not dropped",
-  withStorage(
-    async () => {
-      vi.useFakeTimers().setSystemTime(new Date(20));
-      await setAnchorUsed(BigInt(10000));
-      vi.useRealTimers();
-    },
-    {
-      indexeddb: {
-        before: {
-          anchors: {
-            "10000": { lastUsedTimestamp: 10, hello: "world" },
-          },
-        },
-        after: {
-          anchors: {
-            "10000": { lastUsedTimestamp: 20, hello: "world" },
-          },
-        },
-      },
-    }
-  )
 );
 
 /** Test storage usage. Storage is cleared after the callback has returned.

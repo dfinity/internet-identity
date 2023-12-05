@@ -125,7 +125,8 @@ const getDomain = (url: string) => url.split(".").slice(1).join(".");
 
             const vcAllow = new VcAllowView(browser);
             await vcAllow.waitForDisplay();
-            await vcAllow.typeUserNumber(userNumber);
+            const userNumber_ = await vcAllow.getUserNumber();
+            expect(userNumber_).toBe(userNumber);
             await vcAllow.allow();
             await waitToClose(browser);
 

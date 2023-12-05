@@ -8,6 +8,7 @@ import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
+import { getAnchorByPrincipal } from "$src/storage";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import {
   Delegation,
@@ -98,12 +99,17 @@ const verifyCredentials = async ({
     return abortedCredentials({ reason: "auth_failed_issuer" });
   }
 
+  const userNumber_ = await getAnchorByPrincipal({
+    origin: rpOrigin,
+    principal: givenP_RP,
+  });
+
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({
     relyingOrigin: rpOrigin,
     providerOrigin: issuerOrigin,
     consentMessage: consentInfo.consent_message,
-    userNumber: undefined,
+    userNumber: userNumber_,
   });
   if (allowed.tag === "canceled") {
     return "aborted";
