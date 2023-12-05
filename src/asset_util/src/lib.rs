@@ -12,6 +12,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
+use DirectoryTraversalMode::IncludeSubdirs;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
@@ -24,16 +25,94 @@ pub const IC_CERTIFICATE_EXPRESSION: &str =
     response_certification:ResponseCertification{response_header_exclusions:ResponseHeaderList{headers:[]}}}})";
 
 /// Struct to hold assets together with the necessary certification trees.
-/// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
-/// certification to be valid.
+/// The [CertifiedAssets::root_hash] must be included in the canisters [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
+/// for the certification to be valid.
 #[derive(Debug, Default, Clone)]
 pub struct CertifiedAssets {
-    pub assets: HashMap<String, (Vec<HeaderField>, Vec<u8>)>,
-    pub certification_v1: RbTree<String, Hash>,
-    pub certification_v2: NestedTree<Vec<u8>, Vec<u8>>,
+    assets: HashMap<String, (Vec<HeaderField>, Vec<u8>)>,
+    certification_v1: RbTree<String, Hash>,
+    certification_v2: NestedTree<Vec<u8>, Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CertifiedAsset {
+    /// The headers to be included in the HTTP response.
+    pub headers: Vec<HeaderField>,
+    /// The file content of the asset.
+    pub content: Vec<u8>,
+}
+
+/// Not yet certified asset to be used as input to the certification process
+/// ([certify_assets]).
+#[derive(Debug, Clone)]
+pub struct Asset {
+    pub url_path: String,
+    pub content: Vec<u8>,
+    pub encoding: ContentEncoding,
+    pub content_type: ContentType,
+}
+
+/// Enum to specify the depth of directory traversal when collecting assets.
+pub enum DirectoryTraversalMode {
+    /// Recursively collect assets from the given directory and its subdirectories.
+    IncludeSubdirs,
+    /// Only collect assets from the given directory.
+    ExcludeSubdirs,
 }
 
 impl CertifiedAssets {
+    /// Certifies the provided assets returning a [CertifiedAssets] struct containing the assets and their
+    /// certification. Provides both certification v1 and v2.
+    ///
+    /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
+    /// certification to be valid.
+    pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> Self {
+        let mut certified_assets = Self::default();
+        for Asset {
+            url_path,
+            content,
+            encoding,
+            content_type,
+        } in assets
+        {
+            let body_hash = sha2::Sha256::digest(&content).into();
+            add_certification_v1(&mut certified_assets, &url_path, body_hash);
+
+            let mut headers = match encoding {
+                ContentEncoding::Identity => vec![],
+                ContentEncoding::GZip => {
+                    vec![("Content-Encoding".to_string(), "gzip".to_string())]
+                }
+            };
+            headers.push((
+                "Content-Type".to_string(),
+                content_type.to_mime_type_string(),
+            ));
+
+            // Add caching header for fonts only
+            if content_type == ContentType::WOFF2 {
+                headers.push((
+                    "Cache-Control".to_string(),
+                    "public, max-age=604800".to_string(), // cache for 1 week
+                ));
+            }
+
+            add_certification_v2(
+                &mut certified_assets,
+                &url_path,
+                &shared_headers
+                    .iter()
+                    .chain(headers.iter())
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                body_hash,
+            );
+
+            certified_assets.assets.insert(url_path, (headers, content));
+        }
+        certified_assets
+    }
+
     /// Returns the root_hash of the asset certification tree.
     pub fn root_hash(&self) -> Hash {
         fork_hash(
@@ -49,8 +128,46 @@ impl CertifiedAssets {
         )
     }
 
-    fn witness_v1(&self, path: &str) -> HashTree {
-        let witness = self.certification_v1.witness(path.as_bytes());
+    /// Returns the [CertifiedAsset] for the given URL path and certificate version, if it exists.
+    /// If the canister also uses the [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
+    /// to issue [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures), the caller
+    /// should provide the (pruned) signature (`sigs`) subtree.
+    ///
+    /// The `max_certificate_version` parameter can be used to specify the maximum certificate version that the client supports.
+    /// If available the asset is returned with a certificate matching that version.
+    /// If a certificate version higher than the highest available certificate version is requested, the highest available certificate
+    /// version is returned (which is currently 2).
+    /// For legacy compatibility reasons, the default certificate version is 1.
+    pub fn certified_asset(
+        &self,
+        url_path: &str,
+        max_certificate_version: Option<u16>,
+        sigs_tree: Option<HashTree>,
+    ) -> Option<CertifiedAsset> {
+        assert!(url_path.starts_with('/'));
+        let certified_asset = self
+            .assets
+            .get(url_path)
+            .map(|(headers, content)| CertifiedAsset {
+                headers: headers.clone(),
+                content: content.clone(),
+            });
+        certified_asset.map(|mut certified_asset| {
+            match max_certificate_version {
+                Some(x) if x >= 2 => certified_asset
+                    .headers
+                    .extend(self.certificate_headers_v2(url_path, sigs_tree)),
+                // Certification v1 is also the fallback for unknown certificate versions
+                _ => certified_asset
+                    .headers
+                    .extend(self.certificate_headers_v1(url_path, sigs_tree)),
+            }
+            certified_asset
+        })
+    }
+
+    fn witness_v1(&self, absolute_path: &str) -> HashTree {
+        let witness = self.certification_v1.witness(absolute_path.as_bytes());
         fork(
             labeled(LABEL_ASSETS_V1, witness),
             pruned(labeled_hash(
@@ -61,8 +178,6 @@ impl CertifiedAssets {
     }
 
     fn witness_v2(&self, absolute_path: &str) -> HashTree {
-        assert!(absolute_path.starts_with('/'));
-
         let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
         path.remove(0); // remove leading empty string due to absolute path
         path.push(EXACT_MATCH_TERMINATOR.to_string());
@@ -78,16 +193,20 @@ impl CertifiedAssets {
         )
     }
 
-    pub fn certificate_headers_v1(
+    fn certificate_headers_v1(
         &self,
-        asset_name: &str,
-        sigs_tree: HashTree,
+        absolute_path: &str,
+        sigs_tree: Option<HashTree>,
     ) -> Vec<(String, String)> {
         let certificate = data_certificate().unwrap_or_else(|| {
             trap("data certificate is only available in query calls");
         });
 
-        let tree = fork(self.witness_v1(asset_name), sigs_tree);
+        let witness = self.witness_v1(absolute_path);
+        let tree = match sigs_tree {
+            Some(sigs) => fork(witness, sigs),
+            None => witness,
+        };
         let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
         serializer.self_describe().unwrap();
         tree.serialize(&mut serializer)
@@ -102,12 +221,11 @@ impl CertifiedAssets {
         )]
     }
 
-    pub fn certificate_headers_v2(
+    fn certificate_headers_v2(
         &self,
         absolute_path: &str,
-        sigs_tree: HashTree,
-    ) -> Vec<(String, String)> {
-        assert!(absolute_path.starts_with('/'));
+        sigs_tree: Option<HashTree>,
+    ) -> Vec<HeaderField> {
         let certificate = data_certificate().unwrap_or_else(|| {
             trap("data certificate is only available in query calls");
         });
@@ -117,7 +235,11 @@ impl CertifiedAssets {
         *path.get_mut(0).unwrap() = LABEL_ASSETS_V2.to_string();
         path.push(EXACT_MATCH_TERMINATOR.to_string());
 
-        let tree = fork(self.witness_v2(absolute_path), sigs_tree);
+        let witness = self.witness_v2(absolute_path);
+        let tree = match sigs_tree {
+            Some(sigs) => fork(witness, sigs),
+            None => witness,
+        };
 
         let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);
         tree_serializer.self_describe().unwrap();
@@ -189,56 +311,14 @@ lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
-/// Takes a list of assets and returns a [CertifiedAssets] struct containing the assets and their
-/// certification.
-pub fn certify_assets(
-    assets: Vec<(String, Vec<u8>, ContentEncoding, ContentType)>,
-    shared_headers: &[HeaderField],
-) -> CertifiedAssets {
-    let mut certified_assets = CertifiedAssets::default();
-    for (path, content, content_encoding, content_type) in assets {
-        let body_hash = sha2::Sha256::digest(&content).into();
-        add_certification_v1(&mut certified_assets, &path, body_hash);
-
-        let mut headers = match content_encoding {
-            ContentEncoding::Identity => vec![],
-            ContentEncoding::GZip => {
-                vec![("Content-Encoding".to_string(), "gzip".to_string())]
-            }
-        };
-        headers.push((
-            "Content-Type".to_string(),
-            content_type.to_mime_type_string(),
-        ));
-
-        // Add caching header for fonts only
-        if content_type == ContentType::WOFF2 {
-            headers.push((
-                "Cache-Control".to_string(),
-                "public, max-age=604800".to_string(), // cache for 1 week
-            ));
-        }
-
-        add_certification_v2(
-            &mut certified_assets,
-            &path,
-            &shared_headers
-                .iter()
-                .chain(headers.iter())
-                .cloned()
-                .collect::<Vec<_>>(),
-            body_hash,
-        );
-
-        certified_assets.assets.insert(path, (headers, content));
-    }
-    certified_assets
-}
-
-fn add_certification_v1(certified_assets: &mut CertifiedAssets, path: &str, body_hash: Hash) {
+fn add_certification_v1(
+    certified_assets: &mut CertifiedAssets,
+    absolute_path: &str,
+    body_hash: Hash,
+) {
     certified_assets
         .certification_v1
-        .insert(path.to_string(), body_hash)
+        .insert(absolute_path.to_string(), body_hash)
 }
 
 fn add_certification_v2(
@@ -282,33 +362,43 @@ fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
     response_hash
 }
 
-pub fn collect_assets_recursive(
+/// Collects all assets from the given directory and its optionally its subdirectories.
+/// Optionally, a transformer function can be provided to transform the HTML files.
+pub fn collect_assets(
     dir: &Dir,
-    html_transformer: fn(&str) -> String,
-) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
+    directory_traversal_mode: DirectoryTraversalMode,
+    html_transformer: Option<fn(&str) -> String>,
+) -> Vec<Asset> {
     let mut assets = collect_assets_from_dir(dir, html_transformer);
-    for subdir in dir.dirs() {
-        assets.extend(collect_assets_recursive(subdir, html_transformer).into_iter());
+    match directory_traversal_mode {
+        IncludeSubdirs => {
+            for subdir in dir.dirs() {
+                assets.extend(collect_assets(subdir, IncludeSubdirs, html_transformer).into_iter());
+            }
+        }
+        DirectoryTraversalMode::ExcludeSubdirs => {
+            // nothing to do
+        }
     }
     assets
 }
 
-pub fn collect_assets_from_dir(
-    dir: &Dir,
-    html_transformer: fn(&str) -> String,
-) -> Vec<(String, Vec<u8>, ContentEncoding, ContentType)> {
-    let mut assets: Vec<(String, Vec<u8>, ContentEncoding, ContentType)> = vec![];
+/// Collects all assets from the given directory.
+fn collect_assets_from_dir(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -> Vec<Asset> {
+    let mut assets: Vec<Asset> = vec![];
     for asset in dir.files() {
         let file_bytes = asset.contents().to_vec();
         let (content, encoding, content_type) = match file_extension(asset) {
             "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
-            "html" => (
-                html_transformer(String::from_utf8_lossy(&file_bytes).as_ref())
-                    .as_bytes()
-                    .to_vec(),
-                ContentEncoding::Identity,
-                ContentType::HTML,
-            ),
+            "html" => {
+                if let Some(transformer) = html_transformer {
+                    let content = transformer(std::str::from_utf8(&file_bytes).unwrap());
+                    let content_bytes = content.as_bytes().to_vec();
+                    (content_bytes, ContentEncoding::Identity, ContentType::HTML)
+                } else {
+                    (file_bytes, ContentEncoding::Identity, ContentType::HTML)
+                }
+            }
             "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
             "json" => (file_bytes, ContentEncoding::Identity, ContentType::JSON),
             "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
@@ -324,8 +414,8 @@ pub fn collect_assets_from_dir(
             ),
         };
 
-        let urlpaths = filepath_to_urlpaths(asset.path().to_str().unwrap().to_string());
-        for urlpath in urlpaths {
+        let url_paths = filepath_to_urlpaths(asset.path().to_str().unwrap().to_string());
+        for url_path in url_paths {
             // XXX: we clone the content for each asset instead of doing something smarter
             // for simplicity & because the only assets that currently may be duplicated are
             // small HTML files.
@@ -333,7 +423,12 @@ pub fn collect_assets_from_dir(
             // XXX: the behavior is undefined for assets with overlapping URL paths (e.g. "foo.html" &
             // "foo/index.html"). This assumes that the bundler creating the assets directory
             // creates sensible assets.
-            assets.push((urlpath, content.clone(), encoding, content_type));
+            assets.push(Asset {
+                url_path,
+                content: content.clone(),
+                encoding,
+                content_type,
+            });
         }
     }
     assets

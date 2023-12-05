@@ -308,10 +308,6 @@ pub fn tentative_device_registrations_mut<R>(
     STATE.with(|s| f(&mut s.tentative_device_registrations.borrow_mut()))
 }
 
-pub fn assets<R>(f: impl FnOnce(&CertifiedAssets) -> R) -> R {
-    ASSETS.with(|assets| f(&assets.borrow()))
-}
-
 pub fn assets_mut<R>(f: impl FnOnce(&mut CertifiedAssets) -> R) -> R {
     ASSETS.with(|assets| f(&mut assets.borrow_mut()))
 }
