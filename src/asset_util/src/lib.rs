@@ -253,8 +253,9 @@ lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
-/// Takes a list of assets and returns a [CertifiedAssets] struct containing the assets and their
-/// certification.
+/// Certifies the provided assets returning a [CertifiedAssets] struct containing the assets and their
+/// certification. Provides both certification v1 and v2.
+///
 /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
 /// certification to be valid.
 pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> CertifiedAssets {
