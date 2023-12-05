@@ -61,6 +61,58 @@ pub enum DirectoryTraversalMode {
 }
 
 impl CertifiedAssets {
+    /// Certifies the provided assets returning a [CertifiedAssets] struct containing the assets and their
+    /// certification. Provides both certification v1 and v2.
+    ///
+    /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
+    /// certification to be valid.
+    pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> Self {
+        let mut certified_assets = Self::default();
+        for Asset {
+            url_path,
+            content,
+            encoding,
+            content_type,
+        } in assets
+        {
+            let body_hash = sha2::Sha256::digest(&content).into();
+            add_certification_v1(&mut certified_assets, &url_path, body_hash);
+
+            let mut headers = match encoding {
+                ContentEncoding::Identity => vec![],
+                ContentEncoding::GZip => {
+                    vec![("Content-Encoding".to_string(), "gzip".to_string())]
+                }
+            };
+            headers.push((
+                "Content-Type".to_string(),
+                content_type.to_mime_type_string(),
+            ));
+
+            // Add caching header for fonts only
+            if content_type == ContentType::WOFF2 {
+                headers.push((
+                    "Cache-Control".to_string(),
+                    "public, max-age=604800".to_string(), // cache for 1 week
+                ));
+            }
+
+            add_certification_v2(
+                &mut certified_assets,
+                &url_path,
+                &shared_headers
+                    .iter()
+                    .chain(headers.iter())
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                body_hash,
+            );
+
+            certified_assets.assets.insert(url_path, (headers, content));
+        }
+        certified_assets
+    }
+
     /// Returns the root_hash of the asset certification tree.
     pub fn root_hash(&self) -> Hash {
         fork_hash(
@@ -251,58 +303,6 @@ impl ContentType {
 
 lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
-}
-
-/// Certifies the provided assets returning a [CertifiedAssets] struct containing the assets and their
-/// certification. Provides both certification v1 and v2.
-///
-/// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
-/// certification to be valid.
-pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> CertifiedAssets {
-    let mut certified_assets = CertifiedAssets::default();
-    for Asset {
-        url_path,
-        content,
-        encoding,
-        content_type,
-    } in assets
-    {
-        let body_hash = sha2::Sha256::digest(&content).into();
-        add_certification_v1(&mut certified_assets, &url_path, body_hash);
-
-        let mut headers = match encoding {
-            ContentEncoding::Identity => vec![],
-            ContentEncoding::GZip => {
-                vec![("Content-Encoding".to_string(), "gzip".to_string())]
-            }
-        };
-        headers.push((
-            "Content-Type".to_string(),
-            content_type.to_mime_type_string(),
-        ));
-
-        // Add caching header for fonts only
-        if content_type == ContentType::WOFF2 {
-            headers.push((
-                "Cache-Control".to_string(),
-                "public, max-age=604800".to_string(), // cache for 1 week
-            ));
-        }
-
-        add_certification_v2(
-            &mut certified_assets,
-            &url_path,
-            &shared_headers
-                .iter()
-                .chain(headers.iter())
-                .cloned()
-                .collect::<Vec<_>>(),
-            body_hash,
-        );
-
-        certified_assets.assets.insert(url_path, (headers, content));
-    }
-    certified_assets
 }
 
 fn add_certification_v1(

@@ -3,7 +3,9 @@
 // This file describes which assets are used and how (content, content type and content encoding).
 use crate::http::security_headers;
 use crate::state;
-use asset_util::{collect_assets, Asset, ContentEncoding, ContentType, DirectoryTraversalMode};
+use asset_util::{
+    collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType, DirectoryTraversalMode,
+};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
@@ -15,7 +17,8 @@ use DirectoryTraversalMode::IncludeSubdirs;
 // used both in init and post_upgrade
 pub fn init_assets() {
     state::assets_mut(|certified_assets| {
-        *certified_assets = asset_util::certify_assets(get_static_assets(), &security_headers());
+        *certified_assets =
+            CertifiedAssets::certify_assets(get_static_assets(), &security_headers());
     });
 }
 
