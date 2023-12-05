@@ -132,10 +132,16 @@ impl CertifiedAssets {
     /// If the canister also uses the [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
     /// to issue [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures), the caller
     /// should provide the (pruned) signature (`sigs`) subtree.
+    ///
+    /// The `max_certificate_version` parameter can be used to specify the maximum certificate version that the client supports.
+    /// If available the asset is returned with a certificate matching that version.
+    /// If a certificate version higher than the highest available certificate version is requested, the highest available certificate
+    /// version is returned (which is currently 2).
+    /// For legacy compatibility reasons, the default certificate version is 1.
     pub fn certified_asset(
         &self,
         url_path: &str,
-        certificate_version: Option<u16>,
+        max_certificate_version: Option<u16>,
         sigs_tree: Option<HashTree>,
     ) -> Option<CertifiedAsset> {
         assert!(url_path.starts_with('/'));
@@ -147,7 +153,7 @@ impl CertifiedAssets {
                 content: content.clone(),
             });
         certified_asset.map(|mut certified_asset| {
-            match certificate_version {
+            match max_certificate_version {
                 Some(x) if x >= 2 => certified_asset
                     .headers
                     .extend(self.certificate_headers_v2(url_path, sigs_tree)),
