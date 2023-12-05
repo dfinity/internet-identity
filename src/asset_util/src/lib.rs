@@ -77,7 +77,7 @@ impl CertifiedAssets {
             });
         certified_asset.map(|mut certified_asset| {
             match certificate_version {
-                Some(2) => certified_asset
+                Some(x) if x >= 2 => certified_asset
                     .headers
                     .extend(self.certificate_headers_v2(url_path, sigs_tree)),
                 // Certification v1 is also the fallback for unknown certificate versions
