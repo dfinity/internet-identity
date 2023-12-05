@@ -1,41 +1,20 @@
 use crate::AlternativeOriginsMode::{CertifiedContent, Redirect};
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
+use asset_util::DirectoryTraversalMode::IncludeSubdirs;
+use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api;
 use ic_cdk_macros::{init, post_upgrade, query, update};
-use ic_certified_map::{labeled_hash, AsHashTree, Hash, RbTree};
-use lazy_static::lazy_static;
-use serde::Serialize;
-use serde_bytes::{ByteBuf, Bytes};
-use sha2::Digest;
-use std::borrow::Cow;
+use include_dir::{include_dir, Dir};
+use serde_bytes::ByteBuf;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use AlternativeOriginsMode::UncertifiedContent;
+
+const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
+const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
 
 thread_local! {
-    static ASSETS: RefCell<HashMap<&'static str, (Vec<(String, String)>, Vec<u8>)>> = RefCell::new(HashMap::default());
-    static ASSET_HASHES: RefCell<RbTree<&'static str, [u8; 32]>> = RefCell::new(RbTree::default());
+    static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
     static ALTERNATIVE_ORIGINS_MODE: RefCell<AlternativeOriginsMode> = RefCell::new(CertifiedContent);
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ContentType {
-    HTML,
-    JS,
-    JSON,
-    CSS,
-}
-
-impl ContentType {
-    pub fn to_mime_type_string(&self) -> String {
-        match self {
-            ContentType::HTML => "text/html".to_string(),
-            ContentType::JS => "text/javascript".to_string(),
-            ContentType::JSON => "application/json".to_string(),
-            ContentType::CSS => "text/css".to_string(),
-        }
-    }
 }
 
 #[query]
@@ -48,30 +27,18 @@ fn whoami() -> Principal {
 /// * content: new value of this asset. The content type will always be set to application/json.
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
-fn update_alternative_origins(content: String, mode: AlternativeOriginsMode) {
-    ASSETS.with(|a| {
-        ASSET_HASHES.with(|ah| {
-            let mut assets = a.borrow_mut();
-            let mut asset_hashes = ah.borrow_mut();
-            let path = "/.well-known/ii-alternative-origins";
-            assets.insert(
-                path,
-                (
-                    vec![(
-                        "Content-Type".to_string(),
-                        ContentType::JSON.to_mime_type_string(),
-                    )],
-                    content.as_bytes().to_vec(),
-                ),
-            );
-            asset_hashes.insert(path, sha2::Sha256::digest(content.as_bytes()).into());
-            update_root_hash(&asset_hashes);
-        });
-    });
-
+fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
     ALTERNATIVE_ORIGINS_MODE.with(|m| {
         m.replace(mode);
-    })
+    });
+    ASSETS
+        .with_borrow_mut(|assets| {
+            assets.update_asset_content(
+                ALTERNATIVE_ORIGINS_PATH,
+                alternative_origins.as_bytes().to_vec(),
+            )
+        })
+        .expect("Failed to update alternative origins");
 }
 
 pub type HeaderField = (String, String);
@@ -82,13 +49,14 @@ pub struct HttpRequest {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: ByteBuf,
+    pub certificate_version: Option<u16>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
-    pub body: Cow<'static, Bytes>,
+    pub body: ByteBuf,
 }
 
 /// Enum of the available asset behaviours of /.well-known/ii-alternative-origins:
@@ -106,160 +74,108 @@ pub enum AlternativeOriginsMode {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
-    let mut headers = vec![];
-    headers.push(("Access-Control-Allow-Origin".to_string(), "*".to_string()));
-    let certificate_header =
-        ASSET_HASHES.with(|a| make_asset_certificate_header(&a.borrow(), path));
 
     match path {
-        "/.well-known/ii-alternative-origins" => ALTERNATIVE_ORIGINS_MODE.with(|m| {
-            let mode = m.borrow();
-            let mut status_code = 200;
-            match mode.clone() {
+        ALTERNATIVE_ORIGINS_PATH => ALTERNATIVE_ORIGINS_MODE.with_borrow(|mode| {
+            let mut certified_response = certified_ok_response(path, req.certificate_version)
+                .expect("/.well-known/ii-alternative-origins must be certified");
+            match mode {
                 CertifiedContent => {
-                    headers.push(certificate_header);
+                    // don't tamper with the certified response
+                }
+                UncertifiedContent => {
+                    // drop the IC-Certificate and IC-Certificate-Expr headers
+                    certified_response
+                        .headers
+                        .retain(|(header_name, _)| !header_name.to_lowercase().starts_with("ic-"));
                 }
                 Redirect { location } => {
-                    // needs to be certified content for the service worker
-                    // (which the browser will then ignore and redirect anyway)
-                    headers.push(certificate_header);
-                    headers.push(("Location".to_string(), location));
-                    status_code = 302;
+                    // Add a Location header and modify status code to 302 to indicate redirect
+                    // Keep the content and certification headers as then the response remains valid
+                    // under certification v1.
+                    certified_response
+                        .headers
+                        .push(("Location".to_string(), location.clone()));
+                    certified_response.status_code = 302;
                 }
-                _ => {}
-            };
-            ASSETS.with(|a| {
-                let assets = a.borrow();
-                let (asset_headers, value) = assets.get(path).unwrap();
-                headers.append(&mut asset_headers.clone());
-
-                HttpResponse {
-                    status_code,
-                    headers,
-                    body: Cow::Owned(ByteBuf::from(value.clone())),
-                }
-            })
+            }
+            certified_response
         }),
-        _ => {
-            headers.push(certificate_header);
-            ASSETS.with(|a| match a.borrow().get(path) {
-                Some((asset_headers, value)) => {
-                    headers.append(&mut asset_headers.clone());
-
-                    HttpResponse {
-                        status_code: 200,
-                        headers,
-                        body: Cow::Owned(ByteBuf::from(value.clone())),
-                    }
-                }
-                None => HttpResponse {
-                    status_code: 404,
-                    headers,
-                    body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
-                },
-            })
-        }
+        path => certified_ok_response(path, req.certificate_version)
+            .unwrap_or_else(|| not_found_response(path)),
     }
 }
 
-fn make_asset_certificate_header(
-    asset_hashes: &RbTree<&'static str, Hash>,
-    asset_name: &str,
-) -> (String, String) {
-    let certificate = api::data_certificate().unwrap_or_else(|| {
-        api::trap("data certificate is only available in query calls");
-    });
-    let witness = asset_hashes.witness(asset_name.as_bytes());
-    let tree = ic_certified_map::labeled(b"http_assets", witness);
-    let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
-    serializer.self_describe().unwrap();
-    tree.serialize(&mut serializer)
-        .unwrap_or_else(|e| api::trap(&format!("failed to serialize a hash tree: {}", e)));
-    (
-        "IC-Certificate".to_string(),
-        format!(
-            "certificate=:{}:, tree=:{}:",
-            BASE64.encode(&certificate),
-            BASE64.encode(&serializer.into_inner())
-        ),
+fn certified_ok_response(url: &str, max_certificate_version: Option<u16>) -> Option<HttpResponse> {
+    let maybe_asset =
+        ASSETS.with_borrow(|assets| assets.certified_asset(url, max_certificate_version, None));
+    maybe_asset.map(|asset| {
+        let mut headers = asset.headers;
+        headers.extend(static_headers());
+        HttpResponse {
+            status_code: 200,
+            headers,
+            body: ByteBuf::from(asset.content),
+        }
+    })
+}
+
+fn not_found_response(path: &str) -> HttpResponse {
+    HttpResponse {
+        status_code: 404,
+        headers: static_headers(),
+        body: ByteBuf::from(format!("Asset {} not found.", path)),
+    }
+}
+
+fn static_headers() -> Vec<(String, String)> {
+    vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
+}
+
+// Assets
+static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
+
+fn fixup_html(html: &str) -> String {
+    let canister_id = api::id();
+
+    // the string we are replacing here is inserted by vite during the front-end build
+    html.replace(
+        r#"<script type="module" crossorigin src="/index.js"></script>"#,
+        &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string(),
     )
 }
 
 #[init]
 #[post_upgrade]
-pub fn init_assets() {
-    ASSETS.with(|a| {
-        ASSET_HASHES.with(|ah| {
-            let mut assets = a.borrow_mut();
-            let mut asset_hashes = ah.borrow_mut();
-            for (path, content, content_type) in get_assets() {
-                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                let mut headers = vec![];
-                headers.push((
-                    "Content-Type".to_string(),
-                    content_type.to_mime_type_string(),
-                ));
-                assets.insert(path, (headers, content.to_vec()));
-            }
-            update_root_hash(&asset_hashes);
-        });
+pub fn init() {
+    init_assets(EMPTY_ALTERNATIVE_ORIGINS.to_string());
+}
+
+/// Collect all the assets from the dist folder.
+fn init_assets(alternative_origins: String) {
+    let mut assets = collect_assets(&ASSET_DIR, IncludeSubdirs, Some(fixup_html));
+    assets.push(Asset {
+        url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
+        content: alternative_origins.as_bytes().to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
     });
+
+    // convenience asset to have an url to point to when testing with the redirect alternative origins behaviour
+    assets.push(Asset {
+        url_path: "/.well-known/evil-alternative-origins".to_string(),
+        content: b"{\"alternativeOrigins\":[\"https://evil.com\"]}".to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
+    });
+    ASSETS.with_borrow_mut(|certified_assets| {
+        *certified_assets = CertifiedAssets::certify_assets(assets, &static_headers());
+    });
+    update_root_hash()
 }
 
-fn update_root_hash(a: &RbTree<&'static str, [u8; 32]>) {
-    let prefixed_root_hash = labeled_hash(b"http_assets", &a.root_hash());
-    api::set_certified_data(&prefixed_root_hash[..]);
-}
-
-lazy_static! {
-    // The full content of the index.html, after the canister ID (and script tag) have been
-    // injected
-    static ref INDEX_HTML_STR: String = {
-        let canister_id = api::id();
-        let index_html = include_str!("dist/index.html");
-
-        // the string we are replacing here is inserted by vite during the front-end build
-        let index_html = index_html.replace(
-            r#"<script type="module" crossorigin src="/index.js"></script>"#,
-            &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string()
-        );
-        index_html
-    };
-}
-
-// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
-// prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentType); 7] {
-    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
-    [
-        ("/", index_html, ContentType::HTML),
-        ("/index.html", index_html, ContentType::HTML),
-        (
-            "/index.css",
-            include_bytes!("dist/index.css"),
-            ContentType::CSS,
-        ),
-        (
-            "/index.js",
-            include_bytes!("dist/index.js"),
-            ContentType::JS,
-        ),
-        (
-            "/index2.js",
-            include_bytes!("dist/index2.js"),
-            ContentType::JS,
-        ),
-        // initially empty alternative origins, but can be populated using the update_alternative_origins call
-        (
-            "/.well-known/ii-alternative-origins",
-            b"{\"alternativeOrigins\":[]}",
-            ContentType::JSON,
-        ),
-        // convenience asset to have an url to point to when testing with the redirect alternative origins behaviour
-        (
-            "/.well-known/evil-alternative-origins",
-            b"{\"alternativeOrigins\":[\"https://evil.com\"]}",
-            ContentType::JSON,
-        ),
-    ]
+fn update_root_hash() {
+    ASSETS.with_borrow(|assets| {
+        api::set_certified_data(&assets.root_hash()[..]);
+    })
 }
