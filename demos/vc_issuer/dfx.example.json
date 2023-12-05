@@ -14,8 +14,8 @@
 
     "issuer": {
       "type": "custom",
-      "candid": "vc_issuer.did",
-      "wasm": "vc_issuer.wasm.gz",
+      "candid": "vc_demo_issuer.did",
+      "wasm": "vc_demo_issuer.wasm.gz",
       "build": "./build.sh"
     }
   },
