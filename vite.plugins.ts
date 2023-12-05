@@ -1,4 +1,4 @@
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { execSync } from "child_process";
 import { minify } from "html-minifier-terser";
 import httpProxy from "http-proxy";
@@ -91,11 +91,13 @@ export const replicaForwardPlugin = ({
         return;
       }
 
-      const host = req.headers["host"];
-      if (isNullish(host)) {
+      const host_ = req.headers["host"];
+      if (isNullish(host_)) {
         // default handling
         return next();
       }
+
+      const [host, _port] = host_.split(":");
 
       // forward to the specified canister (served by the replica)
       const forwardToReplica = ({ canisterId }: { canisterId: string }) => {
@@ -135,11 +137,15 @@ export const replicaForwardPlugin = ({
       }
 
       // split the subdomain & domain by splitting on the first dot
-      const [subdomain, ...domain_] = host.split(".");
-      const domain = domain_.join(".");
+      const [subdomain_, ...domain_] = host.split(".");
+      const [subdomain, domain] =
+        domain_.length > 0
+          ? [subdomain_, domain_.join(".")]
+          : [undefined, subdomain_];
 
       if (
-        !isNullish(forwardDomains) &&
+        nonNullish(forwardDomains) &&
+        nonNullish(subdomain) &&
         forwardDomains.includes(domain) &&
         /([a-z0-9])+(-[a-z0-9]+)+/.test(
           subdomain
@@ -151,13 +157,15 @@ export const replicaForwardPlugin = ({
 
       // Try to read the canister ID of a potential canister called <subdomain>
       // and if found forward to that
-      try {
-        const canisterId = execSync(`dfx canister id ${subdomain}`)
-          .toString()
-          .trim();
-        console.log("Forwarding to", canisterId);
-        return forwardToReplica({ canisterId });
-      } catch {}
+      if (nonNullish(subdomain) && domain === "localhost") {
+        try {
+          const canisterId = execSync(`dfx canister id ${subdomain}`)
+            .toString()
+            .trim();
+          console.log("Forwarding to", canisterId);
+          return forwardToReplica({ canisterId });
+        } catch {}
+      }
 
       return next();
     });
