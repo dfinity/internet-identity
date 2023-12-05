@@ -1,6 +1,6 @@
 <html>
   <head>
-    <script type="module" src="./index.ts"></script>
+    <script type="module" src="./index.tsx"></script>
   </head>
   <body>
     <style>
@@ -28,7 +28,12 @@
           <label for="iiUrl" style="display: inline-block; width: 200px"
             >Identity Provider:
           </label>
-          <input type="text" id="iiUrl" value="https://identity.ic0.app/" />
+          <input
+            type="text"
+            data-role="ii-url"
+            id="iiUrl"
+            value="http://localhost:5173"
+          />
         </div>
         <div>
           <label for="maxTimeToLive" style="display: inline-block; width: 200px"
@@ -48,22 +53,14 @@
             placeholder="(use default)"
           />
         </div>
-        <button id="signinBtn">Sign In</button>
+        <button data-action="authenticate" id="signinBtn">Sign In</button>
         <button id="signoutBtn">Sign Out</button>
         <h3>/.well-known/ii-alternative-origins</h3>
         <div id="alternativeOrigins"></div>
         <h3>Principal:</h3>
-        <div id="principal"></div>
+        <div data-role="principal" id="principal"></div>
         <h3>Delegation:</h3>
-        <pre
-          style="
-            font-size: 0.8rem;
-            overflow-x: scroll;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-          "
-          id="delegation"
-        ></pre>
+        <pre id="delegation"></pre>
         <h3>Expiry (ns from now):</h3>
         <div id="expiration"></div>
       </section>
@@ -136,6 +133,7 @@
         <h3>WindowPostMessages:</h3>
         <div id="messages"></div>
       </section>
+      <section id="root-vc-flow"></section>
     </main>
   </body>
 </html>

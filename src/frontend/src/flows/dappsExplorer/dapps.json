@@ -407,5 +407,11 @@
     "name": "ReBlock",
     "website": "https://www.reblock.finance/",
     "logo": "reblock_logo.png"
+  },
+  {
+    "name": "ICPsig",
+    "oneLiner": "Multisig for Internet Computer",
+    "website": "https://icpsig.in/",
+    "logo": "icpsig_logo.png"
   }
 ]

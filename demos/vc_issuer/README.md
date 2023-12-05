@@ -6,7 +6,7 @@ the [attribute sharing flow on the IC](https://github.com/dfinity/wg-identity-au
 ## Supported Behavior
 
 The app implements the interface of the issuer from [the spec](../../docs/vc-spec.md), plus some additional
-APIs for configuring and testing, cf. [vc_issuer.did](./vc_issuer.did).
+APIs for configuring and testing, cf. [vc_demo_issuer.did](./vc_demo_issuer.did).
 Please note that this issuer is for demonstrating the use of issuer APIS, and is **not meant
 for real-world deployment**, as it does not have proper management of user data.
 

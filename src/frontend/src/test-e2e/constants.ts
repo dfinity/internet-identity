@@ -11,6 +11,7 @@ export const TEST_APP_CANONICAL_URL_LEGACY = `https://${testAppCanisterId}.ic0.a
 export const TEST_APP_NICE_URL = "https://nice-name.com";
 
 export const ISSUER_APP_URL = `https://${issuerAppCanisterId}.icp0.io`;
+export const ISSUER_APP_URL_LEGACY = `https://${issuerAppCanisterId}.ic0.app`;
 
 export const II_URL =
   process.env.II_URL ?? "https://identity.internetcomputer.org";

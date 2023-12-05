@@ -706,7 +706,7 @@ mod test {
         let canister_interface = __export_service();
         service_equal(
             CandidSource::Text(&canister_interface),
-            CandidSource::File(Path::new("vc_issuer.did")),
+            CandidSource::File(Path::new("vc_demo_issuer.did")),
         )
         .unwrap_or_else(|e| {
             panic!(

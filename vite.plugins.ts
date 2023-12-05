@@ -1,4 +1,5 @@
 import { isNullish } from "@dfinity/utils";
+import { execSync } from "child_process";
 import { minify } from "html-minifier-terser";
 import httpProxy from "http-proxy";
 import { extname } from "path";
@@ -99,7 +100,7 @@ export const replicaForwardPlugin = ({
       // forward to the specified canister (served by the replica)
       const forwardToReplica = ({ canisterId }: { canisterId: string }) => {
         console.log(
-          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId}`
+          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`
         );
         req.headers["host"] = `${canisterId}.localhost`;
         proxy.web(req, res, {
@@ -109,6 +110,16 @@ export const replicaForwardPlugin = ({
         proxy.on("error", (err: Error) => {
           res.statusCode = 500;
           res.end("Replica forwarding failed: " + err.message);
+        });
+
+        /* Add a 'x-ic-canister-id' header like the BNs do */
+        proxy.on("proxyRes", (res) => {
+          res.headers["x-ic-canister-id"] = canisterId;
+
+          // Ensure the browser accepts the response
+          res.headers["access-control-allow-origin"] = "*";
+          res.headers["access-control-expose-headers"] = "*";
+          res.headers["access-control-allow-headers"] = "*";
         });
       };
 
@@ -137,6 +148,16 @@ export const replicaForwardPlugin = ({
         // Assume the principal-ish thing is a canister ID
         return forwardToReplica({ canisterId: subdomain });
       }
+
+      // Try to read the canister ID of a potential canister called <subdomain>
+      // and if found forward to that
+      try {
+        const canisterId = execSync(`dfx canister id ${subdomain}`)
+          .toString()
+          .trim();
+        console.log("Forwarding to", canisterId);
+        return forwardToReplica({ canisterId });
+      } catch {}
 
       return next();
     });
