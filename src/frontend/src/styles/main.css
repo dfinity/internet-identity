@@ -2780,6 +2780,13 @@ input[type="checkbox"] {
   font-family: monospace;
 }
 
+/* The styling for the markdown-rendered elements of the message
+ * (very minimalistic styling) */
+.c-consent-message h1 {
+  font-size: 1.2em;
+  margin-bottom: 0.5em;
+}
+
 /*
   Marquee
 
