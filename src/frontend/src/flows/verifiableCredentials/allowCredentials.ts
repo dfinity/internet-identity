@@ -1,6 +1,7 @@
 import { mkAnchorInput } from "$src/components/anchorInput";
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
+import { markdownToHTML } from "$src/utils/html";
 import { mount, renderPage, TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { html, TemplateResult } from "lit-html";
@@ -8,7 +9,6 @@ import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 
 import DOMPurify from "dompurify";
-import { parse as parseMarked } from "marked";
 
 import copyJson from "./allowCredentials.json";
 
@@ -45,7 +45,7 @@ const allowCredentialsTemplate = ({
 
   // Kickstart markdown parsing & sanitizing; once done, replace the consent message
   void (async () => {
-    const parsed = await parseMarked(consentMessage_);
+    const parsed = await markdownToHTML(consentMessage_);
     const sanitized = await DOMPurify.sanitize(parsed);
     consentMessage.send(unsafeHTML(sanitized));
   })();
