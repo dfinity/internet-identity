@@ -22,6 +22,28 @@ const DESKTOP_SCREEN: ScreenConfiguration = {
   windowSize: "1920,1080",
 };
 
+// webdriverio sometimes fails to fetch the latest chrome (due to network errors?) and does not
+// retry. So we do the retrying on our side.
+async function remoteRetry(
+  opts: Parameters<typeof remote>[0]
+): ReturnType<typeof remote> {
+  let lastErr;
+  const MAX_RETRIES = 5;
+
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      return await remote(opts);
+    } catch (e: unknown) {
+      lastErr = e;
+      continue;
+    }
+  }
+
+  throw new Error(
+    `Could not start browser after ${MAX_RETRIES} retries: ${lastErr}`
+  );
+}
+
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
@@ -70,7 +92,7 @@ export async function runInBrowser(
     );
   }
 
-  const browser = await remote({
+  const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
       browserVersion: "119.0.6045.105", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
