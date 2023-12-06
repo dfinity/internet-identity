@@ -404,11 +404,6 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
-    "name": "ReBlock",
-    "website": "https://www.reblock.finance/",
-    "logo": "reblock_logo.png"
-  },
-  {
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
