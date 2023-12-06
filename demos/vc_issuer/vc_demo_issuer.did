@@ -121,6 +121,7 @@ service: (opt IssuerConfig) -> {
     /// In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
+    add_adult : (principal) -> (text);
 
 
     /// Serve the app
