@@ -222,7 +222,7 @@ fn update_root_hash() {
         ASSETS.with_borrow(|assets| {
             let prefixed_root_hash = fork_hash(
                 // NB: Labels added in lexicographic order.
-                &labeled_hash(b"http_assets", &assets.root_hash()),
+                &assets.root_hash(),
                 &labeled_hash(LABEL_SIG, &sigs.root_hash()),
             );
 
