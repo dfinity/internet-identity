@@ -73,6 +73,7 @@ export const idlFactory = ({ IDL }) => {
     'Err' : Icrc21Error,
   });
   return IDL.Service({
+    'add_adult' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'add_employee' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'add_graduate' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'configure' : IDL.Func([IssuerConfig], [], []),

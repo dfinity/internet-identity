@@ -67,6 +67,7 @@ export interface PreparedCredentialData {
 }
 export interface SignedIdAlias { 'credential_jws' : string }
 export interface _SERVICE {
+  'add_adult' : ActorMethod<[Principal], string>,
   'add_employee' : ActorMethod<[Principal], string>,
   'add_graduate' : ActorMethod<[Principal], string>,
   'configure' : ActorMethod<[IssuerConfig], undefined>,
