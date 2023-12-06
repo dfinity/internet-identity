@@ -423,10 +423,7 @@ fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<
             hex::encode(root_hash)
         ));
     }
-    let tree = fork(
-        pruned(labeled_hash(b"http_assets", &asset_root_hash)),
-        labeled(LABEL_SIG, witness),
-    );
+    let tree = fork(pruned(asset_root_hash), labeled(LABEL_SIG, witness));
     #[derive(Serialize)]
     struct Sig {
         certificate: ByteBuf,
