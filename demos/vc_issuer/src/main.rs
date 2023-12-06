@@ -30,7 +30,7 @@ use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
     vc_signing_input_hash, AliasTuple,
 };
-use SupportedCredentialType::{UniversityDegree, VerifiedEmployee};
+use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
@@ -59,6 +59,7 @@ const VC_INSTITUTION_NAME: &str = "DFINITY College of Engineering";
 enum SupportedCredentialType {
     VerifiedEmployee(String),
     UniversityDegree(String),
+    VerifiedAdult(u16),
 }
 
 thread_local! {
@@ -67,6 +68,7 @@ thread_local! {
     static SIGNATURES : RefCell<SignatureMap> = RefCell::new(SignatureMap::default());
     static EMPLOYEES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
     static GRADUATES : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
+    static ADULTS : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 
     // Assets for the management app
     #[allow(clippy::type_complexity)]
@@ -313,6 +315,10 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialTy
             )?;
             Ok(UniversityDegree(VC_INSTITUTION_NAME.to_string()))
         }
+        "VerifiedAdult" => {
+            verify_single_argument(spec, "age_at_least", ArgumentValue::Int(18))?;
+            Ok(VerifiedAdult(18))
+        }
         other => Err(format!("Credential {} is not supported", other)),
     }
 }
@@ -373,6 +379,13 @@ fn add_employee(employee_id: Principal) -> String {
 fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
     format!("Added graduate {}", graduate_id)
+}
+
+#[update]
+#[candid_method]
+fn add_adult(adult_id: Principal) -> String {
+    ADULTS.with_borrow_mut(|adults| adults.insert(adult_id));
+    format!("Added adult {}", adult_id)
 }
 
 #[query]
@@ -504,6 +517,24 @@ fn dfinity_employment_credential(subject_principal: Principal, employer_name: &s
         .unwrap()
 }
 
+fn verified_adult_credential(subject_principal: Principal, age_at_least: u16) -> Credential {
+    let subject: Subject = Subject::from_json_value(json!({
+      "id": did_for_principal(subject_principal),
+      "age_at_least": age_at_least,
+    }))
+    .unwrap();
+
+    // Build credential using subject above and issuer.
+    CredentialBuilder::default()
+        .id(Url::parse("https://age_verifier.info/credentials/42").unwrap())
+        .issuer(Url::parse("https://age_verifier.info").unwrap())
+        .type_("VerifiedAdult")
+        .subject(subject)
+        .expiration_date(exp_timestamp())
+        .build()
+        .unwrap()
+}
+
 fn exp_timestamp() -> Timestamp {
     Timestamp::from_unix(((time() + VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as i64)
         .expect("internal: failed computing expiration timestamp")
@@ -530,6 +561,15 @@ fn prepare_credential_payload(
             Ok(bachelor_degree_credential(
                 alias_tuple.id_alias,
                 institution_name.as_str(),
+            ))
+        }
+        VerifiedAdult(age_at_least) => {
+            ADULTS.with_borrow(|adults| {
+                verify_authorized_principal(credential_type, alias_tuple, adults)
+            })?;
+            Ok(verified_adult_credential(
+                alias_tuple.id_alias,
+                *age_at_least,
             ))
         }
     }

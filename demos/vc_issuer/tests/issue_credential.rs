@@ -122,9 +122,17 @@ mod api {
     pub fn add_graduate(
         env: &StateMachine,
         canister_id: CanisterId,
-        employee_id: Principal,
+        graduate_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id, "add_graduate", (employee_id,)).map(|(x,)| x)
+        call_candid(env, canister_id, "add_graduate", (graduate_id,)).map(|(x,)| x)
+    }
+
+    pub fn add_adult(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        adult_id: Principal,
+    ) -> Result<String, CallError> {
+        call_candid(env, canister_id, "add_adult", (adult_id,)).map(|(x,)| x)
     }
 
     pub fn prepare_credential(
@@ -162,7 +170,7 @@ mod api {
 
 /// Verifies that the consent message can be requested.
 #[test]
-fn should_return_vc_consent_message() {
+fn should_return_vc_consent_message_for_employment_vc() {
     let test_cases = [
         ("en-US", "en", "# DFINITY Foundation Employment Credential"),
         ("de-DE", "de", "# Beschäftigungsausweis DFINITY Foundation"),
@@ -199,13 +207,46 @@ fn should_return_vc_consent_message() {
 }
 
 #[test]
+fn should_return_vc_consent_message_for_adult_vc() {
+    let test_cases = [
+        ("en-US", "en", "# Verified Adult"),
+        ("de-DE", "de", "# Erwachsene Person"),
+        ("ja-JP", "en", "# Verified Adult"), // test fallback language
+    ];
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    for (requested_language, actual_language, consent_message_snippet) in test_cases {
+        let mut args = HashMap::new();
+        args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+        let consent_message_request = Icrc21VcConsentMessageRequest {
+            credential_spec: CredentialSpec {
+                credential_type: "VerifiedAdult".to_string(),
+                arguments: Some(args),
+            },
+            preferences: Icrc21ConsentPreferences {
+                language: requested_language.to_string(),
+            },
+        };
+
+        let response =
+            api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+                .expect("API call failed")
+                .expect("Got 'None' from vc_consent_message");
+        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
+        assert_eq!(info.language, actual_language);
+        assert!(info.consent_message.starts_with(consent_message_snippet));
+    }
+}
+
+#[test]
 fn should_fail_vc_consent_message_if_not_supported() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
     let consent_message_request = Icrc21VcConsentMessageRequest {
         credential_spec: CredentialSpec {
-            credential_type: "VerifiedAdult".to_string(),
+            credential_type: "VerifiedResident".to_string(),
             arguments: None,
         },
         preferences: Icrc21ConsentPreferences {
@@ -296,6 +337,15 @@ fn degree_credential_spec() -> CredentialSpec {
     );
     CredentialSpec {
         credential_type: "UniversityDegreeCredential".to_string(),
+        arguments: Some(args),
+    }
+}
+
+fn adult_credential_spec() -> CredentialSpec {
+    let mut args = HashMap::new();
+    args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+    CredentialSpec {
+        credential_type: "VerifiedAdult".to_string(),
         arguments: Some(args),
     }
 }
@@ -552,8 +602,13 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 
     api::add_employee(&env, issuer_id, alias_tuple.id_dapp)?;
     api::add_graduate(&env, issuer_id, alias_tuple.id_dapp)?;
+    api::add_adult(&env, issuer_id, alias_tuple.id_dapp)?;
 
-    for credential_spec in [employee_credential_spec(), degree_credential_spec()] {
+    for credential_spec in [
+        employee_credential_spec(),
+        degree_credential_spec(),
+        adult_credential_spec(),
+    ] {
         let prepare_credential_response = api::prepare_credential(
             &env,
             issuer_id,
