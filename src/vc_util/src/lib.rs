@@ -403,8 +403,10 @@ fn inconsistent_jwt_claims(custom_message: &'static str) -> JwtValidationError {
     ))
 }
 
-// Extracts and returns raw canister sig public key (without DER-prefix) from the given header.
-fn get_canister_sig_pk_raw(jws_header: &JwsHeader) -> Result<Vec<u8>, SignatureVerificationError> {
+/// Extracts and returns raw canister sig public key (without DER-prefix) from the given header.
+pub fn get_canister_sig_pk_raw(
+    jws_header: &JwsHeader,
+) -> Result<Vec<u8>, SignatureVerificationError> {
     let jwk = jws_header
         .deref()
         .jwk()
