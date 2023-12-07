@@ -42,6 +42,14 @@ jobs:
           echo "ii_prod_sha256=$latest_release_ii_prod_sha256" >> "$GITHUB_OUTPUT"
           echo "archive_sha256=$latest_release_archive_sha256" >> "$GITHUB_OUTPUT"
         id: release
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Release build check failed: could not get release"
 
   # Perform the clean build (non-docker), using the release as checkout
   clean-build:
