@@ -14,6 +14,12 @@ import { z } from "zod";
  */
 export const MAX_SAVED_ANCHORS = 10;
 
+/** We don't keep an infinite number of principals to not bloat the storage. We do
+ * keep a significant number however, since (depending on the max TTL for delegation)
+ * a long time might have elapsed since we stored the principal (auth with RP) and the
+ * moment the user tries to verify a credential. */
+export const MAX_SAVED_PRINCIPALS = 40;
+
 /** Read saved anchors, sorted */
 export const getAnchors = async (): Promise<bigint[]> => {
   const data = await readStorage();
@@ -32,7 +38,7 @@ export const setAnchorUsed = async (userNumber: bigint) => {
 
     const anchors = storage.anchors;
     const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
-      knownPrincipalDigests: [],
+      knownPrincipals: [],
     };
     const oldAnchor = anchors[ix] ?? defaultAnchor;
 
@@ -66,7 +72,7 @@ export const getAnchorByPrincipal = async ({
   for (const ix in anchors) {
     const anchor: Anchor = anchors[ix];
 
-    if (anchor.knownPrincipalDigests.includes(digest)) {
+    if (anchor.knownPrincipals.some((digest_) => digest_.digest === digest)) {
       return BigInt(ix);
     }
   }
@@ -85,9 +91,14 @@ export const setKnownPrincipal = async ({
   principal: Principal;
 }) => {
   await withStorage(async (storage) => {
-    const ix = userNumber.toString();
+    const defaultAnchor: AnchorV3 = {
+      knownPrincipals: [],
+      lastUsedTimestamp: nowMillis(),
+    };
 
+    const ix = userNumber.toString();
     const anchors = storage.anchors;
+    const oldAnchor = anchors[ix] ?? defaultAnchor;
 
     const digest = await computePrincipalDigest({
       origin,
@@ -95,19 +106,26 @@ export const setKnownPrincipal = async ({
       hasher: storage.hasher,
     });
 
-    const defaultAnchor: AnchorV3 = {
-      knownPrincipalDigests: [],
+    const principalData = {
+      digest,
       lastUsedTimestamp: nowMillis(),
     };
-    const oldAnchor = anchors[ix] ?? defaultAnchor;
 
-    const knownPrincipalDigests = [
-      ...new Set(oldAnchor.knownPrincipalDigests.concat([digest])),
-    ];
+    // Remove the principal, if we've encountered it already
+    const dedupedPrincipals = oldAnchor.knownPrincipals.filter(
+      (principalData_) => principalData_.digest !== principalData.digest
+    );
+
+    // Add the new principal and sort (most recently used is first)
+    dedupedPrincipals.push(principalData);
+    dedupedPrincipals.sort((a, b) => b.lastUsedTimestamp - a.lastUsedTimestamp);
+
+    // Only keep the more recent N principals
+    const prunedPrincipals = dedupedPrincipals.slice(0, MAX_SAVED_PRINCIPALS);
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
-    storage.anchors[ix] = { ...oldAnchor, knownPrincipalDigests };
+    storage.anchors[ix] = { ...oldAnchor, knownPrincipals: prunedPrincipals };
     return storage;
   });
 };
@@ -323,7 +341,7 @@ const migratedV0 = async (): Promise<Storage | undefined> => {
   const ix = userNumber.toString();
 
   const anchors = {
-    [ix]: { lastUsedTimestamp: nowMillis(), knownPrincipalDigests: [] },
+    [ix]: { lastUsedTimestamp: nowMillis(), knownPrincipals: [] },
   };
 
   const hasher = await newHMACKey();
@@ -355,7 +373,7 @@ const migratedV1 = async (): Promise<Storage | undefined> => {
   const migratedAnchors: AnchorsV3 = {};
   for (const userNumber in anchors) {
     const oldAnchor = anchors[userNumber];
-    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipalDigests: [] };
+    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipals: [] };
   }
 
   const hasher = await newHMACKey();
@@ -418,7 +436,7 @@ const migratedV2 = async (): Promise<Storage | undefined> => {
 
   for (const userNumber in readAnchors) {
     const oldAnchor = readAnchors[userNumber];
-    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipalDigests: [] };
+    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipals: [] };
   }
 
   const hasher = await newHMACKey();
@@ -457,14 +475,23 @@ const writeIndexedDBV2 = async (anchors: AnchorsV2) => {
 type StorageV3 = z.infer<typeof StorageV3>;
 type AnchorsV3 = z.infer<typeof AnchorsV3>;
 type AnchorV3 = z.infer<typeof AnchorV3>;
+type PrincipalDataV3 = z.infer<typeof PrincipalDataV3>;
 
 const IDB_KEY_V3 = "ii-storage-v3";
+
+const PrincipalDataV3 = z.object({
+  /** The actual digest */
+  digest: z.string(),
+
+  /** The last time the user authenticated with the principal */
+  lastUsedTimestamp: z.number(),
+});
 
 const AnchorV3 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
 
-  knownPrincipalDigests: z.array(z.string()),
+  knownPrincipals: z.array(PrincipalDataV3),
 });
 const AnchorsV3 = z.record(AnchorV3);
 

@@ -9,6 +9,7 @@ import {
 } from "idb-keyval";
 import {
   MAX_SAVED_ANCHORS,
+  MAX_SAVED_PRINCIPALS,
   getAnchorByPrincipal,
   getAnchors,
   setAnchorUsed,
@@ -229,6 +230,44 @@ test(
   })
 );
 
+test(
+  "old principals are dropped",
+  withStorage(async () => {
+    const userNumber = BigInt(10000);
+    const principal = Principal.fromText("2vxsx-fae");
+    const oldOrigin = "https://old.com";
+    const veryOldOrigin = "https://very.old.com";
+    vi.useFakeTimers().setSystemTime(new Date(0));
+    await setKnownPrincipal({ userNumber, principal, origin: veryOldOrigin });
+    vi.useFakeTimers().setSystemTime(new Date(1));
+    await setKnownPrincipal({ userNumber, principal, origin: oldOrigin });
+    let date = 2;
+    vi.useFakeTimers().setSystemTime(new Date(date));
+    for (let i = 0; i < MAX_SAVED_PRINCIPALS; i++) {
+      date++;
+      vi.useFakeTimers().setSystemTime(new Date(date));
+      await setKnownPrincipal({
+        userNumber,
+        principal,
+        origin: `https://new${i}.com`,
+      });
+    }
+    date++;
+    vi.useFakeTimers().setSystemTime(new Date(date));
+    const newOrigin = "https://new.com";
+    await setKnownPrincipal({ userNumber, principal, origin: newOrigin });
+    expect(
+      await getAnchorByPrincipal({ principal, origin: veryOldOrigin })
+    ).not.toBeDefined();
+    expect(
+      await getAnchorByPrincipal({ principal, origin: oldOrigin })
+    ).not.toBeDefined();
+    expect(
+      await getAnchorByPrincipal({ principal, origin: newOrigin })
+    ).toBeDefined();
+    vi.useRealTimers();
+  })
+);
 /** Test storage usage. Storage is cleared after the callback has returned.
  * If `before` is specified, storage is populated with its content before the test is run.
  * If `after` is specified, the content of storage are checked against `after` after the
