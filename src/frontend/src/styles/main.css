@@ -1772,6 +1772,12 @@ by all browsers (FF is missing) */
   gap: var(--rs-input-inline);
 }
 
+/*
+* The width of the digits is the result of the gap we want between them and the
+* number of digits we want to display. 
+* 100% is the full width of the container, so we devide it by the number of digits
+* and subtract the gap we want between them.
+*/
 .c-list__item--pin {
   flex-basis: calc(100% / var(--pinDigits) - var(--rs-input-inline));
 }
