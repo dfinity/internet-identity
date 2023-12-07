@@ -108,15 +108,21 @@ pub fn principal_for_did(did: &str) -> Result<Principal, String> {
 }
 
 /// Verifies the given JWS-credential as an id_alias-VC and extracts the alias tuple.
-/// Performs both the cryptographic verification of the credential.
+/// Performs both the cryptographic verification of the credential, and the semantic
+/// validation of the claims in the VC.
 pub fn get_verified_id_alias_from_jws(
     credential_jws: &str,
     signing_canister_id: &Principal,
     root_pk_raw: &[u8],
+    current_time_ns: u128,
 ) -> Result<AliasTuple, CredentialVerificationError> {
-    let claims =
-        verify_credential_jws_with_canister_id(credential_jws, signing_canister_id, root_pk_raw)
-            .map_err(CredentialVerificationError::InvalidJws)?;
+    let claims = verify_credential_jws_with_canister_id(
+        credential_jws,
+        signing_canister_id,
+        root_pk_raw,
+        current_time_ns,
+    )
+    .map_err(CredentialVerificationError::InvalidJws)?;
     validate_claim("iss", II_ISSUER_URL, claims.iss())
         .map_err(CredentialVerificationError::InvalidClaims)?;
     extract_id_alias(&claims).map_err(CredentialVerificationError::InvalidClaims)
@@ -129,6 +135,7 @@ pub fn verify_credential_jws_with_canister_id(
     credential_jws: &str,
     signing_canister_id: &Principal,
     root_pk_raw: &[u8],
+    current_time_ns: u128,
 ) -> Result<JwtClaims<Value>, SignatureVerificationError> {
     ///// Decode JWS.
     let decoder: Decoder = Decoder::new();
@@ -161,7 +168,8 @@ pub fn verify_credential_jws_with_canister_id(
 
     let claims: JwtClaims<Value> = serde_json::from_slice(jws.claims())
         .map_err(|e| invalid_signature_err(&format!("failed parsing JSON JWT claims: {}", e)))?;
-
+    validate_expiration(claims.exp(), current_time_ns)
+        .map_err(|e| invalid_signature_err(&format!("credential expired: {}", e)))?;
     Ok(claims)
 }
 
@@ -189,6 +197,7 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
     vp_jwt: &str,
     vc_flow_parties: &VcFlowParties,
     root_pk_raw: &[u8],
+    current_time_ns: u128,
 ) -> Result<(AliasTuple, JwtClaims<Value>), PresentationVerificationError> {
     let presentation = parse_verifiable_presentation_jwt(vp_jwt)
         .map_err(PresentationVerificationError::InvalidPresentationJwt)?;
@@ -208,6 +217,7 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
         id_alias_vc_jws.as_str(),
         &vc_flow_parties.ii_canister_id,
         root_pk_raw,
+        current_time_ns,
     )
     .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
     let holder = principal_for_did(&presentation.holder.to_string()).map_err(|e| {
@@ -233,6 +243,7 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
         requested_vc_jws.as_str(),
         &vc_flow_parties.issuer_canister_id,
         root_pk_raw,
+        current_time_ns,
     )
     .map_err(|e| {
         PresentationVerificationError::InvalidRequestedCredential(
@@ -322,6 +333,26 @@ fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
     }
 }
 
+fn validate_expiration(
+    maybe_expiration_s: Option<i64>,
+    current_time_ns: u128,
+) -> Result<(), JwtValidationError> {
+    if let Some(expiration_s) = maybe_expiration_s {
+        let expiration_ns: u128 = (expiration_s * 1_000_000_000)
+            .try_into()
+            .map_err(|_| JwtValidationError::ExpirationDate)?;
+        if expiration_ns > current_time_ns {
+            Ok(())
+        } else {
+            Err(JwtValidationError::ExpirationDate)
+        }
+    } else {
+        Err(JwtValidationError::CredentialStructure(
+            JwtVcError::MissingExpirationDate,
+        ))
+    }
+}
+
 // Per https://datatracker.ietf.org/doc/html/rfc7518#section-6.4,
 // JwkParamsOct are for symmetric keys or another key whose value is a single octet sequence.
 fn canister_sig_pk_jwk(canister_sig_pk_der: &[u8]) -> Result<Jwk, String> {
@@ -408,7 +439,13 @@ mod tests {
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
     const DAPP_PRINCIPAL: &str = "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe";
     const ID_ALIAS_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCamxUYzNvSzVRVU9SbUt0T3YyVXBhMnhlQW5vNEJ4RlFFYmY1VWRUSTZlYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOmNwZWhxLTU0aGVmLW9kamp0LWJvY2tsLTNsZHRnLWpxbGU0LXlzaTVyLTZiZmFoLXY2bHNhLXhwcmR2LXBxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDpzMzNxYy1jdG5wNS11Ynl6NC1rdWJxby1wMnRlbS1oZTRscy02ajIzai1od3diYS0zN3pibC10Mmx2My1wYWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIPJBKvDetPwyft_h5oQ0nnxjTE_PNV3PrJy1qwKUrh0LggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIGgDAfUw2gIV3kD2PAwglKvdL6iSQ6qQwFcFPtFnQPTpggRYIBTRAqxOalCVKAHk5WxJ9MVl6VO8uaE3dqwFQzy-KkV_ggRYIPzx8nwybmJ4amD88KZwujDMw22rOmhXTr6RRf38pPV4ggRYIARJcosVL7413JPlfHGUgZQyu2CZ2XFVRnJBCkZSRjROgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwr8xRG17_yzlaO2dIWFTQXGwPVPaAkD4P3hdjJyNmSRKDehzvWAShX03w9q_tZGlCZHRyZWWDAYIEWCAqgobdT9VjwJT-e8ou6LaCrL32vpKdLcqyN9RHVjBthIMCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBggRYIFdVX_z6VIe33hrXKtxlLy8EZsv4_GNMMUXVF64TMzDqgwJYIF8bQCq3kGPfDU8PEiRnEmqgwwtHm3iGJeuwTLlxBocCggNA";
+    const EXPIRY_NS: u128 = 1620329530 * 1_000_000_000;
+    const MINUTE_NS: u128 = 60 * 1_000_000_000;
+    const CURRENT_TIME_AFTER_EXPIRY_NS: u128 = EXPIRY_NS + MINUTE_NS;
+    const CURRENT_TIME_BEFORE_EXPIRY_NS: u128 = EXPIRY_NS - MINUTE_NS;
+
     const ID_ALIAS_CREDENTIAL_JWS_NO_JWK: &str = "eyJraWQiOiJkaWQ6aWM6aWktY2FuaXN0ZXIiLCJhbGciOiJJY0NzIn0.eyJpc3MiOiJodHRwczovL2ludGVybmV0Y29tcHV0ZXIub3JnL2lzc3VlcnMvaW50ZXJuZXQtaWRlbml0eSIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9pbnRlcm5ldGNvbXB1dGVyLm9yZy9jcmVkZW50aWFsL2ludGVybmV0LWlkZW5pdHkiLCJzdWIiOiJkaWQ6d2ViOmNwZWhxLTU0aGVmLW9kamp0LWJvY2tsLTNsZHRnLWpxbGU0LXlzaTVyLTZiZmFoLXY2bHNhLXhwcmR2LXBxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOndlYjpzMzNxYy1jdG5wNS11Ynl6NC1rdWJxby1wMnRlbS1oZTRscy02ajIzai1od3diYS0zN3pibC10Mmx2My1wYWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIG3uU_jutBtXB-of0uEA3RkCrcunK6D8QFPtX-gDSwDeggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIMULjwe1N6XomH10SEyc2r_uc7mGf1aSadeDaid9cUrkggRYIDw__VW2PgWMFp6mK-GmPG-7Fc90q58oK_wjcJ3IrkToggRYIAQTcQAtnxsa93zbfZEZV0f28OhiXL5Wp1OAyDHNI_x4ggRYINkQ8P9zGUvsVi3XbQ2bs6V_3kAiN8UNM6yPgeXfmArEgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwqHrYoUsNvSEaSShbW8barx0_ODXD5ZBEl9nKOdkNy_fBmGErE_C7ILbC91_fyZ7CZHRyZWWDAYIEWCB223o-sI97tc3LwJL3LRxQ4If6v_IvfC1fwIGYYQ9vroMCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBgwJYIHszMLDS2VadioIaHajRY5iJzroqMs63lVrs_Uj42j0sggNAggRYICm0w_XxGEw4fDPoYcojCILEi0qdH4-4Zw7klzdaPNOC";
+    const TEST_CREDENTIAL_JWS_NO_EXPIRY: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCeUk3dlEyOGVybHFnVjVMck03dTNIOUlaeGVwcUxzQkdnSjFyTldaX0tfQSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJpc3MiOiJodHRwczovL2VtcGxveW1lbnQuaW5mby8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvL2NyZWRlbnRpYWxzLzQyIiwic3ViIjoiZGlkOmljcDp2aGJpYi1tNGhtNi1ocHZ5Yy03cHJkMi1zaWl2by1uYmQ3ci02N281eC1uM2F3aC1xc21xei13em5qZi10cWUiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlZlcmlmaWVkRW1wbG95ZWUiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiZW1wbG95ZWVfb2YiOnsiZW1wbG95ZXJJZCI6ImRpZDp3ZWI6ZGZpbml0eS5vcmciLCJlbXBsb3llck5hbWUiOiJERklOSVRZIEZvdW5kYXRpb24ifX19fQ.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggq7DruGSK9j0nNpVYlgkE4OtYMHWfxzrqB0D-tTp77umDAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggc8y0K3LKbNnsixDTg2Ux51vwu6b9Kqm2NFykuHVtd06CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggTwA0M58_LFASzZLk1ju6zhwQ6qzeDSZsYyc8Ak-WWGCCBFgg7bPsepWtwANz_eF2pBaMOy-a-UEVj8ojdMRGhxyIODqCBFggEflcBBzJzouB9GoAqyMJiiexVT1w7LIv72CbckA15-SCBFggFtwxSFgot33A2BgPFXCOTj9gM8Z0ORDn-YD1tYNW2wmDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCisy0ljDwwuPOxJn72Y8qqxgxDRgP0srKPvFkEgygNfVHoEGnwseMBdMMrYzIStrNkdHJlZYMBggRYIAvQZNP5TRQHV7AavT2jNGPPLcQBzfQvva5hEybHvbw8gwJDc2lngwJYIHGZW4y0kE1oq6oGYkhXj36h1sNPmG2jwFX6tPGiRkfXgwJYICslyEcSADtGlWLKMBsBJAlXe8en4eGCuE9yuAnuqRBOggNA";
     const TEST_SIGNING_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
     const TEST_SEED: [u8; 32] = [
         142, 84, 220, 222, 130, 185, 65, 67, 145, 152, 171, 78, 191, 101, 41, 107, 108, 94, 2, 122,
@@ -553,8 +590,31 @@ mod tests {
             ID_ALIAS_CREDENTIAL_JWS,
             &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         )
         .expect("JWS verification failed");
+    }
+
+    #[test]
+    fn should_fail_verify_credential_jws_if_expired() {
+        let result = verify_credential_jws_with_canister_id(
+            ID_ALIAS_CREDENTIAL_JWS,
+            &test_canister_sig_pk().canister_id,
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_AFTER_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if e.to_string().contains("credential expired"));
+    }
+
+    #[test]
+    fn should_fail_verify_credential_jws_if_no_expiry() {
+        let result = verify_credential_jws_with_canister_id(
+            TEST_CREDENTIAL_JWS_NO_EXPIRY,
+            &test_issuer_canister_sig_pk().canister_id,
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_AFTER_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if e.to_string().contains("structure is not semantically correct"));
     }
 
     #[test]
@@ -563,6 +623,7 @@ mod tests {
             ID_ALIAS_CREDENTIAL_JWS_NO_JWK,
             &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if e.to_string().contains("missing JWK in JWS header"));
     }
@@ -574,6 +635,7 @@ mod tests {
             ID_ALIAS_CREDENTIAL_JWS,
             &wrong_canister_sig_pk.canister_id,
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if e.to_string().contains("canister sig canister id does not match provided canister id"));
     }
@@ -586,6 +648,7 @@ mod tests {
             ID_ALIAS_CREDENTIAL_JWS,
             &test_canister_sig_pk().canister_id,
             &ic_root_pk,
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if  { let err_msg = e.to_string();
             err_msg.contains("invalid signature") &&
@@ -598,6 +661,7 @@ mod tests {
             ID_ALIAS_CREDENTIAL_JWS,
             &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         )
         .expect("JWS verification failed");
         assert_eq!(
@@ -653,10 +717,34 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         )
         .expect("vp verification failed");
         assert_eq!(id_alias, alias_tuple_from_jws.id_alias);
         assert_eq!(id_dapp, alias_tuple_from_jws.id_dapp);
+    }
+
+    #[test]
+    fn should_fail_verify_ii_presentation_if_expired() {
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                REQUESTED_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp creation failed");
+        let result = verify_ii_presentation_jwt_with_canister_ids(
+            &vp_jwt,
+            &VcFlowParties {
+                ii_canister_id: test_canister_sig_pk().canister_id,
+                issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
+            },
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_AFTER_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("credential expired"));
     }
 
     #[test]
@@ -678,6 +766,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("expected exactly two verifiable credentials"));
     }
@@ -697,6 +786,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("expected exactly two verifiable credentials"));
     }
@@ -719,6 +809,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("holder does not match subject"));
     }
@@ -743,6 +834,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("subject does not match id_alias"));
     }
@@ -765,6 +857,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("InvalidSignature"));
     }
@@ -787,6 +880,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("InvalidSignature"));
     }
@@ -810,6 +904,7 @@ mod tests {
                 issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("canister id does not match"));
     }
@@ -833,6 +928,7 @@ mod tests {
                 issuer_canister_id: test_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("canister id does not match"));
     }
@@ -858,6 +954,7 @@ mod tests {
                 issuer_canister_id: test_canister_sig_pk().canister_id,
             },
             &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("inconsistent claim in id_alias VC"));
     }

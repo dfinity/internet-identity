@@ -153,8 +153,11 @@ fn apply_config(init: IssuerInit) {
         .expect("failed to apply issuer config");
 }
 
-fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(alias)?;
+fn authorize_vc_request(
+    alias: &SignedIdAlias,
+    current_time_ns: u128,
+) -> Result<AliasTuple, IssueCredentialError> {
+    let alias_tuple = extract_id_alias(alias, current_time_ns)?;
 
     if caller() != alias_tuple.id_dapp {
         return Err(IssueCredentialError::UnauthorizedSubject(format!(
@@ -166,7 +169,10 @@ fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCreden
     Ok(alias_tuple)
 }
 
-fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
+fn extract_id_alias(
+    alias: &SignedIdAlias,
+    current_time_ns: u128,
+) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
 
@@ -175,6 +181,7 @@ fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredential
                 &alias.credential_jws,
                 idp_canister_id,
                 &config.ic_root_key_raw,
+                current_time_ns,
             ) {
                 return Ok(alias_tuple);
             }
@@ -188,7 +195,7 @@ fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredential
 #[update]
 #[candid_method]
 async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return PrepareCredentialResponse::Err(err),
     };
@@ -242,7 +249,7 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return GetCredentialResponse::Err(err),
     };

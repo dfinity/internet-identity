@@ -18,6 +18,7 @@ use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::UNIX_EPOCH;
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
     Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
@@ -597,6 +598,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             .credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
     )
     .expect("Invalid ID alias");
 
@@ -656,6 +658,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             &credential_data.vc_jws,
             &issuer_id,
             &root_pk_raw,
+            env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
         )
         .expect("credential verification failed");
         validate_vc_claims(
