@@ -3,7 +3,7 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
 use canister_tests::{flows, match_value};
-use ic_test_state_machine_client::CallError;
+use ic_test_state_machine_client::{CallError, StateMachine};
 use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
 use identity_jose::jwu::encode_b64;
@@ -12,6 +12,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use std::ops::Deref;
+use std::time::UNIX_EPOCH;
 use vc_util::verify_credential_jws_with_canister_id;
 
 fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
@@ -27,6 +28,9 @@ fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
     assert_eq!(jwk_params.k, encode_b64(canister_sig_pk_der));
 }
 
+fn current_time_ns(env: &StateMachine) -> u128 {
+    env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+}
 // Verifies that a valid id_alias is created.
 #[test]
 fn should_get_valid_id_alias() -> Result<(), CallError> {
@@ -104,6 +108,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_id_alias_credential_via_env(
@@ -118,6 +123,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
             .credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     Ok(())
@@ -241,6 +247,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -249,12 +256,14 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -263,6 +272,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     Ok(())
@@ -389,6 +399,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -397,12 +408,14 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -411,6 +424,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
 
@@ -538,6 +552,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -546,12 +561,14 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -560,6 +577,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        current_time_ns(&env),
     )
     .expect("external verification failed");
 
