@@ -1,3 +1,4 @@
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { IDBFactory } from "fake-indexeddb";
 import {
@@ -6,7 +7,13 @@ import {
   keys as idbKeys,
   set as idbSet,
 } from "idb-keyval";
-import { MAX_SAVED_ANCHORS, getAnchors, setAnchorUsed } from ".";
+import {
+  MAX_SAVED_ANCHORS,
+  getAnchorByPrincipal,
+  getAnchors,
+  setAnchorUsed,
+  setKnownPrincipal,
+} from ".";
 
 beforeAll(() => {
   // Initialize the IndexedDB global
@@ -180,6 +187,28 @@ test(
       await setAnchorUsed(BigInt(i));
     }
     expect((await getAnchors()).length).toStrictEqual(MAX_SAVED_ANCHORS);
+  })
+);
+
+test(
+  "principal digests are stored",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const principal = Principal.fromText("2vxsx-fae");
+    await setKnownPrincipal({
+      userNumber: BigInt(10000),
+      origin,
+      principal,
+    });
+
+    const otherOrigin = "https://other.com";
+    expect(
+      await getAnchorByPrincipal({ origin: otherOrigin, principal })
+    ).not.toBeDefined();
+
+    expect(await getAnchorByPrincipal({ origin, principal })).toBe(
+      BigInt(10000)
+    );
   })
 );
 

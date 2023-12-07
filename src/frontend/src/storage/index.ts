@@ -31,7 +31,10 @@ export const setAnchorUsed = async (userNumber: bigint) => {
     const ix = userNumber.toString();
 
     const anchors = storage.anchors;
-    const oldAnchor = anchors[ix] ?? { knownPrincipalDigests: [] };
+    const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
+      knownPrincipalDigests: [],
+    };
+    const oldAnchor = anchors[ix] ?? defaultAnchor;
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
@@ -61,7 +64,7 @@ export const getAnchorByPrincipal = async ({
   });
 
   for (const ix in anchors) {
-    const anchor: AnchorV3 = anchors[ix];
+    const anchor: Anchor = anchors[ix];
 
     if (anchor.knownPrincipalDigests.includes(digest)) {
       return BigInt(ix);
@@ -92,7 +95,11 @@ export const setKnownPrincipal = async ({
       hasher: storage.hasher,
     });
 
-    const oldAnchor = anchors[ix] ?? { knownPrincipalDigests: [] };
+    const defaultAnchor: AnchorV3 = {
+      knownPrincipalDigests: [],
+      lastUsedTimestamp: nowMillis(),
+    };
+    const oldAnchor = anchors[ix] ?? defaultAnchor;
 
     const knownPrincipalDigests = [
       ...new Set(oldAnchor.knownPrincipalDigests.concat([digest])),
@@ -249,7 +256,7 @@ const nowMillis = (): number => {
  * possibility of collisions.
  */
 const computePrincipalDigest = async ({
-  origin: origin_,
+  origin,
   principal: principal_,
   hasher,
 }: {
@@ -257,18 +264,15 @@ const computePrincipalDigest = async ({
   principal: Principal;
   hasher: CryptoKey;
 }): Promise<string> => {
-  const origin = new Blob([origin_]);
-  const originLen = new Int32Array([origin.size]);
-
-  const principal = principal_.toUint8Array();
-  const principalLen = new Int32Array([principal.length]);
-
-  const data = new Blob([origin, originLen, principal, principalLen]);
-  const digestBytes = await crypto.subtle.sign(
-    "HMAC",
-    hasher,
-    await data.arrayBuffer()
+  // Create a buffer with origin & principal
+  const enc = new TextEncoder();
+  const principal = principal_.toText();
+  const buff = enc.encode(
+    origin + origin.length.toString() + principal + principal.length.toString()
   );
+
+  // Create the digest
+  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
   const digest = arrayBufferToBase64(digestBytes);
   return digest;
 };
@@ -498,6 +502,7 @@ const writeIndexedDBV3 = async (storage: Storage) => {
 
 /* Always points to the latest storage & anchor types */
 type Storage = StorageV3;
+type Anchor = AnchorV3;
 type Anchors = Storage["anchors"];
 const readIndexedDB = readIndexedDBV3;
 const writeIndexedDB = writeIndexedDBV3;
