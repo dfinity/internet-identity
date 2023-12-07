@@ -3,7 +3,7 @@ import {
   CredentialSpec,
   IssuedCredentialData,
 } from "$generated/vc_issuer_types";
-import { handleLogin } from "$src/components/authenticateBox";
+import { usePasskey } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
@@ -119,12 +119,7 @@ const verifyCredentials = async ({
   const userNumber = allowed.userNumber;
 
   // For the rest of the flow we need to be authenticated, so authenticate
-  // XXX: this simply breaks for PIN identities
-  const authResult = await withLoader(() =>
-    handleLogin({
-      login: () => connection.login(userNumber),
-    })
-  );
+  const authResult = await usePasskey({ userNumber, connection });
 
   if (authResult.tag !== "ok") {
     return abortedCredentials({ reason: "auth_failed_ii" });
