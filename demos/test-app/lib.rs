@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use AlternativeOriginsMode::UncertifiedContent;
 
 const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
+const EVIL_ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/evil-alternative-origins";
 const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
 
 thread_local! {
@@ -24,7 +25,7 @@ fn whoami() -> Principal {
 
 /// Function to update the asset /.well-known/ii-alternative-origins.
 /// # Arguments
-/// * content: new value of this asset. The content type will always be set to application/json.
+/// * alternative_origins: new value of this asset. The content type will always be set to application/json.
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
@@ -85,9 +86,9 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 }
                 UncertifiedContent => {
                     // drop the IC-Certificate and IC-Certificate-Expr headers
-                    certified_response
-                        .headers
-                        .retain(|(header_name, _)| !header_name.to_lowercase().starts_with("ic-"));
+                    certified_response.headers.retain(|(header_name, _)| {
+                        !header_name.to_lowercase().starts_with("ic-certificate")
+                    });
                 }
                 Redirect { location } => {
                     // Add a Location header and modify status code to 302 to indicate redirect
@@ -163,7 +164,7 @@ fn init_assets(alternative_origins: String) {
 
     // convenience asset to have an url to point to when testing with the redirect alternative origins behaviour
     assets.push(Asset {
-        url_path: "/.well-known/evil-alternative-origins".to_string(),
+        url_path: EVIL_ALTERNATIVE_ORIGINS_PATH.to_string(),
         content: b"{\"alternativeOrigins\":[\"https://evil.com\"]}".to_vec(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::JSON,
