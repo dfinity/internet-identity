@@ -227,7 +227,7 @@ jobs:
             exit 1
           fi
 
-  vc-issuer-build:
+  vc_demo_issuer-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -290,7 +290,7 @@ jobs:
 
   vc-issuer-test:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, vc-issuer-build]
+    needs: [docker-build-ii, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
@@ -470,7 +470,7 @@ jobs:
 
   selenium:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, test-app-build, vc-issuer-build]
+    needs: [docker-build-ii, test-app-build, vc_demo_issuer-build]
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
@@ -637,7 +637,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-internet_identity_production, docker-build-archive, test-app-build, vc-issuer-build]
+    needs: [docker-build-internet_identity_production, docker-build-archive, test-app-build, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v3
 
@@ -752,7 +752,13 @@ jobs:
           script: |
             return (await github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs"))
               .map(job => {
-                return {id: job.id, name: job.name, steps: job.steps, html_url: job.html_url}
+                return {
+                  id: job.id,
+                  name: job.name,
+                  steps: job.steps.map(step => {
+                    return {name: step.name, number: step.number}
+                  },
+                  html_url: job.html_url}
               });
 
       - uses: actions/github-script@v6
