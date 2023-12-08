@@ -749,7 +749,9 @@ jobs:
       - uses: actions/github-script@v6
         id: pipeline-jobs
         with:
-          script: return github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs");
+          script: |
+            return (await github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs"))
+              .map(job => {id: job.id, job.name, job.steps, job.html_url});
 
       - uses: actions/github-script@v6
         id: latest-release-tag
