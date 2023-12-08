@@ -76,7 +76,7 @@ impl CertifiedAssets {
         } in assets
         {
             let body_hash = sha2::Sha256::digest(&content).into();
-            add_certification_v1(&mut certified_assets, &url_path, body_hash);
+            certified_assets.add_certification_v1(&url_path, body_hash);
 
             let mut headers = match encoding {
                 ContentEncoding::Identity => vec![],
@@ -97,8 +97,7 @@ impl CertifiedAssets {
                 ));
             }
 
-            add_certification_v2(
-                &mut certified_assets,
+            certified_assets.add_certification_v2(
                 &url_path,
                 &shared_headers
                     .iter()
@@ -166,6 +165,27 @@ impl CertifiedAssets {
         })
     }
 
+    /// Efficiently updates the content of an already existing asset, by only re-certifying the
+    /// changed asset.
+    ///
+    /// If the asset does not exist, an error is returned.
+    pub fn update_asset_content(
+        &mut self,
+        url_path: &str,
+        new_content: Vec<u8>,
+    ) -> Result<(), String> {
+        let Some((headers, _)) = self.assets.get(url_path) else {
+            return Err(format!("Asset {} not found.", url_path));
+        };
+        let headers = headers.clone();
+        let body_hash = sha2::Sha256::digest(&new_content).into();
+        self.add_certification_v1(url_path, body_hash);
+        self.add_certification_v2(url_path, &headers, body_hash);
+        self.assets
+            .insert(url_path.to_string(), (headers, new_content));
+        Ok(())
+    }
+
     fn witness_v1(&self, absolute_path: &str) -> HashTree {
         let witness = self.certification_v1.witness(absolute_path.as_bytes());
         fork(
@@ -175,6 +195,33 @@ impl CertifiedAssets {
                 &self.certification_v2.root_hash(),
             )),
         )
+    }
+
+    fn add_certification_v1(&mut self, absolute_path: &str, body_hash: Hash) {
+        self.certification_v1
+            .insert(absolute_path.to_string(), body_hash)
+    }
+
+    fn add_certification_v2(
+        &mut self,
+        absolute_path: &str,
+        headers: &[HeaderField],
+        body_hash: Hash,
+    ) {
+        assert!(absolute_path.starts_with('/'));
+
+        let mut segments: Vec<Vec<u8>> = absolute_path
+            .split('/')
+            .map(str::as_bytes)
+            .map(Vec::from)
+            .collect();
+        segments.remove(0); // remove leading empty string due to absolute path
+        segments.push(EXACT_MATCH_TERMINATOR.as_bytes().to_vec());
+        segments.push(Vec::from(EXPR_HASH.as_slice()));
+        segments.push(vec![]);
+        segments.push(Vec::from(response_hash(headers, &body_hash)));
+
+        self.certification_v2.insert(&segments, vec![])
     }
 
     fn witness_v2(&self, absolute_path: &str) -> HashTree {
@@ -311,38 +358,6 @@ lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
-fn add_certification_v1(
-    certified_assets: &mut CertifiedAssets,
-    absolute_path: &str,
-    body_hash: Hash,
-) {
-    certified_assets
-        .certification_v1
-        .insert(absolute_path.to_string(), body_hash)
-}
-
-fn add_certification_v2(
-    certified_assets: &mut CertifiedAssets,
-    absolute_path: &str,
-    headers: &[HeaderField],
-    body_hash: Hash,
-) {
-    assert!(absolute_path.starts_with('/'));
-
-    let mut segments: Vec<Vec<u8>> = absolute_path
-        .split('/')
-        .map(str::as_bytes)
-        .map(Vec::from)
-        .collect();
-    segments.remove(0); // remove leading empty string due to absolute path
-    segments.push(EXACT_MATCH_TERMINATOR.as_bytes().to_vec());
-    segments.push(Vec::from(EXPR_HASH.as_slice()));
-    segments.push(vec![]);
-    segments.push(Vec::from(response_hash(headers, &body_hash)));
-
-    certified_assets.certification_v2.insert(&segments, vec![])
-}
-
 fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
     let mut response_metadata: HashMap<String, Value> = HashMap::from_iter(
         headers
@@ -401,6 +416,7 @@ fn collect_assets_from_dir(dir: &Dir, html_transformer: Option<fn(&str) -> Strin
             }
             "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
             "json" => (file_bytes, ContentEncoding::Identity, ContentType::JSON),
+            "js" => (file_bytes, ContentEncoding::Identity, ContentType::JS),
             "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
             "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
             "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
