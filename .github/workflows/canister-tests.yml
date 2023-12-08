@@ -381,7 +381,6 @@ jobs:
         run: |
           mkdir dist
           touch dist/index.html
-          touch dist/index.js.gz
 
       # Build the tests
       - name: Build test archive
