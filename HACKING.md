@@ -133,6 +133,27 @@ dfx build internet_identity
 
 This will produce `./internet_identity.wasm.gz`.
 
+## Attribute Sharing / Verifiable Credentials
+
+To experiment with Attribute Sharing / Verifiable Credentials feature, one can start a demo VC-issuer by running
+```bash
+dfx deploy issuer
+```
+This will deploy also `internet_identity`, and provision the issuer for the testing environment.
+See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
+
+Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
+```bash
+dfx deploy test_app
+```
+
+Afterward one can serve the frontends locally via:
+```bash
+npm run dev
+```
+and access the issuer FE at http://issuer.localhost:5173/, and the test-app at http://test_app.localhost:5173/
+(the relying party is functionality is at the bottom of the page).
+
 ## Showcase
 
 The simplest way to make visual changes (HTML & CSS, and non-flow JS) is to start the showcase:
