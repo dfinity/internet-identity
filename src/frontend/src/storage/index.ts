@@ -292,7 +292,7 @@ const computePrincipalDigest = async ({
   const principal = enc.encode(principal_);
   const principalLen = Uint8Array.from([principal_.length]);
 
-  // Create a buffer with all for elements
+  // Create a buffer with all four elements
   const buff = concatUint8Arrays([origin, originLen, principal, principalLen]);
 
   // Create the digest
