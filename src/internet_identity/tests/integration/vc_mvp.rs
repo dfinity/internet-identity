@@ -104,6 +104,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_id_alias_credential_via_env(
@@ -118,6 +119,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
             .credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     Ok(())
@@ -241,6 +243,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -249,12 +252,14 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -263,6 +268,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     Ok(())
@@ -389,6 +395,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -397,12 +404,14 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -411,6 +420,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
 
@@ -538,6 +548,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -546,12 +557,14 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -560,6 +573,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
 
