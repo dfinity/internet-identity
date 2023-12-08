@@ -274,25 +274,47 @@ const nowMillis = (): number => {
  * possibility of collisions.
  */
 const computePrincipalDigest = async ({
-  origin,
-  principal: principal_,
+  origin: origin_,
+  principal: principalObj,
   hasher,
 }: {
   origin: string;
   principal: Principal;
   hasher: CryptoKey;
 }): Promise<string> => {
-  // Create a buffer with origin & principal
+  // Encode each element & size
   const enc = new TextEncoder();
-  const principal = principal_.toText();
-  const buff = enc.encode(
-    origin + origin.length.toString() + principal + principal.length.toString()
-  );
+  const principal_ = principalObj.toText();
+
+  const origin = enc.encode(origin_);
+  const originLen = Uint8Array.from([origin_.length]);
+
+  const principal = enc.encode(principal_);
+  const principalLen = Uint8Array.from([principal_.length]);
+
+  // Create a buffer with all for elements
+  const buff = concatUint8Arrays([origin, originLen, principal, principalLen]);
 
   // Create the digest
   const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
   const digest = arrayBufferToBase64(digestBytes);
   return digest;
+};
+
+// Concat some byte arrays
+const concatUint8Arrays = (buffers: Uint8Array[]): Uint8Array => {
+  // Create a new byte array of the total size
+  const totSize = buffers.reduce((acc, arr) => acc + arr.length, 0);
+  const final = new Uint8Array(totSize);
+
+  // For each of the arrays to concat: write it to the final array, then bump the write offset
+  let offset = 0;
+  buffers.forEach((arr) => {
+    final.set(arr, offset);
+    offset += arr.length;
+  });
+
+  return final;
 };
 
 /* Generate HMAC key */
