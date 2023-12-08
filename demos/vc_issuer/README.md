@@ -22,4 +22,4 @@ process and the latest binary can be fetched via [release notes page](https://gi
 
 To use the demo issuer in a testing setup, the issuer canister has to be configured to match the environment,
 i.e. it has to use the correct root public key, and accept requests from the correct II-canister
-(see [`provision`-script](./provision) for details).
+(see [`provision`-script](./provision) for details, and [HACKING-doc](../../HACKING.md) for setup instructions).
