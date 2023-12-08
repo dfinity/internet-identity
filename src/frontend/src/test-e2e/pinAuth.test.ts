@@ -1,5 +1,11 @@
 import { Principal } from "@dfinity/principal";
-import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
+import {
+  APPLE_USER_AGENT,
+  DEVICE_NAME1,
+  EDGE_USER_AGENT,
+  II_URL,
+  TEST_APP_NICE_URL,
+} from "./constants";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
@@ -16,14 +22,6 @@ import {
   WelcomeView,
 } from "./views";
 
-// The PIN auth feature is only enabled for Apple specific user agents
-const APPLE_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36";
-
-// Sample user agent for Edge on Windows
-const EDGE_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/116.0.1938.81";
-
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
 
 test("PIN registration not enabled on non-Apple device", async () => {
@@ -37,6 +35,9 @@ test("PIN registration not enabled on non-Apple device", async () => {
     await registerView.assertPinRegistrationNotShown();
   }, EDGE_USER_AGENT);
 }, 300_000);
+
+// The PIN auth feature is only enabled for Apple specific user agents, so tests set the user
+// agent to chrome on macOS
 
 test("Register and Log in with PIN identity", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

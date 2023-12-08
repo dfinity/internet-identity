@@ -17,6 +17,7 @@ import {
 } from "./views";
 
 import {
+  APPLE_USER_AGENT,
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
@@ -119,69 +120,72 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
   test(
     "Can issue credentials " + testSuffix,
     async () => {
-      await runInBrowser(async (browser: WebdriverIO.Browser) => {
-        await browser.url(II_URL);
+      await runInBrowser(
+        async (browser: WebdriverIO.Browser) => {
+          await browser.url(II_URL);
 
-        const { userNumber, setupAuth, finalizeAuth } = await register[
-          authType
-        ](browser);
+          const { userNumber, setupAuth, finalizeAuth } = await register[
+            authType
+          ](browser);
 
-        await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+          await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
-        // 1. Add employee
+          // 1. Add employee
 
-        const issuerAppView = new IssuerAppView(browser);
-        await issuerAppView.open({
-          issuerAppUrl: issuer,
-          iiUrl: II_URL,
-        });
-        await issuerAppView.waitForDisplay();
-        await issuerAppView.authenticate();
+          const issuerAppView = new IssuerAppView(browser);
+          await issuerAppView.open({
+            issuerAppUrl: issuer,
+            iiUrl: II_URL,
+          });
+          await issuerAppView.waitForDisplay();
+          await issuerAppView.authenticate();
 
-        await setupAuth(browser);
+          await setupAuth(browser);
 
-        const authenticateView = new AuthenticateView(browser);
-        await authenticateView.waitForDisplay();
-        await authenticateView.pickAnchor(userNumber);
+          const authenticateView = new AuthenticateView(browser);
+          await authenticateView.waitForDisplay();
+          await authenticateView.pickAnchor(userNumber);
 
-        await finalizeAuth(browser);
-        await waitToClose(browser);
+          await finalizeAuth(browser);
+          await waitToClose(browser);
 
-        const _principal = await issuerAppView.waitForAuthenticated();
-        const _msg = await issuerAppView.addEmployee();
+          const _principal = await issuerAppView.waitForAuthenticated();
+          const _msg = await issuerAppView.addEmployee();
 
-        // 2. Auth to RP
+          // 2. Auth to RP
 
-        const vcTestApp = new VcTestAppView(browser);
-        await vcTestApp.open(relyingParty, II_URL, issuer);
+          const vcTestApp = new VcTestAppView(browser);
+          await vcTestApp.open(relyingParty, II_URL, issuer);
 
-        await vcTestApp.startSignIn();
+          await vcTestApp.startSignIn();
 
-        await setupAuth(browser);
+          await setupAuth(browser);
 
-        const authenticateView2 = new AuthenticateView(browser);
-        await authenticateView2.waitForDisplay();
-        await authenticateView2.pickAnchor(userNumber);
+          const authenticateView2 = new AuthenticateView(browser);
+          await authenticateView2.waitForDisplay();
+          await authenticateView2.pickAnchor(userNumber);
 
-        await finalizeAuth(browser);
-        await waitToClose(browser);
+          await finalizeAuth(browser);
+          await waitToClose(browser);
 
-        await vcTestApp.waitForAuthenticated();
-        await vcTestApp.startVcFlow();
+          await vcTestApp.waitForAuthenticated();
+          await vcTestApp.startVcFlow();
 
-        await setupAuth(browser);
+          await setupAuth(browser);
 
-        const vcAllow = new VcAllowView(browser);
-        await vcAllow.waitForDisplay();
-        const userNumber_ = await vcAllow.getUserNumber();
-        expect(userNumber_).toBe(userNumber);
-        await vcAllow.allow();
+          const vcAllow = new VcAllowView(browser);
+          await vcAllow.waitForDisplay();
+          const userNumber_ = await vcAllow.getUserNumber();
+          expect(userNumber_).toBe(userNumber);
+          await vcAllow.allow();
 
-        await finalizeAuth(browser);
-        await waitToClose(browser);
+          await finalizeAuth(browser);
+          await waitToClose(browser);
 
-        // XXX: We don't verify the presentation (yet)
-      });
+          // XXX: We don't verify the presentation (yet)
+        },
+        authType === "pin" ? APPLE_USER_AGENT : undefined
+      );
     },
     300_000
   );
