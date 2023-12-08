@@ -11,11 +11,13 @@ import {
 import {
   AuthenticateView,
   IssuerAppView,
+  PinAuthView,
   VcAllowView,
   VcTestAppView,
 } from "./views";
 
 import {
+  APPLE_USER_AGENT,
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
@@ -41,99 +43,150 @@ test("Can add employee on issuer app", async () => {
   });
 }, 300_000);
 
+// The different ways to register (webauthn, pin).
+// The registration function returns the user number and callbacks
+// used for authenticating.
+const register = {
+  webauthn: async (browser: WebdriverIO.Browser) => {
+    const authenticatorId = await addVirtualAuthenticator(browser);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+
+    return {
+      userNumber,
+      setupAuth: async (browser: WebdriverIO.Browser) => {
+        const authenticatorId = await switchToPopup(browser);
+        await addWebAuthnCredential(
+          browser,
+          authenticatorId,
+          credentials[0],
+          originToRelyingPartyId(II_URL)
+        );
+      },
+      finalizeAuth: () => {
+        /* noop */
+      },
+    };
+  },
+
+  pin: async (browser: WebdriverIO.Browser) => {
+    const pin = "123456";
+    const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
+
+    return {
+      userNumber,
+      setupAuth: async (browser: WebdriverIO.Browser) => {
+        const _authenticatorId = await switchToPopup(browser);
+      },
+      finalizeAuth: async (browser: WebdriverIO.Browser) => {
+        const pinAuthView = new PinAuthView(browser);
+        await pinAuthView.waitForDisplay();
+        await pinAuthView.enterPin(pin);
+      },
+    };
+  },
+};
+
 const getDomain = (url: string) => url.split(".").slice(1).join(".");
 
-[TEST_APP_CANONICAL_URL, TEST_APP_CANONICAL_URL_LEGACY].forEach(
-  (relyingParty) =>
-    [ISSUER_APP_URL, ISSUER_APP_URL_LEGACY].forEach((issuer) => {
-      const testSuffix = `RP: ${getDomain(relyingParty)}, ISS: ${getDomain(
-        issuer
-      )}`;
+// The different test configs (different URLs, differnet auth methods)
+const testConfigs: Array<{
+  relyingParty: string;
+  issuer: string;
+  authType: "pin" | "webauthn";
+}> = [
+  {
+    relyingParty: TEST_APP_CANONICAL_URL_LEGACY,
+    issuer: ISSUER_APP_URL,
+    authType: "webauthn",
+  },
+  {
+    relyingParty: TEST_APP_CANONICAL_URL,
+    issuer: ISSUER_APP_URL_LEGACY,
+    authType: "webauthn",
+  },
+  {
+    relyingParty: TEST_APP_CANONICAL_URL,
+    issuer: ISSUER_APP_URL,
+    authType: "pin",
+  },
+];
 
-      test(
-        "Can issue credentials " + testSuffix,
-        async () => {
-          await runInBrowser(async (browser: WebdriverIO.Browser) => {
-            const authenticatorId_register = await addVirtualAuthenticator(
-              browser
-            );
-            await browser.url(II_URL);
-            const userNumber = await FLOWS.registerNewIdentityWelcomeView(
-              browser
-            );
-            await FLOWS.addRecoveryMechanismSeedPhrase(browser);
-            const credentials = await getWebAuthnCredentials(
-              browser,
-              authenticatorId_register
-            );
-            expect(credentials).toHaveLength(1);
+testConfigs.forEach(({ relyingParty, issuer, authType }) => {
+  const testSuffix = `RP: ${getDomain(relyingParty)}, ISS: ${getDomain(
+    issuer
+  )}, auth: ${authType}`;
 
-            // 1. Add employee
+  test(
+    "Can issue credentials " + testSuffix,
+    async () => {
+      await runInBrowser(
+        async (browser: WebdriverIO.Browser) => {
+          await browser.url(II_URL);
 
-            const issuerAppView = new IssuerAppView(browser);
-            await issuerAppView.open({
-              issuerAppUrl: issuer,
-              iiUrl: II_URL,
-            });
-            await issuerAppView.waitForDisplay();
-            await issuerAppView.authenticate();
+          const { userNumber, setupAuth, finalizeAuth } = await register[
+            authType
+          ](browser);
 
-            const authenticatorId_addEmployee = await switchToPopup(browser);
-            await addWebAuthnCredential(
-              browser,
-              authenticatorId_addEmployee,
-              credentials[0],
-              originToRelyingPartyId(II_URL)
-            );
+          await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
-            const authenticateView = new AuthenticateView(browser);
-            await authenticateView.waitForDisplay();
-            await authenticateView.pickAnchor(userNumber);
-            await waitToClose(browser);
+          // 1. Add employee
 
-            const _principal = await issuerAppView.waitForAuthenticated();
-            const _msg = await issuerAppView.addEmployee();
-
-            // 2. Auth to RP
-
-            const vcTestApp = new VcTestAppView(browser);
-            await vcTestApp.open(relyingParty, II_URL, issuer);
-
-            await vcTestApp.startSignIn();
-
-            const authenticatorId2 = await switchToPopup(browser);
-            await addWebAuthnCredential(
-              browser,
-              authenticatorId2,
-              credentials[0],
-              originToRelyingPartyId(II_URL)
-            );
-
-            const authenticateView2 = new AuthenticateView(browser);
-            await authenticateView2.waitForDisplay();
-            await authenticateView2.pickAnchor(userNumber);
-
-            await vcTestApp.waitForAuthenticated();
-            await vcTestApp.startVcFlow();
-            const authenticatorId3 = await switchToPopup(browser);
-            await addWebAuthnCredential(
-              browser,
-              authenticatorId3,
-              credentials[0],
-              originToRelyingPartyId(II_URL)
-            );
-
-            const vcAllow = new VcAllowView(browser);
-            await vcAllow.waitForDisplay();
-            const userNumber_ = await vcAllow.getUserNumber();
-            expect(userNumber_).toBe(userNumber);
-            await vcAllow.allow();
-            await waitToClose(browser);
-
-            // XXX: We don't verify the presentation (yet)
+          const issuerAppView = new IssuerAppView(browser);
+          await issuerAppView.open({
+            issuerAppUrl: issuer,
+            iiUrl: II_URL,
           });
+          await issuerAppView.waitForDisplay();
+          await issuerAppView.authenticate();
+
+          await setupAuth(browser);
+
+          const authenticateView = new AuthenticateView(browser);
+          await authenticateView.waitForDisplay();
+          await authenticateView.pickAnchor(userNumber);
+
+          await finalizeAuth(browser);
+          await waitToClose(browser);
+
+          const _principal = await issuerAppView.waitForAuthenticated();
+          const _msg = await issuerAppView.addEmployee();
+
+          // 2. Auth to RP
+
+          const vcTestApp = new VcTestAppView(browser);
+          await vcTestApp.open(relyingParty, II_URL, issuer);
+
+          await vcTestApp.startSignIn();
+
+          await setupAuth(browser);
+
+          const authenticateView2 = new AuthenticateView(browser);
+          await authenticateView2.waitForDisplay();
+          await authenticateView2.pickAnchor(userNumber);
+
+          await finalizeAuth(browser);
+          await waitToClose(browser);
+
+          await vcTestApp.waitForAuthenticated();
+          await vcTestApp.startVcFlow();
+
+          await setupAuth(browser);
+
+          const vcAllow = new VcAllowView(browser);
+          await vcAllow.waitForDisplay();
+          const userNumber_ = await vcAllow.getUserNumber();
+          expect(userNumber_).toBe(userNumber);
+          await vcAllow.allow();
+
+          await finalizeAuth(browser);
+          await waitToClose(browser);
+
+          // XXX: We don't verify the presentation (yet)
         },
-        300_000
+        authType === "pin" ? APPLE_USER_AGENT : undefined
       );
-    })
-);
+    },
+    300_000
+  );
+});
