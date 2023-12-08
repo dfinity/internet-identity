@@ -757,7 +757,7 @@ jobs:
                   name: job.name,
                   steps: job.steps.map(step => {
                     return {name: step.name, number: step.number}
-                  },
+                  }),
                   html_url: job.html_url}
               });
 
