@@ -52,7 +52,7 @@ const VC_EMPLOYER_NAME: &str = "DFINITY Foundation";
 const VC_INSTITUTION_NAME: &str = "DFINITY College of Engineering";
 
 #[derive(Debug)]
-enum SupportedCredentialType {
+pub enum SupportedCredentialType {
     VerifiedEmployee(String),
     UniversityDegree(String),
     VerifiedAdult(u16),
