@@ -818,7 +818,8 @@ jobs:
             internet_identity_dev.wasm.gz \
             internet_identity_test.wasm.gz \
             src/internet_identity/internet_identity.did \
-            archive.wasm.gz
+            archive.wasm.gz \
+            vc_demo_issuer.wasm.gz
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
