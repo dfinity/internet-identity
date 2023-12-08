@@ -186,7 +186,7 @@ export const authenticateBoxFlow = async <T, I>({
   };
 
   const doLogin = ({ userNumber }: { userNumber: bigint }) =>
-    usePasskeyFlow({
+    useIdentityFlow({
       userNumber,
       retrievePinIdentityMaterial,
 
@@ -590,7 +590,7 @@ const pinIdentityToDerPubkey = async (
 };
 
 // Find and use a passkey, whether PIN or webauthn
-const usePasskeyFlow = async <T, I>({
+const useIdentityFlow = async <T, I>({
   userNumber,
   retrievePinIdentityMaterial,
   verifyPinValidity,
@@ -687,14 +687,14 @@ const usePasskeyFlow = async <T, I>({
 };
 
 // Use a passkey, with concrete impl.
-export const usePasskey = ({
+export const useIdentity = ({
   userNumber,
   connection,
 }: {
   userNumber: bigint;
   connection: Connection;
 }) =>
-  usePasskeyFlow({
+  useIdentityFlow({
     userNumber,
     retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
 
