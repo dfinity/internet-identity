@@ -234,7 +234,6 @@ fn update_root_hash() {
                 &assets.root_hash(),
                 &labeled_hash(LABEL_SIG, &sigs.root_hash()),
             );
-
             set_certified_data(&prefixed_root_hash[..]);
         })
     })
@@ -394,9 +393,11 @@ fn add_adult(adult_id: Principal) -> String {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
-    let sigs = SIGNATURES.with_borrow(|sigs| pruned(sigs.root_hash()));
-    let maybe_asset = ASSETS
-        .with_borrow(|assets| assets.certified_asset(path, req.certificate_version, Some(sigs)));
+    let sigs_root_hash =
+        SIGNATURES.with_borrow(|sigs| pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())));
+    let maybe_asset = ASSETS.with_borrow(|assets| {
+        assets.certified_asset(path, req.certificate_version, Some(sigs_root_hash))
+    });
 
     let mut headers = static_headers();
     match maybe_asset {

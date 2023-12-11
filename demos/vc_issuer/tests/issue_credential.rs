@@ -3,22 +3,27 @@
 use assert_matches::assert_matches;
 use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
+use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
-use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, II_WASM};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
+use ic_response_verification::types::{Request, Response, VerificationInfo};
+use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use identity_core::common::Value;
 use identity_jose::jwt::JwtClaims;
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
     Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
@@ -698,4 +703,64 @@ fn should_configure() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
+}
+
+/// Verifies that an expected assets are delivered, certified and have security headers.
+#[test]
+fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
+    fn verify_response_certification(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        request: HttpRequest,
+        http_response: HttpResponse,
+        min_certification_version: u16,
+    ) -> VerificationInfo {
+        verify_request_response_pair(
+            Request {
+                method: request.method,
+                url: request.url,
+                headers: request.headers,
+                body: request.body.into_vec(),
+            },
+            Response {
+                status_code: http_response.status_code,
+                headers: http_response.headers,
+                body: http_response.body.into_vec(),
+            },
+            canister_id.as_slice(),
+            time(env) as u128,
+            Duration::from_secs(300).as_nanos(),
+            &env.root_key(),
+            min_certification_version as u8,
+        )
+        .unwrap_or_else(|e| panic!("validation failed: {e}"))
+    }
+
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    // for each asset and certification version, fetch the asset, check the HTTP status code, headers and certificate.
+
+    for certification_version in 1..=2 {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: "/".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(certification_version),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
+        assert_eq!(http_response.status_code, 200);
+
+        let result = verify_response_certification(
+            &env,
+            canister_id,
+            request,
+            http_response,
+            certification_version,
+        );
+        assert_eq!(result.verification_version, certification_version);
+    }
+
+    Ok(())
 }
