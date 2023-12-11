@@ -705,7 +705,7 @@ fn should_configure() {
     api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
 }
 
-/// Verifies that an expected assets are delivered, certified and have security headers.
+/// Verifies that the expected assets is delivered and certified.
 #[test]
 fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
     fn verify_response_certification(
