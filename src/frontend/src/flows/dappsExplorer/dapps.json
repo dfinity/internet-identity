@@ -404,6 +404,12 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
+    "name": "TaxLint",
+    "oneLiner": "Your automated tax reporting IC assistant.",
+    "website": "https://vresg-vyaaa-aaaag-qcj2q-cai.icp0.io/",
+    "logo": "taxlint_logo.png"
+  },
+  {
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
