@@ -282,6 +282,16 @@ const computePrincipalDigest = async ({
   principal: Principal;
   hasher: CryptoKey;
 }): Promise<string> => {
+  if (origin_.length > 255) {
+    // Origins must not be longer than 255 bytes according to RFC1035.
+    // See also here: https://stackoverflow.com/questions/32290167/what-is-the-maximum-length-of-a-dns-name
+    // Given that by these limitations above it should not be possible to exceed the limit, we simply throw
+    // to avoid the associated security issue.
+    // Note: this is consistent with the backend, that also does not allow origins longer than 255 bytes
+    // -> there cannot exist an RP for which the VC flow would be meaningful that has an origin longer than 255 bytes
+    // since sign-in would not work in the first place.
+    throw new Error("origin too long");
+  }
   // Encode each element & size
   const enc = new TextEncoder();
   const principal_ = principalObj.toText();
