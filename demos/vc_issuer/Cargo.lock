@@ -996,6 +996,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "http"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8947b1a6fad4393052c7ba1f4cd97bed3e953a95c79c92ad9b051a04611d9fbb"
+dependencies = [
+ "bytes",
+ "fnv",
+ "itoa",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1063,6 +1074,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-cbor"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10633e3e4f112f370be0d5458cd0bbb5b42a89fd7aaec71da7ba60e659fa0a83"
+dependencies = [
+ "candid",
+ "ic-certification 1.3.0",
+ "leb128",
+ "nom",
+ "thiserror",
+]
+
+[[package]]
 name = "ic-cdk"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1087,6 +1111,21 @@ dependencies = [
  "serde",
  "serde_tokenstream",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ic-certificate-verification"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6f369eef7b7e6691afb9f33510d9cabc91eb36a0cb8a1fbc699221b3686c5c6"
+dependencies = [
+ "candid",
+ "ic-cbor",
+ "ic-certification 1.3.0",
+ "leb128",
+ "miracl_core_bls12381",
+ "nom",
+ "thiserror",
 ]
 
 [[package]]
@@ -1504,6 +1543,29 @@ checksum = "9182ea4781cb21b5ada5ef74da44bbc04849bdb67cceac63d6b09d474fb33f1d"
 dependencies = [
  "leb128",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "ic-response-verification"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc617be90b43f31195c86226d1c7df0b1a5cc0d0bcfe737a5611649f360eed52"
+dependencies = [
+ "base64 0.21.4",
+ "candid",
+ "flate2",
+ "hex",
+ "http",
+ "ic-cbor",
+ "ic-certificate-verification",
+ "ic-certification 1.3.0",
+ "ic-representation-independent-hash",
+ "leb128",
+ "log",
+ "nom",
+ "sha2 0.10.8",
+ "thiserror",
+ "urlencoding",
 ]
 
 [[package]]
@@ -1987,6 +2049,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1994,6 +2062,12 @@ checksum = "e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7"
 dependencies = [
  "adler",
 ]
+
+[[package]]
+name = "miracl_core_bls12381"
+version = "4.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d07cbe42e2a8dd41df582fb8e00fc24d920b5561cc301fcb6d14e2e0434b500f"
 
 [[package]]
 name = "multibase"
@@ -2022,6 +2096,16 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nom"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
 ]
 
 [[package]]
@@ -3037,6 +3121,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
+
+[[package]]
 name = "utf8-width"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3055,6 +3145,7 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-certification 1.3.0",
+ "ic-response-verification",
  "ic-stable-structures 0.6.0",
  "ic-test-state-machine-client",
  "identity_core",
