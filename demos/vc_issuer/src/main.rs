@@ -234,6 +234,7 @@ fn update_root_hash() {
                 &assets.root_hash(),
                 &labeled_hash(LABEL_SIG, &sigs.root_hash()),
             );
+
             set_certified_data(&prefixed_root_hash[..]);
         })
     })
