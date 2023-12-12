@@ -70,7 +70,6 @@ const allowCredentialsTemplate = ({
       <strong class="t-strong">${relyingOrigin}</strong>?
     </p>
 
-
     <div class="c-button-group">
       <button
         data-action="cancel"

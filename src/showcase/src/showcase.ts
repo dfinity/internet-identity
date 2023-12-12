@@ -664,7 +664,9 @@ _This is italic text_
 >> ...by using additional greater-than signs right next to each other...
 > > > ...or with spaces between arrows.
 
-Unordered
+Test link: [Visit website](https://www.example.com)
+
+### Unordered
 
 + Create a list by starting a line with '+', '-', or '*'
 + Sub-lists are made by indenting 2 spaces:
@@ -674,7 +676,7 @@ Unordered
     - Nulla volutpat aliquam velit
 + Very easy!
 
-Ordered
+### Ordered
 
 1. Lorem ipsum dolor sit amet
 2. Consectetur adipiscing elit
