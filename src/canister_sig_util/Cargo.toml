@@ -7,10 +7,15 @@ edition = "2021"
 [dependencies]
 # ic dependencies
 candid.workspace = true
+ic-cdk.workspace = true
 ic-certification.workspace = true
 
 # other dependencies
+hex.workspace = true
 lazy_static.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_bytes.workspace = true
+serde_cbor.workspace = true
 sha2.workspace = true
 
 [dev-dependencies]

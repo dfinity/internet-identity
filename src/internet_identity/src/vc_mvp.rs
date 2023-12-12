@@ -1,15 +1,14 @@
 use crate::delegation::check_frontend_length;
-use crate::{delegation, hash, state, update_root_hash, LABEL_SIG, MINUTE_NS};
+use crate::{delegation, hash, state, update_root_hash, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk::api::{data_certificate, time};
-use ic_cdk::trap;
-use ic_certification::{fork, labeled, pruned, Hash, HashTree};
+use ic_cdk::api::time;
+use ic_certification::Hash;
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 
-use asset_util::CertifiedAssets;
+use canister_sig_util::get_signature_as_cbor;
 use canister_sig_util::signature_map::SignatureMap;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
@@ -17,7 +16,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, IdentityNumber,
 };
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use vc_util::{
@@ -104,19 +102,31 @@ pub fn get_id_alias(
 
         let signing_input = vc_signing_input(rp_id_alias_jwt, &canister_sig_pk)
             .expect("failed getting signing_input");
-        let msg_hash = vc_signing_input_hash(&signing_input);
-        let Some(rp_sig) = get_signature(cert_assets, sigs, seed, msg_hash) else {
-            return GetIdAliasResponse::NoSuchCredentials("rp_sig not found".to_string());
-        };
+        let message_hash = vc_signing_input_hash(&signing_input);
+        let rp_sig =
+            match get_signature_as_cbor(sigs, &seed, message_hash, Some(cert_assets.root_hash())) {
+                Ok(sig) => sig,
+                Err(e) => {
+                    return GetIdAliasResponse::NoSuchCredentials(
+                        format!("rp_sig not found: {}", e).to_string(),
+                    )
+                }
+            };
         let rp_jws = vc_jwt_to_jws(rp_id_alias_jwt, &canister_sig_pk, &rp_sig)
             .expect("failed constructing JWS");
 
         let signing_input = vc_signing_input(issuer_id_alias_jwt, &canister_sig_pk)
             .expect("failed getting signing_input");
-        let msg_hash = vc_signing_input_hash(&signing_input);
-        let Some(issuer_sig) = get_signature(cert_assets, sigs, seed, msg_hash) else {
-            return GetIdAliasResponse::NoSuchCredentials("issuer_sig not found".to_string());
-        };
+        let message_hash = vc_signing_input_hash(&signing_input);
+        let issuer_sig =
+            match get_signature_as_cbor(sigs, &seed, message_hash, Some(cert_assets.root_hash())) {
+                Ok(sig) => sig,
+                Err(e) => {
+                    return GetIdAliasResponse::NoSuchCredentials(
+                        format!("issuer_sig not found: {}", e).to_string(),
+                    )
+                }
+            };
         let issuer_jws = vc_jwt_to_jws(issuer_id_alias_jwt, &canister_sig_pk, &issuer_sig)
             .expect("failed constructing JWS");
 
@@ -133,46 +143,6 @@ pub fn get_id_alias(
             },
         })
     })
-}
-
-fn get_signature(
-    cert_assets: &CertifiedAssets,
-    sigs: &SignatureMap,
-    seed: Hash,
-    msg_hash: Hash,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-
-    let tree = fork(pruned(cert_assets.root_hash()), labeled(LABEL_SIG, witness));
-
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
 }
 
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
