@@ -186,6 +186,9 @@
   --rc-card-backdrop: transparent;
   --rc-background-card--background: transparent;
 
+  --rc-card--inverted: var(--vc-snow);
+  --rc-card--inverted-background: var(--vc-raven);
+
   --rc-line: var(--vc-light-grey);
   --rc-line-interaction: var(--vc-brand-purple);
   --rc-line-inverted: var(--rc-dark);
@@ -624,6 +627,108 @@ a:hover,
   width: 100%;
 }
 
+/* 
+  generic typography
+  .t-formatted us used as a wrapper around formatted text
+  typically used for text that comes from an outside source like a markdown parser 
+*/
+.t-formatted {
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.t-formatted--monospace {
+  font-family: monospace;
+  font-size: 1.1rem;
+}
+
+.t-formatted p,
+.t-formatted h1,
+.t-formatted h2,
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6
+.t-formatted blockquote,
+.t-formatted pre,
+.t-formatted table {
+  margin-top: 1em;
+}
+
+.t-formatted ul,
+.t-formatted ol {
+  margin-left: 1.5em;
+  list-style: disc;
+  margin-top: 1.5em;
+}
+
+.t-formatted ol {
+  list-style: decimal;
+  margin-left: 1.7em;
+}
+
+.t-formatted li + li {
+  margin-top: 0.5em;
+}
+
+.t-formatted *:first-child {
+  margin-top: 0;
+}
+
+.t-formatted h1,
+.t-formatted h2,
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6,
+.t-formatted strong,
+.t-formatted b {
+  font-weight: bolder;
+}
+
+.t-formatted h1 {
+  font-size: 1.5rem;
+}
+.t-formatted h2 {
+  font-size: 1.4rem;
+}
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6 {
+  font-size: 1.2rem;
+}
+
+.t-formatted blockquote {
+  padding: 0.5em 1em;
+  font-style: italic;
+  margin-top: 1em;
+  border-left: 0.2em solid var(--rc-line);
+}
+
+.t-formatted em,
+.t-formatted i {
+  font-style: italic;
+}
+
+.t-formatted del {
+  text-decoration: line-through;
+}
+
+.t-formatted table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1em;
+  border: 1px solid var(--rc-line);
+}
+
+.t-formatted table th,
+.t-formatted table td {
+  padding: 0.5em;
+  border: 1px solid var(--rc-line);
+}
+
+
 .l-wrap {
   position: relative;
   display: flex;
@@ -914,6 +1019,46 @@ a:hover,
     border: none;
     border-radius: 0;
   }
+}
+
+/* Concent Cards */
+
+.c-card--consent {
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
+
+  background-color: var(--rc-card--inverted-background);
+  color: var(--rc-card--inverted);
+
+  max-height: 60vh;
+
+  overflow-y: auto;
+
+  /* if the context is scrollable it will show with some fancy shadow in the direction of the scroll */
+  background:
+      /* Shadow Cover TOP */
+      linear-gradient(var(--rc-card--inverted-background) 30%,
+        rgba(0, 0, 0, 0)) center top,
+  
+      /* Shadow Cover BOTTOM */
+      linear-gradient(rgba(0, 0, 0, 0),
+        var(--rc-card--inverted-background) 70%) center bottom,
+  
+      /* Shadow TOP */
+      radial-gradient(farthest-side at 50% 0,
+        rgba(255, 255, 255, 0.6),
+        rgba(255, 255, 255, 0)) center top,
+  
+      /* Shadow BOTTOM */
+      radial-gradient(farthest-side at 50% 100%,
+        rgba(255, 255, 255, 0.6),
+        rgba(255, 255, 255, 0)) center bottom;
+
+    background-color: var(--rc-card--inverted-background);
+  
+    background-repeat: no-repeat;
+    background-size: 100% 2em, 100% 2em, 100% 1em, 100% 1em;
+    background-attachment: local, local, scroll, scroll;
 }
 
 /* Card label/titles */
@@ -2772,19 +2917,6 @@ input[type="checkbox"] {
   width: 100%;
   /* Makes the canvas more sharp */
   image-rendering: pixelated;
-}
-
-/* A consent message for verifiable credentials */
-.c-consent-message {
-  font-size: 0.7em;
-  font-family: monospace;
-}
-
-/* The styling for the markdown-rendered elements of the message
- * (very minimalistic styling) */
-.c-consent-message h1 {
-  font-size: 1.2em;
-  margin-bottom: 0.5em;
 }
 
 /*

@@ -57,7 +57,11 @@ const allowCredentialsTemplate = ({
     >
       <h1 class="t-title t-title--main">${copy.title}</h1>
     </hgroup>
-
+    <article class="l-stack c-card c-card--consent">
+      <div class="t-formatted t-formatted--monospace">
+        ${asyncReplace(consentMessage)}
+      </div>
+    </article>
     ${anchorInput.template}
 
     <p class="t-paragraph">
@@ -66,9 +70,6 @@ const allowCredentialsTemplate = ({
       <strong class="t-strong">${relyingOrigin}</strong>?
     </p>
 
-    <div class="l-stack c-input c-input--readonly">
-      <pre class="c-consent-message">${asyncReplace(consentMessage)}</pre>
-    </div>
 
     <div class="c-button-group">
       <button
