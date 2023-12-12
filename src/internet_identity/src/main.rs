@@ -6,6 +6,7 @@ use crate::storage::anchor::Anchor;
 use candid::{candid_method, Principal};
 use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -416,6 +417,21 @@ fn update_root_hash() {
         );
         set_certified_data(&prefixed_root_hash[..]);
     })
+}
+
+/// Calls raw rand to retrieve a random salt (32 bytes).
+async fn random_salt() -> Salt {
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get salt: {err}")),
+    };
+    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+            "expected raw randomness to be of length 32, got {}",
+            res.len()
+        ));
+    });
+    salt
 }
 
 /// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate

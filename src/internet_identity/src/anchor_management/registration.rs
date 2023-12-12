@@ -1,11 +1,10 @@
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state::{ChallengeInfo, MAX_INFLIGHT_CAPTCHAS};
 use crate::storage::anchor::Device;
-use crate::storage::Salt;
-use crate::{secs_to_nanos, state};
+use crate::{random_salt, secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
-use ic_cdk::{call, caller, trap};
+use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::*;
 use rand_core::{RngCore, SeedableRng};
@@ -78,17 +77,7 @@ fn prune_expired_challenges(inflight_challenges: &mut HashMap<ChallengeKey, Chal
 
 // Get a random number generator based on 'raw_rand'
 async fn make_rng() -> rand_chacha::ChaCha20Rng {
-    let raw_rand: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get seed: {err}")),
-    };
-    let seed: Salt = raw_rand[..].try_into().unwrap_or_else(|_| {
-        trap(&format!(
-            "when creating seed from raw_rand output, expected raw randomness to be of length 32, got {}",
-            raw_rand.len()
-        ));
-    });
-
+    let seed = random_salt().await;
     rand_chacha::ChaCha20Rng::from_seed(seed)
 }
 
