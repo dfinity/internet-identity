@@ -414,5 +414,11 @@
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
     "logo": "icpsig_logo.png"
+  },
+  {
+    "name": "icRouter",
+    "website": "https://iclight.io/account",
+    "logo": "icrouter_logo.webp",
+    "oneLiner": "icRouter: A cross-chain network of assets"
   }
 ]
