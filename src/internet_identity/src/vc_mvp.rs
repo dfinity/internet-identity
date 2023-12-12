@@ -110,7 +110,7 @@ pub fn get_id_alias(
         let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
         let issuer_sig = match get_signature_as_cbor(
             sigs,
-            &seed,
+            seed,
             issuer_id_alias_msg_hash,
             Some(cert_assets.root_hash()),
         ) {
