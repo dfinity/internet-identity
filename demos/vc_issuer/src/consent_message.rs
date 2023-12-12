@@ -24,10 +24,10 @@ const DEGREE_VC_DESCRIPTION_DE: &str = r###"# Bachelor of Engineering, {institut
 
 Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabschluss in einer Ingenieurwissenschaft des {institute} besitzt."###;
 
-const ADULT_VC_DESCRIPTION_EN: &str = r###"# Verified Adult,
+const ADULT_VC_DESCRIPTION_EN: &str = r###"# Verified Adult
 
 Credential that states that the holder's age is at least {age_at_least} years."###;
-const ADULT_VC_DESCRIPTION_DE: &str = r###"# Erwachsene Person,
+const ADULT_VC_DESCRIPTION_DE: &str = r###"# Erwachsene Person
 
 Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin mindestens {age_at_least} Jahre alt ist."###;
 
