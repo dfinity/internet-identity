@@ -345,6 +345,10 @@ const credentialSpecs = {
     credentialType: "UniversityDegreeCredential",
     arguments: { institutionName: "DFINITY College of Engineering" },
   },
+  adult: {
+    credentialType: "VerifiedAdult",
+    arguments: { age_at_least: 18 },
+  },
 } as const;
 
 type CredType = keyof typeof credentialSpecs;
@@ -506,6 +510,9 @@ const App = () => {
       </button>
       <button data-action="verify-grad" onClick={() => startVcFlow("grad")}>
         Verify Graduate Credential
+      </button>
+      <button data-action="verify-adult" onClick={() => startVcFlow("adult")}>
+        Verify Adult Person Credential
       </button>
 
       <pre data-role="presentation">{latestPresentation}</pre>
