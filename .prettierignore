@@ -17,6 +17,8 @@ dist/
 .env
 lib
 demos/vc_issuer/app/generated/
+# the web2 integration demo has a different version of prettier which clashes with the one in the root
+demos/web2_integration
 
 # Cargo build output
 target/
