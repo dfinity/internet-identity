@@ -20,10 +20,10 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
-    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
-    PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
+    Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError,
+    IssuedCredentialData, PrepareCredentialRequest, PrepareCredentialResponse,
+    PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
@@ -291,16 +291,15 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 
 #[update]
 #[candid_method]
-async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+async fn vc_consent_message(
+    req: Icrc21VcConsentMessageRequest,
+) -> Result<Icrc21ConsentInfo, Icrc21Error> {
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
-            return Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(
-                Icrc21ErrorInfo {
-                    error_code: 0,
-                    description: err,
-                },
-            ));
+            return Err(Icrc21Error::UnsupportedCanisterCall(Icrc21ErrorInfo {
+                description: err,
+            }));
         }
     };
     get_vc_consent_message(&credential_type, &SupportedLanguage::from(req.preferences))

@@ -60,12 +60,12 @@ export const idlFactory = ({ IDL }) => {
     'consent_message' : IDL.Text,
     'language' : IDL.Text,
   });
-  const Icrc21ErrorInfo = IDL.Record({
-    'description' : IDL.Text,
-    'error_code' : IDL.Nat64,
-  });
+  const Icrc21ErrorInfo = IDL.Record({ 'description' : IDL.Text });
   const Icrc21Error = IDL.Variant({
-    'GenericError' : Icrc21ErrorInfo,
+    'GenericError' : IDL.Record({
+      'description' : IDL.Text,
+      'error_code' : IDL.Nat,
+    }),
     'UnsupportedCanisterCall' : Icrc21ErrorInfo,
     'ConsentMessageUnavailable' : Icrc21ErrorInfo,
   });
