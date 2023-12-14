@@ -14,18 +14,6 @@ import Layout from "../layouts/Layout.astro";
     import { decodeJwt } from "jose";
     import { Chan, renderPage, withRef } from "../utils";
 
-    export type ArgumentValue = { int: number } | { string: string };
-
-    /* Convert the JSON map/record into what the did spec expects */
-    const fixupArgs = (
-      arg: Record<string, string | number>,
-    ): Array<[string, ArgumentValue]> => {
-      return Object.entries(arg).map(([k, v]) => [
-        k,
-        typeof v === "string" ? { string: v } : { int: v },
-      ]);
-    };
-
     const latestPres = new Chan<string | undefined>(undefined);
     const ii = new Chan<
       { win: Window; origin: string; flowId: number } | undefined
