@@ -30,7 +30,6 @@
     "@dfinity/principal": "^0.19.3",
     "@dfinity/utils": "^1.1.0",
     "jose": "^5.1.2",
-    "lit-html": "^3.1.0",
-    "zod": "^3.22.4"
+    "lit-html": "^3.1.0"
   }
 }
