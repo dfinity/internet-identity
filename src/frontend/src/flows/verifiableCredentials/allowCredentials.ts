@@ -23,6 +23,7 @@ const getOrigin = (
   oneLiner: string
 ): KnownDapp => {
   let foundDapp = dapplist.find((dapp) => dapp.hasOrigin(origin));
+
   if (!foundDapp) {
     foundDapp = new KnownDapp({
       name: "Unknown Dapp",
@@ -31,6 +32,8 @@ const getOrigin = (
       oneLiner: oneLiner,
     });
   }
+  console.log("one liner", oneLiner);
+  foundDapp.oneLiner = oneLiner;
   return foundDapp;
 };
 
@@ -70,12 +73,16 @@ const allowCredentialsTemplate = ({
     consentMessage.send(unsafeHTML(sanitized));
   })();
 
-  const originDapp = getOrigin(providerOrigin, knownDapps, `${copy.issued_by}`);
+  const originDapp = getOrigin(
+    providerOrigin,
+    knownDapps,
+    copy.issued_by as string
+  );
 
   const relyingDapp = getOrigin(
     relyingOrigin,
     knownDapps,
-    `${copy.relying_party}`
+    copy.relying_party as string
   );
 
   const slot = html`
@@ -93,8 +100,8 @@ const allowCredentialsTemplate = ({
     ${anchorInput.template}
     <h2 class="c-card__label l-stack">${copy.allow_start}</h2>
     <ul class="c-action-list">
-      <li class="c-action-list__item">${dappTemplate(originDapp)}</li>
-      <li class="c-action-list__item">${dappTemplate(relyingDapp)}</li>
+      <li class="c-action-list__item">${dappTemplate(originDapp, true)}</li>
+      <li class="c-action-list__item">${dappTemplate(relyingDapp, true)}</li>
     </ul>
 
     <div class="c-button-group">

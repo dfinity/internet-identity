@@ -2541,6 +2541,12 @@ a.c-action-list__item {
   justify-content: center;
 }
 
+.c-action-list__label--inverted {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  justify-content: center;
+}
+
 .c-action-list__action {
   cursor: pointer;
   color: var(--rc-text);
