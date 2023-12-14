@@ -78,7 +78,7 @@ import Layout from "../layouts/Layout.astro";
           },
         };
 
-        console.log(`message: ${JSON.stringify(message)}`)
+        console.log(`message: ${JSON.stringify(message)}`);
         ii.latest?.win.postMessage(message, ii.latest.origin);
       }
 
