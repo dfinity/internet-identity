@@ -311,6 +311,7 @@
 
   /* generic Lines uses on cards and other separation elements */
   --rs-line: var(--vs-line);
+  --rs-line--thick: calc(var(--rs-line) * 4);
 
   --rs-footer-height: 4rem;
 }
@@ -1072,6 +1073,8 @@ a:hover,
   background-repeat: no-repeat;
   background-size: 100% 2em, 100% 2em, 100% 1em, 100% 1em;
   background-attachment: local, local, scroll, scroll;
+
+  border: var(--rs-line--thick) solid var(--rc-interaction-text);
 }
 
 /* Card label/titles */
