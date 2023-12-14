@@ -36,7 +36,9 @@ const dappsExplorerTemplate = ({
     >
       ${closeIcon}
     </button>
-    <div class="c-action-list">${dapps.map((dapp) => dappTemplate(dapp))}</div>
+    <div class="c-action-list">
+      ${dapps.map((dapp) => dappTemplateLink(dapp))}
+    </div>
     <p class="t-paragraph t-centered">
       ${copy.add_your_dapp}
       <a
@@ -60,8 +62,31 @@ const dappsExplorerTemplate = ({
 
 export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
+export const dappTemplate = ({
+  logoSrc,
+  name,
+  oneLiner,
+  oneLinerAboveTitle = false,
+}: KnownDapp & { oneLinerAboveTitle?: boolean }): TemplateResult => {
+  return html`
+    <div class="c-action-list__icon" aria-hidden="true">
+      <img src=${logoSrc} alt=${name} loading="lazy" />
+    </div>
+    <div
+      class="c-action-list__label c-action-list__label--stacked${oneLinerAboveTitle
+        ? " c-action-list__label--inverted"
+        : ""}"
+    >
+      <h3 class="t-title t-title--list">${name}</h3>
+      ${nonNullish(oneLiner)
+        ? html`<p class="t-weak">${oneLiner}</p>`
+        : undefined}
+    </div>
+  `;
+};
+
 /* Template for a single dapp */
-const dappTemplate = ({
+const dappTemplateLink = ({
   website,
   logoSrc,
   name,
@@ -74,15 +99,7 @@ const dappTemplate = ({
       class="c-action-list__item"
       rel="noopener noreferrer"
     >
-      <div class="c-action-list__icon" aria-hidden="true">
-        <img src=${logoSrc} alt=${name} loading="lazy" />
-      </div>
-      <div class="c-action-list__label c-action-list__label--stacked">
-        <h3 class="t-title t-title--list">${name}</h3>
-        ${nonNullish(oneLiner)
-          ? html`<p class="t-weak">${oneLiner}</p>`
-          : undefined}
-      </div>
+      ${dappTemplate({ logoSrc, name, oneLiner } as KnownDapp)}
       <span class="c-action-list__action"
         ><i class="c-icon c-icon--circle">${externalLinkIcon}</i></span
       >
