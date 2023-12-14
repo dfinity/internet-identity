@@ -12,92 +12,7 @@ import Layout from "../layouts/Layout.astro";
     import { asyncReplace } from "lit-html/directives/async-replace.js";
     import { createRef, ref } from "lit-html/directives/ref.js";
     import { decodeJwt } from "jose";
-    import { z } from "zod";
-    import { Principal } from "@dfinity/principal";
     import { Chan, renderPage, withRef } from "../utils";
-
-    export type ArgumentValue = { int: number } | { string: string };
-
-    /* Convert the JSON map/record into what the did spec expects */
-    const fixupArgs = (
-      arg: Record<string, string | number>,
-    ): Array<[string, ArgumentValue]> => {
-      return Object.entries(arg).map(([k, v]) => [
-        k,
-        typeof v === "string" ? { string: v } : { int: v },
-      ]);
-    };
-
-    const zodPrincipal = z.string().transform((val, ctx) => {
-      let principal;
-      try {
-        principal = Principal.fromText(val);
-      } catch {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Not a principal ",
-        });
-        return z.NEVER;
-      }
-
-      return principal;
-    });
-
-    // Parse & validate a CredentialSpec
-    const zodCredentialSpec = z
-      /* The input object */
-      .object({
-        credentialName: z.string(),
-        arguments: z.optional(
-          z.record(z.string(), z.union([z.string(), z.number()])),
-        ),
-      })
-      /* Transform to make the type easier to use:
-       *    - transform the arguments to whatever the did spec expects
-       *    - work around the JS type gen weirdness for optionals
-       * XXX: TS needs the type annotation or it gets slightly confused
-       */
-      .transform<{
-        credential_name: string;
-        arguments: [] | [Array<[string, ArgumentValue]>];
-      }>(({ credentialName, arguments: args }) => ({
-        credential_name: credentialName,
-        arguments: isNullish(args) ? [] : [fixupArgs(args)],
-      }));
-
-    // https://www.jsonrpc.org/specification
-    // https://github.com/dfinity/internet-identity/blob/vc-mvp/docs/vc-spec.md#identity-provider-api
-    export const VcFlowRequest = z.object({
-      id: z.union([
-        z.number(),
-        z.string(),
-      ]) /* Slightly lax; in principle jsonrpc does not allow fractional numbers as id */,
-      jsonrpc: z.literal("2.0"),
-      method: z.literal("request_credential"),
-      params: z.object({
-        issuer: z.object({
-          origin: z
-            .string()
-            .url() /* XXX: we limit to URLs, but in practice should even be an origin */,
-          canisterId: z.optional(zodPrincipal),
-        }),
-        credentialSpec: zodCredentialSpec,
-        credentialSubject: zodPrincipal,
-      }),
-    });
-
-    // The wire format of a VC flow request
-    export type VcFlowRequestWire = z.input<typeof VcFlowRequest>;
-
-    const inferDefaultIIURL = () => {
-      if (window.location.hostname === "localhost") {
-        return (
-          window.location.protocol + "//" + window.location.hostname + ":5173/"
-        );
-      }
-
-      return "https://identity.ic0.app/";
-    };
 
     const latestPres = new Chan<string | undefined>(undefined);
     const ii = new Chan<
@@ -113,7 +28,7 @@ import Layout from "../layouts/Layout.astro";
 
       if (evnt.data?.method === "vc-flow-ready" && nonNullish(ii.latest)) {
         const principal = withRef(principalInput, (principalInput) => {
-          const value = principalInput.value;
+          const value = principalInput.innerText;
           if (value === "") {
             return undefined;
           }
@@ -141,30 +56,30 @@ import Layout from "../layouts/Layout.astro";
 
         const credentialSpecs = {
           employee: {
-            credentialName: "VerifiedEmployee",
+            credentialType: "VerifiedEmployee",
             arguments: { employerName: "DFINITY Foundation" },
           },
           grad: {
-            credentialName: "UniversityDegreeCredential",
+            credentialType: "UniversityDegreeCredential",
             arguments: { institutionName: "DFINITY College of Engineering" },
           },
-        } as const;
+        };
 
-        ii.latest?.win.postMessage(
-          {
-            id: ii.latest.flowId,
-            jsonrpc: "2.0",
-            method: "request_credential",
-            params: {
-              issuer: {
-                origin: issuerOrigin,
-              },
-              credentialSpec: credentialSpecs[credentialType.latest],
-              credentialSubject: principal,
+        let message = {
+          id: ii.latest.flowId,
+          jsonrpc: "2.0",
+          method: "request_credential",
+          params: {
+            issuer: {
+              origin: issuerOrigin,
             },
-          } satisfies VcFlowRequestWire,
-          ii.latest.origin,
-        );
+            credentialSpec: credentialSpecs[credentialType.latest],
+            credentialSubject: principal,
+          },
+        };
+
+        console.log(`message: ${JSON.stringify(message)}`);
+        ii.latest?.win.postMessage(message, ii.latest.origin);
       }
 
       const verifiablePresentation = evnt.data?.result?.verifiablePresentation;
@@ -175,7 +90,7 @@ import Layout from "../layouts/Layout.astro";
         const pretty = creds.map((cred: string) =>
           JSON.stringify(decodeJwt(cred), null, 2),
         );
-        latestPres.send(pretty.join("\n"));
+        latestPres.send("[" + pretty.join(",") + "]");
 
         ii.latest?.win?.close();
       }
@@ -187,7 +102,6 @@ import Layout from "../layouts/Layout.astro";
     const urlInput = createRef<HTMLInputElement>();
     const issuerInput = createRef<HTMLInputElement>();
     const principalInput = createRef<HTMLInputElement>();
-
     const credentialType = new Chan<"grad" | "employee">("employee");
     const credentialSelection = (exp: "grad" | "employee") =>
       asyncReplace(
@@ -197,16 +111,15 @@ import Layout from "../layouts/Layout.astro";
     const template = () => {
       return html`
         <div class="l-wrap" data-page-name="vc-test-app">
+        <section class="l-container l-stack">
           <hgroup>
             <h1 class="t-title">Relying Party</h1>
           </hgroup>
-          <input
-          ${ref(principalInput)}
-
-                data-role="principal"
-                class="c-input c-input--stack c-input--fullwidth"
-                placeholder="principal (ID_RP)"
-                ></input>
+          <div
+            ${ref(principalInput)}
+            data-role="principal"
+            class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip--small"
+          ></div>
           <button
             class="c-button"
             data-action="authenticate"
@@ -219,7 +132,7 @@ import Layout from "../layouts/Layout.astro";
                 identityProvider: iiUrl,
                 onSuccess: () => {
                   withRef(principalInput, (principalInput) => {
-                    principalInput.value = authClient
+                    principalInput.innerText = authClient
                       .getIdentity()
                       .getPrincipal()
                       .toString();
@@ -232,20 +145,30 @@ import Layout from "../layouts/Layout.astro";
 
               authClient.login(loginOptions);
             }}
-            >Login to Relying Party </button>
-
+            >Login / Link Internet Identity</button>
+            </section>
+            <section class="l-container l-stack">
+            <hgroup>
+            <h1 class="t-title">Identity Provider</h1>
+          </hgroup>
           <input
           ${ref(urlInput)}
           data-role="ii-url"
         class="c-input c-input--stack c-input--fullwidth"
-        value=${inferDefaultIIURL()}
+        value="https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app"
           ></input>
+          </section>
+          <section class="l-container l-stack">
+          <hgroup>
+            <h1 class="t-title">Issuer</h1>
+          </hgroup>
           <input
           ${ref(issuerInput)}
           data-role="issuer-url"
         class="c-input c-input--stack c-input--fullwidth"
-        value="http://issuer.localhost:5173"
+        value="https://v2yvn-myaaa-aaaad-aad4q-cai.icp0.io"
           ></input>
+          </section>
           <div class="c-button-group l-stack">
           <div @click=${() => {
             credentialType.send("employee");
@@ -262,6 +185,7 @@ import Layout from "../layouts/Layout.astro";
           Graduate
           </div>
           </div>
+          <div class="c-button-group l-stack">
           <button
             data-role="start-vc-flow"
             class="c-button l-stack"
@@ -289,6 +213,7 @@ import Layout from "../layouts/Layout.astro";
           >
             Verify Credential
           </button>
+          </div>
           ${asyncReplace(
             latestPres.map((latestPres) =>
               isNullish(latestPres)
@@ -310,5 +235,9 @@ import Layout from "../layouts/Layout.astro";
     const page = renderPage(template);
 
     page(undefined);
+    withRef(principalInput, (principalInput) => {
+      principalInput.innerText = "Not signed In";
+      console.log("set anonymous");
+    });
   </script>
 </Layout>

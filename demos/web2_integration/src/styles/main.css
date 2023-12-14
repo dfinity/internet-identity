@@ -1371,6 +1371,11 @@ by all browsers (FF is missing) */
   color: var(--rc-interactionHighlight-text);
 }
 
+.c-button--selected {
+  color: var(--rc-onButton);
+  background: var(--rc-button);
+}
+
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
   opacity: 0.9;
