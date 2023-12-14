@@ -32,7 +32,6 @@ const getOrigin = (
       oneLiner: oneLiner,
     });
   }
-  console.log("one liner", oneLiner);
   foundDapp.oneLiner = oneLiner;
   return foundDapp;
 };
