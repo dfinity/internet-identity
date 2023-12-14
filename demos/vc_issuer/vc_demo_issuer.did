@@ -20,11 +20,11 @@ type Icrc21ConsentMessageResponse = variant {
 };
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
-    GenericError : Icrc21ErrorInfo;
+    GenericError : record { description : text; error_code : nat };
     UnsupportedCanisterCall : Icrc21ErrorInfo;
     ConsentMessageUnavailable : Icrc21ErrorInfo;
 };
-type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
+type Icrc21ErrorInfo = record { description : text };
 type Icrc21VcConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
     credential_spec : CredentialSpec;
