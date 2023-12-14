@@ -23,6 +23,12 @@
     "logo": "funded_logo.webp"
   },
   {
+    "name": "NFID",
+    "oneLiner": "Your digital identity for the modern world.",
+    "website": "https://t.co/FDpvRjszU3/",
+    "logo": "nfid_logo.webp"
+  },
+  {
     "name": "Dmail",
     "oneLiner": "Web3 Decentralized Email Client",
     "website": "https://dmail.ai/",
@@ -32,6 +38,12 @@
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
     "logo": "icdex_logo.webp"
+  },
+  {
+    "name": "Helix Markets",
+    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
+    "website": "https://t.co/OcdISW1Xww",
+    "logo": "helix_logo.webp"
   },
   {
     "name": "distrikt",
@@ -56,6 +68,23 @@
     "logo": "yumi_logo.webp"
   },
   {
+    "name": "Stoic Wallet",
+    "website": "https://www.stoicwallet.com/",
+    "logo": "stoicwallet_logo.webp"
+  },
+  {
+    "name": "NNS Dapp",
+    "oneLiner": "Dapp for Staking Neurons + Voting On-Chain",
+    "website": "https://nns.ic0.app",
+    "logo": "nnsfront-enddapp_logo-dark.webp"
+  },
+  {
+    "name": "Oisy Wallet",
+    "oneLiner": "A novel Ethereum wallet hosted on the Internet Computer",
+    "website": "https://oisy.com",
+    "logo": "oisy_logo.svg"
+  },
+  {
     "name": "Kinic",
     "oneLiner": "The world's first Web3 search engine",
     "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
@@ -76,6 +105,12 @@
     ],
     "logo": "taggr_logo.webp",
     "oneLiner": "Blending forums and blogs - controlled by a DAO"
+  },
+  {
+    "name": "AutoRoyale",
+    "website": "https://cm6iy-sqaaa-aaaam-abmxq-cai.icp0.io/",
+    "logo": "autoroyale_logo.png",
+    "oneLiner": "A fast-paced 2D multiplayer shooter game"
   },
   {
     "name": "Catalyze",
@@ -116,7 +151,7 @@
   },
   {
     "name": "DSocial",
-    "website": "https://DSocial.app ",
+    "website": "https://DSocial.app",
     "logo": "dsocial_logo.webp"
   },
   {
@@ -207,11 +242,6 @@
     "logo": "icevent_logo_112x112.png"
   },
   {
-    "name": "Stoic Wallet",
-    "website": "https://www.stoicwallet.com/",
-    "logo": "stoicwallet_logo.webp"
-  },
-  {
     "name": "Usergeek",
     "oneLiner": "Product analytics for IC dapps",
     "website": "https://usergeek.app/",
@@ -244,12 +274,6 @@
     "name": "ICNaming",
     "website": "https://app-testnet.icnaming.com/",
     "logo": "icnaming_logo.webp"
-  },
-  {
-    "name": "NNS Dapp",
-    "oneLiner": "Dapp for Staking Neurons + Voting On-Chain",
-    "website": "https://nns.ic0.app",
-    "logo": "nnsfront-enddapp_logo-dark.webp"
   },
   {
     "name": "Tipjar",
@@ -299,12 +323,6 @@
     "website": "https://rakeoff.io/",
     "logo": "rakeoff_logo.webp",
     "oneLiner": "Rakeoff is a user-friendly crypto staking rewards platform on ICP."
-  },
-  {
-    "name": "Oisy Wallet",
-    "oneLiner": "A novel Ethereum wallet hosted on the Internet Computer",
-    "website": "https://oisy.com",
-    "logo": "oisy_logo.svg"
   },
   {
     "name": "Tswaanda",
@@ -386,8 +404,21 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
-    "name": "ReBlock",
-    "website": "https://www.reblock.finance/",
-    "logo": "reblock_logo.png"
+    "name": "TaxLint",
+    "oneLiner": "Your automated tax reporting IC assistant.",
+    "website": "https://vresg-vyaaa-aaaag-qcj2q-cai.icp0.io/",
+    "logo": "taxlint_logo.png"
+  },
+  {
+    "name": "ICPsig",
+    "oneLiner": "Multisig for Internet Computer",
+    "website": "https://icpsig.in/",
+    "logo": "icpsig_logo.png"
+  },
+  {
+    "name": "icRouter",
+    "website": "https://iclight.io/account",
+    "logo": "icrouter_logo.webp",
+    "oneLiner": "icRouter: A cross-chain network of assets"
   }
 ]

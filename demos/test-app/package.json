@@ -7,13 +7,23 @@
     "@dfinity/candid": "^0.19.3",
     "@dfinity/identity": "^0.19.3",
     "@dfinity/principal": "^0.19.3",
-    "buffer": "^6.0.3"
+    "buffer": "^6.0.3",
+    "jose": "^5.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "dev": "vite --config ./vite.config.ts",
+    "check": "tsc --noEmit",
+    "watch": "npm run check -- --watch",
+    "build": "npm run check && vite --config ./vite.config.ts build"
   },
   "devDependencies": {
+    "@types/node": "^20.10.1",
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "5.2.2",
     "vite": "^4.3.9"
   }
 }

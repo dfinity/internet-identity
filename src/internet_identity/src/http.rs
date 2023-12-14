@@ -1,38 +1,13 @@
-use crate::assets::{ContentType, EXACT_MATCH_TERMINATOR, IC_CERTIFICATE_EXPRESSION};
+use crate::assets::{JS_SETUP_SCRIPT1_SRI_HASH, JS_SETUP_SCRIPT2_SRI_HASH};
 use crate::http::metrics::metrics;
-use crate::{assets, state};
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
+use crate::state;
+use asset_util::CertifiedAsset;
 use canister_sig_util::signature_map::LABEL_SIG;
-use ic_cdk::api::data_certificate;
-use ic_cdk::trap;
-use ic_certification::{fork, labeled_hash, pruned};
+use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 
 mod metrics;
-
-pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
-pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
-const LABEL_HTTP_EXPR: &str = "http_expr";
-
-impl ContentType {
-    pub fn to_mime_type_string(self) -> String {
-        match self {
-            ContentType::HTML => "text/html".to_string(),
-            ContentType::JS => "text/javascript".to_string(),
-            ContentType::JSON => "application/json".to_string(),
-            ContentType::CSS => "text/css".to_string(),
-            ContentType::ICO => "image/vnd.microsoft.icon".to_string(),
-            ContentType::WEBP => "image/webp".to_string(),
-            ContentType::OCTETSTREAM => "application/octet-stream".to_string(),
-            ContentType::PNG => "image/png".to_string(),
-            ContentType::SVG => "image/svg+xml".to_string(),
-            ContentType::WOFF2 => "application/font-woff2".to_string(),
-        }
-    }
-}
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
@@ -78,37 +53,28 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 streaming_strategy: None,
             },
         },
-        probably_an_asset => {
-            state::assets(
-                |certified_assets| match certified_assets.assets.get(probably_an_asset) {
-                    Some((asset_headers, data)) => {
-                        let mut headers = security_headers();
-                        let mut certificate_headers = match req.certificate_version {
-                            None | Some(1) => asset_certificate_headers_v1(probably_an_asset),
-                            Some(2) => asset_certificate_headers_v2(probably_an_asset),
-                            _ => trap("Unsupported certificate version."),
-                        };
-                        headers.append(&mut certificate_headers);
-                        headers.append(&mut asset_headers.clone());
-
-                        HttpResponse {
-                            status_code: 200,
-                            headers,
-                            body: ByteBuf::from(data.clone()),
-                            upgrade: None,
-                            streaming_strategy: None,
-                        }
-                    }
-                    None => HttpResponse {
-                        status_code: 404,
-                        headers: security_headers(),
-                        body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
-                        upgrade: None,
-                        streaming_strategy: None,
-                    },
-                },
-            )
-        }
+        probably_an_asset => match certified_asset(probably_an_asset, req.certificate_version) {
+            Some(CertifiedAsset {
+                mut headers,
+                content,
+            }) => {
+                headers.append(&mut security_headers());
+                HttpResponse {
+                    status_code: 200,
+                    headers,
+                    body: ByteBuf::from(content),
+                    upgrade: None,
+                    streaming_strategy: None,
+                }
+            }
+            None => HttpResponse {
+                status_code: 404,
+                headers: security_headers(),
+                body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
+                upgrade: None,
+                streaming_strategy: None,
+            },
+        },
     }
 }
 
@@ -211,12 +177,13 @@ pub fn security_headers() -> Vec<HeaderField> {
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
 pub fn content_security_policy_header() -> String {
-    let hash = assets::JS_SETUP_SCRIPT_SRI_HASH.to_string();
+    let hash1 = JS_SETUP_SCRIPT1_SRI_HASH.to_string();
+    let hash2 = JS_SETUP_SCRIPT2_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
          connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
          img-src 'self' data:;\
-         script-src '{hash}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+         script-src '{hash1}' '{hash2}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
          base-uri 'none';\
          form-action 'none';\
          style-src 'self' 'unsafe-inline';\
@@ -229,72 +196,12 @@ pub fn content_security_policy_header() -> String {
     csp
 }
 
-fn asset_certificate_headers_v1(asset_name: &str) -> Vec<(String, String)> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
+fn certified_asset(asset_name: &str, certificate_version: Option<u16>) -> Option<CertifiedAsset> {
     state::assets_and_signatures(|assets, sigs| {
-        let tree = fork(
-            assets.witness_v1(asset_name),
-            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
-        );
-        let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
-        serializer.self_describe().unwrap();
-        tree.serialize(&mut serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
-        vec![(
-            IC_CERTIFICATE_HEADER.to_string(),
-            format!(
-                "certificate=:{}:, tree=:{}:",
-                BASE64.encode(&certificate),
-                BASE64.encode(serializer.into_inner())
-            ),
-        )]
-    })
-}
-
-fn asset_certificate_headers_v2(absolute_path: &str) -> Vec<(String, String)> {
-    assert!(absolute_path.starts_with('/'));
-
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-
-    let mut path: Vec<String> = absolute_path.split('/').map(str::to_string).collect();
-    // replace the first empty split segment (due to absolute path) with "http_expr"
-    *path.get_mut(0).unwrap() = LABEL_HTTP_EXPR.to_string();
-    path.push(EXACT_MATCH_TERMINATOR.to_string());
-
-    state::assets_and_signatures(|assets, sigs| {
-        let tree = fork(
-            assets.witness_v2(absolute_path),
-            pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())),
-        );
-
-        let mut tree_serializer = serde_cbor::ser::Serializer::new(vec![]);
-        tree_serializer.self_describe().unwrap();
-        tree.serialize(&mut tree_serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a hash tree: {e}")));
-
-        let mut expr_path_serializer = serde_cbor::ser::Serializer::new(vec![]);
-        expr_path_serializer.self_describe().unwrap();
-        path.serialize(&mut expr_path_serializer)
-            .unwrap_or_else(|e| trap(&format!("failed to serialize a expr_path: {e}")));
-
-        vec![
-            (
-                IC_CERTIFICATE_HEADER.to_string(),
-                format!(
-                    "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
-                    BASE64.encode(&certificate),
-                    BASE64.encode(tree_serializer.into_inner()),
-                    BASE64.encode(expr_path_serializer.into_inner())
-                ),
-            ),
-            (
-                IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
-                IC_CERTIFICATE_EXPRESSION.to_string(),
-            ),
-        ]
+        assets.certified_asset(
+            asset_name,
+            certificate_version,
+            Some(pruned(labeled_hash(LABEL_SIG, &sigs.root_hash()))),
+        )
     })
 }

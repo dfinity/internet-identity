@@ -1,4 +1,4 @@
-import loaderUrl from "$src/components/loader.webp";
+import loaderUrl from "$src/components/loader.png";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";

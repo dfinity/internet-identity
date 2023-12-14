@@ -227,7 +227,7 @@ jobs:
             exit 1
           fi
 
-  vc-issuer-build:
+  vc_demo_issuer-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -246,16 +246,16 @@ jobs:
         run: |
           npm ci
           ./build.sh
-      - run: sha256sum vc_issuer.wasm.gz
+      - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
         uses: actions/upload-artifact@v3
         with:
           # name is the name used to display and retrieve the artifact
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           # path is the name used as the file to upload and the name of the
           # downloaded file
-          path: ./demos/vc_issuer/vc_issuer.wasm.gz
+          path: ./demos/vc_issuer/vc_demo_issuer.wasm.gz
 
   test-app-build:
     runs-on: ubuntu-latest
@@ -272,7 +272,9 @@ jobs:
       - uses: ./.github/actions/setup-node
       - name: "Build test app canister"
         working-directory: demos/test-app
-        run: ./build.sh
+        run: |
+          npm ci
+          ./build.sh
       - name: 'Upload test app'
         uses: actions/upload-artifact@v3
         with:
@@ -288,7 +290,7 @@ jobs:
 
   vc-issuer-test:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, vc-issuer-build]
+    needs: [docker-build-ii, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
@@ -302,7 +304,7 @@ jobs:
       - name: 'Download VC issuer wasm'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
@@ -379,7 +381,6 @@ jobs:
         run: |
           mkdir dist
           touch dist/index.html
-          touch dist/index.js.gz
 
       # Build the tests
       - name: Build test archive
@@ -469,7 +470,7 @@ jobs:
 
   selenium:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, test-app-build, vc-issuer-build]
+    needs: [docker-build-ii, test-app-build, vc_demo_issuer-build]
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
@@ -480,7 +481,7 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: [ '1_4', '2_4', '3_4', '4_4' ]
+        shard: [ '1_5', '2_5', '3_5', '4_5', '5_5' ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -520,7 +521,7 @@ jobs:
       - name: 'Download VC issuer wasm'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
 
       - name: Create Canisters
@@ -530,7 +531,7 @@ jobs:
         run: |
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
-          dfx canister install issuer --wasm demos/vc_issuer/vc_issuer.wasm.gz
+          dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
 
       - name: Provision issuer canister
         run: ./demos/vc_issuer/provision
@@ -631,11 +632,12 @@ jobs:
         run: |
           dfx stop
 
-  # This deploys the production build to mainnet, to a canister that we use for release testing.
+  # This deploys the production build to mainnet (to a canister that we use for release testing) alongside
+  # some other canisters useful for testing & playing with II.
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-internet_identity_production, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive, test-app-build, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v3
 
@@ -670,6 +672,36 @@ jobs:
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             --wasm internet_identity_production.wasm.gz \
             fgte5-ciaaa-aaaad-aaatq-cai
+
+      - name: 'Download test app wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: test_app.wasm
+          path: .
+
+      - name: "Deploy test app"
+        run: |
+          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --wasm ./test_app.wasm \
+            vt36r-2qaaa-aaaad-aad5a-cai
+
+      - name: 'Download VC issuer wasm'
+        uses: actions/download-artifact@v3
+        with:
+          name: vc_demo_issuer.wasm.gz
+          path: .
+
+      - name: "Deploy Issuer"
+        run: |
+          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
+            --wasm vc_demo_issuer.wasm.gz \
+            v2yvn-myaaa-aaaad-aad4q-cai
+          ./demos/vc_issuer/provision \
+            --ii-canister-id fgte5-ciaaa-aaaad-aaatq-cai \
+            --dfx-network ic \
+            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai
 
       - name: "Deploy archive"
         run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic
@@ -711,13 +743,23 @@ jobs:
       - name: 'Download wasm.gz'
         uses: actions/download-artifact@v3
         with:
-          name: vc_issuer.wasm.gz
+          name: vc_demo_issuer.wasm.gz
           path: .
 
       - uses: actions/github-script@v6
         id: pipeline-jobs
         with:
-          script: return github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs");
+          script: |
+            return (await github.paginate("GET /repos/dfinity/internet-identity/actions/runs/${{ github.run_id }}/jobs"))
+              .map(job => {
+                return {
+                  id: job.id,
+                  name: job.name,
+                  steps: job.steps.map(step => {
+                    return {name: step.name, number: step.number}
+                  }),
+                  html_url: job.html_url}
+              });
 
       - uses: actions/github-script@v6
         id: latest-release-tag
@@ -761,7 +803,7 @@ jobs:
             internet_identity_dev.wasm.gz
             internet_identity_test.wasm.gz
             archive.wasm.gz
-            vc_issuer.wasm.gz
+            vc_demo_issuer.wasm.gz
           production_asset: internet_identity_production.wasm.gz
           changelog: ${{ steps.changelog.outputs.result }}
           workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
@@ -776,7 +818,8 @@ jobs:
             internet_identity_dev.wasm.gz \
             internet_identity_test.wasm.gz \
             src/internet_identity/internet_identity.did \
-            archive.wasm.gz
+            archive.wasm.gz \
+            vc_demo_issuer.wasm.gz
         env:
           # populated by GitHub Actions
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
@@ -807,6 +850,7 @@ jobs:
 
 
   verify-clean-build-hash:
+    if: false # We skip these builds because recent GHA runner changes made the native ubuntu builds non-reproducible
     needs: ['clean-build', 'docker-build-internet_identity_production']
     runs-on: ${{ matrix.os }}
     strategy:

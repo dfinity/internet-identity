@@ -1,5 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { setKnownPrincipal } from "$src/storage";
 import { LoginData } from "$src/utils/flowResult";
 import { unknownToRecord } from "$src/utils/utils";
 import { Signature } from "@dfinity/agent";
@@ -178,6 +179,15 @@ export async function authenticationProtocol({
   }
 
   const [userKey, parsed_signed_delegation] = result;
+
+  const userPublicKey = Uint8Array.from(userKey);
+  const principal = Principal.selfAuthenticating(userPublicKey);
+
+  await setKnownPrincipal({
+    userNumber: authSuccess.userNumber,
+    origin: authContext.requestOrigin,
+    principal,
+  });
 
   window.opener.postMessage(
     {

@@ -3,21 +3,27 @@
 use assert_matches::assert_matches;
 use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
+use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
-use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, II_WASM};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
+use ic_response_verification::types::{Request, Response, VerificationInfo};
+use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use identity_core::common::Value;
 use identity_jose::jwt::JwtClaims;
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
     Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
@@ -41,7 +47,7 @@ const DUMMY_ALIAS_ID_DAPP_PRINCIPAL: &str =
 lazy_static! {
     /** The gzipped Wasm module for the current VC_ISSUER build, i.e. the one we're testing */
     pub static ref VC_ISSUER_WASM: Vec<u8> = {
-        let def_path = PathBuf::from("./").join("vc_issuer.wasm.gz");
+        let def_path = PathBuf::from("./").join("vc_demo_issuer.wasm.gz");
         let err = format!("
         Could not find VC Issuer Wasm module for current build.
         I will look for it at {:?} (note that I run from {:?}).
@@ -122,9 +128,17 @@ mod api {
     pub fn add_graduate(
         env: &StateMachine,
         canister_id: CanisterId,
-        employee_id: Principal,
+        graduate_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id, "add_graduate", (employee_id,)).map(|(x,)| x)
+        call_candid(env, canister_id, "add_graduate", (graduate_id,)).map(|(x,)| x)
+    }
+
+    pub fn add_adult(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        adult_id: Principal,
+    ) -> Result<String, CallError> {
+        call_candid(env, canister_id, "add_adult", (adult_id,)).map(|(x,)| x)
     }
 
     pub fn prepare_credential(
@@ -162,7 +176,7 @@ mod api {
 
 /// Verifies that the consent message can be requested.
 #[test]
-fn should_return_vc_consent_message() {
+fn should_return_vc_consent_message_for_employment_vc() {
     let test_cases = [
         ("en-US", "en", "# DFINITY Foundation Employment Credential"),
         ("de-DE", "de", "# Beschäftigungsausweis DFINITY Foundation"),
@@ -199,13 +213,46 @@ fn should_return_vc_consent_message() {
 }
 
 #[test]
+fn should_return_vc_consent_message_for_adult_vc() {
+    let test_cases = [
+        ("en-US", "en", "# Verified Adult"),
+        ("de-DE", "de", "# Erwachsene Person"),
+        ("ja-JP", "en", "# Verified Adult"), // test fallback language
+    ];
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    for (requested_language, actual_language, consent_message_snippet) in test_cases {
+        let mut args = HashMap::new();
+        args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+        let consent_message_request = Icrc21VcConsentMessageRequest {
+            credential_spec: CredentialSpec {
+                credential_type: "VerifiedAdult".to_string(),
+                arguments: Some(args),
+            },
+            preferences: Icrc21ConsentPreferences {
+                language: requested_language.to_string(),
+            },
+        };
+
+        let response =
+            api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
+                .expect("API call failed")
+                .expect("Got 'None' from vc_consent_message");
+        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
+        assert_eq!(info.language, actual_language);
+        assert!(info.consent_message.starts_with(consent_message_snippet));
+    }
+}
+
+#[test]
 fn should_fail_vc_consent_message_if_not_supported() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
 
     let consent_message_request = Icrc21VcConsentMessageRequest {
         credential_spec: CredentialSpec {
-            credential_type: "VerifiedAdult".to_string(),
+            credential_type: "VerifiedResident".to_string(),
             arguments: None,
         },
         preferences: Icrc21ConsentPreferences {
@@ -296,6 +343,15 @@ fn degree_credential_spec() -> CredentialSpec {
     );
     CredentialSpec {
         credential_type: "UniversityDegreeCredential".to_string(),
+        arguments: Some(args),
+    }
+}
+
+fn adult_credential_spec() -> CredentialSpec {
+    let mut args = HashMap::new();
+    args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+    CredentialSpec {
+        credential_type: "VerifiedAdult".to_string(),
         arguments: Some(args),
     }
 }
@@ -547,13 +603,19 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             .credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
     )
     .expect("Invalid ID alias");
 
     api::add_employee(&env, issuer_id, alias_tuple.id_dapp)?;
     api::add_graduate(&env, issuer_id, alias_tuple.id_dapp)?;
+    api::add_adult(&env, issuer_id, alias_tuple.id_dapp)?;
 
-    for credential_spec in [employee_credential_spec(), degree_credential_spec()] {
+    for credential_spec in [
+        employee_credential_spec(),
+        degree_credential_spec(),
+        adult_credential_spec(),
+    ] {
         let prepare_credential_response = api::prepare_credential(
             &env,
             issuer_id,
@@ -601,6 +663,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             &credential_data.vc_jws,
             &issuer_id,
             &root_pk_raw,
+            env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
         )
         .expect("credential verification failed");
         validate_vc_claims(
@@ -640,4 +703,64 @@ fn should_configure() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
+}
+
+/// Verifies that the expected assets is delivered and certified.
+#[test]
+fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
+    fn verify_response_certification(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        request: HttpRequest,
+        http_response: HttpResponse,
+        min_certification_version: u16,
+    ) -> VerificationInfo {
+        verify_request_response_pair(
+            Request {
+                method: request.method,
+                url: request.url,
+                headers: request.headers,
+                body: request.body.into_vec(),
+            },
+            Response {
+                status_code: http_response.status_code,
+                headers: http_response.headers,
+                body: http_response.body.into_vec(),
+            },
+            canister_id.as_slice(),
+            time(env) as u128,
+            Duration::from_secs(300).as_nanos(),
+            &env.root_key(),
+            min_certification_version as u8,
+        )
+        .unwrap_or_else(|e| panic!("validation failed: {e}"))
+    }
+
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    // for each asset and certification version, fetch the asset, check the HTTP status code, headers and certificate.
+
+    for certification_version in 1..=2 {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: "/".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(certification_version),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
+        assert_eq!(http_response.status_code, 200);
+
+        let result = verify_response_certification(
+            &env,
+            canister_id,
+            request,
+            http_response,
+            certification_version,
+        );
+        assert_eq!(result.verification_version, certification_version);
+    }
+
+    Ok(())
 }

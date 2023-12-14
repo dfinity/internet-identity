@@ -12,8 +12,10 @@ import {
   DeviceKey,
   FrontendHostname,
   GetDelegationResponse,
+  IdAliasCredentials,
   IdentityAnchorInfo,
   KeyType,
+  PreparedIdAlias,
   PublicKey,
   Purpose,
   RegisterResponse,
@@ -469,6 +471,17 @@ export class AuthenticatedConnection extends Connection {
     return await actor.get_anchor_info(this.userNumber);
   };
 
+  getPrincipal = async ({
+    origin: origin_,
+  }: {
+    origin: string;
+  }): Promise<Principal> => {
+    const origin = remapToLegacyDomain(origin_);
+
+    const actor = await this.getActor();
+    return await actor.get_principal(this.userNumber, origin);
+  };
+
   enterDeviceRegistrationMode = async (): Promise<Timestamp> => {
     const actor = await this.getActor();
     return await actor.enter_device_registration_mode(this.userNumber);
@@ -525,18 +538,19 @@ export class AuthenticatedConnection extends Connection {
   };
 
   prepareDelegation = async (
-    hostname: FrontendHostname,
+    origin_: FrontendHostname,
     sessionKey: SessionKey,
     maxTimeToLive?: bigint
   ): Promise<[PublicKey, bigint] | { error: unknown }> => {
     try {
+      const origin = remapToLegacyDomain(origin_);
       console.log(
-        `prepare_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey})`
+        `prepare_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey})`
       );
       const actor = await this.getActor();
       return await actor.prepare_delegation(
         this.userNumber,
-        hostname,
+        origin,
         sessionKey,
         nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
       );
@@ -547,18 +561,19 @@ export class AuthenticatedConnection extends Connection {
   };
 
   getDelegation = async (
-    hostname: FrontendHostname,
+    origin_: FrontendHostname,
     sessionKey: SessionKey,
     timestamp: Timestamp
   ): Promise<GetDelegationResponse | { error: unknown }> => {
     try {
+      const origin = remapToLegacyDomain(origin_);
       console.log(
-        `get_delegation(user: ${this.userNumber}, hostname: ${hostname}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+        `get_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey}, timestamp: ${timestamp})`
       );
       const actor = await this.getActor();
       return await actor.get_delegation(
         this.userNumber,
-        hostname,
+        origin,
         sessionKey,
         timestamp
       );
@@ -566,6 +581,84 @@ export class AuthenticatedConnection extends Connection {
       console.error(e);
       return { error: e };
     }
+  };
+
+  prepareIdAlias = async ({
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<
+    | PreparedIdAlias
+    | { error: "internal_error" }
+    | { error: "authentication_failed" }
+  > => {
+    const issuerOrigin = remapToLegacyDomain(issuerOrigin_);
+    const rpOrigin = remapToLegacyDomain(rpOrigin_);
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+    const [result] = await actor.prepare_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+    });
+
+    if (isNullish(result)) {
+      console.error("Canister did not send a response");
+      return { error: "internal_error" };
+    }
+
+    if ("authentication_failed" in result) {
+      console.error(
+        ["Authentication failed", result.authentication_failed].join(": ")
+      );
+      return { error: "authentication_failed" };
+    }
+
+    return result.ok;
+  };
+
+  getIdAlias = async ({
+    preparedIdAlias,
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
+    preparedIdAlias: PreparedIdAlias;
+    issuerOrigin: string;
+    rpOrigin: string;
+  }): Promise<
+    | IdAliasCredentials
+    | { error: "internal_error" }
+    | { error: "authentication_failed" }
+  > => {
+    const issuerOrigin = remapToLegacyDomain(issuerOrigin_);
+    const rpOrigin = remapToLegacyDomain(rpOrigin_);
+    const actor = await this.getActor();
+    const userNumber = this.userNumber;
+
+    const [result] = await actor.get_id_alias({
+      issuer: issuerOrigin,
+      relying_party: rpOrigin,
+      identity_number: userNumber,
+      ...preparedIdAlias,
+    });
+
+    if (isNullish(result)) {
+      console.error("Canister did not send a response");
+      return { error: "internal_error" };
+    }
+
+    if ("no_such_credentials" in result) {
+      console.error(["No credentials", result.no_such_credentials].join(": "));
+      return { error: "internal_error" };
+    }
+
+    if ("authentication_failed" in result) {
+      return { error: "authentication_failed" };
+    }
+
+    return result.ok;
   };
 }
 
@@ -638,6 +731,20 @@ export const creationOptions = (
       displayName: "Internet Identity",
     },
   };
+};
+
+// In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
+// we map back the derivation origin to the ic0.app domain.
+const remapToLegacyDomain = (origin: string): string => {
+  const ORIGIN_MAPPING_REGEX =
+    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
+  const match = origin.match(ORIGIN_MAPPING_REGEX);
+  const subdomain = match?.groups?.subdomain;
+  if (nonNullish(subdomain)) {
+    return `https://${subdomain}.ic0.app`;
+  } else {
+    return origin;
+  }
 };
 
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>

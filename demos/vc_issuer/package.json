@@ -23,8 +23,8 @@
     "watch": "npm run check -- --watch",
     "build": "npm run check && vite --config ./vite.config.ts build",
     "generate": "npm run generate:types && npm run generate:js",
-    "generate:types": "didc bind ./vc_issuer.did -t ts > ./app/generated/vc_issuer_types.d.ts",
-    "generate:js": "didc bind ./vc_issuer.did -t js > ./app/generated/vc_issuer_idl.js"
+    "generate:types": "didc bind ./vc_demo_issuer.did -t ts > ./app/generated/vc_issuer_types.d.ts",
+    "generate:js": "didc bind ./vc_demo_issuer.did -t js > ./app/generated/vc_issuer_idl.js"
   },
   "devDependencies": {
     "@types/html-minifier-terser": "^7.0.0",
@@ -32,7 +32,7 @@
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.0",
-    "vite": "^4.3.9",
+    "vite": "^4.5.1",
     "typescript": "5.2.2"
   }
 }

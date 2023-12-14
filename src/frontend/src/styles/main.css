@@ -2735,14 +2735,32 @@ input[type="checkbox"] {
   background: var(--rc-overlay-backdrop);
 }
 
+/* Pretend the astronaut is moving in space */
+@keyframes astrodance {
+  0% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) rotate(10deg);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+}
+
 .c-loader__image {
-  width: 125px;
+  width: 64px;
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
   user-select: none;
+  animation-name: astrodance;
+  animation-duration: 5s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
 }
 
 /* Wrap QR codes in a white square (for legibility) and prettify a bit */
@@ -2754,6 +2772,19 @@ input[type="checkbox"] {
   width: 100%;
   /* Makes the canvas more sharp */
   image-rendering: pixelated;
+}
+
+/* A consent message for verifiable credentials */
+.c-consent-message {
+  font-size: 0.7em;
+  font-family: monospace;
+}
+
+/* The styling for the markdown-rendered elements of the message
+ * (very minimalistic styling) */
+.c-consent-message h1 {
+  font-size: 1.2em;
+  margin-bottom: 0.5em;
 }
 
 /*

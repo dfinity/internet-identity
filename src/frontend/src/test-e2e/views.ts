@@ -568,6 +568,27 @@ export class AboutView extends View {
   }
 }
 
+export class VcAllowView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="vc-allow"]')
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async allow(): Promise<void> {
+    await this.browser.$('[data-action="allow"]').click();
+  }
+
+  async getUserNumber(): Promise<string> {
+    return await this.browser.$('[data-role="anchor-input"]').getValue();
+  }
+
+  async typeUserNumber(userNumber: string): Promise<void> {
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
+    await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
+  }
+}
+
 export class IssuerAppView extends View {
   async open({
     issuerAppUrl,
@@ -650,6 +671,60 @@ export class IssuerAppView extends View {
     // meaning there is at least one log line, so -1 cannot be undefined.
     const logLinesNow = await this.canisterLogs();
     return logLinesNow.at(-1) as string;
+  }
+}
+
+export class VcTestAppView extends View {
+  async open(
+    demoAppUrl: string,
+    iiUrl: string,
+    issuerUrl: string
+  ): Promise<void> {
+    await this.browser.url(demoAppUrl);
+    await setInputValue(this.browser, '[data-role="ii-url"]', iiUrl);
+    await setInputValue(this.browser, '[data-role="issuer-url"]', issuerUrl);
+  }
+
+  async startSignIn(): Promise<void> {
+    await this.browser.$('[data-action="authenticate"]').click();
+  }
+
+  async startVcFlow(): Promise<void> {
+    await this.browser.$('[data-action="verify-employee"]').click();
+  }
+
+  /** Waits for the authentication to finish, the window to close and the principal to update.
+   * Returns the principal after the user has been authenticated.
+   */
+  async waitForAuthenticated(): Promise<void> {
+    // wait for the demo app to close the II window
+    await waitToClose(this.browser);
+    // wait for the demo app to update the principal
+    await this.browser.waitUntil(async () => {
+      const principal_ = await this.getPrincipal();
+      const principal = (() => {
+        try {
+          return Principal.fromText(principal_).toText();
+        } catch (e) {
+          return undefined;
+        }
+      })();
+      console.log("PRINCIPAL", principal);
+
+      if (principal === undefined) {
+        return false;
+      }
+
+      if (principal === Principal.anonymous().toText()) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  getPrincipal(): Promise<string> {
+    return this.browser.$('[data-role="principal"]').getText();
   }
 }
 
@@ -830,6 +905,16 @@ export class ErrorView extends View {
   async continue(): Promise<void> {
     await this.browser.$("#displayErrorPrimary").click();
   }
+}
+
+async function setInputValue(
+  browser: WebdriverIO.Browser,
+  selector: string,
+  text: string
+): Promise<void> {
+  const elem = await browser.$(selector);
+  await elem.clearValue();
+  await elem.setValue(text);
 }
 
 async function fillText(

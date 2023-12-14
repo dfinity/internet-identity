@@ -58,6 +58,7 @@ import { NonEmptyArray } from "$src/utils/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
+import { abortedCredentialsPage } from "$src/flows/verifiableCredentials/abortedCredentials";
 import { allowCredentialsPage } from "$src/flows/verifiableCredentials/allowCredentials";
 
 const identityBackground = loadIdentityBackground();
@@ -644,6 +645,12 @@ Credential that states that the holder is employed by the ACME Inc at the time o
       `,
       onAllow: () => toast.info(html`Allowed`),
       onCancel: () => toast.info(html`Canceled`),
+    }),
+  abortedCredentialsInternalError: () =>
+    abortedCredentialsPage({
+      i18n,
+      reason: "internal_error",
+      onAcknowledge: () => toast.info(html`Acked`),
     }),
 };
 

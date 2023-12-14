@@ -1,3 +1,4 @@
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { IDBFactory } from "fake-indexeddb";
 import {
@@ -6,7 +7,14 @@ import {
   keys as idbKeys,
   set as idbSet,
 } from "idb-keyval";
-import { MAX_SAVED_ANCHORS, getAnchors, setAnchorUsed } from ".";
+import {
+  MAX_SAVED_ANCHORS,
+  MAX_SAVED_PRINCIPALS,
+  getAnchorByPrincipal,
+  getAnchors,
+  setAnchorUsed,
+  setKnownPrincipal,
+} from ".";
 
 beforeAll(() => {
   // Initialize the IndexedDB global
@@ -18,7 +26,7 @@ test("anchors default to nothing", async () => {
 });
 
 test(
-  "old userNumber is recovered",
+  "old userNumber V0 is recovered",
   withStorage(
     async () => {
       expect(await getAnchors()).toStrictEqual([BigInt(123456)]);
@@ -76,20 +84,18 @@ test(
     {
       localStorage: {
         before: { userNumber: "123456" },
-        after: (storage) => {
-          const value = storage["anchors"];
-          expect(value).toBeDefined();
-          const anchors = JSON.parse(value);
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["123456"]).toBeDefined();
-        },
       },
       indexeddb: {
         after: (storage) => {
+          // Written to V3
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchors: any = storage["anchors"];
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["123456"]).toBeDefined();
+          const storageV3: any = storage["ii-storage-v3"];
+          expect(storageV3).toBeTypeOf("object");
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anchorsV3: any = storageV3["anchors"];
+          expect(anchorsV3).toBeTypeOf("object");
+          expect(anchorsV3["123456"]).toBeDefined();
         },
       },
     }
@@ -117,7 +123,30 @@ test(
 );
 
 test(
-  "anchors are also written to localstorage",
+  "V2 anchors are migrated",
+  withStorage(
+    async () => {
+      expect(await getAnchors()).toContain(BigInt(10000));
+      expect(await getAnchors()).toContain(BigInt(10001));
+      expect(await getAnchors()).toContain(BigInt(10003));
+    },
+    {
+      indexeddb: {
+        before: {
+          /* V2 layout */
+          anchors: {
+            "10000": { lastUsedTimestamp: 0 },
+            "10001": { lastUsedTimestamp: 0 },
+            "10003": { lastUsedTimestamp: 0 },
+          },
+        },
+      },
+    }
+  )
+);
+
+test(
+  "anchors are also written to V2",
   withStorage(
     async () => {
       await setAnchorUsed(BigInt(10000));
@@ -125,15 +154,15 @@ test(
       await setAnchorUsed(BigInt(10003));
     },
     {
-      localStorage: {
+      indexeddb: {
         after: (storage) => {
-          const value = storage["anchors"];
-          expect(value).toBeDefined();
-          const anchors = JSON.parse(value);
-          expect(anchors).toBeTypeOf("object");
-          expect(anchors["10000"]).toBeDefined();
-          expect(anchors["10001"]).toBeDefined();
-          expect(anchors["10003"]).toBeDefined();
+          // Written to V2
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anchorsV2: any = storage["anchors"];
+          expect(anchorsV2).toBeTypeOf("object");
+          expect(anchorsV2["10000"]).toBeDefined();
+          expect(anchorsV2["10001"]).toBeDefined();
+          expect(anchorsV2["10003"]).toBeDefined();
         },
       },
     }
@@ -163,6 +192,28 @@ test(
 );
 
 test(
+  "principal digests are stored",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const principal = Principal.fromText("2vxsx-fae");
+    await setKnownPrincipal({
+      userNumber: BigInt(10000),
+      origin,
+      principal,
+    });
+
+    const otherOrigin = "https://other.com";
+    expect(
+      await getAnchorByPrincipal({ origin: otherOrigin, principal })
+    ).not.toBeDefined();
+
+    expect(await getAnchorByPrincipal({ origin, principal })).toBe(
+      BigInt(10000)
+    );
+  })
+);
+
+test(
   "old anchors are dropped",
   withStorage(async () => {
     vi.useFakeTimers().setSystemTime(new Date(0));
@@ -180,30 +231,43 @@ test(
 );
 
 test(
-  "unknown fields are not dropped",
-  withStorage(
-    async () => {
-      vi.useFakeTimers().setSystemTime(new Date(20));
-      await setAnchorUsed(BigInt(10000));
-      vi.useRealTimers();
-    },
-    {
-      indexeddb: {
-        before: {
-          anchors: {
-            "10000": { lastUsedTimestamp: 10, hello: "world" },
-          },
-        },
-        after: {
-          anchors: {
-            "10000": { lastUsedTimestamp: 20, hello: "world" },
-          },
-        },
-      },
+  "old principals are dropped",
+  withStorage(async () => {
+    const userNumber = BigInt(10000);
+    const principal = Principal.fromText("2vxsx-fae");
+    const oldOrigin = "https://old.com";
+    const veryOldOrigin = "https://very.old.com";
+    vi.useFakeTimers().setSystemTime(new Date(0));
+    await setKnownPrincipal({ userNumber, principal, origin: veryOldOrigin });
+    vi.useFakeTimers().setSystemTime(new Date(1));
+    await setKnownPrincipal({ userNumber, principal, origin: oldOrigin });
+    let date = 2;
+    vi.useFakeTimers().setSystemTime(new Date(date));
+    for (let i = 0; i < MAX_SAVED_PRINCIPALS; i++) {
+      date++;
+      vi.useFakeTimers().setSystemTime(new Date(date));
+      await setKnownPrincipal({
+        userNumber,
+        principal,
+        origin: `https://new${i}.com`,
+      });
     }
-  )
+    date++;
+    vi.useFakeTimers().setSystemTime(new Date(date));
+    const newOrigin = "https://new.com";
+    await setKnownPrincipal({ userNumber, principal, origin: newOrigin });
+    expect(
+      await getAnchorByPrincipal({ principal, origin: veryOldOrigin })
+    ).not.toBeDefined();
+    expect(
+      await getAnchorByPrincipal({ principal, origin: oldOrigin })
+    ).not.toBeDefined();
+    expect(
+      await getAnchorByPrincipal({ principal, origin: newOrigin })
+    ).toBeDefined();
+    vi.useRealTimers();
+  })
 );
-
 /** Test storage usage. Storage is cleared after the callback has returned.
  * If `before` is specified, storage is populated with its content before the test is run.
  * If `after` is specified, the content of storage are checked against `after` after the

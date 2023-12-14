@@ -1,15 +1,13 @@
-use crate::assets::CertifiedAssets;
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk::api::{data_certificate, time};
+use canister_sig_util::signature_map::SignatureMap;
+use canister_sig_util::{get_signature_as_cbor, CanisterSigPublicKey};
+use ic_cdk::api::time;
 use ic_cdk::{id, trap};
-use ic_certification::{fork, labeled, pruned, Hash, HashTree};
+use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -128,15 +126,19 @@ pub fn get_delegation(
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
 
-    state::assets_and_signatures(|asset_hashes, sigs| {
-        match get_signature(
-            asset_hashes,
-            sigs,
-            session_key.clone(),
-            calculate_seed(anchor_number, &frontend),
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let message_hash = delegation_signature_msg_hash(&Delegation {
+            pubkey: session_key.clone(),
             expiration,
+            targets: None,
+        });
+        match get_signature_as_cbor(
+            sigs,
+            &calculate_seed(anchor_number, &frontend),
+            message_hash,
+            Some(certified_assets.root_hash()),
         ) {
-            Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+            Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                 delegation: Delegation {
                     pubkey: session_key,
                     expiration,
@@ -144,7 +146,7 @@ pub fn get_delegation(
                 },
                 signature: ByteBuf::from(signature),
             }),
-            None => GetDelegationResponse::NoSuchDelegation,
+            Err(_) => GetDelegationResponse::NoSuchDelegation,
         }
     })
 }
@@ -195,52 +197,6 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     }
     let map_hash = hash::hash_of_map(m);
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
-}
-
-fn get_signature(
-    assets: &CertifiedAssets,
-    sigs: &SignatureMap,
-    pk: PublicKey,
-    seed: Hash,
-    expiration: Timestamp,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-    let msg_hash = delegation_signature_msg_hash(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    });
-    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-
-    let tree = fork(pruned(assets.root_hash()), labeled(LABEL_SIG, witness));
-
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
 }
 
 fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration: Timestamp) {
