@@ -7,24 +7,35 @@ import Layout from "../layouts/Layout.astro";
 
   <script>
     import { html } from "lit-html";
-    import { AuthClient } from "@dfinity/auth-client";
     import { nonNullish, isNullish } from "@dfinity/utils";
     import { asyncReplace } from "lit-html/directives/async-replace.js";
     import { createRef, ref } from "lit-html/directives/ref.js";
     import { decodeJwt } from "jose";
     import { Chan, renderPage, withRef } from "../utils";
+    import { ChallengeAuthClient } from "../auth_overrides";
+    import { DelegationIdentity } from "@dfinity/identity";
 
     const latestPres = new Chan<string | undefined>(undefined);
     const ii = new Chan<
       { win: Window; origin: string; flowId: number } | undefined
     >(undefined);
-    const evntHandler = (evnt: MessageEvent) => {
+    const evntHandler = async (evnt: MessageEvent) => {
       console.log(
         `Got:
         ${JSON.stringify(evnt.data, (_key, value) =>
           typeof value === "bigint" ? value.toString() : value,
         )}`,
       );
+      const credentialSpecs = {
+        employee: {
+          credentialType: "VerifiedEmployee",
+          arguments: { employerName: "DFINITY Foundation" },
+        },
+        grad: {
+          credentialType: "UniversityDegreeCredential",
+          arguments: { institutionName: "DFINITY College of Engineering" },
+        },
+      };
 
       if (evnt.data?.method === "vc-flow-ready" && nonNullish(ii.latest)) {
         const principal = withRef(principalInput, (principalInput) => {
@@ -54,17 +65,6 @@ import Layout from "../layouts/Layout.astro";
           return;
         }
 
-        const credentialSpecs = {
-          employee: {
-            credentialType: "VerifiedEmployee",
-            arguments: { employerName: "DFINITY Foundation" },
-          },
-          grad: {
-            credentialType: "UniversityDegreeCredential",
-            arguments: { institutionName: "DFINITY College of Engineering" },
-          },
-        };
-
         let message = {
           id: ii.latest.flowId,
           jsonrpc: "2.0",
@@ -84,6 +84,17 @@ import Layout from "../layouts/Layout.astro";
 
       const verifiablePresentation = evnt.data?.result?.verifiablePresentation;
       if (nonNullish(verifiablePresentation)) {
+        await fetch("/api/attribute/verify", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            verifiablePresentation: verifiablePresentation,
+            credentialSpec: credentialSpecs[credentialType.latest],
+          }),
+        });
         const ver = decodeJwt(verifiablePresentation) as any;
         const creds = ver.vp.verifiableCredential;
 
@@ -124,18 +135,33 @@ import Layout from "../layouts/Layout.astro";
             class="c-button"
             data-action="authenticate"
             @click=${async () => {
-              const authClient = await AuthClient.create();
+              let challengeResponse = await fetch("/api/challenge");
+              let { challenge }: { challenge: string } =
+                await challengeResponse.json();
+              console.log(`Retrieved challenge: ${challenge}`);
+              const authClient = new ChallengeAuthClient(challenge);
 
               const iiUrl = withRef(urlInput, (i) => i.value);
 
               const loginOptions: Parameters<typeof authClient.login>[0] = {
                 identityProvider: iiUrl,
-                onSuccess: () => {
+                onSuccess: async () => {
                   withRef(principalInput, (principalInput) => {
                     principalInput.innerText = authClient
                       .getIdentity()
                       .getPrincipal()
                       .toString();
+                  });
+                  let delegation = (
+                    authClient.getIdentity() as DelegationIdentity
+                  ).getDelegation();
+                  await fetch("/api/challenge/verify", {
+                    method: "POST",
+                    headers: {
+                      Accept: "application/json",
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(delegation.toJSON()),
                   });
                 },
                 onError: (e) => {
