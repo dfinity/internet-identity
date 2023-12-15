@@ -1,4 +1,4 @@
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Nat};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -123,7 +123,6 @@ pub struct Icrc21ConsentPreferences {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Icrc21ErrorInfo {
-    pub error_code: u64,
     pub description: String,
 }
 
@@ -131,19 +130,16 @@ pub struct Icrc21ErrorInfo {
 pub enum Icrc21Error {
     UnsupportedCanisterCall(Icrc21ErrorInfo),
     ConsentMessageUnavailable(Icrc21ErrorInfo),
-    GenericError(Icrc21ErrorInfo),
+    GenericError {
+        error_code: Nat,
+        description: String,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Icrc21ConsentInfo {
     pub consent_message: String,
     pub language: String,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum Icrc21ConsentMessageResponse {
-    Ok(Icrc21ConsentInfo),
-    Err(Icrc21Error),
 }
 
 #[cfg(test)]

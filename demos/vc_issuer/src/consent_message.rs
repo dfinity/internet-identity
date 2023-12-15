@@ -6,8 +6,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use strfmt::strfmt;
 use vc_util::issuer_api::{
-    Icrc21ConsentInfo, Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21ErrorInfo,
+    Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo,
 };
 use SupportedLanguage::{English, German};
 
@@ -127,29 +126,26 @@ impl Display for SupportedLanguage {
 pub fn get_vc_consent_message(
     credential_type: &SupportedCredentialType,
     language: &SupportedLanguage,
-) -> Icrc21ConsentMessageResponse {
-    match render_consent_message(credential_type, language) {
-        Ok(message) => Icrc21ConsentMessageResponse::Ok(Icrc21ConsentInfo {
-            consent_message: message,
-            language: format!("{}", language),
-        }),
-        Err(err) => Icrc21ConsentMessageResponse::Err(Icrc21Error::GenericError(err)),
-    }
+) -> Result<Icrc21ConsentInfo, Icrc21Error> {
+    render_consent_message(credential_type, language).map(|message| Icrc21ConsentInfo {
+        consent_message: message,
+        language: format!("{}", language),
+    })
 }
 
 fn render_consent_message(
     credential: &SupportedCredentialType,
     language: &SupportedLanguage,
-) -> Result<String, Icrc21ErrorInfo> {
+) -> Result<String, Icrc21Error> {
     let template = CONSENT_MESSAGE_TEMPLATES
         .get(&(CredentialTemplateType::from(credential), language.clone()))
-        .ok_or(Icrc21ErrorInfo {
-            error_code: 0,
+        .ok_or(Icrc21Error::ConsentMessageUnavailable(Icrc21ErrorInfo {
             description: "Consent message template not found".to_string(),
-        })?;
+        }))?;
 
-    strfmt(template, &HashMap::from([credential.to_param_tuple()])).map_err(|e| Icrc21ErrorInfo {
-        error_code: 0,
-        description: e.to_string(),
+    strfmt(template, &HashMap::from([credential.to_param_tuple()])).map_err(|e| {
+        Icrc21Error::ConsentMessageUnavailable(Icrc21ErrorInfo {
+            description: e.to_string(),
+        })
     })
 }
