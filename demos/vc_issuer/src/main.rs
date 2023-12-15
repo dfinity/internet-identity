@@ -1,18 +1,18 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
-use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
-use ic_cdk::trap;
+use canister_sig_util::{
+    extract_raw_root_pk_from_der, get_signature_as_cbor, CanisterSigPublicKey, IC_ROOT_PK_DER,
+};
+use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
-use ic_certification::{fork, fork_hash, labeled, labeled_hash, pruned, Hash, HashTree};
+use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use include_dir::{include_dir, Dir};
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -20,10 +20,10 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
-    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
-    PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
+    Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError,
+    IssuedCredentialData, PrepareCredentialRequest, PrepareCredentialResponse,
+    PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
@@ -264,17 +264,25 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
-    let msg_hash = vc_signing_input_hash(&signing_input);
-    let maybe_sig = SIGNATURES.with(|sigs| {
-        let sigs = sigs.borrow();
-        get_signature(&sigs, seed, msg_hash)
+    let message_hash = vc_signing_input_hash(&signing_input);
+    let sig_result = SIGNATURES.with(|sigs| {
+        let sig_map = sigs.borrow();
+        let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
+        get_signature_as_cbor(
+            &sig_map,
+            &seed,
+            message_hash,
+            Some(certified_assets_root_hash),
+        )
     });
-    let sig = if let Some(sig) = maybe_sig {
-        sig
-    } else {
-        return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound(String::from(
-            "signature not prepared or expired",
-        )));
+    let sig = match sig_result {
+        Ok(sig) => sig,
+        Err(e) => {
+            return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound(format!(
+                "signature not prepared or expired: {}",
+                e
+            )));
+        }
     };
     let vc_jws =
         vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig).expect("failed constructing JWS");
@@ -283,16 +291,15 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
 
 #[update]
 #[candid_method]
-async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+async fn vc_consent_message(
+    req: Icrc21VcConsentMessageRequest,
+) -> Result<Icrc21ConsentInfo, Icrc21Error> {
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
-            return Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(
-                Icrc21ErrorInfo {
-                    error_code: 0,
-                    description: err,
-                },
-            ));
+            return Err(Icrc21Error::UnsupportedCanisterCall(Icrc21ErrorInfo {
+                description: err,
+            }));
         }
     };
     get_vc_consent_message(&credential_type, &SupportedLanguage::from(req.preferences))
@@ -427,40 +434,6 @@ fn main() {}
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
     let signature_expires_at = time().saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
     sigs.put(hash_bytes(seed), msg_hash, signature_expires_at);
-}
-
-fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-    let asset_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
-    let witness = sigs.witness(hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-    let tree = fork(pruned(asset_root_hash), labeled(LABEL_SIG, witness));
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
 }
 
 fn calculate_seed(principal: &Principal) -> Hash {

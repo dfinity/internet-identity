@@ -35,13 +35,12 @@ export interface Icrc21ConsentInfo {
 export type Icrc21ConsentMessageResponse = { 'Ok' : Icrc21ConsentInfo } |
   { 'Err' : Icrc21Error };
 export interface Icrc21ConsentPreferences { 'language' : string }
-export type Icrc21Error = { 'GenericError' : Icrc21ErrorInfo } |
+export type Icrc21Error = {
+    'GenericError' : { 'description' : string, 'error_code' : bigint }
+  } |
   { 'UnsupportedCanisterCall' : Icrc21ErrorInfo } |
   { 'ConsentMessageUnavailable' : Icrc21ErrorInfo };
-export interface Icrc21ErrorInfo {
-  'description' : string,
-  'error_code' : bigint,
-}
+export interface Icrc21ErrorInfo { 'description' : string }
 export interface Icrc21VcConsentMessageRequest {
   'preferences' : Icrc21ConsentPreferences,
   'credential_spec' : CredentialSpec,

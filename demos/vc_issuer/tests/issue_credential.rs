@@ -26,9 +26,8 @@ use std::path::PathBuf;
 use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
-    PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
+    Icrc21ConsentPreferences, Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError,
+    PrepareCredentialRequest, PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, verify_credential_jws_with_canister_id,
@@ -92,6 +91,7 @@ pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
 
 mod api {
     use super::*;
+    use vc_util::issuer_api::Icrc21ConsentInfo;
 
     pub fn configure(
         env: &StateMachine,
@@ -106,7 +106,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         consent_message_request: &Icrc21VcConsentMessageRequest,
-    ) -> Result<Option<Icrc21ConsentMessageResponse>, CallError> {
+    ) -> Result<Result<Icrc21ConsentInfo, Icrc21Error>, CallError> {
         call_candid_as(
             env,
             canister_id,
@@ -204,11 +204,12 @@ fn should_return_vc_consent_message_for_employment_vc() {
         let response =
             api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
                 .expect("API call failed")
-                .expect("Got 'None' from vc_consent_message");
+                .expect("Consent message error");
 
-        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
-        assert_eq!(info.language, actual_language);
-        assert!(info.consent_message.starts_with(consent_message_snippet));
+        assert_eq!(response.language, actual_language);
+        assert!(response
+            .consent_message
+            .starts_with(consent_message_snippet));
     }
 }
 
@@ -238,10 +239,11 @@ fn should_return_vc_consent_message_for_adult_vc() {
         let response =
             api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
                 .expect("API call failed")
-                .expect("Got 'None' from vc_consent_message");
-        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
-        assert_eq!(info.language, actual_language);
-        assert!(info.consent_message.starts_with(consent_message_snippet));
+                .expect("Consent message error");
+        assert_eq!(response.language, actual_language);
+        assert!(response
+            .consent_message
+            .starts_with(consent_message_snippet));
     }
 }
 
@@ -262,12 +264,8 @@ fn should_fail_vc_consent_message_if_not_supported() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 #[test]
@@ -287,12 +285,8 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 #[test]
@@ -315,12 +309,8 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 fn employee_credential_spec() -> CredentialSpec {

@@ -1,12 +1,11 @@
 use crate::delegation::check_frontend_length;
-use crate::{delegation, hash, random_salt, state, update_root_hash, LABEL_SIG, MINUTE_NS};
-use asset_util::CertifiedAssets;
+use crate::{delegation, hash, random_salt, state, update_root_hash, MINUTE_NS};
+
 use candid::Principal;
 use canister_sig_util::signature_map::SignatureMap;
-use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk::api::{data_certificate, time};
-use ic_cdk::trap;
-use ic_certification::{fork, labeled, pruned, Hash, HashTree};
+use canister_sig_util::{get_signature_as_cbor, CanisterSigPublicKey};
+use ic_cdk::api::time;
+use ic_certification::Hash;
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -15,7 +14,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasResponse, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::{FrontendHostname, IdentityNumber};
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use vc_util::{
@@ -86,31 +84,45 @@ pub fn get_id_alias(
             Ok(pk) => pk,
             Err(err) => return GetIdAliasResponse::NoSuchCredentials(err),
         };
+        let seed = canister_sig_pk.seed.as_slice();
 
         let id_alias_principal = Principal::self_authenticating(canister_sig_pk.to_der());
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
 
         let rp_alias_msg_hash = vc_signing_input_hash(rp_id_alias_jwt.as_bytes());
-        let Some(rp_sig) =
-            get_signature(cert_assets, sigs, &canister_sig_pk.seed, rp_alias_msg_hash)
-        else {
-            return GetIdAliasResponse::NoSuchCredentials("rp_sig not found".to_string());
+        let rp_sig = match get_signature_as_cbor(
+            sigs,
+            seed,
+            rp_alias_msg_hash,
+            Some(cert_assets.root_hash()),
+        ) {
+            Ok(sig) => sig,
+            Err(e) => {
+                return GetIdAliasResponse::NoSuchCredentials(
+                    format!("rp_sig not found: {}", e).to_string(),
+                )
+            }
         };
         let rp_jws =
-            add_sig_to_signing_input(rp_id_alias_jwt, &rp_sig).expect("failed constructing JWS");
+            add_sig_to_signing_input(rp_id_alias_jwt, &rp_sig).expect("failed constructing rp JWS");
 
         let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
-        let Some(issuer_sig) = get_signature(
-            cert_assets,
+        let issuer_sig = match get_signature_as_cbor(
             sigs,
-            &canister_sig_pk.seed,
+            seed,
             issuer_id_alias_msg_hash,
-        ) else {
-            return GetIdAliasResponse::NoSuchCredentials("issuer_sig not found".to_string());
+            Some(cert_assets.root_hash()),
+        ) {
+            Ok(sig) => sig,
+            Err(e) => {
+                return GetIdAliasResponse::NoSuchCredentials(
+                    format!("issuer_sig not found: {}", e).to_string(),
+                )
+            }
         };
         let issuer_jws = add_sig_to_signing_input(issuer_id_alias_jwt, &issuer_sig)
-            .expect("failed constructing JWS");
+            .expect("failed constructing issuer JWS");
 
         GetIdAliasResponse::Ok(IdAliasCredentials {
             rp_id_alias_credential: SignedIdAlias {
@@ -157,46 +169,6 @@ fn add_sig_to_signing_input(signing_input: &str, sig: &[u8]) -> Result<String, S
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(parsed_signing_input.claims(), header)
         .map_err(|e| format!("internal: failed creating JWS encoder: {:?}", e))?;
     Ok(encoder.into_jws(sig))
-}
-
-fn get_signature(
-    cert_assets: &CertifiedAssets,
-    sigs: &SignatureMap,
-    seed: impl AsRef<[u8]>,
-    msg_hash: Hash,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-
-    let tree = fork(pruned(cert_assets.root_hash()), labeled(LABEL_SIG, witness));
-
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
 }
 
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
