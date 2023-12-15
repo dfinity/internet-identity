@@ -15,8 +15,10 @@ import DOMPurify from "dompurify";
 
 import copyJson from "./allowCredentials.json";
 
-/* A screen prompting the user to allow (or cancel) issuing verified
- * credentials */
+/*
+ * Get the dapp that corresponds to the origin, or create a new one if it's
+ * unknown
+ */
 const getOrigin = (
   origin: string,
   dapplist: KnownDapp[],
@@ -36,6 +38,8 @@ const getOrigin = (
   return foundDapp;
 };
 
+/* A screen prompting the user to allow (or cancel) issuing verified
+ * credentials */
 const allowCredentialsTemplate = ({
   i18n,
   relyingOrigin,
