@@ -10,6 +10,11 @@ use candid::Principal;
 use identity_credential::validator::JwtValidationError;
 use std::collections::HashMap;
 
+/// Validates the provided presentation `vp_jwt`, checking the following conditions:
+///  - the presentation is a valid presentation of the IC Attribute Sharing flow;
+///    in particular the presentation contains IdAlias and a matching VerifiedAdult credentials
+///  - both credentials are valid wrt. `vc_flow_signers`, `root_pk_raw`, and `current_time_ns`
+///  - `effective_vc_subject` matches the principal to which the presentation applies
 pub fn validate_verified_adult_presentation(
     vp_jwt: &str,
     effective_vc_subject: Principal,
@@ -69,6 +74,7 @@ mod tests {
     const EXPIRY_NS: u128 = 1620329530 * 1_000_000_000; // from ID_ALIAS_CREDENTIAL_JWS
     const MINUTE_NS: u128 = 60 * 1_000_000_000;
     const CURRENT_TIME_BEFORE_EXPIRY_NS: u128 = EXPIRY_NS - MINUTE_NS;
+    const CURRENT_TIME_AFTER_EXPIRY_NS: u128 = EXPIRY_NS + MINUTE_NS;
     const II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
     const ISSUER_CANISTER_ID: &str = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 
@@ -133,12 +139,32 @@ mod tests {
         .expect("vp-creation failed");
         let result = validate_verified_adult_presentation(
             &vp_jwt,
-            id_alias_principal(),
+            id_alias_principal(), // wrong effective subject
             &default_test_vc_flow_signers(),
             &test_ic_root_pk_raw(),
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("holder does not match subject"));
+    }
+
+    #[test]
+    fn should_fail_validate_verified_adult_presentation_if_expired() {
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            rp_principal(),
+            vec![
+                ID_ALIAS_CREDENTIAL_JWS.to_string(),
+                ADULT_CREDENTIAL_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+        let result = validate_verified_adult_presentation(
+            &vp_jwt,
+            rp_principal(),
+            &default_test_vc_flow_signers(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_AFTER_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("credential expired"));
     }
 
     #[test]
