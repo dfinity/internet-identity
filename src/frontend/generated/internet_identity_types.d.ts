@@ -99,6 +99,8 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export type GetIdAliasError = { 'NoSuchCredentials' : string } |
+  { 'AuthenticationFailed' : string };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
   'issuer' : FrontendHostname,
@@ -106,9 +108,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type GetIdAliasResponse = { 'ok' : IdAliasCredentials } |
-  { 'authentication_failed' : string } |
-  { 'no_such_credentials' : string };
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -174,13 +173,12 @@ export type MetadataMap = Array<
       { 'bytes' : Uint8Array | number[] },
   ]
 >;
+export type PrepareIdAliasError = { 'AuthenticationFailed' : string };
 export interface PrepareIdAliasRequest {
   'issuer' : FrontendHostname,
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
-  { 'authentication_failed' : string };
 export interface PreparedIdAlias {
   'rp_id_alias_jwt' : string,
   'issuer_id_alias_jwt' : string,
@@ -259,7 +257,11 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_id_alias' : ActorMethod<[GetIdAliasRequest], [] | [GetIdAliasResponse]>,
+  'get_id_alias' : ActorMethod<
+    [GetIdAliasRequest],
+    { 'Ok' : IdAliasCredentials } |
+      { 'Err' : GetIdAliasError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -280,7 +282,8 @@ export interface _SERVICE {
   >,
   'prepare_id_alias' : ActorMethod<
     [PrepareIdAliasRequest],
-    [] | [PrepareIdAliasResponse]
+    { 'Ok' : PreparedIdAlias } |
+      { 'Err' : PrepareIdAliasError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

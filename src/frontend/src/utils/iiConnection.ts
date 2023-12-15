@@ -598,7 +598,7 @@ export class AuthenticatedConnection extends Connection {
     const rpOrigin = remapToLegacyDomain(rpOrigin_);
     const actor = await this.getActor();
     const userNumber = this.userNumber;
-    const [result] = await actor.prepare_id_alias({
+    const result = await actor.prepare_id_alias({
       issuer: issuerOrigin,
       relying_party: rpOrigin,
       identity_number: userNumber,
@@ -609,14 +609,25 @@ export class AuthenticatedConnection extends Connection {
       return { error: "internal_error" };
     }
 
-    if ("authentication_failed" in result) {
+    if ("Ok" in result) {
+      return result.Ok;
+    }
+
+    if (!("Err" in result)) {
       console.error(
-        ["Authentication failed", result.authentication_failed].join(": ")
+        "Expected property 'Ok' or 'Err', got: ",
+        JSON.stringify(result)
       );
+      return { error: "internal_error" };
+    }
+
+    const err = result.Err;
+    if ("AuthenticationFailed" in err) {
       return { error: "authentication_failed" };
     }
 
-    return result.ok;
+    console.error("Unknown error", err);
+    return { error: "internal_error" };
   };
 
   getIdAlias = async ({
@@ -637,7 +648,7 @@ export class AuthenticatedConnection extends Connection {
     const actor = await this.getActor();
     const userNumber = this.userNumber;
 
-    const [result] = await actor.get_id_alias({
+    const result = await actor.get_id_alias({
       issuer: issuerOrigin,
       relying_party: rpOrigin,
       identity_number: userNumber,
@@ -649,16 +660,29 @@ export class AuthenticatedConnection extends Connection {
       return { error: "internal_error" };
     }
 
-    if ("no_such_credentials" in result) {
-      console.error(["No credentials", result.no_such_credentials].join(": "));
+    if ("Ok" in result) {
+      return result.Ok;
+    }
+
+    if (!("Err" in result)) {
+      console.error(
+        "Expected property 'Ok' or 'Err', got: ",
+        JSON.stringify(result)
+      );
       return { error: "internal_error" };
     }
 
-    if ("authentication_failed" in result) {
+    const err = result.Err;
+    if ("NoSuchCredentials" in err) {
+      console.error(["No credentials", err.NoSuchCredentials].join(": "));
+      return { error: "internal_error" };
+    }
+    if ("AuthenticationFailed" in err) {
       return { error: "authentication_failed" };
     }
 
-    return result.ok;
+    console.error("Unknown error", err);
+    return { error: "internal_error" };
   };
 }
 

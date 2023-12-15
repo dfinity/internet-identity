@@ -399,11 +399,9 @@ type PrepareIdAliasRequest = record {
     identity_number : IdentityNumber;
 };
 
-type PrepareIdAliasResponse = variant {
-    /// Credentials prepared successfully, can be retrieved via `get_id_alias`
-    ok : PreparedIdAlias;
+type PrepareIdAliasError = variant {
     /// Caller authentication failed.
-    authentication_failed : text;
+    AuthenticationFailed : text;
 };
 
 /// The prepared id alias contains two (still unsigned) credentials in JWT format,
@@ -425,13 +423,11 @@ type GetIdAliasRequest = record {
     identity_number : IdentityNumber;
 };
 
-type GetIdAliasResponse = variant {
-    /// The signed id alias credentials
-    ok : IdAliasCredentials;
+type GetIdAliasError = variant {
     /// Caller authentication failed.
-    authentication_failed : text;
+    AuthenticationFailed : text;
     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
-    no_such_credentials : text;
+    NoSuchCredentials : text;
 };
 
 /// The signed id alias credentials for each involved party.
@@ -519,6 +515,6 @@ service : (opt InternetIdentityInit) -> {
 
     // Attribute Sharing MVP API
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
-    prepare_id_alias : (PrepareIdAliasRequest) -> (opt PrepareIdAliasResponse);
-    get_id_alias : (GetIdAliasRequest) -> (opt GetIdAliasResponse) query;
+    prepare_id_alias : (PrepareIdAliasRequest) -> (variant {Ok: PreparedIdAlias; Err: PrepareIdAliasError;});
+    get_id_alias : (GetIdAliasRequest) -> (variant {Ok: IdAliasCredentials; Err: GetIdAliasError;}) query;
 }

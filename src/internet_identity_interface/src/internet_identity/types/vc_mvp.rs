@@ -31,10 +31,7 @@ pub struct PreparedIdAlias {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum PrepareIdAliasResponse {
-    #[serde(rename = "ok")]
-    Ok(PreparedIdAlias),
-    #[serde(rename = "authentication_failed")]
+pub enum PrepareIdAliasError {
     AuthenticationFailed(String),
 }
 
@@ -59,11 +56,7 @@ pub struct GetIdAliasRequest {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetIdAliasResponse {
-    #[serde(rename = "ok")]
-    Ok(IdAliasCredentials),
-    #[serde(rename = "authentication_failed")]
+pub enum GetIdAliasError {
     AuthenticationFailed(String),
-    #[serde(rename = "no_such_credentials")]
     NoSuchCredentials(String),
 }

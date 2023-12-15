@@ -170,10 +170,9 @@ export const idlFactory = ({ IDL }) => {
     'rp_id_alias_credential' : SignedIdAlias,
     'issuer_id_alias_credential' : SignedIdAlias,
   });
-  const GetIdAliasResponse = IDL.Variant({
-    'ok' : IdAliasCredentials,
-    'authentication_failed' : IDL.Text,
-    'no_such_credentials' : IDL.Text,
+  const GetIdAliasError = IDL.Variant({
+    'NoSuchCredentials' : IDL.Text,
+    'AuthenticationFailed' : IDL.Text,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -238,9 +237,8 @@ export const idlFactory = ({ IDL }) => {
     'issuer_id_alias_jwt' : IDL.Text,
     'canister_sig_pk_der' : PublicKey,
   });
-  const PrepareIdAliasResponse = IDL.Variant({
-    'ok' : PreparedIdAlias,
-    'authentication_failed' : IDL.Text,
+  const PrepareIdAliasError = IDL.Variant({
+    'AuthenticationFailed' : IDL.Text,
   });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
@@ -303,7 +301,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_id_alias' : IDL.Func(
         [GetIdAliasRequest],
-        [IDL.Opt(GetIdAliasResponse)],
+        [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
         ['query'],
       ),
     'get_principal' : IDL.Func(
@@ -337,7 +335,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'prepare_id_alias' : IDL.Func(
         [PrepareIdAliasRequest],
-        [IDL.Opt(PrepareIdAliasResponse)],
+        [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
         [],
       ),
     'register' : IDL.Func(
