@@ -73,14 +73,15 @@ export const dappTemplate = ({
   logoSrc,
   name,
   oneLiner,
-  oneLinerAboveTitle,
+  oneLinerAboveTitle = false,
 }: DappTemplateArgs): TemplateResult => {
   return html`
     <div class="c-action-list__icon" aria-hidden="true">
       <img src=${logoSrc} alt=${name} loading="lazy" />
     </div>
     <div
-      class="c-action-list__label c-action-list__label--stacked${oneLinerAboveTitle
+      class="c-action-list__label c-action-list__label--stacked${oneLinerAboveTitle ===
+      true
         ? " c-action-list__label--inverted"
         : ""}"
     >
