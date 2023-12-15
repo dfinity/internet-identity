@@ -11,7 +11,8 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
+    PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
@@ -623,7 +624,9 @@ mod attribute_sharing_mvp {
 
     #[update]
     #[candid_method]
-    async fn prepare_id_alias(req: PrepareIdAliasRequest) -> Option<PrepareIdAliasResponse> {
+    async fn prepare_id_alias(
+        req: PrepareIdAliasRequest,
+    ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
         let _maybe_ii_domain = authenticate_and_record_activity(req.identity_number);
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
@@ -633,19 +636,19 @@ mod attribute_sharing_mvp {
             },
         )
         .await;
-        Some(PrepareIdAliasResponse::Ok(prepared_id_alias))
+        Ok(prepared_id_alias)
     }
 
     #[query]
     #[candid_method(query)]
-    fn get_id_alias(req: GetIdAliasRequest) -> Option<GetIdAliasResponse> {
+    fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
         let Ok(_) = check_authentication(req.identity_number) else {
-            return Some(GetIdAliasResponse::AuthenticationFailed(format!(
+            return Err(GetIdAliasError::AuthenticationFailed(format!(
                 "{} could not be authenticated.",
                 caller()
             )));
         };
-        let response = vc_mvp::get_id_alias(
+        vc_mvp::get_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
                 relying_party: req.relying_party,
@@ -653,8 +656,7 @@ mod attribute_sharing_mvp {
             },
             &req.rp_id_alias_jwt,
             &req.issuer_id_alias_jwt,
-        );
-        Some(response)
+        )
     }
 }
 

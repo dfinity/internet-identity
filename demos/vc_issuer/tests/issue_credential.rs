@@ -16,7 +16,7 @@ use identity_core::common::Value;
 use identity_jose::jwt::JwtClaims;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasRequest, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
@@ -552,15 +552,10 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         issuer: issuer.clone(),
     };
 
-    let prepare_response =
+    let prepared_id_alias =
         ii_api::prepare_id_alias(&env, ii_id, principal_1(), prepare_id_alias_req)?
-            .expect("Got 'None' from prepare_id_alias");
+            .expect("prepare id_alias failed");
 
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(response) = prepare_response {
-        response
-    } else {
-        panic!("prepare id_alias failed")
-    };
     let canister_sig_pk =
         CanisterSigPublicKey::try_from(prepared_id_alias.canister_sig_pk_der.as_ref())
             .expect("failed parsing canister sig pk");
@@ -572,18 +567,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
         issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
     };
-    let id_alias_credentials =
-        match ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+    let id_alias_credentials = ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
+        .expect("get id_alias failed");
 
     let root_pk_raw =
         extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");

@@ -11,7 +11,7 @@ use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use identity_jose::jws::{CompactJwsEncoder, Decoder};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasResponse, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
+    GetIdAliasError, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::{FrontendHostname, IdentityNumber};
 use serde_bytes::ByteBuf;
@@ -75,15 +75,13 @@ pub fn get_id_alias(
     dapps: InvolvedDapps,
     rp_id_alias_jwt: &str,
     issuer_id_alias_jwt: &str,
-) -> GetIdAliasResponse {
+) -> Result<IdAliasCredentials, GetIdAliasError> {
     check_frontend_length(&dapps.relying_party);
     check_frontend_length(&dapps.issuer);
 
     state::assets_and_signatures(|cert_assets, sigs| {
-        let canister_sig_pk = match canister_sig_pk_from_signing_input(rp_id_alias_jwt) {
-            Ok(pk) => pk,
-            Err(err) => return GetIdAliasResponse::NoSuchCredentials(err),
-        };
+        let canister_sig_pk = canister_sig_pk_from_signing_input(rp_id_alias_jwt)
+            .map_err(GetIdAliasError::NoSuchCredentials)?;
         let seed = canister_sig_pk.seed.as_slice();
 
         let id_alias_principal = Principal::self_authenticating(canister_sig_pk.to_der());
@@ -91,40 +89,28 @@ pub fn get_id_alias(
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
 
         let rp_alias_msg_hash = vc_signing_input_hash(rp_id_alias_jwt.as_bytes());
-        let rp_sig = match get_signature_as_cbor(
-            sigs,
-            seed,
-            rp_alias_msg_hash,
-            Some(cert_assets.root_hash()),
-        ) {
-            Ok(sig) => sig,
-            Err(e) => {
-                return GetIdAliasResponse::NoSuchCredentials(
-                    format!("rp_sig not found: {}", e).to_string(),
-                )
-            }
-        };
+        let rp_sig =
+            get_signature_as_cbor(sigs, seed, rp_alias_msg_hash, Some(cert_assets.root_hash()))
+                .map_err(|err| {
+                    GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
+                })?;
         let rp_jws =
             add_sig_to_signing_input(rp_id_alias_jwt, &rp_sig).expect("failed constructing rp JWS");
 
         let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
-        let issuer_sig = match get_signature_as_cbor(
+        let issuer_sig = get_signature_as_cbor(
             sigs,
             seed,
             issuer_id_alias_msg_hash,
             Some(cert_assets.root_hash()),
-        ) {
-            Ok(sig) => sig,
-            Err(e) => {
-                return GetIdAliasResponse::NoSuchCredentials(
-                    format!("issuer_sig not found: {}", e).to_string(),
-                )
-            }
-        };
+        )
+        .map_err(|err| {
+            GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
+        })?;
         let issuer_jws = add_sig_to_signing_input(issuer_id_alias_jwt, &issuer_sig)
             .expect("failed constructing issuer JWS");
 
-        GetIdAliasResponse::Ok(IdAliasCredentials {
+        Ok(IdAliasCredentials {
             rp_id_alias_credential: SignedIdAlias {
                 id_alias: id_alias_principal,
                 id_dapp: id_rp,
