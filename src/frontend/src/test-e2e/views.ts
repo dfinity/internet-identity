@@ -576,6 +576,8 @@ export class VcAllowView extends View {
   }
 
   async allow(): Promise<void> {
+    await this.browser.$('[data-action="allow"]').waitForDisplayed();
+    await this.browser.$('[data-action="allow"]').scrollIntoView();
     await this.browser.$('[data-action="allow"]').click();
   }
 
