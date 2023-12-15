@@ -1,5 +1,6 @@
 use candid::{CandidType, Deserialize};
 use serde_bytes::ByteBuf;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -66,6 +67,27 @@ impl Display for ArgumentValue {
         match &self {
             ArgumentValue::String(s) => write!(f, "'{}'", s),
             ArgumentValue::Int(i) => write!(f, "{}", i),
+        }
+    }
+}
+
+impl PartialEq<serde_json::Value> for ArgumentValue {
+    fn eq(&self, other: &Value) -> bool {
+        match self {
+            ArgumentValue::String(ls) => {
+                if let Some(rs) = other.as_str() {
+                    return ls.eq(rs);
+                } else {
+                    return false;
+                }
+            }
+            ArgumentValue::Int(li) => {
+                if let Some(ri) = other.as_i64() {
+                    return (*li as i64) == ri;
+                } else {
+                    return false;
+                }
+            }
         }
     }
 }
@@ -137,6 +159,46 @@ mod tests {
         assert_eq!(
             "'some string'",
             format!("{}", ArgumentValue::String("some string".to_string()))
+        );
+    }
+
+    #[test]
+    fn should_correctly_compare_argument_values() {
+        assert_eq!(ArgumentValue::Int(42), Value::from(42));
+        assert_eq!(ArgumentValue::Int(123456789), Value::from(123456789));
+        assert_eq!(ArgumentValue::Int(0), Value::from(0));
+
+        assert_ne!(ArgumentValue::Int(42), Value::from(11));
+        assert_ne!(ArgumentValue::Int(42), Value::from("some string"));
+        assert_ne!(ArgumentValue::Int(42), Value::from(true));
+        assert_ne!(ArgumentValue::Int(42), Value::from(vec![1, 2, 3]));
+
+        assert_eq!(
+            ArgumentValue::String("same string".to_string()),
+            Value::from("same string")
+        );
+        let long_string = "this is a bit longer string just for testing purposes";
+        assert_eq!(
+            ArgumentValue::String(long_string.to_string()),
+            Value::from(long_string)
+        );
+        assert_eq!(ArgumentValue::String("".to_string()), Value::from(""));
+
+        assert_ne!(
+            ArgumentValue::String("some string".to_string()),
+            Value::from("different")
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(42)
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(true)
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(vec![1, 2, 3])
         );
     }
 }
