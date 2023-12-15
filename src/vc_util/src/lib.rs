@@ -989,6 +989,6 @@ mod tests {
             &test_ic_root_pk_raw(),
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
-        assert_matches!(result, Err(e) if format!("{:?}", e).contains("inconsistent claim in id_alias VC"));
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("inconsistent claim in VC"));
     }
 }

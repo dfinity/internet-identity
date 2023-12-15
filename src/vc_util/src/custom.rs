@@ -4,7 +4,7 @@ use crate::issuer_api::{ArgumentValue, CredentialSpec};
 use crate::{
     inconsistent_jwt_claims, validate_claim, validate_claims_match_spec,
     verify_ii_presentation_jwt_with_canister_ids, CredentialVerificationError,
-    PresentationVerificationError, VcFlowSigners, II_ISSUER_URL,
+    PresentationVerificationError, VcFlowSigners,
 };
 use candid::Principal;
 use identity_credential::validator::JwtValidationError;
@@ -25,14 +25,14 @@ pub fn validate_verified_adult_presentation(
         current_time_ns,
     )?;
     validate_claim("iss", &vc_flow_signers.issuer_origin, claims.iss())
-        .map_err(|e| invalid_requested_vc(e))?;
+        .map_err(invalid_requested_vc)?;
     let vc_claims = claims
         .vc()
         .ok_or(invalid_requested_vc(inconsistent_jwt_claims(
             "missing vc in id_alias JWT claims",
         )))?;
     validate_claims_match_spec(vc_claims, &verified_adult_vc_spec())
-        .map_err(|e| invalid_requested_vc(e))?;
+        .map_err(invalid_requested_vc)?;
     Ok(())
 }
 
@@ -55,6 +55,7 @@ fn verified_adult_vc_spec() -> CredentialSpec {
 mod tests {
     use super::super::tests::create_verifiable_presentation_jwt_for_test;
     use super::*;
+    use crate::II_ISSUER_URL;
     use assert_matches::assert_matches;
     use identity_jose::jwu::decode_b64;
 

@@ -76,16 +76,16 @@ impl PartialEq<serde_json::Value> for ArgumentValue {
         match self {
             ArgumentValue::String(ls) => {
                 if let Some(rs) = other.as_str() {
-                    return ls.eq(rs);
+                    ls.eq(rs)
                 } else {
-                    return false;
+                    false
                 }
             }
             ArgumentValue::Int(li) => {
                 if let Some(ri) = other.as_i64() {
-                    return (*li as i64) == ri;
+                    (*li as i64) == ri
                 } else {
-                    return false;
+                    false
                 }
             }
         }
