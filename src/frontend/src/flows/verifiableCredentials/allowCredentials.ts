@@ -19,22 +19,16 @@ import copyJson from "./allowCredentials.json";
  * Get the dapp that corresponds to the origin, or create a new one if it's
  * unknown
  */
-const getOrigin = (
-  origin: string,
-  dapplist: KnownDapp[],
-  oneLiner: string
-): KnownDapp => {
+const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
   let foundDapp = dapplist.find((dapp) => dapp.hasOrigin(origin));
 
   if (!foundDapp) {
     foundDapp = new KnownDapp({
-      name: "Unknown Dapp",
+      name: origin,
       website: origin,
       logo: "unwnowndapp.png",
-      oneLiner: oneLiner,
     });
   }
-  foundDapp.oneLiner = oneLiner;
   return foundDapp;
 };
 
@@ -76,18 +70,10 @@ const allowCredentialsTemplate = ({
     consentMessage.send(unsafeHTML(sanitized));
   })();
 
-  const originDapp = getOrigin(
-    providerOrigin,
-    knownDapps,
-    copy.issued_by as string
-  );
+  const originDapp = getOrigin(providerOrigin, knownDapps);
+  const relyingDapp = getOrigin(relyingOrigin, knownDapps);
 
-  const relyingDapp = getOrigin(
-    relyingOrigin,
-    knownDapps,
-    copy.relying_party as string
-  );
-
+  // copy.relying_party as string
   const slot = html`
     <hgroup
       data-page="vc-allow"
@@ -103,8 +89,22 @@ const allowCredentialsTemplate = ({
     ${anchorInput.template}
     <h2 class="c-card__label l-stack">${copy.allow_start}</h2>
     <ul class="c-action-list">
-      <li class="c-action-list__item">${dappTemplate(originDapp, true)}</li>
-      <li class="c-action-list__item">${dappTemplate(relyingDapp, true)}</li>
+      <li class="c-action-list__item">
+        ${dappTemplate({
+          logoSrc: originDapp.logoSrc,
+          name: originDapp.name,
+          oneLinerAboveTitle: true,
+          oneLiner: copy.issued_by as string,
+        })}
+      </li>
+      <li class="c-action-list__item">
+        ${dappTemplate({
+          logoSrc: relyingDapp.logoSrc,
+          name: relyingDapp.name,
+          oneLinerAboveTitle: true,
+          oneLiner: copy.relying_party as string,
+        })}
+      </li>
     </ul>
 
     <div class="c-button-group">

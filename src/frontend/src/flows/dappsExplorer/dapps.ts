@@ -43,10 +43,6 @@ export class KnownDapp {
     return this.descr.oneLiner;
   }
 
-  public set oneLiner(oneLiner: string | undefined) {
-    this.descr.oneLiner = oneLiner;
-  }
-
   public get website(): string | undefined {
     return this.descr.website;
   }

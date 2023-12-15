@@ -62,10 +62,19 @@ const dappsExplorerTemplate = ({
 
 export const dappsExplorerPage = renderPage(dappsExplorerTemplate);
 
-export const dappTemplate = (
-  { logoSrc, name, oneLiner }: KnownDapp,
-  oneLinerAboveTitle = false
-): TemplateResult => {
+export type DappTemplateArgs = {
+  logoSrc: string;
+  name: string;
+  oneLiner?: string;
+  oneLinerAboveTitle?: boolean;
+};
+
+export const dappTemplate = ({
+  logoSrc,
+  name,
+  oneLiner,
+  oneLinerAboveTitle,
+}: DappTemplateArgs): TemplateResult => {
   return html`
     <div class="c-action-list__icon" aria-hidden="true">
       <img src=${logoSrc} alt=${name} loading="lazy" />
