@@ -228,6 +228,9 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
     .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
     // TODO: change `get_verified_id_alias_from_jws` to additionally take `effective_vc_subject`
     //       as an argument and to perform the check below internally.
+    //       Also, consider adding `ii_origin`-argument to enable custom values for II-origin,
+    //       and extend should_fail_validate_verified_adult_presentation_if_wrong_vc_flow_signers()
+    //       if needed.
     if effective_vc_subject != alias_tuple.id_dapp {
         return Err(PresentationVerificationError::InvalidPresentationJwt(
             format!(

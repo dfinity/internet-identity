@@ -1,4 +1,4 @@
-// Custom utils for handling specific VCs/VPs.
+//! Custom utils for handling specific VCs/VPs.
 
 use crate::issuer_api::{ArgumentValue, CredentialSpec};
 use crate::{
@@ -125,6 +125,57 @@ mod tests {
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         )
         .expect("VP verification failed");
+    }
+
+    #[test]
+    fn should_fail_validate_verified_adult_presentation_if_wrong_vc_flow_signers() {
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            rp_principal(),
+            vec![
+                ID_ALIAS_CREDENTIAL_JWS.to_string(),
+                ADULT_CREDENTIAL_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+
+        // wrong ii_canister_id
+        let result = validate_verified_adult_presentation(
+            &vp_jwt,
+            rp_principal(),
+            &VcFlowSigners {
+                ii_canister_id: issuer_canister_id(),
+                ..default_test_vc_flow_signers()
+            },
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InvalidSignature"));
+
+        // wrong issuer_canister_id
+        let result = validate_verified_adult_presentation(
+            &vp_jwt,
+            rp_principal(),
+            &VcFlowSigners {
+                issuer_canister_id: ii_canister_id(),
+                ..default_test_vc_flow_signers()
+            },
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InvalidSignature"));
+
+        // wrong issuer_origin
+        let result = validate_verified_adult_presentation(
+            &vp_jwt,
+            rp_principal(),
+            &VcFlowSigners {
+                issuer_origin: "https://wrong.origin.com".to_string(),
+                ..default_test_vc_flow_signers()
+            },
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InconsistentCredentialJwtClaims"));
     }
 
     #[test]
