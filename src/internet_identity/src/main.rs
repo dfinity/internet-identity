@@ -160,6 +160,7 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
             .map(|mut d| {
                 // Remove non-public fields.
                 d.alias = "".to_string();
+                d.metadata = None;
                 d
             })
             .collect()
