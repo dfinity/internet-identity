@@ -14,7 +14,8 @@ use std::collections::HashMap;
 ///  - the presentation is a valid presentation of the IC Attribute Sharing flow;
 ///    in particular the presentation contains IdAlias and a matching VerifiedAdult credentials
 ///  - both credentials are valid wrt. `vc_flow_signers`, `root_pk_raw`, and `current_time_ns`
-///  - `effective_vc_subject` matches the principal to which the presentation applies
+///  - `effective_vc_subject` matches the principal to which the presentation applies, i.e.
+///    the subject of the IdAlias VC (which is linked via id_alias-id to the VerifiedAdult VC)
 pub fn validate_verified_adult_presentation(
     vp_jwt: &str,
     effective_vc_subject: Principal,
