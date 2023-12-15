@@ -168,7 +168,7 @@ function parseScreen(): ScreenConfiguration {
       console.log(
         `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`
       );
-      return DESKTOP_SCREEN;
+      return MOBILE_SCREEN;
   }
 }
 
