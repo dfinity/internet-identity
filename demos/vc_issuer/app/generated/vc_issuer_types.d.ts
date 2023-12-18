@@ -13,8 +13,6 @@ export interface GetCredentialRequest {
   'prepared_context' : [] | [Uint8Array | number[]],
   'credential_spec' : CredentialSpec,
 }
-export type GetCredentialResponse = { 'Ok' : IssuedCredentialData } |
-  { 'Err' : IssueCredentialError };
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -32,8 +30,6 @@ export interface Icrc21ConsentInfo {
   'consent_message' : string,
   'language' : string,
 }
-export type Icrc21ConsentMessageResponse = { 'Ok' : Icrc21ConsentInfo } |
-  { 'Err' : Icrc21Error };
 export interface Icrc21ConsentPreferences { 'language' : string }
 export type Icrc21Error = {
     'GenericError' : { 'description' : string, 'error_code' : bigint }
@@ -60,8 +56,6 @@ export interface PrepareCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'credential_spec' : CredentialSpec,
 }
-export type PrepareCredentialResponse = { 'Ok' : PreparedCredentialData } |
-  { 'Err' : IssueCredentialError };
 export interface PreparedCredentialData {
   'prepared_context' : [] | [Uint8Array | number[]],
 }
@@ -71,15 +65,21 @@ export interface _SERVICE {
   'add_employee' : ActorMethod<[Principal], string>,
   'add_graduate' : ActorMethod<[Principal], string>,
   'configure' : ActorMethod<[IssuerConfig], undefined>,
-  'get_credential' : ActorMethod<[GetCredentialRequest], GetCredentialResponse>,
+  'get_credential' : ActorMethod<
+    [GetCredentialRequest],
+    { 'Ok' : IssuedCredentialData } |
+      { 'Err' : IssueCredentialError }
+  >,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'prepare_credential' : ActorMethod<
     [PrepareCredentialRequest],
-    PrepareCredentialResponse
+    { 'Ok' : PreparedCredentialData } |
+      { 'Err' : IssueCredentialError }
   >,
   'vc_consent_message' : ActorMethod<
     [Icrc21VcConsentMessageRequest],
-    Icrc21ConsentMessageResponse
+    { 'Ok' : Icrc21ConsentInfo } |
+      { 'Err' : Icrc21Error }
   >,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
