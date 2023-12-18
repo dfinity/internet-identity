@@ -129,8 +129,8 @@ You might get different canister IDs (and that's totally fine). If the `webapp` 
 ![](./webapp.png)
 
 _If you actually use the webapp, make sure that the "Internet Identity URL" field points to one of these URLS_:
-* Chrome and FirefoxSafari `http://<canister ID of the internet_identity canister>.localhost:4943/`.
-* Safari `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`.
+* Chrome, Firefox: `http://<canister ID of the internet_identity canister>.localhost:4943/`.
+* Safari: `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`.
 
 ## Helpers
 

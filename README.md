@@ -64,7 +64,7 @@ Use the Internet Identity canister in your local dfx project by adding the follo
 ```
 To deploy, run `dfx deploy`.
 
-To access Internet Identity use one of the following URLs:
+To access Internet Identity or configure it for your dapp, use one of the following URLs:
 * Chrome, Firefox: `http://<canister_id>.localhost:4943`
 * Safari: `http://localhost:4943?canisterId=<canister_id>`
 
