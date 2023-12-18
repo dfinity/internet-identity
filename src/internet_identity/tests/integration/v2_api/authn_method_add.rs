@@ -6,12 +6,9 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
-use canister_tests::match_value;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::{
-    AuthnMethodAddResponse, IdentityInfoResponse, MetadataEntry,
-};
+use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntry};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
@@ -24,21 +21,18 @@ fn should_add_authn_method() -> Result<(), CallError> {
     let authn_method_2 = sample_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
-    match_value!(
-        api_v2::authn_method_add(
-            &env,
-            canister_id,
-            principal,
-            identity_number,
-            &authn_method_2,
-        )?,
-        Some(AuthnMethodAddResponse::Ok)
-    );
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, principal, identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    api_v2::authn_method_add(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        &authn_method_2,
+    )?
+    .expect("authn method add failed");
+
+    let identity_info = api_v2::identity_info(&env, canister_id, principal, identity_number)?
+        .expect("identity info failed");
 
     assert!(eq_ignoring_last_authentication(
         &identity_info.authn_methods[1],
@@ -84,16 +78,16 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
 
-    match_value!(
-        api_v2::authn_method_add(
-            &env,
-            canister_id,
-            principal,
-            identity_number,
-            &authn_method_2,
-        )?,
-        Some(AuthnMethodAddResponse::InvalidMetadata(_))
-    );
-
+    let result = api_v2::authn_method_add(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        &authn_method_2,
+    )?;
+    assert!(matches!(
+        result,
+        Err(AuthnMethodAddError::InvalidMetadata(_))
+    ));
     Ok(())
 }

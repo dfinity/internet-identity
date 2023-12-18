@@ -1,0 +1,25 @@
+diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
+index 09937178..e545e0ba 100644
+--- a/src/internet_identity/internet_identity.did
++++ b/src/internet_identity/internet_identity.did
+@@ -313,16 +313,16 @@ type PublicKeyAuthn = record {
+ 
+ // The authentication methods currently supported by II.
+ type AuthnMethod = variant {
+-    WebAuthn: WebAuthn;
+-    PubKey: PublicKeyAuthn;
++    webauthn: WebAuthn;
++    pubkey: PublicKeyAuthn;
+ };
+ 
+ // This describes whether an authentication method is "protected" or not.
+ // When protected, a authentication method can only be updated or removed if the
+ // user is authenticated with that very authentication method.
+ type AuthnMethodProtection = variant {
+-    Protected;
+-    Unprotected;
++    protected;
++    unprotected;
+ };
+ 
+ type AuthnMethodData = record {

@@ -511,8 +511,7 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 /// New v2 API that aims to eventually replace the current API.
 /// The v2 API:
 /// * uses terminology more aligned with the front-end and is more consistent in its naming.
-/// * uses opt variant return types consistently in order to by able to extend / change return types
-///   in the future without breaking changes.
+/// * uses [Result] return types consistently.
 ///
 /// TODO, API v2 rollout plan:
 /// 1. Develop API v2 far enough so that front-ends can switch to it.
@@ -525,9 +524,9 @@ mod v2_api {
 
     #[update]
     #[candid_method]
-    async fn captcha_create() -> Option<CaptchaCreateResponse> {
+    async fn captcha_create() -> Result<Challenge, ()> {
         let challenge = anchor_management::registration::create_challenge().await;
-        Some(CaptchaCreateResponse::Ok(challenge))
+        Ok(challenge)
     }
 
     #[update]
@@ -536,23 +535,20 @@ mod v2_api {
         authn_method: AuthnMethodData,
         challenge_result: ChallengeAttempt,
         temp_key: Option<Principal>,
-    ) -> Option<IdentityRegisterResponse> {
-        let result = match DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| IdentityRegisterResponse::InvalidMetadata(err.to_string()))
-        {
-            Ok(device) => IdentityRegisterResponse::from(register(
-                DeviceData::from(device),
-                challenge_result,
-                temp_key,
-            )),
-            Err(err) => err,
-        };
-        Some(result)
+    ) -> Result<IdentityNumber, IdentityRegisterError> {
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| IdentityRegisterError::InvalidMetadata(err.to_string()))?;
+
+        match register(DeviceData::from(device), challenge_result, temp_key) {
+            RegisterResponse::Registered { user_number } => Ok(user_number),
+            RegisterResponse::CanisterFull => Err(IdentityRegisterError::CanisterFull),
+            RegisterResponse::BadChallenge => Err(IdentityRegisterError::BadCaptcha),
+        }
     }
 
     #[update]
     #[candid_method]
-    fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
+    fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, ()> {
         authenticate_and_record_activity(identity_number);
         let anchor_info = anchor_management::get_anchor_info(identity_number);
         let metadata = state::anchor(identity_number)
@@ -571,7 +567,7 @@ mod v2_api {
                 .map(AuthnMethodRegistration::from),
             metadata,
         };
-        Some(IdentityInfoResponse::Ok(identity_info))
+        Ok(identity_info)
     }
 
     #[update]
@@ -579,17 +575,10 @@ mod v2_api {
     fn authn_method_add(
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
-    ) -> Option<AuthnMethodAddResponse> {
-        let result = match DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| AuthnMethodAddResponse::InvalidMetadata(err.to_string()))
-        {
-            Ok(device) => {
-                add(identity_number, DeviceData::from(device));
-                AuthnMethodAddResponse::Ok
-            }
-            Err(err) => err,
-        };
-        Some(result)
+    ) -> Result<(), AuthnMethodAddError> {
+        DeviceWithUsage::try_from(authn_method)
+            .map(|device| add(identity_number, DeviceData::from(device)))
+            .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))
     }
 
     #[update]
@@ -597,9 +586,9 @@ mod v2_api {
     fn authn_method_remove(
         identity_number: IdentityNumber,
         public_key: PublicKey,
-    ) -> Option<AuthnMethodRemoveResponse> {
+    ) -> Result<(), ()> {
         remove(identity_number, public_key);
-        Some(AuthnMethodRemoveResponse::Ok)
+        Ok(())
     }
 
     #[update]
@@ -607,14 +596,14 @@ mod v2_api {
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntry>,
-    ) -> Option<IdentityMetadataReplaceResponse> {
-        let result = authenticated_anchor_operation(identity_number, |anchor| {
+    ) -> Result<(), ()> {
+        authenticated_anchor_operation(identity_number, |anchor| {
             Ok((
-                IdentityMetadataReplaceResponse::Ok,
+                (),
                 anchor_management::identity_metadata_replace(anchor, metadata),
             ))
         });
-        Some(result)
+        Ok(())
     }
 }
 

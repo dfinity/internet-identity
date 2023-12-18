@@ -485,7 +485,8 @@ mod pull_entries_tests {
             device.principal(),
             anchor,
             &metadata,
-        )?;
+        )?
+        .unwrap();
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));

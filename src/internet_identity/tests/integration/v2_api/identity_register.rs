@@ -7,10 +7,9 @@ use canister_tests::framework::{
     arg_with_anchor_range, env, expect_user_error_with_message, install_ii_canister,
     install_ii_canister_with_arg, II_WASM,
 };
-use canister_tests::match_value;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaCreateResponse, ChallengeAttempt, IdentityRegisterResponse, MetadataEntry,
+    ChallengeAttempt, IdentityRegisterError, MetadataEntry,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -48,25 +47,21 @@ fn should_not_exceed_configured_identity_range() {
     create_identity_with_authn_method(&env, canister_id, &authn_method);
     create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    match_value!(
-        api_v2::captcha_create(&env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
 
-    match_value!(
-        api_v2::identity_register(
-            &env,
-            canister_id,
-            authn_method.principal(),
-            &authn_method,
-            &ChallengeAttempt {
-                chars: "a".to_string(),
-                key: challenge.challenge_key,
-            },
-            None,
-        ),
-        Ok(Some(IdentityRegisterResponse::CanisterFull))
-    );
+    let result = api_v2::identity_register(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        &authn_method,
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        None,
+    )
+    .unwrap();
+    assert!(matches!(result, Err(IdentityRegisterError::CanisterFull)));
 }
 
 #[test]
@@ -74,10 +69,7 @@ fn should_verify_sender_matches_authn_method() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    match_value!(
-        api_v2::captcha_create(&env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
 
     let result = api_v2::identity_register(
         &env,
@@ -103,25 +95,21 @@ fn should_not_allow_wrong_captcha() {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = test_authn_method();
 
-    match_value!(
-        api_v2::captcha_create(&env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
 
-    match_value!(
-        api_v2::identity_register(
-            &env,
-            canister_id,
-            authn_method.principal(),
-            &authn_method,
-            &ChallengeAttempt {
-                chars: "wrong solution".to_string(),
-                key: challenge.challenge_key,
-            },
-            None,
-        ),
-        Ok(Some(IdentityRegisterResponse::BadCaptcha))
-    );
+    let result = api_v2::identity_register(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        &authn_method,
+        &ChallengeAttempt {
+            chars: "wrong solution".to_string(),
+            key: challenge.challenge_key,
+        },
+        None,
+    )
+    .unwrap();
+    assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
 }
 
 #[test]
@@ -130,27 +118,23 @@ fn should_not_allow_expired_captcha() {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = test_authn_method();
 
-    match_value!(
-        api_v2::captcha_create(&env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
 
     env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
 
-    match_value!(
-        api_v2::identity_register(
-            &env,
-            canister_id,
-            authn_method.principal(),
-            &authn_method,
-            &ChallengeAttempt {
-                chars: "wrong solution".to_string(),
-                key: challenge.challenge_key,
-            },
-            None,
-        ),
-        Ok(Some(IdentityRegisterResponse::BadCaptcha))
-    );
+    let result = api_v2::identity_register(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        &authn_method,
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        None,
+    )
+    .unwrap();
+    assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
 }
 
 #[test]
@@ -163,23 +147,22 @@ fn should_fail_on_invalid_metadata() {
         MetadataEntry::Bytes(ByteBuf::from("invalid")),
     );
 
-    match_value!(
-        api_v2::captcha_create(&env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
 
-    match_value!(
-        api_v2::identity_register(
-            &env,
-            canister_id,
-            authn_method.principal(),
-            &authn_method,
-            &ChallengeAttempt {
-                chars: "a".to_string(),
-                key: challenge.challenge_key,
-            },
-            None,
-        ),
-        Ok(Some(IdentityRegisterResponse::InvalidMetadata(_)))
-    );
+    let result = api_v2::identity_register(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        &authn_method,
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        None,
+    )
+    .unwrap();
+    assert!(matches!(
+        result,
+        Err(IdentityRegisterError::InvalidMetadata(_))
+    ));
 }

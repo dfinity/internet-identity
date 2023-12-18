@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub fn captcha_create(
     env: &StateMachine,
     canister_id: CanisterId,
-) -> Result<Option<CaptchaCreateResponse>, CallError> {
+) -> Result<Result<Challenge, ()>, CallError> {
     call_candid(env, canister_id, "captcha_create", ()).map(|(x,)| x)
 }
 
@@ -18,7 +18,7 @@ pub fn identity_register(
     authn_method: &AuthnMethodData,
     challenge_attempt: &ChallengeAttempt,
     temp_key: Option<Principal>,
-) -> Result<Option<IdentityRegisterResponse>, CallError> {
+) -> Result<Result<IdentityNumber, IdentityRegisterError>, CallError> {
     call_candid_as(
         env,
         canister_id,
@@ -34,7 +34,7 @@ pub fn identity_info(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Option<IdentityInfoResponse>, CallError> {
+) -> Result<Result<IdentityInfo, ()>, CallError> {
     call_candid_as(
         env,
         canister_id,
@@ -51,7 +51,7 @@ pub fn identity_metadata_replace(
     sender: Principal,
     identity_number: IdentityNumber,
     metadata: &HashMap<String, MetadataEntry>,
-) -> Result<Option<IdentityMetadataReplaceResponse>, CallError> {
+) -> Result<Result<(), ()>, CallError> {
     call_candid_as(
         env,
         canister_id,
@@ -68,7 +68,7 @@ pub fn authn_method_add(
     sender: Principal,
     identity_number: IdentityNumber,
     authn_method: &AuthnMethodData,
-) -> Result<Option<AuthnMethodAddResponse>, CallError> {
+) -> Result<Result<(), AuthnMethodAddError>, CallError> {
     call_candid_as(
         env,
         canister_id,
@@ -85,7 +85,7 @@ pub fn authn_method_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     public_key: &PublicKey,
-) -> Result<Option<AuthnMethodRemoveResponse>, CallError> {
+) -> Result<Result<(), ()>, CallError> {
     call_candid_as(
         env,
         canister_id,
