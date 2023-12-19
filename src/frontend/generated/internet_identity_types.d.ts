@@ -27,10 +27,9 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
-export type AuthnMethod = { 'webauthn' : WebAuthn } |
-  { 'pubkey' : PublicKeyAuthn };
-export type AuthnMethodAddResponse = { 'ok' : null } |
-  { 'invalid_metadata' : string };
+export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
+  { 'WebAuthn' : WebAuthn };
+export type AuthnMethodAddError = { 'InvalidMetadata' : string };
 export interface AuthnMethodData {
   'metadata' : MetadataMap,
   'protection' : AuthnMethodProtection,
@@ -38,20 +37,18 @@ export interface AuthnMethodData {
   'authn_method' : AuthnMethod,
   'purpose' : Purpose,
 }
-export type AuthnMethodProtection = { 'unprotected' : null } |
-  { 'protected' : null };
+export type AuthnMethodProtection = { 'Protected' : null } |
+  { 'Unprotected' : null };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
-export type AuthnMethodRemoveResponse = { 'ok' : null };
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
   'anchor_number' : UserNumber,
   'timestamp' : Timestamp,
 }
-export type CaptchaCreateResponse = { 'ok' : Challenge };
 export type CaptchaResult = ChallengeResult;
 export interface Challenge {
   'png_base64' : string,
@@ -136,13 +133,10 @@ export interface IdentityInfo {
   'metadata' : MetadataMap,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
-export type IdentityInfoResponse = { 'ok' : IdentityInfo };
-export type IdentityMetadataReplaceResponse = { 'ok' : null };
 export type IdentityNumber = bigint;
-export type IdentityRegisterResponse = { 'ok' : IdentityNumber } |
-  { 'invalid_metadata' : string } |
-  { 'bad_captcha' : null } |
-  { 'canister_full' : null };
+export type IdentityRegisterError = { 'BadCaptcha' : null } |
+  { 'CanisterFull' : null } |
+  { 'InvalidMetadata' : string };
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
@@ -239,13 +233,15 @@ export interface _SERVICE {
   >,
   'authn_method_add' : ActorMethod<
     [IdentityNumber, AuthnMethodData],
-    [] | [AuthnMethodAddResponse]
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodAddError }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],
-    [] | [AuthnMethodRemoveResponse]
+    { 'Ok' : null } |
+      { 'Err' : null }
   >,
-  'captcha_create' : ActorMethod<[], [] | [CaptchaCreateResponse]>,
+  'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
@@ -265,14 +261,20 @@ export interface _SERVICE {
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
-  'identity_info' : ActorMethod<[IdentityNumber], [] | [IdentityInfoResponse]>,
+  'identity_info' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : IdentityInfo } |
+      { 'Err' : null }
+  >,
   'identity_metadata_replace' : ActorMethod<
     [IdentityNumber, MetadataMap],
-    [] | [IdentityMetadataReplaceResponse]
+    { 'Ok' : null } |
+      { 'Err' : null }
   >,
   'identity_register' : ActorMethod<
     [AuthnMethodData, CaptchaResult, [] | [Principal]],
-    [] | [IdentityRegisterResponse]
+    { 'Ok' : IdentityNumber } |
+      { 'Err' : IdentityRegisterError }
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
