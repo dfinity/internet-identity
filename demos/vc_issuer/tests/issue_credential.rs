@@ -402,8 +402,8 @@ fn should_fail_get_credential_for_wrong_sender() {
             signed_id_alias: signed_id_alias.clone(),
         },
     )
-    .unwrap()
-    .unwrap();
+    .expect("API call failed")
+    .expect("failed to prepare credential");
 
     let get_credential_response = api::get_credential(
         &env,
@@ -599,7 +599,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 },
             },
         )?
-        .unwrap();
+        .expect("failed to prepare credential");
 
         let get_credential_response = api::get_credential(
             &env,
