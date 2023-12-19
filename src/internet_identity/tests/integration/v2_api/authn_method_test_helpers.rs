@@ -50,8 +50,8 @@ pub fn create_identity_with_authn_method(
         &challenge_attempt,
         None,
     )
-    .unwrap()
-    .unwrap()
+    .expect("API call failed")
+    .expect("identity_register failed")
 }
 
 pub fn sample_authn_method(i: u8) -> AuthnMethodData {
