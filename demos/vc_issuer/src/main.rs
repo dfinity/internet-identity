@@ -20,10 +20,9 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse, Icrc21ConsentInfo,
-    Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError,
-    IssuedCredentialData, PrepareCredentialRequest, PrepareCredentialResponse,
-    PreparedCredentialData, SignedIdAlias,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
@@ -188,23 +187,23 @@ fn extract_id_alias(
 
 #[update]
 #[candid_method]
-async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
+async fn prepare_credential(
+    req: PrepareCredentialRequest,
+) -> Result<PreparedCredentialData, IssueCredentialError> {
     let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
-        Err(err) => return PrepareCredentialResponse::Err(err),
+        Err(err) => return Err(err),
     };
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
-            return PrepareCredentialResponse::Err(
-                IssueCredentialError::UnsupportedCredentialSpec(err),
-            );
+            return Err(IssueCredentialError::UnsupportedCredentialSpec(err));
         }
     };
 
     let credential = match prepare_credential_payload(&credential_type, &alias_tuple) {
         Ok(credential) => credential,
-        Err(err) => return PrepareCredentialResponse::Err(err),
+        Err(err) => return Result::<PreparedCredentialData, IssueCredentialError>::Err(err),
     };
     let seed = calculate_seed(&alias_tuple.id_alias);
     let canister_id = ic_cdk::id();
@@ -221,7 +220,7 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
         add_signature(&mut sigs, msg_hash, seed);
     });
     update_root_hash();
-    PrepareCredentialResponse::Ok(PreparedCredentialData {
+    Ok(PreparedCredentialData {
         prepared_context: Some(ByteBuf::from(credential_jwt.as_bytes())),
     })
 }
@@ -242,13 +241,15 @@ fn update_root_hash() {
 
 #[query]
 #[candid_method(query)]
-fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
+fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
     let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
-        Err(err) => return GetCredentialResponse::Err(err),
+        Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
-        return GetCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(err));
+        return Result::<IssuedCredentialData, IssueCredentialError>::Err(
+            IssueCredentialError::UnsupportedCredentialSpec(err),
+        );
     }
     let subject_principal = alias_tuple.id_alias;
     let seed = calculate_seed(&subject_principal);
@@ -256,11 +257,19 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
     let prepared_context = match req.prepared_context {
         Some(context) => context,
-        None => return GetCredentialResponse::Err(internal_error("missing prepared_context")),
+        None => {
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(internal_error(
+                "missing prepared_context",
+            ))
+        }
     };
     let credential_jwt = match String::from_utf8(prepared_context.into_vec()) {
         Ok(s) => s,
-        Err(_) => return GetCredentialResponse::Err(internal_error("invalid prepared_context")),
+        Err(_) => {
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(internal_error(
+                "invalid prepared_context",
+            ))
+        }
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
@@ -278,15 +287,17 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let sig = match sig_result {
         Ok(sig) => sig,
         Err(e) => {
-            return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound(format!(
-                "signature not prepared or expired: {}",
-                e
-            )));
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(
+                IssueCredentialError::SignatureNotFound(format!(
+                    "signature not prepared or expired: {}",
+                    e
+                )),
+            );
         }
     };
     let vc_jws =
         vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig).expect("failed constructing JWS");
-    GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
+    Result::<IssuedCredentialData, IssueCredentialError>::Ok(IssuedCredentialData { vc_jws })
 }
 
 #[update]

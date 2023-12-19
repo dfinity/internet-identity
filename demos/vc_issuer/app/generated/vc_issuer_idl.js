@@ -23,10 +23,6 @@ export const idlFactory = ({ IDL }) => {
     'UnknownSubject' : IDL.Text,
     'UnsupportedCredentialSpec' : IDL.Text,
   });
-  const GetCredentialResponse = IDL.Variant({
-    'Ok' : IssuedCredentialData,
-    'Err' : IssueCredentialError,
-  });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -47,10 +43,6 @@ export const idlFactory = ({ IDL }) => {
   const PreparedCredentialData = IDL.Record({
     'prepared_context' : IDL.Opt(IDL.Vec(IDL.Nat8)),
   });
-  const PrepareCredentialResponse = IDL.Variant({
-    'Ok' : PreparedCredentialData,
-    'Err' : IssueCredentialError,
-  });
   const Icrc21ConsentPreferences = IDL.Record({ 'language' : IDL.Text });
   const Icrc21VcConsentMessageRequest = IDL.Record({
     'preferences' : Icrc21ConsentPreferences,
@@ -69,10 +61,6 @@ export const idlFactory = ({ IDL }) => {
     'UnsupportedCanisterCall' : Icrc21ErrorInfo,
     'ConsentMessageUnavailable' : Icrc21ErrorInfo,
   });
-  const Icrc21ConsentMessageResponse = IDL.Variant({
-    'Ok' : Icrc21ConsentInfo,
-    'Err' : Icrc21Error,
-  });
   return IDL.Service({
     'add_adult' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'add_employee' : IDL.Func([IDL.Principal], [IDL.Text], []),
@@ -80,18 +68,28 @@ export const idlFactory = ({ IDL }) => {
     'configure' : IDL.Func([IssuerConfig], [], []),
     'get_credential' : IDL.Func(
         [GetCredentialRequest],
-        [GetCredentialResponse],
+        [
+          IDL.Variant({
+            'Ok' : IssuedCredentialData,
+            'Err' : IssueCredentialError,
+          }),
+        ],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'prepare_credential' : IDL.Func(
         [PrepareCredentialRequest],
-        [PrepareCredentialResponse],
+        [
+          IDL.Variant({
+            'Ok' : PreparedCredentialData,
+            'Err' : IssueCredentialError,
+          }),
+        ],
         [],
       ),
     'vc_consent_message' : IDL.Func(
         [Icrc21VcConsentMessageRequest],
-        [Icrc21ConsentMessageResponse],
+        [IDL.Variant({ 'Ok' : Icrc21ConsentInfo, 'Err' : Icrc21Error })],
         [],
       ),
   });

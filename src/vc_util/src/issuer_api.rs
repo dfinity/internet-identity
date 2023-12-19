@@ -18,12 +18,6 @@ pub struct PrepareCredentialRequest {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum PrepareCredentialResponse {
-    Ok(PreparedCredentialData),
-    Err(IssueCredentialError),
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IssueCredentialError {
     UnknownSubject(String),
     UnauthorizedSubject(String),
@@ -38,12 +32,6 @@ pub struct GetCredentialRequest {
     pub signed_id_alias: SignedIdAlias,
     pub credential_spec: CredentialSpec,
     pub prepared_context: Option<ByteBuf>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetCredentialResponse {
-    Ok(IssuedCredentialData),
-    Err(IssueCredentialError),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
