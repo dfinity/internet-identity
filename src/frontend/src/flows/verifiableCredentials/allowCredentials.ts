@@ -26,9 +26,10 @@ const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
     foundDapp = new KnownDapp({
       name: origin,
       website: origin,
-      logo: "unwnowndapp.png",
+      logo: "../unwnowndapp.png",
     });
   }
+
   return foundDapp;
 };
 
