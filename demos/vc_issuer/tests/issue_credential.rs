@@ -5,8 +5,8 @@ use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
+use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
-use canister_tests::{flows, match_value};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::{Request, Response, VerificationInfo};
 use ic_response_verification::verify_request_response_pair;
@@ -25,9 +25,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo,
     Icrc21ConsentPreferences, Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError,
-    PrepareCredentialRequest, PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
+    IssuedCredentialData, PrepareCredentialRequest, PreparedCredentialData,
+    SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, verify_credential_jws_with_canister_id,
@@ -91,7 +92,6 @@ pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
 
 mod api {
     use super::*;
-    use vc_util::issuer_api::Icrc21ConsentInfo;
 
     pub fn configure(
         env: &StateMachine,
@@ -146,7 +146,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         prepare_credential_request: &PrepareCredentialRequest,
-    ) -> Result<PrepareCredentialResponse, CallError> {
+    ) -> Result<Result<PreparedCredentialData, IssueCredentialError>, CallError> {
         call_candid_as(
             env,
             canister_id,
@@ -162,7 +162,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         get_credential_request: &GetCredentialRequest,
-    ) -> Result<GetCredentialResponse, CallError> {
+    ) -> Result<Result<IssuedCredentialData, IssueCredentialError>, CallError> {
         query_candid_as(
             env,
             canister_id,
@@ -360,7 +360,7 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+    assert_matches!(response, Err(e) if format!("{:?}", e).contains("unauthorized principal"));
 }
 
 #[test]
@@ -380,7 +380,7 @@ fn should_fail_prepare_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
     );
 }
 
@@ -393,18 +393,18 @@ fn should_fail_get_credential_for_wrong_sender() {
     api::add_employee(&env, issuer_id, authorized_principal).expect("failed to add employee");
     let unauthorized_principal = test_principal(2);
 
-    match_value!(
-        api::prepare_credential(
-            &env,
-            issuer_id,
-            authorized_principal,
-            &PrepareCredentialRequest {
-                credential_spec: employee_credential_spec(),
-                signed_id_alias: signed_id_alias.clone(),
-            },
-        ),
-        Ok(PrepareCredentialResponse::Ok(prepare_credential_response))
-    );
+    let prepare_credential_response = api::prepare_credential(
+        &env,
+        issuer_id,
+        authorized_principal,
+        &PrepareCredentialRequest {
+            credential_spec: employee_credential_spec(),
+            signed_id_alias: signed_id_alias.clone(),
+        },
+    )
+    .expect("API call failed")
+    .expect("failed to prepare credential");
+
     let get_credential_response = api::get_credential(
         &env,
         issuer_id,
@@ -417,7 +417,7 @@ fn should_fail_get_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(get_credential_response,
-        GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
     );
 }
 
@@ -436,7 +436,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
     );
 }
 
@@ -460,10 +460,7 @@ fn should_fail_prepare_credential_for_wrong_root_key() {
         },
     )
     .expect("API call failed");
-    assert_matches!(
-        response,
-        PrepareCredentialResponse::Err(IssueCredentialError::InvalidIdAlias(_))
-    );
+    assert_matches!(response, Err(IssueCredentialError::InvalidIdAlias(_)));
 }
 
 #[test]
@@ -486,10 +483,7 @@ fn should_fail_prepare_credential_for_wrong_idp_canister_id() {
         },
     )
     .expect("API call failed");
-    assert_matches!(
-        response,
-        PrepareCredentialResponse::Err(IssueCredentialError::InvalidIdAlias(_))
-    );
+    assert_matches!(response, Err(IssueCredentialError::InvalidIdAlias(_)));
 }
 
 #[test]
@@ -508,7 +502,7 @@ fn should_prepare_employee_credential_for_authorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Ok(_));
+    assert_matches!(response, Ok(_));
 }
 
 #[test]
@@ -527,7 +521,7 @@ fn should_prepare_degree_credential_for_authorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Ok(_));
+    assert_matches!(response, Ok(_));
 }
 
 /// Verifies that different credentials are being created including II interactions.
@@ -591,7 +585,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         degree_credential_spec(),
         adult_credential_spec(),
     ] {
-        let prepare_credential_response = api::prepare_credential(
+        let prepared_credential = api::prepare_credential(
             &env,
             issuer_id,
             id_alias_credentials.issuer_id_alias_credential.id_dapp,
@@ -604,16 +598,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                         .clone(),
                 },
             },
-        )?;
-        let prepared_credential =
-            if let PrepareCredentialResponse::Ok(data) = prepare_credential_response {
-                data
-            } else {
-                panic!(
-                    "Prepare credential failed: {:?}",
-                    prepare_credential_response
-                );
-            };
+        )?
+        .expect("failed to prepare credential");
 
         let get_credential_response = api::get_credential(
             &env,
@@ -630,12 +616,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 prepared_context: prepared_credential.prepared_context,
             },
         )?;
-        match_value!(
-            get_credential_response,
-            GetCredentialResponse::Ok(credential_data)
-        );
         let claims = verify_credential_jws_with_canister_id(
-            &credential_data.vc_jws,
+            &get_credential_response.unwrap().vc_jws,
             &issuer_id,
             &root_pk_raw,
             env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
