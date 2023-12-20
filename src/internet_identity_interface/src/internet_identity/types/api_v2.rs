@@ -1,6 +1,4 @@
-use crate::internet_identity::types::{
-    Challenge, CredentialId, MetadataEntry, PublicKey, Purpose, Timestamp,
-};
+use crate::internet_identity::types::{CredentialId, MetadataEntry, PublicKey, Purpose, Timestamp};
 use candid::{CandidType, Deserialize};
 use std::collections::HashMap;
 
@@ -8,9 +6,7 @@ pub type IdentityNumber = u64;
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodProtection {
-    #[serde(rename = "protected")]
     Protected,
-    #[serde(rename = "unprotected")]
     Unprotected,
 }
 
@@ -28,9 +24,7 @@ pub struct WebAuthn {
 /// Supported authentication methods
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethod {
-    #[serde(rename = "webauthn")]
     WebAuthn(WebAuthn),
-    #[serde(rename = "pubkey")]
     PubKey(PublicKeyAuthn),
 }
 
@@ -62,45 +56,13 @@ pub struct IdentityInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum CaptchaCreateResponse {
-    #[serde(rename = "ok")]
-    Ok(Challenge),
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum IdentityRegisterResponse {
-    #[serde(rename = "ok")]
-    Ok(IdentityNumber),
-    #[serde(rename = "canister_full")]
+pub enum IdentityRegisterError {
     CanisterFull,
-    #[serde(rename = "bad_captcha")]
     BadCaptcha,
-    #[serde(rename = "invalid_metadata")]
     InvalidMetadata(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum IdentityInfoResponse {
-    #[serde(rename = "ok")]
-    Ok(IdentityInfo),
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum AuthnMethodAddResponse {
-    #[serde(rename = "ok")]
-    Ok,
-    #[serde(rename = "invalid_metadata")]
+pub enum AuthnMethodAddError {
     InvalidMetadata(String),
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum AuthnMethodRemoveResponse {
-    #[serde(rename = "ok")]
-    Ok,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum IdentityMetadataReplaceResponse {
-    #[serde(rename = "ok")]
-    Ok,
 }

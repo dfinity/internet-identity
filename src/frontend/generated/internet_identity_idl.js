@@ -70,17 +70,17 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
-    'unprotected' : IDL.Null,
-    'protected' : IDL.Null,
+    'Protected' : IDL.Null,
+    'Unprotected' : IDL.Null,
   });
+  const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
   const WebAuthn = IDL.Record({
     'pubkey' : PublicKey,
     'credential_id' : CredentialId,
   });
-  const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
   const AuthnMethod = IDL.Variant({
-    'webauthn' : WebAuthn,
-    'pubkey' : PublicKeyAuthn,
+    'PubKey' : PublicKeyAuthn,
+    'WebAuthn' : WebAuthn,
   });
   const AuthnMethodData = IDL.Record({
     'metadata' : MetadataMap,
@@ -89,17 +89,12 @@ export const idlFactory = ({ IDL }) => {
     'authn_method' : AuthnMethod,
     'purpose' : Purpose,
   });
-  const AuthnMethodAddResponse = IDL.Variant({
-    'ok' : IDL.Null,
-    'invalid_metadata' : IDL.Text,
-  });
-  const AuthnMethodRemoveResponse = IDL.Variant({ 'ok' : IDL.Null });
+  const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
     'challenge_key' : ChallengeKey,
   });
-  const CaptchaCreateResponse = IDL.Variant({ 'ok' : Challenge });
   const DeployArchiveResult = IDL.Variant({
     'creation_in_progress' : IDL.Null,
     'success' : IDL.Principal,
@@ -213,18 +208,15 @@ export const idlFactory = ({ IDL }) => {
     'metadata' : MetadataMap,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
-  const IdentityInfoResponse = IDL.Variant({ 'ok' : IdentityInfo });
-  const IdentityMetadataReplaceResponse = IDL.Variant({ 'ok' : IDL.Null });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
   });
   const CaptchaResult = ChallengeResult;
-  const IdentityRegisterResponse = IDL.Variant({
-    'ok' : IdentityNumber,
-    'invalid_metadata' : IDL.Text,
-    'bad_captcha' : IDL.Null,
-    'canister_full' : IDL.Null,
+  const IdentityRegisterError = IDL.Variant({
+    'BadCaptcha' : IDL.Null,
+    'CanisterFull' : IDL.Null,
+    'InvalidMetadata' : IDL.Text,
   });
   const UserKey = PublicKey;
   const PrepareIdAliasRequest = IDL.Record({
@@ -274,15 +266,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
-        [IDL.Opt(AuthnMethodAddResponse)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
         [],
       ),
     'authn_method_remove' : IDL.Func(
         [IdentityNumber, PublicKey],
-        [IDL.Opt(AuthnMethodRemoveResponse)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
         [],
       ),
-    'captcha_create' : IDL.Func([], [IDL.Opt(CaptchaCreateResponse)], []),
+    'captcha_create' : IDL.Func(
+        [],
+        [IDL.Variant({ 'Ok' : Challenge, 'Err' : IDL.Null })],
+        [],
+      ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -313,17 +309,17 @@ export const idlFactory = ({ IDL }) => {
     'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
     'identity_info' : IDL.Func(
         [IdentityNumber],
-        [IDL.Opt(IdentityInfoResponse)],
+        [IDL.Variant({ 'Ok' : IdentityInfo, 'Err' : IDL.Null })],
         [],
       ),
     'identity_metadata_replace' : IDL.Func(
         [IdentityNumber, MetadataMap],
-        [IDL.Opt(IdentityMetadataReplaceResponse)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
         [],
       ),
     'identity_register' : IDL.Func(
         [AuthnMethodData, CaptchaResult, IDL.Opt(IDL.Principal)],
-        [IDL.Opt(IdentityRegisterResponse)],
+        [IDL.Variant({ 'Ok' : IdentityNumber, 'Err' : IdentityRegisterError })],
         [],
       ),
     'init_salt' : IDL.Func([], [], []),

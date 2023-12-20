@@ -6,13 +6,8 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
-use canister_tests::match_value;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::IdentityInfoResponse;
-use internet_identity_interface::internet_identity::types::{
-    AuthnMethodAddResponse, AuthnMethodRemoveResponse,
-};
 use regex::Regex;
 
 #[test]
@@ -24,34 +19,28 @@ fn should_remove_authn_method() -> Result<(), CallError> {
     let authn_method_2 = sample_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
-    let result = api_v2::authn_method_add(
+    api_v2::authn_method_add(
         &env,
         canister_id,
         principal,
         identity_number,
         &authn_method_2,
     )?
-    .unwrap();
+    .expect("authn method add failed");
 
-    assert!(matches!(result, AuthnMethodAddResponse::Ok));
-
-    match_value!(
-        api_v2::identity_info(&env, canister_id, principal, identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info = api_v2::identity_info(&env, canister_id, principal, identity_number)?
+        .expect("identity info failed");
 
     assert_eq!(identity_info.authn_methods.len(), 2);
 
-    match_value!(
-        api_v2::authn_method_remove(
-            &env,
-            canister_id,
-            principal,
-            identity_number,
-            &authn_method_2.public_key(),
-        )?,
-        Some(AuthnMethodRemoveResponse::Ok)
-    );
+    api_v2::authn_method_remove(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        &authn_method_2.public_key(),
+    )?
+    .expect("authn method remove failed");
     Ok(())
 }
 

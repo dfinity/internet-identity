@@ -1,10 +1,9 @@
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::match_value;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, CaptchaCreateResponse, ChallengeAttempt,
-    IdentityNumber, IdentityRegisterResponse, PublicKeyAuthn, Purpose,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, ChallengeAttempt, IdentityNumber,
+    PublicKeyAuthn, Purpose,
 };
 use serde_bytes::ByteBuf;
 
@@ -37,27 +36,24 @@ pub fn create_identity_with_authn_method(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
-    match_value!(
-        api_v2::captcha_create(env, canister_id).unwrap(),
-        Some(CaptchaCreateResponse::Ok(challenge))
-    );
+    let challenge = api_v2::captcha_create(env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let challenge_attempt = ChallengeAttempt {
         chars: "a".to_string(),
         key: challenge.challenge_key,
     };
-    match_value!(
-        api_v2::identity_register(
-            env,
-            canister_id,
-            authn_method.principal(),
-            authn_method,
-            &challenge_attempt,
-            None,
-        ),
-        Ok(Some(IdentityRegisterResponse::Ok(user_number)))
-    );
-    user_number
+    api_v2::identity_register(
+        env,
+        canister_id,
+        authn_method.principal(),
+        authn_method,
+        &challenge_attempt,
+        None,
+    )
+    .expect("API call failed")
+    .expect("identity_register failed")
 }
 
 pub fn sample_authn_method(i: u8) -> AuthnMethodData {

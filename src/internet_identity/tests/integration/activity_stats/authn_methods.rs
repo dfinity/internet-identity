@@ -47,12 +47,14 @@ fn should_report_daily_active_authn_methods() -> Result<(), CallError> {
 
         // repeated activity with the same authn_method on the same identity within the 24h
         // collection period should not increase the counter
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?
+            .expect("identity info failed");
 
         env.advance_time(Duration::from_secs(DAY_SECONDS));
 
         // some activity is required to update the stats
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?
+            .expect("identity info failed");
 
         let metrics = get_metrics(&env, canister_id);
         assert_metric(
@@ -103,12 +105,14 @@ fn should_report_monthly_active_authn_methods() -> Result<(), CallError> {
 
         // repeated activity with the same authn_method on the same identity within the 30-day
         // collection period should not increase the counter
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?
+            .expect("identity info failed");
 
         env.advance_time(Duration::from_secs(MONTH_SECONDS));
 
         // some activity is required to update the stats
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?
+            .expect("identity info failed");
 
         let metrics = get_metrics(&env, canister_id);
         assert_metric(
@@ -180,7 +184,8 @@ fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
         canister_id,
         non_ii_authn_method.principal(),
         identity_nr,
-    )?;
+    )?
+    .expect("identity info failed");
     env.advance_time(Duration::from_secs(MONTH_SECONDS));
     // some activity on an II domain is required to update the stats
     create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
@@ -223,7 +228,8 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     env.advance_time(Duration::from_secs(DAY_SECONDS));
 
     // some activity is required to update the stats
-    api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?;
+    api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_nr)?
+        .expect("identity info failed");
 
     assert_metric(
         &get_metrics(&env, canister_id),
