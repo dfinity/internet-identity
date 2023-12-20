@@ -327,7 +327,7 @@ fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
         if expected == actual {
             Ok(())
         } else {
-            ic_cdk::println!(
+            println!(
                 "inconsistent claim [{}] in VC::  expected: {}, actual: {}",
                 label,
                 expected,
@@ -336,7 +336,7 @@ fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
             Err(inconsistent_jwt_claims("inconsistent claim in VC"))
         }
     } else {
-        ic_cdk::println!("missing claim [{}] in VC", label);
+        println!("missing claim [{}] in VC", label);
         Err(inconsistent_jwt_claims("missing claim in VC"))
     }
 }
