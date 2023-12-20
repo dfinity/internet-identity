@@ -329,9 +329,7 @@ fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
         } else {
             println!(
                 "inconsistent claim [{}] in VC::  expected: {}, actual: {}",
-                label,
-                expected,
-                actual
+                label, expected, actual
             );
             Err(inconsistent_jwt_claims("inconsistent claim in VC"))
         }
