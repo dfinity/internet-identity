@@ -3174,7 +3174,6 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "canister_sig_util",
- "ic-cdk",
  "ic-certification 1.3.0",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",

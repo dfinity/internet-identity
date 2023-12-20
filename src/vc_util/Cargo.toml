@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 # ic dependencies
 candid.workspace = true
-ic-cdk.workspace = true
 ic-certification.workspace = true
 ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "bf9bc00b032a18d2dbcfcfcfb7a76a562f350c9e" }
 ic-types = { git = "https://github.com/dfinity/ic", rev = "bf9bc00b032a18d2dbcfcfcfb7a76a562f350c9e" }
