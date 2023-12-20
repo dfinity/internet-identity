@@ -95,7 +95,9 @@ fn should_not_allow_wrong_captcha() {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = test_authn_method();
 
-    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(&env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let result = api_v2::identity_register(
         &env,
@@ -118,7 +120,9 @@ fn should_not_allow_expired_captcha() {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = test_authn_method();
 
-    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(&env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
 
@@ -147,7 +151,9 @@ fn should_fail_on_invalid_metadata() {
         MetadataEntry::Bytes(ByteBuf::from("invalid")),
     );
 
-    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(&env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let result = api_v2::identity_register(
         &env,

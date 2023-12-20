@@ -36,7 +36,9 @@ pub fn create_identity_with_authn_method(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
-    let challenge = api_v2::captcha_create(env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let challenge_attempt = ChallengeAttempt {
         chars: "a".to_string(),
