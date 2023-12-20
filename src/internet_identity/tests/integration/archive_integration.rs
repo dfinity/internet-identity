@@ -486,7 +486,7 @@ mod pull_entries_tests {
             anchor,
             &metadata,
         )?
-        .unwrap();
+        .expect("identity_metadata_replace failed");
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));

@@ -47,7 +47,9 @@ fn should_not_exceed_configured_identity_range() {
     create_identity_with_authn_method(&env, canister_id, &authn_method);
     create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(&env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let result = api_v2::identity_register(
         &env,
@@ -60,7 +62,7 @@ fn should_not_exceed_configured_identity_range() {
         },
         None,
     )
-    .unwrap();
+    .expect("API call failed");
     assert!(matches!(result, Err(IdentityRegisterError::CanisterFull)));
 }
 
@@ -69,7 +71,9 @@ fn should_verify_sender_matches_authn_method() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    let challenge = api_v2::captcha_create(&env, canister_id).unwrap().unwrap();
+    let challenge = api_v2::captcha_create(&env, canister_id)
+        .expect("API call failed")
+        .expect("captcha_create failed");
 
     let result = api_v2::identity_register(
         &env,
@@ -110,7 +114,7 @@ fn should_not_allow_wrong_captcha() {
         },
         None,
     )
-    .unwrap();
+    .expect("API call failed");
     assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
 }
 
@@ -137,7 +141,7 @@ fn should_not_allow_expired_captcha() {
         },
         None,
     )
-    .unwrap();
+    .expect("API call failed");
     assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
 }
 
@@ -166,7 +170,7 @@ fn should_fail_on_invalid_metadata() {
         },
         None,
     )
-    .unwrap();
+    .expect("API call failed");
     assert!(matches!(
         result,
         Err(IdentityRegisterError::InvalidMetadata(_))
