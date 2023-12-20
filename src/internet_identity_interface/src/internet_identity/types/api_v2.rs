@@ -86,3 +86,9 @@ pub enum IdentityRegisterError {
 pub enum AuthnMethodAddError {
     InvalidMetadata(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AuthnMethodMetadataReplaceError {
+    InvalidMetadata(String),
+    AuthnMethodNotFound,
+}
