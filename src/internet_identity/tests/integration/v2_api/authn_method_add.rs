@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, eq_ignoring_last_authentication, sample_authn_method,
+    create_identity_with_authn_method, eq_ignoring_last_authentication, sample_pubkey_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -16,9 +16,9 @@ use serde_bytes::ByteBuf;
 fn should_add_authn_method() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let authn_method_1 = sample_authn_method(1);
+    let authn_method_1 = sample_pubkey_authn_method(1);
     let principal = authn_method_1.principal();
-    let authn_method_2 = sample_authn_method(2);
+    let authn_method_2 = sample_pubkey_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
 
@@ -45,7 +45,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
 fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let authn_method = sample_authn_method(1);
+    let authn_method = sample_pubkey_authn_method(1);
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
     let result = api_v2::authn_method_add(
@@ -68,9 +68,9 @@ fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> 
 fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let authn_method_1 = sample_authn_method(1);
+    let authn_method_1 = sample_pubkey_authn_method(1);
     let principal = authn_method_1.principal();
-    let mut authn_method_2 = sample_authn_method(2);
+    let mut authn_method_2 = sample_pubkey_authn_method(2);
     authn_method_2.metadata.insert(
         "usage".to_string(),
         MetadataEntry::Bytes(ByteBuf::from("invalid")),
