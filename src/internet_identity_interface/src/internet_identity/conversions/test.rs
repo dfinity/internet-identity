@@ -70,6 +70,40 @@ fn should_fail_to_convert_to_device_on_bad_metadata_types() {
     }
 }
 
+#[test]
+fn should_convert_authn_method_purpose() {
+    let authn_method_purpose = AuthnMethodPurpose::Authentication;
+    let purpose = Purpose::from(authn_method_purpose.clone());
+    assert_eq!(purpose, Purpose::Authentication);
+    assert_eq!(AuthnMethodPurpose::from(purpose), authn_method_purpose);
+
+    let authn_method_purpose = AuthnMethodPurpose::Recovery;
+    let purpose = Purpose::from(authn_method_purpose.clone());
+    assert_eq!(purpose, Purpose::Recovery);
+    assert_eq!(AuthnMethodPurpose::from(purpose), authn_method_purpose);
+}
+
+#[test]
+fn should_convert_metadata_entry() {
+    let test_string = "some data";
+    let test_bytes = ByteBuf::from(*b"some data");
+
+    let entry_v2 = MetadataEntryV2::String(test_string.to_string());
+    let entry = MetadataEntry::from(entry_v2.clone());
+    assert_eq!(entry, MetadataEntry::String(test_string.to_string()));
+    assert_eq!(MetadataEntryV2::from(entry), entry_v2);
+
+    let entry_v2 = MetadataEntryV2::Bytes(test_bytes.clone());
+    let entry = MetadataEntry::from(entry_v2.clone());
+    assert_eq!(entry, MetadataEntry::Bytes(test_bytes));
+    assert_eq!(MetadataEntryV2::from(entry), entry_v2);
+
+    let entry_v2 = MetadataEntryV2::Map(HashMap::new());
+    let entry = MetadataEntry::from(entry_v2.clone());
+    assert_eq!(entry, MetadataEntry::Map(HashMap::new()));
+    assert_eq!(MetadataEntryV2::from(entry), entry_v2);
+}
+
 fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
     const ORIGIN: &str = "origin";
     const ALIAS: &str = "alias";
