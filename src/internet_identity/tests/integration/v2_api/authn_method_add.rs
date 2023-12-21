@@ -8,7 +8,7 @@ use canister_tests::framework::{
 };
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntry};
+use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntryV2};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
@@ -73,7 +73,7 @@ fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     let mut authn_method_2 = sample_pubkey_authn_method(2);
     authn_method_2.metadata.insert(
         "usage".to_string(),
-        MetadataEntry::Bytes(ByteBuf::from("invalid")),
+        MetadataEntryV2::Bytes(ByteBuf::from("invalid")),
     );
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);

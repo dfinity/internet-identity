@@ -71,6 +71,52 @@ impl From<AuthnMethodProtection> for DeviceProtection {
     }
 }
 
+impl From<AuthnMethodPurpose> for Purpose {
+    fn from(value: AuthnMethodPurpose) -> Self {
+        match value {
+            AuthnMethodPurpose::Recovery => Purpose::Recovery,
+            AuthnMethodPurpose::Authentication => Purpose::Authentication,
+        }
+    }
+}
+
+impl From<Purpose> for AuthnMethodPurpose {
+    fn from(value: Purpose) -> Self {
+        match value {
+            Purpose::Recovery => AuthnMethodPurpose::Recovery,
+            Purpose::Authentication => AuthnMethodPurpose::Authentication,
+        }
+    }
+}
+
+impl From<MetadataEntryV2> for MetadataEntry {
+    fn from(value: MetadataEntryV2) -> Self {
+        match value {
+            MetadataEntryV2::String(data) => MetadataEntry::String(data),
+            MetadataEntryV2::Bytes(data) => MetadataEntry::Bytes(data),
+            MetadataEntryV2::Map(data) => MetadataEntry::Map(
+                data.into_iter()
+                    .map(|(key, value)| (key, MetadataEntry::from(value)))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl From<MetadataEntry> for MetadataEntryV2 {
+    fn from(value: MetadataEntry) -> Self {
+        match value {
+            MetadataEntry::String(data) => MetadataEntryV2::String(data),
+            MetadataEntry::Bytes(data) => MetadataEntryV2::Bytes(data),
+            MetadataEntry::Map(data) => MetadataEntryV2::Map(
+                data.into_iter()
+                    .map(|(key, value)| (key, MetadataEntryV2::from(value)))
+                    .collect(),
+            ),
+        }
+    }
+}
+
 impl From<DeviceWithUsage> for AuthnMethodData {
     fn from(device_data: DeviceWithUsage) -> Self {
         let authn_method = if let Some(credential_id) = device_data.credential_id.clone() {
@@ -126,9 +172,12 @@ impl From<DeviceWithUsage> for AuthnMethodData {
 
         Self {
             authn_method,
-            metadata,
+            metadata: metadata
+                .into_iter()
+                .map(|(key, value)| (key, MetadataEntryV2::from(value)))
+                .collect(),
             protection: AuthnMethodProtection::from(device_data.protection),
-            purpose: device_data.purpose,
+            purpose: AuthnMethodPurpose::from(device_data.purpose),
             last_authentication: device_data.last_usage,
         }
     }
@@ -195,8 +244,8 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
             data.metadata
                 .remove(key)
                 .map(|entry| match entry {
-                    MetadataEntry::String(value) => Ok(value),
-                    value @ MetadataEntry::Bytes(_) | value @ MetadataEntry::Map(_) => {
+                    MetadataEntryV2::String(value) => Ok(value),
+                    value @ MetadataEntryV2::Bytes(_) | value @ MetadataEntryV2::Map(_) => {
                         Err(AuthnMethodConversionError::InvalidMetadataType {
                             key: key.to_string(),
                             expected_type: "string".to_string(),
@@ -241,12 +290,17 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
             pubkey,
             alias,
             credential_id,
-            purpose: data.purpose,
+            purpose: Purpose::from(data.purpose),
             key_type,
             protection: DeviceProtection::from(data.protection),
             origin,
             last_usage: data.last_authentication,
-            metadata: Some(data.metadata),
+            metadata: Some(
+                data.metadata
+                    .into_iter()
+                    .map(|(key, value)| (key, MetadataEntry::from(value)))
+                    .collect(),
+            ),
         })
     }
 }

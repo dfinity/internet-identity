@@ -553,10 +553,14 @@ mod v2_api {
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, ()> {
         authenticate_and_record_activity(identity_number);
         let anchor_info = anchor_management::get_anchor_info(identity_number);
+
         let metadata = state::anchor(identity_number)
             .identity_metadata()
             .clone()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, MetadataEntryV2::from(v)))
+            .collect();
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
@@ -597,9 +601,13 @@ mod v2_api {
     #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
-        metadata: HashMap<String, MetadataEntry>,
+        metadata: HashMap<String, MetadataEntryV2>,
     ) -> Result<(), ()> {
         authenticated_anchor_operation(identity_number, |anchor| {
+            let metadata = metadata
+                .into_iter()
+                .map(|(k, v)| (k, MetadataEntry::from(v)))
+                .collect();
             Ok((
                 (),
                 anchor_management::identity_metadata_replace(anchor, metadata),

@@ -8,7 +8,7 @@ use canister_tests::framework::{
 };
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, MetadataEntry, Purpose, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodPurpose, MetadataEntryV2, WebAuthn,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -151,7 +151,7 @@ fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
     let ii_authn_method = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
-            MetadataEntry::String("https://identity.ic0.app".to_string()),
+            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
         )]),
         ..test_authn_method()
     };
@@ -210,7 +210,7 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
-            MetadataEntry::String("https://identity.ic0.app".to_string()),
+            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
         )]),
         ..test_authn_method()
     };
@@ -247,7 +247,7 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
     });
     let ii_domain_entry = (
         "origin".to_string(),
-        MetadataEntry::String("https://identity.ic0.app".to_string()),
+        MetadataEntryV2::String("https://identity.ic0.app".to_string()),
     );
     vec![
         (
@@ -269,7 +269,7 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
             "webauthn_recovery".to_string(),
             AuthnMethodData {
                 authn_method: webauthn_authn_method,
-                purpose: Purpose::Recovery,
+                purpose: AuthnMethodPurpose::Recovery,
                 metadata: HashMap::from([ii_domain_entry.clone()]),
                 ..test_authn_method()
             },
@@ -280,7 +280,7 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
                 metadata: HashMap::from([
                     (
                         "usage".to_string(),
-                        MetadataEntry::String("recovery_phrase".to_string()),
+                        MetadataEntryV2::String("recovery_phrase".to_string()),
                     ),
                     ii_domain_entry.clone(),
                 ]),
@@ -293,7 +293,7 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
                 metadata: HashMap::from([
                     (
                         "usage".to_string(),
-                        MetadataEntry::String("browser_storage_key".to_string()),
+                        MetadataEntryV2::String("browser_storage_key".to_string()),
                     ),
                     ii_domain_entry.clone(),
                 ]),

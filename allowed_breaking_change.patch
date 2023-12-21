@@ -1,8 +1,8 @@
 diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
-index 09937178..e545e0ba 100644
+index 125d8de0..b5a84b1e 100644
 --- a/src/internet_identity/internet_identity.did
 +++ b/src/internet_identity/internet_identity.did
-@@ -313,16 +313,16 @@ type PublicKeyAuthn = record {
+@@ -320,21 +320,21 @@ type PublicKeyAuthn = record {
  
  // The authentication methods currently supported by II.
  type AuthnMethod = variant {
@@ -22,4 +22,38 @@ index 09937178..e545e0ba 100644
 +    unprotected;
  };
  
+ type AuthnMethodPurpose = variant {
+-    Recovery;
+-    Authentication;
++    recovery;
++    authentication;
+ };
+ 
  type AuthnMethodData = record {
+@@ -348,7 +348,7 @@ type AuthnMethodData = record {
+     // - usage: data taken from key_type and reduced to "recovery_phrase", "browser_storage_key" or absent on migration
+     // Note: for compatibility reasons with the v1 API, the entries above (if present)
+     // must be of the `String` variant. This restriction may be lifted in the future.
+-    metadata: MetadataMapV2;
++    metadata: MetadataMap;
+     last_authentication: opt Timestamp;
+ };
+ 
+@@ -367,7 +367,7 @@ type IdentityInfo = record {
+     authn_methods: vec AuthnMethodData;
+     authn_method_registration: opt AuthnMethodRegistrationInfo;
+     // Authentication method independent metadata
+-    metadata: MetadataMapV2;
++    metadata: MetadataMap;
+ };
+ 
+ type IdentityRegisterError = variant {
+@@ -490,7 +490,7 @@ service : (opt InternetIdentityInit) -> {
+     // Replaces the authentication method independent metadata map.
+     // The existing metadata map will be overwritten.
+     // Requires authentication.
+-    identity_metadata_replace: (IdentityNumber, MetadataMapV2) -> (variant {Ok; Err;});
++    identity_metadata_replace: (IdentityNumber, MetadataMap) -> (variant {Ok; Err;});
+ 
+     // Adds a new authentication method to the identity.
+     // Requires authentication.

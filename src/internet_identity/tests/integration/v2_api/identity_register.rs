@@ -9,7 +9,7 @@ use canister_tests::framework::{
 };
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
-    ChallengeAttempt, IdentityRegisterError, MetadataEntry,
+    ChallengeAttempt, IdentityRegisterError, MetadataEntryV2,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -152,7 +152,7 @@ fn should_fail_on_invalid_metadata() {
     let mut authn_method = test_authn_method();
     authn_method.metadata.insert(
         "usage".to_string(),
-        MetadataEntry::Bytes(ByteBuf::from("invalid")),
+        MetadataEntryV2::Bytes(ByteBuf::from("invalid")),
     );
 
     let challenge = api_v2::captcha_create(&env, canister_id)

@@ -8,7 +8,7 @@ use canister_tests::framework::{
 };
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::MetadataEntry;
+use internet_identity_interface::internet_identity::types::MetadataEntryV2;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ fn should_write_metadata() -> Result<(), CallError> {
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("some value".to_string()),
+        MetadataEntryV2::String("some value".to_string()),
     )]);
 
     api_v2::identity_metadata_replace(
@@ -58,7 +58,7 @@ fn should_require_authentication_to_replace_identity_metadata() {
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("some value".to_string()),
+        MetadataEntryV2::String("some value".to_string()),
     )]);
 
     let result = api_v2::identity_metadata_replace(
@@ -91,7 +91,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("a".repeat(3000)),
+        MetadataEntryV2::String("a".repeat(3000)),
     )]);
 
     let result = api_v2::identity_metadata_replace(

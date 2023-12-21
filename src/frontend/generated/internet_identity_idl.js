@@ -1,5 +1,6 @@
 export const idlFactory = ({ IDL }) => {
   const MetadataMap = IDL.Rec();
+  const MetadataMapV2 = IDL.Rec();
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -69,6 +70,18 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const IdentityNumber = IDL.Nat64;
+  MetadataMapV2.fill(
+    IDL.Vec(
+      IDL.Tuple(
+        IDL.Text,
+        IDL.Variant({
+          'Map' : MetadataMapV2,
+          'String' : IDL.Text,
+          'Bytes' : IDL.Vec(IDL.Nat8),
+        }),
+      )
+    )
+  );
   const AuthnMethodProtection = IDL.Variant({
     'Protected' : IDL.Null,
     'Unprotected' : IDL.Null,
@@ -82,12 +95,16 @@ export const idlFactory = ({ IDL }) => {
     'PubKey' : PublicKeyAuthn,
     'WebAuthn' : WebAuthn,
   });
+  const AuthnMethodPurpose = IDL.Variant({
+    'Recovery' : IDL.Null,
+    'Authentication' : IDL.Null,
+  });
   const AuthnMethodData = IDL.Record({
-    'metadata' : MetadataMap,
+    'metadata' : MetadataMapV2,
     'protection' : AuthnMethodProtection,
     'last_authentication' : IDL.Opt(Timestamp),
     'authn_method' : AuthnMethod,
-    'purpose' : Purpose,
+    'purpose' : AuthnMethodPurpose,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
   const ChallengeKey = IDL.Text;
@@ -205,7 +222,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
-    'metadata' : MetadataMap,
+    'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
   const ChallengeResult = IDL.Record({
@@ -313,7 +330,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'identity_metadata_replace' : IDL.Func(
-        [IdentityNumber, MetadataMap],
+        [IdentityNumber, MetadataMapV2],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
         [],
       ),
