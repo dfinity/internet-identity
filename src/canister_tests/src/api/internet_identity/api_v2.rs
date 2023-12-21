@@ -50,7 +50,7 @@ pub fn identity_metadata_replace(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    metadata: &HashMap<String, MetadataEntry>,
+    metadata: &HashMap<String, MetadataEntryV2>,
 ) -> Result<Result<(), ()>, CallError> {
     call_candid_as(
         env,

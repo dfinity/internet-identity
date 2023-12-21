@@ -1,8 +1,8 @@
 use crate::internet_identity::conversions::AuthnMethodConversionError;
 use crate::internet_identity::types as ii_types;
 use crate::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, DeviceProtection, DeviceWithUsage,
-    KeyType, MetadataEntry, PublicKeyAuthn, Purpose, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, DeviceProtection,
+    DeviceWithUsage, KeyType, MetadataEntry, MetadataEntryV2, PublicKeyAuthn, Purpose, WebAuthn,
 };
 use ii_types::{DeviceData, WebAuthnCredential};
 use serde_bytes::ByteBuf;
@@ -57,7 +57,7 @@ fn should_fail_to_convert_to_device_on_bad_metadata_types() {
         let (_, mut authn_method) = test_conversion_pairs().pop().unwrap();
         authn_method.metadata.insert(
             key.to_string(),
-            MetadataEntry::Bytes(ByteBuf::from([1, 2, 3])),
+            MetadataEntryV2::Bytes(ByteBuf::from([1, 2, 3])),
         );
         assert_eq!(
             DeviceWithUsage::try_from(authn_method).unwrap_err(),
@@ -99,14 +99,14 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey: pubkey.clone(),
         }),
         metadata: HashMap::from([
-            (ALIAS.to_string(), MetadataEntry::String(alias.clone())),
-            (ORIGIN.to_string(), MetadataEntry::String(origin.clone())),
+            (ALIAS.to_string(), MetadataEntryV2::String(alias.clone())),
+            (ORIGIN.to_string(), MetadataEntryV2::String(origin.clone())),
             (
                 "some_key".to_string(),
-                MetadataEntry::String("some data".to_string()),
+                MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
-        purpose: Purpose::Recovery,
+        purpose: AuthnMethodPurpose::Recovery,
         protection: AuthnMethodProtection::Protected,
         last_authentication: Some(123456789),
     };
@@ -129,16 +129,16 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey: pubkey.clone(),
             credential_id: credential_id.clone(),
         }),
-        purpose: Purpose::Authentication,
+        purpose: AuthnMethodPurpose::Authentication,
         metadata: HashMap::from([
-            (ALIAS.to_string(), MetadataEntry::String(alias.clone())),
+            (ALIAS.to_string(), MetadataEntryV2::String(alias.clone())),
             (
                 AUTHENTICATOR_ATTACHMENT.to_string(),
-                MetadataEntry::String("cross_platform".to_string()),
+                MetadataEntryV2::String("cross_platform".to_string()),
             ),
             (
                 "some_key2".to_string(),
-                MetadataEntry::String("some data".to_string()),
+                MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
         protection: AuthnMethodProtection::Unprotected,
@@ -158,15 +158,15 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey,
             credential_id,
         }),
-        purpose: Purpose::Authentication,
+        purpose: AuthnMethodPurpose::Authentication,
         metadata: HashMap::from([
             (
                 AUTHENTICATOR_ATTACHMENT.to_string(),
-                MetadataEntry::String("cross_platform".to_string()),
+                MetadataEntryV2::String("cross_platform".to_string()),
             ),
             (
                 "some_key2".to_string(),
-                MetadataEntry::String("some data".to_string()),
+                MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
         protection: AuthnMethodProtection::Unprotected,
@@ -180,7 +180,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
     let mut authn_method_data4 = authn_method_data1.clone();
     authn_method_data4.metadata.insert(
         USAGE.to_string(),
-        MetadataEntry::String("recovery_phrase".to_string()),
+        MetadataEntryV2::String("recovery_phrase".to_string()),
     );
 
     let device5 = DeviceWithUsage {
@@ -190,7 +190,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
     let mut authn_method_data5 = authn_method_data1.clone();
     authn_method_data5.metadata.insert(
         USAGE.to_string(),
-        MetadataEntry::String("browser_storage_key".to_string()),
+        MetadataEntryV2::String("browser_storage_key".to_string()),
     );
 
     vec![

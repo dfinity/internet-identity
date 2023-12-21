@@ -476,7 +476,7 @@ mod pull_entries_tests {
 
         let metadata = HashMap::from_iter(vec![(
             METADATA_KEY.to_string(),
-            MetadataEntry::String("some value".to_string()),
+            MetadataEntryV2::String("some value".to_string()),
         )]);
 
         ii_api::api_v2::identity_metadata_replace(

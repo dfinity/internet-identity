@@ -2,8 +2,8 @@ use canister_tests::api::internet_identity::api_v2;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, ChallengeAttempt, IdentityNumber,
-    MetadataEntry, PublicKeyAuthn, Purpose, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, ChallengeAttempt,
+    IdentityNumber, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ pub fn test_authn_method() -> AuthnMethodData {
         }),
         metadata: Default::default(),
         protection: AuthnMethodProtection::Unprotected,
-        purpose: Purpose::Authentication,
+        purpose: AuthnMethodPurpose::Authentication,
         last_authentication: None,
     }
 }
@@ -120,15 +120,15 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
         metadata: HashMap::from([
             (
                 "some_key".to_string(),
-                MetadataEntry::String("some data".to_string()),
+                MetadataEntryV2::String("some data".to_string()),
             ),
             (
                 "origin".to_string(),
-                MetadataEntry::String("https://some.origin".to_string()),
+                MetadataEntryV2::String("https://some.origin".to_string()),
             ),
             (
                 "alias".to_string(),
-                MetadataEntry::String("Test Authn Method 1".to_string()),
+                MetadataEntryV2::String("Test Authn Method 1".to_string()),
             ),
         ]),
         ..sample_pubkey_authn_method(0)
@@ -137,7 +137,7 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
     let authn_method2 = AuthnMethodData {
         metadata: HashMap::from([(
             "different_key".to_string(),
-            MetadataEntry::String("other data".to_string()),
+            MetadataEntryV2::String("other data".to_string()),
         )]),
         ..sample_webauthn_authn_method(1)
     };
@@ -146,24 +146,24 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
         metadata: HashMap::from([
             (
                 "recovery_metadata_1".to_string(),
-                MetadataEntry::String("recovery data 1".to_string()),
+                MetadataEntryV2::String("recovery data 1".to_string()),
             ),
             (
                 "origin".to_string(),
-                MetadataEntry::String("https://identity.ic0.app".to_string()),
+                MetadataEntryV2::String("https://identity.ic0.app".to_string()),
             ),
             (
                 "usage".to_string(),
-                MetadataEntry::String("recovery_phrase".to_string()),
+                MetadataEntryV2::String("recovery_phrase".to_string()),
             ),
         ]),
-        purpose: Purpose::Recovery,
+        purpose: AuthnMethodPurpose::Recovery,
         ..sample_pubkey_authn_method(2)
     };
 
     let authn_method4 = AuthnMethodData {
         metadata: HashMap::default(),
-        purpose: Purpose::Recovery,
+        purpose: AuthnMethodPurpose::Recovery,
         ..sample_webauthn_authn_method(3)
     };
 
@@ -171,15 +171,15 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
         metadata: HashMap::from([
             (
                 "origin".to_string(),
-                MetadataEntry::String("https://identity.internetcomputer.org".to_string()),
+                MetadataEntryV2::String("https://identity.internetcomputer.org".to_string()),
             ),
             (
                 "alias".to_string(),
-                MetadataEntry::String("Test Authn Method 5".to_string()),
+                MetadataEntryV2::String("Test Authn Method 5".to_string()),
             ),
             (
                 "usage".to_string(),
-                MetadataEntry::String("browser_storage_key".to_string()),
+                MetadataEntryV2::String("browser_storage_key".to_string()),
             ),
         ]),
         ..sample_webauthn_authn_method(4)
