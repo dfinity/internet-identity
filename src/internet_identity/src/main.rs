@@ -641,10 +641,7 @@ mod attribute_sharing_mvp {
     #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
         let Ok(_) = check_authentication(req.identity_number) else {
-            return Err(GetIdAliasError::AuthenticationFailed(format!(
-                "{} could not be authenticated.",
-                caller()
-            )));
+            return Err(GetIdAliasError::Unauthorized);
         };
         vc_mvp::get_id_alias(
             req.identity_number,

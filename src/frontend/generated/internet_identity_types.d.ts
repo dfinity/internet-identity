@@ -98,8 +98,8 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
-export type GetIdAliasError = { 'NoSuchCredentials' : string } |
-  { 'AuthenticationFailed' : string };
+export type GetIdAliasError = { 'Unauthorized' : null } |
+  { 'NoSuchCredentials' : string };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
   'issuer' : FrontendHostname,
@@ -177,7 +177,7 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
-export type PrepareIdAliasError = { 'AuthenticationFailed' : string };
+export type PrepareIdAliasError = { 'Unauthorized' : null };
 export interface PrepareIdAliasRequest {
   'issuer' : FrontendHostname,
   'relying_party' : FrontendHostname,

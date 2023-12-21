@@ -622,7 +622,7 @@ export class AuthenticatedConnection extends Connection {
     }
 
     const err = result.Err;
-    if ("AuthenticationFailed" in err) {
+    if ("Unauthorized" in err) {
       return { error: "authentication_failed" };
     }
 
@@ -677,7 +677,7 @@ export class AuthenticatedConnection extends Connection {
       console.error(["No credentials", err.NoSuchCredentials].join(": "));
       return { error: "internal_error" };
     }
-    if ("AuthenticationFailed" in err) {
+    if ("Unauthorized" in err) {
       return { error: "authentication_failed" };
     }
 
