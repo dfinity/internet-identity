@@ -183,8 +183,8 @@ export const idlFactory = ({ IDL }) => {
     'issuer_id_alias_credential' : SignedIdAlias,
   });
   const GetIdAliasError = IDL.Variant({
+    'Unauthorized' : IDL.Null,
     'NoSuchCredentials' : IDL.Text,
-    'AuthenticationFailed' : IDL.Text,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -250,9 +250,7 @@ export const idlFactory = ({ IDL }) => {
     'issuer_id_alias_jwt' : IDL.Text,
     'canister_sig_pk_der' : PublicKey,
   });
-  const PrepareIdAliasError = IDL.Variant({
-    'AuthenticationFailed' : IDL.Text,
-  });
+  const PrepareIdAliasError = IDL.Variant({ 'Unauthorized' : IDL.Null });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
