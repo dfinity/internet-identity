@@ -37,6 +37,8 @@ export interface AuthnMethodData {
   'authn_method' : AuthnMethod,
   'purpose' : AuthnMethodPurpose,
 }
+export type AuthnMethodMetadataReplaceError = { 'AuthnMethodNotFound' : null } |
+  { 'InvalidMetadata' : string };
 export type AuthnMethodProtection = { 'Protected' : null } |
   { 'Unprotected' : null };
 export type AuthnMethodPurpose = { 'Recovery' : null } |
@@ -249,6 +251,11 @@ export interface _SERVICE {
     [IdentityNumber, AuthnMethodData],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
+  >,
+  'authn_method_metadata_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, MetadataMapV2],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodMetadataReplaceError }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],
