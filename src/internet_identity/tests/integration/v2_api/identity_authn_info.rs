@@ -4,7 +4,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_canister, II_WASM};
 use ic_test_state_machine_client::CallError;
-use internet_identity_interface::internet_identity::types::Purpose;
+use internet_identity_interface::internet_identity::types::AuthnMethodPurpose;
 
 #[test]
 fn should_get_identity_authn_info() -> Result<(), CallError> {
@@ -20,7 +20,7 @@ fn should_get_identity_authn_info() -> Result<(), CallError> {
         identity_authn_info.authn_methods,
         authn_methods
             .iter()
-            .filter(|x| x.purpose == Purpose::Authentication)
+            .filter(|x| x.purpose == AuthnMethodPurpose::Authentication)
             .map(|x| x.authn_method.clone())
             .collect::<Vec<_>>()
     );
@@ -28,7 +28,7 @@ fn should_get_identity_authn_info() -> Result<(), CallError> {
         identity_authn_info.recovery_authn_methods,
         authn_methods
             .iter()
-            .filter(|x| x.purpose == Purpose::Recovery)
+            .filter(|x| x.purpose == AuthnMethodPurpose::Recovery)
             .map(|x| x.authn_method.clone())
             .collect::<Vec<_>>()
     );
