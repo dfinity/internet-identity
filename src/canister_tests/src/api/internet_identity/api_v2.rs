@@ -1,6 +1,8 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{call_candid, call_candid_as, CallError, StateMachine};
+use ic_test_state_machine_client::{
+    call_candid, call_candid_as, query_candid, CallError, StateMachine,
+};
 use internet_identity_interface::internet_identity::types::*;
 use std::collections::HashMap;
 
@@ -27,6 +29,14 @@ pub fn identity_register(
         (authn_method, challenge_attempt, temp_key),
     )
     .map(|(x,)| x)
+}
+
+pub fn identity_authn_info(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    identity_number: IdentityNumber,
+) -> Result<Result<IdentityAuthnInfo, ()>, CallError> {
+    query_candid(env, canister_id, "identity_authn_info", (identity_number,)).map(|(x,)| x)
 }
 
 pub fn identity_info(
