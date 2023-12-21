@@ -87,6 +87,7 @@ fn verify_tentative_device(
             user_verification_code,
         )
     })
+    .unwrap_or_else(|err| err)
 }
 
 #[update]
@@ -111,6 +112,7 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
         Ok(((), anchor_management::add(anchor, device_data)))
     })
+    .unwrap_or_else(|err| err)
 }
 
 #[update]
@@ -122,6 +124,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
             anchor_management::update(anchor, device_key, device_data),
         ))
     })
+    .unwrap_or_else(|err| err)
 }
 
 #[update]
@@ -133,6 +136,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
             anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
+    .unwrap_or_else(|err| err)
 }
 
 #[update]
@@ -144,6 +148,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
             anchor_management::remove(anchor_number, anchor, device_key),
         ))
     })
+    .unwrap_or_else(|err| err)
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
@@ -457,16 +462,13 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDom
 /// the necessary bookkeeping for anchor operations.
 ///
 /// * anchor_number: indicates the anchor to be provided op should be called on
-/// * op: Function that modifies an anchor and returns a value `R` wrapped in a [Result] indicating
+/// * op: Function that modifies an anchor and returns a [Result] indicating
 ///       success or failure which determines whether additional bookkeeping (on success) is required.
 ///       On success, the function must also return an [Operation] which is used for archiving purposes.
-///       The type `R` is usually bound to an interface type specified in the candid file. This type
-///       is either unit or a variant unifying success and error cases (which is why the [Result] has
-///       `R` in both success and error positions).
-fn authenticated_anchor_operation<R>(
+fn authenticated_anchor_operation<R, E>(
     anchor_number: AnchorNumber,
-    op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
-) -> R {
+    op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), E>,
+) -> Result<R, E> {
     let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
@@ -482,9 +484,9 @@ fn authenticated_anchor_operation<R>(
     match result {
         Ok((ret, operation)) => {
             post_operation_bookkeeping(anchor_number, operation);
-            ret
+            Ok(ret)
         }
-        Err(err) => err,
+        Err(err) => Err(err),
     }
 }
 
@@ -602,8 +604,7 @@ mod v2_api {
                 (),
                 anchor_management::identity_metadata_replace(anchor, metadata),
             ))
-        });
-        Ok(())
+        })
     }
 }
 
