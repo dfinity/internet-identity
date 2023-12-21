@@ -31,14 +31,16 @@ export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
   { 'WebAuthn' : WebAuthn };
 export type AuthnMethodAddError = { 'InvalidMetadata' : string };
 export interface AuthnMethodData {
-  'metadata' : MetadataMap,
+  'metadata' : MetadataMapV2,
   'protection' : AuthnMethodProtection,
   'last_authentication' : [] | [Timestamp],
   'authn_method' : AuthnMethod,
-  'purpose' : Purpose,
+  'purpose' : AuthnMethodPurpose,
 }
 export type AuthnMethodProtection = { 'Protected' : null } |
   { 'Unprotected' : null };
+export type AuthnMethodPurpose = { 'Recovery' : null } |
+  { 'Authentication' : null };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
@@ -130,7 +132,7 @@ export interface IdentityAnchorInfo {
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
-  'metadata' : MetadataMap,
+  'metadata' : MetadataMapV2,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
 export type IdentityNumber = bigint;
@@ -165,6 +167,14 @@ export type MetadataMap = Array<
     { 'map' : MetadataMap } |
       { 'string' : string } |
       { 'bytes' : Uint8Array | number[] },
+  ]
+>;
+export type MetadataMapV2 = Array<
+  [
+    string,
+    { 'Map' : MetadataMapV2 } |
+      { 'String' : string } |
+      { 'Bytes' : Uint8Array | number[] },
   ]
 >;
 export type PrepareIdAliasError = { 'AuthenticationFailed' : string };
@@ -267,7 +277,7 @@ export interface _SERVICE {
       { 'Err' : null }
   >,
   'identity_metadata_replace' : ActorMethod<
-    [IdentityNumber, MetadataMap],
+    [IdentityNumber, MetadataMapV2],
     { 'Ok' : null } |
       { 'Err' : null }
   >,
