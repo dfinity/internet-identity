@@ -8,11 +8,13 @@ use canister_tests::framework::{
 };
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodPurpose, MetadataEntryV2, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
+use AuthnMethodProtection::Unprotected;
 
 const DAY_SECONDS: u64 = 24 * 60 * 60;
 const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
@@ -269,7 +271,10 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
             "webauthn_recovery".to_string(),
             AuthnMethodData {
                 authn_method: webauthn_authn_method,
-                purpose: AuthnMethodPurpose::Recovery,
+                security_settings: AuthnMethodSecuritySettings {
+                    purpose: AuthnMethodPurpose::Recovery,
+                    protection: Unprotected,
+                },
                 metadata: HashMap::from([ii_domain_entry.clone()]),
                 ..test_authn_method()
             },

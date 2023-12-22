@@ -9,7 +9,8 @@ use canister_tests::framework::{
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, AuthnMethodMetadataReplaceError, AuthnMethodPurpose, MetadataEntryV2,
+    AuthnMethodData, AuthnMethodMetadataReplaceError, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, MetadataEntryV2,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -82,7 +83,10 @@ fn should_replace_authn_method_metadata() -> Result<(), CallError> {
                 MetadataEntryV2::String("recovery_phrase".to_string()),
             ),
         ]),
-        purpose: AuthnMethodPurpose::Recovery,
+        security_settings: AuthnMethodSecuritySettings {
+            purpose: AuthnMethodPurpose::Recovery,
+            protection: AuthnMethodProtection::Unprotected,
+        },
         ..sample_pubkey_authn_method(0)
     };
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);

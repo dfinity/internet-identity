@@ -2,8 +2,9 @@ use canister_tests::api::internet_identity::api_v2;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, ChallengeAttempt,
-    IdentityNumber, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, ChallengeAttempt, IdentityNumber, MetadataEntryV2, PublicKeyAuthn,
+    WebAuthn,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -43,8 +44,10 @@ pub fn test_authn_method() -> AuthnMethodData {
             pubkey: ByteBuf::from(vec![0; 32]),
         }),
         metadata: Default::default(),
-        protection: AuthnMethodProtection::Unprotected,
-        purpose: AuthnMethodPurpose::Authentication,
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
         last_authentication: None,
     }
 }
@@ -157,13 +160,19 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
                 MetadataEntryV2::String("recovery_phrase".to_string()),
             ),
         ]),
-        purpose: AuthnMethodPurpose::Recovery,
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Protected,
+            purpose: AuthnMethodPurpose::Recovery,
+        },
         ..sample_pubkey_authn_method(2)
     };
 
     let authn_method4 = AuthnMethodData {
         metadata: HashMap::default(),
-        purpose: AuthnMethodPurpose::Recovery,
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Recovery,
+        },
         ..sample_webauthn_authn_method(3)
     };
 

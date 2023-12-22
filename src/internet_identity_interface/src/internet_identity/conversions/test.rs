@@ -1,8 +1,9 @@
 use crate::internet_identity::conversions::AuthnMethodConversionError;
 use crate::internet_identity::types as ii_types;
 use crate::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, DeviceProtection,
-    DeviceWithUsage, KeyType, MetadataEntry, MetadataEntryV2, PublicKeyAuthn, Purpose, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, DeviceProtection, DeviceWithUsage, KeyType, MetadataEntry,
+    MetadataEntryV2, PublicKeyAuthn, Purpose, WebAuthn,
 };
 use ii_types::{DeviceData, WebAuthnCredential};
 use serde_bytes::ByteBuf;
@@ -140,8 +141,10 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
                 MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
-        purpose: AuthnMethodPurpose::Recovery,
-        protection: AuthnMethodProtection::Protected,
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Protected,
+            purpose: AuthnMethodPurpose::Recovery,
+        },
         last_authentication: Some(123456789),
     };
     let device2 = DeviceWithUsage {
@@ -163,7 +166,6 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey: pubkey.clone(),
             credential_id: credential_id.clone(),
         }),
-        purpose: AuthnMethodPurpose::Authentication,
         metadata: HashMap::from([
             (ALIAS.to_string(), MetadataEntryV2::String(alias.clone())),
             (
@@ -175,7 +177,10 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
                 MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
-        protection: AuthnMethodProtection::Unprotected,
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
         last_authentication: None,
     };
 
@@ -192,7 +197,6 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
             pubkey,
             credential_id,
         }),
-        purpose: AuthnMethodPurpose::Authentication,
         metadata: HashMap::from([
             (
                 AUTHENTICATOR_ATTACHMENT.to_string(),
@@ -203,7 +207,10 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
                 MetadataEntryV2::String("some data".to_string()),
             ),
         ]),
-        protection: AuthnMethodProtection::Unprotected,
+        security_settings: AuthnMethodSecuritySettings {
+            purpose: AuthnMethodPurpose::Authentication,
+            protection: AuthnMethodProtection::Unprotected,
+        },
         last_authentication: None,
     };
 

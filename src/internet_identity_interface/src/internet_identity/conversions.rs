@@ -176,8 +176,10 @@ impl From<DeviceWithUsage> for AuthnMethodData {
                 .into_iter()
                 .map(|(key, value)| (key, MetadataEntryV2::from(value)))
                 .collect(),
-            protection: AuthnMethodProtection::from(device_data.protection),
-            purpose: AuthnMethodPurpose::from(device_data.purpose),
+            security_settings: AuthnMethodSecuritySettings {
+                protection: AuthnMethodProtection::from(device_data.protection),
+                purpose: AuthnMethodPurpose::from(device_data.purpose),
+            },
             last_authentication: device_data.last_usage,
         }
     }
@@ -290,9 +292,9 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
             pubkey,
             alias,
             credential_id,
-            purpose: Purpose::from(data.purpose),
+            purpose: Purpose::from(data.security_settings.purpose),
             key_type,
-            protection: DeviceProtection::from(data.protection),
+            protection: DeviceProtection::from(data.security_settings.protection),
             origin,
             last_usage: data.last_authentication,
             metadata: Some(

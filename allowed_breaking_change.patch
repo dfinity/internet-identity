@@ -1,5 +1,5 @@
 diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
-index ae4fc77f..b5a84b1e 100644
+index c1bf6d34..60bd6b90 100644
 --- a/src/internet_identity/internet_identity.did
 +++ b/src/internet_identity/internet_identity.did
 @@ -320,21 +320,21 @@ type PublicKeyAuthn = record {
@@ -29,8 +29,18 @@ index ae4fc77f..b5a84b1e 100644
 +    authentication;
  };
  
+ type AuthnMethodSecuritySettings = record {
+@@ -344,7 +344,8 @@ type AuthnMethodSecuritySettings = record {
+ 
  type AuthnMethodData = record {
-@@ -348,7 +348,7 @@ type AuthnMethodData = record {
+     authn_method: AuthnMethod;
+-    security_settings: AuthnMethodSecuritySettings;
++    protection: AuthnMethodProtection;
++    purpose: AuthnMethodPurpose;
+     // contains the following fields of the DeviceWithUsage type:
+     // - alias
+     // - origin
+@@ -352,7 +353,7 @@ type AuthnMethodData = record {
      // - usage: data taken from key_type and reduced to "recovery_phrase", "browser_storage_key" or absent on migration
      // Note: for compatibility reasons with the v1 API, the entries above (if present)
      // must be of the `String` variant. This restriction may be lifted in the future.
@@ -39,16 +49,7 @@ index ae4fc77f..b5a84b1e 100644
      last_authentication: opt Timestamp;
  };
  
-@@ -367,7 +367,7 @@ type IdentityInfo = record {
-     authn_methods: vec AuthnMethodData;
-     authn_method_registration: opt AuthnMethodRegistrationInfo;
-     // Authentication method independent metadata
--    metadata: MetadataMapV2;
-+    metadata: MetadataMap;
- };
- 
- type IdentityRegisterError = variant {
-@@ -393,8 +393,8 @@ type PrepareIdAliasRequest = record {
+@@ -433,8 +434,8 @@ type PrepareIdAliasRequest = record {
  };
  
  type PrepareIdAliasError = variant {
@@ -59,7 +60,7 @@ index ae4fc77f..b5a84b1e 100644
  };
  
  /// The prepared id alias contains two (still unsigned) credentials in JWT format,
-@@ -417,8 +417,8 @@ type GetIdAliasRequest = record {
+@@ -457,8 +458,8 @@ type GetIdAliasRequest = record {
  };
  
  type GetIdAliasError = variant {
@@ -70,7 +71,7 @@ index ae4fc77f..b5a84b1e 100644
      /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
      NoSuchCredentials : text;
  };
-@@ -490,7 +490,7 @@ service : (opt InternetIdentityInit) -> {
+@@ -534,7 +535,7 @@ service : (opt InternetIdentityInit) -> {
      // Replaces the authentication method independent metadata map.
      // The existing metadata map will be overwritten.
      // Requires authentication.
