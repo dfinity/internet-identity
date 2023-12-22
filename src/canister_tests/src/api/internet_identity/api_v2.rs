@@ -105,3 +105,67 @@ pub fn authn_method_remove(
     )
     .map(|(x,)| x)
 }
+
+pub fn tentative_authn_method_registration_mode_enter(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Result<RegistrationModeInfo, ()>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "tentative_authn_method_registration_mode_enter",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn tentative_authn_method_registration_mode_exit(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Result<(), ()>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "tentative_authn_method_registration_mode_exit",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn tentative_authn_method_add(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    identity_number: IdentityNumber,
+    authn_method: &AuthnMethodData,
+) -> Result<Result<TentativeAuthnMethodAddInfo, TentativeAuthnMethodAddError>, CallError> {
+    call_candid(
+        env,
+        canister_id,
+        "tentative_authn_method_add",
+        (identity_number, authn_method),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn tentative_authn_method_verify(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    verification_code: &str,
+) -> Result<Result<(), TentativeAuthnMethodVerificationError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "tentative_authn_method_verify",
+        (identity_number, verification_code),
+    )
+    .map(|(x,)| x)
+}

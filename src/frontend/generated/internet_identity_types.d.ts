@@ -220,6 +220,18 @@ export interface StreamingCallbackHttpResponse {
 export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
+export type TentativeAuthnMethodAddError = { 'RegistrationModeOff' : null } |
+  { 'VerificationAlreadyInProgress' : null } |
+  { 'InvalidMetadata' : string };
+export interface TentativeAuthnMethodAddInfo {
+  'expiration' : Timestamp,
+  'verification_code' : string,
+}
+export type TentativeAuthnMethodVerificationError = {
+    'NoAuthnMethodToVerify' : null
+  } |
+  { 'RegistrationModeOff' : null } |
+  { 'WrongCode' : { 'retries_left' : number } };
 export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
@@ -313,6 +325,26 @@ export interface _SERVICE {
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  'tentative_authn_method_add' : ActorMethod<
+    [IdentityNumber, AuthnMethodData],
+    { 'Ok' : TentativeAuthnMethodAddInfo } |
+      { 'Err' : TentativeAuthnMethodAddError }
+  >,
+  'tentative_authn_method_registration_mode_enter' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : { 'expiration' : Timestamp } } |
+      { 'Err' : null }
+  >,
+  'tentative_authn_method_registration_mode_exit' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : null } |
+      { 'Err' : null }
+  >,
+  'tentative_authn_method_verify' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : TentativeAuthnMethodVerificationError }
+  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

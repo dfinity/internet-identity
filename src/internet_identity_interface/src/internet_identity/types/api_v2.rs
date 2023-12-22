@@ -86,3 +86,28 @@ pub enum IdentityRegisterError {
 pub enum AuthnMethodAddError {
     InvalidMetadata(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RegistrationModeInfo {
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct TentativeAuthnMethodAddInfo {
+    pub verification_code: String,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum TentativeAuthnMethodAddError {
+    RegistrationModeOff,
+    VerificationAlreadyInProgress,
+    InvalidMetadata(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum TentativeAuthnMethodVerificationError {
+    WrongCode { retries_left: u8 },
+    RegistrationModeOff,
+    NoAuthnMethodToVerify,
+}
