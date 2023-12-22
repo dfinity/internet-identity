@@ -633,6 +633,20 @@ mod v2_api {
 
     #[update]
     #[candid_method]
+    fn authn_method_replace(
+        identity_number: IdentityNumber,
+        authn_method_pk: PublicKey,
+        new_authn_method: AuthnMethodData,
+    ) -> Result<(), AuthnMethodReplaceError> {
+        let new_device = DeviceWithUsage::try_from(new_authn_method)
+            .map(DeviceData::from)
+            .map_err(|err| AuthnMethodReplaceError::InvalidMetadata(err.to_string()))?;
+        replace(identity_number, authn_method_pk, new_device);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
     fn authn_method_metadata_replace(
         identity_number: IdentityNumber,
         authn_method_pk: PublicKey,
