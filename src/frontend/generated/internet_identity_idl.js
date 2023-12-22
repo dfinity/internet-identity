@@ -107,6 +107,10 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : AuthnMethodPurpose,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
+  const AuthnMethodMetadataReplaceError = IDL.Variant({
+    'AuthnMethodNotFound' : IDL.Null,
+    'InvalidMetadata' : IDL.Text,
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -288,6 +292,16 @@ export const idlFactory = ({ IDL }) => {
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
+        [],
+      ),
+    'authn_method_metadata_replace' : IDL.Func(
+        [IdentityNumber, PublicKey, MetadataMapV2],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AuthnMethodMetadataReplaceError,
+          }),
+        ],
         [],
       ),
     'authn_method_remove' : IDL.Func(
