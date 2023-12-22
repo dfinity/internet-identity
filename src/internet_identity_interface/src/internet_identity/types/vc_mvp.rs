@@ -32,7 +32,7 @@ pub struct PreparedIdAlias {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum PrepareIdAliasError {
-    AuthenticationFailed(String),
+    Unauthorized,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -57,6 +57,6 @@ pub struct GetIdAliasRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetIdAliasError {
-    AuthenticationFailed(String),
+    Unauthorized,
     NoSuchCredentials(String),
 }

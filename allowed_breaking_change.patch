@@ -1,5 +1,5 @@
 diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
-index 125d8de0..b5a84b1e 100644
+index ae4fc77f..b5a84b1e 100644
 --- a/src/internet_identity/internet_identity.did
 +++ b/src/internet_identity/internet_identity.did
 @@ -320,21 +320,21 @@ type PublicKeyAuthn = record {
@@ -48,6 +48,28 @@ index 125d8de0..b5a84b1e 100644
  };
  
  type IdentityRegisterError = variant {
+@@ -393,8 +393,8 @@ type PrepareIdAliasRequest = record {
+ };
+ 
+ type PrepareIdAliasError = variant {
+-    /// The caller is not authorized to call this method with the given arguments.
+-    Unauthorized;
++    /// Caller authentication failed.
++    AuthenticationFailed : text;
+ };
+ 
+ /// The prepared id alias contains two (still unsigned) credentials in JWT format,
+@@ -417,8 +417,8 @@ type GetIdAliasRequest = record {
+ };
+ 
+ type GetIdAliasError = variant {
+-    /// The caller is not authorized to call this method with the given arguments.
+-    Unauthorized;
++    /// Caller authentication failed.
++    AuthenticationFailed : text;
+     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
+     NoSuchCredentials : text;
+ };
 @@ -490,7 +490,7 @@ service : (opt InternetIdentityInit) -> {
      // Replaces the authentication method independent metadata map.
      // The existing metadata map will be overwritten.

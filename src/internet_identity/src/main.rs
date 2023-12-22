@@ -675,6 +675,73 @@ mod v2_api {
             ))
         })
     }
+
+    #[update]
+    #[candid_method]
+    fn tentative_authn_method_registration_mode_enter(
+        identity_number: IdentityNumber,
+    ) -> Result<RegistrationModeInfo, ()> {
+        let timeout = enter_device_registration_mode(identity_number);
+        Ok(RegistrationModeInfo {
+            expiration: timeout,
+        })
+    }
+
+    #[update]
+    #[candid_method]
+    fn tentative_authn_method_registration_mode_exit(
+        identity_number: IdentityNumber,
+    ) -> Result<(), ()> {
+        exit_device_registration_mode(identity_number);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
+    async fn tentative_authn_method_add(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Result<TentativeAuthnMethodAddInfo, TentativeAuthnMethodAddError> {
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| TentativeAuthnMethodAddError::InvalidMetadata(err.to_string()))?;
+        let result = add_tentative_device(identity_number, DeviceData::from(device)).await;
+        match result {
+            AddTentativeDeviceResponse::AddedTentatively {
+                device_registration_timeout,
+                verification_code,
+            } => Ok(TentativeAuthnMethodAddInfo {
+                expiration: device_registration_timeout,
+                verification_code,
+            }),
+            AddTentativeDeviceResponse::DeviceRegistrationModeOff => {
+                Err(TentativeAuthnMethodAddError::RegistrationModeOff)
+            }
+            AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
+                Err(TentativeAuthnMethodAddError::VerificationAlreadyInProgress)
+            }
+        }
+    }
+
+    #[update]
+    #[candid_method]
+    fn tentative_authn_method_verify(
+        identity_number: IdentityNumber,
+        verification_code: String,
+    ) -> Result<(), TentativeAuthnMethodVerificationError> {
+        let response = verify_tentative_device(identity_number, verification_code);
+        match response {
+            VerifyTentativeDeviceResponse::Verified => Ok(()),
+            VerifyTentativeDeviceResponse::WrongCode { retries_left } => {
+                Err(TentativeAuthnMethodVerificationError::WrongCode { retries_left })
+            }
+            VerifyTentativeDeviceResponse::DeviceRegistrationModeOff => {
+                Err(TentativeAuthnMethodVerificationError::RegistrationModeOff)
+            }
+            VerifyTentativeDeviceResponse::NoDeviceToVerify => {
+                Err(TentativeAuthnMethodVerificationError::NoAuthnMethodToVerify)
+            }
+        }
+    }
 }
 
 /// API for the attribute sharing mvp
@@ -702,10 +769,7 @@ mod attribute_sharing_mvp {
     #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
         let Ok(_) = check_authentication(req.identity_number) else {
-            return Err(GetIdAliasError::AuthenticationFailed(format!(
-                "{} could not be authenticated.",
-                caller()
-            )));
+            return Err(GetIdAliasError::Unauthorized);
         };
         vc_mvp::get_id_alias(
             req.identity_number,

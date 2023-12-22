@@ -363,6 +363,31 @@ type AuthnMethodRegistrationInfo = record {
     expiration: Timestamp;
 };
 
+type TentativeAuthnMethodAddInfo = record {
+    verification_code: text;
+    expiration: Timestamp;
+};
+
+type TentativeAuthnMethodAddError = variant {
+    // Authentication method registration mode is off, either due to timeout or because it was never enabled.
+    RegistrationModeOff;
+    // There is another authentication method already added tentatively that needs to be verified first.
+    VerificationAlreadyInProgress;
+    // The metadata of the provided authentication method contains invalid entries.
+    InvalidMetadata: text;
+};
+
+type TentativeAuthnMethodVerificationError = variant {
+    // Wrong verification code entered. Retry with correct code.
+    WrongCode: record {
+        retries_left: nat8
+    };
+    // Authentication method registration mode is off, either due to timeout or because it was never enabled.
+    RegistrationModeOff;
+    // There is no tentative authentication method to be verified.
+    NoAuthnMethodToVerify;
+};
+
 type IdentityAuthnInfo = record {
     authn_methods: vec AuthnMethod;
     recovery_authn_methods: vec AuthnMethod;
@@ -404,8 +429,8 @@ type PrepareIdAliasRequest = record {
 };
 
 type PrepareIdAliasError = variant {
-    /// Caller authentication failed.
-    AuthenticationFailed : text;
+    /// The caller is not authorized to call this method with the given arguments.
+    Unauthorized;
 };
 
 /// The prepared id alias contains two (still unsigned) credentials in JWT format,
@@ -428,8 +453,8 @@ type GetIdAliasRequest = record {
 };
 
 type GetIdAliasError = variant {
-    /// Caller authentication failed.
-    AuthenticationFailed : text;
+    /// The caller is not authorized to call this method with the given arguments.
+    Unauthorized;
     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
     NoSuchCredentials : text;
 };
@@ -519,6 +544,27 @@ service : (opt InternetIdentityInit) -> {
     // Removes the authentication method associated with the public key from the identity.
     // Requires authentication.
     authn_method_remove: (IdentityNumber, PublicKey) -> (variant {Ok; Err;});
+
+    // Enters the authentication method registration mode for the identity.
+    // In this mode, a new authentication method can be added tentatively, which then needs to be
+    // verified before it can be used for authentication on this identity.
+    // The registration mode is automatically exited after the returned expiration timestamp.
+    // Requires authentication.
+    tentative_authn_method_registration_mode_enter : (IdentityNumber) -> (variant {Ok: record { expiration: Timestamp; }; Err;});
+
+    // Exits the authentication method registration mode for the identity.
+    // Requires authentication.
+    tentative_authn_method_registration_mode_exit : (IdentityNumber) -> (variant {Ok; Err;});
+
+    // Tentatively adds a new authentication method to the identity.
+    // This authentication method needs to be verified before it can be used for authentication on this identity.
+    tentative_authn_method_add: (IdentityNumber, AuthnMethodData) -> (variant {Ok: TentativeAuthnMethodAddInfo; Err: TentativeAuthnMethodAddError;});
+
+    // Verifies a previously added tentative authentication method.
+    // On successful verification, the tentative authentication method is permanently added to the identity and can
+    // subsequently be used for authentication for that identity.
+    // Requires authentication.
+    tentative_authn_method_verify: (IdentityNumber, verification_code: text) -> (variant {Ok; Err: TentativeAuthnMethodVerificationError;});
 
     // Attribute Sharing MVP API
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.

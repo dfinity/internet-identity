@@ -6,3 +6,4 @@ mod identity_authn_info;
 mod identity_info;
 mod identity_metadata;
 mod identity_register;
+mod tentative_authn_method;
