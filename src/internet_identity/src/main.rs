@@ -635,14 +635,14 @@ mod v2_api {
     #[candid_method]
     fn authn_method_metadata_replace(
         identity_number: IdentityNumber,
-        public_key: PublicKey,
-        metadata: HashMap<String, MetadataEntryV2>,
+        authn_method_pk: PublicKey,
+        new_metadata: HashMap<String, MetadataEntryV2>,
     ) -> Result<(), AuthnMethodMetadataReplaceError> {
         let anchor_info = get_anchor_info(identity_number);
         let Some(device) = anchor_info
             .into_device_data()
             .into_iter()
-            .find(|d| d.pubkey == public_key)
+            .find(|d| d.pubkey == authn_method_pk)
         else {
             return Err(AuthnMethodMetadataReplaceError::AuthnMethodNotFound);
         };
@@ -650,11 +650,11 @@ mod v2_api {
         // We need to assign the metadata to an AuthnMethodData and then convert that to DeviceData in order to get
         // the correct metadata validation with respect to reserved keys, etc.
         let mut authn_method = AuthnMethodData::from(device);
-        authn_method.metadata = metadata;
+        authn_method.metadata = new_metadata;
         let device = DeviceWithUsage::try_from(authn_method)
             .map(DeviceData::from)
             .map_err(|err| AuthnMethodMetadataReplaceError::InvalidMetadata(err.to_string()))?;
-        update(identity_number, public_key, device);
+        update(identity_number, authn_method_pk, device);
         Ok(())
     }
 
