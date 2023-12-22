@@ -413,6 +413,12 @@ type AuthnMethodAddError = variant {
     InvalidMetadata: text;
 };
 
+type AuthnMethodMetadataReplaceError = variant {
+    InvalidMetadata: text;
+    /// No authentication method found with the given public key.
+    AuthnMethodNotFound;
+};
+
 type PrepareIdAliasRequest = record {
     /// Origin of the issuer in the attribute sharing flow.
     issuer : FrontendHostname;
@@ -529,6 +535,11 @@ service : (opt InternetIdentityInit) -> {
     // Adds a new authentication method to the identity.
     // Requires authentication.
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (variant {Ok; Err: AuthnMethodAddError;});
+
+    // Replaces the authentication method metadata map.
+    // The existing metadata map will be overwritten.
+    // Requires authentication.
+    authn_method_metadata_replace: (IdentityNumber, PublicKey, MetadataMapV2) -> (variant {Ok; Err: AuthnMethodMetadataReplaceError;});
 
     // Removes the authentication method associated with the public key from the identity.
     // Requires authentication.
