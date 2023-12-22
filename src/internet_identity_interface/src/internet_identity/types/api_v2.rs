@@ -92,6 +92,7 @@ pub enum AuthnMethodMetadataReplaceError {
     InvalidMetadata(String),
     AuthnMethodNotFound,
 }
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RegistrationModeInfo {
     pub expiration: Timestamp,
 }
