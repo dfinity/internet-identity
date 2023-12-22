@@ -89,6 +89,24 @@ pub fn authn_method_add(
     .map(|(x,)| x)
 }
 
+pub fn authn_method_replace(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    public_key: &PublicKey,
+    authn_method: &AuthnMethodData,
+) -> Result<Result<(), AuthnMethodReplaceError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "authn_method_replace",
+        (identity_number, public_key, authn_method),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn authn_method_metadata_replace(
     env: &StateMachine,
     canister_id: CanisterId,
