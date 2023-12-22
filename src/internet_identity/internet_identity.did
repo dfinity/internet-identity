@@ -388,6 +388,11 @@ type TentativeAuthnMethodVerificationError = variant {
     NoAuthnMethodToVerify;
 };
 
+type IdentityAuthnInfo = record {
+    authn_methods: vec AuthnMethod;
+    recovery_authn_methods: vec AuthnMethod;
+};
+
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_method_registration: opt AuthnMethodRegistrationInfo;
@@ -418,8 +423,8 @@ type PrepareIdAliasRequest = record {
 };
 
 type PrepareIdAliasError = variant {
-    /// Caller authentication failed.
-    AuthenticationFailed : text;
+    /// The caller is not authorized to call this method with the given arguments.
+    Unauthorized;
 };
 
 /// The prepared id alias contains two (still unsigned) credentials in JWT format,
@@ -442,8 +447,8 @@ type GetIdAliasRequest = record {
 };
 
 type GetIdAliasError = variant {
-    /// Caller authentication failed.
-    AuthenticationFailed : text;
+    /// The caller is not authorized to call this method with the given arguments.
+    Unauthorized;
     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
     NoSuchCredentials : text;
 };
@@ -507,6 +512,10 @@ service : (opt InternetIdentityInit) -> {
     // A valid captcha solution to a previously generated captcha (using create_captcha) must be provided.
     // The sender needs to match the supplied authn_method.
     identity_register: (AuthnMethodData, CaptchaResult, opt principal) -> (variant {Ok: IdentityNumber; Err: IdentityRegisterError;});
+
+    // Returns information about the authentication methods of the identity with the given number.
+    // Only returns the minimal information required for authentication without exposing any metadata such as aliases.
+    identity_authn_info: (IdentityNumber) -> (variant {Ok: IdentityAuthnInfo; Err;}) query;
 
     // Returns information about the identity with the given number.
     // Requires authentication.

@@ -63,6 +63,12 @@ pub struct AuthnMethodRegistration {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdentityAuthnInfo {
+    pub authn_methods: Vec<AuthnMethod>,
+    pub recovery_authn_methods: Vec<AuthnMethod>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
     pub authn_method_registration: Option<AuthnMethodRegistration>,

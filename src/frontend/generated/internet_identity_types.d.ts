@@ -98,8 +98,8 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
-export type GetIdAliasError = { 'NoSuchCredentials' : string } |
-  { 'AuthenticationFailed' : string };
+export type GetIdAliasError = { 'Unauthorized' : null } |
+  { 'NoSuchCredentials' : string };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
   'issuer' : FrontendHostname,
@@ -129,6 +129,10 @@ export interface IdAliasCredentials {
 export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
+}
+export interface IdentityAuthnInfo {
+  'authn_methods' : Array<AuthnMethod>,
+  'recovery_authn_methods' : Array<AuthnMethod>,
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
@@ -177,7 +181,7 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
-export type PrepareIdAliasError = { 'AuthenticationFailed' : string };
+export type PrepareIdAliasError = { 'Unauthorized' : null };
 export interface PrepareIdAliasRequest {
   'issuer' : FrontendHostname,
   'relying_party' : FrontendHostname,
@@ -271,6 +275,11 @@ export interface _SERVICE {
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
+  'identity_authn_info' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : IdentityAuthnInfo } |
+      { 'Err' : null }
+  >,
   'identity_info' : ActorMethod<
     [IdentityNumber],
     { 'Ok' : IdentityInfo } |

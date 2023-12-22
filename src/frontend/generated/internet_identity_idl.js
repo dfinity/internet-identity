@@ -183,8 +183,8 @@ export const idlFactory = ({ IDL }) => {
     'issuer_id_alias_credential' : SignedIdAlias,
   });
   const GetIdAliasError = IDL.Variant({
+    'Unauthorized' : IDL.Null,
     'NoSuchCredentials' : IDL.Text,
-    'AuthenticationFailed' : IDL.Text,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -216,6 +216,10 @@ export const idlFactory = ({ IDL }) => {
     'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
+  const IdentityAuthnInfo = IDL.Record({
+    'authn_methods' : IDL.Vec(AuthnMethod),
+    'recovery_authn_methods' : IDL.Vec(AuthnMethod),
+  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'authn_method' : IDL.Opt(AuthnMethodData),
@@ -246,9 +250,7 @@ export const idlFactory = ({ IDL }) => {
     'issuer_id_alias_jwt' : IDL.Text,
     'canister_sig_pk_der' : PublicKey,
   });
-  const PrepareIdAliasError = IDL.Variant({
-    'AuthenticationFailed' : IDL.Text,
-  });
+  const PrepareIdAliasError = IDL.Variant({ 'Unauthorized' : IDL.Null });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
@@ -324,6 +326,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
+    'identity_authn_info' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Variant({ 'Ok' : IdentityAuthnInfo, 'Err' : IDL.Null })],
+        ['query'],
+      ),
     'identity_info' : IDL.Func(
         [IdentityNumber],
         [IDL.Variant({ 'Ok' : IdentityInfo, 'Err' : IDL.Null })],

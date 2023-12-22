@@ -659,10 +659,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
         },
     )?;
 
-    assert!(matches!(
-        response,
-        Err(GetIdAliasError::AuthenticationFailed(_))
-    ));
+    assert!(matches!(response, Err(GetIdAliasError::Unauthorized)));
     Ok(())
 }
 
