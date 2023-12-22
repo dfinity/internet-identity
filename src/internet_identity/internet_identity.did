@@ -417,6 +417,12 @@ type AuthnMethodAddError = variant {
     InvalidMetadata: text;
 };
 
+type AuthnMethodReplaceError = variant {
+    InvalidMetadata: text;
+    // No authentication method found with the given public key.
+    AuthnMethodNotFound;
+};
+
 type AuthnMethodMetadataReplaceError = variant {
     InvalidMetadata: text;
     /// No authentication method found with the given public key.
@@ -539,6 +545,11 @@ service : (opt InternetIdentityInit) -> {
     // Adds a new authentication method to the identity.
     // Requires authentication.
     authn_method_add: (IdentityNumber, AuthnMethodData) -> (variant {Ok; Err: AuthnMethodAddError;});
+
+    // Atomically replaces the authentication method matching the supplied public key with the new authentication method
+    // provided.
+    // Requires authentication.
+    authn_method_replace: (IdentityNumber, PublicKey, AuthnMethodData) -> (variant {Ok; Err: AuthnMethodReplaceError;});
 
     // Replaces the authentication method metadata map.
     // The existing metadata map will be overwritten.

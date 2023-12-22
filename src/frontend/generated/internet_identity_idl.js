@@ -114,6 +114,10 @@ export const idlFactory = ({ IDL }) => {
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
+  const AuthnMethodReplaceError = IDL.Variant({
+    'AuthnMethodNotFound' : IDL.Null,
+    'InvalidMetadata' : IDL.Text,
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -322,6 +326,11 @@ export const idlFactory = ({ IDL }) => {
     'authn_method_remove' : IDL.Func(
         [IdentityNumber, PublicKey],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
+        [],
+      ),
+    'authn_method_replace' : IDL.Func(
+        [IdentityNumber, PublicKey, AuthnMethodData],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodReplaceError })],
         [],
       ),
     'captcha_create' : IDL.Func(
