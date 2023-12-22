@@ -105,6 +105,11 @@ pub enum AuthnMethodMetadataReplaceError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AuthnMethodSecuritySettingsReplaceError {
+    AuthnMethodNotFound,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RegistrationModeInfo {
     pub expiration: Timestamp,
 }

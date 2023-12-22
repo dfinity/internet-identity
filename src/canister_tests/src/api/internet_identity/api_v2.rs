@@ -125,6 +125,24 @@ pub fn authn_method_metadata_replace(
     .map(|(x,)| x)
 }
 
+pub fn authn_method_security_settings_replace(
+    env: &StateMachine,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    public_key: &PublicKey,
+    security_settings: &AuthnMethodSecuritySettings,
+) -> Result<Result<(), AuthnMethodSecuritySettingsReplaceError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        sender,
+        "authn_method_security_settings_replace",
+        (identity_number, public_key, security_settings),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn authn_method_remove(
     env: &StateMachine,
     canister_id: CanisterId,

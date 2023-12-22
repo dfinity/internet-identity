@@ -674,6 +674,28 @@ mod v2_api {
 
     #[update]
     #[candid_method]
+    fn authn_method_security_settings_replace(
+        identity_number: IdentityNumber,
+        authn_method_pk: PublicKey,
+        new_security_settings: AuthnMethodSecuritySettings,
+    ) -> Result<(), AuthnMethodSecuritySettingsReplaceError> {
+        let anchor_info = get_anchor_info(identity_number);
+        let Some(mut device) = anchor_info
+            .into_device_data()
+            .into_iter()
+            .find(|d| d.pubkey == authn_method_pk)
+        else {
+            return Err(AuthnMethodSecuritySettingsReplaceError::AuthnMethodNotFound);
+        };
+
+        device.protection = DeviceProtection::from(new_security_settings.protection);
+        device.purpose = Purpose::from(new_security_settings.purpose);
+        update(identity_number, authn_method_pk, device);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntryV2>,
