@@ -2,6 +2,7 @@ mod authn_method_add;
 mod authn_method_metadata;
 mod authn_method_remove;
 mod authn_method_replace;
+mod authn_method_security_settings;
 pub mod authn_method_test_helpers;
 mod identity_authn_info;
 mod identity_info;

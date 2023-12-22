@@ -52,6 +52,9 @@ export interface AuthnMethodSecuritySettings {
   'protection' : AuthnMethodProtection,
   'purpose' : AuthnMethodPurpose,
 }
+export type AuthnMethodSecuritySettingsReplaceError = {
+    'AuthnMethodNotFound' : null
+  };
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -283,6 +286,11 @@ export interface _SERVICE {
     [IdentityNumber, PublicKey, AuthnMethodData],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodReplaceError }
+  >,
+  'authn_method_security_settings_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthnMethodSecuritySettings],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
   'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
   'create_challenge' : ActorMethod<[], Challenge>,
