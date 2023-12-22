@@ -31,11 +31,10 @@ export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
   { 'WebAuthn' : WebAuthn };
 export type AuthnMethodAddError = { 'InvalidMetadata' : string };
 export interface AuthnMethodData {
+  'security_settings' : AuthnMethodSecuritySettings,
   'metadata' : MetadataMapV2,
-  'protection' : AuthnMethodProtection,
   'last_authentication' : [] | [Timestamp],
   'authn_method' : AuthnMethod,
-  'purpose' : AuthnMethodPurpose,
 }
 export type AuthnMethodMetadataReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
@@ -49,6 +48,10 @@ export interface AuthnMethodRegistrationInfo {
 }
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
+export interface AuthnMethodSecuritySettings {
+  'protection' : AuthnMethodProtection,
+  'purpose' : AuthnMethodPurpose,
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],

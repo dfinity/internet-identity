@@ -43,15 +43,20 @@ pub enum AuthnMethod {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AuthnMethodSecuritySettings {
+    pub protection: AuthnMethodProtection,
+    pub purpose: AuthnMethodPurpose,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AuthnMethodData {
     pub authn_method: AuthnMethod,
+    pub security_settings: AuthnMethodSecuritySettings,
     // contains now the following fields
     // - alias
     // - origin
     // - key_type: reduced to "platform", "cross_platform" on migration
     pub metadata: HashMap<String, MetadataEntryV2>,
-    pub protection: AuthnMethodProtection,
-    pub purpose: AuthnMethodPurpose,
     // last usage timestamp cannot be written and will always be ignored on write
     pub last_authentication: Option<Timestamp>,
 }

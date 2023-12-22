@@ -20,7 +20,7 @@ fn should_get_identity_authn_info() -> Result<(), CallError> {
         identity_authn_info.authn_methods,
         authn_methods
             .iter()
-            .filter(|x| x.purpose == AuthnMethodPurpose::Authentication)
+            .filter(|x| x.security_settings.purpose == AuthnMethodPurpose::Authentication)
             .map(|x| x.authn_method.clone())
             .collect::<Vec<_>>()
     );
@@ -28,7 +28,7 @@ fn should_get_identity_authn_info() -> Result<(), CallError> {
         identity_authn_info.recovery_authn_methods,
         authn_methods
             .iter()
-            .filter(|x| x.purpose == AuthnMethodPurpose::Recovery)
+            .filter(|x| x.security_settings.purpose == AuthnMethodPurpose::Recovery)
             .map(|x| x.authn_method.clone())
             .collect::<Vec<_>>()
     );

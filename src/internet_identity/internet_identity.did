@@ -337,10 +337,14 @@ type AuthnMethodPurpose = variant {
     Authentication;
 };
 
-type AuthnMethodData = record {
-    authn_method: AuthnMethod;
+type AuthnMethodSecuritySettings = record {
     protection: AuthnMethodProtection;
     purpose: AuthnMethodPurpose;
+};
+
+type AuthnMethodData = record {
+    authn_method: AuthnMethod;
+    security_settings: AuthnMethodSecuritySettings;
     // contains the following fields of the DeviceWithUsage type:
     // - alias
     // - origin
