@@ -70,6 +70,18 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const IdentityNumber = IDL.Nat64;
+  const AuthnMethodProtection = IDL.Variant({
+    'Protected' : IDL.Null,
+    'Unprotected' : IDL.Null,
+  });
+  const AuthnMethodPurpose = IDL.Variant({
+    'Recovery' : IDL.Null,
+    'Authentication' : IDL.Null,
+  });
+  const AuthnMethodSecuritySettings = IDL.Record({
+    'protection' : AuthnMethodProtection,
+    'purpose' : AuthnMethodPurpose,
+  });
   MetadataMapV2.fill(
     IDL.Vec(
       IDL.Tuple(
@@ -82,10 +94,6 @@ export const idlFactory = ({ IDL }) => {
       )
     )
   );
-  const AuthnMethodProtection = IDL.Variant({
-    'Protected' : IDL.Null,
-    'Unprotected' : IDL.Null,
-  });
   const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
   const WebAuthn = IDL.Record({
     'pubkey' : PublicKey,
@@ -95,16 +103,11 @@ export const idlFactory = ({ IDL }) => {
     'PubKey' : PublicKeyAuthn,
     'WebAuthn' : WebAuthn,
   });
-  const AuthnMethodPurpose = IDL.Variant({
-    'Recovery' : IDL.Null,
-    'Authentication' : IDL.Null,
-  });
   const AuthnMethodData = IDL.Record({
+    'security_settings' : AuthnMethodSecuritySettings,
     'metadata' : MetadataMapV2,
-    'protection' : AuthnMethodProtection,
     'last_authentication' : IDL.Opt(Timestamp),
     'authn_method' : AuthnMethod,
-    'purpose' : AuthnMethodPurpose,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
   const AuthnMethodMetadataReplaceError = IDL.Variant({
