@@ -46,6 +46,8 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
+export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
+  { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
   'protection' : AuthnMethodProtection,
   'purpose' : AuthnMethodPurpose,
@@ -276,6 +278,11 @@ export interface _SERVICE {
     [IdentityNumber, PublicKey],
     { 'Ok' : null } |
       { 'Err' : null }
+  >,
+  'authn_method_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthnMethodData],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodReplaceError }
   >,
   'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
   'create_challenge' : ActorMethod<[], Challenge>,
