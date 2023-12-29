@@ -212,13 +212,9 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
             "expected exactly two verifiable credentials".to_string(),
         ));
     }
-    let id_alias_vc_jws =
-        presentation
-            .verifiable_credential
-            .get(0)
-            .ok_or(PresentationVerificationError::Unknown(
-                "missing id_alias vc".to_string(),
-            ))?;
+    let id_alias_vc_jws = presentation.verifiable_credential.first().ok_or(
+        PresentationVerificationError::Unknown("missing id_alias vc".to_string()),
+    )?;
     let alias_tuple = get_verified_id_alias_from_jws(
         id_alias_vc_jws.as_str(),
         &vc_flow_signers.ii_canister_id,

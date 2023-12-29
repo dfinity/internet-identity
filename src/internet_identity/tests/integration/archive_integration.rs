@@ -261,7 +261,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &register_entry
         );
 
@@ -375,7 +375,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &expected_register_entry
         );
 
@@ -506,7 +506,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &expected_metadata_entry
         );
 
@@ -715,7 +715,7 @@ mod pull_entries_tests {
             message: format!("Canister {} is stopped", ii_canister.to_text()),
         };
         assert_eq!(
-            status.call_info.call_errors.get(0).unwrap(),
+            status.call_info.call_errors.first().unwrap(),
             &expected_error
         );
         Ok(())
