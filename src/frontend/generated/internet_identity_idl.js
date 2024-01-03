@@ -110,8 +110,22 @@ export const idlFactory = ({ IDL }) => {
     'authn_method' : AuthnMethod,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
+  const AuthnMethodConfirmationError = IDL.Variant({
+    'RegistrationModeOff' : IDL.Null,
+    'NoAuthnMethodToConfirm' : IDL.Null,
+    'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
+  });
   const AuthnMethodMetadataReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
+    'InvalidMetadata' : IDL.Text,
+  });
+  const AuthnMethodConfirmationCode = IDL.Record({
+    'confirmation_code' : IDL.Text,
+    'expiration' : Timestamp,
+  });
+  const AuthnMethodRegisterError = IDL.Variant({
+    'RegistrationModeOff' : IDL.Null,
+    'RegistrationAlreadyInProgress' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
   const AuthnMethodReplaceError = IDL.Variant({
@@ -283,20 +297,6 @@ export const idlFactory = ({ IDL }) => {
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
   });
-  const TentativeAuthnMethodAddInfo = IDL.Record({
-    'expiration' : Timestamp,
-    'verification_code' : IDL.Text,
-  });
-  const TentativeAuthnMethodAddError = IDL.Variant({
-    'RegistrationModeOff' : IDL.Null,
-    'VerificationAlreadyInProgress' : IDL.Null,
-    'InvalidMetadata' : IDL.Text,
-  });
-  const TentativeAuthnMethodVerificationError = IDL.Variant({
-    'NoAuthnMethodToVerify' : IDL.Null,
-    'RegistrationModeOff' : IDL.Null,
-    'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
-  });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
@@ -316,6 +316,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
         [],
       ),
+    'authn_method_confirm' : IDL.Func(
+        [IdentityNumber, IDL.Text],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AuthnMethodConfirmationError,
+          }),
+        ],
+        [],
+      ),
     'authn_method_metadata_replace' : IDL.Func(
         [IdentityNumber, PublicKey, MetadataMapV2],
         [
@@ -324,6 +334,31 @@ export const idlFactory = ({ IDL }) => {
             'Err' : AuthnMethodMetadataReplaceError,
           }),
         ],
+        [],
+      ),
+    'authn_method_register' : IDL.Func(
+        [IdentityNumber, AuthnMethodData],
+        [
+          IDL.Variant({
+            'Ok' : AuthnMethodConfirmationCode,
+            'Err' : AuthnMethodRegisterError,
+          }),
+        ],
+        [],
+      ),
+    'authn_method_registration_mode_enter' : IDL.Func(
+        [IdentityNumber],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Record({ 'expiration' : Timestamp }),
+            'Err' : IDL.Null,
+          }),
+        ],
+        [],
+      ),
+    'authn_method_registration_mode_exit' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
         [],
       ),
     'authn_method_remove' : IDL.Func(
@@ -419,41 +454,6 @@ export const idlFactory = ({ IDL }) => {
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
-    'tentative_authn_method_add' : IDL.Func(
-        [IdentityNumber, AuthnMethodData],
-        [
-          IDL.Variant({
-            'Ok' : TentativeAuthnMethodAddInfo,
-            'Err' : TentativeAuthnMethodAddError,
-          }),
-        ],
-        [],
-      ),
-    'tentative_authn_method_registration_mode_enter' : IDL.Func(
-        [IdentityNumber],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Record({ 'expiration' : Timestamp }),
-            'Err' : IDL.Null,
-          }),
-        ],
-        [],
-      ),
-    'tentative_authn_method_registration_mode_exit' : IDL.Func(
-        [IdentityNumber],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
-        [],
-      ),
-    'tentative_authn_method_verify' : IDL.Func(
-        [IdentityNumber, IDL.Text],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Null,
-            'Err' : TentativeAuthnMethodVerificationError,
-          }),
-        ],
-        [],
-      ),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],

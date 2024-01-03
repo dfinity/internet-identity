@@ -714,7 +714,7 @@ mod v2_api {
 
     #[update]
     #[candid_method]
-    fn tentative_authn_method_registration_mode_enter(
+    fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
     ) -> Result<RegistrationModeInfo, ()> {
         let timeout = enter_device_registration_mode(identity_number);
@@ -725,56 +725,54 @@ mod v2_api {
 
     #[update]
     #[candid_method]
-    fn tentative_authn_method_registration_mode_exit(
-        identity_number: IdentityNumber,
-    ) -> Result<(), ()> {
+    fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
         exit_device_registration_mode(identity_number);
         Ok(())
     }
 
     #[update]
     #[candid_method]
-    async fn tentative_authn_method_add(
+    async fn authn_method_register(
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
-    ) -> Result<TentativeAuthnMethodAddInfo, TentativeAuthnMethodAddError> {
+    ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         let device = DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| TentativeAuthnMethodAddError::InvalidMetadata(err.to_string()))?;
+            .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
         let result = add_tentative_device(identity_number, DeviceData::from(device)).await;
         match result {
             AddTentativeDeviceResponse::AddedTentatively {
                 device_registration_timeout,
                 verification_code,
-            } => Ok(TentativeAuthnMethodAddInfo {
+            } => Ok(AuthnMethodConfirmationCode {
                 expiration: device_registration_timeout,
-                verification_code,
+                confirmation_code: verification_code,
             }),
             AddTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(TentativeAuthnMethodAddError::RegistrationModeOff)
+                Err(AuthnMethodRegisterError::RegistrationModeOff)
             }
             AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
-                Err(TentativeAuthnMethodAddError::VerificationAlreadyInProgress)
+                Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
             }
         }
     }
 
     #[update]
     #[candid_method]
-    fn tentative_authn_method_verify(
+    fn authn_method_confirm(
         identity_number: IdentityNumber,
-        verification_code: String,
-    ) -> Result<(), TentativeAuthnMethodVerificationError> {
-        let response = verify_tentative_device(identity_number, verification_code);
+        confirmation_code: String,
+    ) -> Result<(), AuthnMethodConfirmationError> {
+        let response = verify_tentative_device(identity_number, confirmation_code);
         match response {
             VerifyTentativeDeviceResponse::Verified => Ok(()),
             VerifyTentativeDeviceResponse::WrongCode { retries_left } => {
-                Err(TentativeAuthnMethodVerificationError::WrongCode { retries_left })
+                Err(AuthnMethodConfirmationError::WrongCode { retries_left })
             }
             VerifyTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(TentativeAuthnMethodVerificationError::RegistrationModeOff)
+                Err(AuthnMethodConfirmationError::RegistrationModeOff)
             }
             VerifyTentativeDeviceResponse::NoDeviceToVerify => {
-                Err(TentativeAuthnMethodVerificationError::NoAuthnMethodToVerify)
+                Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
             }
         }
     }

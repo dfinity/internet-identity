@@ -367,29 +367,29 @@ type AuthnMethodRegistrationInfo = record {
     expiration: Timestamp;
 };
 
-type TentativeAuthnMethodAddInfo = record {
-    verification_code: text;
+type AuthnMethodConfirmationCode = record {
+    confirmation_code: text;
     expiration: Timestamp;
 };
 
-type TentativeAuthnMethodAddError = variant {
+type AuthnMethodRegisterError = variant {
     // Authentication method registration mode is off, either due to timeout or because it was never enabled.
     RegistrationModeOff;
-    // There is another authentication method already added tentatively that needs to be verified first.
-    VerificationAlreadyInProgress;
+    // There is another authentication method already registered that needs to be confirmed first.
+    RegistrationAlreadyInProgress;
     // The metadata of the provided authentication method contains invalid entries.
     InvalidMetadata: text;
 };
 
-type TentativeAuthnMethodVerificationError = variant {
-    // Wrong verification code entered. Retry with correct code.
+type AuthnMethodConfirmationError = variant {
+    // Wrong confirmation code entered. Retry with correct code.
     WrongCode: record {
         retries_left: nat8
     };
     // Authentication method registration mode is off, either due to timeout or because it was never enabled.
     RegistrationModeOff;
-    // There is no tentative authentication method to be verified.
-    NoAuthnMethodToVerify;
+    // There is no registered authentication method to be confirmed.
+    NoAuthnMethodToConfirm;
 };
 
 type IdentityAuthnInfo = record {
@@ -571,25 +571,25 @@ service : (opt InternetIdentityInit) -> {
     authn_method_remove: (IdentityNumber, PublicKey) -> (variant {Ok; Err;});
 
     // Enters the authentication method registration mode for the identity.
-    // In this mode, a new authentication method can be added tentatively, which then needs to be
-    // verified before it can be used for authentication on this identity.
+    // In this mode, a new authentication method can be registered, which then needs to be
+    // confirmed before it can be used for authentication on this identity.
     // The registration mode is automatically exited after the returned expiration timestamp.
     // Requires authentication.
-    tentative_authn_method_registration_mode_enter : (IdentityNumber) -> (variant {Ok: record { expiration: Timestamp; }; Err;});
+    authn_method_registration_mode_enter : (IdentityNumber) -> (variant {Ok: record { expiration: Timestamp; }; Err;});
 
     // Exits the authentication method registration mode for the identity.
     // Requires authentication.
-    tentative_authn_method_registration_mode_exit : (IdentityNumber) -> (variant {Ok; Err;});
+    authn_method_registration_mode_exit : (IdentityNumber) -> (variant {Ok; Err;});
 
-    // Tentatively adds a new authentication method to the identity.
-    // This authentication method needs to be verified before it can be used for authentication on this identity.
-    tentative_authn_method_add: (IdentityNumber, AuthnMethodData) -> (variant {Ok: TentativeAuthnMethodAddInfo; Err: TentativeAuthnMethodAddError;});
+    // Registers a new authentication method to the identity.
+    // This authentication method needs to be confirmed before it can be used for authentication on this identity.
+    authn_method_register: (IdentityNumber, AuthnMethodData) -> (variant {Ok: AuthnMethodConfirmationCode; Err: AuthnMethodRegisterError;});
 
-    // Verifies a previously added tentative authentication method.
-    // On successful verification, the tentative authentication method is permanently added to the identity and can
+    // Confirms a previously registered authentication method.
+    // On successful confirmation, the authentication method is permanently added to the identity and can
     // subsequently be used for authentication for that identity.
     // Requires authentication.
-    tentative_authn_method_verify: (IdentityNumber, verification_code: text) -> (variant {Ok; Err: TentativeAuthnMethodVerificationError;});
+    authn_method_confirm: (IdentityNumber, confirmation_code: text) -> (variant {Ok; Err: AuthnMethodConfirmationError;});
 
     // Attribute Sharing MVP API
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
