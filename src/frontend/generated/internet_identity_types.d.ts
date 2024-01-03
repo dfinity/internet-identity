@@ -30,6 +30,13 @@ export interface ArchiveInfo {
 export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
   { 'WebAuthn' : WebAuthn };
 export type AuthnMethodAddError = { 'InvalidMetadata' : string };
+export interface AuthnMethodConfirmationCode {
+  'confirmation_code' : string,
+  'expiration' : Timestamp,
+}
+export type AuthnMethodConfirmationError = { 'RegistrationModeOff' : null } |
+  { 'NoAuthnMethodToConfirm' : null } |
+  { 'WrongCode' : { 'retries_left' : number } };
 export interface AuthnMethodData {
   'security_settings' : AuthnMethodSecuritySettings,
   'metadata' : MetadataMapV2,
@@ -42,6 +49,9 @@ export type AuthnMethodProtection = { 'Protected' : null } |
   { 'Unprotected' : null };
 export type AuthnMethodPurpose = { 'Recovery' : null } |
   { 'Authentication' : null };
+export type AuthnMethodRegisterError = { 'RegistrationModeOff' : null } |
+  { 'RegistrationAlreadyInProgress' : null } |
+  { 'InvalidMetadata' : string };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
@@ -230,18 +240,6 @@ export interface StreamingCallbackHttpResponse {
 export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
-export type TentativeAuthnMethodAddError = { 'RegistrationModeOff' : null } |
-  { 'VerificationAlreadyInProgress' : null } |
-  { 'InvalidMetadata' : string };
-export interface TentativeAuthnMethodAddInfo {
-  'expiration' : Timestamp,
-  'verification_code' : string,
-}
-export type TentativeAuthnMethodVerificationError = {
-    'NoAuthnMethodToVerify' : null
-  } |
-  { 'RegistrationModeOff' : null } |
-  { 'WrongCode' : { 'retries_left' : number } };
 export type Timestamp = bigint;
 export type Token = {};
 export type UserKey = PublicKey;
@@ -272,10 +270,30 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
   >,
+  'authn_method_confirm' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodConfirmationError }
+  >,
   'authn_method_metadata_replace' : ActorMethod<
     [IdentityNumber, PublicKey, MetadataMapV2],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodMetadataReplaceError }
+  >,
+  'authn_method_register' : ActorMethod<
+    [IdentityNumber, AuthnMethodData],
+    { 'Ok' : AuthnMethodConfirmationCode } |
+      { 'Err' : AuthnMethodRegisterError }
+  >,
+  'authn_method_registration_mode_enter' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : { 'expiration' : Timestamp } } |
+      { 'Err' : null }
+  >,
+  'authn_method_registration_mode_exit' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : null } |
+      { 'Err' : null }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],
@@ -350,26 +368,6 @@ export interface _SERVICE {
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  'tentative_authn_method_add' : ActorMethod<
-    [IdentityNumber, AuthnMethodData],
-    { 'Ok' : TentativeAuthnMethodAddInfo } |
-      { 'Err' : TentativeAuthnMethodAddError }
-  >,
-  'tentative_authn_method_registration_mode_enter' : ActorMethod<
-    [IdentityNumber],
-    { 'Ok' : { 'expiration' : Timestamp } } |
-      { 'Err' : null }
-  >,
-  'tentative_authn_method_registration_mode_exit' : ActorMethod<
-    [IdentityNumber],
-    { 'Ok' : null } |
-      { 'Err' : null }
-  >,
-  'tentative_authn_method_verify' : ActorMethod<
-    [IdentityNumber, string],
-    { 'Ok' : null } |
-      { 'Err' : TentativeAuthnMethodVerificationError }
-  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
