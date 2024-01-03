@@ -68,6 +68,12 @@
     "logo": "yumi_logo.webp"
   },
   {
+    "name": "Sonic DEX",
+    "oneLiner": "Sonic DEX is an AMM and Perpetual trading platform",
+    "website": "https://sonic.ooo/",
+    "logo": "sonic-dex_logo.webp"
+  },
+  {
     "name": "Stoic Wallet",
     "website": "https://www.stoicwallet.com/",
     "logo": "stoicwallet_logo.webp"
