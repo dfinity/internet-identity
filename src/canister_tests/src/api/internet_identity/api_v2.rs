@@ -160,7 +160,7 @@ pub fn authn_method_remove(
     .map(|(x,)| x)
 }
 
-pub fn tentative_authn_method_registration_mode_enter(
+pub fn authn_method_registration_mode_enter(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
@@ -170,13 +170,13 @@ pub fn tentative_authn_method_registration_mode_enter(
         env,
         canister_id,
         sender,
-        "tentative_authn_method_registration_mode_enter",
+        "authn_method_registration_mode_enter",
         (identity_number,),
     )
     .map(|(x,)| x)
 }
 
-pub fn tentative_authn_method_registration_mode_exit(
+pub fn authn_method_registration_mode_exit(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
@@ -186,40 +186,40 @@ pub fn tentative_authn_method_registration_mode_exit(
         env,
         canister_id,
         sender,
-        "tentative_authn_method_registration_mode_exit",
+        "authn_method_registration_mode_exit",
         (identity_number,),
     )
     .map(|(x,)| x)
 }
 
-pub fn tentative_authn_method_add(
+pub fn authn_method_register(
     env: &StateMachine,
     canister_id: CanisterId,
     identity_number: IdentityNumber,
     authn_method: &AuthnMethodData,
-) -> Result<Result<TentativeAuthnMethodAddInfo, TentativeAuthnMethodAddError>, CallError> {
+) -> Result<Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError>, CallError> {
     call_candid(
         env,
         canister_id,
-        "tentative_authn_method_add",
+        "authn_method_register",
         (identity_number, authn_method),
     )
     .map(|(x,)| x)
 }
 
-pub fn tentative_authn_method_verify(
+pub fn authn_method_confirm(
     env: &StateMachine,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    verification_code: &str,
-) -> Result<Result<(), TentativeAuthnMethodVerificationError>, CallError> {
+    confirmation_code: &str,
+) -> Result<Result<(), AuthnMethodConfirmationError>, CallError> {
     call_candid_as(
         env,
         canister_id,
         sender,
-        "tentative_authn_method_verify",
-        (identity_number, verification_code),
+        "authn_method_confirm",
+        (identity_number, confirmation_code),
     )
     .map(|(x,)| x)
 }

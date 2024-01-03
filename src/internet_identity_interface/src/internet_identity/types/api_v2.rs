@@ -115,21 +115,21 @@ pub struct RegistrationModeInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct TentativeAuthnMethodAddInfo {
-    pub verification_code: String,
+pub struct AuthnMethodConfirmationCode {
+    pub confirmation_code: String,
     pub expiration: Timestamp,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum TentativeAuthnMethodAddError {
+pub enum AuthnMethodRegisterError {
     RegistrationModeOff,
-    VerificationAlreadyInProgress,
+    RegistrationAlreadyInProgress,
     InvalidMetadata(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum TentativeAuthnMethodVerificationError {
+pub enum AuthnMethodConfirmationError {
     WrongCode { retries_left: u8 },
     RegistrationModeOff,
-    NoAuthnMethodToVerify,
+    NoAuthnMethodToConfirm,
 }
