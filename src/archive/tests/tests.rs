@@ -38,7 +38,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
 
     let logs = api::get_entries(&env, canister_id, None, None)?;
     assert_eq!(logs.entries.len(), 1);
-    assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap(), &entry);
+    assert_eq!(logs.entries.first().unwrap().as_ref().unwrap(), &entry);
     let user_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
     assert_eq!(user_logs.entries.len(), 1);
     Ok(())
@@ -84,7 +84,7 @@ mod rollback_tests {
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
         assert_eq!(
-            CompatEntry::from(logs.entries.get(0).unwrap().clone().unwrap()),
+            CompatEntry::from(logs.entries.first().unwrap().clone().unwrap()),
             entry
         );
         Ok(())
@@ -121,7 +121,7 @@ mod rollback_tests {
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 2);
         assert_eq!(
-            CompatEntry::from(logs.entries.get(0).unwrap().clone().unwrap()),
+            CompatEntry::from(logs.entries.first().unwrap().clone().unwrap()),
             entry1
         );
         assert_eq!(
@@ -216,7 +216,7 @@ mod read_tests {
         let logs = api::get_entries(&env, canister_id, None, None)?;
         assert_eq!(logs.entries.len(), 1);
         assert_eq!(
-            logs.entries.get(0).unwrap().as_ref().unwrap(),
+            logs.entries.first().unwrap().as_ref().unwrap(),
             &log_entry_1()
         );
         Ok(())
@@ -251,14 +251,14 @@ mod read_tests {
         let user_1_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(user_1_logs.entries.len(), 1);
         assert_eq!(
-            user_1_logs.entries.get(0).unwrap().as_ref().unwrap(),
+            user_1_logs.entries.first().unwrap().as_ref().unwrap(),
             &log_entry_1()
         );
 
         let user_2_logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_2, None, None)?;
         assert_eq!(user_2_logs.entries.len(), 1);
         assert_eq!(
-            user_2_logs.entries.get(0).unwrap().as_ref().unwrap(),
+            user_2_logs.entries.first().unwrap().as_ref().unwrap(),
             &log_entry_2()
         );
 
@@ -319,7 +319,7 @@ mod read_tests {
             assert_eq!(logs.entries.len(), 2);
             assert_eq!(
                 logs.entries
-                    .get(0)
+                    .first()
                     .unwrap()
                     .as_ref()
                     .unwrap()
@@ -404,7 +404,7 @@ mod read_tests {
         )?;
         assert_eq!(logs.entries.len(), 2);
         assert_eq!(
-            logs.entries.get(0).unwrap().as_ref().unwrap(),
+            logs.entries.first().unwrap().as_ref().unwrap(),
             &log_entry_2()
         );
         assert_eq!(
@@ -449,7 +449,7 @@ mod read_tests {
 
         let logs = api::get_anchor_entries(&env, canister_id, ANCHOR_NUMBER_1, None, None)?;
         assert_eq!(logs.entries.len(), 3);
-        assert_eq!(logs.entries.get(0).unwrap().as_ref().unwrap().timestamp, 1);
+        assert_eq!(logs.entries.first().unwrap().as_ref().unwrap().timestamp, 1);
         assert_eq!(
             logs.entries.get(1).unwrap().as_ref().unwrap().timestamp,
             1u64 << 8
@@ -749,7 +749,7 @@ mod stable_memory_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &register_entry
         );
 
