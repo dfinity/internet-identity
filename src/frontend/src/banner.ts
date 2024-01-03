@@ -6,7 +6,8 @@ import { anyFeatures } from "./features";
 // is a flavored build, or if the origin is not the official II URL.
 export const showWarningIfNecessary = (): void => {
   if (anyFeatures()) {
-    showWarning(html`Test only. Do not use your regular Internet Identity!
+    showWarning(html`Utopia test build. Do not use your regular Internet
+      Identity!
       <a
         class="features-warning-btn"
         target="_blank"

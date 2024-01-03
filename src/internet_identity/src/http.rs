@@ -181,7 +181,7 @@ pub fn content_security_policy_header() -> String {
     let hash2 = JS_SETUP_SCRIPT2_SRI_HASH.to_string();
     let csp = format!(
         "default-src 'none';\
-         connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
+         connect-src *;\
          img-src 'self' data:;\
          script-src '{hash1}' '{hash2}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
          base-uri 'none';\
