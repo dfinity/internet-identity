@@ -95,6 +95,22 @@ then
     exit 1
 fi
 
+# Check for exact node version
+if [[ "$(node --version)" !=  "v$(cat .node-version)" ]]
+then
+    echo; echo
+    echo "!!!WARNING!!!: could not find node with exact expected version: v$(cat .node-version)"
+    # On CI we abort
+    if [ -n "${CI:-}" ]
+    then
+        exit 1
+    fi
+    # If the node version doesn't match 100% the build might still succeed though is less likely
+    # to be reproducible. For developer convenience we still try to go through.
+    echo "This might cause build or reproducibility issues."
+    echo; echo
+fi
+
 # Builds a single canister
 # build_canister CANISTER EXTRA_BUILD_ARGS...
 # CANISTER: possible values: [internet_identity, archive]
