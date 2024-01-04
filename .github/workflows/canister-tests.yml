@@ -850,7 +850,6 @@ jobs:
 
 
   verify-clean-build-hash:
-    if: false # We skip these builds because recent GHA runner changes made the native ubuntu builds non-reproducible
     needs: ['clean-build', 'docker-build-internet_identity_production']
     runs-on: ${{ matrix.os }}
     strategy:

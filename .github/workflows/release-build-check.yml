@@ -53,7 +53,6 @@ jobs:
 
   # Perform the clean build (non-docker), using the release as checkout
   clean-build:
-    if: false # We skip these builds because recent GHA runner changes made the native ubuntu builds non-reproducible
     runs-on: ${{ matrix.os }}
     needs: latest-release
     strategy:
