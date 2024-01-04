@@ -15,14 +15,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
         build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake
 
 # Install node
-RUN curl --fail -sSf https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
+RUN curl --fail -sSf https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 ENV NVM_DIR=/root/.nvm
 COPY .node-version .node-version
 RUN . "$NVM_DIR/nvm.sh" && nvm install "$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm use "v$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm alias default "v$(cat .node-version)"
-RUN ln -s "/root/.nvm/versions/node/v$(cat .node-version)" /root/.nvm/versions/node/default
-ENV PATH="/root/.nvm/versions/node/default/bin/:${PATH}"
+RUN ln -s "$NVM_DIR/versions/node/v$(cat .node-version)" "$NVM_DIR/versions/node/default"
+ENV PATH="$NVM_DIR/versions/node/default/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 
