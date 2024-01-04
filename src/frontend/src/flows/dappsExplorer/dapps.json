@@ -426,5 +426,11 @@
     "website": "https://iclight.io/account",
     "logo": "icrouter_logo.webp",
     "oneLiner": "icRouter: A cross-chain network of assets"
+  },
+  {
+    "name": "The Asset App",
+    "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
+    "logo": "asset-app_logo.png",
+    "oneLiner": "Allows any user to generate their own file canister smart contract and visually manage their files on the Internet Computer without requiring any code"
   }
 ]
