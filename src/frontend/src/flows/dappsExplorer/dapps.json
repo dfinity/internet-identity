@@ -1,7 +1,7 @@
 [
   {
     "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on chain",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
     "website": "https://dscvr.one/",
     "logo": "dscvr_logo.webp"
   },
@@ -27,6 +27,12 @@
     "oneLiner": "Your digital identity for the modern world.",
     "website": "https://t.co/FDpvRjszU3/",
     "logo": "nfid_logo.webp"
+  },
+  {
+    "name": "Trax",
+    "oneLiner": "Trax is the world's first artist and fan-owned music platform.",
+    "website": "https://trax.so/",
+    "logo": "trax_logo.webp"
   },
   {
     "name": "Dmail",
@@ -98,7 +104,7 @@
   },
   {
     "name": "Modclub",
-    "oneLiner": "The world's first AI powered Web3 crowdwork platform",
+    "oneLiner": "The world's first AI-powered Web3 crowdwork platform",
     "website": "https://modclub.ai",
     "logo": "modclub_logo.webp"
   },
@@ -194,7 +200,7 @@
   },
   {
     "name": "CrowdGov.org",
-    "oneLiner": "The simplified, one stop shop for IC Governance.",
+    "oneLiner": "The simplified, one-stop shop for IC Governance.",
     "website": "https://crowdgov.org",
     "logo": "crowdgovorg_logo.webp"
   },
