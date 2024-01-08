@@ -380,8 +380,8 @@ const base64UrlEncode = (x: unknown): string => {
   const b64 = btoa(json);
   // make it URL friendly:
   // '=': used as padding, just remove
-  // '/': Base64Url as per jwt.io's playgrond replaces it with '_'
-  // '+': Base64Url as per jwt.io's playgrond replaces it with '-'
+  // '/': Base64Url as per jwt.io's playground replaces it with '_'
+  // '+': Base64Url as per jwt.io's playground replaces it with '-'
   return b64.replace(/=+$/, "").replace("/", "_").replace("+", "-");
 };
 
