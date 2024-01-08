@@ -186,6 +186,8 @@ After receiving the notification that II is ready, the relying party can request
     * `credentialType`: The type of the requested credential.
     * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
+  * `derivationOrigin`: (optional) The origin that should be used for principal derivation (instead of the client origin) during the verification of `credentialSubject` (applicable if the relying party
+        uses the [Alternative Frontend Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature).
 
 #### Examples
 
@@ -226,7 +228,8 @@ After receiving the notification that II is ready, the relying party can request
             "minAge": 21
         }
     },
-    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae"
+    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae",
+    "derivationOrigin": "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io"
   }
 }
 ```
