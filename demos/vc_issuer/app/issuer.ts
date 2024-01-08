@@ -31,4 +31,9 @@ export class VcIssuer {
     const actor = await this.createActor();
     return await actor.add_employee(Principal.fromText(principal));
   };
+
+  addAdult = async ({ principal }: { principal: string }): Promise<string> => {
+    const actor = await this.createActor();
+    return await actor.add_adult(Principal.fromText(principal));
+  };
 }

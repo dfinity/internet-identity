@@ -261,7 +261,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &register_entry
         );
 
@@ -375,7 +375,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &expected_register_entry
         );
 
@@ -476,7 +476,7 @@ mod pull_entries_tests {
 
         let metadata = HashMap::from_iter(vec![(
             METADATA_KEY.to_string(),
-            MetadataEntry::String("some value".to_string()),
+            MetadataEntryV2::String("some value".to_string()),
         )]);
 
         ii_api::api_v2::identity_metadata_replace(
@@ -485,7 +485,8 @@ mod pull_entries_tests {
             device.principal(),
             anchor,
             &metadata,
-        )?;
+        )?
+        .expect("identity_metadata_replace failed");
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -505,7 +506,7 @@ mod pull_entries_tests {
             sequence_number: 0,
         };
         assert_eq!(
-            entries.entries.get(0).unwrap().as_ref().unwrap(),
+            entries.entries.first().unwrap().as_ref().unwrap(),
             &expected_metadata_entry
         );
 
@@ -714,7 +715,7 @@ mod pull_entries_tests {
             message: format!("Canister {} is stopped", ii_canister.to_text()),
         };
         assert_eq!(
-            status.call_info.call_errors.get(0).unwrap(),
+            status.call_info.call_errors.first().unwrap(),
             &expected_error
         );
         Ok(())

@@ -1,18 +1,19 @@
 //! Tests that `get_identity_info` returns the correct information.
 
+use crate::v2_api::authn_method_test_helpers::{
+    assert_eq_ignoring_last_authentication, create_identity_with_authn_method,
+    create_identity_with_authn_methods, sample_authn_methods,
+};
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, time, II_WASM,
 };
-use canister_tests::{flows, match_value};
-use ic_cdk::api::management_canister::main::CanisterId;
+use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodAddResponse, AuthnMethodData, AuthnMethodRegistration, DeviceData,
-    IdentityInfoResponse, IdentityNumber, KeyType, MetadataEntry, Purpose,
+    AuthnMethodData, AuthnMethodRegistration, DeviceData, DeviceWithUsage, MetadataEntry,
 };
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -23,15 +24,18 @@ use std::time::Duration;
 fn should_get_identity_info() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let devices = sample_devices();
-    let identity_number = create_identity_with_devices(&env, canister_id, &devices);
+    let authn_methods = sample_authn_methods();
+    let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, devices[0].principal(), identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info = api_v2::identity_info(
+        &env,
+        canister_id,
+        authn_methods[0].principal(),
+        identity_number,
+    )?
+    .expect("identity info failed");
 
-    assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &devices);
+    assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &authn_methods);
     assert_eq!(identity_info.authn_method_registration, None);
 
     // check that the last authentication timestamp is set correctly
@@ -48,8 +52,8 @@ fn should_get_identity_info() -> Result<(), CallError> {
 fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let devices = sample_devices();
-    let identity_number = create_identity_with_devices(&env, canister_id, &devices);
+    let authn_methods = sample_authn_methods();
+    let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 
     let result = api_v2::identity_info(&env, canister_id, Principal::anonymous(), identity_number);
 
@@ -66,24 +70,32 @@ fn should_provide_authn_registration() -> Result<(), CallError> {
     const AUTHN_METHOD_REGISTRATION_TIMEOUT: u64 = Duration::from_secs(900).as_nanos() as u64; // 15 minutes
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let device1 = sample_devices().remove(0);
-    let identity_number = flows::register_anchor_with_device(&env, canister_id, &device1);
+    let authn_method1 = sample_authn_methods().remove(0);
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let device2 = DeviceData {
         pubkey: ByteBuf::from([55; 32]),
         metadata: Some(HashMap::from([(
             "recovery_metadata_1".to_string(),
             MetadataEntry::String("recovery data 1".to_string()),
         )])),
-        ..device1.clone()
+        ..DeviceData::from(DeviceWithUsage::try_from(authn_method1.clone()).unwrap())
     };
 
-    api::enter_device_registration_mode(&env, canister_id, device1.principal(), identity_number)?;
+    api::enter_device_registration_mode(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number,
+    )?;
     api::add_tentative_device(&env, canister_id, identity_number, &device2)?;
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, device1.principal(), identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info = api_v2::identity_info(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number,
+    )?
+    .expect("identity info failed");
 
     assert_eq!(
         identity_info.authn_method_registration,
@@ -93,89 +105,4 @@ fn should_provide_authn_registration() -> Result<(), CallError> {
         })
     );
     Ok(())
-}
-
-fn assert_eq_ignoring_last_authentication(
-    authn_methods: &[AuthnMethodData],
-    devices: &[DeviceData],
-) {
-    assert_eq!(
-        authn_methods
-            .iter()
-            .cloned()
-            .map(|mut pass| {
-                pass.last_authentication = None;
-                pass
-            })
-            .collect::<Vec<_>>(),
-        devices
-            .iter()
-            .cloned()
-            .map(AuthnMethodData::from)
-            .collect::<Vec<_>>()
-    );
-}
-
-fn create_identity_with_devices(
-    env: &StateMachine,
-    canister_id: CanisterId,
-    devices: &[DeviceData],
-) -> IdentityNumber {
-    let mut iter = devices.iter();
-    let device1 = iter.next().unwrap();
-    let identity_number = flows::register_anchor_with_device(env, canister_id, device1);
-    for (idx, device) in iter.enumerate() {
-        match_value!(
-            api_v2::authn_method_add(
-                env,
-                canister_id,
-                device1.principal(),
-                identity_number,
-                &AuthnMethodData::from(device.clone()),
-            )
-            .unwrap_or_else(|_| panic!("could not add device {}", idx)),
-            Some(AuthnMethodAddResponse::Ok)
-        );
-    }
-    identity_number
-}
-
-fn sample_devices() -> Vec<DeviceData> {
-    let device1 = DeviceData {
-        metadata: Some(HashMap::from([(
-            "some_key".to_string(),
-            MetadataEntry::String("some data".to_string()),
-        )])),
-        origin: Some("https://some.origin".to_string()),
-        ..DeviceData::auth_test_device()
-    };
-
-    let device2 = DeviceData {
-        pubkey: ByteBuf::from([1; 32]),
-        credential_id: Some(ByteBuf::from([12; 32])),
-        metadata: Some(HashMap::from([(
-            "different_key".to_string(),
-            MetadataEntry::String("other data".to_string()),
-        )])),
-        ..DeviceData::auth_test_device()
-    };
-    let device3 = DeviceData {
-        pubkey: ByteBuf::from([2; 32]),
-        purpose: Purpose::Recovery,
-        key_type: KeyType::SeedPhrase,
-        metadata: Some(HashMap::from([(
-            "recovery_metadata_1".to_string(),
-            MetadataEntry::String("recovery data 1".to_string()),
-        )])),
-        ..DeviceData::auth_test_device()
-    };
-    let device4 = DeviceData {
-        pubkey: ByteBuf::from([3; 32]),
-        purpose: Purpose::Recovery,
-        credential_id: Some(ByteBuf::from("credential id 1")),
-        key_type: KeyType::CrossPlatform,
-        ..DeviceData::auth_test_device()
-    };
-
-    vec![device1, device2, device3, device4]
 }

@@ -5,7 +5,7 @@
 #
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
-FROM --platform=linux/amd64 ubuntu@sha256:626ffe58f6e7566e00254b638eb7e0f3b11d4da9675088f4781a50ae288f3322 as deps
+FROM --platform=linux/amd64 ubuntu@sha256:bbf3d1baa208b7649d1d0264ef7d522e1dc0deeeaaf6085bf8e4618867f03494 as deps
 
 ENV TZ=UTC
 
@@ -15,14 +15,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
         build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake
 
 # Install node
-RUN curl --fail -sSf https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh | bash
+RUN curl --fail -sSf https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 ENV NVM_DIR=/root/.nvm
 COPY .node-version .node-version
 RUN . "$NVM_DIR/nvm.sh" && nvm install "$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm use "v$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm alias default "v$(cat .node-version)"
-RUN ln -s "/root/.nvm/versions/node/v$(cat .node-version)" /root/.nvm/versions/node/default
-ENV PATH="/root/.nvm/versions/node/default/bin/:${PATH}"
+RUN ln -s "$NVM_DIR/versions/node/v$(cat .node-version)" "$NVM_DIR/versions/node/default"
+ENV PATH="$NVM_DIR/versions/node/default/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 

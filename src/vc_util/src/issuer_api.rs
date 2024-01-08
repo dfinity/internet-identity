@@ -1,5 +1,6 @@
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Nat};
 use serde_bytes::ByteBuf;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -17,12 +18,6 @@ pub struct PrepareCredentialRequest {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum PrepareCredentialResponse {
-    Ok(PreparedCredentialData),
-    Err(IssueCredentialError),
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IssueCredentialError {
     UnknownSubject(String),
     UnauthorizedSubject(String),
@@ -37,12 +32,6 @@ pub struct GetCredentialRequest {
     pub signed_id_alias: SignedIdAlias,
     pub credential_spec: CredentialSpec,
     pub prepared_context: Option<ByteBuf>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetCredentialResponse {
-    Ok(IssuedCredentialData),
-    Err(IssueCredentialError),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -66,6 +55,27 @@ impl Display for ArgumentValue {
         match &self {
             ArgumentValue::String(s) => write!(f, "'{}'", s),
             ArgumentValue::Int(i) => write!(f, "{}", i),
+        }
+    }
+}
+
+impl PartialEq<serde_json::Value> for ArgumentValue {
+    fn eq(&self, other: &Value) -> bool {
+        match self {
+            ArgumentValue::String(ls) => {
+                if let Some(rs) = other.as_str() {
+                    ls.eq(rs)
+                } else {
+                    false
+                }
+            }
+            ArgumentValue::Int(li) => {
+                if let Some(ri) = other.as_i64() {
+                    (*li as i64) == ri
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -101,7 +111,6 @@ pub struct Icrc21ConsentPreferences {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Icrc21ErrorInfo {
-    pub error_code: u64,
     pub description: String,
 }
 
@@ -109,19 +118,16 @@ pub struct Icrc21ErrorInfo {
 pub enum Icrc21Error {
     UnsupportedCanisterCall(Icrc21ErrorInfo),
     ConsentMessageUnavailable(Icrc21ErrorInfo),
-    GenericError(Icrc21ErrorInfo),
+    GenericError {
+        error_code: Nat,
+        description: String,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Icrc21ConsentInfo {
     pub consent_message: String,
     pub language: String,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum Icrc21ConsentMessageResponse {
-    Ok(Icrc21ConsentInfo),
-    Err(Icrc21Error),
 }
 
 #[cfg(test)]
@@ -137,6 +143,46 @@ mod tests {
         assert_eq!(
             "'some string'",
             format!("{}", ArgumentValue::String("some string".to_string()))
+        );
+    }
+
+    #[test]
+    fn should_correctly_compare_argument_values() {
+        assert_eq!(ArgumentValue::Int(42), Value::from(42));
+        assert_eq!(ArgumentValue::Int(123456789), Value::from(123456789));
+        assert_eq!(ArgumentValue::Int(0), Value::from(0));
+
+        assert_ne!(ArgumentValue::Int(42), Value::from(11));
+        assert_ne!(ArgumentValue::Int(42), Value::from("some string"));
+        assert_ne!(ArgumentValue::Int(42), Value::from(true));
+        assert_ne!(ArgumentValue::Int(42), Value::from(vec![1, 2, 3]));
+
+        assert_eq!(
+            ArgumentValue::String("same string".to_string()),
+            Value::from("same string")
+        );
+        let long_string = "this is a bit longer string just for testing purposes";
+        assert_eq!(
+            ArgumentValue::String(long_string.to_string()),
+            Value::from(long_string)
+        );
+        assert_eq!(ArgumentValue::String("".to_string()), Value::from(""));
+
+        assert_ne!(
+            ArgumentValue::String("some string".to_string()),
+            Value::from("different")
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(42)
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(true)
+        );
+        assert_ne!(
+            ArgumentValue::String("a string".to_string()),
+            Value::from(vec![1, 2, 3])
         );
     }
 }

@@ -6,12 +6,12 @@ use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
 use crate::storage::DEFAULT_RANGE_SIZE;
-use crate::{Salt, Storage};
+use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
-use candid::{CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize};
 use canister_sig_util::signature_map::SignatureMap;
 use ic_cdk::api::time;
-use ic_cdk::{call, trap};
+use ic_cdk::trap;
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::*;
 use std::cell::{Cell, RefCell};
@@ -193,17 +193,7 @@ pub async fn init_salt() {
         }
     });
 
-    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res,)) => res,
-        Err((_, err)) => trap(&format!("failed to get salt: {err}")),
-    };
-    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
-        trap(&format!(
-            "expected raw randomness to be of length 32, got {}",
-            res.len()
-        ));
-    });
-
+    let salt = random_salt().await;
     storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
 }
 

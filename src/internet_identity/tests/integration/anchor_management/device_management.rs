@@ -32,16 +32,23 @@ fn should_lookup() -> Result<(), CallError> {
         user_number,
         &recovery_device_data_1(),
     )?;
+    api::add(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &large_size_device(),
+    )?;
 
     let mut devices = api::lookup(&env, canister_id, user_number)?;
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
 
     let mut anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
     // clear alias to make it consistent with lookup
-    anchor_info
-        .devices
-        .iter_mut()
-        .for_each(|device| device.alias = "".to_string());
+    anchor_info.devices.iter_mut().for_each(|device| {
+        device.alias = "".to_string();
+        device.metadata = None;
+    });
     anchor_info.devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
 
     assert_eq!(devices, anchor_info.into_device_data());

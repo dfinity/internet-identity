@@ -1,19 +1,18 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
-use ic_cdk::api::{caller, data_certificate, set_certified_data, time};
-use ic_cdk::trap;
-use ic_cdk_macros::{init, query, update};
-use ic_certification::{
-    fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, RbTree,
+use canister_sig_util::{
+    extract_raw_root_pk_from_der, get_signature_as_cbor, CanisterSigPublicKey, IC_ROOT_PK_DER,
 };
+use ic_cdk::api::{caller, set_certified_data, time};
+use ic_cdk_macros::{init, query, update};
+use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
-use serde::Serialize;
+use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -21,10 +20,9 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21Error, Icrc21ErrorInfo, Icrc21VcConsentMessageRequest,
-    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest,
-    PrepareCredentialResponse, PreparedCredentialData, SignedIdAlias,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
@@ -32,13 +30,10 @@ use vc_util::{
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
+use asset_util::{collect_assets, CertifiedAssets, DirectoryTraversalMode};
 use ic_cdk::api;
 use ic_cdk_macros::post_upgrade;
-use lazy_static::lazy_static;
-use serde_bytes::Bytes;
-use std::collections::HashMap;
+use DirectoryTraversalMode::IncludeSubdirs;
 
 mod consent_message;
 
@@ -56,7 +51,7 @@ const VC_EMPLOYER_NAME: &str = "DFINITY Foundation";
 const VC_INSTITUTION_NAME: &str = "DFINITY College of Engineering";
 
 #[derive(Debug)]
-enum SupportedCredentialType {
+pub enum SupportedCredentialType {
     VerifiedEmployee(String),
     UniversityDegree(String),
     VerifiedAdult(u16),
@@ -71,9 +66,7 @@ thread_local! {
     static ADULTS : RefCell<HashSet<Principal>> = RefCell::new(HashSet::new());
 
     // Assets for the management app
-    #[allow(clippy::type_complexity)]
-    static ASSETS: RefCell<HashMap<&'static str, (Vec<(String, String)>, Vec<u8>)>> = RefCell::new(HashMap::default());
-    static ASSET_HASHES: RefCell<RbTree<&'static str, [u8; 32]>> = RefCell::new(RbTree::default());
+    static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
 }
 
 /// Reserve the first stable memory page for the configuration stable cell.
@@ -153,8 +146,11 @@ fn apply_config(init: IssuerInit) {
         .expect("failed to apply issuer config");
 }
 
-fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(alias)?;
+fn authorize_vc_request(
+    alias: &SignedIdAlias,
+    current_time_ns: u128,
+) -> Result<AliasTuple, IssueCredentialError> {
+    let alias_tuple = extract_id_alias(alias, current_time_ns)?;
 
     if caller() != alias_tuple.id_dapp {
         return Err(IssueCredentialError::UnauthorizedSubject(format!(
@@ -166,7 +162,10 @@ fn authorize_vc_request(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCreden
     Ok(alias_tuple)
 }
 
-fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredentialError> {
+fn extract_id_alias(
+    alias: &SignedIdAlias,
+    current_time_ns: u128,
+) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
 
@@ -175,6 +174,7 @@ fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredential
                 &alias.credential_jws,
                 idp_canister_id,
                 &config.ic_root_key_raw,
+                current_time_ns,
             ) {
                 return Ok(alias_tuple);
             }
@@ -187,23 +187,23 @@ fn extract_id_alias(alias: &SignedIdAlias) -> Result<AliasTuple, IssueCredential
 
 #[update]
 #[candid_method]
-async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialResponse {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+async fn prepare_credential(
+    req: PrepareCredentialRequest,
+) -> Result<PreparedCredentialData, IssueCredentialError> {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
-        Err(err) => return PrepareCredentialResponse::Err(err),
+        Err(err) => return Err(err),
     };
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
-            return PrepareCredentialResponse::Err(
-                IssueCredentialError::UnsupportedCredentialSpec(err),
-            );
+            return Err(IssueCredentialError::UnsupportedCredentialSpec(err));
         }
     };
 
     let credential = match prepare_credential_payload(&credential_type, &alias_tuple) {
         Ok(credential) => credential,
-        Err(err) => return PrepareCredentialResponse::Err(err),
+        Err(err) => return Result::<PreparedCredentialData, IssueCredentialError>::Err(err),
     };
     let seed = calculate_seed(&alias_tuple.id_alias);
     let canister_id = ic_cdk::id();
@@ -220,18 +220,18 @@ async fn prepare_credential(req: PrepareCredentialRequest) -> PrepareCredentialR
         add_signature(&mut sigs, msg_hash, seed);
     });
     update_root_hash();
-    PrepareCredentialResponse::Ok(PreparedCredentialData {
+    Ok(PreparedCredentialData {
         prepared_context: Some(ByteBuf::from(credential_jwt.as_bytes())),
     })
 }
 
 fn update_root_hash() {
-    SIGNATURES.with(|sigs| {
-        ASSET_HASHES.with(|ah| {
+    SIGNATURES.with_borrow(|sigs| {
+        ASSETS.with_borrow(|assets| {
             let prefixed_root_hash = fork_hash(
                 // NB: Labels added in lexicographic order.
-                &labeled_hash(b"http_assets", &ah.borrow().root_hash()),
-                &labeled_hash(LABEL_SIG, &sigs.borrow().root_hash()),
+                &assets.root_hash(),
+                &labeled_hash(LABEL_SIG, &sigs.root_hash()),
             );
 
             set_certified_data(&prefixed_root_hash[..]);
@@ -241,13 +241,15 @@ fn update_root_hash() {
 
 #[query]
 #[candid_method(query)]
-fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias) {
+fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
         Ok(alias_tuple) => alias_tuple,
-        Err(err) => return GetCredentialResponse::Err(err),
+        Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
-        return GetCredentialResponse::Err(IssueCredentialError::UnsupportedCredentialSpec(err));
+        return Result::<IssuedCredentialData, IssueCredentialError>::Err(
+            IssueCredentialError::UnsupportedCredentialSpec(err),
+        );
     }
     let subject_principal = alias_tuple.id_alias;
     let seed = calculate_seed(&subject_principal);
@@ -255,43 +257,60 @@ fn get_credential(req: GetCredentialRequest) -> GetCredentialResponse {
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
     let prepared_context = match req.prepared_context {
         Some(context) => context,
-        None => return GetCredentialResponse::Err(internal_error("missing prepared_context")),
+        None => {
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(internal_error(
+                "missing prepared_context",
+            ))
+        }
     };
     let credential_jwt = match String::from_utf8(prepared_context.into_vec()) {
         Ok(s) => s,
-        Err(_) => return GetCredentialResponse::Err(internal_error("invalid prepared_context")),
+        Err(_) => {
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(internal_error(
+                "invalid prepared_context",
+            ))
+        }
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
-    let msg_hash = vc_signing_input_hash(&signing_input);
-    let maybe_sig = SIGNATURES.with(|sigs| {
-        let sigs = sigs.borrow();
-        get_signature(&sigs, seed, msg_hash)
+    let message_hash = vc_signing_input_hash(&signing_input);
+    let sig_result = SIGNATURES.with(|sigs| {
+        let sig_map = sigs.borrow();
+        let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
+        get_signature_as_cbor(
+            &sig_map,
+            &seed,
+            message_hash,
+            Some(certified_assets_root_hash),
+        )
     });
-    let sig = if let Some(sig) = maybe_sig {
-        sig
-    } else {
-        return GetCredentialResponse::Err(IssueCredentialError::SignatureNotFound(String::from(
-            "signature not prepared or expired",
-        )));
+    let sig = match sig_result {
+        Ok(sig) => sig,
+        Err(e) => {
+            return Result::<IssuedCredentialData, IssueCredentialError>::Err(
+                IssueCredentialError::SignatureNotFound(format!(
+                    "signature not prepared or expired: {}",
+                    e
+                )),
+            );
+        }
     };
     let vc_jws =
         vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig).expect("failed constructing JWS");
-    GetCredentialResponse::Ok(IssuedCredentialData { vc_jws })
+    Result::<IssuedCredentialData, IssueCredentialError>::Ok(IssuedCredentialData { vc_jws })
 }
 
 #[update]
 #[candid_method]
-async fn vc_consent_message(req: Icrc21VcConsentMessageRequest) -> Icrc21ConsentMessageResponse {
+async fn vc_consent_message(
+    req: Icrc21VcConsentMessageRequest,
+) -> Result<Icrc21ConsentInfo, Icrc21Error> {
     let credential_type = match verify_credential_spec(&req.credential_spec) {
         Ok(credential_type) => credential_type,
         Err(err) => {
-            return Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(
-                Icrc21ErrorInfo {
-                    error_code: 0,
-                    description: err,
-                },
-            ));
+            return Err(Icrc21Error::UnsupportedCanisterCall(Icrc21ErrorInfo {
+                description: err,
+            }));
         }
     };
     get_vc_consent_message(&credential_type, &SupportedLanguage::from(req.preferences))
@@ -393,27 +412,32 @@ fn add_adult(adult_id: Principal) -> String {
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
-    let mut headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
-    let certificate_header =
-        ASSET_HASHES.with(|a| make_asset_certificate_header(&a.borrow(), path));
+    let sigs_root_hash =
+        SIGNATURES.with_borrow(|sigs| pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())));
+    let maybe_asset = ASSETS.with_borrow(|assets| {
+        assets.certified_asset(path, req.certificate_version, Some(sigs_root_hash))
+    });
 
-    headers.push(certificate_header);
-    ASSETS.with(|a| match a.borrow().get(path) {
-        Some((asset_headers, value)) => {
-            headers.append(&mut asset_headers.clone());
-
+    let mut headers = static_headers();
+    match maybe_asset {
+        Some(asset) => {
+            headers.extend(asset.headers);
             HttpResponse {
                 status_code: 200,
+                body: ByteBuf::from(asset.content),
                 headers,
-                body: Cow::Owned(ByteBuf::from(value.clone())),
             }
         }
         None => HttpResponse {
             status_code: 404,
             headers,
-            body: Cow::Owned(ByteBuf::from(format!("Asset {} not found.", path))),
+            body: ByteBuf::from(format!("Asset {} not found.", path)),
         },
-    })
+    }
+}
+
+fn static_headers() -> Vec<(String, String)> {
+    vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
 }
 
 fn main() {}
@@ -421,43 +445,6 @@ fn main() {}
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
     let signature_expires_at = time().saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
     sigs.put(hash_bytes(seed), msg_hash, signature_expires_at);
-}
-
-fn get_signature(sigs: &SignatureMap, seed: Hash, msg_hash: Hash) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
-    let asset_root_hash = ASSET_HASHES.with_borrow(|asset_hashes| asset_hashes.root_hash());
-    let witness = sigs.witness(hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-    let tree = fork(
-        pruned(labeled_hash(b"http_assets", &asset_root_hash)),
-        labeled(LABEL_SIG, witness),
-    );
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
 }
 
 fn calculate_seed(principal: &Principal) -> Hash {
@@ -609,45 +596,17 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 candid::export_service!();
 
 // Assets
-
+static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 pub fn init_assets() {
-    ASSETS.with(|a| {
-        ASSET_HASHES.with(|ah| {
-            let mut assets = a.borrow_mut();
-            let mut asset_hashes = ah.borrow_mut();
-            for (path, content, content_type) in get_assets() {
-                asset_hashes.insert(path, sha2::Sha256::digest(content).into());
-                let headers = vec![(
-                    "Content-Type".to_string(),
-                    content_type.to_mime_type_string(),
-                )];
-                assets.insert(path, (headers, content.to_vec()));
-            }
-        });
+    ASSETS.with_borrow_mut(|assets| {
+        *assets = CertifiedAssets::certify_assets(
+            collect_assets(&ASSET_DIR, IncludeSubdirs, Some(fixup_html)),
+            &static_headers(),
+        );
     });
 
     update_root_hash()
 }
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ContentType {
-    HTML,
-    JS,
-    JSON,
-    CSS,
-}
-
-impl ContentType {
-    pub fn to_mime_type_string(&self) -> String {
-        match self {
-            ContentType::HTML => "text/html".to_string(),
-            ContentType::JS => "text/javascript".to_string(),
-            ContentType::JSON => "application/json".to_string(),
-            ContentType::CSS => "text/css".to_string(),
-        }
-    }
-}
-
 pub type HeaderField = (String, String);
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -656,81 +615,24 @@ pub struct HttpRequest {
     pub url: String,
     pub headers: Vec<HeaderField>,
     pub body: ByteBuf,
+    pub certificate_version: Option<u16>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
-    pub body: Cow<'static, Bytes>,
+    pub body: ByteBuf,
 }
 
-lazy_static! {
-    // The full content of the index.html, after the canister ID (and script tag) have been
-    // injected
-    static ref INDEX_HTML_STR: String = {
-        let canister_id = api::id();
-        let index_html = include_str!("../dist/index.html");
+fn fixup_html(html: &str) -> String {
+    let canister_id = api::id();
 
-        // the string we are replacing here is inserted by vite during the front-end build
-        index_html.replace(
+    // the string we are replacing here is inserted by vite during the front-end build
+    html.replace(
             r#"<script type="module" crossorigin src="/index.js"></script>"#,
             &format!(r#"<script data-canister-id="{canister_id}" type="module" crossorigin src="/index.js"></script>"#).to_string()
         )
-    };
-}
-
-// Get all the assets. Duplicated assets like index.html are shared and generally all assets are
-// prepared only once (like injecting the canister ID).
-fn get_assets() -> [(&'static str, &'static [u8], ContentType); 5] {
-    let index_html: &[u8] = INDEX_HTML_STR.as_bytes();
-    [
-        ("/", index_html, ContentType::HTML),
-        ("/index.html", index_html, ContentType::HTML),
-        (
-            "/index.css",
-            include_bytes!("../dist/index.css"),
-            ContentType::CSS,
-        ),
-        (
-            "/index.js",
-            include_bytes!("../dist/index.js"),
-            ContentType::JS,
-        ),
-        (
-            "/index2.js",
-            include_bytes!("../dist/index2.js"),
-            ContentType::JS,
-        ),
-    ]
-}
-
-fn make_asset_certificate_header(
-    asset_hashes: &RbTree<&'static str, Hash>,
-    asset_name: &str,
-) -> (String, String) {
-    let certificate = api::data_certificate().unwrap_or_else(|| {
-        api::trap("data certificate is only available in query calls");
-    });
-    let witness = asset_hashes.witness(asset_name.as_bytes());
-    let sigs_root_hash = SIGNATURES.with_borrow(|signatures| signatures.root_hash());
-    let tree = fork(
-        labeled(b"http_assets", witness),
-        pruned(labeled_hash(LABEL_SIG, &sigs_root_hash)),
-    );
-
-    let mut serializer = serde_cbor::ser::Serializer::new(vec![]);
-    serializer.self_describe().unwrap();
-    tree.serialize(&mut serializer)
-        .unwrap_or_else(|e| api::trap(&format!("failed to serialize a hash tree: {}", e)));
-    (
-        "IC-Certificate".to_string(),
-        format!(
-            "certificate=:{}:, tree=:{}:",
-            BASE64.encode(certificate),
-            BASE64.encode(serializer.into_inner())
-        ),
-    )
 }
 
 #[cfg(test)]

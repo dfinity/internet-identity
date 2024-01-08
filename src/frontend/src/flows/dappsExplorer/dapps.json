@@ -1,7 +1,7 @@
 [
   {
     "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on chain",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
     "website": "https://dscvr.one/",
     "logo": "dscvr_logo.webp"
   },
@@ -27,6 +27,12 @@
     "oneLiner": "Your digital identity for the modern world.",
     "website": "https://t.co/FDpvRjszU3/",
     "logo": "nfid_logo.webp"
+  },
+  {
+    "name": "Trax",
+    "oneLiner": "Trax is the world's first artist and fan-owned music platform.",
+    "website": "https://trax.so/",
+    "logo": "trax_logo.webp"
   },
   {
     "name": "Dmail",
@@ -68,6 +74,12 @@
     "logo": "yumi_logo.webp"
   },
   {
+    "name": "Sonic DEX",
+    "oneLiner": "Sonic DEX is an AMM and Perpetual trading platform",
+    "website": "https://sonic.ooo/",
+    "logo": "sonic-dex_logo.webp"
+  },
+  {
     "name": "Stoic Wallet",
     "website": "https://www.stoicwallet.com/",
     "logo": "stoicwallet_logo.webp"
@@ -92,7 +104,7 @@
   },
   {
     "name": "Modclub",
-    "oneLiner": "The world's first AI powered Web3 crowdwork platform",
+    "oneLiner": "The world's first AI-powered Web3 crowdwork platform",
     "website": "https://modclub.ai",
     "logo": "modclub_logo.webp"
   },
@@ -128,7 +140,7 @@
   {
     "name": "Arth",
     "oneLiner": "Arth ckBTC wallet and swap btc<>ckBtc",
-    "website": "https://arth.foo",
+    "website": "https://play.google.com/store/apps/details?id=com.foo.arth&pli=1",
     "logo": "arth_logo.png"
   },
   {
@@ -178,7 +190,7 @@
   },
   {
     "name": "IC Drive",
-    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/#/",
+    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/",
     "logo": "icdrive_logo.webp"
   },
   {
@@ -188,7 +200,7 @@
   },
   {
     "name": "CrowdGov.org",
-    "oneLiner": "The simplified, one stop shop for IC Governance.",
+    "oneLiner": "The simplified, one-stop shop for IC Governance.",
     "website": "https://crowdgov.org",
     "logo": "crowdgovorg_logo.webp"
   },
@@ -387,7 +399,7 @@
   },
   {
     "name": "dFlow",
-    "website": "https://dcentra.io/dflow",
+    "website": "https://txyr5-iiaaa-aaaai-abhuq-cai.ic0.app/home",
     "logo": "dflow_logo.png",
     "oneLiner": "Automate interactions between organizations."
   },
@@ -404,9 +416,27 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
+    "name": "TaxLint",
+    "oneLiner": "Your automated tax reporting IC assistant.",
+    "website": "https://vresg-vyaaa-aaaag-qcj2q-cai.icp0.io/",
+    "logo": "taxlint_logo.png"
+  },
+  {
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
     "logo": "icpsig_logo.png"
+  },
+  {
+    "name": "icRouter",
+    "website": "https://iclight.io/account",
+    "logo": "icrouter_logo.webp",
+    "oneLiner": "icRouter: A cross-chain network of assets"
+  },
+  {
+    "name": "The Asset App",
+    "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
+    "logo": "asset-app_logo.png",
+    "oneLiner": "Allows any user to generate their own file canister smart contract and visually manage their files on the Internet Computer without requiring any code"
   }
 ]

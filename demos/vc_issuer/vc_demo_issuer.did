@@ -14,17 +14,13 @@ type ArgumentValue = variant { "Int" : int32; String : text };
 /// Messages for ICRC-21 consent message, cf.
 /// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
-type Icrc21ConsentMessageResponse = variant {
-    Ok : Icrc21ConsentInfo;
-    Err : Icrc21Error;
-};
 type Icrc21ConsentPreferences = record { language : text };
 type Icrc21Error = variant {
-    GenericError : Icrc21ErrorInfo;
+    GenericError : record { description : text; error_code : nat };
     UnsupportedCanisterCall : Icrc21ErrorInfo;
     ConsentMessageUnavailable : Icrc21ErrorInfo;
 };
-type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
+type Icrc21ErrorInfo = record { description : text };
 type Icrc21VcConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
     credential_spec : CredentialSpec;
@@ -43,10 +39,6 @@ type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
 };
-type PrepareCredentialResponse = variant {
-    Ok : PreparedCredentialData;
-    Err : IssueCredentialError;
-};
 type PreparedCredentialData = record { prepared_context : opt vec nat8 };
 
 /// Messages for `get_credential`.
@@ -54,10 +46,6 @@ type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
     prepared_context : opt vec nat8;
-};
-type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError;
 };
 
 type SignedIdAlias = record {
@@ -100,6 +88,7 @@ type HttpRequest = record {
     url: text;
     headers: vec HeaderField;
     body: blob;
+    certificate_version: opt nat16;
 };
 
 type HttpResponse = record {
@@ -110,9 +99,9 @@ type HttpResponse = record {
 
 service: (opt IssuerConfig) -> {
     /// VC-flow API.
-    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
-    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
-    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
+    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (variant { Ok : Icrc21ConsentInfo; Err : Icrc21Error;});
+    prepare_credential : (PrepareCredentialRequest) -> (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
+    get_credential : (GetCredentialRequest) -> (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
 
     /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();

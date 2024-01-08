@@ -12,6 +12,7 @@ runs:
   using: "composite"
   steps:
     - uses: ./.github/actions/bootstrap
+    - uses: ./.github/actions/setup-node
 
     # run the build
     - run: npm ci
