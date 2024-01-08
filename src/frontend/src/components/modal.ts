@@ -24,7 +24,7 @@ export const createModal = ({ slot }: { slot: TemplateResult }) => {
       @close=${() => removeContainer()}
       role="dialog"
       class="c-modal"
-      aria-modal
+      aria-modal="true"
     >
       <div class="c-modal__content c-card c-card--modal">
         <div class="c-modal__inner">
