@@ -27,7 +27,9 @@
     "test:e2e": "vitest --mode e2e --config ./vitest.config.ts --threads=false",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
-    "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
+    "lint": "npm run lint:eslint && npm run lint:lit",
+    "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
+    "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
     "format": "prettier --write src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos",
     "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
   },
@@ -46,6 +48,7 @@
     "fake-indexeddb": "^4.0.2",
     "html-minifier-terser": "^7.2.0",
     "http-proxy": "^1.18.1",
+    "lit-analyzer": "^2.0.2",
     "prettier": "2.8.0",
     "prettier-plugin-organize-imports": "^3.2.2",
     "ts-loader": "9.4.1",

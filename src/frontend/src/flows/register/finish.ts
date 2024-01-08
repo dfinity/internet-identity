@@ -94,7 +94,7 @@ export const displayUserNumberTemplate = ({
 
       <aside class="l-stack">
         <h3 class="t-title">Why is it important to save this number?</h3>
-        <p class="t-paragraph">If you lose this number, you will lose access to all of the accounts that you created with it</paragraph>
+        <p class="t-paragraph">If you lose this number, you will lose access to all of the accounts that you created with it</p>
       </aside>
 
       <aside class="l-stack">
