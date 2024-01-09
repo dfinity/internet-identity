@@ -1,6 +1,7 @@
 //! Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
+use candid::Principal;
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;

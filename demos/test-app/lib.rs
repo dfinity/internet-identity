@@ -29,6 +29,7 @@ fn whoami() -> Principal {
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
+    ic_cdk::println!("Updating alternative origins mode to {:?}", mode);
     ALTERNATIVE_ORIGINS_MODE.with(|m| {
         m.replace(mode);
     });
@@ -40,6 +41,7 @@ fn update_alternative_origins(alternative_origins: String, mode: AlternativeOrig
             )
         })
         .expect("Failed to update alternative origins");
+    update_root_hash()
 }
 
 pub type HeaderField = (String, String);
@@ -80,6 +82,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         ALTERNATIVE_ORIGINS_PATH => ALTERNATIVE_ORIGINS_MODE.with_borrow(|mode| {
             let mut certified_response = certified_ok_response(path, req.certificate_version)
                 .expect("/.well-known/ii-alternative-origins must be certified");
+            ic_cdk::println!("Alternative origins mode is {:?}", mode);
             match mode {
                 CertifiedContent => {
                     // don't tamper with the certified response

@@ -300,6 +300,7 @@ const init = async () => {
       ).value;
       mode = { Redirect: { location: location } };
     }
+    console.log("mode: ", JSON.stringify(mode));
     await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
     await updateAlternativeOriginsView();
   };
