@@ -13,6 +13,8 @@ const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
 const EVIL_ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/evil-alternative-origins";
 const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
 
+const OUTDATED_INVALID_CERTIFICATE_HEADER: &str = ":2dn3omR0cmVlgwGDAYMBgwJIY2FuaXN0ZXKDAYMBggRYIF7eYW50QXA1hAANBQ4J616Ekjch0ihDxnNGwvlxxIKDgwGCBFggH4wduBeihx+gd8Oe2KvzyQxp/PEe6ustjHJNlVhLbmaDAkqAAAAAABAAAwEBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIIA3JGAjACCVyCTmsRmhhlZDI5oDZZkhGVMbpCIFTEejggRYIIMJ950nCB4emD2uvICtY5WfLhcOzb2BaqH4EvUGTX2xggRYIFfnBG3quMbImRDu81QLZKq0ADXD75bQIoPHA2y4JRQVggRYIETEKmiZ1Lflrx8sIiDUOqBdb7X+mJ5+kEturndxJYzeggRYINPKhi8ZGTDLJJGHdaSlL3lxf8JFGiBHe3FVp4y/myCvggRYIIZ883QyMwhObp/SFU8xtXu8w8xGgwEWfkJYAWqC9dNSgwGCBFgg49iYnFVeAADyzEwGNNe…Bcfct/T4ZWVYbJe/P3gUbLOS8n9uDAklodHRwX2V4cHKDAYMBgwGCBFgggaSHI9J56LbuKjb58O8AWYlQNqTWZBxB58L7Y6u9j2ODAksud2VsbC1rbm93boMBggRYIJY8druSGXKdr/LHH3Kr/F+Vo9VwgluKJZS6HxkTrIeUgwJWaWktYWx0ZXJuYXRpdmUtb3JpZ2luc4MCQzwkPoMCWCBiB64Pds+kxrd7O3KKhS3TAcooPTqycnGLKWuiy3dP6IMCQIMCWCCaryvDtyyZdDWHqiLmkc63lZuPrBF2Tt6ULsG0LUkWcIIDQIIEWCAYA1f5ooQFb7bDDkKE0QhYJLkfsn2j1GCIGJvp8r8ucYIEWCB28Uo/B0pARPP3FnDUBj83i4NpGPehI4IGGI2I2iOQhg==:, expr_path=:2dn3hGlodHRwX2V4cHJrLndlbGwta25vd252aWktYWx0ZXJuYXRpdmUtb3JpZ2luc2M8JD4=:, version=2";
+
 thread_local! {
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
     static ALTERNATIVE_ORIGINS_MODE: RefCell<AlternativeOriginsMode> = RefCell::new(CertifiedContent);
@@ -29,7 +31,6 @@ fn whoami() -> Principal {
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
-    ic_cdk::println!("Updating alternative origins mode to {:?}", mode);
     ALTERNATIVE_ORIGINS_MODE.with(|m| {
         m.replace(mode);
     });
@@ -38,9 +39,11 @@ fn update_alternative_origins(alternative_origins: String, mode: AlternativeOrig
             assets.update_asset_content(
                 ALTERNATIVE_ORIGINS_PATH,
                 alternative_origins.as_bytes().to_vec(),
+                &static_headers(),
             )
         })
         .expect("Failed to update alternative origins");
+
     update_root_hash()
 }
 
@@ -88,10 +91,16 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     // don't tamper with the certified response
                 }
                 UncertifiedContent => {
-                    // drop the IC-Certificate and IC-Certificate-Expr headers
-                    certified_response.headers.retain(|(header_name, _)| {
-                        !header_name.to_lowercase().starts_with("ic-certificate")
-                    });
+                    certified_response.headers = certified_response.headers.into_iter().map(|(header_name, header_value)| {
+                        // Modify the IC-Certificate header to make certification invalid
+                        // Note: we cannot simply drop the header because then the local replica will skip the certification
+                        // check altogether.
+                        if header_name == "IC-Certificate" {
+                            (header_name, OUTDATED_INVALID_CERTIFICATE_HEADER.to_string())
+                        } else {
+                            (header_name, header_value)
+                        }
+                    }).collect::<_>()
                 }
                 Redirect { location } => {
                     // Add a Location header and modify status code to 302 to indicate redirect

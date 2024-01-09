@@ -1,17 +1,18 @@
 //! Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
-use candid::Principal;
+use candid::{CandidType, Deserialize};
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::{Request, Response, VerificationInfo};
 use ic_response_verification::verify_request_response_pair;
-use ic_test_state_machine_client::{CallError, StateMachine};
+use ic_test_state_machine_client::{call_candid, CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::ChallengeAttempt;
 use serde_bytes::ByteBuf;
+use std::path;
 use std::time::{Duration, UNIX_EPOCH};
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -127,6 +128,86 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     );
     assert_eq!(result.verification_version, CERTIFICATION_VERSION);
 
+    Ok(())
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub enum AlternativeOriginsMode {
+    CertifiedContent,
+    UncertifiedContent,
+    Redirect { location: String },
+}
+
+/// Verifies that the cache-control header is set for fonts.
+#[test]
+fn dummy() -> Result<(), CallError> {
+    println!(
+        "{}",
+        &std::env::current_dir()
+            .map(|x| x.display().to_string())
+            .unwrap_or_else(|_| "an unknown directory".to_string())
+    );
+    let env = env();
+    let wasm = get_wasm_path(
+        "NA".to_string(),
+        &path::PathBuf::from("..")
+            .join("..")
+            .join("demos/test-app/test_app.wasm"),
+    )
+    .unwrap();
+    let canister_id = install_ii_canister(&env, wasm);
+    let assets: Vec<(&str, Option<&str>)> =
+        vec![("/", None), ("/.well-known/ii-alternative-origins", None)];
+
+    let _: () = call_candid(
+        &env,
+        canister_id,
+        "update_alternative_origins",
+        ("some new text", AlternativeOriginsMode::CertifiedContent),
+    )
+    .unwrap();
+
+    // for each asset and certification version, fetch the asset, check the HTTP status code, headers and certificate.
+    for (asset, encoding) in assets {
+        for certification_version in 1..=2 {
+            println!(
+                "asset: {}, certificate_version: {}",
+                asset, certification_version
+            );
+            let request = HttpRequest {
+                method: "GET".to_string(),
+                url: asset.to_string(),
+                headers: vec![],
+                body: ByteBuf::new(),
+                certificate_version: Some(certification_version),
+            };
+            let http_response = http_request(&env, canister_id, &request)?;
+
+            assert_eq!(http_response.status_code, 200);
+
+            // check the appropriate Content-Encoding header is set
+            if let Some(enc) = encoding {
+                let (_, content_encoding) = http_response
+                    .headers
+                    .iter()
+                    .find(|(name, _)| name.to_lowercase() == "content-encoding")
+                    .expect("Content-Encoding header not found");
+                assert_eq!(
+                    content_encoding, enc,
+                    "unexpected Content-Encoding header value"
+                );
+            }
+
+            let result = verify_response_certification(
+                &env,
+                canister_id,
+                request,
+                http_response,
+                certification_version,
+            );
+            assert_eq!(result.verification_version, certification_version);
+        }
+    }
     Ok(())
 }
 

@@ -12,6 +12,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use DirectoryTraversalMode::IncludeSubdirs;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
@@ -173,6 +174,7 @@ impl CertifiedAssets {
         &mut self,
         url_path: &str,
         new_content: Vec<u8>,
+        shared_headers: &[HeaderField],
     ) -> Result<(), String> {
         let Some((headers, _)) = self.assets.get(url_path) else {
             return Err(format!("Asset {} not found.", url_path));
@@ -180,7 +182,15 @@ impl CertifiedAssets {
         let headers = headers.clone();
         let body_hash = sha2::Sha256::digest(&new_content).into();
         self.add_certification_v1(url_path, body_hash);
-        self.add_certification_v2(url_path, &headers, body_hash);
+        self.add_certification_v2(
+            url_path,
+            &shared_headers
+                .iter()
+                .chain(headers.iter())
+                .cloned()
+                .collect::<Vec<_>>(),
+            body_hash,
+        );
         self.assets
             .insert(url_path.to_string(), (headers, new_content));
         Ok(())
@@ -217,6 +227,8 @@ impl CertifiedAssets {
             .collect();
         segments.remove(0); // remove leading empty string due to absolute path
         segments.push(EXACT_MATCH_TERMINATOR.as_bytes().to_vec());
+        // delete any old certification for the given path, if any
+        self.certification_v2.delete(&segments);
         segments.push(Vec::from(EXPR_HASH.as_slice()));
         segments.push(vec![]);
         segments.push(Vec::from(response_hash(headers, &body_hash)));
