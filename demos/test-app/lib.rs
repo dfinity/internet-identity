@@ -37,9 +37,11 @@ fn update_alternative_origins(alternative_origins: String, mode: AlternativeOrig
             assets.update_asset_content(
                 ALTERNATIVE_ORIGINS_PATH,
                 alternative_origins.as_bytes().to_vec(),
+                &static_headers()
             )
         })
         .expect("Failed to update alternative origins");
+    update_root_hash()
 }
 
 pub type HeaderField = (String, String);
