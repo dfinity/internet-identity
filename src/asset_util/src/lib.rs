@@ -100,6 +100,7 @@ impl CertifiedAssets {
 
             certified_assets.add_certification_v2(
                 &url_path,
+                200,
                 &shared_headers
                     .iter()
                     .chain(headers.iter())
@@ -184,6 +185,7 @@ impl CertifiedAssets {
         self.add_certification_v1(url_path, body_hash);
         self.add_certification_v2(
             url_path,
+            200,
             &shared_headers
                 .iter()
                 .chain(headers.iter())
@@ -193,6 +195,20 @@ impl CertifiedAssets {
         );
         self.assets
             .insert(url_path.to_string(), (headers, new_content));
+        Ok(())
+    }
+
+    /// Adds a certified redirect response for a given path.
+    pub fn certify_redirect(
+        &mut self,
+        url_path: &str,
+        redirect_location: &str,
+    ) -> Result<(), String> {
+        let headers = vec![("Location".to_string(), redirect_location.to_string())];
+        let body_hash = sha2::Sha256::digest(&[]).into(); // empty body
+        self.add_certification_v1(url_path, body_hash);
+        self.add_certification_v2(url_path, 302, &headers, body_hash);
+        self.assets.insert(url_path.to_string(), (headers, vec![]));
         Ok(())
     }
 
@@ -215,6 +231,7 @@ impl CertifiedAssets {
     fn add_certification_v2(
         &mut self,
         absolute_path: &str,
+        status_code: u16,
         headers: &[HeaderField],
         body_hash: Hash,
     ) {
@@ -231,7 +248,7 @@ impl CertifiedAssets {
         self.certification_v2.delete(&segments);
         segments.push(Vec::from(EXPR_HASH.as_slice()));
         segments.push(vec![]);
-        segments.push(Vec::from(response_hash(headers, &body_hash)));
+        segments.push(Vec::from(response_hash(status_code, headers, &body_hash)));
 
         self.certification_v2.insert(&segments, vec![])
     }
@@ -370,7 +387,7 @@ lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
-fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
+fn response_hash(status_code: u16, headers: &[HeaderField], body_hash: &Hash) -> Hash {
     let mut response_metadata: HashMap<String, Value> = HashMap::from_iter(
         headers
             .iter()
@@ -381,7 +398,10 @@ fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
         IC_CERTIFICATE_EXPRESSION_HEADER.to_ascii_lowercase(),
         Value::String(IC_CERTIFICATE_EXPRESSION.to_string()),
     );
-    response_metadata.insert(STATUS_CODE_PSEUDO_HEADER.to_string(), Value::Number(200));
+    response_metadata.insert(
+        STATUS_CODE_PSEUDO_HEADER.to_string(),
+        Value::Number(status_code as u64),
+    );
     let mut response_metadata_hash: Vec<u8> =
         representation_independent_hash(&response_metadata.into_iter().collect::<Vec<_>>()).into();
     response_metadata_hash.extend_from_slice(body_hash);
