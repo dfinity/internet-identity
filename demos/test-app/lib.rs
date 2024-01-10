@@ -31,19 +31,23 @@ fn whoami() -> Principal {
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
-    ALTERNATIVE_ORIGINS_MODE.with(|m| {
-        m.replace(mode);
-    });
     ASSETS
         .with_borrow_mut(|assets| {
-            assets.update_asset_content(
-                ALTERNATIVE_ORIGINS_PATH,
-                alternative_origins.as_bytes().to_vec(),
-                &static_headers(),
-            )
+            match &mode {
+                CertifiedContent | UncertifiedContent => assets.update_asset_content(
+                    ALTERNATIVE_ORIGINS_PATH,
+                    alternative_origins.as_bytes().to_vec(),
+                    &static_headers(),
+                ),
+                Redirect { location } => assets.certify_redirect(ALTERNATIVE_ORIGINS_PATH, location.as_str(), &static_headers())
+            }
+
         })
         .expect("Failed to update alternative origins");
 
+    ALTERNATIVE_ORIGINS_MODE.with(|m| {
+        m.replace(mode);
+    });
     update_root_hash()
 }
 
@@ -102,13 +106,8 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                         }
                     }).collect::<_>()
                 }
-                Redirect { location } => {
-                    // Add a Location header and modify status code to 302 to indicate redirect
-                    // Keep the content and certification headers as then the response remains valid
-                    // under certification v1.
-                    certified_response
-                        .headers
-                        .push(("Location".to_string(), location.clone()));
+                Redirect { .. } => {
+                    // Set the response status code to 302
                     certified_response.status_code = 302;
                 }
             }

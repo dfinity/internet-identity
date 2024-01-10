@@ -203,11 +203,21 @@ impl CertifiedAssets {
         &mut self,
         url_path: &str,
         redirect_location: &str,
+        shared_headers: &[HeaderField],
     ) -> Result<(), String> {
         let headers = vec![("Location".to_string(), redirect_location.to_string())];
         let body_hash = sha2::Sha256::digest(&[]).into(); // empty body
         self.add_certification_v1(url_path, body_hash);
-        self.add_certification_v2(url_path, 302, &headers, body_hash);
+        self.add_certification_v2(
+            url_path,
+            302,
+            &shared_headers
+                .iter()
+                .chain(headers.iter())
+                .cloned()
+                .collect::<Vec<_>>(),
+            body_hash,
+        );
         self.assets.insert(url_path.to_string(), (headers, vec![]));
         Ok(())
     }
