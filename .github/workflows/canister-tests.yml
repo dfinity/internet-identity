@@ -503,7 +503,7 @@ jobs:
       - run: npm test
 
       - name: 'Run dfx'
-        run: dfx start --background
+        run: dfx start --background --artificial-delay 0
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v3
@@ -595,7 +595,7 @@ jobs:
 
       - name: Start replica
         run: |
-          dfx start --background
+          dfx start --background --artificial-delay 0
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v3
