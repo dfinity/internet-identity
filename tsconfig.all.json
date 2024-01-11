@@ -2,5 +2,5 @@
   "extends": "./tsconfig.json",
   "include": [ "src/frontend"],
   "exclude": [ "src/frontend/generated/*" ],
-  "references": [ { "path": "./src/vc-api" }, { "path": "./demos/test-app" } ]
+  "references": [ { "path": "./src/vc-api" }, { "path": "./demos/test-app" }, { "path": "./demos/vc_issuer" } ]
 }
