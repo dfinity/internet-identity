@@ -29,8 +29,7 @@ pub const IC_CERTIFICATE_EXPRESSION: &str =
 /// for the certification to be valid.
 #[derive(Debug, Default, Clone)]
 pub struct CertifiedAssets {
-    /// Map from URL path to tuple of response (status_code, headers, body)
-    assets: HashMap<String, (u16, Vec<HeaderField>, Vec<u8>)>,
+    assets: HashMap<String, CertifiedAsset>,
     certification_v1: RbTree<String, Hash>,
     certification_v2: NestedTree<Vec<u8>, Vec<u8>>,
 }
@@ -113,9 +112,14 @@ impl CertifiedAssets {
                 body_hash,
             );
 
-            certified_assets
-                .assets
-                .insert(url_path, (HTTP_OK_STATUS, headers, content));
+            certified_assets.assets.insert(
+                url_path,
+                CertifiedAsset {
+                    status_code: HTTP_OK_STATUS,
+                    headers,
+                    content,
+                },
+            );
         }
         certified_assets
     }
@@ -152,14 +156,7 @@ impl CertifiedAssets {
         sigs_tree: Option<HashTree>,
     ) -> Option<CertifiedAsset> {
         assert!(url_path.starts_with('/'));
-        let certified_asset = self
-            .assets
-            .get(url_path)
-            .map(|(status_code, headers, content)| CertifiedAsset {
-                status_code: *status_code,
-                headers: headers.clone(),
-                content: content.clone(),
-            });
+        let certified_asset = self.assets.get(url_path).cloned();
         certified_asset.map(|mut certified_asset| {
             match max_certificate_version {
                 Some(x) if x >= 2 => certified_asset
@@ -184,7 +181,12 @@ impl CertifiedAssets {
         new_content: Vec<u8>,
         shared_headers: &[HeaderField],
     ) -> Result<(), String> {
-        let Some((status_code, headers, _)) = self.assets.get(url_path).cloned() else {
+        let Some(CertifiedAsset {
+            status_code,
+            headers,
+            ..
+        }) = self.assets.get(url_path).cloned()
+        else {
             return Err(format!("Asset {} not found.", url_path));
         };
 
@@ -200,8 +202,14 @@ impl CertifiedAssets {
                 .collect::<Vec<_>>(),
             body_hash,
         );
-        self.assets
-            .insert(url_path.to_string(), (status_code, headers, new_content));
+        self.assets.insert(
+            url_path.to_string(),
+            CertifiedAsset {
+                status_code,
+                headers,
+                content: new_content,
+            },
+        );
         Ok(())
     }
 
