@@ -69,59 +69,63 @@ impl CertifiedAssets {
     /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
     /// certification to be valid.
     pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> Self {
-        const HTTP_OK_STATUS: u16 = 200;
-
         let mut certified_assets = Self::default();
-        for Asset {
+        for asset in assets {
+            certified_assets.certify_asset(asset, shared_headers);
+        }
+        certified_assets
+    }
+
+    /// Certifies a single asset. Overrides the previous asset / certification, if any.
+    pub fn certify_asset(&mut self, asset: Asset, shared_headers: &[HeaderField]) {
+        const HTTP_OK_STATUS: u16 = 200;
+        let Asset {
             url_path,
             content,
             encoding,
             content_type,
-        } in assets
-        {
-            let body_hash = sha2::Sha256::digest(&content).into();
-            certified_assets.add_certification_v1(&url_path, body_hash);
+        } = asset;
+        let body_hash = sha2::Sha256::digest(&content).into();
+        self.add_certification_v1(&url_path, body_hash);
 
-            let mut headers = match encoding {
-                ContentEncoding::Identity => vec![],
-                ContentEncoding::GZip => {
-                    vec![("Content-Encoding".to_string(), "gzip".to_string())]
-                }
-            };
-            headers.push((
-                "Content-Type".to_string(),
-                content_type.to_mime_type_string(),
-            ));
-
-            // Add caching header for fonts only
-            if content_type == ContentType::WOFF2 {
-                headers.push((
-                    "Cache-Control".to_string(),
-                    "public, max-age=604800".to_string(), // cache for 1 week
-                ));
+        let mut headers = match encoding {
+            ContentEncoding::Identity => vec![],
+            ContentEncoding::GZip => {
+                vec![("Content-Encoding".to_string(), "gzip".to_string())]
             }
+        };
+        headers.push((
+            "Content-Type".to_string(),
+            content_type.to_mime_type_string(),
+        ));
 
-            certified_assets.add_certification_v2(
-                &url_path,
-                HTTP_OK_STATUS,
-                &shared_headers
-                    .iter()
-                    .chain(headers.iter())
-                    .cloned()
-                    .collect::<Vec<_>>(),
-                body_hash,
-            );
-
-            certified_assets.assets.insert(
-                url_path,
-                CertifiedAsset {
-                    status_code: HTTP_OK_STATUS,
-                    headers,
-                    content,
-                },
-            );
+        // Add caching header for fonts only
+        if content_type == ContentType::WOFF2 {
+            headers.push((
+                "Cache-Control".to_string(),
+                "public, max-age=604800".to_string(), // cache for 1 week
+            ));
         }
-        certified_assets
+
+        self.add_certification_v2(
+            &url_path,
+            HTTP_OK_STATUS,
+            &shared_headers
+                .iter()
+                .chain(headers.iter())
+                .cloned()
+                .collect::<Vec<_>>(),
+            body_hash,
+        );
+
+        self.assets.insert(
+            url_path,
+            CertifiedAsset {
+                status_code: HTTP_OK_STATUS,
+                headers,
+                content,
+            },
+        );
     }
 
     /// Returns the root_hash of the asset certification tree.
@@ -149,7 +153,7 @@ impl CertifiedAssets {
     /// If a certificate version higher than the highest available certificate version is requested, the highest available certificate
     /// version is returned (which is currently 2).
     /// For legacy compatibility reasons, the default certificate version is 1.
-    pub fn certified_asset(
+    pub fn get_certified_asset(
         &self,
         url_path: &str,
         max_certificate_version: Option<u16>,
@@ -171,30 +175,21 @@ impl CertifiedAssets {
         })
     }
 
-    /// Efficiently updates the content of an already existing asset, by only re-certifying the
-    /// changed asset.
-    ///
-    /// If the asset does not exist, an error is returned.
-    pub fn update_asset_content(
+    /// Adds a certified redirect response for a given path.
+    pub fn certify_redirect(
         &mut self,
         url_path: &str,
-        new_content: Vec<u8>,
+        redirect_location: &str,
         shared_headers: &[HeaderField],
     ) -> Result<(), String> {
-        let Some(CertifiedAsset {
-            status_code,
-            headers,
-            ..
-        }) = self.assets.get(url_path).cloned()
-        else {
-            return Err(format!("Asset {} not found.", url_path));
-        };
+        const HTTP_SEE_OTHER_STATUS: u16 = 303;
 
-        let body_hash = sha2::Sha256::digest(&new_content).into();
+        let headers = vec![("Location".to_string(), redirect_location.to_string())];
+        let body_hash = sha2::Sha256::digest([]).into(); // empty body
         self.add_certification_v1(url_path, body_hash);
         self.add_certification_v2(
             url_path,
-            status_code,
+            HTTP_SEE_OTHER_STATUS,
             &shared_headers
                 .iter()
                 .chain(headers.iter())
@@ -205,9 +200,9 @@ impl CertifiedAssets {
         self.assets.insert(
             url_path.to_string(),
             CertifiedAsset {
-                status_code,
+                status_code: HTTP_SEE_OTHER_STATUS,
                 headers,
-                content: new_content,
+                content: vec![],
             },
         );
         Ok(())
