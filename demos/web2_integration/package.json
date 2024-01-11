@@ -29,6 +29,9 @@
     "@dfinity/identity": "^0.19.3",
     "@dfinity/principal": "^0.19.3",
     "@dfinity/utils": "^1.1.0",
+    "@dfinity/vc-util-web": "file:../../../vc-util-web/dist",
+    "@dfinity/standalone-sig-verifier-web": "^1.0.0",
+    "ic0": "^0.2.8",
     "jose": "^5.1.2",
     "lit-html": "^3.1.0"
   }

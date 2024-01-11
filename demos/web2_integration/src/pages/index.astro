@@ -35,6 +35,10 @@ import Layout from "../layouts/Layout.astro";
           credentialType: "UniversityDegreeCredential",
           arguments: { institutionName: "DFINITY College of Engineering" },
         },
+        adult: {
+          credentialType: "VerifiedAdult",
+          arguments: { age_at_least: 18 },
+        },
       };
 
       if (evnt.data?.method === "vc-flow-ready" && nonNullish(ii.latest)) {
@@ -83,9 +87,18 @@ import Layout from "../layouts/Layout.astro";
       }
 
       const verifiablePresentation = evnt.data?.result?.verifiablePresentation;
+      const issuerOrigin = withRef(issuerInput, (issuerInput) => {
+        const value = issuerInput.value;
+        if (value === "") {
+          return undefined;
+        }
+
+        return value;
+      });
       if (nonNullish(verifiablePresentation)) {
         await fetch("/api/attribute/verify", {
           method: "POST",
+          credentials: "same-origin",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
@@ -93,6 +106,9 @@ import Layout from "../layouts/Layout.astro";
           body: JSON.stringify({
             verifiablePresentation: verifiablePresentation,
             credentialSpec: credentialSpecs[credentialType.latest],
+            issuerOrigin,
+            iiOrigin: ii.latest.origin,
+            cookies: ["arg cookies = ", document.cookie ],
           }),
         });
         const ver = decodeJwt(verifiablePresentation) as any;
@@ -113,8 +129,8 @@ import Layout from "../layouts/Layout.astro";
     const urlInput = createRef<HTMLInputElement>();
     const issuerInput = createRef<HTMLInputElement>();
     const principalInput = createRef<HTMLInputElement>();
-    const credentialType = new Chan<"grad" | "employee">("employee");
-    const credentialSelection = (exp: "grad" | "employee") =>
+    const credentialType = new Chan<"adult" | "employee">("adult");
+    const credentialSelection = (exp: "adult" | "employee") =>
       asyncReplace(
         credentialType.map((ty) => (ty === exp ? "c-button--selected" : "")),
       );
@@ -122,138 +138,126 @@ import Layout from "../layouts/Layout.astro";
     const template = () => {
       return html`
         <div class="l-wrap" data-page-name="vc-test-app">
-        <section class="l-container l-stack">
-          <hgroup>
-            <h1 class="t-title">Relying Party</h1>
-          </hgroup>
-          <div
-            ${ref(principalInput)}
-            data-role="principal"
-            class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip--small"
-          ></div>
-          <button
-            class="c-button"
-            data-action="authenticate"
-            @click=${async () => {
-              let challengeResponse = await fetch("/api/challenge");
-              let { challenge }: { challenge: string } =
-                await challengeResponse.json();
-              console.log(`Retrieved challenge: ${challenge}`);
-              const authClient = new ChallengeAuthClient(challenge);
-
-              const iiUrl = withRef(urlInput, (i) => i.value);
-
-              const loginOptions: Parameters<typeof authClient.login>[0] = {
-                identityProvider: iiUrl,
-                onSuccess: async () => {
-                  withRef(principalInput, (principalInput) => {
-                    principalInput.innerText = authClient
-                      .getIdentity()
-                      .getPrincipal()
-                      .toString();
-                  });
-                  let delegation = (
-                    authClient.getIdentity() as DelegationIdentity
-                  ).getDelegation();
-                  await fetch("/api/challenge/verify", {
-                    method: "POST",
-                    headers: {
-                      Accept: "application/json",
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(delegation.toJSON()),
-                  });
-                },
-                onError: (e) => {
-                  alert(e ?? "Unknown error");
-                },
-              };
-
-              authClient.login(loginOptions);
-            }}
-            >Login / Link Internet Identity</button>
-            </section>
-            <section class="l-container l-stack">
+          <section class="l-container l-stack">
             <hgroup>
-            <h1 class="t-title">Identity Provider</h1>
-          </hgroup>
-          <input
-          ${ref(urlInput)}
-          data-role="ii-url"
-        class="c-input c-input--stack c-input--fullwidth"
-        value="https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app"
-          ></input>
+              <h1 class="t-title">Web2-site using IC Attribute Sharing feature</h1>
+            </hgroup>
+            <div
+                ${ref(principalInput)}
+                data-role="principal"
+                class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip--small"
+            ></div>
+            <button
+                class="c-button"
+                data-action="authenticate"
+                @click=${async () => {
+                  let challengeResponse = await fetch("/api/challenge");
+                  let {challenge}: { challenge: string } =
+                      await challengeResponse.json();
+                  console.log(`Retrieved challenge: ${challenge}`);
+                  const authClient = new ChallengeAuthClient(challenge);
+
+                  const iiUrl = withRef(urlInput, (i) => i.value);
+
+                  const loginOptions: Parameters<typeof authClient.login>[0] = {
+                    identityProvider: iiUrl,
+                    onSuccess: async () => {
+                      withRef(principalInput, (principalInput) => {
+                        principalInput.innerText = authClient
+                            .getIdentity()
+                            .getPrincipal()
+                            .toString();
+                      });
+                      let delegation = (
+                          authClient.getIdentity() as DelegationIdentity
+                      ).getDelegation();
+                      await fetch("/api/challenge/verify", {
+                        method: "POST",
+                        headers: {
+                          Accept: "application/json",
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(delegation.toJSON()),
+                      });
+                    },
+                    onError: (e) => {
+                      alert(e ?? "Unknown error");
+                    },
+                  };
+
+                  authClient.login(loginOptions);
+                }}
+            >STEP A: Link Internet Identity
+            </button>
           </section>
           <section class="l-container l-stack">
-          <hgroup>
-            <h1 class="t-title">Issuer</h1>
-          </hgroup>
-          <input
-          ${ref(issuerInput)}
-          data-role="issuer-url"
-        class="c-input c-input--stack c-input--fullwidth"
-        value="https://v2yvn-myaaa-aaaad-aad4q-cai.icp0.io"
-          ></input>
+            <div class="c-button-group l-stack">
+              <button
+                  data-role="start-vc-flow"
+                  class="c-button l-stack"
+                  @click=${() => {
+                    const urlRaw = withRef(urlInput, (urlInput) => urlInput.value);
+                    if (isNullish(urlRaw)) {
+                      alert("Could not read URL");
+                      return;
+                    }
+
+                    const urlParsed = new URL(urlRaw);
+                    urlParsed.pathname = "vc-flow/";
+
+                    const iiWindow = window.open(urlParsed.toString());
+                    if (isNullish(iiWindow)) {
+                      alert("Could not open window");
+                      return;
+                    }
+
+                    const flowId = nextId.latest;
+                    ii.send({win: iiWindow, origin: urlParsed.toString(), flowId});
+
+                    nextId.send(flowId + 1);
+                  }}
+              >
+                STEP B: Verify that you are over 18
+              </button>
+            </div>
           </section>
-          <div class="c-button-group l-stack">
-          <div @click=${() => {
-            credentialType.send("employee");
-          }} class="c-button c-button--secondary ${credentialSelection(
-            "employee",
-          )}">
-          Employee
-          </div>
-          <div @click=${() => {
-            credentialType.send("grad");
-          }} class="c-button c-button--secondary ${credentialSelection(
-            "grad",
-          )}">
-          Graduate
-          </div>
-          </div>
-          <div class="c-button-group l-stack">
-          <button
-            data-role="start-vc-flow"
-            class="c-button l-stack"
-            @click=${() => {
-              const urlRaw = withRef(urlInput, (urlInput) => urlInput.value);
-              if (isNullish(urlRaw)) {
-                alert("Could not read URL");
-                return;
-              }
-
-              const urlParsed = new URL(urlRaw);
-              urlParsed.pathname = "vc-flow/";
-
-              const iiWindow = window.open(urlParsed.toString());
-              if (isNullish(iiWindow)) {
-                alert("Could not open window");
-                return;
-              }
-
-              const flowId = nextId.latest;
-              ii.send({ win: iiWindow, origin: urlParsed.toString(), flowId });
-
-              nextId.send(flowId + 1);
-            }}
-          >
-            Verify Credential
-          </button>
-          </div>
           ${asyncReplace(
-            latestPres.map((latestPres) =>
-              isNullish(latestPres)
-                ? undefined
-                : html`
-                    <aside
-                      style="max-width: 100%;"
-                      class="l-stack c-card c-card--narrow"
-                    >
-                      <pre>    ${latestPres}</pre>
-                    </aside>
+              latestPres.map((latestPres) =>
+                  isNullish(latestPres)
+                      ? undefined
+                      : html`
+                        <aside
+                            style="max-width: 100%;"
+                            class="l-stack c-card c-card--narrow"
+                        >
+                          <pre>    ${latestPres}</pre>
+                        </aside>
                   `,
-            ),
+              ),
           )}
+          <section class="l-container l-stack">
+            <hgroup>
+              <h1 class="t-title">Identity Provider</h1>
+            </hgroup>
+            <input
+                ${ref(urlInput)}
+                data-role="ii-url"
+                class="c-input c-input--stack c-input--fullwidth"
+                value="https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app"
+            ></input>
+          </section>
+          <section class="l-container l-stack">
+            <hgroup>
+              <h1 class="t-title">Issuer</h1>
+            </hgroup>
+            <input
+                ${ref(issuerInput)}
+                data-role="issuer-url"
+                class="c-input c-input--stack c-input--fullwidth"
+                value="https://v2yvn-myaaa-aaaad-aad4q-cai.icp0.io"
+            ></input>
+          </section>
+
         </div>
       `;
     };
