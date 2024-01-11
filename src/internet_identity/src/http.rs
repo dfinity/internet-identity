@@ -55,12 +55,13 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         },
         probably_an_asset => match certified_asset(probably_an_asset, req.certificate_version) {
             Some(CertifiedAsset {
+                status_code,
                 mut headers,
                 content,
             }) => {
                 headers.append(&mut security_headers());
                 HttpResponse {
-                    status_code: 200,
+                    status_code,
                     headers,
                     body: ByteBuf::from(content),
                     upgrade: None,
@@ -198,7 +199,7 @@ pub fn content_security_policy_header() -> String {
 
 fn certified_asset(asset_name: &str, certificate_version: Option<u16>) -> Option<CertifiedAsset> {
     state::assets_and_signatures(|assets, sigs| {
-        assets.certified_asset(
+        assets.get_certified_asset(
             asset_name,
             certificate_version,
             Some(pruned(labeled_hash(LABEL_SIG, &sigs.root_hash()))),
