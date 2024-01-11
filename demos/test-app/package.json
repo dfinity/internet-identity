@@ -2,11 +2,11 @@
   "name": "@dfinity/internet-identity-test-app",
   "private": true,
   "dependencies": {
-    "@dfinity/agent": "^0.19.3",
-    "@dfinity/auth-client": "^0.19.3",
-    "@dfinity/candid": "^0.19.3",
-    "@dfinity/identity": "^0.19.3",
-    "@dfinity/principal": "^0.19.3",
+    "@dfinity/agent": "^0.19.2",
+    "@dfinity/auth-client": "^0.19.2",
+    "@dfinity/candid": "^0.19.2",
+    "@dfinity/identity": "^0.19.2",
+    "@dfinity/principal": "^0.19.2",
     "buffer": "^6.0.3",
     "jose": "^5.1.2",
     "react": "^18.2.0",
@@ -19,6 +19,7 @@
     "build": "npm run check && vite --config ./vite.config.ts build"
   },
   "devDependencies": {
+    "@dfinity/internet-identity-vc-api": "*",
     "@types/node": "^20.10.1",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",

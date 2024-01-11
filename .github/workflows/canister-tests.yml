@@ -270,11 +270,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/test-app/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
+      - run: npm ci
       - name: "Build test app canister"
         working-directory: demos/test-app
-        run: |
-          npm ci
-          ./build.sh
+        run: ./build.sh
       - name: 'Upload test app'
         uses: actions/upload-artifact@v3
         with:

@@ -1,3 +1,5 @@
+import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
+
 import type { Identity, SignIdentity } from "@dfinity/agent";
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { AuthClient } from "@dfinity/auth-client";
@@ -393,9 +395,7 @@ function handleFlowReady(evnt: MessageEvent) {
     return showError(`"${principal}" is not a principal`);
   }
 
-  // XXX: we don't export the VC-relevant types from the II codebase
-  // so we cannot typecheck this
-  const req = {
+  const req: VcFlowRequestWire = {
     id: opts.flowId.toString(),
     jsonrpc: "2.0",
     method: "request_credential",

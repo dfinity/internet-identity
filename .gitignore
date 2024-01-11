@@ -27,3 +27,5 @@ test-failures/
 *.wasm
 *.wasm.gz
 ic-test-state-machine
+
+*.tsbuildinfo

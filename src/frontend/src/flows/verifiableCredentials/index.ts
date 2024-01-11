@@ -1,8 +1,4 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
-import {
-  CredentialSpec,
-  IssuedCredentialData,
-} from "$generated/vc_issuer_types";
 import { useIdentity } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
@@ -16,6 +12,10 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@dfinity/identity";
+import {
+  CredentialSpec,
+  IssuedCredentialData,
+} from "@dfinity/internet-identity-vc-api";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";

@@ -18,7 +18,7 @@
     "generate": "npm run generate:types && npm run generate:js && npm run generate:types-issuer && npm run generate:js-issuer",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts > src/frontend/generated/vc_issuer_types.d.ts",
+    "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts > src/vc-api/src/generated/vc_issuer_types.ts",
     "generate:js-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t js > src/frontend/generated/vc_issuer_idl.js",
     "build:showcase": "tsc --noEmit && astro check --root ./src/showcase && astro build --root ./src/showcase",
     "preview:showcase": "astro preview --root ./src/showcase",
@@ -30,8 +30,8 @@
     "lint": "npm run lint:eslint && npm run lint:lit",
     "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
-    "format": "prettier --write src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos",
-    "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
+    "format": "prettier --write src/showcase src/frontend src/vc-api tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos",
+    "format-check": "prettier --check src/showcase src/frontend src/vc-api tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
@@ -62,6 +62,7 @@
     "@dfinity/agent": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
+    "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/principal": "^0.19.2",
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
@@ -78,5 +79,9 @@
   "engines": {
     "npm": ">=10.0.0 <11.0.0",
     "node": ">=20.0.0 <21.0.0"
-  }
+  },
+  "workspaces": [
+    "src/vc-api",
+    "demos/test-app"
+  ]
 }
