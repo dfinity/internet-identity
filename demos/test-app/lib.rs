@@ -30,25 +30,24 @@ fn whoami() -> Principal {
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
-    ASSETS
-        .with_borrow_mut(|assets| {
-            let asset = Asset {
-                url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
-                content: alternative_origins.as_bytes().to_vec(),
-                encoding: ContentEncoding::Identity,
-                content_type: ContentType::JSON,
-            };
-            match &mode {
-                CertifiedContent | UncertifiedContent => {
-                    assets.certify_asset(asset, &static_headers())
-                }
-                Redirect { location } => assets.certify_redirect(
+    ASSETS.with_borrow_mut(|assets| {
+        let asset = Asset {
+            url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
+            content: alternative_origins.as_bytes().to_vec(),
+            encoding: ContentEncoding::Identity,
+            content_type: ContentType::JSON,
+        };
+        match &mode {
+            CertifiedContent | UncertifiedContent => assets.certify_asset(asset, &static_headers()),
+            Redirect { location } => assets
+                .certify_redirect(
                     ALTERNATIVE_ORIGINS_PATH,
                     location.as_str(),
                     &static_headers(),
-                ).expect("Failed to certify alternative origins redirect"),
-            }
-        });
+                )
+                .expect("Failed to certify alternative origins redirect"),
+        }
+    });
 
     ALTERNATIVE_ORIGINS_MODE.with(|m| {
         m.replace(mode);
@@ -162,9 +161,12 @@ fn fixup_html(html: &str) -> String {
 }
 
 #[init]
-#[post_upgrade]
 pub fn init() {
     init_assets(EMPTY_ALTERNATIVE_ORIGINS.to_string());
+}
+#[post_upgrade]
+fn post_upgrade() {
+    init()
 }
 
 /// Collect all the assets from the dist folder.

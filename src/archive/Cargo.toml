@@ -13,7 +13,7 @@ internet_identity_interface.workspace = true
 candid.workspace = true
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
-ic-cdk-timers = "0.4"
+ic-cdk-timers = "0.6.0"
 ic-metrics-encoder.workspace = true
 ic-stable-structures.workspace = true
 # other
@@ -21,7 +21,7 @@ serde.workspace = true
 serde_bytes.workspace = true
 
 [dev-dependencies]
-candid = { version = "0.9", features = ["parser"] }
+candid_parser.workspace = true
 canister_tests.workspace = true
 hex.workspace = true
 ic-test-state-machine-client.workspace = true

@@ -512,7 +512,6 @@ fn set_highest_archived_sequence_number(sequence_number: u64) {
 }
 
 #[init]
-#[post_upgrade]
 #[candid_method(init)]
 fn initialize(arg: ArchiveInit) {
     write_config(ArchiveConfig {
@@ -527,6 +526,11 @@ fn initialize(arg: ArchiveInit) {
     set_timer_interval(Duration::from_nanos(arg.polling_interval_ns), || {
         ic_cdk::spawn(fetch_entries())
     });
+}
+
+#[post_upgrade]
+fn post_upgrade(arg: ArchiveInit) {
+    initialize(arg)
 }
 
 fn write_config(config: ArchiveConfig) {
@@ -690,7 +694,7 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is

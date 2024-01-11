@@ -124,7 +124,6 @@ struct IssuerInit {
 }
 
 #[init]
-#[post_upgrade]
 #[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
     if let Some(init) = init_arg {
@@ -132,6 +131,11 @@ fn init(init_arg: Option<IssuerInit>) {
     };
 
     init_assets();
+}
+
+#[post_upgrade]
+fn post_upgrade(init_arg: Option<IssuerInit>) {
+    init(init_arg);
 }
 
 #[update]
@@ -638,7 +642,7 @@ fn fixup_html(html: &str) -> String {
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is
