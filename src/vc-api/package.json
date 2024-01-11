@@ -1,0 +1,16 @@
+{
+  "name": "@dfinity/internet-identity-vc-api",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "check": "tsc --noEmit",
+    "postinstall": "npm run build"
+  },
+  "license": "SEE LICENSE IN LICENSE.md",
+  "devDependencies": {
+    "typescript": "*",
+    "zod": "*",
+    "@dfinity/principal": "*",
+    "@dfinity/utils": "*"
+  }
+}

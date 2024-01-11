@@ -13,6 +13,7 @@
 # frontend code
 node_modules/
 src/frontend/generated/
+src/vc-api/src/generated/
 dist/
 .env
 lib
