@@ -7,10 +7,12 @@
     "postinstall": "npm run build"
   },
   "license": "SEE LICENSE IN LICENSE.md",
-  "devDependencies": {
-    "typescript": "*",
+  "dependencies": {
     "zod": "*",
     "@dfinity/principal": "*",
     "@dfinity/utils": "*"
+  },
+  "devDependencies": {
+    "typescript": "*"
   }
 }
