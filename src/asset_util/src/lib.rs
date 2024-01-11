@@ -29,13 +29,15 @@ pub const IC_CERTIFICATE_EXPRESSION: &str =
 /// for the certification to be valid.
 #[derive(Debug, Default, Clone)]
 pub struct CertifiedAssets {
-    assets: HashMap<String, (Vec<HeaderField>, Vec<u8>)>,
+    assets: HashMap<String, CertifiedAsset>,
     certification_v1: RbTree<String, Hash>,
     certification_v2: NestedTree<Vec<u8>, Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct CertifiedAsset {
+    /// The status code of the HTTP response.
+    pub status_code: u16,
     /// The headers to be included in the HTTP response.
     pub headers: Vec<HeaderField>,
     /// The file content of the asset.
@@ -67,6 +69,8 @@ impl CertifiedAssets {
     /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
     /// certification to be valid.
     pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> Self {
+        const HTTP_OK_STATUS: u16 = 200;
+
         let mut certified_assets = Self::default();
         for Asset {
             url_path,
@@ -99,6 +103,7 @@ impl CertifiedAssets {
 
             certified_assets.add_certification_v2(
                 &url_path,
+                HTTP_OK_STATUS,
                 &shared_headers
                     .iter()
                     .chain(headers.iter())
@@ -107,7 +112,14 @@ impl CertifiedAssets {
                 body_hash,
             );
 
-            certified_assets.assets.insert(url_path, (headers, content));
+            certified_assets.assets.insert(
+                url_path,
+                CertifiedAsset {
+                    status_code: HTTP_OK_STATUS,
+                    headers,
+                    content,
+                },
+            );
         }
         certified_assets
     }
@@ -144,13 +156,7 @@ impl CertifiedAssets {
         sigs_tree: Option<HashTree>,
     ) -> Option<CertifiedAsset> {
         assert!(url_path.starts_with('/'));
-        let certified_asset = self
-            .assets
-            .get(url_path)
-            .map(|(headers, content)| CertifiedAsset {
-                headers: headers.clone(),
-                content: content.clone(),
-            });
+        let certified_asset = self.assets.get(url_path).cloned();
         certified_asset.map(|mut certified_asset| {
             match max_certificate_version {
                 Some(x) if x >= 2 => certified_asset
@@ -175,14 +181,20 @@ impl CertifiedAssets {
         new_content: Vec<u8>,
         shared_headers: &[HeaderField],
     ) -> Result<(), String> {
-        let Some((headers, _)) = self.assets.get(url_path) else {
+        let Some(CertifiedAsset {
+            status_code,
+            headers,
+            ..
+        }) = self.assets.get(url_path).cloned()
+        else {
             return Err(format!("Asset {} not found.", url_path));
         };
-        let headers = headers.clone();
+
         let body_hash = sha2::Sha256::digest(&new_content).into();
         self.add_certification_v1(url_path, body_hash);
         self.add_certification_v2(
             url_path,
+            status_code,
             &shared_headers
                 .iter()
                 .chain(headers.iter())
@@ -190,8 +202,14 @@ impl CertifiedAssets {
                 .collect::<Vec<_>>(),
             body_hash,
         );
-        self.assets
-            .insert(url_path.to_string(), (headers, new_content));
+        self.assets.insert(
+            url_path.to_string(),
+            CertifiedAsset {
+                status_code,
+                headers,
+                content: new_content,
+            },
+        );
         Ok(())
     }
 
@@ -214,6 +232,7 @@ impl CertifiedAssets {
     fn add_certification_v2(
         &mut self,
         absolute_path: &str,
+        status_code: u16,
         headers: &[HeaderField],
         body_hash: Hash,
     ) {
@@ -230,7 +249,7 @@ impl CertifiedAssets {
         self.certification_v2.delete(&segments);
         segments.push(Vec::from(EXPR_HASH.as_slice()));
         segments.push(vec![]);
-        segments.push(Vec::from(response_hash(headers, &body_hash)));
+        segments.push(Vec::from(response_hash(status_code, headers, &body_hash)));
 
         self.certification_v2.insert(&segments, vec![])
     }
@@ -369,7 +388,7 @@ lazy_static! {
     pub static ref EXPR_HASH: Hash = sha2::Sha256::digest(IC_CERTIFICATE_EXPRESSION).into();
 }
 
-fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
+fn response_hash(status_code: u16, headers: &[HeaderField], body_hash: &Hash) -> Hash {
     let mut response_metadata: HashMap<String, Value> = HashMap::from_iter(
         headers
             .iter()
@@ -380,7 +399,10 @@ fn response_hash(headers: &[HeaderField], body_hash: &Hash) -> Hash {
         IC_CERTIFICATE_EXPRESSION_HEADER.to_ascii_lowercase(),
         Value::String(IC_CERTIFICATE_EXPRESSION.to_string()),
     );
-    response_metadata.insert(STATUS_CODE_PSEUDO_HEADER.to_string(), Value::Number(200));
+    response_metadata.insert(
+        STATUS_CODE_PSEUDO_HEADER.to_string(),
+        Value::Number(status_code as u64),
+    );
     let mut response_metadata_hash: Vec<u8> =
         representation_independent_hash(&response_metadata.into_iter().collect::<Vec<_>>()).into();
     response_metadata_hash.extend_from_slice(body_hash);
