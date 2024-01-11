@@ -415,7 +415,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     let sigs_root_hash =
         SIGNATURES.with_borrow(|sigs| pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())));
     let maybe_asset = ASSETS.with_borrow(|assets| {
-        assets.certified_asset(path, req.certificate_version, Some(sigs_root_hash))
+        assets.get_certified_asset(path, req.certificate_version, Some(sigs_root_hash))
     });
 
     let mut headers = static_headers();
