@@ -240,12 +240,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
-
+      - run: npm ci
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
-        run: |
-          npm ci
-          ./build.sh
+        run: ./build.sh
       - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
