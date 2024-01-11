@@ -55,12 +55,13 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         },
         probably_an_asset => match certified_asset(probably_an_asset, req.certificate_version) {
             Some(CertifiedAsset {
+                status_code,
                 mut headers,
                 content,
             }) => {
                 headers.append(&mut security_headers());
                 HttpResponse {
-                    status_code: 200,
+                    status_code,
                     headers,
                     body: ByteBuf::from(content),
                     upgrade: None,
