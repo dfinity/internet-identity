@@ -1,5 +1,6 @@
 {
   "name": "@dfinity/internet-identity-test-app",
+  "type": "module",
   "private": true,
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@dfinity/internet-identity-vc-api": "*",
+    "@dfinity/internet-identity-vite-plugins": "*",
     "@types/node": "^20.10.1",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
