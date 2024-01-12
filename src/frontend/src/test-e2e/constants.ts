@@ -1,4 +1,4 @@
-import { readCanisterId } from "../../../../utils";
+import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 
 // XXX: this is not exactly a constant (since it might change on every node eval) but in
 // practice is very stable, and is much easier to use as "constants" than as a lookup function.

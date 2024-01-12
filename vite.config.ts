@@ -1,12 +1,12 @@
-import basicSsl from "@vitejs/plugin-basic-ssl";
-import { resolve } from "path";
-import { AliasOptions, UserConfig, defineConfig } from "vite";
 import {
   compression,
   injectCanisterIdPlugin,
   minifyHTML,
   replicaForwardPlugin,
-} from "./vite.plugins";
+} from "@dfinity/internet-identity-vite-plugins";
+import basicSsl from "@vitejs/plugin-basic-ssl";
+import { resolve } from "path";
+import { AliasOptions, UserConfig, defineConfig } from "vite";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -63,7 +63,11 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     plugins: [
-      [...(mode === "development" ? [injectCanisterIdPlugin()] : [])],
+      [
+        ...(mode === "development"
+          ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]
+          : []),
+      ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       replicaForwardPlugin({
