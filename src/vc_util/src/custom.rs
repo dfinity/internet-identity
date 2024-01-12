@@ -196,7 +196,7 @@ mod tests {
             &test_ic_root_pk_raw(),
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
-        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("holder does not match subject"));
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("unexpected vc subject"));
     }
 
     #[test]

@@ -152,22 +152,7 @@ fn apply_config(init: IssuerInit) {
 
 fn authorize_vc_request(
     alias: &SignedIdAlias,
-    current_time_ns: u128,
-) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(alias, current_time_ns)?;
-
-    if caller() != alias_tuple.id_dapp {
-        return Err(IssueCredentialError::UnauthorizedSubject(format!(
-            "Caller {} does not match id alias dapp principal {}.",
-            caller(),
-            alias_tuple.id_dapp
-        )));
-    }
-    Ok(alias_tuple)
-}
-
-fn extract_id_alias(
-    alias: &SignedIdAlias,
+    expected_vc_subject: &Principal,
     current_time_ns: u128,
 ) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
@@ -176,6 +161,7 @@ fn extract_id_alias(
         for idp_canister_id in &config.idp_canister_ids {
             if let Ok(alias_tuple) = get_verified_id_alias_from_jws(
                 &alias.credential_jws,
+                expected_vc_subject,
                 idp_canister_id,
                 &config.ic_root_key_raw,
                 current_time_ns,
@@ -194,7 +180,7 @@ fn extract_id_alias(
 async fn prepare_credential(
     req: PrepareCredentialRequest,
 ) -> Result<PreparedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Err(err),
     };
@@ -246,7 +232,7 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
     };

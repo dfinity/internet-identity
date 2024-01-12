@@ -117,6 +117,7 @@ pub fn principal_for_did(did: &str) -> Result<Principal, String> {
 /// validation of the claims in the VC.
 pub fn get_verified_id_alias_from_jws(
     credential_jws: &str,
+    expected_vc_subject: &Principal,
     signing_canister_id: &Principal,
     root_pk_raw: &[u8],
     current_time_ns: u128,
@@ -130,7 +131,14 @@ pub fn get_verified_id_alias_from_jws(
     .map_err(CredentialVerificationError::InvalidJws)?;
     validate_claim("iss", II_ISSUER_URL, claims.iss())
         .map_err(CredentialVerificationError::InvalidClaims)?;
-    extract_id_alias(&claims).map_err(CredentialVerificationError::InvalidClaims)
+    let alias_tuple =
+        extract_id_alias(&claims).map_err(CredentialVerificationError::InvalidClaims)?;
+    if *expected_vc_subject != alias_tuple.id_dapp {
+        return Err(CredentialVerificationError::InvalidClaims(
+            inconsistent_jwt_claims("unexpected vc subject"),
+        ));
+    }
+    Ok(alias_tuple)
 }
 
 /// Verifies the specified JWS credential cryptographically and checks that the signature was
@@ -192,11 +200,12 @@ fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, 
 
 /// Verifies the specified JWT presentation cryptographically, which should contain exactly
 /// two verifiable credentials (in the order specifed):
-///   1. An id_alias credential which links the holder of the VP to a temporary id_alias.
+///   1. An "Id alias" credential which links the effective subject of the VP to a temporary id_alias.
 ///      This credential should be signed by canister vc_flow_parties.ii_canister_id.
 ///   2. An actual credential requested by a user.  The subject of this credential is id_alias,
 ///      and it should be signed by canister vc_flow_parties.issuer_canister_id
-/// Returns holder's identity together with id_alias, and the claims from the requested credential.
+/// Verifies that the subject of the first credential matches `effective_vc_subject`.
+/// Returns the verified `effective_vc_subject` with id_alias, and the claims from the requested credential.
 /// DOES NOT perform semantic validation of the returned claims.
 pub fn verify_ii_presentation_jwt_with_canister_ids(
     vp_jwt: &str,
@@ -217,25 +226,12 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
     )?;
     let alias_tuple = get_verified_id_alias_from_jws(
         id_alias_vc_jws.as_str(),
+        &effective_vc_subject,
         &vc_flow_signers.ii_canister_id,
         root_pk_raw,
         current_time_ns,
     )
     .map_err(PresentationVerificationError::InvalidIdAliasCredential)?;
-    // TODO: change `get_verified_id_alias_from_jws` to additionally take `effective_vc_subject`
-    //       as an argument and to perform the check below internally.
-    //       Also, consider adding `ii_origin`-argument to enable custom values for II-origin,
-    //       and extend should_fail_validate_verified_adult_presentation_if_wrong_vc_flow_signers()
-    //       if needed.
-    if effective_vc_subject != alias_tuple.id_dapp {
-        return Err(PresentationVerificationError::InvalidPresentationJwt(
-            format!(
-                "holder does not match subject: expected {}, got {}",
-                effective_vc_subject, alias_tuple.id_dapp
-            )
-            .to_string(),
-        ));
-    }
     let requested_vc_jws =
         presentation
             .verifiable_credential
@@ -692,6 +688,7 @@ mod tests {
     fn should_verify_and_extract_id_alias_credential_jws() {
         let alias_tuple = get_verified_id_alias_from_jws(
             ID_ALIAS_CREDENTIAL_JWS,
+            &dapp_principal(),
             &test_canister_sig_pk().canister_id,
             &test_ic_root_pk_raw(),
             CURRENT_TIME_BEFORE_EXPIRY_NS,
@@ -843,7 +840,7 @@ mod tests {
             &test_ic_root_pk_raw(),
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
-        assert_matches!(result, Err(e) if format!("{:?}", e).contains("holder does not match subject"));
+        assert_matches!(result, Err(e) if format!("{:?}", e).contains("unexpected vc subject"));
     }
 
     #[test]
