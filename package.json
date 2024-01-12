@@ -30,8 +30,8 @@
     "lint": "npm run lint:eslint && npm run lint:lit",
     "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
-    "format": "prettier --write src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json .eslintrc.json vite.config.ts vitest.config.ts demos",
-    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json .eslintrc.json vite.config.ts vitest.config.ts demos"
+    "format": "prettier --write src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos",
+    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
+    "@dfinity/auth-client": "*",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
     "@dfinity/internet-identity-vc-api": "*",
