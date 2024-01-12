@@ -208,6 +208,12 @@ type CanisterStatus = record {
     memory_size: nat;
     cycles: nat;
     idle_cycles_burned_per_day: nat;
+    query_stats: record {
+        num_calls_total: nat;
+        num_instructions_total: nat;
+        request_payload_bytes_total: nat;
+        response_payload_bytes_total: nat;
+    };
 }
 
 service : (ArchiveInit) -> {

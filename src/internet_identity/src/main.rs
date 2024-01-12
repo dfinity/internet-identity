@@ -825,7 +825,7 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is

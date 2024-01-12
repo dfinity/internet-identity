@@ -19,8 +19,7 @@ pub fn health_check(env: &StateMachine, canister_id: CanisterId) {
     let user_number: types::AnchorNumber = 0;
     // XXX: we use "IDLValue" because we're just checking that the canister is sending
     // valid data, but we don't care about the actual data.
-    let _: (candid::types::value::IDLValue,) =
-        call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
+    let _: () = call_candid(env, canister_id, "lookup", (user_number,)).unwrap();
 }
 
 pub fn create_challenge(
