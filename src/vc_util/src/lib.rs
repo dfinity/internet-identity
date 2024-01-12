@@ -200,11 +200,12 @@ fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, 
 
 /// Verifies the specified JWT presentation cryptographically, which should contain exactly
 /// two verifiable credentials (in the order specifed):
-///   1. An id_alias credential which links the holder of the VP to a temporary id_alias.
+///   1. An "Id alias" credential which links the effective subject of the VP to a temporary id_alias.
 ///      This credential should be signed by canister vc_flow_parties.ii_canister_id.
 ///   2. An actual credential requested by a user.  The subject of this credential is id_alias,
 ///      and it should be signed by canister vc_flow_parties.issuer_canister_id
-/// Returns holder's identity together with id_alias, and the claims from the requested credential.
+/// Verifies that the subject of the first credential matches `effective_vc_subject`.
+/// Returns the verified `effective_vc_subject` with id_alias, and the claims from the requested credential.
 /// DOES NOT perform semantic validation of the returned claims.
 pub fn verify_ii_presentation_jwt_with_canister_ids(
     vp_jwt: &str,
