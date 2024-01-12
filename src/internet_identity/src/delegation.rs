@@ -3,7 +3,7 @@ use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::signature_map::SignatureMap;
-use canister_sig_util::{get_signature_as_cbor, CanisterSigPublicKey};
+use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::time;
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
@@ -19,10 +19,6 @@ const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 // The maximum expiration time for delegation
 // (calculated as now() + this)
 const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
-
-// The expiration used for signatures
-#[allow(clippy::identity_op)]
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
 
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,
@@ -43,7 +39,7 @@ pub async fn prepare_delegation(
     let seed = calculate_seed(anchor_number, &frontend);
 
     state::signature_map_mut(|sigs| {
-        add_signature(sigs, session_key, seed, expiration);
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
     });
     update_root_hash();
 
@@ -132,8 +128,7 @@ pub fn get_delegation(
             expiration,
             targets: None,
         });
-        match get_signature_as_cbor(
-            sigs,
+        match sigs.get_signature_as_cbor(
             &calculate_seed(anchor_number, &frontend),
             message_hash,
             Some(certified_assets.root_hash()),
@@ -199,14 +194,18 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
-fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration: Timestamp) {
+fn add_delegation_signature(
+    sigs: &mut SignatureMap,
+    pk: PublicKey,
+    seed: &[u8],
+    expiration: Timestamp,
+) {
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
     });
-    let expires_at = time().saturating_add(SIGNATURE_EXPIRATION_PERIOD_NS);
-    sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
+    sigs.add_signature(seed, msg_hash);
 }
 
 /// Removes a batch of expired signatures from the signature map.

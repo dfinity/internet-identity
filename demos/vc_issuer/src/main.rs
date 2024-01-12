@@ -1,9 +1,7 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{
-    extract_raw_root_pk_from_der, get_signature_as_cbor, CanisterSigPublicKey, IC_ROOT_PK_DER,
-};
+use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
 use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
@@ -43,7 +41,6 @@ type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type ConfigCell = StableCell<IssuerConfig, Memory>;
 
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
-const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
 // The expiration of issued verifiable credentials.
 const VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
@@ -221,7 +218,7 @@ async fn prepare_credential(
 
     SIGNATURES.with(|sigs| {
         let mut sigs = sigs.borrow_mut();
-        add_signature(&mut sigs, msg_hash, seed);
+        sigs.add_signature(seed.as_ref(), msg_hash);
     });
     update_root_hash();
     Ok(PreparedCredentialData {
@@ -281,12 +278,7 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
     let sig_result = SIGNATURES.with(|sigs| {
         let sig_map = sigs.borrow();
         let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
-        get_signature_as_cbor(
-            &sig_map,
-            &seed,
-            message_hash,
-            Some(certified_assets_root_hash),
-        )
+        sig_map.get_signature_as_cbor(&seed, message_hash, Some(certified_assets_root_hash))
     });
     let sig = match sig_result {
         Ok(sig) => sig,
@@ -445,11 +437,6 @@ fn static_headers() -> Vec<(String, String)> {
 }
 
 fn main() {}
-
-fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
-    let signature_expires_at = time().saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
-    sigs.put(hash_bytes(seed), msg_hash, signature_expires_at);
-}
 
 fn calculate_seed(principal: &Principal) -> Hash {
     // IMPORTANT: In a real dapp the salt should be set to a random value.
