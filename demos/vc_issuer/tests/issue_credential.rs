@@ -380,7 +380,7 @@ fn should_fail_prepare_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -417,7 +417,7 @@ fn should_fail_get_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(get_credential_response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -436,7 +436,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains("id alias could not be verified")
     );
 }
 
