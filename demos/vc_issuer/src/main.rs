@@ -148,13 +148,6 @@ fn apply_config(init: IssuerInit) {
 
 fn authorize_vc_request(
     alias: &SignedIdAlias,
-    current_time_ns: u128,
-) -> Result<AliasTuple, IssueCredentialError> {
-    extract_id_alias(alias, &caller(), current_time_ns)
-}
-
-fn extract_id_alias(
-    alias: &SignedIdAlias,
     expected_vc_subject: &Principal,
     current_time_ns: u128,
 ) -> Result<AliasTuple, IssueCredentialError> {
@@ -183,7 +176,7 @@ fn extract_id_alias(
 async fn prepare_credential(
     req: PrepareCredentialRequest,
 ) -> Result<PreparedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Err(err),
     };
@@ -235,7 +228,7 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
     };
