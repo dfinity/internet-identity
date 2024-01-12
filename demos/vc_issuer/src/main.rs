@@ -150,20 +150,12 @@ fn authorize_vc_request(
     alias: &SignedIdAlias,
     current_time_ns: u128,
 ) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(alias, current_time_ns)?;
-
-    if caller() != alias_tuple.id_dapp {
-        return Err(IssueCredentialError::UnauthorizedSubject(format!(
-            "Caller {} does not match id alias dapp principal {}.",
-            caller(),
-            alias_tuple.id_dapp
-        )));
-    }
-    Ok(alias_tuple)
+    extract_id_alias(alias, &caller(), current_time_ns)
 }
 
 fn extract_id_alias(
     alias: &SignedIdAlias,
+    expected_vc_subject: &Principal,
     current_time_ns: u128,
 ) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
@@ -172,6 +164,7 @@ fn extract_id_alias(
         for idp_canister_id in &config.idp_canister_ids {
             if let Ok(alias_tuple) = get_verified_id_alias_from_jws(
                 &alias.credential_jws,
+                expected_vc_subject,
                 idp_canister_id,
                 &config.ic_root_key_raw,
                 current_time_ns,

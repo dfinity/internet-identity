@@ -570,6 +570,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
+        &id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
         env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
