@@ -433,7 +433,10 @@ fn static_headers() -> Vec<(String, String)> {
 fn main() {}
 
 fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
-    let signature_expires_at = time().saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
+    const MAX_SIGS_TO_PRUNE: usize = 50;
+    let now = time();
+    sigs.prune_expired(now, MAX_SIGS_TO_PRUNE);
+    let signature_expires_at = now.saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
     sigs.put(hash_bytes(seed), msg_hash, signature_expires_at);
 }
 
