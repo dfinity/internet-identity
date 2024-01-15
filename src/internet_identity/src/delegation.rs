@@ -28,7 +28,6 @@ pub async fn prepare_delegation(
     ii_domain: &Option<IIDomain>,
 ) -> (UserKey, Timestamp) {
     state::ensure_salt_set().await;
-    prune_expired_signatures();
     check_frontend_length(&frontend);
 
     let delta = u64::min(
@@ -206,19 +205,6 @@ fn add_delegation_signature(
         targets: None,
     });
     sigs.add_signature(seed, msg_hash);
-}
-
-/// Removes a batch of expired signatures from the signature map.
-///
-/// This function piggy-backs on update calls that create new signatures to
-/// amortize the cost of tree pruning. Each operation on the signature map
-/// will prune at most MAX_SIGS_TO_PRUNE other signatures.
-pub fn prune_expired_signatures() {
-    const MAX_SIGS_TO_PRUNE: usize = 50;
-    let num_pruned = state::signature_map_mut(|sigs| sigs.prune_expired(time(), MAX_SIGS_TO_PRUNE));
-    if num_pruned > 0 {
-        update_root_hash();
-    }
 }
 
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
