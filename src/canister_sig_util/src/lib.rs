@@ -1,11 +1,9 @@
 use candid::Principal;
-use ic_cdk::api::data_certificate;
-use ic_certification::{fork, labeled, pruned, Hash, HashTree};
+use ic_certification::{Hash, HashTree};
 use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use signature_map::{SignatureMap, LABEL_SIG};
 
 pub mod signature_map;
 
@@ -141,51 +139,6 @@ pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 struct CanisterSig {
     certificate: ByteBuf,
     tree: HashTree,
-}
-
-/// Returns canister signature for the specified `seed` and `message_hash` by retrieving
-/// the witness from `sig_map`.  If the canister uses
-/// [certified_data](https://internetcomputer.org/docs/current/references/ic-interface-spec/#system-api-certified-data)
-/// to manage certified assets, the caller should provide also the root hash of the assets subtree
-/// (cf. `asset_util`-crate).
-/// The returned value (if found) is a CBOR-serialised `CanisterSig`.
-pub fn get_signature_as_cbor(
-    sig_map: &SignatureMap,
-    seed: &[u8],
-    message_hash: Hash,
-    maybe_certified_assets_root_hash: Option<Hash>,
-) -> Result<Vec<u8>, String> {
-    let certificate = data_certificate()
-        .ok_or("data certificate is only available in query calls".to_string())?;
-    let witness = sig_map
-        .witness(hash_bytes(seed), message_hash)
-        .ok_or("missing witness".to_string())?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sig_map.root_hash();
-    if witness_hash != root_hash {
-        return Err(format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-
-    let sigs_tree = labeled(LABEL_SIG, witness);
-    let tree = match maybe_certified_assets_root_hash {
-        Some(certified_assets_root_hash) => fork(pruned(certified_assets_root_hash), sigs_tree),
-        None => sigs_tree,
-    };
-
-    let sig = CanisterSig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Ok(cbor.into_inner())
 }
 
 #[cfg(test)]
