@@ -42,7 +42,7 @@ fn test_signature_expiration() {
     map.put(&seed(2), message(1), 15);
     map.put(&seed(2), message(2), 25);
 
-    assert_eq!(2, map.prune_expired(/*time now*/ 19, /*max_to_prune*/ 10));
+    assert_eq!(2, map.prune_expired(/*time now*/ 19));
     assert!(map.witness(&seed(1), message(1)).is_none());
     assert!(map.witness(&seed(2), message(1)).is_none());
 
@@ -54,16 +54,16 @@ fn test_signature_expiration() {
 fn test_signature_expiration_limit() {
     let mut map = SignatureMap::default();
 
-    for i in 0..10 {
-        map.put(&seed(i), message(i), 10 * i);
+    for i in 0..100 {
+        map.put(&seed(i), message(i), 10 + i);
     }
 
-    assert_eq!(5, map.prune_expired(/*time now*/ 100, /*max_to_prune*/ 5));
+    assert_eq!(50, map.prune_expired(/*time now*/ 100));
 
-    for i in 0..5 {
+    for i in 0..50 {
         assert!(map.witness(&seed(i), message(i)).is_none());
     }
-    for i in 5..10 {
+    for i in 50..100 {
         assert!(map.witness(&seed(i), message(i)).is_some());
     }
 }
@@ -94,7 +94,7 @@ fn test_random_modifications() {
             }
         }
 
-        map.prune_expired(round.saturating_sub(window_size), 1000);
+        map.prune_expired(round.saturating_sub(window_size));
 
         for (k, v) in pairs.iter() {
             if let Some(witness) = map.witness(k, *v) {
