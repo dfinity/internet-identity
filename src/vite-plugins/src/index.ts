@@ -3,25 +3,28 @@ import { execSync } from "child_process";
 import { minify } from "html-minifier-terser";
 import httpProxy from "http-proxy";
 import { extname } from "path";
-import { Plugin, ViteDevServer } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { readCanisterId } from "./utils";
+import { readCanisterId } from "./utils.js";
+
+export * from "./utils.js";
 
 /**
- * Inject the II canister ID as a <script /> tag in index.html for local development. Will process
+ * Inject the canister ID of 'canisterName' as a <script /> tag in index.html for local development. Will process
  * at most 1 script tag.
  */
-export const injectCanisterIdPlugin = (): {
+export const injectCanisterIdPlugin = ({
+  canisterName,
+}: {
+  canisterName: string;
+}): {
   name: "html-transform";
   transformIndexHtml(html: string): string;
 } => ({
   name: "html-transform",
   transformIndexHtml(html): string {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
-    const canisterId = readCanisterId({
-      canisterName: "internet_identity",
-    });
-
+    const canisterId = readCanisterId({ canisterName });
     return html.replace(rgx, (_match, src) => {
       return `<script data-canister-id="${canisterId}" type="module" src="${src}"></script>`;
     });

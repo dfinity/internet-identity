@@ -30,13 +30,11 @@
     "lint": "npm run lint:eslint && npm run lint:lit",
     "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
-    "format": "prettier --write src/showcase src/frontend src/vc-api tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos",
-    "format-check": "prettier --check src/showcase src/frontend src/vc-api tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
+    "format": "prettier --write src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos",
+    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
-    "@types/html-minifier-terser": "^7.0.0",
-    "@types/http-proxy": "^1.17.14",
     "@types/ua-parser-js": "^0.7.36",
     "@typescript-eslint/eslint-plugin": "6.7.5",
     "@typescript-eslint/parser": "6.7.5",
@@ -45,8 +43,6 @@
     "astro": "^2.4.1",
     "eslint": "8.51.0",
     "fake-indexeddb": "^4.0.2",
-    "html-minifier-terser": "^7.2.0",
-    "http-proxy": "^1.18.1",
     "lit-analyzer": "^2.0.2",
     "prettier": "2.8.0",
     "prettier-plugin-organize-imports": "^3.2.2",
@@ -54,12 +50,14 @@
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
     "vite": "^4.2.1",
-    "vite-plugin-compression": "^0.5.1",
     "vitest": "^0.34.0",
-    "webdriverio": "^8.21.0"
+    "webdriverio": "^8.21.0",
+
+    "@dfinity/internet-identity-vite-plugins": "*"
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
+    "@dfinity/auth-client": "*",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
     "@dfinity/internet-identity-vc-api": "*",
@@ -83,6 +81,7 @@
   "workspaces": [
     "src/vc-api",
     "demos/test-app",
-    "demos/vc_issuer"
+    "demos/vc_issuer",
+    "src/vite-plugins"
   ]
 }

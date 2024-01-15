@@ -4,18 +4,15 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
-    "@dfinity/agent": "^0.19.3",
-    "@dfinity/auth-client": "^0.19.3",
-    "@dfinity/candid": "^0.19.3",
-    "@dfinity/identity": "^0.19.3",
-    "@dfinity/principal": "^0.19.3",
-    "@dfinity/utils": "^0.0.20",
+    "@dfinity/agent": "*",
+    "@dfinity/auth-client": "*",
+    "@dfinity/candid": "*",
+    "@dfinity/identity": "*",
+    "@dfinity/principal": "*",
+    "@dfinity/utils": "*",
     "buffer": "^6.0.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "http-proxy": "^1.18.1",
-    "vite-plugin-compression": "^0.5.1",
-    "html-minifier-terser": "^7.2.0"
+    "react-dom": "^18.2.0"
   },
   "scripts": {
     "dev": "vite --config ./vite.config.ts",
@@ -27,12 +24,11 @@
     "generate:js": "didc bind ./vc_demo_issuer.did -t js > ./app/generated/vc_issuer_idl.js"
   },
   "devDependencies": {
-    "@types/html-minifier-terser": "^7.0.0",
-    "@types/http-proxy": "^1.17.14",
+    "@dfinity/internet-identity-vite-plugins": "*",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.0",
-    "vite": "^4.5.1",
-    "typescript": "5.2.2"
+    "typescript": "5.2.2",
+    "vite": "^4.5.1"
   }
 }
