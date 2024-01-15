@@ -27,30 +27,130 @@ import {
 
 test("Can add employee on issuer app", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await addVirtualAuthenticator(browser);
-    const issuerAppView = new IssuerAppView(browser);
-    await issuerAppView.open({ issuerAppUrl: ISSUER_APP_URL, iiUrl: II_URL });
-    await issuerAppView.waitForDisplay();
-    expect(await issuerAppView.isAuthenticated()).toBe(false);
-    await issuerAppView.authenticate();
-    await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(browser);
-    await waitToClose(browser);
-    const principal = await issuerAppView.waitForAuthenticated();
-    const msg = await issuerAppView.addEmployee();
+    const { setupAuth, finalizeAuth, userNumber } = await register["webauthn"](
+      browser
+    );
+
+    const { msg, principal } = await registerWithIssuer({
+      browser,
+      authConfig: { setupAuth, finalizeAuth, userNumber },
+      issuer: ISSUER_APP_URL,
+    });
+
     expect(msg).toContain("Added");
     expect(msg).toContain(principal);
   });
 }, 300_000);
 
+// Open the issuer demo, authenticate and register as an employee
+const registerWithIssuer = async ({
+  browser,
+  issuer,
+  authConfig: { setupAuth, finalizeAuth, userNumber },
+}: {
+  browser: WebdriverIO.Browser;
+  issuer: string;
+  authConfig: AuthConfig;
+}): Promise<{ msg: string; principal: string }> => {
+  const issuerAppView = new IssuerAppView(browser);
+  await issuerAppView.open({
+    issuerAppUrl: issuer,
+    iiUrl: II_URL,
+  });
+  await issuerAppView.waitForDisplay();
+
+  expect(await issuerAppView.isAuthenticated()).toBe(false);
+
+  await issuerAppView.authenticate();
+
+  await setupAuth(browser);
+
+  const authenticateView = new AuthenticateView(browser);
+  await authenticateView.waitForDisplay();
+  await authenticateView.pickAnchor(userNumber);
+
+  await finalizeAuth(browser);
+  await waitToClose(browser);
+
+  const principal = await issuerAppView.waitForAuthenticated();
+  const msg = await issuerAppView.addEmployee();
+
+  return { principal, msg };
+};
+
+// Open the specified test app on the URL `relyingParty` and authenticate
+const authenticateToRelyingParty = async ({
+  browser,
+  authConfig: { setupAuth, finalizeAuth, userNumber },
+  issuer,
+  relyingParty,
+}: {
+  browser: WebdriverIO.Browser;
+  relyingParty: string;
+  issuer: string;
+  authConfig: AuthConfig;
+}): Promise<VcTestAppView> => {
+  const vcTestApp = new VcTestAppView(browser);
+  await vcTestApp.open(relyingParty, II_URL, issuer);
+
+  await vcTestApp.startSignIn();
+
+  await setupAuth(browser);
+
+  const authenticateView2 = new AuthenticateView(browser);
+  await authenticateView2.waitForDisplay();
+  await authenticateView2.pickAnchor(userNumber);
+
+  await finalizeAuth(browser);
+  await waitToClose(browser);
+
+  await vcTestApp.waitForAuthenticated();
+
+  return vcTestApp;
+};
+
+// Go through the VC flow and get the presentation
+const getVCPresentation = async ({
+  vcTestApp,
+  browser,
+  authConfig: { setupAuth, finalizeAuth, userNumber },
+}: {
+  vcTestApp: VcTestAppView;
+  browser: WebdriverIO.Browser;
+  authConfig: AuthConfig;
+}) => {
+  await vcTestApp.startVcFlow();
+
+  await setupAuth(browser);
+
+  const vcAllow = new VcAllowView(browser);
+  await vcAllow.waitForDisplay();
+  const userNumber_ = await vcAllow.getUserNumber();
+  expect(userNumber_).toBe(userNumber);
+  await vcAllow.allow();
+
+  await finalizeAuth(browser);
+  await waitToClose(browser);
+};
+
 // The different ways to register (webauthn, pin).
-// The registration function returns the user number and callbacks
-// used for authenticating.
-const register = {
+// The registration function returns an 'AuthConfig' that
+// can be used for authenticating.
+type AuthConfig = {
+  userNumber: string;
+  setupAuth: (browser: WebdriverIO.Browser) => Promise<void>;
+  finalizeAuth: (browser: WebdriverIO.Browser) => Promise<void>;
+};
+const register: Record<
+  "webauthn" | "pin",
+  (browser: WebdriverIO.Browser) => Promise<AuthConfig>
+> = {
   webauthn: async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
     const authenticatorId = await addVirtualAuthenticator(browser);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
     return {
       userNumber,
@@ -63,7 +163,7 @@ const register = {
           originToRelyingPartyId(II_URL)
         );
       },
-      finalizeAuth: () => {
+      finalizeAuth: async (_: WebdriverIO.Browser) => {
         /* noop */
       },
     };
@@ -72,6 +172,7 @@ const register = {
   pin: async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
+    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
     return {
       userNumber,
@@ -124,63 +225,34 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
         async (browser: WebdriverIO.Browser) => {
           await browser.url(II_URL);
 
-          const { userNumber, setupAuth, finalizeAuth } = await register[
-            authType
-          ](browser);
-
-          await FLOWS.addRecoveryMechanismSeedPhrase(browser);
+          const authConfig = await register[authType](browser);
 
           // 1. Add employee
 
-          const issuerAppView = new IssuerAppView(browser);
-          await issuerAppView.open({
-            issuerAppUrl: issuer,
-            iiUrl: II_URL,
-          });
-          await issuerAppView.waitForDisplay();
-          await issuerAppView.authenticate();
-
-          await setupAuth(browser);
-
-          const authenticateView = new AuthenticateView(browser);
-          await authenticateView.waitForDisplay();
-          await authenticateView.pickAnchor(userNumber);
-
-          await finalizeAuth(browser);
-          await waitToClose(browser);
-
-          const _principal = await issuerAppView.waitForAuthenticated();
-          const _msg = await issuerAppView.addEmployee();
+          const { msg: _msg, principal: _principal } = await registerWithIssuer(
+            {
+              browser,
+              issuer,
+              authConfig,
+            }
+          );
 
           // 2. Auth to RP
 
-          const vcTestApp = new VcTestAppView(browser);
-          await vcTestApp.open(relyingParty, II_URL, issuer);
+          const vcTestApp = await authenticateToRelyingParty({
+            browser,
+            issuer,
+            authConfig,
+            relyingParty,
+          });
 
-          await vcTestApp.startSignIn();
+          // 3. Get VC presentation
 
-          await setupAuth(browser);
-
-          const authenticateView2 = new AuthenticateView(browser);
-          await authenticateView2.waitForDisplay();
-          await authenticateView2.pickAnchor(userNumber);
-
-          await finalizeAuth(browser);
-          await waitToClose(browser);
-
-          await vcTestApp.waitForAuthenticated();
-          await vcTestApp.startVcFlow();
-
-          await setupAuth(browser);
-
-          const vcAllow = new VcAllowView(browser);
-          await vcAllow.waitForDisplay();
-          const userNumber_ = await vcAllow.getUserNumber();
-          expect(userNumber_).toBe(userNumber);
-          await vcAllow.allow();
-
-          await finalizeAuth(browser);
-          await waitToClose(browser);
+          await getVCPresentation({
+            vcTestApp,
+            browser,
+            authConfig,
+          });
 
           // XXX: We don't verify the presentation (yet)
         },
