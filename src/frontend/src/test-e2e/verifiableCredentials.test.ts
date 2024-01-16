@@ -27,13 +27,11 @@ import {
 
 test("Can add employee on issuer app", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { setupAuth, finalizeAuth, userNumber } = await register["webauthn"](
-      browser
-    );
+    const authConfig = await register["webauthn"](browser);
 
     const { msg, principal } = await registerWithIssuer({
       browser,
-      authConfig: { setupAuth, finalizeAuth, userNumber },
+      authConfig,
       issuer: ISSUER_APP_URL,
     });
 
@@ -97,9 +95,9 @@ const authenticateToRelyingParty = async ({
 
   await setupAuth(browser);
 
-  const authenticateView2 = new AuthenticateView(browser);
-  await authenticateView2.waitForDisplay();
-  await authenticateView2.pickAnchor(userNumber);
+  const authenticateView = new AuthenticateView(browser);
+  await authenticateView.waitForDisplay();
+  await authenticateView.pickAnchor(userNumber);
 
   await finalizeAuth(browser);
   await waitToClose(browser);
@@ -118,7 +116,7 @@ const getVCPresentation = async ({
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
-}) => {
+}): Promise<{ alias: string; credential: string }> => {
   await vcTestApp.startVcFlow();
 
   await setupAuth(browser);
@@ -131,6 +129,11 @@ const getVCPresentation = async ({
 
   await finalizeAuth(browser);
   await waitToClose(browser);
+
+  const alias = await vcTestApp.getPresentationAlias();
+  const credential = await vcTestApp.getPresentationCredential();
+
+  return { alias, credential };
 };
 
 // The different ways to register (webauthn, pin).
@@ -246,15 +249,19 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             relyingParty,
           });
 
+          const principalRP = await vcTestApp.getPrincipal();
+
           // 3. Get VC presentation
 
-          await getVCPresentation({
+          const { alias } = await getVCPresentation({
             vcTestApp,
             browser,
             authConfig,
           });
 
-          // XXX: We don't verify the presentation (yet)
+          // Perform a basic check on the alias
+          const aliasObj = JSON.parse(alias);
+          expect(aliasObj.sub).toBe(`did:icp:${principalRP}`);
         },
         authType === "pin" ? APPLE_USER_AGENT : undefined
       );
