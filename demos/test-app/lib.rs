@@ -12,6 +12,7 @@ use AlternativeOriginsMode::UncertifiedContent;
 const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
 const EVIL_ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/evil-alternative-origins";
 const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
+const OUTDATED_INVALID_CERTIFICATE_HEADER: &str = ":2dn3omR0cmVlgwGDAYMBgwJIY2FuaXN0ZXKDAYMBggRYIF7eYW50QXA1hAANBQ4J616Ekjch0ihDxnNGwvlxxIKDgwGCBFggH4wduBeihx+gd8Oe2KvzyQxp/PEe6ustjHJNlVhLbmaDAkqAAAAAABAAAwEBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIIA3JGAjACCVyCTmsRmhhlZDI5oDZZkhGVMbpCIFTEejggRYIIMJ950nCB4emD2uvICtY5WfLhcOzb2BaqH4EvUGTX2xggRYIFfnBG3quMbImRDu81QLZKq0ADXD75bQIoPHA2y4JRQVggRYIETEKmiZ1Lflrx8sIiDUOqBdb7X+mJ5+kEturndxJYzeggRYINPKhi8ZGTDLJJGHdaSlL3lxf8JFGiBHe3FVp4y/myCvggRYIIZ883QyMwhObp/SFU8xtXu8w8xGgwEWfkJYAWqC9dNSgwGCBFgg49iYnFVeAADyzEwGNNe…Bcfct/T4ZWVYbJe/P3gUbLOS8n9uDAklodHRwX2V4cHKDAYMBgwGCBFgggaSHI9J56LbuKjb58O8AWYlQNqTWZBxB58L7Y6u9j2ODAksud2VsbC1rbm93boMBggRYIJY8druSGXKdr/LHH3Kr/F+Vo9VwgluKJZS6HxkTrIeUgwJWaWktYWx0ZXJuYXRpdmUtb3JpZ2luc4MCQzwkPoMCWCBiB64Pds+kxrd7O3KKhS3TAcooPTqycnGLKWuiy3dP6IMCQIMCWCCaryvDtyyZdDWHqiLmkc63lZuPrBF2Tt6ULsG0LUkWcIIDQIIEWCAYA1f5ooQFb7bDDkKE0QhYJLkfsn2j1GCIGJvp8r8ucYIEWCB28Uo/B0pARPP3FnDUBj83i4NpGPehI4IGGI2I2iOQhg==:, expr_path=:2dn3hGlodHRwX2V4cHJrLndlbGwta25vd252aWktYWx0ZXJuYXRpdmUtb3JpZ2luc2M8JD4=:, version=2";
 
 thread_local! {
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
@@ -29,17 +30,29 @@ fn whoami() -> Principal {
 /// * mode: enum that allows changing the behaviour of the asset. See [AlternativeOriginsMode].
 #[update]
 fn update_alternative_origins(alternative_origins: String, mode: AlternativeOriginsMode) {
+    ASSETS.with_borrow_mut(|assets| {
+        let asset = Asset {
+            url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
+            content: alternative_origins.as_bytes().to_vec(),
+            encoding: ContentEncoding::Identity,
+            content_type: ContentType::JSON,
+        };
+        match &mode {
+            CertifiedContent | UncertifiedContent => assets.certify_asset(asset, &static_headers()),
+            Redirect { location } => assets
+                .certify_redirect(
+                    ALTERNATIVE_ORIGINS_PATH,
+                    location.as_str(),
+                    &static_headers(),
+                )
+                .expect("Failed to certify alternative origins redirect"),
+        }
+    });
+
     ALTERNATIVE_ORIGINS_MODE.with(|m| {
         m.replace(mode);
     });
-    ASSETS
-        .with_borrow_mut(|assets| {
-            assets.update_asset_content(
-                ALTERNATIVE_ORIGINS_PATH,
-                alternative_origins.as_bytes().to_vec(),
-            )
-        })
-        .expect("Failed to update alternative origins");
+    update_root_hash()
 }
 
 pub type HeaderField = (String, String);
@@ -78,43 +91,44 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 
     match path {
         ALTERNATIVE_ORIGINS_PATH => ALTERNATIVE_ORIGINS_MODE.with_borrow(|mode| {
-            let mut certified_response = certified_ok_response(path, req.certificate_version)
+            let mut certified_response = certified_response(path, req.certificate_version)
                 .expect("/.well-known/ii-alternative-origins must be certified");
             match mode {
-                CertifiedContent => {
-                    // don't tamper with the certified response
-                }
                 UncertifiedContent => {
-                    // drop the IC-Certificate and IC-Certificate-Expr headers
-                    certified_response.headers.retain(|(header_name, _)| {
-                        !header_name.to_lowercase().starts_with("ic-certificate")
-                    });
-                }
-                Redirect { location } => {
-                    // Add a Location header and modify status code to 302 to indicate redirect
-                    // Keep the content and certification headers as then the response remains valid
-                    // under certification v1.
-                    certified_response
+                    certified_response.headers = certified_response
                         .headers
-                        .push(("Location".to_string(), location.clone()));
-                    certified_response.status_code = 302;
+                        .into_iter()
+                        .map(|(header_name, header_value)| {
+                            // Modify the IC-Certificate header to make certification invalid
+                            // Note: we cannot simply drop the header because then the local replica (dfx 0.15 and later)
+                            // will skip the certification check altogether.
+                            if header_name == "IC-Certificate" {
+                                (header_name, OUTDATED_INVALID_CERTIFICATE_HEADER.to_string())
+                            } else {
+                                (header_name, header_value)
+                            }
+                        })
+                        .collect::<_>()
+                }
+                Redirect { .. } | CertifiedContent => {
+                    // don't tamper with the certified response
                 }
             }
             certified_response
         }),
-        path => certified_ok_response(path, req.certificate_version)
+        path => certified_response(path, req.certificate_version)
             .unwrap_or_else(|| not_found_response(path)),
     }
 }
 
-fn certified_ok_response(url: &str, max_certificate_version: Option<u16>) -> Option<HttpResponse> {
+fn certified_response(url: &str, max_certificate_version: Option<u16>) -> Option<HttpResponse> {
     let maybe_asset =
-        ASSETS.with_borrow(|assets| assets.certified_asset(url, max_certificate_version, None));
+        ASSETS.with_borrow(|assets| assets.get_certified_asset(url, max_certificate_version, None));
     maybe_asset.map(|asset| {
         let mut headers = asset.headers;
         headers.extend(static_headers());
         HttpResponse {
-            status_code: 200,
+            status_code: asset.status_code,
             headers,
             body: ByteBuf::from(asset.content),
         }
@@ -147,9 +161,12 @@ fn fixup_html(html: &str) -> String {
 }
 
 #[init]
-#[post_upgrade]
 pub fn init() {
     init_assets(EMPTY_ALTERNATIVE_ORIGINS.to_string());
+}
+#[post_upgrade]
+fn post_upgrade() {
+    init()
 }
 
 /// Collect all the assets from the dist folder.

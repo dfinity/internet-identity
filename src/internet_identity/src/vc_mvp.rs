@@ -1,11 +1,9 @@
 use crate::delegation::check_frontend_length;
-use crate::{delegation, hash, random_salt, state, update_root_hash, MINUTE_NS};
+use crate::{delegation, random_salt, state, update_root_hash, MINUTE_NS};
 
 use candid::Principal;
-use canister_sig_util::signature_map::SignatureMap;
-use canister_sig_util::{get_signature_as_cbor, CanisterSigPublicKey};
+use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::time;
-use ic_certification::Hash;
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -21,12 +19,9 @@ use vc_util::{
     AliasTuple, II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
 };
 
-// The expiration used for signatures.
-#[allow(clippy::identity_op)]
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
-
 // The expiration of id_alias verifiable credentials.
 const ID_ALIAS_VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
+
 pub struct InvolvedDapps {
     pub(crate) relying_party: FrontendHostname,
     pub(crate) issuer: FrontendHostname,
@@ -59,8 +54,8 @@ pub async fn prepare_id_alias(
         vc_signing_input(&prepare_id_alias_jwt(&issuer_tuple), &canister_sig_pk)
             .expect("failed getting signing_input");
     state::signature_map_mut(|sigs| {
-        add_signature(sigs, vc_signing_input_hash(&rp_signing_input), seed);
-        add_signature(sigs, vc_signing_input_hash(&issuer_signing_input), seed);
+        sigs.add_signature(seed.as_ref(), vc_signing_input_hash(&rp_signing_input));
+        sigs.add_signature(seed.as_ref(), vc_signing_input_hash(&issuer_signing_input));
     });
     update_root_hash();
     PreparedIdAlias {
@@ -89,24 +84,24 @@ pub fn get_id_alias(
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
 
         let rp_alias_msg_hash = vc_signing_input_hash(rp_id_alias_jwt.as_bytes());
-        let rp_sig =
-            get_signature_as_cbor(sigs, seed, rp_alias_msg_hash, Some(cert_assets.root_hash()))
-                .map_err(|err| {
-                    GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
-                })?;
+        let rp_sig = sigs
+            .get_signature_as_cbor(seed, rp_alias_msg_hash, Some(cert_assets.root_hash()))
+            .map_err(|err| {
+                GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
+            })?;
         let rp_jws =
             add_sig_to_signing_input(rp_id_alias_jwt, &rp_sig).expect("failed constructing rp JWS");
 
         let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
-        let issuer_sig = get_signature_as_cbor(
-            sigs,
-            seed,
-            issuer_id_alias_msg_hash,
-            Some(cert_assets.root_hash()),
-        )
-        .map_err(|err| {
-            GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
-        })?;
+        let issuer_sig = sigs
+            .get_signature_as_cbor(
+                seed,
+                issuer_id_alias_msg_hash,
+                Some(cert_assets.root_hash()),
+            )
+            .map_err(|err| {
+                GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
+            })?;
         let issuer_jws = add_sig_to_signing_input(issuer_id_alias_jwt, &issuer_sig)
             .expect("failed constructing issuer JWS");
 
@@ -155,11 +150,6 @@ fn add_sig_to_signing_input(signing_input: &str, sig: &[u8]) -> Result<String, S
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(parsed_signing_input.claims(), header)
         .map_err(|e| format!("internal: failed creating JWS encoder: {:?}", e))?;
     Ok(encoder.into_jws(sig))
-}
-
-fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
-    let expires_at = time().saturating_add(SIGNATURE_EXPIRATION_PERIOD_NS);
-    sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
 }
 
 fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {

@@ -240,12 +240,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
-
+      - run: npm ci
       - name: "Build VC issuer canister"
         working-directory: demos/vc_issuer
-        run: |
-          npm ci
-          ./build.sh
+        run: ./build.sh
       - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
@@ -270,11 +268,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('demos/test-app/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
+      - run: npm ci
       - name: "Build test app canister"
         working-directory: demos/test-app
-        run: |
-          npm ci
-          ./build.sh
+        run: ./build.sh
       - name: 'Upload test app'
         uses: actions/upload-artifact@v4
         with:
@@ -504,7 +501,7 @@ jobs:
       - run: npm test
 
       - name: 'Run dfx'
-        run: dfx start --background
+        run: dfx start --background --artificial-delay 0
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v4
@@ -596,7 +593,7 @@ jobs:
 
       - name: Start replica
         run: |
-          dfx start --background
+          dfx start --background --artificial-delay 0
 
       - name: 'Download wasm'
         uses: actions/download-artifact@v4

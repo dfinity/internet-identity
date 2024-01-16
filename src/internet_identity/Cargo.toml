@@ -46,8 +46,9 @@ identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
+ic-http-certification.workspace = true
 ic-test-state-machine-client.workspace = true
-candid = { version = "0.9", features = ["parser"] }
+candid_parser.workspace = true
 canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true

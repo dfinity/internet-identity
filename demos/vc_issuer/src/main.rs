@@ -1,9 +1,7 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{
-    extract_raw_root_pk_from_der, get_signature_as_cbor, CanisterSigPublicKey, IC_ROOT_PK_DER,
-};
+use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
 use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
@@ -43,7 +41,6 @@ type Memory = RestrictedMemory<DefaultMemoryImpl>;
 type ConfigCell = StableCell<IssuerConfig, Memory>;
 
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
-const CERTIFICATE_VALIDITY_PERIOD_NS: u64 = 5 * MINUTE_NS;
 const PROD_II_CANISTER_ID: &str = "rdmx6-jaaaa-aaaaa-aaadq-cai";
 // The expiration of issued verifiable credentials.
 const VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
@@ -124,7 +121,6 @@ struct IssuerInit {
 }
 
 #[init]
-#[post_upgrade]
 #[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
     if let Some(init) = init_arg {
@@ -132,6 +128,11 @@ fn init(init_arg: Option<IssuerInit>) {
     };
 
     init_assets();
+}
+
+#[post_upgrade]
+fn post_upgrade(init_arg: Option<IssuerInit>) {
+    init(init_arg);
 }
 
 #[update]
@@ -148,22 +149,7 @@ fn apply_config(init: IssuerInit) {
 
 fn authorize_vc_request(
     alias: &SignedIdAlias,
-    current_time_ns: u128,
-) -> Result<AliasTuple, IssueCredentialError> {
-    let alias_tuple = extract_id_alias(alias, current_time_ns)?;
-
-    if caller() != alias_tuple.id_dapp {
-        return Err(IssueCredentialError::UnauthorizedSubject(format!(
-            "Caller {} does not match id alias dapp principal {}.",
-            caller(),
-            alias_tuple.id_dapp
-        )));
-    }
-    Ok(alias_tuple)
-}
-
-fn extract_id_alias(
-    alias: &SignedIdAlias,
+    expected_vc_subject: &Principal,
     current_time_ns: u128,
 ) -> Result<AliasTuple, IssueCredentialError> {
     CONFIG.with_borrow(|config| {
@@ -172,6 +158,7 @@ fn extract_id_alias(
         for idp_canister_id in &config.idp_canister_ids {
             if let Ok(alias_tuple) = get_verified_id_alias_from_jws(
                 &alias.credential_jws,
+                expected_vc_subject,
                 idp_canister_id,
                 &config.ic_root_key_raw,
                 current_time_ns,
@@ -190,7 +177,7 @@ fn extract_id_alias(
 async fn prepare_credential(
     req: PrepareCredentialRequest,
 ) -> Result<PreparedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Err(err),
     };
@@ -217,7 +204,7 @@ async fn prepare_credential(
 
     SIGNATURES.with(|sigs| {
         let mut sigs = sigs.borrow_mut();
-        add_signature(&mut sigs, msg_hash, seed);
+        sigs.add_signature(seed.as_ref(), msg_hash);
     });
     update_root_hash();
     Ok(PreparedCredentialData {
@@ -242,7 +229,7 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, time().into()) {
+    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
     };
@@ -277,12 +264,7 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
     let sig_result = SIGNATURES.with(|sigs| {
         let sig_map = sigs.borrow();
         let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
-        get_signature_as_cbor(
-            &sig_map,
-            &seed,
-            message_hash,
-            Some(certified_assets_root_hash),
-        )
+        sig_map.get_signature_as_cbor(&seed, message_hash, Some(certified_assets_root_hash))
     });
     let sig = match sig_result {
         Ok(sig) => sig,
@@ -415,7 +397,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     let sigs_root_hash =
         SIGNATURES.with_borrow(|sigs| pruned(labeled_hash(LABEL_SIG, &sigs.root_hash())));
     let maybe_asset = ASSETS.with_borrow(|assets| {
-        assets.certified_asset(path, req.certificate_version, Some(sigs_root_hash))
+        assets.get_certified_asset(path, req.certificate_version, Some(sigs_root_hash))
     });
 
     let mut headers = static_headers();
@@ -441,11 +423,6 @@ fn static_headers() -> Vec<(String, String)> {
 }
 
 fn main() {}
-
-fn add_signature(sigs: &mut SignatureMap, msg_hash: Hash, seed: Hash) {
-    let signature_expires_at = time().saturating_add(CERTIFICATE_VALIDITY_PERIOD_NS);
-    sigs.put(hash_bytes(seed), msg_hash, signature_expires_at);
-}
 
 fn calculate_seed(principal: &Principal) -> Hash {
     // IMPORTANT: In a real dapp the salt should be set to a random value.
@@ -638,7 +615,7 @@ fn fixup_html(html: &str) -> String {
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is

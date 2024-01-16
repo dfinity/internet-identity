@@ -5,7 +5,7 @@ use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_response_verification::types::{Request, Response, VerificationInfo};
+use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -472,13 +472,13 @@ fn verify_response_certification(
     min_certification_version: u16,
 ) -> VerificationInfo {
     verify_request_response_pair(
-        Request {
+        ic_http_certification::HttpRequest {
             method: request.method,
             url: request.url,
             headers: request.headers,
             body: request.body.into_vec(),
         },
-        Response {
+        ic_http_certification::HttpResponse {
             status_code: http_response.status_code,
             headers: http_response.headers,
             body: http_response.body.into_vec(),

@@ -1,8 +1,4 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
-import {
-  CredentialSpec,
-  IssuedCredentialData,
-} from "$generated/vc_issuer_types";
 import { useIdentity } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
@@ -16,8 +12,11 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@dfinity/identity";
+import {
+  CredentialSpec,
+  IssuedCredentialData,
+} from "@dfinity/internet-identity-vc-api";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { base64url } from "jose";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
 import { VcVerifiablePresentation, vcProtocol } from "./postMessageInterface";
@@ -374,6 +373,18 @@ const authenticateForIssuer = async ({
   return { ok: DelegationIdentity.fromDelegation(tempIdentity, delegations) };
 };
 
+// Perform a "base64url" encoding, i.e. a URL-friendly variation of base64 encoding
+const base64UrlEncode = (x: unknown): string => {
+  const json = JSON.stringify(x);
+  // Pretend the json is binary and use btoa (binary-to-ascii as base64) to base64 encode
+  const b64 = btoa(json);
+  // make it URL friendly:
+  // '=': used as padding, just remove
+  // '/': Base64Url as per jwt.io's playground replaces it with '_'
+  // '+': Base64Url as per jwt.io's playground replaces it with '-'
+  return b64.replace(/=+$/, "").replace("/", "_").replace("+", "-");
+};
+
 // Create the final presentation (to be then returned to the RP)
 const createPresentation = ({
   issuerCanisterId,
@@ -399,8 +410,8 @@ const createPresentation = ({
     },
   };
 
-  const header = base64url.encode(JSON.stringify(headerObj));
-  const payload = base64url.encode(JSON.stringify(payloadObj));
+  const header = base64UrlEncode(headerObj);
+  const payload = base64UrlEncode(payloadObj);
 
   // NOTE: the JWT is not signed, as per the spec
   const signature = "";

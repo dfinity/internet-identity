@@ -50,7 +50,7 @@ fn should_expose_status() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
-    assert_eq!(status.canister_status.cycles, 0);
+    assert_eq!(status.canister_status.cycles, 0u8);
     Ok(())
 }
 

@@ -1,14 +1,15 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
 import { idlFactory as vc_issuer_idl } from "$generated/vc_issuer_idl";
+
+import { features } from "$src/features";
+import { Actor, ActorSubclass, HttpAgent, Identity } from "@dfinity/agent";
 import {
   CredentialSpec,
   Icrc21ConsentInfo,
   IssuedCredentialData,
   PreparedCredentialData,
   _SERVICE,
-} from "$generated/vc_issuer_types";
-import { features } from "$src/features";
-import { Actor, ActorSubclass, HttpAgent, Identity } from "@dfinity/agent";
+} from "@dfinity/internet-identity-vc-api";
 
 import { inferHost } from "$src/utils/iiConnection";
 

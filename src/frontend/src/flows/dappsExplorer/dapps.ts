@@ -43,7 +43,7 @@ export class KnownDapp {
     return this.descr.oneLiner;
   }
 
-  public get website(): string | undefined {
+  public get website(): string {
     return this.descr.website;
   }
 }

@@ -8,7 +8,7 @@ use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
-use ic_response_verification::types::{Request, Response, VerificationInfo};
+use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
@@ -380,7 +380,7 @@ fn should_fail_prepare_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -417,7 +417,7 @@ fn should_fail_get_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(get_credential_response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -436,7 +436,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -570,6 +570,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
+        &id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
         env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
@@ -673,13 +674,13 @@ fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
         min_certification_version: u16,
     ) -> VerificationInfo {
         verify_request_response_pair(
-            Request {
+            ic_http_certification::HttpRequest {
                 method: request.method,
                 url: request.url,
                 headers: request.headers,
                 body: request.body.into_vec(),
             },
-            Response {
+            ic_http_certification::HttpResponse {
                 status_code: http_response.status_code,
                 headers: http_response.headers,
                 body: http_response.body.into_vec(),

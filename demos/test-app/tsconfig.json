@@ -1,21 +1,9 @@
 {
+  "extends": "../../tsconfig.json",
   "include": ["vite.config.ts", "./src"],
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2021", "DOM"],
-    "module": "esnext",
-    "strict": true,
-    "target": "es2018",
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "jsx": "react-jsx",
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "composite": true
   }
 }
