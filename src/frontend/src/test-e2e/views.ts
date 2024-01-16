@@ -728,6 +728,14 @@ export class VcTestAppView extends View {
   getPrincipal(): Promise<string> {
     return this.browser.$('[data-role="principal"]').getText();
   }
+
+  getPresentationAlias(): Promise<string> {
+    return this.browser.$('[data-role="presentation-alias"]').getText();
+  }
+
+  getPresentationCredential(): Promise<string> {
+    return this.browser.$('[data-role="presentation-credential"]').getText();
+  }
 }
 
 export class DemoAppView extends View {
