@@ -56,7 +56,7 @@ jobs:
           shasum -a 256 screenshots/${{ matrix.device }}/*.png | sort -k2 # sort by 2nd column (filename)
 
       - name: Upload screenshots
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: e2e-screenshots-${{ matrix.ref }}-${{ matrix.device }}
           path: screenshots/${{ matrix.device }}/*.png
@@ -179,19 +179,19 @@ jobs:
           find ./timestamps -xtype l -delete
 
       # Download the screenshots artifacts (head & base, mobile & desktop)
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-screenshots-head-desktop
           path: ${{ steps.sys.outputs.tmpdir }}/head/desktop/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-screenshots-head-mobile
           path: ${{ steps.sys.outputs.tmpdir }}/head/mobile/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-screenshots-base-desktop
           path: ${{ steps.sys.outputs.tmpdir }}/base/desktop/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-screenshots-base-mobile
           path: ${{ steps.sys.outputs.tmpdir }}/base/mobile/

@@ -104,7 +104,7 @@ jobs:
       - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}
       - run: sha256sum ${{ matrix.name }}
       - name: 'Upload ${{ matrix.name }}'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: ${{ matrix.name }}
@@ -131,7 +131,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: 'Download dev build II wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
           path: .
@@ -163,7 +163,7 @@ jobs:
       - run: mv out/internet_identity.wasm.gz internet_identity_production.wasm.gz
       - run: sha256sum internet_identity_production.wasm.gz
       - name: 'Upload internet_identity_production.wasm.gz'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: internet_identity_production.wasm.gz
@@ -193,7 +193,7 @@ jobs:
       - run: mv out/archive.wasm.gz archive.wasm.gz
       - run: sha256sum archive.wasm.gz
       - name: 'Upload archive.wasm.gz'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: archive.wasm.gz
@@ -207,7 +207,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: 'Download wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
@@ -247,7 +247,7 @@ jobs:
       - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: 'Upload VC issuer'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: vc_demo_issuer.wasm.gz
@@ -273,7 +273,7 @@ jobs:
         working-directory: demos/test-app
         run: ./build.sh
       - name: 'Upload test app'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: test_app.wasm
@@ -299,12 +299,12 @@ jobs:
           key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - name: 'Download VC issuer wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
@@ -394,7 +394,7 @@ jobs:
           mv /tmp/test-archive/canister-tests-${{ matrix.os }}.tar.zst .
 
       - name: 'Upload canister test archive'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: canister-tests-${{ matrix.os }}.tar.zst
@@ -418,7 +418,7 @@ jobs:
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
       - name: 'Download nextest test archive'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
@@ -434,13 +434,13 @@ jobs:
           ./ic-test-state-machine --version
 
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
 
       - name: 'Download archive wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
@@ -504,19 +504,19 @@ jobs:
         run: dfx start --background --artificial-delay 0
 
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
 
       - name: 'Download test app wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: test_app.wasm
           path: demos/test-app
 
       - name: 'Download VC issuer wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
@@ -558,7 +558,7 @@ jobs:
 
       - name: Archive test failures
         if: ${{ always() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: e2e-test-failures-${{ matrix.device }}-${{ matrix.shard }}
           path: test-failures/*
@@ -596,7 +596,7 @@ jobs:
           dfx start --background --artificial-delay 0
 
       - name: 'Download wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
           path: .
@@ -641,13 +641,13 @@ jobs:
       - uses: ./.github/actions/setup-dfx
 
       - name: 'Download II wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
 
       - name: 'Download archive wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
@@ -671,7 +671,7 @@ jobs:
             fgte5-ciaaa-aaaad-aaatq-cai
 
       - name: 'Download test app wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: test_app.wasm
           path: .
@@ -684,7 +684,7 @@ jobs:
             vt36r-2qaaa-aaaad-aad5a-cai
 
       - name: 'Download VC issuer wasm'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
@@ -714,31 +714,31 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: 'Download wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
 
       - name: 'Download wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
           path: .
 
       - name: 'Download wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
 
       - name: 'Download wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
 
       - name: 'Download wasm.gz'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
@@ -836,7 +836,7 @@ jobs:
       - uses: ./.github/actions/check-build
       - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
       - name: 'Upload ${{ matrix.name }}'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
           name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
@@ -858,13 +858,13 @@ jobs:
         os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04"]') || fromJson('[ "ubuntu-22.04" ]') }}
     steps:
       - name: Download internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
           path: .
 
       - name: Download internet_identity_production.wasm.gz
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
