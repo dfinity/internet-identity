@@ -1,5 +1,4 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { execSync } from "child_process";
 import { minify } from "html-minifier-terser";
 import httpProxy from "http-proxy";
 import { extname } from "path";
@@ -136,6 +135,7 @@ export const replicaForwardPlugin = ({
         const canisterId = readCanisterId({
           canisterName: matchingRule.canisterName,
         });
+        console.log("Host matches forward rule", host);
         return forwardToReplica({ canisterId });
       }
 
@@ -155,6 +155,7 @@ export const replicaForwardPlugin = ({
         ) /* fast check for principal-ish */
       ) {
         // Assume the principal-ish thing is a canister ID
+        console.log("Domain matches list to forward", domain);
         return forwardToReplica({ canisterId: subdomain });
       }
 
@@ -162,10 +163,8 @@ export const replicaForwardPlugin = ({
       // and if found forward to that
       if (nonNullish(subdomain) && domain === "localhost") {
         try {
-          const canisterId = execSync(`dfx canister id ${subdomain}`)
-            .toString()
-            .trim();
-          console.log("Forwarding to", canisterId);
+          const canisterId = readCanisterId({ canisterName: subdomain });
+          console.log("Subdomain is a canister", subdomain, canisterId);
           return forwardToReplica({ canisterId });
         } catch {}
       }

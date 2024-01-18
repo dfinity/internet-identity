@@ -482,6 +482,10 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
+    env:
+      # Suffix used for tagging artifacts
+      artifact_suffix: ${{ contains(matrix.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-${{ matrix.shard }}
+
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-node
@@ -536,7 +540,7 @@ jobs:
       - name: Run dev server
         id: dev-server-start
         run: |
-          TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev&
+          TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
@@ -556,11 +560,19 @@ jobs:
         if: ${{ always() }}
         run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
 
+      - name: Archive dev server logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-server-logs-${{ env.artifact_suffix }}
+          path: dev-server-logs.txt
+          if-no-files-found: ignore
+
       - name: Archive test failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-failures-${{ matrix.device }}-${{ matrix.shard }}
+          name: e2e-test-failures-${{ env.artifact_suffix }}
           path: test-failures/*
           if-no-files-found: ignore
 
