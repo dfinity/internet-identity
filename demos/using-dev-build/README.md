@@ -48,7 +48,7 @@ This section explains how to add Internet Identity to your (local) project. Add 
 "internet_identity": {
   "type": "custom",
   "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
+  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
   "remote": {
     "id": {
       "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
