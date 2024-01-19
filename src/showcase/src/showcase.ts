@@ -161,7 +161,7 @@ export const iiPages: Record<string, () => void> = {
       stepper: registerStepper({ current: "finish" }),
       marketingIntroSlot: tempKeyWarningBox({ i18n: new I18n("en") }),
     }),
-  compatibilityNotice: () => compatibilityNotice("This is the reason."),
+  compatibilityNotice: () => compatibilityNotice(),
   promptDeviceAlias: () =>
     promptDeviceAliasPage({
       title: "Register this device",

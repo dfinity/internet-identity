@@ -4,7 +4,7 @@ import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
 import "./styles/main.css";
-import { checkRequiredFeatures } from "./utils/featureDetection";
+import { supportsWebAuthn } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
@@ -77,9 +77,7 @@ const preloadLoaderImage = () => {
 };
 
 // Create a single page app with canister connection
-export const createSpa = async (
-  app: (connection: Connection) => Promise<never>
-) => {
+export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   try {
     printDevMessage();
   } catch (e) {
@@ -93,9 +91,8 @@ export const createSpa = async (
   // https://github.com/dfinity/internet-identity#build-features
   showWarningIfNecessary();
 
-  const okOrReason = await checkRequiredFeatures();
-  if (okOrReason !== true) {
-    return compatibilityNotice(okOrReason);
+  if (!supportsWebAuthn()) {
+    return compatibilityNotice();
   }
 
   // Prepare the actor/connection to talk to the canister

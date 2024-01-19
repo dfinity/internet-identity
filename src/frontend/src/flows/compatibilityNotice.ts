@@ -1,26 +1,31 @@
-import { compatibilityChart } from "$src/components/compatibilityChart";
 import { mainWindow } from "$src/components/mainWindow";
 import { warnBox } from "$src/components/warnBox";
 import { html, render } from "lit-html";
 
 // Taken from: https://caniuse.com/?search=PublicKeyCredential
-const pageContent = (reason: string) => html`
-  <h1 class="t-title t-title--main" id="compatibilityNotice">
-    Internet Identity does not support your browser
-  </h1>
-  ${warnBox({
-    title: "Reason",
-    message: reason,
+const pageContent = () =>
+  warnBox({
+    title: "Browser Not Supported",
+    message: html`
+      <p class="t-paragraph">
+        Internet Identity is not supported by your browser.
+      </p>
+      <p class="t-paragraph">
+        This device does not offer
+        <a href="https://webauthn.io" rel="noopener noreferrer" class="t-link"
+          >WebAuthn</a
+        >
+        authentication. Please make sure you have biometrics (fingerprint /
+        Touch ID / Face ID) enabled and try again.
+      </p>
+    `,
     additionalClasses: ["l-stack"],
-  })}
-  <div class="l-stack">${compatibilityChart}</div>
-`;
-
-export const compatibilityNotice = (reason: string): void => {
+  });
+export const compatibilityNotice = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(
     mainWindow({
-      slot: pageContent(reason),
+      slot: pageContent(),
       showLogo: false,
     }),
     container
