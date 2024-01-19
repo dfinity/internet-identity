@@ -1,3 +1,6 @@
+use crate::anchor_management::tentative_device_registration::{
+    TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
+};
 use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
@@ -71,7 +74,25 @@ async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    tentative_device_registration::add_tentative_device(anchor_number, device_data).await
+    let result =
+        tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
+    match result {
+        Ok(TentativeRegistrationInfo {
+            verification_code,
+            device_registration_timeout,
+        }) => AddTentativeDeviceResponse::AddedTentatively {
+            verification_code,
+            device_registration_timeout,
+        },
+        Err(err) => match err {
+            TentativeDeviceRegistrationError::DeviceRegistrationModeOff => {
+                AddTentativeDeviceResponse::DeviceRegistrationModeOff
+            }
+            TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
+                AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
+            }
+        },
+    }
 }
 
 #[update]
@@ -80,14 +101,27 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    let result = authenticated_anchor_operation(anchor_number, |anchor| {
         tentative_device_registration::verify_tentative_device(
             anchor,
             anchor_number,
             user_verification_code,
         )
-    })
-    .unwrap_or_else(|err| err)
+    });
+    match result {
+        Ok(()) => VerifyTentativeDeviceResponse::Verified,
+        Err(err) => match err {
+            VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+                VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
+            }
+            VerifyTentativeDeviceError::NoDeviceToVerify => {
+                VerifyTentativeDeviceResponse::NoDeviceToVerify
+            }
+            VerifyTentativeDeviceError::WrongCode { retries_left } => {
+                VerifyTentativeDeviceResponse::WrongCode { retries_left }
+            }
+        },
+    }
 }
 
 #[update]
