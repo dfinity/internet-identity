@@ -16,7 +16,7 @@ import {
   VcTestAppView,
 } from "$src/test-e2e/views";
 
-import { II_URL, TEST_APP_NICE_URL } from "$src/test-e2e/constants";
+import { II_URL } from "$src/test-e2e/constants";
 
 import { nonNullish } from "@dfinity/utils";
 
@@ -78,7 +78,7 @@ export const authenticateToRelyingParty = async ({
     await demoView.setDerivationOrigin(derivationOrigin);
 
     await demoView.updateAlternativeOrigins(
-      `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
+      `{"alternativeOrigins":["${relyingParty}"]}`,
       "certified"
     );
 
