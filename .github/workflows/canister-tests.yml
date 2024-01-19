@@ -716,46 +716,47 @@ jobs:
         run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic
 
 
-  # This ... releases
+  # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
+  # On release tags, a new release is created and the assets are uploaded.
   release:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/release-')
     needs: [docker-build-internet_identity_production, docker-build-archive]
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: 'Download wasm.gz'
+      - name: 'Download test build'
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
 
-      - name: 'Download wasm.gz'
+      - name: 'Download dev build'
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
           path: .
 
-      - name: 'Download wasm.gz'
+      - name: 'Download production build'
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
 
-      - name: 'Download wasm.gz'
+      - name: 'Download archive'
         uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
 
-      - name: 'Download wasm.gz'
+      - name: 'Download issuer'
         uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
 
-      - uses: actions/github-script@v6
+      - name: 'Get GHA job IDs'
+        uses: actions/github-script@v6
         id: pipeline-jobs
         with:
           script: |
@@ -770,7 +771,8 @@ jobs:
                   html_url: job.html_url}
               });
 
-      - uses: actions/github-script@v6
+      - name: 'Get latest release'
+        uses: actions/github-script@v6
         id: latest-release-tag
         with:
           result-encoding: string
@@ -781,7 +783,8 @@ jobs:
       # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
       # listing contributions since).
       # https://github.com/github/feedback/discussions/5975
-      - uses: actions/github-script@v6
+      - name: 'Generate CHANGELOG'
+        uses: actions/github-script@v6
         id: changelog
         with:
           result-encoding: string
@@ -817,7 +820,11 @@ jobs:
           changelog: ${{ steps.changelog.outputs.result }}
           workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
 
+      - name: Release notes
+        run: cat ${{ steps.prepare-release.outputs.notes-file }}
+
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/release-')
         run: |
           ./scripts/release \
             --tag ${{ github.ref }} \
