@@ -1,10 +1,9 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { minify } from "html-minifier-terser";
-import httpProxy from "http-proxy";
 import { extname } from "path";
 import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { readCanisterId } from "./utils.js";
+import { forwardToReplica, readCanisterId } from "./utils.js";
 
 export * from "./utils.js";
 
@@ -75,10 +74,6 @@ export const replicaForwardPlugin = ({
 }) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
-    const proxy = httpProxy.createProxyServer({
-      secure: false,
-    });
-
     server.middlewares.use((req, res, next) => {
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
@@ -101,32 +96,6 @@ export const replicaForwardPlugin = ({
 
       const [host, _port] = host_.split(":");
 
-      // forward to the specified canister (served by the replica)
-      const forwardToReplica = ({ canisterId }: { canisterId: string }) => {
-        console.log(
-          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`
-        );
-        req.headers["host"] = `${canisterId}.localhost`;
-        proxy.web(req, res, {
-          target: `http://${replicaOrigin}`,
-        });
-
-        proxy.on("error", (err: Error) => {
-          res.statusCode = 500;
-          res.end("Replica forwarding failed: " + err.message);
-        });
-
-        /* Add a 'x-ic-canister-id' header like the BNs do */
-        proxy.on("proxyRes", (res) => {
-          res.headers["x-ic-canister-id"] = canisterId;
-
-          // Ensure the browser accepts the response
-          res.headers["access-control-allow-origin"] = "*";
-          res.headers["access-control-expose-headers"] = "*";
-          res.headers["access-control-allow-headers"] = "*";
-        });
-      };
-
       const matchingRule = forwardRules.find((rule) =>
         rule.hosts.includes(host)
       );
@@ -136,7 +105,7 @@ export const replicaForwardPlugin = ({
           canisterName: matchingRule.canisterName,
         });
         console.log("Host matches forward rule", host);
-        return forwardToReplica({ canisterId });
+        return forwardToReplica({ canisterId, req, res, replicaOrigin });
       }
 
       // split the subdomain & domain by splitting on the first dot
@@ -156,7 +125,12 @@ export const replicaForwardPlugin = ({
       ) {
         // Assume the principal-ish thing is a canister ID
         console.log("Domain matches list to forward", domain);
-        return forwardToReplica({ canisterId: subdomain });
+        return forwardToReplica({
+          canisterId: subdomain,
+          req,
+          res,
+          replicaOrigin,
+        });
       }
 
       // Try to read the canister ID of a potential canister called <subdomain>
@@ -165,7 +139,7 @@ export const replicaForwardPlugin = ({
         try {
           const canisterId = readCanisterId({ canisterName: subdomain });
           console.log("Subdomain is a canister", subdomain, canisterId);
-          return forwardToReplica({ canisterId });
+          return forwardToReplica({ canisterId, req, res, replicaOrigin });
         } catch {}
       }
 
