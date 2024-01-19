@@ -907,8 +907,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          # we need the history for the tags, but we don't need the files (except for the GitHub workflows / actions)
+          # --> sparse checkout of only the needed things
+          fetch-depth: 0
+          sparse-checkout: |
+            src/internet_identity/internet_identity.did
+            src/internet_identity/breaking_change_exceptions.patch
+            .github
+            .didc-release
+          sparse-checkout-cone-mode: false
       - uses: ./.github/actions/setup-didc
       - name: "Check canister interface compatibility"
         run: |
+          release="release-2024-01-05"
+          # undo the breaking changes that we _explicitly_ made
+          # remove after the next release
+          # if we accidentally introduced other breaking changes, the patch would no longer apply / fix them
+          # making this job fail.
+          if [ "$(git describe --tags --match="release-[0-9-]*" HEAD --abbrev=0)" == "$release" ]; then
+            echo "Applying breaking change exceptions for release $release"
+            git apply src/internet_identity/breaking_change_exceptions.patch
+          fi
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
           didc check src/internet_identity/internet_identity.did internet_identity_previous.did

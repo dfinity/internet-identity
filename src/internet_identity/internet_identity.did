@@ -434,6 +434,15 @@ type AuthnMethodSecuritySettingsReplaceError = variant {
     AuthnMethodNotFound;
 };
 
+type IdentityMetadataReplaceError = variant {
+    /// The caller is not authorized to call this method with the given arguments.
+    Unauthorized;
+    /// The supplied metadata including the new metadata exceeds the maximum allowed size.
+    StorageSpaceExceeded;
+    /// Internal canister error. See the error message for details.
+    InternalCanisterError: text;
+};
+
 type PrepareIdAliasRequest = record {
     /// Origin of the issuer in the attribute sharing flow.
     issuer : FrontendHostname;
@@ -545,7 +554,7 @@ service : (opt InternetIdentityInit) -> {
     // Replaces the authentication method independent metadata map.
     // The existing metadata map will be overwritten.
     // Requires authentication.
-    identity_metadata_replace: (IdentityNumber, MetadataMapV2) -> (variant {Ok; Err;});
+    identity_metadata_replace: (IdentityNumber, MetadataMapV2) -> (variant {Ok; Err: IdentityMetadataReplaceError;});
 
     // Adds a new authentication method to the identity.
     // Requires authentication.

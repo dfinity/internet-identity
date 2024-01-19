@@ -61,7 +61,7 @@ pub fn identity_metadata_replace(
     sender: Principal,
     identity_number: IdentityNumber,
     metadata: &HashMap<String, MetadataEntryV2>,
-) -> Result<Result<(), ()>, CallError> {
+) -> Result<Result<(), IdentityMetadataReplaceError>, CallError> {
     call_candid_as(
         env,
         canister_id,

@@ -133,3 +133,10 @@ pub enum AuthnMethodConfirmationError {
     RegistrationModeOff,
     NoAuthnMethodToConfirm,
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdentityMetadataReplaceError {
+    Unauthorized,
+    StorageSpaceExceeded,
+    InternalCanisterError(String),
+}
