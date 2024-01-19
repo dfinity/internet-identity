@@ -1,47 +1,27 @@
-import { FLOWS } from "./flows";
+import { FLOWS } from "$src/test-e2e/flows";
 import {
   addVirtualAuthenticator,
   addWebAuthnCredential,
   getWebAuthnCredentials,
   originToRelyingPartyId,
-  runInBrowser,
   switchToPopup,
   waitToClose,
-} from "./util";
+} from "$src/test-e2e/util";
 import {
   AuthenticateView,
+  DemoAppView,
   IssuerAppView,
   PinAuthView,
   VcAllowView,
   VcTestAppView,
-} from "./views";
+} from "$src/test-e2e/views";
 
-import {
-  APPLE_USER_AGENT,
-  II_URL,
-  ISSUER_APP_URL,
-  ISSUER_APP_URL_LEGACY,
-  TEST_APP_CANONICAL_URL,
-  TEST_APP_CANONICAL_URL_LEGACY,
-} from "./constants";
+import { II_URL } from "$src/test-e2e/constants";
 
-test("Can add employee on issuer app", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const authConfig = await register["webauthn"](browser);
-
-    const { msg, principal } = await registerWithIssuer({
-      browser,
-      authConfig,
-      issuer: ISSUER_APP_URL,
-    });
-
-    expect(msg).toContain("Added");
-    expect(msg).toContain(principal);
-  });
-}, 300_000);
+import { nonNullish } from "@dfinity/utils";
 
 // Open the issuer demo, authenticate and register as an employee
-const registerWithIssuer = async ({
+export const registerWithIssuer = async ({
   browser,
   issuer,
   authConfig: { setupAuth, finalizeAuth, userNumber },
@@ -77,20 +57,33 @@ const registerWithIssuer = async ({
 };
 
 // Open the specified test app on the URL `relyingParty` and authenticate
-const authenticateToRelyingParty = async ({
+export const authenticateToRelyingParty = async ({
   browser,
   authConfig: { setupAuth, finalizeAuth, userNumber },
   issuer,
   relyingParty,
+  derivationOrigin,
 }: {
   browser: WebdriverIO.Browser;
   relyingParty: string;
   issuer: string;
   authConfig: AuthConfig;
+  derivationOrigin?: string;
 }): Promise<VcTestAppView> => {
   const vcTestApp = new VcTestAppView(browser);
   await vcTestApp.open(relyingParty, II_URL, issuer);
 
+  if (nonNullish(derivationOrigin)) {
+    const demoView = new DemoAppView(browser);
+    await demoView.setDerivationOrigin(derivationOrigin);
+
+    await demoView.updateAlternativeOrigins(
+      `{"alternativeOrigins":["${relyingParty}"]}`,
+      "certified"
+    );
+
+    await vcTestApp.setAlternativeOrigin(derivationOrigin);
+  }
   await vcTestApp.startSignIn();
 
   await setupAuth(browser);
@@ -107,8 +100,23 @@ const authenticateToRelyingParty = async ({
   return vcTestApp;
 };
 
+export const getVCPresentation = async (args: {
+  vcTestApp: VcTestAppView;
+  browser: WebdriverIO.Browser;
+  authConfig: AuthConfig;
+}): Promise<{ alias: string; credential: string }> => {
+  const result = await getVCPresentation_(args);
+  if (result.result === "aborted") {
+    throw new Error(
+      "Expected successful VC flow, got error: " + JSON.stringify(result)
+    );
+  }
+
+  return result;
+};
+
 // Go through the VC flow and get the presentation
-const getVCPresentation = async ({
+export const getVCPresentation_ = async ({
   vcTestApp,
   browser,
   authConfig: { setupAuth, finalizeAuth, userNumber },
@@ -116,13 +124,20 @@ const getVCPresentation = async ({
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
-}): Promise<{ alias: string; credential: string }> => {
+}): Promise<
+  | { result: "ok"; alias: string; credential: string }
+  | { result: "aborted"; reason: string }
+> => {
   await vcTestApp.startVcFlow();
 
   await setupAuth(browser);
 
   const vcAllow = new VcAllowView(browser);
-  await vcAllow.waitForDisplay();
+  const ty = await vcAllow.waitForDisplay();
+  if (ty === "aborted") {
+    const reason = await vcAllow.getAbortReason();
+    return { result: "aborted", reason };
+  }
   const userNumber_ = await vcAllow.getUserNumber();
   expect(userNumber_).toBe(userNumber);
   await vcAllow.allow();
@@ -133,7 +148,7 @@ const getVCPresentation = async ({
   const alias = await vcTestApp.getPresentationAlias();
   const credential = await vcTestApp.getPresentationCredential();
 
-  return { alias, credential };
+  return { result: "ok", alias, credential };
 };
 
 // The different ways to register (webauthn, pin).
@@ -144,7 +159,8 @@ type AuthConfig = {
   setupAuth: (browser: WebdriverIO.Browser) => Promise<void>;
   finalizeAuth: (browser: WebdriverIO.Browser) => Promise<void>;
 };
-const register: Record<
+
+export const register: Record<
   "webauthn" | "pin",
   (browser: WebdriverIO.Browser) => Promise<AuthConfig>
 > = {
@@ -190,82 +206,3 @@ const register: Record<
     };
   },
 };
-
-const getDomain = (url: string) => url.split(".").slice(1).join(".");
-
-// The different test configs (different URLs, differnet auth methods)
-const testConfigs: Array<{
-  relyingParty: string;
-  issuer: string;
-  authType: "pin" | "webauthn";
-}> = [
-  {
-    relyingParty: TEST_APP_CANONICAL_URL_LEGACY,
-    issuer: ISSUER_APP_URL,
-    authType: "webauthn",
-  },
-  {
-    relyingParty: TEST_APP_CANONICAL_URL,
-    issuer: ISSUER_APP_URL_LEGACY,
-    authType: "webauthn",
-  },
-  {
-    relyingParty: TEST_APP_CANONICAL_URL,
-    issuer: ISSUER_APP_URL,
-    authType: "pin",
-  },
-];
-
-testConfigs.forEach(({ relyingParty, issuer, authType }) => {
-  const testSuffix = `RP: ${getDomain(relyingParty)}, ISS: ${getDomain(
-    issuer
-  )}, auth: ${authType}`;
-
-  test(
-    "Can issue credentials " + testSuffix,
-    async () => {
-      await runInBrowser(
-        async (browser: WebdriverIO.Browser) => {
-          await browser.url(II_URL);
-
-          const authConfig = await register[authType](browser);
-
-          // 1. Add employee
-
-          const { msg: _msg, principal: _principal } = await registerWithIssuer(
-            {
-              browser,
-              issuer,
-              authConfig,
-            }
-          );
-
-          // 2. Auth to RP
-
-          const vcTestApp = await authenticateToRelyingParty({
-            browser,
-            issuer,
-            authConfig,
-            relyingParty,
-          });
-
-          const principalRP = await vcTestApp.getPrincipal();
-
-          // 3. Get VC presentation
-
-          const { alias } = await getVCPresentation({
-            vcTestApp,
-            browser,
-            authConfig,
-          });
-
-          // Perform a basic check on the alias
-          const aliasObj = JSON.parse(alias);
-          expect(aliasObj.sub).toBe(`did:icp:${principalRP}`);
-        },
-        authType === "pin" ? APPLE_USER_AGENT : undefined
-      );
-    },
-    300_000
-  );
-});

@@ -74,6 +74,7 @@ export const VcFlowRequest = z.object({
     }),
     credentialSpec: zodCredentialSpec,
     credentialSubject: zodPrincipal,
+    derivationOrigin: z.optional(z.string()),
   }),
 });
 

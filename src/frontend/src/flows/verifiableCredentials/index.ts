@@ -4,6 +4,7 @@ import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
+import { validateDerivationOrigin } from "$src/flows/authorize/validateDerivationOrigin";
 import { getAnchorByPrincipal } from "$src/storage";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import {
@@ -69,8 +70,9 @@ const verifyCredentials = async ({
     credentialSubject: givenP_RP,
     issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId_ },
     credentialSpec,
+    derivationOrigin: rpDerivationOrigin,
   },
-  rpOrigin,
+  rpOrigin: rpOrigin_,
 }: { connection: Connection } & VerifyCredentialsArgs) => {
   // Look up the canister ID from the origin
   const lookedUp = await withLoader(() =>
@@ -89,6 +91,15 @@ const verifyCredentials = async ({
     }
   }
 
+  const validationResult = await withLoader(() =>
+    validateDerivationOrigin(rpOrigin_, rpDerivationOrigin)
+  );
+  if (validationResult.result === "invalid") {
+    return abortedCredentials({ reason: "bad_derivation_origin_rp" });
+  }
+  validationResult.result satisfies "valid";
+  const rpOrigin = rpDerivationOrigin ?? rpOrigin_;
+
   const vcIssuer = new VcIssuer(issuerCanisterId);
   // XXX: We don't check that the language matches the user's language. We need
   // to figure what to do UX-wise first.
@@ -99,13 +110,15 @@ const verifyCredentials = async ({
   }
 
   const userNumber_ = await getAnchorByPrincipal({
-    origin: rpOrigin,
+    origin:
+      rpOrigin_ /* NOTE: the storage uses the request origin, not the derivation origin */,
     principal: givenP_RP,
   });
 
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({
-    relyingOrigin: rpOrigin,
+    relyingOrigin:
+      rpOrigin_ /* NOTE: the design does not show the derivation origin (yet) */,
     providerOrigin: issuerOrigin,
     consentMessage: consentInfo.consent_message,
     userNumber: userNumber_,

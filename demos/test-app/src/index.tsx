@@ -360,6 +360,7 @@ let latestOpts:
   | undefined
   | {
       issuerOrigin: string;
+      derivationOrigin?: string;
       credTy: CredType;
       flowId: number;
       win: Window;
@@ -408,6 +409,7 @@ function handleFlowReady(evnt: MessageEvent) {
       },
       credentialSpec: credentialSpecs[opts.credTy],
       credentialSubject: principal,
+      derivationOrigin: opts.derivationOrigin,
     },
   };
 
@@ -458,6 +460,9 @@ const App = () => {
     "http://issuer.localhost:5173"
   );
 
+  // Alternative origin for the RP, if any
+  const [derivationOrigin, setDerivationOrigin] = useState<string>("");
+
   // Continuously incrementing flow IDs used in the JSON RPC messages
   const [nextFlowId, setNextFlowId] = useState(0);
 
@@ -486,6 +491,7 @@ const App = () => {
       flowId,
       credTy,
       issuerOrigin: issuerUrl,
+      derivationOrigin: derivationOrigin !== "" ? derivationOrigin : undefined,
       win: iiWindow,
     };
 
@@ -502,6 +508,15 @@ const App = () => {
           type="text"
           value={issuerUrl}
           onChange={(evt) => setIssuerUrl(evt.target.value)}
+        />
+      </label>
+      <label>
+        Alternative Derivation Origin:
+        <input
+          data-role="derivation-origin-rp"
+          type="text"
+          placeholder="(use default)"
+          onChange={(evt) => setDerivationOrigin(evt.target.value)}
         />
       </label>
 
