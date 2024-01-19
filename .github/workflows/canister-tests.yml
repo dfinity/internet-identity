@@ -847,7 +847,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/check-build
       - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-      - name: 'Upload ${{ matrix.name }}'
+      - name: 'Upload clean build'
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
