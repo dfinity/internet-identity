@@ -102,7 +102,9 @@ test("Cannot issue credential with bad alternative RP derivation origin", async 
 
     expect(result.result).toBe("aborted");
     if (!("reason" in result)) {
-      throw new Error("brwa");
+      throw new Error(
+        "Expected VC result to be aborted, got: " + JSON.stringify(result)
+      );
     }
     expect(result.reason).toBe("bad_derivation_origin_rp");
   });
