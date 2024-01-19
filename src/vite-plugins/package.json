@@ -23,11 +23,10 @@
   "devDependencies": {
     "typescript": "*",
     "vite": "^4.2.1",
+    "undici": "*",
     "vite-plugin-compression": "^0.5.1",
     "@dfinity/utils": "^0.0.20",
     "@types/html-minifier-terser": "^7.0.0",
-    "html-minifier-terser": "^7.2.0",
-    "http-proxy": "^1.18.1",
-    "@types/http-proxy": "^1.17.14"
+    "html-minifier-terser": "^7.2.0"
   }
 }
