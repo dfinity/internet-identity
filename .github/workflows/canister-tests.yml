@@ -720,7 +720,7 @@ jobs:
   # On release tags, a new release is created and the assets are uploaded.
   release:
     runs-on: ubuntu-latest
-    needs: [docker-build-internet_identity_production, docker-build-archive]
+    needs: [docker-build-internet_identity_production, docker-build-archive, vc_demo_issuer-build]
 
     steps:
       - uses: actions/checkout@v3
