@@ -92,7 +92,7 @@ async fn add_tentative_device(
             TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
-            TentativeDeviceRegistrationError::AnchorOpError(err) => {
+            TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
                 // Legacy API traps instead of returning an error.
                 trap(String::from(err).as_str())
             }
@@ -125,7 +125,7 @@ fn verify_tentative_device(
             VerifyTentativeDeviceError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
             }
-            VerifyTentativeDeviceError::AnchorOpError(err) => {
+            VerifyTentativeDeviceError::IdentityUpdateError(err) => {
                 // Legacy API traps instead of returning an error.
                 trap(String::from(err).as_str())
             }

@@ -60,12 +60,12 @@ pub struct TentativeRegistrationInfo {
 pub enum TentativeDeviceRegistrationError {
     DeviceRegistrationModeOff,
     AnotherDeviceTentativelyAdded,
-    AnchorOpError(IdentityUpdateError),
+    IdentityUpdateError(IdentityUpdateError),
 }
 
 impl From<IdentityUpdateError> for TentativeDeviceRegistrationError {
     fn from(err: IdentityUpdateError) -> Self {
-        TentativeDeviceRegistrationError::AnchorOpError(err)
+        TentativeDeviceRegistrationError::IdentityUpdateError(err)
     }
 }
 
@@ -108,12 +108,12 @@ pub enum VerifyTentativeDeviceError {
     WrongCode { retries_left: u8 },
     DeviceRegistrationModeOff,
     NoDeviceToVerify,
-    AnchorOpError(IdentityUpdateError),
+    IdentityUpdateError(IdentityUpdateError),
 }
 
 impl From<IdentityUpdateError> for VerifyTentativeDeviceError {
     fn from(err: IdentityUpdateError) -> Self {
-        VerifyTentativeDeviceError::AnchorOpError(err)
+        VerifyTentativeDeviceError::IdentityUpdateError(err)
     }
 }
 
