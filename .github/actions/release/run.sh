@@ -49,7 +49,9 @@ do
     if [ -z "$filename" ]; then continue; fi
     >&2 echo working on asset "$filename"
 
-    # Find out the Job ID
+    # For each asset, find the ID of the job that created the asset and find the step that
+    # printed the asset's checksum (will be linked in the notes)
+    #
     # XXX: Unfortunately GitHub actions doesn't give us a way to find out the Job ID explicitely.
     # Instead, we find the job name that includes "$filename" without the .wasm or .wasm.gz extension and assume that's the Job ID.
     # This works because our jobs contain the filename without extension
