@@ -257,6 +257,11 @@ export const idlFactory = ({ IDL }) => {
     'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
+  const IdentityMetadataReplaceError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Null,
+    'StorageSpaceExceeded' : IDL.Null,
+  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -426,7 +431,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'identity_metadata_replace' : IDL.Func(
         [IdentityNumber, MetadataMapV2],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : IdentityMetadataReplaceError,
+          }),
+        ],
         [],
       ),
     'identity_register' : IDL.Func(
