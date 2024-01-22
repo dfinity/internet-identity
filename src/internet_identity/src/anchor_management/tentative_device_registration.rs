@@ -9,8 +9,7 @@ use ic_cdk::{call, trap};
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::*;
 use std::collections::HashMap;
-use AddTentativeDeviceResponse::{AddedTentatively, AnotherDeviceTentativelyAdded};
-use VerifyTentativeDeviceResponse::{NoDeviceToVerify, WrongCode};
+use TentativeDeviceRegistrationError::{AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff};
 
 // 15 mins
 const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
@@ -52,10 +51,20 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     });
 }
 
+pub struct TentativeRegistrationInfo {
+    pub verification_code: DeviceVerificationCode,
+    pub device_registration_timeout: Timestamp,
+}
+
+pub enum TentativeDeviceRegistrationError {
+    DeviceRegistrationModeOff,
+    AnotherDeviceTentativelyAdded,
+}
+
 pub async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
-) -> AddTentativeDeviceResponse {
+) -> Result<TentativeRegistrationInfo, TentativeDeviceRegistrationError> {
     let verification_code = new_verification_code().await;
     let now = time();
 
@@ -63,27 +72,34 @@ pub async fn add_tentative_device(
         prune_expired_tentative_device_registrations(registrations);
 
         match registrations.get_mut(&anchor_number) {
-            None => AddTentativeDeviceResponse::DeviceRegistrationModeOff,
+            None => Err(DeviceRegistrationModeOff),
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
-                AddTentativeDeviceResponse::DeviceRegistrationModeOff
+                Err(DeviceRegistrationModeOff)
             }
             Some(TentativeDeviceRegistration {
                 state: DeviceTentativelyAdded { .. },
                 ..
-            }) => AnotherDeviceTentativelyAdded,
+            }) => Err(AnotherDeviceTentativelyAdded),
             Some(registration) => {
                 registration.state = DeviceTentativelyAdded {
                     tentative_device: device_data,
                     failed_attempts: 0,
                     verification_code: verification_code.clone(),
                 };
-                AddedTentatively {
+                Ok(TentativeRegistrationInfo {
                     device_registration_timeout: registration.expiration,
                     verification_code,
-                }
+                })
             }
         }
     })
+}
+
+#[derive(Clone, Debug)]
+pub enum VerifyTentativeDeviceError {
+    WrongCode { retries_left: u8 },
+    DeviceRegistrationModeOff,
+    NoDeviceToVerify,
 }
 
 /// Verifies the tentative device using the submitted `user_verification_code` and returns
@@ -94,11 +110,11 @@ pub fn verify_tentative_device(
     anchor: &mut Anchor,
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
-) -> Result<(VerifyTentativeDeviceResponse, Operation), VerifyTentativeDeviceResponse> {
+) -> Result<((), Operation), VerifyTentativeDeviceError> {
     match get_verified_device(anchor_number, user_verification_code) {
         Ok(device) => {
             let operation = add(anchor, device);
-            Ok((VerifyTentativeDeviceResponse::Verified, operation))
+            Ok(((), operation))
         }
         Err(err) => Err(err),
     }
@@ -110,16 +126,16 @@ pub fn verify_tentative_device(
 fn get_verified_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
-) -> Result<DeviceData, VerifyTentativeDeviceResponse> {
+) -> Result<DeviceData, VerifyTentativeDeviceError> {
     state::tentative_device_registrations_mut(|registrations| {
         prune_expired_tentative_device_registrations(registrations);
 
         let mut tentative_registration = registrations
             .remove(&anchor_number)
-            .ok_or(VerifyTentativeDeviceResponse::DeviceRegistrationModeOff)?;
+            .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
 
         match tentative_registration.state {
-            DeviceRegistrationModeActive => Err(NoDeviceToVerify),
+            DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
             DeviceTentativelyAdded {
                 failed_attempts,
                 verification_code,
@@ -139,7 +155,7 @@ fn get_verified_device(
                     // reinsert because retries are allowed
                     registrations.insert(anchor_number, tentative_registration);
                 }
-                Err(WrongCode {
+                Err(VerifyTentativeDeviceError::WrongCode {
                     retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
                 })
             }
