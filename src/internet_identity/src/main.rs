@@ -6,6 +6,7 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::ii_domain::IIDomain;
 use crate::storage::anchor::Anchor;
+use crate::storage::StorageError;
 use candid::{candid_method, Principal};
 use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
@@ -91,6 +92,10 @@ async fn add_tentative_device(
             TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
+            TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
+                // Legacy API traps instead of returning an error.
+                trap(String::from(err).as_str())
+            }
         },
     }
 }
@@ -120,6 +125,10 @@ fn verify_tentative_device(
             VerifyTentativeDeviceError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
             }
+            VerifyTentativeDeviceError::IdentityUpdateError(err) => {
+                // Legacy API traps instead of returning an error.
+                trap(String::from(err).as_str())
+            }
         },
     }
 }
@@ -144,45 +153,45 @@ fn register(
 #[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok(((), anchor_management::add(anchor, device_data)))
+        Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
     })
-    .unwrap_or_else(|err| err)
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+        Ok::<_, String>((
             (),
             anchor_management::update(anchor, device_key, device_data),
         ))
     })
-    .unwrap_or_else(|err| err)
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+        Ok::<_, String>((
             (),
             anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
-    .unwrap_or_else(|err| err)
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+        Ok::<_, String>((
             (),
             anchor_management::remove(anchor_number, anchor, device_key),
         ))
     })
-    .unwrap_or_else(|err| err)
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
@@ -492,6 +501,31 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDom
     domain
 }
 
+#[derive(Debug)]
+enum IdentityUpdateError {
+    Unauthorized(Principal),
+    StorageError(IdentityNumber, StorageError),
+}
+
+impl From<IdentityUpdateError> for String {
+    fn from(err: IdentityUpdateError) -> Self {
+        match err {
+            IdentityUpdateError::Unauthorized(principal) => {
+                // This error message is used by the legacy API and should not be changed, even though
+                // it is confusing authentication with authorization.
+                format!("{} could not be authenticated.", principal)
+            }
+            IdentityUpdateError::StorageError(identity_nr, err) => {
+                // This error message is used by the legacy API and should not be changed
+                format!(
+                    "unable to update anchor {} in stable memory: {}",
+                    identity_nr, err
+                )
+            }
+        }
+    }
+}
+
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
 /// the necessary bookkeeping for anchor operations.
 ///
@@ -502,18 +536,20 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDom
 fn authenticated_anchor_operation<R, E>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), E>,
-) -> Result<R, E> {
+) -> Result<R, E>
+where
+    E: From<IdentityUpdateError>,
+{
     let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
+        return Err(E::from(IdentityUpdateError::Unauthorized(caller())));
     };
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
 
     // write back anchor
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
-        |err| panic!("unable to update anchor {anchor_number} in stable memory: {err}"),
-    );
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor))
+        .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
 
     match result {
         Ok((ret, operation)) => {
@@ -557,6 +593,7 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
     use super::*;
+    use crate::storage::anchor::AnchorError;
 
     #[query]
     #[candid_method(query)]
@@ -728,20 +765,57 @@ mod v2_api {
         Ok(())
     }
 
+    impl From<IdentityUpdateError> for IdentityMetadataReplaceError {
+        fn from(value: IdentityUpdateError) -> Self {
+            let storage_err = match value {
+                IdentityUpdateError::Unauthorized(principal) => {
+                    return IdentityMetadataReplaceError::Unauthorized(principal)
+                }
+                IdentityUpdateError::StorageError(_, storage_err) => storage_err,
+            };
+
+            match storage_err {
+                StorageError::EntrySizeLimitExceeded {
+                    space_available,
+                    space_required,
+                } => IdentityMetadataReplaceError::StorageSpaceExceeded {
+                    space_required,
+                    space_available,
+                },
+                err => IdentityMetadataReplaceError::InternalCanisterError(err.to_string()),
+            }
+        }
+    }
+
+    impl From<AnchorError> for IdentityMetadataReplaceError {
+        fn from(value: AnchorError) -> Self {
+            match value {
+                AnchorError::CumulativeDataLimitExceeded { length, limit } => {
+                    IdentityMetadataReplaceError::StorageSpaceExceeded {
+                        space_required: length as u64,
+                        space_available: limit as u64,
+                    }
+                }
+                err => IdentityMetadataReplaceError::InternalCanisterError(err.to_string()),
+            }
+        }
+    }
+
     #[update]
     #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntryV2>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), IdentityMetadataReplaceError> {
         authenticated_anchor_operation(identity_number, |anchor| {
             let metadata = metadata
                 .into_iter()
                 .map(|(k, v)| (k, MetadataEntry::from(v)))
                 .collect();
-            Ok((
+            Ok::<_, IdentityMetadataReplaceError>((
                 (),
-                anchor_management::identity_metadata_replace(anchor, metadata),
+                anchor_management::identity_metadata_replace(anchor, metadata)
+                    .map_err(IdentityMetadataReplaceError::from)?,
             ))
         })
     }

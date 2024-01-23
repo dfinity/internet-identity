@@ -2,7 +2,7 @@ use crate::anchor_management::add;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
-use crate::{secs_to_nanos, state};
+use crate::{secs_to_nanos, state, IdentityUpdateError};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
@@ -56,9 +56,17 @@ pub struct TentativeRegistrationInfo {
     pub device_registration_timeout: Timestamp,
 }
 
+#[derive(Debug)]
 pub enum TentativeDeviceRegistrationError {
     DeviceRegistrationModeOff,
     AnotherDeviceTentativelyAdded,
+    IdentityUpdateError(IdentityUpdateError),
+}
+
+impl From<IdentityUpdateError> for TentativeDeviceRegistrationError {
+    fn from(err: IdentityUpdateError) -> Self {
+        TentativeDeviceRegistrationError::IdentityUpdateError(err)
+    }
 }
 
 pub async fn add_tentative_device(
@@ -95,11 +103,18 @@ pub async fn add_tentative_device(
     })
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum VerifyTentativeDeviceError {
     WrongCode { retries_left: u8 },
     DeviceRegistrationModeOff,
     NoDeviceToVerify,
+    IdentityUpdateError(IdentityUpdateError),
+}
+
+impl From<IdentityUpdateError> for VerifyTentativeDeviceError {
+    fn from(err: IdentityUpdateError) -> Self {
+        VerifyTentativeDeviceError::IdentityUpdateError(err)
+    }
 }
 
 /// Verifies the tentative device using the submitted `user_verification_code` and returns

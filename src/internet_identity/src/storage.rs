@@ -286,7 +286,10 @@ impl<M: Memory + Clone> Storage<M> {
 
     fn write_entry_bytes(&mut self, record_number: u32, buf: Vec<u8>) -> Result<(), StorageError> {
         if buf.len() > self.candid_entry_size_limit() {
-            return Err(StorageError::EntrySizeLimitExceeded(buf.len()));
+            return Err(StorageError::EntrySizeLimitExceeded {
+                space_required: buf.len() as u64,
+                space_available: self.candid_entry_size_limit() as u64,
+            });
         }
 
         let address = self.record_address(record_number);
@@ -521,7 +524,10 @@ pub enum StorageError {
     BadAnchorNumber(u64),
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
-    EntrySizeLimitExceeded(usize),
+    EntrySizeLimitExceeded {
+        space_required: u64,
+        space_available: u64,
+    },
 }
 
 impl fmt::Display for StorageError {
@@ -542,10 +548,13 @@ impl fmt::Display for StorageError {
             Self::SerializationError(err) => {
                 write!(f, "failed to serialize a Candid value: {err}")
             }
-            Self::EntrySizeLimitExceeded(n) => write!(
+            Self::EntrySizeLimitExceeded {
+                space_required,
+                space_available,
+            } => write!(
                 f,
-                "attempted to store an entry of size {n} \
-                 which is larger then the max allowed entry size"
+                "attempted to store an entry of size {space_required} \
+                 which is larger then the max allowed entry size {space_available}"
             ),
         }
     }

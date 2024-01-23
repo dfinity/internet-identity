@@ -1,0 +1,13 @@
+diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
+index 43c7400b..e724916b 100644
+--- a/src/internet_identity/internet_identity.did
++++ b/src/internet_identity/internet_identity.did
+@@ -554,7 +554,7 @@ service : (opt InternetIdentityInit) -> {
+     // Replaces the authentication method independent metadata map.
+     // The existing metadata map will be overwritten.
+     // Requires authentication.
+-    identity_metadata_replace: (IdentityNumber, MetadataMapV2) -> (variant {Ok; Err: IdentityMetadataReplaceError;});
++    identity_metadata_replace: (IdentityNumber, MetadataMapV2) -> (variant {Ok; Err;});
+ 
+     // Adds a new authentication method to the identity.
+     // Requires authentication.

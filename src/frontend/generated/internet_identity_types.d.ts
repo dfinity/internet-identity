@@ -159,6 +159,16 @@ export interface IdentityInfo {
   'metadata' : MetadataMapV2,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
+export type IdentityMetadataReplaceError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal } |
+  {
+    'StorageSpaceExceeded' : {
+      'space_required' : bigint,
+      'space_available' : bigint,
+    }
+  };
 export type IdentityNumber = bigint;
 export type IdentityRegisterError = { 'BadCaptcha' : null } |
   { 'CanisterFull' : null } |
@@ -343,7 +353,7 @@ export interface _SERVICE {
   'identity_metadata_replace' : ActorMethod<
     [IdentityNumber, MetadataMapV2],
     { 'Ok' : null } |
-      { 'Err' : null }
+      { 'Err' : IdentityMetadataReplaceError }
   >,
   'identity_register' : ActorMethod<
     [AuthnMethodData, CaptchaResult, [] | [Principal]],

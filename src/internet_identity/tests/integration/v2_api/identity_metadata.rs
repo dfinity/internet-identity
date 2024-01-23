@@ -3,13 +3,11 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
-};
+use canister_tests::framework::{env, install_ii_canister, II_WASM};
 use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::MetadataEntryV2;
-use regex::Regex;
+use internet_identity_interface::internet_identity::types::{
+    IdentityMetadataReplaceError, MetadataEntryV2,
+};
 use std::collections::HashMap;
 
 #[test]
@@ -48,7 +46,7 @@ fn should_write_metadata() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_replace_identity_metadata() {
+fn should_require_authentication_to_replace_identity_metadata() -> Result<(), CallError> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -67,12 +65,12 @@ fn should_require_authentication_to_replace_identity_metadata() {
         Principal::anonymous(),
         identity_number,
         &metadata,
-    );
-    expect_user_error_with_message(
+    )?;
+    assert!(matches!(
         result,
-        CanisterCalledTrap,
-        Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-    );
+        Err(IdentityMetadataReplaceError::Unauthorized(_))
+    ));
+    Ok(())
 }
 
 #[test]
@@ -100,11 +98,10 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
         authn_method.principal(),
         identity_number,
         &metadata,
-    );
-    expect_user_error_with_message(
+    )?;
+    assert!(matches!(
         result,
-        CanisterCalledTrap,
-        Regex::new("failed to write identity metadata: Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\.").unwrap(),
-    );
+        Err(IdentityMetadataReplaceError::StorageSpaceExceeded { .. })
+    ));
     Ok(())
 }
