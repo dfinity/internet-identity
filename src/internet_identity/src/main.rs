@@ -62,14 +62,14 @@ async fn init_salt() {
 #[update]
 #[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authz_utils::authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 #[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authz_utils::authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -253,7 +253,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 #[update] // this is an update call because queries are not (yet) certified
 #[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authz_utils::authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
 
@@ -274,7 +274,8 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    let ii_domain = authz_utils::authenticate_and_record_activity(anchor_number);
+    let ii_domain = authenticate_and_record_activity(anchor_number)
+        .unwrap_or_else(|err| trap(&format!("{err}")));
     delegation::prepare_delegation(
         anchor_number,
         frontend,
@@ -563,7 +564,8 @@ mod v2_api {
     #[update]
     #[candid_method]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, ()> {
-        authenticate_and_record_activity(identity_number);
+        authenticate_and_record_activity(identity_number)
+            .unwrap_or_else(|err| trap(&format!("{err}")));
         let anchor_info = anchor_management::get_anchor_info(identity_number);
 
         let metadata = state::anchor(identity_number)
@@ -766,7 +768,8 @@ mod attribute_sharing_mvp {
     async fn prepare_id_alias(
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
-        let _maybe_ii_domain = authenticate_and_record_activity(req.identity_number);
+        authenticate_and_record_activity(req.identity_number)
+            .map_err(|_err| PrepareIdAliasError::Unauthorized)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {

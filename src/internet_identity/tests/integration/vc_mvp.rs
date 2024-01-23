@@ -8,7 +8,7 @@ use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
 use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasError, GetIdAliasRequest, PrepareIdAliasRequest,
+    GetIdAliasError, GetIdAliasRequest, PrepareIdAliasError, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use std::ops::Deref;
@@ -605,15 +605,14 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
 }
 
 #[test]
-#[should_panic(expected = "could not be authenticated")]
-fn should_not_prepare_id_alias_for_different_user() {
+fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
 
-    let _ = api::vc_mvp::prepare_id_alias(
+    let result = api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_2(),
@@ -622,8 +621,9 @@ fn should_not_prepare_id_alias_for_different_user() {
             relying_party,
             issuer,
         },
-    )
-    .expect("Got 'None' from prepare_id_alias");
+    )?;
+    assert!(matches!(result, Err(PrepareIdAliasError::Unauthorized)));
+    Ok(())
 }
 
 #[test]
