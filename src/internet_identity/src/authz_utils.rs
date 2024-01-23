@@ -56,8 +56,9 @@ impl From<IdentityUpdateError> for String {
     }
 }
 
-/// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
+/// Authenticates the caller calls the provided function and handles all
 /// the necessary bookkeeping for anchor operations.
+/// Returns an error if the caller cannot be authenticated or the anchor cannot be written to stable memory.
 ///
 /// * anchor_number: indicates the anchor to be provided op should be called on
 /// * op: Function that modifies an anchor and returns a [Result] indicating
@@ -111,8 +112,9 @@ pub fn check_authentication(
     Err(AuthorizationError::Unauthorized(caller))
 }
 
-/// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
-/// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
+/// Authenticates the caller and updates the device used to authenticate reflecting the current activity.
+/// Also updates the aggregated stats on daily and monthly active users.
+/// Returns an error if the caller cannot be authenticated or the anchor cannot be written to stable memory.
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
