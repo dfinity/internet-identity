@@ -12,8 +12,11 @@ const pageContent = () =>
       </p>
       <p class="t-paragraph">
         This device does not offer
-        <a href="https://webauthn.io" rel="noopener noreferrer" class="t-link"
-          >WebAuthn</a
+        <a
+          href="https://fidoalliance.org/passkeys/"
+          rel="noopener noreferrer"
+          class="t-link"
+          >Passkeys</a
         >
         authentication. Please make sure you have biometrics (fingerprint /
         Touch ID / Face ID) enabled and try again.
