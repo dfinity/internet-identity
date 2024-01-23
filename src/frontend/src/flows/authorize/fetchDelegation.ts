@@ -6,7 +6,16 @@ import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { unknownToString } from "$src/utils/utils";
 import { Signature } from "@dfinity/agent";
-import { Delegation } from "./postMessageInterface";
+import { Principal } from "@dfinity/principal";
+
+export interface Delegation {
+  delegation: {
+    pubkey: Uint8Array;
+    expiration: bigint;
+    targets?: Principal[];
+  };
+  signature: Signature;
+}
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the derivation.
