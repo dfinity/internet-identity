@@ -162,8 +162,13 @@ export interface IdentityInfo {
 export type IdentityMetadataReplaceError = {
     'InternalCanisterError' : string
   } |
-  { 'Unauthorized' : null } |
-  { 'StorageSpaceExceeded' : null };
+  { 'Unauthorized' : Principal } |
+  {
+    'StorageSpaceExceeded' : {
+      'space_required' : bigint,
+      'space_available' : bigint,
+    }
+  };
 export type IdentityNumber = bigint;
 export type IdentityRegisterError = { 'BadCaptcha' : null } |
   { 'CanisterFull' : null } |

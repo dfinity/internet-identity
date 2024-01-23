@@ -259,8 +259,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityMetadataReplaceError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
-    'Unauthorized' : IDL.Null,
-    'StorageSpaceExceeded' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'StorageSpaceExceeded' : IDL.Record({
+      'space_required' : IDL.Nat64,
+      'space_available' : IDL.Nat64,
+    }),
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
