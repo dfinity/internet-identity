@@ -1,8 +1,32 @@
 diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
-index 43c7400b..e724916b 100644
+index 6ef07401..a9883f61 100644
 --- a/src/internet_identity/internet_identity.did
 +++ b/src/internet_identity/internet_identity.did
-@@ -554,7 +554,7 @@ service : (opt InternetIdentityInit) -> {
+@@ -454,9 +454,7 @@ type PrepareIdAliasRequest = record {
+ 
+ type PrepareIdAliasError = variant {
+     /// The principal is not authorized to call this method with the given arguments.
+-    Unauthorized: principal;
+-    /// Internal canister error. See the error message for details.
+-    InternalCanisterError: text;
++    Unauthorized;
+ };
+ 
+ /// The prepared id alias contains two (still unsigned) credentials in JWT format,
+@@ -480,11 +478,9 @@ type GetIdAliasRequest = record {
+ 
+ type GetIdAliasError = variant {
+     /// The principal is not authorized to call this method with the given arguments.
+-    Unauthorized: principal;
++    Unauthorized;
+     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
+     NoSuchCredentials : text;
+-    /// Internal canister error. See the error message for details.
+-    InternalCanisterError: text;
+ };
+ 
+ /// The signed id alias credentials for each involved party.
+@@ -558,7 +554,7 @@ service : (opt InternetIdentityInit) -> {
      // Replaces the authentication method independent metadata map.
      // The existing metadata map will be overwritten.
      // Requires authentication.

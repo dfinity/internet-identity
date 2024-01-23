@@ -768,8 +768,7 @@ mod attribute_sharing_mvp {
     async fn prepare_id_alias(
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
-        authenticate_and_record_activity(req.identity_number)
-            .map_err(|_err| PrepareIdAliasError::Unauthorized)?;
+        authenticate_and_record_activity(req.identity_number).map_err(PrepareIdAliasError::from)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
@@ -784,9 +783,7 @@ mod attribute_sharing_mvp {
     #[query]
     #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
-        let Ok(_) = check_authentication(req.identity_number) else {
-            return Err(GetIdAliasError::Unauthorized);
-        };
+        check_authentication(req.identity_number).map_err(GetIdAliasError::from)?;
         vc_mvp::get_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {

@@ -622,7 +622,7 @@ fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
             issuer,
         },
     )?;
-    assert!(matches!(result, Err(PrepareIdAliasError::Unauthorized)));
+    assert!(matches!(result, Err(PrepareIdAliasError::Unauthorized(_))));
     Ok(())
 }
 
@@ -659,7 +659,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
         },
     )?;
 
-    assert!(matches!(response, Err(GetIdAliasError::Unauthorized)));
+    assert!(matches!(response, Err(GetIdAliasError::Unauthorized(_))));
     Ok(())
 }
 

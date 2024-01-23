@@ -453,8 +453,10 @@ type PrepareIdAliasRequest = record {
 };
 
 type PrepareIdAliasError = variant {
-    /// The caller is not authorized to call this method with the given arguments.
-    Unauthorized;
+    /// The principal is not authorized to call this method with the given arguments.
+    Unauthorized: principal;
+    /// Internal canister error. See the error message for details.
+    InternalCanisterError: text;
 };
 
 /// The prepared id alias contains two (still unsigned) credentials in JWT format,
@@ -477,10 +479,12 @@ type GetIdAliasRequest = record {
 };
 
 type GetIdAliasError = variant {
-    /// The caller is not authorized to call this method with the given arguments.
-    Unauthorized;
+    /// The principal is not authorized to call this method with the given arguments.
+    Unauthorized: principal;
     /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
     NoSuchCredentials : text;
+    /// Internal canister error. See the error message for details.
+    InternalCanisterError: text;
 };
 
 /// The signed id alias credentials for each involved party.
