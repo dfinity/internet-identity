@@ -1,8 +1,9 @@
 use crate::anchor_management::add;
+use crate::authz_utils::IdentityUpdateError;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
-use crate::{secs_to_nanos, state, IdentityUpdateError};
+use crate::{secs_to_nanos, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
