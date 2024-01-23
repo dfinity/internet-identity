@@ -118,7 +118,8 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
-export type GetIdAliasError = { 'Unauthorized' : null } |
+export type GetIdAliasError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
   { 'NoSuchCredentials' : string };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
@@ -211,7 +212,8 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
-export type PrepareIdAliasError = { 'Unauthorized' : null };
+export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
   'issuer' : FrontendHostname,
   'relying_party' : FrontendHostname,
