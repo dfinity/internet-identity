@@ -435,10 +435,10 @@ type AuthnMethodSecuritySettingsReplaceError = variant {
 };
 
 type IdentityMetadataReplaceError = variant {
-    /// The caller is not authorized to call this method with the given arguments.
-    Unauthorized;
-    /// The supplied metadata including the new metadata exceeds the maximum allowed size.
-    StorageSpaceExceeded;
+    /// The principal is not authorized to call this method with the given arguments.
+    Unauthorized: principal;
+    /// The identity including the new metadata exceeds the maximum allowed size.
+    StorageSpaceExceeded: record {space_available: nat64; space_required: nat64};
     /// Internal canister error. See the error message for details.
     InternalCanisterError: text;
 };

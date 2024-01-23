@@ -503,17 +503,17 @@ fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDom
 
 #[derive(Debug)]
 enum IdentityUpdateError {
-    Unauthorized,
+    Unauthorized(Principal),
     StorageError(IdentityNumber, StorageError),
 }
 
 impl From<IdentityUpdateError> for String {
     fn from(err: IdentityUpdateError) -> Self {
         match err {
-            IdentityUpdateError::Unauthorized => {
+            IdentityUpdateError::Unauthorized(principal) => {
                 // This error message is used by the legacy API and should not be changed, even though
                 // it is confusing authentication with authorization.
-                format!("{} could not be authenticated.", caller())
+                format!("{} could not be authenticated.", principal)
             }
             IdentityUpdateError::StorageError(identity_nr, err) => {
                 // This error message is used by the legacy API and should not be changed
@@ -541,7 +541,7 @@ where
     E: From<IdentityUpdateError>,
 {
     let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        return Err(E::from(IdentityUpdateError::Unauthorized));
+        return Err(E::from(IdentityUpdateError::Unauthorized(caller())));
     };
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
@@ -768,16 +768,20 @@ mod v2_api {
     impl From<IdentityUpdateError> for IdentityMetadataReplaceError {
         fn from(value: IdentityUpdateError) -> Self {
             let storage_err = match value {
-                IdentityUpdateError::Unauthorized => {
-                    return IdentityMetadataReplaceError::Unauthorized
+                IdentityUpdateError::Unauthorized(principal) => {
+                    return IdentityMetadataReplaceError::Unauthorized(principal)
                 }
                 IdentityUpdateError::StorageError(_, storage_err) => storage_err,
             };
 
             match storage_err {
-                StorageError::EntrySizeLimitExceeded(_) => {
-                    IdentityMetadataReplaceError::StorageSpaceExceeded
-                }
+                StorageError::EntrySizeLimitExceeded {
+                    space_available,
+                    space_required,
+                } => IdentityMetadataReplaceError::StorageSpaceExceeded {
+                    space_required,
+                    space_available,
+                },
                 err => IdentityMetadataReplaceError::InternalCanisterError(err.to_string()),
             }
         }
@@ -786,8 +790,11 @@ mod v2_api {
     impl From<AnchorError> for IdentityMetadataReplaceError {
         fn from(value: AnchorError) -> Self {
             match value {
-                AnchorError::CumulativeDataLimitExceeded { .. } => {
-                    IdentityMetadataReplaceError::StorageSpaceExceeded
+                AnchorError::CumulativeDataLimitExceeded { length, limit } => {
+                    IdentityMetadataReplaceError::StorageSpaceExceeded {
+                        space_required: length as u64,
+                        space_available: limit as u64,
+                    }
                 }
                 err => IdentityMetadataReplaceError::InternalCanisterError(err.to_string()),
             }

@@ -1,5 +1,5 @@
 use crate::internet_identity::types::{CredentialId, PublicKey, Timestamp};
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
@@ -136,7 +136,10 @@ pub enum AuthnMethodConfirmationError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdentityMetadataReplaceError {
-    Unauthorized,
-    StorageSpaceExceeded,
+    Unauthorized(Principal),
+    StorageSpaceExceeded {
+        space_available: u64,
+        space_required: u64,
+    },
     InternalCanisterError(String),
 }
