@@ -541,7 +541,7 @@ jobs:
       # Check the return code of npm ci
       - name: Check on npm ci
         # make sure we don't wait too long if for some unlikely reason the npm status file doesn't get created
-        timeout-minutes: 1
+        timeout-minutes: 5
         run: |
           until [ -f ~/npm-ci-status ]; do sleep 1; done
           exit $(cat ~/npm-ci-status)
