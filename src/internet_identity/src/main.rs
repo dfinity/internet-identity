@@ -768,7 +768,8 @@ mod attribute_sharing_mvp {
     async fn prepare_id_alias(
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
-        let _maybe_ii_domain = authenticate_and_record_activity(req.identity_number);
+        authenticate_and_record_activity(req.identity_number)
+            .map_err(|err| PrepareIdAliasError::Unauthorized)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
