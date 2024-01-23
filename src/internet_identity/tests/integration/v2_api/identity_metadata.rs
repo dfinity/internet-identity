@@ -68,7 +68,7 @@ fn should_require_authentication_to_replace_identity_metadata() -> Result<(), Ca
     )?;
     assert!(matches!(
         result,
-        Err(IdentityMetadataReplaceError::Unauthorized)
+        Err(IdentityMetadataReplaceError::Unauthorized(_))
     ));
     Ok(())
 }
@@ -101,7 +101,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
     )?;
     assert!(matches!(
         result,
-        Err(IdentityMetadataReplaceError::StorageSpaceExceeded)
+        Err(IdentityMetadataReplaceError::StorageSpaceExceeded { .. })
     ));
     Ok(())
 }
