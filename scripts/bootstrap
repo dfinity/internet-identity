@@ -28,3 +28,8 @@ then
     echo "installing ic-wasm 0.3.5"
     run cargo install ic-wasm --version 0.3.5
 fi
+
+# make sure the packages are actually installed (rustup waits for the first invoke to lazyload)
+cargo --version
+cargo clippy --version
+cargo fmt --version
