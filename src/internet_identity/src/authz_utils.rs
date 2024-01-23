@@ -4,16 +4,56 @@ use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
 use candid::Principal;
-use ic_cdk::{caller, trap};
+use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DeviceKey, IdentityNumber,
 };
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum IdentityUpdateError {
     Unauthorized(Principal),
     StorageError(IdentityNumber, StorageError),
+}
+
+#[derive(Debug)]
+pub enum AuthorizationError {
+    Unauthorized(Principal),
+}
+
+impl From<AuthorizationError> for IdentityUpdateError {
+    fn from(err: AuthorizationError) -> Self {
+        match err {
+            AuthorizationError::Unauthorized(principal) => {
+                IdentityUpdateError::Unauthorized(principal)
+            }
+        }
+    }
+}
+
+impl Display for IdentityUpdateError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IdentityUpdateError::Unauthorized(principal) => {
+                // This error message is used by the legacy API and should not be changed, even though
+                // it is confusing authentication with authorization.
+                f.write_str(&format!("{principal} could not be authenticated."))
+            }
+            IdentityUpdateError::StorageError(identity_nr, err) => {
+                // This error message is used by the legacy API and should not be changed
+                f.write_str(&format!(
+                    "unable to update anchor {identity_nr} in stable memory: {err}"
+                ))
+            }
+        }
+    }
+}
+
+impl From<IdentityUpdateError> for String {
+    fn from(err: IdentityUpdateError) -> Self {
+        format!("{}", err)
+    }
 }
 
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
@@ -30,9 +70,8 @@ pub fn authenticated_anchor_operation<R, E>(
 where
     E: From<IdentityUpdateError>,
 {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        return Err(E::from(IdentityUpdateError::Unauthorized(caller())));
-    };
+    let (mut anchor, device_key) = check_authentication(anchor_number)
+        .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
@@ -52,7 +91,9 @@ where
 
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Returns an error if the caller cannot be authenticated.
-pub fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKey), ()> {
+pub fn check_authentication(
+    anchor_number: AnchorNumber,
+) -> Result<(Anchor, DeviceKey), AuthorizationError> {
     let anchor = state::anchor(anchor_number);
     let caller = caller();
 
@@ -67,7 +108,7 @@ pub fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, Devi
             return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
-    Err(())
+    Err(AuthorizationError::Unauthorized(caller))
 }
 
 /// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
@@ -75,33 +116,14 @@ pub fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, Devi
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
-pub fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-    let domain = anchor.device(&device_key).unwrap().ii_domain();
+pub fn authenticate_and_record_activity(
+    anchor_number: AnchorNumber,
+) -> Result<Option<IIDomain>, IdentityUpdateError> {
+    let (mut anchor, device_key) =
+        check_authentication(anchor_number).map_err(IdentityUpdateError::from)?;
+    let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
-        |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
-    );
-    domain
-}
-
-impl From<IdentityUpdateError> for String {
-    fn from(err: IdentityUpdateError) -> Self {
-        match err {
-            IdentityUpdateError::Unauthorized(principal) => {
-                // This error message is used by the legacy API and should not be changed, even though
-                // it is confusing authentication with authorization.
-                format!("{} could not be authenticated.", principal)
-            }
-            IdentityUpdateError::StorageError(identity_nr, err) => {
-                // This error message is used by the legacy API and should not be changed
-                format!(
-                    "unable to update anchor {} in stable memory: {}",
-                    identity_nr, err
-                )
-            }
-        }
-    }
+    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor))
+        .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
+    Ok(maybe_domain)
 }
