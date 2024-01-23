@@ -769,7 +769,7 @@ mod attribute_sharing_mvp {
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
         authenticate_and_record_activity(req.identity_number)
-            .map_err(|err| PrepareIdAliasError::Unauthorized)?;
+            .map_err(|_err| PrepareIdAliasError::Unauthorized)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
