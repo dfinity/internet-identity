@@ -1,22 +1,12 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
-import { setKnownPrincipal } from "$src/storage";
-import { LoginData } from "$src/utils/flowResult";
-import { unknownToRecord } from "$src/utils/utils";
-import { Signature } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
-import { fetchDelegation } from "./fetchDelegation";
-import { validateDerivationOrigin } from "./validateDerivationOrigin";
+import { z } from "zod";
+import { Delegation } from "./fetchDelegation";
 
-export interface Delegation {
-  delegation: {
-    pubkey: Uint8Array;
-    expiration: bigint;
-    targets?: Principal[];
-  };
-  signature: Signature;
-}
+// The type of messages that kick start the flow (II -> RP)
+export const AuthReady = {
+  kind: "authorize-ready",
+};
 
 /**
  * All information required to process an authentication request received from
@@ -33,87 +23,55 @@ export interface AuthContext {
   requestOrigin: string;
 }
 
-export interface AuthRequest {
-  kind: "authorize-client";
-  sessionPublicKey: Uint8Array;
-  maxTimeToLive?: bigint;
-  derivationOrigin?: string;
-}
+export const AuthRequest = z.object({
+  kind: z.literal("authorize-client"),
+  sessionPublicKey: z.instanceof(Uint8Array),
+  maxTimeToLive: z
+    .optional(z.union([z.number(), z.bigint()]))
+    .transform((val) => {
+      if (typeof val === "number") {
+        // Temporary work around for clients that use 'number' instead of 'bigint'
+        // https://github.com/dfinity/internet-identity/issues/1050
+        console.warn(
+          "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future"
+        );
+        return BigInt(val);
+      }
+      return val;
+    }),
+  derivationOrigin: z.optional(z.string()),
+});
 
-/** Try to read unknown data as authentication request */
-const asAuthRequest = (msg: unknown): AuthRequest | string => {
-  const obj = unknownToRecord(msg);
+export type AuthRequest = z.output<typeof AuthRequest>;
 
-  if (isNullish(obj)) {
-    return "request is undefined";
-  }
-
-  if (!("kind" in obj)) {
-    return "request does not have 'kind'";
-  }
-
-  if (obj.kind !== "authorize-client") {
-    return "'kind' is not 'authorize-client'";
-  }
-
-  if (!("sessionPublicKey" in obj)) {
-    return "request does not have 'sessionPublicKey'";
-  }
-
-  if (!(obj.sessionPublicKey instanceof Uint8Array)) {
-    return "'sessionPublicKey' is not 'Uint8Array'";
-  }
-
-  // Temporary work around for clients that use 'number' instead of 'bigint'
-  // https://github.com/dfinity/internet-identity/issues/1050
-  let maxTimeToLive = obj.maxTimeToLive;
-  if (typeof maxTimeToLive === "number") {
-    console.warn(
-      "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future"
-    );
-    maxTimeToLive = BigInt(maxTimeToLive);
-  }
-
-  if (
-    typeof maxTimeToLive !== "undefined" &&
-    typeof maxTimeToLive !== "bigint"
-  ) {
-    return "'maxTimeToLive' is not 'bigint'";
-  }
-
-  const derivationOrigin = obj.derivationOrigin;
-  if (
-    typeof derivationOrigin !== "undefined" &&
-    typeof derivationOrigin !== "string"
-  ) {
-    return "'derivationOrigin' is not 'string'";
-  }
-
-  return {
-    kind: obj.kind,
-    sessionPublicKey: obj.sessionPublicKey,
-    maxTimeToLive,
-    derivationOrigin,
-  };
-};
+export type AuthResponse =
+  | {
+      kind: "authorize-client-failure";
+      text: string;
+    }
+  | {
+      kind: "authorize-client-success";
+      delegations: Delegation[];
+      userPublicKey: Uint8Array;
+    };
 
 /**
  * The postMessage-based authentication protocol.
  */
 export async function authenticationProtocol({
   authenticate,
-  onInvalidOrigin,
   onProgress,
 }: {
   /** The callback used to get auth data (i.e. select or create anchor) */
-  authenticate: (authContext: AuthContext) => Promise<LoginData>;
-  /** Callback used to show an "invalid origin" error. At this point the authentication protocol is not over so we use a callback to regain control afterwards. */
-  onInvalidOrigin: (opts: {
-    authContext: AuthContext;
-    message: string;
-  }) => Promise<void>;
+  authenticate: (authContext: {
+    authRequest: AuthRequest;
+    requestOrigin: string;
+  }) => Promise<
+    | { kind: "success"; delegations: Delegation[]; userPublicKey: Uint8Array }
+    | { kind: "failure"; text: string }
+  >;
   /* Progress update messages to let the user know what's happening. */
-  onProgress: (state: "waiting" | "validating" | "fetching delegation") => void;
+  onProgress: (state: "waiting" | "validating") => void;
 }): Promise<"orphan" | "success" | "failure"> {
   if (window.opener === null) {
     // If there's no `window.opener` a user has manually navigated to "/#authorize".
@@ -125,110 +83,63 @@ export async function authenticationProtocol({
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
-  window.opener.postMessage({ kind: "authorize-ready" }, "*");
+  window.opener.postMessage(AuthReady, "*");
 
   onProgress("waiting");
 
-  const authContext = await waitForAuthRequest();
+  const { origin, request } = await waitForRequest();
+  const authContext = { authRequest: request, requestOrigin: origin };
 
   onProgress("validating");
 
-  const validationResult = await validateDerivationOrigin(
-    authContext.requestOrigin,
-    authContext.authRequest.derivationOrigin
-  );
+  const result = await authenticate(authContext);
 
-  if (validationResult.result === "invalid") {
-    await onInvalidOrigin({ message: validationResult.message, authContext });
-    // notify the client application
-    // do this after showing the error because the client application might close the window immediately after receiving the message and might not show the user what's going on
-    window.opener.postMessage(
-      {
-        kind: "authorize-client-failure",
-        text: `Invalid derivation origin: ${validationResult.message}`,
-      },
-      authContext.requestOrigin
-    );
-
-    return "failure";
-  }
-  const authSuccess = await authenticate(authContext);
-
-  onProgress("fetching delegation");
-
-  // at this point, derivationOrigin is either validated or undefined
-  const derivationOrigin =
-    authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
-
-  const result = await fetchDelegation({
-    connection: authSuccess.connection,
-    derivationOrigin,
-    publicKey: authContext.authRequest.sessionPublicKey,
-    maxTimeToLive: authContext.authRequest.maxTimeToLive,
-  });
-
-  if ("error" in result) {
-    window.opener.postMessage(
-      {
-        kind: "authorize-client-failure",
-        text: "Unexpected error",
-      },
-      authContext.requestOrigin
-    );
+  if (result.kind === "failure") {
+    window.opener.postMessage({
+      kind: "authorize-client-failure",
+      text: result.text,
+    } satisfies AuthResponse);
     return "failure";
   }
 
-  const [userKey, parsed_signed_delegation] = result;
-
-  const userPublicKey = Uint8Array.from(userKey);
-  const principal = Principal.selfAuthenticating(userPublicKey);
-
-  await setKnownPrincipal({
-    userNumber: authSuccess.userNumber,
-    origin: authContext.requestOrigin,
-    principal,
-  });
+  result.kind satisfies "success";
 
   window.opener.postMessage(
     {
       kind: "authorize-client-success",
-      delegations: [parsed_signed_delegation],
-      userPublicKey: Uint8Array.from(userKey),
-    },
+      delegations: result.delegations,
+      userPublicKey: result.userPublicKey,
+    } satisfies AuthResponse,
     authContext.requestOrigin
   );
 
   return "success";
 }
 
-/**
- * Wait for client to request authentication.
- */
-const waitForAuthRequest = (): Promise<AuthContext> =>
-  new Promise<AuthContext>((resolve) => {
-    const evntHandler = (evnt: MessageEvent) => {
-      const message: unknown = evnt.data; // Drop assumptions about evnt.data (an 'any')
-      const authRequest = asAuthRequest(message);
-      if (typeof authRequest !== "string") {
-        window.removeEventListener("message", evntHandler);
-        console.log(
-          `Handling authorize-client request ${JSON.stringify(
-            authRequest,
-            (_, v) => (typeof v === "bigint" ? v.toString() : v)
-          )}`
-        );
-        resolve({
-          authRequest,
-          requestOrigin: evnt.origin,
-        });
-      } else {
-        console.warn(
-          `Bad authentication request received: ${authRequest}`,
-          message
-        );
+// Wait for a request to kickstart the flow
+const waitForRequest = (): Promise<{
+  request: AuthRequest;
+  origin: string;
+}> => {
+  return new Promise((resolve) => {
+    const messageEventHandler = (evnt: MessageEvent) => {
+      const message: unknown = evnt.data;
+      const result = AuthRequest.safeParse(message);
+
+      if (!result.success) {
+        const message = `Unexpected error: flow request ` + result.error;
+        console.error(message);
+        // XXX: here we just wait further assuming the opener might recover
+        // and send a correct request
+        return;
       }
+
+      window.removeEventListener("message", messageEventHandler);
+
+      resolve({ request: result.data, origin: evnt.origin });
     };
 
     // Set up an event listener for receiving messages from the client.
-    window.addEventListener("message", evntHandler);
+    window.addEventListener("message", messageEventHandler);
   });
+};

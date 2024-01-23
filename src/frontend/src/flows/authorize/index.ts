@@ -9,12 +9,16 @@ import { showSpinner } from "$src/components/spinner";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
+import { setKnownPrincipal } from "$src/storage";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
+import { Principal } from "@dfinity/principal";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { authenticationProtocol } from "./postMessageInterface";
+import { Delegation, fetchDelegation } from "./fetchDelegation";
+import { AuthContext, authenticationProtocol } from "./postMessageInterface";
+import { validateDerivationOrigin } from "./validateDerivationOrigin";
 
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
@@ -147,6 +151,92 @@ export const authnTemplateAuthorize = ({
   };
 };
 
+const authenticate = async (
+  connection: Connection,
+  authContext: AuthContext
+): Promise<
+  | { kind: "success"; delegations: Delegation[]; userPublicKey: Uint8Array }
+  | { kind: "failure"; text: string }
+> => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
+
+  const validationResult = await validateDerivationOrigin(
+    authContext.requestOrigin,
+    authContext.authRequest.derivationOrigin
+  );
+
+  if (validationResult.result === "invalid") {
+    await displayError({
+      title: copy.invalid_derivation_origin,
+      message: html`"${authContext.authRequest.derivationOrigin}"
+      ${copy.is_not_valid_origin_for} "${authContext.requestOrigin}"`,
+      detail: validationResult.message,
+      primaryButton: copy.continue,
+    });
+
+    return {
+      kind: "failure",
+      text: `Invalid derivation origin: ${validationResult.message}`,
+    };
+  }
+
+  const authSuccess = await authenticateBox({
+    connection,
+    i18n,
+    templates: authnTemplateAuthorize({
+      origin: authContext.requestOrigin,
+      derivationOrigin: authContext.authRequest.derivationOrigin,
+      i18n,
+      knownDapp: getDapps().find((dapp) =>
+        dapp.hasOrigin(authContext.requestOrigin)
+      ),
+    }),
+  });
+
+  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
+  // one. The exact flow depends on the device they use.
+  // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
+  // may have already closed the II window
+  if (!authSuccess.newAnchor) {
+    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+  }
+
+  // at this point, derivationOrigin is either validated or undefined
+  const derivationOrigin =
+    authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
+
+  const result = await fetchDelegation({
+    connection: authSuccess.connection,
+    derivationOrigin,
+    publicKey: authContext.authRequest.sessionPublicKey,
+    maxTimeToLive: authContext.authRequest.maxTimeToLive,
+  });
+
+  if ("error" in result) {
+    return {
+      kind: "failure",
+      text: "Unexpected error",
+    };
+  }
+
+  const [userKey, parsed_signed_delegation] = result;
+
+  const userPublicKey = Uint8Array.from(userKey);
+  const principal = Principal.selfAuthenticating(userPublicKey);
+
+  await setKnownPrincipal({
+    userNumber: authSuccess.userNumber,
+    origin: authContext.requestOrigin,
+    principal,
+  });
+
+  return {
+    kind: "success",
+    delegations: [parsed_signed_delegation],
+    userPublicKey: Uint8Array.from(userKey),
+  };
+};
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
  * using an existing anchor or creating a new anchor, etc.
  */
@@ -158,44 +248,13 @@ export const authFlowAuthorize = async (
 
   showSpinner({ message: copy.starting_authentication });
   const result = await authenticationProtocol({
-    authenticate: async (authContext) => {
-      const authSuccess = await authenticateBox({
-        connection,
-        i18n,
-        templates: authnTemplateAuthorize({
-          origin: authContext.requestOrigin,
-          derivationOrigin: authContext.authRequest.derivationOrigin,
-          i18n,
-          knownDapp: getDapps().find((dapp) =>
-            dapp.hasOrigin(authContext.requestOrigin)
-          ),
-        }),
-      });
-
-      // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
-      // one. The exact flow depends on the device they use.
-      // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
-      // may have already closed the II window
-      if (!authSuccess.newAnchor) {
-        await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
-      }
-      return authSuccess;
-    },
-    onInvalidOrigin: (result) =>
-      displayError({
-        title: copy.invalid_derivation_origin,
-        message: html`"${result.authContext.authRequest.derivationOrigin}"
-        ${copy.is_not_valid_origin_for} "${result.authContext.requestOrigin}"`,
-        detail: result.message,
-        primaryButton: copy.continue,
-      }),
+    authenticate: (authContext) => authenticate(connection, authContext),
 
     onProgress: (status) =>
       showSpinner({
         message: {
           waiting: copy.waiting_for_auth_data,
-          validating: copy.validating_auth_data,
-          "fetching delegation": copy.finalizing_auth,
+          validating: copy.finalizing_auth,
         }[status],
       }),
   });
