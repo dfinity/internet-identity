@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
+    "@types/node": "*",
     "@types/ua-parser-js": "^0.7.36",
     "@typescript-eslint/eslint-plugin": "6.7.5",
     "@typescript-eslint/parser": "6.7.5",
@@ -49,7 +50,7 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
-    "vite": "^4.2.1",
+    "vite": "^4.5.2",
     "vitest": "^0.34.0",
     "webdriverio": "^8.21.0",
 
@@ -57,11 +58,12 @@
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
-    "@dfinity/auth-client": "*",
+    "@dfinity/auth-client": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
-    "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/principal": "^0.19.2",
+
+    "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",

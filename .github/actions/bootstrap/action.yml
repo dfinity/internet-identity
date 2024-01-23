@@ -34,8 +34,10 @@ runs:
     # NOTE: we include the output of uname to ensure binary compatibility (e.g. same glibc)
     - uses: actions/cache@v3
       with:
-        path: ~/.cargo/bin
-        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-3
+        path: |
+          ~/.cargo/bin/ic-wasm
+          ~/.rustup
+        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-4
 
     - name: Bootstrap
       shell: bash

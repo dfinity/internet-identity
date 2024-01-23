@@ -569,10 +569,28 @@ export class AboutView extends View {
 }
 
 export class VcAllowView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$('[data-page="vc-allow"]')
-      .waitForDisplayed({ timeout: 10_000 });
+  async waitForDisplay(): Promise<"ok" | "aborted"> {
+    const elem = await this.browser.$(
+      '[data-page="vc-allow"],[data-page="vc-aborted"]'
+    );
+    await elem.waitForDisplayed({ timeout: 10_000 });
+    const page = await elem.getAttribute("data-page");
+
+    if (page === "vc-allow") {
+      return "ok";
+    }
+
+    if (page === "vc-aborted") {
+      return "aborted";
+    }
+
+    throw new Error("Unexpected page: " + page);
+  }
+
+  async getAbortReason(): Promise<string> {
+    return await this.browser
+      .$("[data-abort-reason]")
+      .getAttribute("data-abort-reason");
   }
 
   async allow(): Promise<void> {
@@ -727,6 +745,14 @@ export class VcTestAppView extends View {
 
   getPrincipal(): Promise<string> {
     return this.browser.$('[data-role="principal"]').getText();
+  }
+
+  setAlternativeOrigin(origin: string) {
+    return setInputValue(
+      this.browser,
+      '[data-role="derivation-origin-rp"]',
+      origin
+    );
   }
 
   getPresentationAlias(): Promise<string> {
