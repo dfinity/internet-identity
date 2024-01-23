@@ -21,6 +21,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use storage::{Salt, Storage};
 
 mod activity_stats;
@@ -58,14 +59,14 @@ async fn init_salt() {
 #[update]
 #[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 #[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -249,7 +250,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 #[update] // this is an update call because queries are not (yet) certified
 #[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authenticate_and_record_activity(anchor_number);
+    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
 
@@ -270,7 +271,8 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    let ii_domain = authenticate_and_record_activity(anchor_number);
+    let ii_domain = authenticate_and_record_activity(anchor_number)
+        .unwrap_or_else(|err| trap(&format!("{err}")));
     delegation::prepare_delegation(
         anchor_number,
         frontend,
@@ -489,16 +491,17 @@ async fn random_salt() -> Salt {
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
-fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-    let domain = anchor.device(&device_key).unwrap().ii_domain();
+fn authenticate_and_record_activity(
+    anchor_number: AnchorNumber,
+) -> Result<Option<IIDomain>, IdentityUpdateError> {
+    let (mut anchor, device_key) =
+        check_authentication(anchor_number).map_err(IdentityUpdateError::from)?;
+    let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
         |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
     );
-    domain
+    Ok(maybe_domain)
 }
 
 #[derive(Debug)]
@@ -507,23 +510,43 @@ enum IdentityUpdateError {
     StorageError(IdentityNumber, StorageError),
 }
 
-impl From<IdentityUpdateError> for String {
-    fn from(err: IdentityUpdateError) -> Self {
+impl From<AuthorizationError> for IdentityUpdateError {
+    fn from(err: AuthorizationError) -> Self {
         match err {
-            IdentityUpdateError::Unauthorized(principal) => {
-                // This error message is used by the legacy API and should not be changed, even though
-                // it is confusing authentication with authorization.
-                format!("{} could not be authenticated.", principal)
-            }
-            IdentityUpdateError::StorageError(identity_nr, err) => {
-                // This error message is used by the legacy API and should not be changed
-                format!(
-                    "unable to update anchor {} in stable memory: {}",
-                    identity_nr, err
-                )
+            AuthorizationError::Unauthorized(principal) => {
+                IdentityUpdateError::Unauthorized(principal)
             }
         }
     }
+}
+
+impl Display for IdentityUpdateError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IdentityUpdateError::Unauthorized(principal) => {
+                // This error message is used by the legacy API and should not be changed, even though
+                // it is confusing authentication with authorization.
+                f.write_str(&format!("{principal} could not be authenticated."))
+            }
+            IdentityUpdateError::StorageError(identity_nr, err) => {
+                // This error message is used by the legacy API and should not be changed
+                f.write_str(&format!(
+                    "unable to update anchor {identity_nr} in stable memory: {err}"
+                ))
+            }
+        }
+    }
+}
+
+impl From<IdentityUpdateError> for String {
+    fn from(err: IdentityUpdateError) -> Self {
+        format!("{}", err)
+    }
+}
+
+#[derive(Debug)]
+enum AuthorizationError {
+    Unauthorized(Principal),
 }
 
 /// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
@@ -540,9 +563,8 @@ fn authenticated_anchor_operation<R, E>(
 where
     E: From<IdentityUpdateError>,
 {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        return Err(E::from(IdentityUpdateError::Unauthorized(caller())));
-    };
+    let (mut anchor, device_key) = check_authentication(anchor_number)
+        .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
     let result = op(&mut anchor);
@@ -562,7 +584,9 @@ where
 
 /// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
 /// Returns an error if the caller cannot be authenticated.
-fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKey), ()> {
+fn check_authentication(
+    anchor_number: AnchorNumber,
+) -> Result<(Anchor, DeviceKey), AuthorizationError> {
     let anchor = state::anchor(anchor_number);
     let caller = caller();
 
@@ -577,7 +601,7 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
             return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
-    Err(())
+    Err(AuthorizationError::Unauthorized(caller))
 }
 
 /// New v2 API that aims to eventually replace the current API.
@@ -656,7 +680,8 @@ mod v2_api {
     #[update]
     #[candid_method]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, ()> {
-        authenticate_and_record_activity(identity_number);
+        authenticate_and_record_activity(identity_number)
+            .unwrap_or_else(|err| trap(&format!("{err}")));
         let anchor_info = anchor_management::get_anchor_info(identity_number);
 
         let metadata = state::anchor(identity_number)
