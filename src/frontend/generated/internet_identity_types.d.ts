@@ -160,6 +160,8 @@ export interface IdentityInfo {
   'metadata' : MetadataMapV2,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
+export type IdentityInfoError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type IdentityMetadataReplaceError = {
     'InternalCanisterError' : string
   } |
@@ -350,7 +352,7 @@ export interface _SERVICE {
   'identity_info' : ActorMethod<
     [IdentityNumber],
     { 'Ok' : IdentityInfo } |
-      { 'Err' : null }
+      { 'Err' : IdentityInfoError }
   >,
   'identity_metadata_replace' : ActorMethod<
     [IdentityNumber, MetadataMapV2],

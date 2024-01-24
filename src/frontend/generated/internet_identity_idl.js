@@ -258,6 +258,10 @@ export const idlFactory = ({ IDL }) => {
     'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
   });
+  const IdentityInfoError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const IdentityMetadataReplaceError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
@@ -433,7 +437,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'identity_info' : IDL.Func(
         [IdentityNumber],
-        [IDL.Variant({ 'Ok' : IdentityInfo, 'Err' : IDL.Null })],
+        [IDL.Variant({ 'Ok' : IdentityInfo, 'Err' : IdentityInfoError })],
         [],
       ),
     'identity_metadata_replace' : IDL.Func(
