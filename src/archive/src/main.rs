@@ -46,8 +46,9 @@ use ic_cdk_macros::{init, post_upgrade, query, update};
 use ic_cdk_timers::set_timer_interval;
 use ic_metrics_encoder::MetricsEncoder;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
+use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{
-    cell::Cell as StableCell, log::Log, BoundedStorable, DefaultMemoryImpl, Memory as StableMemory,
+    cell::Cell as StableCell, log::Log, DefaultMemoryImpl, Memory as StableMemory,
     RestrictedMemory, StableBTreeMap, Storable,
 };
 use internet_identity_interface::archive::types::*;
@@ -194,6 +195,8 @@ impl Storable for ConfigState {
             candid::decode_one::<ArchiveConfig>(&bytes).expect("failed to decode archive config"),
         )
     }
+
+    const BOUND: Bound = Bound::Unbounded;
 }
 
 /// Index key for the anchor index.
@@ -231,11 +234,11 @@ impl Storable for AnchorIndexKey {
             ),
         }
     }
-}
 
-impl BoundedStorable for AnchorIndexKey {
-    const MAX_SIZE: u32 = std::mem::size_of::<AnchorIndexKey>() as u32;
-    const IS_FIXED_SIZE: bool = true;
+    const BOUND: Bound = Bound::Bounded {
+        is_fixed_size: true,
+        max_size: std::mem::size_of::<AnchorIndexKey>() as u32,
+    };
 }
 
 /// This method is kept for legacy compatibility and easier testability of the archive.

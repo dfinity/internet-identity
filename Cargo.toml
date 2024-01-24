@@ -34,7 +34,7 @@ ic-http-certification = "2.2"
 ic-metrics-encoder = "1"
 ic-representation-independent-hash = "2.2"
 ic-response-verification = "2.2"
-ic-stable-structures = "0.5"
+ic-stable-structures = "0.6"
 ic-test-state-machine-client = "3"
 
 # other dependencies
