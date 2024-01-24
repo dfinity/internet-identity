@@ -4,7 +4,9 @@ use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, PrepareIdAliasError,
 };
-use internet_identity_interface::internet_identity::types::IdentityMetadataReplaceError;
+use internet_identity_interface::internet_identity::types::{
+    IdentityInfoError, IdentityMetadataReplaceError,
+};
 
 impl From<IdentityUpdateError> for IdentityMetadataReplaceError {
     fn from(value: IdentityUpdateError) -> Self {
@@ -49,6 +51,17 @@ impl From<IdentityUpdateError> for PrepareIdAliasError {
                 PrepareIdAliasError::Unauthorized(principal)
             }
             err => PrepareIdAliasError::InternalCanisterError(err.to_string()),
+        }
+    }
+}
+
+impl From<IdentityUpdateError> for IdentityInfoError {
+    fn from(value: IdentityUpdateError) -> Self {
+        match value {
+            IdentityUpdateError::Unauthorized(principal) => {
+                IdentityInfoError::Unauthorized(principal)
+            }
+            err => IdentityInfoError::InternalCanisterError(err.to_string()),
         }
     }
 }

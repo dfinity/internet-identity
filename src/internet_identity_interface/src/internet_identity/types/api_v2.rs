@@ -81,6 +81,12 @@ pub struct IdentityInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdentityInfoError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdentityRegisterError {
     CanisterFull,
     BadCaptcha,

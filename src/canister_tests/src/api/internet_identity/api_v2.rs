@@ -44,7 +44,7 @@ pub fn identity_info(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<IdentityInfo, ()>, CallError> {
+) -> Result<Result<IdentityInfo, IdentityInfoError>, CallError> {
     call_candid_as(
         env,
         canister_id,

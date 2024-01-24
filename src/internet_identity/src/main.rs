@@ -563,9 +563,8 @@ mod v2_api {
 
     #[update]
     #[candid_method]
-    fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, ()> {
-        authenticate_and_record_activity(identity_number)
-            .unwrap_or_else(|err| trap(&format!("{err}")));
+    fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
+        authenticate_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
         let anchor_info = anchor_management::get_anchor_info(identity_number);
 
         let metadata = state::anchor(identity_number)
