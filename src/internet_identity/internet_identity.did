@@ -404,6 +404,15 @@ type IdentityInfo = record {
     metadata: MetadataMapV2;
 };
 
+type IdentityInfoError = variant {
+    /// The principal is not authorized to call this method with the given arguments.
+    Unauthorized: principal;
+    /// Internal canister error. See the error message for details.
+    InternalCanisterError: text;
+};
+
+
+
 type IdentityRegisterError = variant {
     // No more registrations are possible in this instance of the II service canister.
     CanisterFull;
@@ -553,7 +562,7 @@ service : (opt InternetIdentityInit) -> {
 
     // Returns information about the identity with the given number.
     // Requires authentication.
-    identity_info: (IdentityNumber) -> (variant {Ok: IdentityInfo; Err;});
+    identity_info: (IdentityNumber) -> (variant {Ok: IdentityInfo; Err: IdentityInfoError;});
 
     // Replaces the authentication method independent metadata map.
     // The existing metadata map will be overwritten.

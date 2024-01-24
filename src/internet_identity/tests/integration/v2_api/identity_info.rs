@@ -7,15 +7,12 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, time, II_WASM,
-};
+use canister_tests::framework::{env, install_ii_canister, time, II_WASM};
 use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, AuthnMethodRegistration, DeviceData, DeviceWithUsage, MetadataEntry,
+    AuthnMethodData, AuthnMethodRegistration, DeviceData, DeviceWithUsage, IdentityInfoError,
+    MetadataEntry,
 };
-use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -55,13 +52,8 @@ fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
     let authn_methods = sample_authn_methods();
     let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 
-    let result = api_v2::identity_info(&env, canister_id, Principal::anonymous(), identity_number);
-
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-    );
+    let result = api_v2::identity_info(&env, canister_id, Principal::anonymous(), identity_number)?;
+    assert!(matches!(result, Err(IdentityInfoError::Unauthorized(_))));
     Ok(())
 }
 
