@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: "Download build for Release Candidate"
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         with:
           script: |
             // Find all artifacts for the production build, and filter for non-expired main artifacts
