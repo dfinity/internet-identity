@@ -4,7 +4,6 @@
   "private": true,
   "dependencies": {
     "@dfinity/agent": "*",
-    "@dfinity/auth-client": "*",
     "@dfinity/candid": "*",
     "@dfinity/identity": "*",
     "@dfinity/principal": "*",
