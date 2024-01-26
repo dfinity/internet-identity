@@ -15,7 +15,7 @@ test("Delegation maxTimeToLive: 1 min", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.setMaxTimeToLive(BigInt(60_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
@@ -34,13 +34,13 @@ test("Delegation maxTimeToLive: 1 day", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.setMaxTimeToLive(BigInt(86400_000_000_000));
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(browser);
     await waitToClose(browser);
-    expect(await demoAppView.getPrincipal()).not.toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).not.toBe("");
     const exp = await browser.$("#expiration").getText();
     expect(Number(exp) / 86400_000_000_000).toBeCloseTo(1);
   });
@@ -52,7 +52,7 @@ test("Delegation maxTimeToLive: 2 months", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.setMaxTimeToLive(BigInt(5_184_000_000_000_000)); // 60 days
     await demoAppView.signin();
     await switchToPopup(browser);

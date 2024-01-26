@@ -2,9 +2,7 @@ import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
 
 import type { Identity, SignIdentity } from "@dfinity/agent";
 import { Actor, HttpAgent } from "@dfinity/agent";
-import { AuthClient } from "@dfinity/auth-client";
 import {
-  Delegation,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -16,10 +14,11 @@ import ReactDOM from "react-dom/client";
 
 import { decodeJwt } from "jose";
 
+import { authWithII, extractDelegation } from "./auth";
+
 import "./main.css";
 
 const signInBtn = document.getElementById("signinBtn") as HTMLButtonElement;
-const signOutBtn = document.getElementById("signoutBtn") as HTMLButtonElement;
 const whoamiBtn = document.getElementById("whoamiBtn") as HTMLButtonElement;
 const updateAlternativeOriginsBtn = document.getElementById(
   "updateNewAlternativeOrigins"
@@ -67,9 +66,19 @@ const derivationOriginEl = document.getElementById(
   "derivationOrigin"
 ) as HTMLInputElement;
 
-let authClient: AuthClient;
 let iiProtocolTestWindow: Window | undefined;
-let localIdentity: SignIdentity;
+
+// The identity set by the authentication
+let delegationIdentity: DelegationIdentity | undefined = undefined;
+
+// The local, ephemeral key-pair
+let localIdentity_: SignIdentity | undefined = undefined;
+function getLocalIdentity(): SignIdentity {
+  if (localIdentity_ === undefined) {
+    localIdentity_ = Ed25519KeyIdentity.generate();
+  }
+  return localIdentity_;
+}
 
 const idlFactory = ({ IDL }: { IDL: any }) => {
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
@@ -129,7 +138,13 @@ const updateAlternativeOriginsView = async () => {
   alternativeOriginsEl.innerText = await response.text();
 };
 
-function addMessageElement(message: unknown, received: boolean) {
+function addMessageElement({
+  message,
+  ty,
+}: {
+  message: unknown;
+  ty: "received" | "sent";
+}) {
   const messageContainer = document.createElement("div");
   messageContainer.classList.add("postMessage");
   const messageTitle = document.createElement("div");
@@ -138,7 +153,7 @@ function addMessageElement(message: unknown, received: boolean) {
   messageContent.innerText = JSON.stringify(message, (_, v) =>
     typeof v === "bigint" ? v.toString() : v
   );
-  if (received) {
+  if (ty === "received") {
     messageTitle.innerText = "Message Received";
     messageContainer.classList.add("received");
   } else {
@@ -151,30 +166,24 @@ function addMessageElement(message: unknown, received: boolean) {
 }
 
 window.addEventListener("message", (event) => {
-  if (event.source === iiProtocolTestWindow) {
-    addMessageElement(event.data, true);
-    if (event?.data?.kind === "authorize-client-success") {
-      const delegations = event.data.delegations.map(
-        (signedDelegation: any) => {
-          return {
-            delegation: new Delegation(
-              signedDelegation.delegation.pubkey,
-              signedDelegation.delegation.expiration,
-              signedDelegation.delegation.targets
-            ),
-            signature: signedDelegation.signature.buffer,
-          };
-        }
-      );
-      const delegationChain = DelegationChain.fromDelegations(
-        delegations,
-        event.data.userPublicKey.buffer
-      );
-      updateDelegationView(
-        DelegationIdentity.fromDelegation(localIdentity, delegationChain)
-      );
-    }
+  if (!event.source || event.source !== iiProtocolTestWindow) {
+    return;
   }
+
+  addMessageElement({ message: event.data, ty: "received" });
+
+  if (event?.data?.kind !== "authorize-client-success") {
+    return;
+  }
+
+  const delegations = event.data.delegations.map(extractDelegation);
+  const delegationChain = DelegationChain.fromDelegations(
+    delegations,
+    event.data.userPublicKey.buffer
+  );
+  updateDelegationView(
+    DelegationIdentity.fromDelegation(getLocalIdentity(), delegationChain)
+  );
 });
 
 const readCanisterId = (): string => {
@@ -183,31 +192,28 @@ const readCanisterId = (): string => {
 };
 
 const init = async () => {
-  authClient = await AuthClient.create();
-  updateDelegationView(authClient.getIdentity());
   await updateAlternativeOriginsView();
   signInBtn.onclick = async () => {
-    let derivationOrigin =
+    const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
+    // The default max TTL setin the @dfinity/auth-client library
+    const authClientDefaultMaxTTL =
+      /* hours */ BigInt(8) * /* nanoseconds */ BigInt(3_600_000_000_000);
+    const maxTimeToLive =
+      maxTimeToLive_ > BigInt(0) ? maxTimeToLive_ : authClientDefaultMaxTTL;
+    const derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
-    if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
-      authClient.login({
-        identityProvider: iiUrlEl.value,
-        maxTimeToLive: BigInt(maxTimeToLiveEl.value),
-        derivationOrigin,
-        onSuccess: () => updateDelegationView(authClient.getIdentity()),
-      });
-    } else {
-      authClient.login({
-        identityProvider: iiUrlEl.value,
-        derivationOrigin,
-        onSuccess: () => updateDelegationView(authClient.getIdentity()),
-      });
-    }
-  };
 
-  signOutBtn.onclick = async () => {
-    await authClient.logout();
-    updateDelegationView(authClient.getIdentity());
+    try {
+      delegationIdentity = await authWithII({
+        url: iiUrlEl.value,
+        maxTimeToLive,
+        derivationOrigin,
+        sessionIdentity: getLocalIdentity(),
+      });
+      updateDelegationView(delegationIdentity);
+    } catch (e) {
+      showError(JSON.stringify(e));
+    }
   };
 
   openIiWindowBtn.onclick = () => {
@@ -231,7 +237,7 @@ const init = async () => {
       return;
     }
     const invalidData = "some invalid data";
-    addMessageElement(invalidData, false);
+    addMessageElement({ message: invalidData, ty: "sent" });
     iiProtocolTestWindow.postMessage(invalidData, iiUrlEl.value);
   };
 
@@ -241,7 +247,7 @@ const init = async () => {
       return;
     }
     const incompleteMessage = { kind: "authorize-client" };
-    addMessageElement(incompleteMessage, false);
+    addMessageElement({ message: incompleteMessage, ty: "sent" });
     iiProtocolTestWindow.postMessage(incompleteMessage, iiUrlEl.value);
   };
 
@@ -250,7 +256,6 @@ const init = async () => {
       alert("Open II tab first");
       return;
     }
-    localIdentity = Ed25519KeyIdentity.generate();
     let derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
     let maxTimeToLive =
@@ -259,11 +264,13 @@ const init = async () => {
         : undefined;
     const validMessage = {
       kind: "authorize-client",
-      sessionPublicKey: new Uint8Array(localIdentity.getPublicKey().toDer()),
+      sessionPublicKey: new Uint8Array(
+        getLocalIdentity().getPublicKey().toDer()
+      ),
       derivationOrigin,
       maxTimeToLive,
     };
-    addMessageElement(validMessage, false);
+    addMessageElement({ message: validMessage, ty: "sent" });
     iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
   };
 
@@ -273,7 +280,7 @@ const init = async () => {
       return;
     }
     let message = JSON.parse(customMessageEl.value);
-    addMessageElement(message, false);
+    addMessageElement({ message, ty: "sent" });
     iiProtocolTestWindow.postMessage(message, iiUrlEl.value);
   };
 
@@ -310,12 +317,11 @@ const init = async () => {
 init();
 
 whoamiBtn.addEventListener("click", async () => {
-  const identity = await authClient.getIdentity();
   const canisterId = Principal.fromText(readCanisterId());
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
       host: hostUrlEl.value,
-      identity,
+      identity: delegationIdentity,
     }),
     canisterId,
   });
