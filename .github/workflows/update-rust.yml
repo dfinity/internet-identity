@@ -11,7 +11,7 @@ jobs:
   rust-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
         # First, check rust GitHub releases for a new version. We assume that the
         # latest version's tag name is the version.

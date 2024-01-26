@@ -11,7 +11,7 @@ jobs:
   didc-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
         # First, check didc releases (on the candid repo) for a new version.
       - name: Check new didc version

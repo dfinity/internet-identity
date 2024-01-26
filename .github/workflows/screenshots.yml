@@ -23,9 +23,9 @@ jobs:
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: ${{ matrix.ref == 'head' }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: ${{ matrix.ref == 'base' }}
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -90,7 +90,7 @@ jobs:
           echo "dumpster_path=objs/$branch_alias" >> "$GITHUB_OUTPUT"
         id: sys
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         # Checks out 'image-dumpster', a single-commit branch used to keep objects (screenshots).
         # We store the images in a branch (as opposed to e.g. artifacts) so that GitHub will serve
         # them (on rawgithubusercontent), meaning we can display them on PRs.
