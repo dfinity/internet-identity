@@ -3,16 +3,13 @@
 // This file describes which assets are used and how (content, content type and content encoding).
 use crate::http::security_headers;
 use crate::state;
-use asset_util::{
-    collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType, DirectoryTraversalMode,
-};
+use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
 use lazy_static::lazy_static;
 use sha2::Digest;
-use DirectoryTraversalMode::IncludeSubdirs;
 
 // used both in init and post_upgrade
 pub fn init_assets() {
@@ -61,7 +58,7 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 fn get_static_assets() -> Vec<Asset> {
-    let mut assets = collect_assets(&ASSET_DIR, IncludeSubdirs, Some(fixup_html));
+    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
 
     // Required to make II available on the identity.internetcomputer.org domain.
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes

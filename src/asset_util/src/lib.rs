@@ -12,7 +12,6 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
-use DirectoryTraversalMode::IncludeSubdirs;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
@@ -52,14 +51,6 @@ pub struct Asset {
     pub content: Vec<u8>,
     pub encoding: ContentEncoding,
     pub content_type: ContentType,
-}
-
-/// Enum to specify the depth of directory traversal when collecting assets.
-pub enum DirectoryTraversalMode {
-    /// Recursively collect assets from the given directory and its subdirectories.
-    IncludeSubdirs,
-    /// Only collect assets from the given directory.
-    ExcludeSubdirs,
 }
 
 impl CertifiedAssets {
@@ -405,43 +396,36 @@ fn response_hash(status_code: u16, headers: &[HeaderField], body_hash: &Hash) ->
     response_hash
 }
 
-/// Collects all assets from the given directory and its optionally its subdirectories.
+/// Collects all assets from the given directory, recursing into subdirectories.
 /// Optionally, a transformer function can be provided to transform the HTML files.
-pub fn collect_assets(
-    dir: &Dir,
-    directory_traversal_mode: DirectoryTraversalMode,
-    html_transformer: Option<fn(&str) -> String>,
-) -> Vec<Asset> {
-    let mut assets = collect_assets_from_dir(dir, html_transformer);
-    match directory_traversal_mode {
-        IncludeSubdirs => {
-            for subdir in dir.dirs() {
-                assets.extend(collect_assets(subdir, IncludeSubdirs, html_transformer).into_iter());
+pub fn collect_assets(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -> Vec<Asset> {
+    let mut assets = vec![];
+
+    // Collect all assets, recursively
+    collect_assets_rec(dir, &mut assets);
+
+    // If an HTML transformer was given, apply it to all HTML assets
+    if let Some(html_transformer) = html_transformer {
+        for asset in &mut assets {
+            if let ContentType::HTML = asset.content_type {
+                asset.content = html_transformer(std::str::from_utf8(&asset.content).unwrap())
+                    .as_bytes()
+                    .to_vec();
             }
         }
-        DirectoryTraversalMode::ExcludeSubdirs => {
-            // nothing to do
-        }
     }
+
     assets
 }
 
-/// Collects all assets from the given directory.
-fn collect_assets_from_dir(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -> Vec<Asset> {
-    let mut assets: Vec<Asset> = vec![];
+/// Collects all assets from the given directory (mutably into the accumulator).
+/// NOTE: behavior is undefined with symlinks (and esp. symlink loops)!
+fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
     for asset in dir.files() {
         let file_bytes = asset.contents().to_vec();
         let (content, encoding, content_type) = match file_extension(asset) {
             "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
-            "html" => {
-                if let Some(transformer) = html_transformer {
-                    let content = transformer(std::str::from_utf8(&file_bytes).unwrap());
-                    let content_bytes = content.as_bytes().to_vec();
-                    (content_bytes, ContentEncoding::Identity, ContentType::HTML)
-                } else {
-                    (file_bytes, ContentEncoding::Identity, ContentType::HTML)
-                }
-            }
+            "html" => (file_bytes, ContentEncoding::Identity, ContentType::HTML),
             "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
             "json" => (file_bytes, ContentEncoding::Identity, ContentType::JSON),
             "js" => (file_bytes, ContentEncoding::Identity, ContentType::JS),
@@ -475,7 +459,10 @@ fn collect_assets_from_dir(dir: &Dir, html_transformer: Option<fn(&str) -> Strin
             });
         }
     }
-    assets
+
+    for dir in dir.dirs() {
+        collect_assets_rec(dir, assets);
+    }
 }
 
 /// Returns the portion of the filename after the first dot.
