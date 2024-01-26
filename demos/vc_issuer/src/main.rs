@@ -28,10 +28,9 @@ use vc_util::{
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
-use asset_util::{collect_assets, CertifiedAssets, DirectoryTraversalMode};
+use asset_util::{collect_assets, CertifiedAssets};
 use ic_cdk::api;
 use ic_cdk_macros::post_upgrade;
-use DirectoryTraversalMode::IncludeSubdirs;
 
 mod consent_message;
 
@@ -577,7 +576,7 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 pub fn init_assets() {
     ASSETS.with_borrow_mut(|assets| {
         *assets = CertifiedAssets::certify_assets(
-            collect_assets(&ASSET_DIR, IncludeSubdirs, Some(fixup_html)),
+            collect_assets(&ASSET_DIR, Some(fixup_html)),
             &static_headers(),
         );
     });
