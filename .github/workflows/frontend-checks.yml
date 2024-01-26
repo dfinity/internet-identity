@@ -7,7 +7,7 @@ jobs:
   frontend-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           # set a PAT so that add-and-commit can trigger CI runs
           token: ${{ secrets.GIX_BOT_PAT }}
@@ -50,7 +50,7 @@ jobs:
   showcase:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
       - run: npm ci
 

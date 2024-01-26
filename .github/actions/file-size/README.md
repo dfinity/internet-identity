@@ -8,7 +8,7 @@ A GitHub Action for recording file sizes in git notes.
   record-readme-size:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/file-size
         with:
           file: README.md
