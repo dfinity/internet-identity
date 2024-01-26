@@ -3,6 +3,7 @@ import {
   Delegation,
   DelegationChain,
   DelegationIdentity,
+  SignedDelegation,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 
@@ -98,16 +99,7 @@ const identityFromResponse = ({
   sessionIdentity: SignIdentity;
   response: AuthResponseSuccess;
 }): DelegationIdentity => {
-  const delegations = response.delegations.map((signedDelegation) => {
-    return {
-      delegation: new Delegation(
-        signedDelegation.delegation.pubkey,
-        signedDelegation.delegation.expiration,
-        signedDelegation.delegation.targets
-      ),
-      signature: signedDelegation.signature.buffer as Signature,
-    };
-  });
+  const delegations = response.delegations.map(extractDelegation);
 
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
@@ -121,3 +113,20 @@ const identityFromResponse = ({
 
   return identity;
 };
+
+// Infer the type of an array's elements
+type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
+  ? ElementOf
+  : "argument is not an array";
+
+export const extractDelegation = (
+  signedDelegation: ElementOf<AuthResponseSuccess["delegations"]>
+): SignedDelegation => ({
+  delegation: new Delegation(
+    signedDelegation.delegation.pubkey,
+    signedDelegation.delegation.expiration,
+    signedDelegation.delegation.targets
+  ),
+  signature: signedDelegation.signature
+    .buffer as Signature /* brand type for agent-js */,
+});

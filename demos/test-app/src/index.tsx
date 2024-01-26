@@ -3,7 +3,6 @@ import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
 import type { Identity, SignIdentity } from "@dfinity/agent";
 import { Actor, HttpAgent } from "@dfinity/agent";
 import {
-  Delegation,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -15,7 +14,7 @@ import ReactDOM from "react-dom/client";
 
 import { decodeJwt } from "jose";
 
-import { authWithII } from "./auth";
+import { authWithII, extractDelegation } from "./auth";
 
 import "./main.css";
 
@@ -177,16 +176,7 @@ window.addEventListener("message", (event) => {
     return;
   }
 
-  const delegations = event.data.delegations.map((signedDelegation: any) => {
-    return {
-      delegation: new Delegation(
-        signedDelegation.delegation.pubkey,
-        signedDelegation.delegation.expiration,
-        signedDelegation.delegation.targets
-      ),
-      signature: signedDelegation.signature.buffer,
-    };
-  });
+  const delegations = event.data.delegations.map(extractDelegation);
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
     event.data.userPublicKey.buffer
