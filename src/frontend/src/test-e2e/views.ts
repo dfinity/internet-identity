@@ -735,7 +735,7 @@ export class VcTestAppView extends View {
         return false;
       }
 
-      if (principal === Principal.anonymous().toText()) {
+      if (principal === "") {
         return false;
       }
 
@@ -778,7 +778,6 @@ export class DemoAppView extends View {
   }
 
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("#principal").waitForDisplayed({ timeout: 10_000 });
     // wait for the slowest element to appear
     await this.browser.waitUntil(
       async () =>
@@ -803,14 +802,11 @@ export class DemoAppView extends View {
     await waitToClose(this.browser);
     // wait for the demo app to update the principal
     await this.browser.waitUntil(
-      async () => (await this.getPrincipal()) !== Principal.anonymous().toText()
+      async () => (await this.getPrincipal()) !== ""
     );
     return this.getPrincipal();
   }
 
-  async signout(): Promise<void> {
-    await this.browser.$("#signoutBtn").click();
-  }
   async setMaxTimeToLive(mttl: bigint): Promise<void> {
     await fillText(this.browser, "maxTimeToLive", String(mttl));
   }

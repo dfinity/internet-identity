@@ -1,4 +1,3 @@
-import { Principal } from "@dfinity/principal";
 import {
   APPLE_USER_AGENT,
   DEVICE_NAME1,
@@ -131,9 +130,7 @@ test("Log into client application using PIN registration flow", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe(
-      Principal.anonymous().toText()
-    );
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerPinNewIdentityAuthenticateView(pin, browser);
@@ -157,9 +154,7 @@ test("Register with PIN then log into client application", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe(
-      Principal.anonymous().toText()
-    );
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.signin();
 
     await switchToPopup(browser);
