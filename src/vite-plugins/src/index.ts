@@ -15,11 +15,8 @@ export const injectCanisterIdPlugin = ({
   canisterName,
 }: {
   canisterName: string;
-}): {
-  name: "html-transform";
-  transformIndexHtml(html: string): string;
-} => ({
-  name: "html-transform",
+}): Plugin => ({
+  name: "inject-canister-id",
   transformIndexHtml(html): string {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
     const canisterId = readCanisterId({ canisterName });
@@ -37,19 +34,14 @@ export const compression = (): Plugin =>
     // II canister only supports one content type per resource. That is why we remove the original file.
     deleteOriginFile: true,
     filter: (file: string): boolean =>
-      ![".html", ".css", ".webp", ".png", ".ico", ".svg"].includes(
-        extname(file)
-      ),
+      [".js", ".woff2"].includes(extname(file)),
   });
 
 /**
  * Minify HTML
  */
-export const minifyHTML = (): {
-  name: "html-transform";
-  transformIndexHtml(html: string): Promise<string>;
-} => ({
-  name: "html-transform",
+export const minifyHTML = (): Plugin => ({
+  name: "minify-html",
   async transformIndexHtml(html): Promise<string> {
     return minify(html, { collapseWhitespace: true });
   },
