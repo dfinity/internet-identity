@@ -4,6 +4,7 @@ import {
 } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon } from "$src/components/icons";
+import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
@@ -206,12 +207,14 @@ const authenticate = async (
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
-  const result = await fetchDelegation({
-    connection: authSuccess.connection,
-    derivationOrigin,
-    publicKey: authContext.authRequest.sessionPublicKey,
-    maxTimeToLive: authContext.authRequest.maxTimeToLive,
-  });
+  const result = await withLoader(() =>
+    fetchDelegation({
+      connection: authSuccess.connection,
+      derivationOrigin,
+      publicKey: authContext.authRequest.sessionPublicKey,
+      maxTimeToLive: authContext.authRequest.maxTimeToLive,
+    })
+  );
 
   if ("error" in result) {
     return {
