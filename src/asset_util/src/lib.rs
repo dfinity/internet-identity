@@ -699,7 +699,7 @@ fn should_return_correct_extension() {
     ];
     for (path, expected_extension, expected_encoding) in path_extension_encoding {
         assert_eq!(
-            content_type_and_encoding(&Path::new(path)),
+            content_type_and_encoding(Path::new(path)),
             (expected_extension, expected_encoding)
         );
     }
