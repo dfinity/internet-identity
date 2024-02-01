@@ -440,6 +440,12 @@
     "oneLiner": "Allows any user to generate their own file canister smart contract and visually manage their files on the Internet Computer without requiring any code"
   },
   {
+    "name": "icgpt",
+    "oneLiner": "A fun dApp to demonstrate on-chain LLMs",
+    "website": "https://icgpt.icpp.world/",
+    "logo": "icpp-logo.dracula-cyan.112x112.png"
+  },
+  {
     "name": "Ping",
     "website": "https://h7jna-pqaaa-aaaak-afgiq-cai.icp0.io/",
     "logo": "ping_logo.webp",
