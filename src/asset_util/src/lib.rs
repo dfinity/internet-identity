@@ -454,7 +454,7 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
 /// e.g. `ContentType::JS` for "some.gzipped.file.js.gz", and the encoding is `ContentEncoding::GZip`.
 /// Otherwise the content type is determined by the text after the last dot in the file name,
 /// and the encoding is `ContentEncoding::Identity`.
-fn content_type_and_encoding<'a>(asset: &'a File) -> (ContentType, ContentEncoding) {
+fn content_type_and_encoding(asset: &File) -> (ContentType, ContentEncoding) {
     let extension = asset.path().extension().unwrap().to_str().unwrap();
     let (extension, encoding) = if extension == "gz" {
         let type_extension = asset
