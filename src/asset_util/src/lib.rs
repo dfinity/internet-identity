@@ -31,6 +31,8 @@ pub struct CertifiedAssets {
     assets: HashMap<String, CertifiedAsset>,
     certification_v1: RbTree<String, Hash>,
     certification_v2: NestedTree<Vec<u8>, Vec<u8>>,
+    /// Headers shared by all assets; stored separately to avoid duplication
+    pub shared_headers: Box<[HeaderField]>,
 }
 
 #[derive(Debug, Clone)]
@@ -60,7 +62,12 @@ impl CertifiedAssets {
     /// The [CertifiedAssets::root_hash] must be included in the canisters `certified_data` for the
     /// certification to be valid.
     pub fn certify_assets(assets: Vec<Asset>, shared_headers: &[HeaderField]) -> Self {
-        let mut certified_assets = Self::default();
+        let mut certified_assets = Self {
+            assets: HashMap::new(),
+            certification_v1: RbTree::new(),
+            certification_v2: NestedTree::default(),
+            shared_headers: shared_headers.to_vec().into_boxed_slice(),
+        };
         for asset in assets {
             certified_assets.certify_asset(asset, shared_headers);
         }
