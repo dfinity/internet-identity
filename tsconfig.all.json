@@ -6,6 +6,7 @@
     { "path": "./src/vc-api" },
     { "path": "./demos/test-app" },
     { "path": "./demos/vc_issuer" },
-    { "path": "./src/vite-plugins" }
+    { "path": "./src/vite-plugins" },
+    { "path": "./src/vc_util_js" }
   ]
 }

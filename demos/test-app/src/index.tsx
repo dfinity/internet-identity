@@ -16,6 +16,8 @@ import { decodeJwt } from "jose";
 
 import { authWithII, extractDelegation } from "./auth";
 
+import vcUtil, {validateVerifiedAdultPresentation} from "@dfinity/vc_util_js/vc_util_js";
+
 import "./main.css";
 
 const signInBtn = document.getElementById("signinBtn") as HTMLButtonElement;
