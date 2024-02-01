@@ -423,7 +423,7 @@ pub fn collect_assets(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -
 fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
     for asset in dir.files() {
         let content = asset.contents().to_vec();
-        let (extension, encoding) = file_extension(asset);
+        let (extension, encoding) = file_extension_and_encoding(asset);
         let content_type = match extension {
             "css" => ContentType::CSS,
             "html" => ContentType::HTML,
@@ -471,7 +471,7 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
 /// Otherwise the extension is the text after the last dot in the file name,
 /// and the encoding is `ContentEncoding::Identity`.
 /// This corresponds to the file extension for the assets handled by this crate.
-fn file_extension<'a>(asset: &'a File) -> (&'a str, ContentEncoding) {
+fn file_extension_and_encoding<'a>(asset: &'a File) -> (&'a str, ContentEncoding) {
     let extension = asset.path().extension().unwrap().to_str().unwrap();
     if extension == "gz" {
         let type_extension = asset
@@ -483,9 +483,9 @@ fn file_extension<'a>(asset: &'a File) -> (&'a str, ContentEncoding) {
             .split('.')
             .nth_back(1)
             .unwrap();
-        return (type_extension, ContentEncoding::GZip);
+        (type_extension, ContentEncoding::GZip)
     } else {
-        return (extension, ContentEncoding::Identity);
+        (extension, ContentEncoding::Identity)
     }
 }
 
@@ -634,7 +634,7 @@ fn should_return_correct_extension() {
     ];
     for (path, expected_extension, expected_encoding) in path_extension_encoding {
         assert_eq!(
-            file_extension(&File::new(path, &[42])),
+            file_extension_and_encoding(&File::new(path, &[42])),
             (expected_extension, expected_encoding)
         );
     }
