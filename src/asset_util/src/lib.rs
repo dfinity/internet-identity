@@ -6,12 +6,13 @@ use ic_certification::{
     fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, NestedTree, RbTree,
 };
 use ic_representation_independent_hash::{representation_independent_hash, Value};
-use include_dir::{Dir, File};
+use include_dir::Dir;
 use internet_identity_interface::http_gateway::HeaderField;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
+use std::path::Path;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
@@ -423,7 +424,7 @@ pub fn collect_assets(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -
 fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
     for asset in dir.files() {
         let content = asset.contents().to_vec();
-        let (content_type, encoding) = content_type_and_encoding(asset);
+        let (content_type, encoding) = content_type_and_encoding(asset.path());
 
         let url_paths = filepath_to_urlpaths(asset.path().to_str().unwrap().to_string());
         for url_path in url_paths {
@@ -454,11 +455,10 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
 /// e.g. `ContentType::JS` for "some.gzipped.file.js.gz", and the encoding is `ContentEncoding::GZip`.
 /// Otherwise the content type is determined by the text after the last dot in the file name,
 /// and the encoding is `ContentEncoding::Identity`.
-fn content_type_and_encoding(asset: &File) -> (ContentType, ContentEncoding) {
-    let extension = asset.path().extension().unwrap().to_str().unwrap();
+fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding) {
+    let extension = asset_path.extension().unwrap().to_str().unwrap();
     let (extension, encoding) = if extension == "gz" {
-        let type_extension = asset
-            .path()
+        let type_extension = asset_path
             .file_name()
             .unwrap()
             .to_str()
@@ -483,7 +483,7 @@ fn content_type_and_encoding(asset: &File) -> (ContentType, ContentEncoding) {
         ext => panic!(
             "Unknown asset type '{}' for asset '{}'",
             ext,
-            asset.path().display()
+            asset_path.display()
         ),
     };
     (content_type, encoding)
@@ -699,7 +699,7 @@ fn should_return_correct_extension() {
     ];
     for (path, expected_extension, expected_encoding) in path_extension_encoding {
         assert_eq!(
-            content_type_and_encoding(&File::new(path, &[42])),
+            content_type_and_encoding(&Path::new(path)),
             (expected_extension, expected_encoding)
         );
     }
