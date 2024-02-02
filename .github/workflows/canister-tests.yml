@@ -231,7 +231,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -259,7 +259,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -290,7 +290,7 @@ jobs:
     needs: [docker-build-ii, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -346,7 +346,7 @@ jobs:
       # The test binaries are only dependent on rust code, because the front-end code is bundled in the `wasm` file
       # that is loaded by the test binaries.
       # If the binary can be restored from cache, we skip the build step, including even setting up the toolchain etc.
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache-test-archive
         with:
           path: /tmp/test-archive
@@ -355,7 +355,7 @@ jobs:
       - uses: ./.github/actions/bootstrap
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
         with:
           path: |
@@ -891,7 +891,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           path: |
