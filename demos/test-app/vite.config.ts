@@ -3,6 +3,7 @@ import {
   readCanisterId,
 } from "@dfinity/internet-identity-vite-plugins";
 import { defineConfig } from "vite";
+import wasm from "vite-plugin-wasm";
 
 const rewriteRoute = (pathAndParams: string): string => {
   let queryParamsString = `?`;
@@ -22,6 +23,7 @@ const rewriteRoute = (pathAndParams: string): string => {
 
 export default defineConfig(({ command, mode }) => ({
   root: "./src",
+  plugins: [wasm()],
   build: {
     outDir: "../dist",
     emptyOutDir: true,

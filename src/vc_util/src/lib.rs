@@ -1,4 +1,4 @@
-use crate::issuer_api::CredentialSpec;
+pub use crate::issuer_api::CredentialSpec;
 use candid::Principal;
 use canister_sig_util::{extract_raw_canister_sig_pk_from_der, CanisterSigPublicKey};
 use ic_certification::Hash;
@@ -319,6 +319,7 @@ fn validate_claim<T: PartialEq<S> + std::fmt::Display, S: std::fmt::Display>(
         if expected == actual {
             Ok(())
         } else {
+            // TODO: don't use println for errors
             println!(
                 "inconsistent claim [{}] in VC::  expected: {}, actual: {}",
                 label, expected, actual
@@ -356,7 +357,9 @@ fn validate_claims_match_spec(
     spec: &CredentialSpec,
 ) -> Result<(), JwtValidationError> {
     let credential_type = vc_claims
-        .get("type")
+        .get("type");
+
+    let credential_type = credential_type
         .ok_or(inconsistent_jwt_claims("missing type JWT vc"))?;
     let types = credential_type
         .as_array()
@@ -372,9 +375,19 @@ fn validate_claims_match_spec(
     let subject = Subject::from_json_value(credential_subject.clone()).map_err(|_| {
         inconsistent_jwt_claims("missing credentialSubject in VerifiedAdult JWT vc")
     })?;
-    for (key, value) in spec.arguments.as_ref().unwrap_or(&HashMap::new()).iter() {
-        if *value != subject.properties[key] {
-            return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
+
+    let empty_hashmap = HashMap::new();
+    // TODO: why iterate over an empty map?
+    let iter = spec.arguments.as_ref().unwrap_or(&empty_hashmap).iter() ;
+    for (key, value) in iter {
+        let foo = subject.properties.get(key);
+        if let Some(v) = foo {
+            if value != v {
+                return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
+            }
+        } else {
+            return Err(help(format!("missing TODO, {}, {}", key, value)));
+
         }
     }
     Ok(())
@@ -422,6 +435,13 @@ fn key_decoding_err(custom_message: &str) -> SignatureVerificationError {
 fn invalid_signature_err(custom_message: &str) -> SignatureVerificationError {
     let err: SignatureVerificationError = SignatureVerificationErrorKind::InvalidSignature.into();
     err.with_custom_message(custom_message.to_string())
+}
+
+fn help(msg: String) -> JwtValidationError {
+    JwtValidationError::CredentialStructure(JwtVcError::InvalidStatus(
+        msg,
+    ))
+
 }
 
 fn inconsistent_jwt_claims(custom_message: &'static str) -> JwtValidationError {

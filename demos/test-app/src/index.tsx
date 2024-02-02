@@ -16,7 +16,9 @@ import { decodeJwt } from "jose";
 
 import { authWithII, extractDelegation } from "./auth";
 
-import vcUtil, {validateVerifiedAdultPresentation} from "@dfinity/vc_util_js/vc_util_js";
+import initVCValidation, {
+  validateVerifiedPresentation,
+} from "@dfinity/vc_util_js/vc_util_js";
 
 import "./main.css";
 
@@ -431,7 +433,7 @@ function handleFlowReady(evnt: MessageEvent) {
   }
 }
 
-function handleFlowFinished(evnt: MessageEvent) {
+async function handleFlowFinished(evnt: MessageEvent) {
   if (latestOpts === undefined) {
     // no inflight requests, so we don't expect a response.
     return;
@@ -457,6 +459,8 @@ function handleFlowFinished(evnt: MessageEvent) {
 
     setLatestPresentation({ alias, credential });
     latestOpts?.win.close();
+
+    window.localStorage.setItem("pres", verifiablePresentation);
   } finally {
     window.removeEventListener("message", handleFlowFinished);
   }
@@ -508,6 +512,47 @@ const App = () => {
 
   return (
     <>
+      <button
+        onClick={async () => {
+          await initVCValidation();
+          const pres = window.localStorage.getItem("pres")!;
+
+          const principal =
+            "k2loa-bpgcx-mdb4e-pzcwx-4fjet-vmz26-jljhq-edewv-7dexs-btanl-oae";
+          const II_CANISTER_ID = "bkyz2-fmaaa-aaaaa-qaaaq-cai";
+          const issuerOrigin = "issuer.localhost:5173";
+          const issuerCanisterId = "bd3sg-teaaa-aaaaa-qaaba-cai";
+          const rootPkRaw = new Uint8Array([
+            48, 129, 130, 48, 29, 6, 13, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 1,
+            2, 1, 6, 12, 43, 6, 1, 4, 1, 130, 220, 124, 5, 3, 2, 1, 3, 97, 0,
+            162, 135, 105, 90, 133, 12, 110, 228, 45, 86, 27, 165, 181, 88, 244,
+            47, 189, 108, 230, 157, 217, 28, 132, 140, 121, 119, 176, 4, 0, 238,
+            174, 140, 108, 165, 169, 196, 62, 35, 55, 253, 133, 123, 245, 27,
+            227, 138, 145, 78, 7, 91, 90, 87, 128, 26, 196, 182, 183, 118, 148,
+            214, 126, 131, 98, 225, 208, 2, 225, 191, 200, 201, 226, 119, 21,
+            48, 56, 174, 173, 208, 30, 103, 54, 152, 128, 86, 213, 31, 99, 112,
+            58, 128, 219, 164, 86, 255, 57, 89,
+          ]);
+          // XXX: why the f* do I need the current time
+          const currentTime = BigInt(0);
+
+          var enc = new TextEncoder();
+
+          await validateVerifiedPresentation(
+            "VerifiedEmployee",
+            enc.encode(pres),
+            enc.encode(principal),
+            enc.encode(II_CANISTER_ID),
+            enc.encode(issuerOrigin),
+            enc.encode(issuerCanisterId),
+            rootPkRaw,
+            currentTime
+          );
+          console.log("VC verified");
+        }}
+      >
+        Test
+      </button>
       <h1>Verifiable Credentials</h1>
       <label>
         Issuer URL:

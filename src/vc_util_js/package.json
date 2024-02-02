@@ -4,7 +4,7 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
-    "./vc_util_js": "dist/vc_utils_js.js",
+    "./vc_util_js": "dist/vc_util_js.js",
     "./package.json": "package.json"
   },
   "typesVersions": {
@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json",
+    "build": "wasm-pack build --target web --out-dir dist --release --scope dfinity && rm dist/package.json",
     "postinstall": "npm run build"
   },
   "devDependencies": {

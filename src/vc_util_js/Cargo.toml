@@ -11,5 +11,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 candid.workspace = true
+canister_sig_util.workspace = true
 vc_util.workspace = true
 wasm-bindgen = "0.2"

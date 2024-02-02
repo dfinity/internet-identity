@@ -1,4 +1,5 @@
-use candid::{CandidType, Deserialize, Nat};
+use candid::{CandidType, Nat};
+use serde::{Serialize, Deserialize};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -44,7 +45,7 @@ pub struct IssuedCredentialData {
     pub vc_jws: String,
 }
 
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Serialize, Deserialize)]
 pub enum ArgumentValue {
     String(String),
     Int(i32),
@@ -80,7 +81,7 @@ impl PartialEq<serde_json::Value> for ArgumentValue {
     }
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
 pub struct CredentialSpec {
     pub credential_type: String,
     pub arguments: Option<HashMap<String, ArgumentValue>>,
