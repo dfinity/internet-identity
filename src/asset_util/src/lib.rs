@@ -6,12 +6,13 @@ use ic_certification::{
     fork, fork_hash, labeled, labeled_hash, pruned, AsHashTree, Hash, HashTree, NestedTree, RbTree,
 };
 use ic_representation_independent_hash::{representation_independent_hash, Value};
-use include_dir::{Dir, File};
+use include_dir::Dir;
 use internet_identity_interface::http_gateway::HeaderField;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
 use std::collections::HashMap;
+use std::path::Path;
 
 pub const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
 pub const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
@@ -429,25 +430,8 @@ pub fn collect_assets(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -
 /// NOTE: behavior is undefined with symlinks (and esp. symlink loops)!
 fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
     for asset in dir.files() {
-        let file_bytes = asset.contents().to_vec();
-        let (content, encoding, content_type) = match file_extension(asset) {
-            "css" => (file_bytes, ContentEncoding::Identity, ContentType::CSS),
-            "html" => (file_bytes, ContentEncoding::Identity, ContentType::HTML),
-            "ico" => (file_bytes, ContentEncoding::Identity, ContentType::ICO),
-            "json" => (file_bytes, ContentEncoding::Identity, ContentType::JSON),
-            "js" => (file_bytes, ContentEncoding::Identity, ContentType::JS),
-            "js.gz" => (file_bytes, ContentEncoding::GZip, ContentType::JS),
-            "png" => (file_bytes, ContentEncoding::Identity, ContentType::PNG),
-            "svg" => (file_bytes, ContentEncoding::Identity, ContentType::SVG),
-            "webp" => (file_bytes, ContentEncoding::Identity, ContentType::WEBP),
-            "woff2" => (file_bytes, ContentEncoding::Identity, ContentType::WOFF2),
-            "woff2.gz" => (file_bytes, ContentEncoding::GZip, ContentType::WOFF2),
-            ext => panic!(
-                "Unknown asset type '{}' for asset '{}'",
-                ext,
-                asset.path().display()
-            ),
-        };
+        let content = asset.contents().to_vec();
+        let (content_type, encoding) = content_type_and_encoding(asset.path());
 
         let url_paths = filepath_to_urlpaths(asset.path().to_str().unwrap().to_string());
         for url_path in url_paths {
@@ -472,21 +456,44 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
     }
 }
 
-/// Returns the portion of the filename after the first dot.
-/// This corresponds to the file extension for the assets handled by this canister.
-///
-/// The builtin `extension` method on `Path` does not work for file extensions with multiple dots
-/// such as `.js.gz`.
-fn file_extension<'a>(asset: &'a File) -> &'a str {
-    asset
-        .path()
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split_once('.')
-        .unwrap()
-        .1
+/// Returns the content type and the encoding type of the given file, based on the extension(s).
+/// If the text after the last dot is "gz" (i.e. this is a gzipped file), then content type
+/// is determined by the text after the second to last dot and the last dot in the file name,
+/// e.g. `ContentType::JS` for "some.gzipped.file.js.gz", and the encoding is `ContentEncoding::GZip`.
+/// Otherwise the content type is determined by the text after the last dot in the file name,
+/// and the encoding is `ContentEncoding::Identity`.
+fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding) {
+    let extension = asset_path.extension().unwrap().to_str().unwrap();
+    let (extension, encoding) = if extension == "gz" {
+        let type_extension = asset_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split('.')
+            .nth_back(1)
+            .unwrap();
+        (type_extension, ContentEncoding::GZip)
+    } else {
+        (extension, ContentEncoding::Identity)
+    };
+    let content_type = match extension {
+        "css" => ContentType::CSS,
+        "html" => ContentType::HTML,
+        "ico" => ContentType::ICO,
+        "json" => ContentType::JSON,
+        "js" => ContentType::JS,
+        "png" => ContentType::PNG,
+        "svg" => ContentType::SVG,
+        "webp" => ContentType::WEBP,
+        "woff2" => ContentType::WOFF2,
+        ext => panic!(
+            "Unknown asset type '{}' for asset '{}'",
+            ext,
+            asset_path.display()
+        ),
+    };
+    (content_type, encoding)
 }
 
 /// Returns the URL paths for a given asset filepath. For instance:
@@ -611,4 +618,96 @@ fn test_filepath_urlpaths() {
             "/sub/foo/index.html".to_string(),
         ],
     );
+}
+
+#[test]
+fn should_return_correct_extension() {
+    let path_extension_encoding = [
+        (
+            "path1/some_css_file.css",
+            ContentType::CSS,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path2/an_html_file.html",
+            ContentType::HTML,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path3/an_ico_file.ico",
+            ContentType::ICO,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path4/json_file.json",
+            ContentType::JSON,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path5/js_file.js",
+            ContentType::JS,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path6/gzipped_js_file.js.gz",
+            ContentType::JS,
+            ContentEncoding::GZip,
+        ),
+        (
+            "path7/a_png_file.png",
+            ContentType::PNG,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path8/svg_file.svg",
+            ContentType::SVG,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path9/webp_file.webp",
+            ContentType::WEBP,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path10/a_file.woff2",
+            ContentType::WOFF2,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path11/gz_woff2.woff2.gz",
+            ContentType::WOFF2,
+            ContentEncoding::GZip,
+        ),
+        (
+            "path12.dot/ico_file.ico",
+            ContentType::ICO,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path13/file.with.dots.js",
+            ContentType::JS,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path14.dot/gz_js_file.js.gz",
+            ContentType::JS,
+            ContentEncoding::GZip,
+        ),
+        (
+            "path15.dots/.dots.woff2.gz",
+            ContentType::WOFF2,
+            ContentEncoding::GZip,
+        ),
+        (
+            "path16.dot/gz_json_file.json.gz",
+            ContentType::JSON,
+            ContentEncoding::GZip,
+        ),
+    ];
+    for (path, expected_extension, expected_encoding) in path_extension_encoding {
+        assert_eq!(
+            content_type_and_encoding(Path::new(path)),
+            (expected_extension, expected_encoding)
+        );
+    }
 }
