@@ -8,6 +8,6 @@ runs:
       id: read-node-version
       run: echo "version=$(cat .node-version)" >> "$GITHUB_OUTPUT"
 
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
         node-version: ${{ steps.read-node-version.outputs.version }}
