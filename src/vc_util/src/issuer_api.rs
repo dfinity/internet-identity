@@ -1,5 +1,5 @@
 use candid::{CandidType, Nat};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
 use std::collections::HashMap;

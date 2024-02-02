@@ -1,14 +1,14 @@
 use candid::Principal;
+use canister_sig_util::extract_raw_root_pk_from_der;
 use std::collections::HashMap;
-use canister_sig_util::{extract_raw_root_pk_from_der};
-use vc_util::{VcFlowSigners, CredentialSpec};
 use vc_util::issuer_api::ArgumentValue;
+use vc_util::{CredentialSpec, VcFlowSigners};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 // TODO: clarify encoding of all those &[u8]
 #[wasm_bindgen(js_name = validateVerifiedPresentation)]
 pub fn validate_verified_presentation(
-    _credential_type: String /* TODO: USEME */,
+    _credential_type: String, /* TODO: USEME */
     vp_jwt: &[u8],
     vc_subject_principal: &[u8],
     ii_canister_id: &[u8],
@@ -21,13 +21,19 @@ pub fn validate_verified_presentation(
     // TODO; proper args
     // XXX: right now, somehow the employerName is nested in the issued jwt
     let arguments = None; // Some(HashMap::from([("employerName".to_string(), ArgumentValue::String("DFINITY Foundation".to_string()))]));
-    let credential_spec = CredentialSpec { credential_type, arguments};
+    let credential_spec = CredentialSpec {
+        credential_type,
+        arguments,
+    };
     let vp_jwt = String::from_utf8(vp_jwt.to_vec()).expect("wrong vp_jwt");
     // TODO: panic does not work (unreachable)
     // TODO: why does Principal::from_slice not work? what is expected encoding?
-    let effective_vc_subject = Principal::from_text(&String::from_utf8(vc_subject_principal.to_vec()).unwrap()).unwrap();
-    let ii_canister_id = Principal::from_text(&String::from_utf8(ii_canister_id.to_vec()).unwrap()).unwrap();
-    let issuer_canister_id = Principal::from_text(&String::from_utf8(issuer_canister_id.to_vec()).unwrap()).unwrap();
+    let effective_vc_subject =
+        Principal::from_text(&String::from_utf8(vc_subject_principal.to_vec()).unwrap()).unwrap();
+    let ii_canister_id =
+        Principal::from_text(&String::from_utf8(ii_canister_id.to_vec()).unwrap()).unwrap();
+    let issuer_canister_id =
+        Principal::from_text(&String::from_utf8(issuer_canister_id.to_vec()).unwrap()).unwrap();
     let root_pk_raw = extract_raw_root_pk_from_der(root_pk_raw).unwrap();
     let vc_flow_signers: VcFlowSigners = VcFlowSigners {
         ii_canister_id,

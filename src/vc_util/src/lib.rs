@@ -356,11 +356,9 @@ fn validate_claims_match_spec(
     vc_claims: &Map<String, Value>,
     spec: &CredentialSpec,
 ) -> Result<(), JwtValidationError> {
-    let credential_type = vc_claims
-        .get("type");
+    let credential_type = vc_claims.get("type");
 
-    let credential_type = credential_type
-        .ok_or(inconsistent_jwt_claims("missing type JWT vc"))?;
+    let credential_type = credential_type.ok_or(inconsistent_jwt_claims("missing type JWT vc"))?;
     let types = credential_type
         .as_array()
         .ok_or(inconsistent_jwt_claims("wrong types in JWT vc"))?;
@@ -378,7 +376,7 @@ fn validate_claims_match_spec(
 
     let empty_hashmap = HashMap::new();
     // TODO: why iterate over an empty map?
-    let iter = spec.arguments.as_ref().unwrap_or(&empty_hashmap).iter() ;
+    let iter = spec.arguments.as_ref().unwrap_or(&empty_hashmap).iter();
     for (key, value) in iter {
         let foo = subject.properties.get(key);
         if let Some(v) = foo {
@@ -387,7 +385,6 @@ fn validate_claims_match_spec(
             }
         } else {
             return Err(help(format!("missing TODO, {}, {}", key, value)));
-
         }
     }
     Ok(())
@@ -438,10 +435,7 @@ fn invalid_signature_err(custom_message: &str) -> SignatureVerificationError {
 }
 
 fn help(msg: String) -> JwtValidationError {
-    JwtValidationError::CredentialStructure(JwtVcError::InvalidStatus(
-        msg,
-    ))
-
+    JwtValidationError::CredentialStructure(JwtVcError::InvalidStatus(msg))
 }
 
 fn inconsistent_jwt_claims(custom_message: &'static str) -> JwtValidationError {

@@ -67,8 +67,7 @@ pub fn validate_verified_presentation(
             "missing vc in id_alias JWT claims",
         )))?;
 
-    validate_claims_match_spec(vc_claims, credential_spec)
-        .map_err(invalid_requested_vc)?;
+    validate_claims_match_spec(vc_claims, credential_spec).map_err(invalid_requested_vc)?;
     Ok(())
 }
 
