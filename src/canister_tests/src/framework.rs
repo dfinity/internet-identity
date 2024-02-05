@@ -416,11 +416,11 @@ xr-spatial-tracking=()",
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
         .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
-    assert!(Regex::new(
+    let rgx = Regex::new(
         "^default-src 'none';\
 connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://\\*\\.icp0.io https://\\*\\.ic0.app;\
 img-src 'self' data:;\
-script-src 'sha256-[a-zA-Z0-9/=+]+' 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
 base-uri 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline';\
@@ -429,8 +429,12 @@ font-src 'self';\
 frame-ancestors 'none';\
 upgrade-insecure-requests;$"
     )
-    .unwrap()
-    .is_match(csp));
+    .unwrap();
+
+    assert!(
+        rgx.is_match(csp),
+        "CSP header did not match expected. Expected: {rgx} \n Actual: {csp}"
+    );
 }
 
 pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {

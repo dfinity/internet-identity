@@ -4,60 +4,45 @@
 use crate::http::security_headers;
 use crate::state;
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
-use lazy_static::lazy_static;
-use sha2::Digest;
 
 // used both in init and post_upgrade
 pub fn init_assets() {
     state::assets_mut(|certified_assets| {
+        let assets = get_static_assets();
+
+        // Extract the integrity hashes from all the HTML files
+        // i.e. go through the HTML and grab INTEGRITY from all the <script integrity="INTEGRITY">
+        let integrity_hashes = assets
+            .iter()
+            .filter(|asset| asset.content_type == ContentType::HTML)
+            .fold(vec![], |mut acc: Vec<String>, e| {
+                let content = std::str::from_utf8(&e.content).unwrap().to_string();
+                acc.append(&mut extract_integrity_hashes(content));
+                acc
+            });
+
         *certified_assets =
-            CertifiedAssets::certify_assets(get_static_assets(), &security_headers());
+            CertifiedAssets::certify_assets(assets, &security_headers(integrity_hashes));
     });
 }
 
-// The <script> tag that loads the 'index.js'
-pub const JS_SETUP_SCRIPT1: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index.js';document.head.appendChild(s);";
-pub const JS_SETUP_SCRIPT2: &str = "let s = document.createElement('script');s.type = 'module';s.src = '/index2.js';document.head.appendChild(s);";
-
-// Fix up HTML pages, by injecting canister ID & script tag
+// Fix up HTML pages, by injecting canister ID
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
-    let setup_js1: String = JS_SETUP_SCRIPT1.to_string();
-    let html = html.replace(
-        r#"<script type="module" crossorigin src="/index.js"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js1}</script>"#),
-    );
-
-    let setup_js2: String = JS_SETUP_SCRIPT2.to_string();
+    // XXX: to match, we rely on the fact that our bundle injects an 'integrity' attribute
+    // before all other attributes
     html.replace(
-        r#"<script type="module" crossorigin src="/index2.js"></script>"#,
-        &format!(r#"<script data-canister-id="{canister_id}" type="module">{setup_js2}</script>"#),
+        r#"<script integrity="#,
+        &format!(r#"<script data-canister-id="{canister_id}" integrity="#),
     )
-}
-
-lazy_static! {
-    // The SRI sha256 hash of the script tag, used by the CSP policy.
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/script-src
-    pub static ref JS_SETUP_SCRIPT1_SRI_HASH: String = {
-        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT1.as_bytes());
-        let hash = BASE64.encode(hash);
-        format!("sha256-{hash}")
-    };
-    pub static ref JS_SETUP_SCRIPT2_SRI_HASH: String = {
-        let hash = &sha2::Sha256::digest(JS_SETUP_SCRIPT2.as_bytes());
-        let hash = BASE64.encode(hash);
-        format!("sha256-{hash}")
-    };
 }
 
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
-fn get_static_assets() -> Vec<Asset> {
+pub fn get_static_assets() -> Vec<Asset> {
     let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
 
     // Required to make II available on the identity.internetcomputer.org domain.
@@ -69,4 +54,38 @@ fn get_static_assets() -> Vec<Asset> {
         content_type: ContentType::OCTETSTREAM,
     });
     assets
+}
+
+/// Extract all integrity hashes from the given HTML
+fn extract_integrity_hashes(content: String) -> Vec<String> {
+    // Extract anything between 'integrity="' and '"'; simpler & more efficient
+    // than parsing the HTML and works well enough
+    let hash_prefix = r#"integrity=""#;
+    let hash_suffix = r#"""#;
+    content
+        .match_indices(hash_prefix)
+        .map(|(size, _)| {
+            let offset = size + hash_prefix.len();
+            let len = content[offset..].find(hash_suffix).unwrap();
+            content[offset..(offset + len)].to_string()
+        })
+        .collect()
+}
+
+#[test]
+fn test_extract_integrity_hashes() {
+    let expected: Vec<String> = vec![];
+    let actual = extract_integrity_hashes(r#"<head></head>"#.to_string());
+    assert_eq!(expected, actual);
+
+    let expected: Vec<String> = vec!["hello-world".to_string()];
+    let actual =
+        extract_integrity_hashes(r#"<script integrity="hello-world"></script>"#.to_string());
+    assert_eq!(expected, actual);
+
+    let expected: Vec<String> = vec!["one".to_string(), "two".to_string()];
+    let actual = extract_integrity_hashes(
+        r#"<script integrity="one"></script><script foo=bar integrity="two" broken"#.to_string(),
+    );
+    assert_eq!(expected, actual);
 }

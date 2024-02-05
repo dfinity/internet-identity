@@ -2210,7 +2210,6 @@ name = "internet_identity"
 version = "0.1.0"
 dependencies = [
  "asset_util",
- "base64 0.21.5",
  "candid",
  "candid_parser",
  "canister_sig_util",
