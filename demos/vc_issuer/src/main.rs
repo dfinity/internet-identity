@@ -440,6 +440,7 @@ fn calculate_seed(principal: &Principal) -> Hash {
 fn bachelor_degree_credential(subject_principal: Principal, institution_name: &str) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
+      // TODO: double check that it matches credential_type
       "degree": {
         "type": "BachelorDegree",
         "name": "Bachelor of Engineering",
@@ -462,6 +463,7 @@ fn bachelor_degree_credential(subject_principal: Principal, institution_name: &s
 fn dfinity_employment_credential(subject_principal: Principal, employer_name: &str) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
+      // TODO: change for VerifiedEmployee
       "employee_of": {
             "employerId" : "did:web:dfinity.org",
             "employerName": employer_name,
@@ -481,6 +483,7 @@ fn dfinity_employment_credential(subject_principal: Principal, employer_name: &s
 }
 
 fn verified_adult_credential(subject_principal: Principal, age_at_least: u16) -> Credential {
+    // TODO: change this to have { VerifiedAdult: { age_at_least : 18 } }
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
       "age_at_least": age_at_least,

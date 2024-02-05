@@ -376,6 +376,7 @@ fn validate_claims_match_spec(
 
     let empty_hashmap = HashMap::new();
     // TODO: why iterate over an empty map?
+    // XXX: this is incorrect ;TODO: look at [credential_type] key in spec.arguments
     let iter = spec.arguments.as_ref().unwrap_or(&empty_hashmap).iter();
     for (key, value) in iter {
         let foo = subject.properties.get(key);
