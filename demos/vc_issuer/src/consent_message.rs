@@ -25,10 +25,10 @@ Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin einen Bachelorabs
 
 const ADULT_VC_DESCRIPTION_EN: &str = r###"# Verified Adult
 
-Credential that states that the holder's age is at least {age_at_least} years."###;
+Credential that states that the holder's age is at least {minAge} years."###;
 const ADULT_VC_DESCRIPTION_DE: &str = r###"# Erwachsene Person
 
-Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin mindestens {age_at_least} Jahre alt ist."###;
+Ausweis, der bestätigt, dass der Besitzer oder die Besitzerin mindestens {minAge} Jahre alt ist."###;
 
 lazy_static! {
     static ref CONSENT_MESSAGE_TEMPLATES: HashMap<(CredentialTemplateType, SupportedLanguage), &'static str> =
@@ -97,10 +97,9 @@ impl SupportedCredentialType {
             SupportedCredentialType::UniversityDegree(institute) => {
                 ("institute".to_string(), institute.to_string())
             }
-            SupportedCredentialType::VerifiedAdult(age_at_least) => (
-                "age_at_least".to_string(),
-                format!("{}", age_at_least).to_string(),
-            ),
+            SupportedCredentialType::VerifiedAdult(min_age) => {
+                ("minAge".to_string(), format!("{}", min_age).to_string())
+            }
         }
     }
 }

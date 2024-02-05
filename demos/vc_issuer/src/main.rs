@@ -316,7 +316,7 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialTy
             Ok(UniversityDegree(VC_INSTITUTION_NAME.to_string()))
         }
         "VerifiedAdult" => {
-            verify_single_argument(spec, "age_at_least", ArgumentValue::Int(18))?;
+            verify_single_argument(spec, "minAge", ArgumentValue::Int(18))?;
             Ok(VerifiedAdult(18))
         }
         other => Err(format!("Credential {} is not supported", other)),
@@ -440,7 +440,7 @@ fn calculate_seed(principal: &Principal) -> Hash {
 fn bachelor_degree_credential(subject_principal: Principal, institution_name: &str) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
-      "degree": {
+      "VerifiedDegree": {
         "type": "BachelorDegree",
         "name": "Bachelor of Engineering",
         "institutionName": institution_name,
@@ -462,7 +462,7 @@ fn bachelor_degree_credential(subject_principal: Principal, institution_name: &s
 fn dfinity_employment_credential(subject_principal: Principal, employer_name: &str) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
-      "employee_of": {
+      "VerifiedEmployee": {
             "employerId" : "did:web:dfinity.org",
             "employerName": employer_name,
       },
@@ -480,10 +480,12 @@ fn dfinity_employment_credential(subject_principal: Principal, employer_name: &s
         .unwrap()
 }
 
-fn verified_adult_credential(subject_principal: Principal, age_at_least: u16) -> Credential {
+fn verified_adult_credential(subject_principal: Principal, min_age: u16) -> Credential {
     let subject: Subject = Subject::from_json_value(json!({
       "id": did_for_principal(subject_principal),
-      "age_at_least": age_at_least,
+      "VerifiedAdult": {
+          "minAge": min_age,
+      },
     }))
     .unwrap();
 
@@ -526,14 +528,11 @@ fn prepare_credential_payload(
                 institution_name.as_str(),
             ))
         }
-        VerifiedAdult(age_at_least) => {
+        VerifiedAdult(min_age) => {
             ADULTS.with_borrow(|adults| {
                 verify_authorized_principal(credential_type, alias_tuple, adults)
             })?;
-            Ok(verified_adult_credential(
-                alias_tuple.id_alias,
-                *age_at_least,
-            ))
+            Ok(verified_adult_credential(alias_tuple.id_alias, *min_age))
         }
     }
 }

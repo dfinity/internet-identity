@@ -372,8 +372,16 @@ fn validate_claims_match_spec(
     let subject = Subject::from_json_value(credential_subject.clone()).map_err(|_| {
         inconsistent_jwt_claims("missing credentialSubject in VerifiedAdult JWT vc")
     })?;
+    let credential_type = &spec.credential_type;
+    let verified_adult_claim = if subject.properties.contains_key(credential_type) {
+        subject.properties[credential_type].clone()
+    } else {
+        return Err(inconsistent_jwt_claims(
+            "missing VerifiedAdult-claim in VerifiedAdult JWT vc",
+        ));
+    };
     for (key, value) in spec.arguments.as_ref().unwrap_or(&HashMap::new()).iter() {
-        if *value != subject.properties[key] {
+        if *value != verified_adult_claim[key] {
             return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
         }
     }
