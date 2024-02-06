@@ -63,7 +63,7 @@
 //! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
-use std::convert::TryInto;
+use std::borrow::Cow;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
@@ -72,15 +72,18 @@ use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::{Memory, RestrictedMemory};
+use ic_stable_structures::{Memory, RestrictedMemory, Storable};
 
 use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
+use crate::storage::storable_anchor::StorableAnchor;
 
 pub mod anchor;
 
+/// module for the internal serialization format of anchors
+mod storable_anchor;
 #[cfg(test)]
 mod tests;
 
@@ -279,27 +282,19 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, anchor_number: AnchorNumber, data: Anchor) -> Result<(), StorageError> {
-        let record_number = self.anchor_number_to_record(anchor_number)?;
-        let buf = candid::encode_one(data).map_err(StorageError::SerializationError)?;
-        self.write_entry_bytes(record_number, buf)
-    }
-
-    fn write_entry_bytes(&mut self, record_number: u32, buf: Vec<u8>) -> Result<(), StorageError> {
-        if buf.len() > self.candid_entry_size_limit() {
+        let storable_anchor = StorableAnchor::from(data);
+        let buf = storable_anchor.to_bytes();
+        if buf.len() > self.header.entry_size as usize {
             return Err(StorageError::EntrySizeLimitExceeded {
                 space_required: buf.len() as u64,
-                space_available: self.candid_entry_size_limit() as u64,
+                space_available: self.header.entry_size as u64,
             });
         }
 
+        let record_number = self.anchor_number_to_record(anchor_number)?;
         let address = self.record_address(record_number);
-        let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(&mut self.anchor_memory, address),
-        );
-        writer
-            .write_all(&(buf.len() as u16).to_le_bytes())
-            .expect("memory write failed");
+        let mut writer = Writer::new(&mut self.anchor_memory, address);
+
         writer.write_all(&buf).expect("memory write failed");
         writer.flush().expect("memory write failed");
         Ok(())
@@ -308,38 +303,14 @@ impl<M: Memory + Clone> Storage<M> {
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         let record_number = self.anchor_number_to_record(anchor_number)?;
-        let data_buf = self.read_entry_bytes(record_number);
-        candid::decode_one(&data_buf).map_err(StorageError::DeserializationError)
-    }
-
-    fn read_entry_bytes(&self, record_number: u32) -> Vec<u8> {
         let address = self.record_address(record_number);
-        // the reader will check stable memory bounds
-        // use buffered reader to minimize expensive stable memory operations
-        let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(&self.anchor_memory, address),
-        );
-        let mut len_buf = vec![0; 2];
-        reader
-            .read_exact(len_buf.as_mut_slice())
-            .expect("failed to read memory");
-        let len = u16::from_le_bytes(len_buf.try_into().unwrap()) as usize;
 
-        // This error most likely indicates stable memory corruption.
-        if len > self.candid_entry_size_limit() {
-            trap(&format!(
-                "persisted value size {} exceeds maximum size {}",
-                len,
-                self.candid_entry_size_limit()
-            ))
-        }
+        let mut reader = Reader::new(&self.anchor_memory, address);
+        let mut buf = vec![0; self.header.entry_size as usize];
 
-        let mut data_buf = vec![0; len];
-        reader
-            .read_exact(data_buf.as_mut_slice())
-            .expect("failed to read memory");
-        data_buf
+        reader.read_exact(&mut buf).expect("failed to read memory");
+        let storable_anchor = StorableAnchor::from_bytes(Cow::Owned(buf));
+        Ok(Anchor::from(storable_anchor))
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -424,15 +395,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     fn record_address(&self, record_number: u32) -> u64 {
         record_number as u64 * self.header.entry_size as u64
-    }
-
-    /// The anchor space is divided into two parts:
-    /// * 2 bytes of candid length (u16 little endian)
-    /// * length bytes of encoded candid
-    ///
-    /// This function returns the length limit of the candid part.
-    fn candid_entry_size_limit(&self) -> usize {
-        self.header.entry_size as usize - std::mem::size_of::<u16>()
     }
 
     /// Returns the address of the first byte not yet allocated to a anchor.

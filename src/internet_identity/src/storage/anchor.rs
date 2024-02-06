@@ -1,4 +1,5 @@
 use crate::ii_domain::IIDomain;
+use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
@@ -13,7 +14,7 @@ mod tests;
 /// The anchor has limited visibility for the constructor to make sure it is loaded from storage.
 /// The devices can only be modified by the exposed functions which keeps invariant checking local
 /// to this module.
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Anchor {
     devices: Vec<Device>,
     metadata: Option<HashMap<String, MetadataEntry>>,
@@ -93,6 +94,24 @@ impl From<Device> for DeviceDataWithoutAlias {
                 .metadata
                 .as_ref()
                 .map(|m| m.keys().cloned().collect()),
+        }
+    }
+}
+
+impl From<Anchor> for StorableAnchor {
+    fn from(anchor: Anchor) -> Self {
+        Self {
+            devices: anchor.devices,
+            metadata: anchor.metadata,
+        }
+    }
+}
+
+impl From<StorableAnchor> for Anchor {
+    fn from(storable_anchor: StorableAnchor) -> Self {
+        Anchor {
+            devices: storable_anchor.devices,
+            metadata: storable_anchor.metadata,
         }
     }
 }
