@@ -5,7 +5,7 @@ use crate::anchor_management::tentative_device_registration::{
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use authz_utils::{
-    authenticate_and_record_activity, authenticated_anchor_operation, check_authentication,
+    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
 use candid::{candid_method, Principal};
 use canister_sig_util::signature_map::LABEL_SIG;
@@ -62,14 +62,14 @@ async fn init_salt() {
 #[update]
 #[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 #[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -110,7 +110,7 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    let result = authenticated_anchor_operation(anchor_number, |anchor| {
+    let result = anchor_operation_with_authz_check(anchor_number, |anchor| {
         tentative_device_registration::verify_tentative_device(
             anchor,
             anchor_number,
@@ -156,7 +156,7 @@ fn register(
 #[update]
 #[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -165,7 +165,7 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 #[update]
 #[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
             anchor_management::update(anchor, device_key, device_data),
@@ -177,7 +177,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 #[update]
 #[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
             anchor_management::replace(anchor_number, anchor, device_key, device_data),
@@ -189,7 +189,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[update]
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
             anchor_management::remove(anchor_number, anchor, device_key),
@@ -253,14 +253,14 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 #[update] // this is an update call because queries are not (yet) certified
 #[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authenticate_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
 #[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    let Ok(_) = check_authentication(anchor_number) else {
+    let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_principal(anchor_number, frontend)
@@ -274,7 +274,7 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    let ii_domain = authenticate_and_record_activity(anchor_number)
+    let ii_domain = check_authz_and_record_activity(anchor_number)
         .unwrap_or_else(|err| trap(&format!("{err}")));
     delegation::prepare_delegation(
         anchor_number,
@@ -294,7 +294,7 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    let Ok(_) = check_authentication(anchor_number) else {
+    let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
@@ -564,7 +564,7 @@ mod v2_api {
     #[update]
     #[candid_method]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
-        authenticate_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
+        check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
         let anchor_info = anchor_management::get_anchor_info(identity_number);
 
         let metadata = state::anchor(identity_number)
@@ -679,7 +679,7 @@ mod v2_api {
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntryV2>,
     ) -> Result<(), IdentityMetadataReplaceError> {
-        authenticated_anchor_operation(identity_number, |anchor| {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
             let metadata = metadata
                 .into_iter()
                 .map(|(k, v)| (k, MetadataEntry::from(v)))
@@ -767,7 +767,7 @@ mod attribute_sharing_mvp {
     async fn prepare_id_alias(
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
-        authenticate_and_record_activity(req.identity_number).map_err(PrepareIdAliasError::from)?;
+        check_authz_and_record_activity(req.identity_number).map_err(PrepareIdAliasError::from)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
@@ -782,7 +782,7 @@ mod attribute_sharing_mvp {
     #[query]
     #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
-        check_authentication(req.identity_number).map_err(GetIdAliasError::from)?;
+        check_authorization(req.identity_number).map_err(GetIdAliasError::from)?;
         vc_mvp::get_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
