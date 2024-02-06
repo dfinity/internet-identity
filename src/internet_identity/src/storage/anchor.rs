@@ -14,7 +14,7 @@ mod tests;
 /// The anchor has limited visibility for the constructor to make sure it is loaded from storage.
 /// The devices can only be modified by the exposed functions which keeps invariant checking local
 /// to this module.
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Anchor {
     devices: Vec<Device>,
     metadata: Option<HashMap<String, MetadataEntry>>,

@@ -3,6 +3,7 @@ use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivi
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
+use crate::storage::storable_anchor::StorableAnchor;
 use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
@@ -109,14 +110,16 @@ fn should_serialize_first_record() {
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&anchor).unwrap().len();
+    let expected_length = candid::encode_one(&StorableAnchor::from(anchor.clone()))
+        .unwrap()
+        .len();
 
     storage.write(anchor_number, anchor.clone()).unwrap();
 
     let mut buf = vec![0u8; expected_length];
     memory.read(RESERVED_HEADER_BYTES + LENGTH_OFFSET, &mut buf);
-    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
-    assert_eq!(decoded_from_memory, anchor);
+    let decoded_from_memory: StorableAnchor = candid::decode_one(&buf).unwrap();
+    assert_eq!(Anchor::from(decoded_from_memory), anchor);
 }
 
 #[test]
@@ -131,7 +134,9 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
     assert_eq!(anchor_number, 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&anchor).unwrap().len();
+    let expected_length = candid::encode_one(&StorableAnchor::from(anchor.clone()))
+        .unwrap()
+        .len();
 
     storage.write(anchor_number, anchor.clone()).unwrap();
 
@@ -140,8 +145,8 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
         RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET + LENGTH_OFFSET,
         &mut buf,
     );
-    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
-    assert_eq!(decoded_from_memory, anchor);
+    let decoded_from_memory: StorableAnchor = candid::decode_one(&buf).unwrap();
+    assert_eq!(Anchor::from(decoded_from_memory), anchor);
 }
 
 #[test]
@@ -168,7 +173,7 @@ fn should_deserialize_first_record() {
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&anchor).unwrap();
+    let buf = candid::encode_one(&StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(RESERVED_HEADER_BYTES, &(buf.len() as u16).to_le_bytes());
     memory.write(RESERVED_HEADER_BYTES + 2, &buf);
 
@@ -194,7 +199,7 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
     assert_eq!(anchor_number, 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&anchor).unwrap();
+    let buf = candid::encode_one(&StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(
         RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET,
         &(buf.len() as u16).to_le_bytes(),
