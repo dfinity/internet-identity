@@ -78,7 +78,7 @@ where
     let result = op(&mut anchor);
 
     // write back anchor
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor))
+    state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
 
     match result {
@@ -126,7 +126,7 @@ pub fn check_authz_and_record_activity(
         check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
     let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor))
+    state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
     Ok(maybe_domain)
 }

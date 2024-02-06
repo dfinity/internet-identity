@@ -270,18 +270,19 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Returns None if the range of Identity Anchor assigned to this
     /// storage is exhausted.
-    pub fn allocate_anchor(&mut self) -> Option<(AnchorNumber, Anchor)> {
+    pub fn allocate_anchor(&mut self) -> Option<Anchor> {
         let anchor_number = self.header.id_range_lo + self.header.num_anchors as u64;
         if anchor_number >= self.header.id_range_hi {
             return None;
         }
         self.header.num_anchors += 1;
         self.flush();
-        Some((anchor_number, Anchor::new()))
+        Some(Anchor::new(anchor_number))
     }
 
     /// Writes the data of the specified anchor to stable memory.
-    pub fn write(&mut self, anchor_number: AnchorNumber, data: Anchor) -> Result<(), StorageError> {
+    pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
+        let anchor_number = data.anchor_number();
         let storable_anchor = StorableAnchor::from(data);
         let buf = storable_anchor.to_bytes();
         if buf.len() > self.header.entry_size as usize {
@@ -310,7 +311,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         reader.read_exact(&mut buf).expect("failed to read memory");
         let storable_anchor = StorableAnchor::from_bytes(Cow::Owned(buf));
-        Ok(Anchor::from(storable_anchor))
+        Ok(Anchor::from((anchor_number, storable_anchor)))
     }
 
     /// Make sure all the required metadata is recorded to stable memory.

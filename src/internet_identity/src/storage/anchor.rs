@@ -14,8 +14,9 @@ mod tests;
 /// The anchor has limited visibility for the constructor to make sure it is loaded from storage.
 /// The devices can only be modified by the exposed functions which keeps invariant checking local
 /// to this module.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Anchor {
+    anchor_number: AnchorNumber,
     devices: Vec<Device>,
     metadata: Option<HashMap<String, MetadataEntry>>,
 }
@@ -107,9 +108,10 @@ impl From<Anchor> for StorableAnchor {
     }
 }
 
-impl From<StorableAnchor> for Anchor {
-    fn from(storable_anchor: StorableAnchor) -> Self {
+impl From<(AnchorNumber, StorableAnchor)> for Anchor {
+    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
         Anchor {
+            anchor_number,
             devices: storable_anchor.devices,
             metadata: storable_anchor.metadata,
         }
@@ -119,11 +121,16 @@ impl From<StorableAnchor> for Anchor {
 impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
-    pub(super) fn new() -> Anchor {
+    pub(super) fn new(anchor_number: AnchorNumber) -> Anchor {
         Self {
+            anchor_number,
             devices: vec![],
             metadata: None,
         }
+    }
+
+    pub fn anchor_number(&self) -> AnchorNumber {
+        self.anchor_number
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {
