@@ -617,11 +617,6 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 prepared_context: prepared_credential.prepared_context,
             },
         )?;
-
-        println!(
-            "--- VC jws: {}",
-            get_credential_response.clone().unwrap().vc_jws
-        );
         let claims = verify_credential_jws_with_canister_id(
             &get_credential_response.unwrap().vc_jws,
             &issuer_id,
