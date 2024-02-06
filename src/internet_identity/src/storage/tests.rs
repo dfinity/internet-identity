@@ -110,7 +110,7 @@ fn should_serialize_first_record() {
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&StorableAnchor::from(anchor.clone()))
+    let expected_length = candid::encode_one(StorableAnchor::from(anchor.clone()))
         .unwrap()
         .len();
 
@@ -134,7 +134,7 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
     assert_eq!(anchor_number, 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&StorableAnchor::from(anchor.clone()))
+    let expected_length = candid::encode_one(StorableAnchor::from(anchor.clone()))
         .unwrap()
         .len();
 
@@ -173,7 +173,7 @@ fn should_deserialize_first_record() {
     assert_eq!(anchor_number, 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&StorableAnchor::from(anchor.clone())).unwrap();
+    let buf = candid::encode_one(StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(RESERVED_HEADER_BYTES, &(buf.len() as u16).to_le_bytes());
     memory.write(RESERVED_HEADER_BYTES + 2, &buf);
 
@@ -199,7 +199,7 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
     assert_eq!(anchor_number, 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&StorableAnchor::from(anchor.clone())).unwrap();
+    let buf = candid::encode_one(StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(
         RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET,
         &(buf.len() as u16).to_le_bytes(),
