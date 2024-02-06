@@ -56,22 +56,22 @@ impl From<IdentityUpdateError> for String {
     }
 }
 
-/// Authenticates the caller calls the provided function and handles all
-/// the necessary bookkeeping for anchor operations.
-/// Returns an error if the caller cannot be authenticated or the anchor cannot be written to stable memory.
+/// Checks the authorization of the caller for the given anchor and calls the provided function, if successful.
+/// Handles all the necessary bookkeeping for anchor operations.
+/// Returns an error if the caller is not authorized or the anchor cannot be written to stable memory.
 ///
 /// * anchor_number: indicates the anchor to be provided op should be called on
 /// * op: Function that modifies an anchor and returns a [Result] indicating
 ///       success or failure which determines whether additional bookkeeping (on success) is required.
 ///       On success, the function must also return an [Operation] which is used for archiving purposes.
-pub fn authenticated_anchor_operation<R, E>(
+pub fn anchor_operation_with_authz_check<R, E>(
     anchor_number: AnchorNumber,
     op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), E>,
 ) -> Result<R, E>
 where
     E: From<IdentityUpdateError>,
 {
-    let (mut anchor, device_key) = check_authentication(anchor_number)
+    let (mut anchor, device_key) = check_authorization(anchor_number)
         .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
@@ -90,9 +90,9 @@ where
     }
 }
 
-/// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
-/// Returns an error if the caller cannot be authenticated.
-pub fn check_authentication(
+/// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the device used.
+/// Returns an error if the caller is not authorized.
+pub fn check_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<(Anchor, DeviceKey), AuthorizationError> {
     let anchor = state::anchor(anchor_number);
@@ -112,17 +112,18 @@ pub fn check_authentication(
     Err(AuthorizationError::Unauthorized(caller))
 }
 
-/// Authenticates the caller and updates the device used to authenticate reflecting the current activity.
+/// Checks that the caller is authorized to operate on the given anchor_number and updates the device used to
+/// reflect the current activity.
 /// Also updates the aggregated stats on daily and monthly active users.
-/// Returns an error if the caller cannot be authenticated or the anchor cannot be written to stable memory.
+/// Returns an error if the caller is not authorized or the anchor cannot be written to stable memory.
 ///
 /// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
 /// do not further modify the anchor.
-pub fn authenticate_and_record_activity(
+pub fn check_authz_and_record_activity(
     anchor_number: AnchorNumber,
 ) -> Result<Option<IIDomain>, IdentityUpdateError> {
     let (mut anchor, device_key) =
-        check_authentication(anchor_number).map_err(IdentityUpdateError::from)?;
+        check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
     let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor))
