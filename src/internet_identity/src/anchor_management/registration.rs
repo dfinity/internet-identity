@@ -244,20 +244,25 @@ pub fn register(
     verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
 
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor());
-    let Some((anchor_number, mut anchor)) = allocation else {
+    let Some(mut anchor) = allocation else {
         return RegisterResponse::CanisterFull;
     };
+    let anchor_number = anchor.anchor_number();
 
-    anchor
-        .add_device(device.clone())
-        .unwrap_or_else(|err| trap(&format!("failed to register anchor {anchor_number}: {err}")));
+    anchor.add_device(device.clone()).unwrap_or_else(|err| {
+        trap(&format!(
+            "failed to register anchor {}: {err}",
+            anchor_number
+        ))
+    });
     activity_bookkeeping(&mut anchor, &device.pubkey);
 
     // write anchor to stable memory
     state::storage_borrow_mut(|storage| {
-        storage.write(anchor_number, anchor).unwrap_or_else(|err| {
+        storage.write(anchor).unwrap_or_else(|err| {
             trap(&format!(
-                "failed to write data of anchor {anchor_number}: {err}"
+                "failed to write data of anchor {}: {err}",
+                anchor_number
             ))
         });
     });

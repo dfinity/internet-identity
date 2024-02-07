@@ -203,27 +203,28 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 #[query]
 #[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
-    state::storage_borrow(|storage| {
-        storage
-            .read(anchor_number)
-            .unwrap_or_default()
-            .into_devices()
-            .into_iter()
-            .map(DeviceData::from)
-            .map(|mut d| {
-                // Remove non-public fields.
-                d.alias = "".to_string();
-                d.metadata = None;
-                d
-            })
-            .collect()
-    })
+    let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
+        return vec![];
+    };
+    anchor
+        .into_devices()
+        .into_iter()
+        .map(DeviceData::from)
+        .map(|mut d| {
+            // Remove non-public fields.
+            d.alias = "".to_string();
+            d.metadata = None;
+            d
+        })
+        .collect()
 }
 
 #[query]
 #[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
-    let anchor = state::storage_borrow(|storage| storage.read(anchor_number).unwrap_or_default());
+    let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
+        return AnchorCredentials::default();
+    };
 
     anchor.into_devices().into_iter().fold(
         AnchorCredentials {
@@ -506,8 +507,12 @@ mod v2_api {
     #[query]
     #[candid_method(query)]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
-        let anchor =
-            state::storage_borrow(|storage| storage.read(identity_number).unwrap_or_default());
+        let Ok(anchor) = state::storage_borrow(|storage| storage.read(identity_number)) else {
+            return Ok(IdentityAuthnInfo {
+                authn_methods: vec![],
+                recovery_authn_methods: vec![],
+            });
+        };
 
         let authn_info = anchor.into_devices().into_iter().fold(
             IdentityAuthnInfo {
