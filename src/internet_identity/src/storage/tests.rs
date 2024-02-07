@@ -151,6 +151,18 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
 }
 
 #[test]
+fn should_not_write_using_anchor_number_outside_allocated_range() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((123, 456), memory);
+    storage.allocate_anchor().unwrap();
+
+    let anchor = Anchor::new(222);
+
+    let result = storage.write(anchor);
+    assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
+}
+
+#[test]
 fn should_deserialize_first_record() {
     let memory = VectorMemory::default();
     memory.grow(3);
