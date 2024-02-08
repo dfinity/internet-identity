@@ -84,6 +84,7 @@
     "src/vc-api",
     "demos/test-app",
     "demos/vc_issuer",
-    "src/vite-plugins"
+    "src/vite-plugins",
+    "src/vc_util_js"
   ]
 }
