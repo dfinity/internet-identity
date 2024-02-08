@@ -23,8 +23,10 @@ RUN . "$NVM_DIR/nvm.sh" && nvm use "v$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm alias default "v$(cat .node-version)"
 RUN ln -s "$NVM_DIR/versions/node/v$(cat .node-version)" "$NVM_DIR/versions/node/default"
 ENV PATH="$NVM_DIR/versions/node/default/bin/:${PATH}"
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 RUN node --version
 RUN npm --version
+RUN wasm-pack --version
 
 # Install Rust and Cargo in /opt
 ENV RUSTUP_HOME=/opt/rustup \

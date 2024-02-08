@@ -1,5 +1,5 @@
 name: 'Setup nodejs'
-description: Setup nodejs
+description: Setup nodejs and other frontend tools used in the frontend build
 runs:
   using: "composite"
   steps:
