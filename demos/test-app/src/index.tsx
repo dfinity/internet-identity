@@ -355,7 +355,7 @@ const credentialSpecs = {
   },
   adult: {
     credentialType: "VerifiedAdult",
-    arguments: { age_at_least: 18 },
+    arguments: { minAge: 18 },
   },
 } as const;
 

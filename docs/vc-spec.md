@@ -154,6 +154,45 @@ This call must be authenticated, i.e. the sender must match the principal for wh
 
 Upon successful checks, issuer returns the signed credential in JWS-format.
 
+### Recommended convention connecting credential specification with the returned credentials.
+
+Service discovery and syntax of the claims in the returned credentials are out of scope
+of this spec (of the MVP service).  However, an issuer may follow the convention below,
+for an easier verification of the returned credentials.
+
+Given a credential spec like
+```json
+    "credentialSpec": {
+        "credentialType": "SomeVerifiedProperty",
+        "arguments": {
+            "argument_1": "value_1",
+            "another_argument": 42,
+        }
+```
+the returned JWT should contain in `credentialSubject` a property
+named by the value of `credentialType` from the spec, with key-value
+entries listing the arguments from the spec, namely
+```json
+    "SomeVerifiedProperty": {
+        "argument_1": "value_1",
+        "another_argument": 42,
+    }
+```
+
+For example, for `VerifiedAdult`-credential we'd use the following credential spec
+```json
+    "credentialSpec": {
+        "credentialType": "VerifiedAdult",
+        "arguments": {
+            "minAge": 18,
+    }
+```
+and a compliant issuer would issue a VC that contains `credentialSubject` with the property
+```json
+    "VerifiedAdult": {
+        "minAge": 18,
+    }
+```
 
 ##  Identity Provider API
 

@@ -225,7 +225,7 @@ fn should_return_vc_consent_message_for_adult_vc() {
 
     for (requested_language, actual_language, consent_message_snippet) in test_cases {
         let mut args = HashMap::new();
-        args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+        args.insert("minAge".to_string(), ArgumentValue::Int(18));
         let consent_message_request = Icrc21VcConsentMessageRequest {
             credential_spec: CredentialSpec {
                 credential_type: "VerifiedAdult".to_string(),
@@ -339,7 +339,7 @@ fn degree_credential_spec() -> CredentialSpec {
 
 fn adult_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
-    args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+    args.insert("minAge".to_string(), ArgumentValue::Int(18));
     CredentialSpec {
         credential_type: "VerifiedAdult".to_string(),
         arguments: Some(args),

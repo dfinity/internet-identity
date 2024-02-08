@@ -371,11 +371,28 @@ fn validate_claims_match_spec(
     let subject = Subject::from_json_value(credential_subject.clone()).map_err(|_| {
         inconsistent_jwt_claims("missing credentialSubject in VerifiedAdult JWT vc")
     })?;
+    let credential_type = &spec.credential_type;
+    let verified_claim_arguments = {
+        if let Some(claim) = subject.properties.get(credential_type) {
+            if let Some(claim_arguments) = claim.as_object() {
+                claim_arguments
+            } else {
+                return Err(inconsistent_jwt_claims(
+                    "wrong VerifiedAdult-claim in VerifiedAdult JWT vc",
+                ));
+            }
+        } else {
+            return Err(inconsistent_jwt_claims(
+                "missing VerifiedAdult-claim in VerifiedAdult JWT vc",
+            ));
+        }
+    };
+
     if let Some(arguments) = spec.arguments.as_ref() {
         for (key, value) in arguments.iter() {
-            if let Some(v) = subject.properties.get(key) {
+            if let Some(v) = verified_claim_arguments.get(key) {
                 if value != v {
-                    return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
+                    return Err(inconsistent_jwt_claims("Wrong value in VerifiedAdult vc"));
                 }
             } else {
                 return Err(inconsistent_jwt_claims("Missing key in subject properties"));
