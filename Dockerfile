@@ -23,10 +23,8 @@ RUN . "$NVM_DIR/nvm.sh" && nvm use "v$(cat .node-version)"
 RUN . "$NVM_DIR/nvm.sh" && nvm alias default "v$(cat .node-version)"
 RUN ln -s "$NVM_DIR/versions/node/v$(cat .node-version)" "$NVM_DIR/versions/node/default"
 ENV PATH="$NVM_DIR/versions/node/default/bin/:${PATH}"
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 RUN node --version
 RUN npm --version
-RUN wasm-pack --version
 
 # Install Rust and Cargo in /opt
 ENV RUSTUP_HOME=/opt/rustup \
@@ -38,6 +36,8 @@ COPY ./scripts/bootstrap ./scripts/bootstrap
 COPY ./rust-toolchain.toml ./rust-toolchain.toml
 
 RUN ./scripts/bootstrap
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+RUN wasm-pack --version
 
 # Pre-build all cargo dependencies. Because cargo doesn't have a build option
 # to build only the dependecies, we pretend that our project is a simple, empty
