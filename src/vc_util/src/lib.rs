@@ -18,7 +18,6 @@ use identity_jose::jwt::JwtClaims;
 use identity_jose::jwu::{decode_b64, encode_b64};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::ops::{Add, Deref, DerefMut};
 
 pub mod custom;
