@@ -1,0 +1,14 @@
+[package]
+name = "vc_util_js"
+description = "JavaScript Wasm wrapper around vc_util"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+candid.workspace = true
+canister_sig_util.workspace = true
+vc_util.workspace = true
+wasm-bindgen = "0.2"
