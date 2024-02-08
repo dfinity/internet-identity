@@ -18,7 +18,6 @@ use identity_jose::jwt::JwtClaims;
 use identity_jose::jwu::{decode_b64, encode_b64};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::ops::{Add, Deref, DerefMut};
 
 pub mod custom;
@@ -372,9 +371,15 @@ fn validate_claims_match_spec(
     let subject = Subject::from_json_value(credential_subject.clone()).map_err(|_| {
         inconsistent_jwt_claims("missing credentialSubject in VerifiedAdult JWT vc")
     })?;
-    for (key, value) in spec.arguments.as_ref().unwrap_or(&HashMap::new()).iter() {
-        if *value != subject.properties[key] {
-            return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
+    if let Some(arguments) = spec.arguments.as_ref() {
+        for (key, value) in arguments.iter() {
+            if let Some(v) = subject.properties.get(key) {
+                if value != v {
+                    return Err(inconsistent_jwt_claims("wrong VerifiedAdult vc"));
+                }
+            } else {
+                return Err(inconsistent_jwt_claims("Missing key in subject properties"));
+            }
         }
     }
     Ok(())
