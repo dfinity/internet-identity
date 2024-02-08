@@ -18,7 +18,6 @@ sha2.workspace = true
 
 # Captcha deps
 lodepng = "*"
-base64.workspace = true
 
 rand = { version ="*", default-features = false }
 
