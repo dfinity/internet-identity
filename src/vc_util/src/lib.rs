@@ -266,6 +266,35 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
     Ok((alias_tuple, claims))
 }
 
+/// Validates the provided presentation `vp_jwt`, both cryptographically and semantically:
+///  - verifies the cryptographic consistency via `verify_ii_presentation_jwt_with_canister_ids(...)`.
+///  - checks that the claims from the presentation match the credential spec `vc_spec`.
+pub fn validate_ii_presentation_and_claims(
+    vp_jwt: &str,
+    effective_vc_subject: Principal,
+    vc_flow_signers: &VcFlowSigners,
+    vc_spec: &CredentialSpec,
+    root_pk_raw: &[u8],
+    current_time_ns: u128,
+) -> Result<(), PresentationVerificationError> {
+    let (_alias_tuple, claims) = verify_ii_presentation_jwt_with_canister_ids(
+        vp_jwt,
+        effective_vc_subject,
+        vc_flow_signers,
+        root_pk_raw,
+        current_time_ns,
+    )?;
+    validate_claim("iss", &vc_flow_signers.issuer_origin, claims.iss())
+        .map_err(invalid_requested_vc)?;
+    let vc_claims = claims
+        .vc()
+        .ok_or(invalid_requested_vc(inconsistent_jwt_claims(
+            "missing vc in id_alias JWT claims",
+        )))?;
+    validate_claims_match_spec(vc_claims, vc_spec).map_err(invalid_requested_vc)?;
+    Ok(())
+}
+
 /// Returns the given `signing_input` prefixed with
 ///      length(VC_SIGNING_INPUT_DOMAIN) || VC_SIGNING_INPUT_DOMAIN
 /// (for domain separation).
@@ -276,6 +305,11 @@ fn signing_input_with_prefix(signing_input: &[u8]) -> Vec<u8> {
     result
 }
 
+fn invalid_requested_vc(e: JwtValidationError) -> PresentationVerificationError {
+    PresentationVerificationError::InvalidRequestedCredential(
+        CredentialVerificationError::InvalidClaims(e),
+    )
+}
 fn extract_subject(claims: &JwtClaims<Value>) -> Result<Principal, JwtValidationError> {
     let Some(sub) = claims.sub() else {
         return Err(JwtValidationError::CredentialStructure(
@@ -350,52 +384,65 @@ fn validate_expiration(
     }
 }
 
+// Validates that provided `vc_claims` are consistent and match the given `spec`:
+//  - `vc_claims` contain "type"-claim that contains `spec.credential_type`
+//  - `vc_claims` contain claim named `spec.credential_type` with arguments that match `spec.arguments`,
+//     cf. a convention at https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md#recommended-convention-connecting-credential-specification-with-the-returned-credentials
 fn validate_claims_match_spec(
     vc_claims: &Map<String, Value>,
     spec: &CredentialSpec,
 ) -> Result<(), JwtValidationError> {
-    let credential_type = vc_claims
-        .get("type")
-        .ok_or(inconsistent_jwt_claims("missing type JWT vc"))?;
-    let types = credential_type
-        .as_array()
-        .ok_or(inconsistent_jwt_claims("wrong types in JWT vc"))?;
-    if !types.contains(&Value::String(spec.credential_type.clone())) {
-        return Err(inconsistent_jwt_claims("wrong vc type"));
-    };
-    let credential_subject = vc_claims
-        .get("credentialSubject")
-        .ok_or(inconsistent_jwt_claims(
-            "missing credentialSubject in JWT vc",
-        ))?;
-    let subject = Subject::from_json_value(credential_subject.clone()).map_err(|_| {
-        inconsistent_jwt_claims("missing credentialSubject in VerifiedAdult JWT vc")
-    })?;
     let credential_type = &spec.credential_type;
-    let verified_claim_arguments = {
-        if let Some(claim) = subject.properties.get(credential_type) {
-            if let Some(claim_arguments) = claim.as_object() {
-                claim_arguments
-            } else {
-                return Err(inconsistent_jwt_claims(
-                    "wrong VerifiedAdult-claim in VerifiedAdult JWT vc",
-                ));
-            }
-        } else {
-            return Err(inconsistent_jwt_claims(
-                "missing VerifiedAdult-claim in VerifiedAdult JWT vc",
-            ));
-        }
+
+    // Check that type-claim contains spec.credential_type.
+    let vc_type_entry = vc_claims
+        .get("type")
+        .ok_or(inconsistent_jwt_claims("missing type-claim"))?;
+    let types = vc_type_entry
+        .as_array()
+        .ok_or(inconsistent_jwt_claims("malformed types-claim"))?;
+    if !types.contains(&Value::String(credential_type.clone())) {
+        return Err(inconsistent_jwt_claims(
+            "missing credential_type in type-claim",
+        ));
     };
 
-    if let Some(arguments) = spec.arguments.as_ref() {
-        for (key, value) in arguments.iter() {
+    // Check that credentialSubject-claim contains spec.credential_type entry with matching arguments.
+    let credential_subject = vc_claims
+        .get("credentialSubject")
+        .ok_or(inconsistent_jwt_claims("missing credentialSubject-claim"))?;
+    let subject = Subject::from_json_value(credential_subject.clone())
+        .map_err(|_| inconsistent_jwt_claims("malformed credentialSubject-claim"))?;
+    let verified_claim_arguments = subject
+        .properties
+        .get(credential_type)
+        .ok_or(inconsistent_jwt_claims("missing credential_type claim"))?
+        .as_object()
+        .ok_or(inconsistent_jwt_claims(
+            "malformed credential_type arguments",
+        ))?;
+    let spec_arguments_count = if let Some(spec_arguments) = spec.arguments.as_ref() {
+        spec_arguments.len()
+    } else {
+        0
+    };
+    if spec_arguments_count != verified_claim_arguments.len() {
+        return Err(inconsistent_jwt_claims(
+            "wrong number of credential_type arguments",
+        ));
+    }
+    if let Some(spec_arguments) = spec.arguments.as_ref() {
+        for (key, value) in spec_arguments.iter() {
             if let Some(v) = verified_claim_arguments.get(key) {
                 if value != v {
-                    return Err(inconsistent_jwt_claims("Wrong value in VerifiedAdult vc"));
+                    return Err(inconsistent_jwt_claims(
+                        "wrong value in credential_type argument",
+                    ));
                 }
             } else {
-                return Err(inconsistent_jwt_claims("Missing key in subject properties"));
+                return Err(inconsistent_jwt_claims(
+                    "missing key in credential_type arguments",
+                ));
             }
         }
     }
@@ -481,10 +528,12 @@ pub fn get_canister_sig_pk_raw(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::issuer_api::ArgumentValue;
     use assert_matches::assert_matches;
     use canister_sig_util::{extract_raw_root_pk_from_der, IC_ROOT_PK_DER_PREFIX};
     use identity_core::common::Url;
     use identity_credential::presentation::{JwtPresentationOptions, PresentationBuilder};
+    use std::collections::HashMap;
 
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
     const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
@@ -1006,5 +1055,166 @@ mod tests {
             CURRENT_TIME_BEFORE_EXPIRY_NS,
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).contains("inconsistent claim in VC"));
+    }
+
+    fn credential_spec_with_0_args() -> CredentialSpec {
+        CredentialSpec {
+            credential_type: "vcWithoutArgs".to_string(),
+            arguments: None,
+        }
+    }
+
+    fn credential_spec_with_1_arg() -> CredentialSpec {
+        let mut args = HashMap::new();
+        args.insert(
+            "firstArg".to_string(),
+            ArgumentValue::String("string arg value".to_string()),
+        );
+        CredentialSpec {
+            credential_type: "vcWithOneArg".to_string(),
+            arguments: Some(args),
+        }
+    }
+
+    fn credential_spec_with_2_args() -> CredentialSpec {
+        let mut args = HashMap::new();
+        args.insert(
+            "firstArg".to_string(),
+            ArgumentValue::String("string arg value".to_string()),
+        );
+        args.insert("secondArg".to_string(), ArgumentValue::Int(42));
+        CredentialSpec {
+            credential_type: "vcWithOneArg".to_string(),
+            arguments: Some(args),
+        }
+    }
+
+    fn credential_specs_for_test() -> Vec<CredentialSpec> {
+        vec![
+            credential_spec_with_0_args(),
+            credential_spec_with_1_arg(),
+            credential_spec_with_2_args(),
+        ]
+    }
+
+    fn vc_claims_for_spec(spec: &CredentialSpec) -> Map<String, Value> {
+        let mut claims = Map::new();
+        let types = vec![
+            Value::String("VerifiableCredential".to_string()),
+            Value::String(spec.credential_type.to_string()),
+        ];
+        claims.insert("type".to_string(), Value::Array(types));
+        let mut arguments = Map::new();
+        if let Some(args) = spec.arguments.as_ref() {
+            for arg in args {
+                arguments.insert(arg.0.clone(), arg.1.clone().into());
+            }
+        }
+        let mut subject = Map::new();
+        subject.insert(spec.credential_type.clone(), Value::Object(arguments));
+        claims.insert("credentialSubject".to_string(), Value::Object(subject));
+        claims
+    }
+
+    #[test]
+    fn should_validate_claims_match_spec() {
+        for spec in credential_specs_for_test() {
+            let claims = vc_claims_for_spec(&spec);
+            validate_claims_match_spec(&claims, &spec)
+                .expect(&format!("failed for spec: {:?}", spec));
+        }
+    }
+
+    #[test]
+    fn should_fail_validate_claims_match_spec_if_wrong_type() {
+        for spec in credential_specs_for_test() {
+            // Construct claims with wrong "type" entry.
+            let mut claims = vc_claims_for_spec(&spec);
+            claims.insert(
+                "type".to_string(),
+                Value::Array(vec![Value::String("WrongType".to_string())]),
+            );
+            let result = validate_claims_match_spec(&claims, &spec);
+            assert_matches!(result, Err(e) if format!("{:?}", e).contains("missing credential_type in type-claim"));
+        }
+    }
+
+    #[test]
+    fn should_fail_validate_claims_match_spec_if_missing_credential_type_claim() {
+        for spec in credential_specs_for_test() {
+            // Construct claims without "credential_type"-claim.
+            let mut claims = vc_claims_for_spec(&spec);
+            claims
+                .get_mut("credentialSubject")
+                .expect("missing credentialSubject")
+                .as_object_mut()
+                .expect("wrong credentialSubject")
+                .remove(&spec.credential_type)
+                .expect("missing credential_type claim");
+            let result = validate_claims_match_spec(&claims, &spec);
+            assert_matches!(result, Err(e) if format!("{:?}", e).contains("missing credential_type claim"));
+        }
+    }
+
+    #[test]
+    fn should_fail_validate_claims_match_spec_with_extra_args_in_credential_type_claim() {
+        for spec in credential_specs_for_test() {
+            // Construct claims with extra arg in "credential_type"-claim.
+            let mut claims = vc_claims_for_spec(&spec);
+            claims
+                .get_mut("credentialSubject")
+                .expect("missing credentialSubject")
+                .as_object_mut()
+                .expect("wrong credentialSubject")
+                .get_mut(&spec.credential_type)
+                .expect("missing credential_type claim")
+                .as_object_mut()
+                .expect("wrong credential_type claim")
+                .insert("extraArg".to_string(), Value::Null);
+            let result = validate_claims_match_spec(&claims, &spec);
+            assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong number of credential_type arguments"));
+        }
+    }
+
+    #[test]
+    fn should_fail_validate_claims_match_spec_with_missing_args_in_credential_type_claim() {
+        for spec in [credential_spec_with_1_arg(), credential_spec_with_2_args()] {
+            // Construct claims with extra arg in "credential_type"-claim.
+            let mut claims = vc_claims_for_spec(&spec);
+            let arg_name = spec.arguments.as_ref().unwrap().keys().last().unwrap();
+            claims
+                .get_mut("credentialSubject")
+                .expect("missing credentialSubject")
+                .as_object_mut()
+                .expect("wrong credentialSubject")
+                .get_mut(&spec.credential_type)
+                .expect("missing credential_type claim")
+                .as_object_mut()
+                .expect("wrong credential_type claim")
+                .remove(arg_name);
+            let result = validate_claims_match_spec(&claims, &spec);
+            assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong number of credential_type arguments"));
+        }
+    }
+
+    #[test]
+    fn should_fail_validate_claims_match_spec_with_wrong_arg_value_in_credential_type_claim() {
+        for spec in [credential_spec_with_1_arg(), credential_spec_with_2_args()] {
+            // Construct claims with extra arg in "credential_type"-claim.
+            let mut claims = vc_claims_for_spec(&spec);
+            let arg_name = spec.arguments.as_ref().unwrap().keys().last().unwrap();
+            claims
+                .get_mut("credentialSubject")
+                .expect("missing credentialSubject")
+                .as_object_mut()
+                .expect("wrong credentialSubject")
+                .get_mut(&spec.credential_type)
+                .expect("missing credential_type claim")
+                .as_object_mut()
+                .expect("wrong credential_type claim")
+                .insert(arg_name.clone(), Value::String("a wrong value".to_string()));
+            let result = validate_claims_match_spec(&claims, &spec);
+            assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong value in credential_type argument"));
+        }
     }
 }
