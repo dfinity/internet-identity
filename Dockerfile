@@ -87,13 +87,10 @@ ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 ARG II_INSECURE_REQUESTS=
 
-# DFX specific metadata for dfx deps
-ARG DFX_METADATA=
-
 RUN touch src/*/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build ${DFX_METADATA:+"--dfx-metadata" "$DFX_METADATA"}
+RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm.gz
 
 FROM deps as build_archive
