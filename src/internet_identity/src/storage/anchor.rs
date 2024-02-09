@@ -181,7 +181,7 @@ impl Anchor {
         // Check the new set of devices is consistent
         let mut devices = self.devices.clone();
         devices[index] = modified_device;
-        check_anchor_invariants( &devices[..], &self.metadata,)?;
+        check_anchor_invariants(&devices[..], &self.metadata)?;
 
         // Replace devices
         self.devices = devices;
