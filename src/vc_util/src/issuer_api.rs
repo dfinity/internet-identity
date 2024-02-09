@@ -59,9 +59,9 @@ impl Display for ArgumentValue {
     }
 }
 
-impl Into<Value> for ArgumentValue {
-    fn into(self) -> Value {
-        match self {
+impl From<ArgumentValue> for Value {
+    fn from(argument_value: ArgumentValue) -> Self {
+        match argument_value {
             ArgumentValue::String(s) => Value::String(s),
             ArgumentValue::Int(i) => Value::Number(Number::from(i)),
         }
