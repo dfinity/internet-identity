@@ -96,16 +96,8 @@ then
     exit 1
 fi
 
-# dev build
-dfx_metadata_dev="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz)"
-II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 II_INSECURE_REQUESTS=1 ./scripts/docker-build ${dfx_metadata_dev:+"--dfx-metadata" "$dfx_metadata_dev"}
-dev_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
-# delete the dev wasm file
-rm ./internet_identity.wasm.gz
-
-# prod build
-dfx_metadata_prod="$(./scripts/dfx-metadata --asset-name internet_identity_dev.wasm.gz --wasm-hash "$dev_build_sha256")"
-./scripts/docker-build ${dfx_metadata_prod:+"--dfx-metadata" "$dfx_metadata_prod"}
+# Run the build
+./scripts/docker-build
 prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
 
 if [ "$prod_build_sha256" == "$expected_ii_hash" ]
