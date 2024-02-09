@@ -1121,7 +1121,7 @@ mod tests {
         for spec in credential_specs_for_test() {
             let claims = vc_claims_for_spec(&spec);
             validate_claims_match_spec(&claims, &spec)
-                .expect(&format!("failed for spec: {:?}", spec));
+                .unwrap_or_else(|_| panic!("failed for spec: {:?}", spec));
         }
     }
 
