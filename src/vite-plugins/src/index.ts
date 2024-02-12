@@ -1,6 +1,4 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { createHash } from "crypto";
-import { writeFileSync } from "fs";
 import { minify } from "html-minifier-terser";
 import { extname } from "path";
 import type { Plugin, ViteDevServer } from "vite";
@@ -142,52 +140,23 @@ export const replicaForwardPlugin = ({
   },
 });
 
-/** Update the HTML files to include integrity hashes for script.
- * i.e.: `<script src="foo.js">` becomes `<script integrity="<hash(./foo.js)>" src="foo.js">`.
+/** Update the HTML files to inline script imports.
+ * i.e.: `<script src="foo.js"></script>` becomes `<script>... insert new script node...</script>`.
+ *
+ * This allows us to use the `strict-dynamic` CSP directive.
+ * Otherwise, the directive requires `integrity=...` attributes which (in Chrome) does not easily allow importing
+ * other scripts. https://github.com/WICG/import-maps/issues/174#issuecomment-987678704
  */
-export const integrityPlugin: Plugin = {
+export const inlineScriptsPlugin: Plugin = {
   name: "integrity",
   apply: "build" /* only use during build, not serve */,
 
-  // XXX We use writeBundle as opposed to transformIndexHtml because transformIndexHtml still
-  // includes some variables (VITE_PRELOAD) that will be replaced later (by vite), changing
-  // the effective checksum. By the time writeBundle is called, the bundle has already been
-  // written so we update the files directly on the filesystem.
-  writeBundle(options: any, bundle: any) {
-    // Matches a script tag, grouping all the attributes (re-injected later) and extracting
-    // the 'src' attribute
+  transformIndexHtml(html: string): string {
     const rgx =
-      /<script(?<attrs>(?:\s+[^>]+)*\s+src="?(?<src>[^"]+)"?(?:\s+[^>]+)*)>/g;
-
-    const distDir = options.dir;
-
-    for (const filename in bundle) {
-      // If this is not HTML, skip
-      if (!filename.endsWith(".html")) {
-        continue;
-      }
-
-      // Grab the source, match all the script tags, inject the hash, and write the updated
-      // HTML to the filesystem
-      const html: string = bundle[filename].source;
-      const replaced = html.replace(rgx, (match, attrs, src) => {
-        const subresourcePath = src.slice(1); /* drop leading slash */
-        const item =
-          bundle[subresourcePath]; /* grab the item from the bundle */
-        const content = item.source || item.code;
-        const HASH_ALGO = "sha384" as const;
-        const integrityHash = createHash(HASH_ALGO)
-          .update(content)
-          .digest()
-          .toString("base64"); /* Compute the hash */
-
-        const integrityValue = `${HASH_ALGO}-${integrityHash}`;
-        return `<script integrity="${integrityValue}"${attrs}>`;
-      });
-
-      // Write the new content to disk
-      const filepath = [distDir, filename].join("/");
-      writeFileSync(filepath, replaced);
-    }
+      /<script(?<attrs>(?<beforesrc>\s+[^>]+)*\s+src="?(?<src>[^"]+)"?(?<aftersrc>\s+[^>]+)*)>/g;
+    return html.replace(rgx, (match, _attrs, beforesrc, src, aftersrc) => {
+      const tag = ["script", beforesrc, aftersrc].filter(Boolean).join(" ");
+      return `<${tag}>let s = document.createElement('script');s.type = 'module';s.src = '${src}';document.head.appendChild(s);`;
+    });
   },
 };
