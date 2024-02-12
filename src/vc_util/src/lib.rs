@@ -421,11 +421,7 @@ fn validate_claims_match_spec(
         .ok_or(inconsistent_jwt_claims(
             "malformed credential_type arguments",
         ))?;
-    let spec_arguments_count = if let Some(spec_arguments) = spec.arguments.as_ref() {
-        spec_arguments.len()
-    } else {
-        0
-    };
+    let spec_arguments_count = spec.arguments.as_ref().map_or(0, |args| args.len());
     if spec_arguments_count != verified_claim_arguments.len() {
         return Err(inconsistent_jwt_claims(
             "wrong number of credential_type arguments",
