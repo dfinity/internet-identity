@@ -1,7 +1,7 @@
 import {
   compression,
   injectCanisterIdPlugin,
-  integrityPlugin,
+  inlineScriptsPlugin,
   minifyHTML,
   replicaForwardPlugin,
 } from "@dfinity/internet-identity-vite-plugins";
@@ -64,7 +64,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       },
     },
     plugins: [
-      integrityPlugin,
+      inlineScriptsPlugin,
       [
         ...(mode === "development"
           ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]

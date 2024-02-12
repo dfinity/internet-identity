@@ -4,22 +4,29 @@
 use crate::http::security_headers;
 use crate::state;
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
+use sha2::Digest;
 
 // used both in init and post_upgrade
 pub fn init_assets() {
     state::assets_mut(|certified_assets| {
         let assets = get_static_assets();
 
-        // Extract the integrity hashes from all the HTML files
-        // i.e. go through the HTML and grab INTEGRITY from all the <script integrity="INTEGRITY">
+        // Extract integrity hashes for all inlined scripts, from all the HTML files.
         let integrity_hashes = assets
             .iter()
             .filter(|asset| asset.content_type == ContentType::HTML)
             .fold(vec![], |mut acc: Vec<String>, e| {
                 let content = std::str::from_utf8(&e.content).unwrap().to_string();
-                acc.append(&mut extract_integrity_hashes(content));
+                for inlined in extract_inline_scripts(content).iter() {
+                    let hash = sha2::Sha384::digest(inlined.as_bytes());
+                    let hash = BASE64.encode(hash);
+                    let hash = format!("sha384-{hash}");
+                    acc.push(hash);
+                }
                 acc
             });
 
@@ -31,11 +38,9 @@ pub fn init_assets() {
 // Fix up HTML pages, by injecting canister ID
 fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
-    // XXX: to match, we rely on the fact that our bundle injects an 'integrity' attribute
-    // before all other attributes
     html.replace(
-        r#"<script integrity="#,
-        &format!(r#"<script data-canister-id="{canister_id}" integrity="#),
+        r#"<script "#,
+        &format!(r#"<script data-canister-id="{canister_id}" "#),
     )
 }
 
@@ -57,35 +62,33 @@ pub fn get_static_assets() -> Vec<Asset> {
 }
 
 /// Extract all integrity hashes from the given HTML
-fn extract_integrity_hashes(content: String) -> Vec<String> {
-    // Extract anything between 'integrity="' and '"'; simpler & more efficient
+fn extract_inline_scripts(content: String) -> Vec<String> {
+    // Extract content (C to D~ below) of <script> tags; simpler & more efficient
     // than parsing the HTML and works well enough
-    let hash_prefix = r#"integrity=""#;
-    let hash_suffix = r#"""#;
+    //
+    //  <script foo=bar>var foo = 42;</script>
+    //  ^              ^^            ^
+    //  A              BC            D
     content
-        .match_indices(hash_prefix)
-        .map(|(size, _)| {
-            let offset = size + hash_prefix.len();
-            let len = content[offset..].find(hash_suffix).unwrap();
-            content[offset..(offset + len)].to_string()
+        .match_indices("<script")
+        .map(|(tag_open_start /* A */, _)| {
+            let tag_open_len = content[tag_open_start..].find('>').unwrap(); /* B */
+            let inline_start /* C */ = tag_open_start + tag_open_len + 1;
+            let tag_close_start /* D */ = content[inline_start..].find("</script>").unwrap();
+            content[(inline_start)..(inline_start + tag_close_start)].to_string()
         })
         .collect()
 }
 
 #[test]
-fn test_extract_integrity_hashes() {
+fn test_extract_inline_scripts() {
     let expected: Vec<String> = vec![];
-    let actual = extract_integrity_hashes(r#"<head></head>"#.to_string());
+    let actual = extract_inline_scripts(r#"<head></head>"#.to_string());
     assert_eq!(expected, actual);
 
-    let expected: Vec<String> = vec!["hello-world".to_string()];
-    let actual =
-        extract_integrity_hashes(r#"<script integrity="hello-world"></script>"#.to_string());
-    assert_eq!(expected, actual);
-
-    let expected: Vec<String> = vec!["one".to_string(), "two".to_string()];
-    let actual = extract_integrity_hashes(
-        r#"<script integrity="one"></script><script foo=bar integrity="two" broken"#.to_string(),
+    let expected: Vec<String> = vec!["this is content".to_string()];
+    let actual = extract_inline_scripts(
+        r#"<script integrity="hello-world">this is content</script>"#.to_string(),
     );
     assert_eq!(expected, actual);
 }
