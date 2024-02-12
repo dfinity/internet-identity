@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Nat};
 use serde_bytes::ByteBuf;
-use serde_json::Value;
+use serde_json::{Number, Value};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -55,6 +55,15 @@ impl Display for ArgumentValue {
         match &self {
             ArgumentValue::String(s) => write!(f, "'{}'", s),
             ArgumentValue::Int(i) => write!(f, "{}", i),
+        }
+    }
+}
+
+impl From<ArgumentValue> for Value {
+    fn from(argument_value: ArgumentValue) -> Self {
+        match argument_value {
+            ArgumentValue::String(s) => Value::String(s),
+            ArgumentValue::Int(i) => Value::Number(Number::from(i)),
         }
     }
 }
