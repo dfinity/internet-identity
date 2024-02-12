@@ -101,7 +101,6 @@ jobs:
           colima start
 
       - name: "Verify Hash"
-        id: dfx-metadata
         run: |
           ./scripts/verify-hash --ii-hash ${{ needs.latest-release.outputs.ii_prod_sha256 }} --archive-hash ${{ needs.latest-release.outputs.archive_sha256 }}
 
