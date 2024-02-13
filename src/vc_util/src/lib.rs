@@ -1407,4 +1407,32 @@ mod tests {
         );
         assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InconsistentCredentialJwtClaims"));
     }
+
+    // Removes nbf-entry from the given VC-JWT.
+    fn remove_nbf(vc_jwt: &str) -> String {
+        let mut ret = vc_jwt.to_string();
+        let nbf_start = vc_jwt.find("\"nbf\"").unwrap();
+        let nbf_end = vc_jwt.find("\"jti\"").unwrap();
+        ret.replace_range(nbf_start..nbf_end, "");
+        ret
+    }
+
+    #[test]
+    fn should_build_credential_jwt() {
+        let example_jwt = "{\"exp\":1620329470,\"iss\":\"https://age_verifier.info/\",\"nbf\":1707817485,\"jti\":\"https://age_verifier.info/credentials/42\",\"sub\":\"did:icp:p2nlc-3s5ul-lcu74-t6pn2-ui5im-i4a5f-a4tga-e6znf-tnvlh-wkmjs-dqe\",\"vc\":{\"@context\":\"https://www.w3.org/2018/credentials/v1\",\"type\":[\"VerifiableCredential\",\"VerifiedAdult\"],\"credentialSubject\":{\"VerifiedAdult\":{\"minAge\":18}}}}";
+        let example_jwt_without_nbf = "{\"exp\":1620329470,\"iss\":\"https://age_verifier.info/\",\"jti\":\"https://age_verifier.info/credentials/42\",\"sub\":\"did:icp:p2nlc-3s5ul-lcu74-t6pn2-ui5im-i4a5f-a4tga-e6znf-tnvlh-wkmjs-dqe\",\"vc\":{\"@context\":\"https://www.w3.org/2018/credentials/v1\",\"type\":[\"VerifiableCredential\",\"VerifiedAdult\"],\"credentialSubject\":{\"VerifiedAdult\":{\"minAge\":18}}}}";
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let params = CredentialParams {
+            spec: verified_adult_vc_spec(),
+            subject_id: did_for_principal(id_dapp),
+            credential_id_url: "https://age_verifier.info/credentials/42".to_string(),
+            issuer_url: "https://age_verifier.info".to_string(),
+            expiration_timestamp_s: (CURRENT_TIME_BEFORE_EXPIRY_NS / 1_000_000_000) as u32,
+        };
+        let credential = build_credential_jwt(params);
+        assert_eq!(credential.len(), example_jwt.len());
+        assert_ne!(credential, example_jwt);
+        // build credential should differ from the expected one only by the nbf-entry.
+        assert_eq!(remove_nbf(credential.as_str()), example_jwt_without_nbf);
+    }
 }
