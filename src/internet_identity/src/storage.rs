@@ -8,6 +8,8 @@
 //! * ENTRY_OFFSET: 131 072 bytes = 2 WASM Pages
 //! * Anchor size: 4096 bytes
 //!
+//! Within the first page of the raw stable memory, the layout is as follows:
+//!
 //! ```text
 //! ------------------------------------------- <- Address 0
 //! Magic "IIC"                 ↕ 3 bytes
@@ -26,8 +28,21 @@
 //! -------------------------------------------
 //! Entry offset (ENTRY_OFFSET) ↕ 8 bytes
 //! ------------------------------------------- <- HEADER_SIZE
-//! Reserved space              ↕ (RESERVED_HEADER_BYTES - HEADER_SIZE) bytes
-//! ------------------------------------------- <- ENTRY_OFFSET
+//! Unused space                ↕
+//! ------------------------------------------- <- Start of wasm memory page 1
+//! ```
+//!
+//! The second page and onwards is managed by the [MemoryManager] and is currently split into two
+//! managed memories:
+//! * Anchor memory: used to store the candid encoded anchors
+//! * Archive buffer memory: used to store the archive entries yet to be pulled by the archive canister
+//!
+//! ### Anchor memory
+//!
+//! The layout within the (virtual) anchor memory is as follows:
+//!
+//! ```text
+//! ------------------------------------------- <- Address 0
 //! A_0_size                    ↕ 2 bytes
 //! -------------------------------------------
 //! Candid encoded entry        ↕ A_0_size bytes
@@ -46,9 +61,7 @@
 //! -------------------------------------------
 //! Candid encoded entry        ↕ A_MAX_size bytes
 //! -------------------------------------------
-//! Unused space A_MAX          ↕ (SIZE_MAX - A_MAX_size - 2) bytes
-//! -------------------------------------------
-//! Unallocated space           ↕ STABLE_MEMORY_RESERVE bytes
+//! Unallocated space
 //! -------------------------------------------
 //! ```
 //!
@@ -63,6 +76,15 @@
 //! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
+//!
+//! ### Archive buffer memory
+//!
+//! The archive buffer memory is entirely owned by a [StableBTreeMap] used to store the buffered
+//! entries. The entries are indexed by their sequence number.
+//!
+//! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
+//! bucket of 128 pages.
+use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
 use std::fmt;
@@ -72,8 +94,10 @@ use std::ops::RangeInclusive;
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::reader::{BufferedReader, Reader};
+use ic_stable_structures::storable::Bound;
 use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::{Memory, RestrictedMemory, Storable};
+use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, Storable};
+use internet_identity_interface::archive::types::BufferedEntry;
 
 use internet_identity_interface::internet_identity::types::*;
 
@@ -88,12 +112,12 @@ mod storable_anchor;
 #[cfg(test)]
 mod tests;
 
-// version   0: invalid
-// version 1-6: no longer supported
-// version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
-//              with memory manager (from 2nd page on)
-// version  8+: invalid
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=7;
+/// * version   0: invalid
+/// * version 1-6: no longer supported
+/// * version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
+///                with memory manager (from 2nd page on)
+/// * version   8: same as 7, but archive entries buffer in stable memory
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=8;
 
 /// Reserved space for the header before the anchor records start.
 const ENTRY_OFFSET: u64 = 2 * WASM_PAGE_SIZE_IN_BYTES as u64; // 1 page reserved for II config, 1 for memory manager
@@ -112,7 +136,9 @@ const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// MemoryManager parameters.
 const ANCHOR_MEMORY_INDEX: u8 = 0u8;
+const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
+const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -124,22 +150,39 @@ pub const DEFAULT_RANGE_SIZE: u64 = (STABLE_MEMORY_SIZE - ENTRY_OFFSET) / DEFAUL
 
 pub type Salt = [u8; 32];
 
+type ArchiveBufferMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
+
+/// The [BufferedEntry] is wrapped to allow this crate to implement [Storable].
+#[derive(Clone, Debug, CandidType, Deserialize)]
+struct BufferedEntryWrapper(BufferedEntry);
+
+impl Storable for BufferedEntryWrapper {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(&self.0).expect("failed to serialize archive entry"))
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        BufferedEntryWrapper(
+            candid::decode_one(&bytes).expect("failed to deserialize archive entry"),
+        )
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: VirtualMemory<RestrictedMemory<M>>,
+    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, ArchiveBufferMemory<M>>,
 }
 
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Header {
     magic: [u8; 3],
-    // version   0: invalid
-    // version 1-6: no longer supported
-    // version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config
-    //              with managed memory
-    // version  8+: invalid
+    /// See [SUPPORTED_LAYOUT_VERSIONS]
     version: u8,
     num_anchors: u32,
     id_range_lo: u64,
@@ -170,7 +213,7 @@ impl<M: Memory + Clone> Storage<M> {
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
-        let version: u8 = 7;
+        let version: u8 = 8;
 
         let mut storage = Self {
             header: Header {
@@ -185,6 +228,7 @@ impl<M: Memory + Clone> Storage<M> {
             },
             header_memory,
             anchor_memory,
+            archive_entries_buffer: Self::init_archive_entries_buffer(&memory_manager),
         };
         storage.flush();
         storage
@@ -246,7 +290,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         match header.version {
-            7 => {
+            7 | 8 => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
                 let managed_memory = RestrictedMemory::new(memory, 1..MAX_WASM_PAGES);
                 let memory_manager =
@@ -256,6 +300,7 @@ impl<M: Memory + Clone> Storage<M> {
                     header,
                     header_memory,
                     anchor_memory,
+                    archive_entries_buffer: Self::init_archive_entries_buffer(&memory_manager),
                 })
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
@@ -375,6 +420,38 @@ impl<M: Memory + Clone> Storage<M> {
         self.flush();
     }
 
+    /// Add a new archive entry to the buffer.
+    pub fn add_archive_entry(&mut self, entry: BufferedEntry) {
+        self.archive_entries_buffer
+            .insert(entry.sequence_number, BufferedEntryWrapper(entry));
+    }
+
+    /// Get the first `max_entries` archive entries from the buffer.
+    pub fn get_archive_entries(&mut self, max_entries: u16) -> Vec<BufferedEntry> {
+        self.archive_entries_buffer
+            .iter()
+            .take(max_entries as usize)
+            .map(|(_, v)| v.0.clone())
+            .collect()
+    }
+
+    /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
+    pub fn prune_archive_entries(&mut self, sequence_number: u64) {
+        let entries_to_prune = self
+            .archive_entries_buffer
+            .range(..=sequence_number)
+            .map(|(k, _)| k)
+            .collect::<Vec<_>>();
+        entries_to_prune.iter().for_each(|k| {
+            self.archive_entries_buffer.remove(k);
+        });
+    }
+
+    /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
+    pub fn archive_entries_count(&self) -> usize {
+        self.archive_entries_buffer.iter().count()
+    }
+
     fn anchor_number_to_record(&self, anchor_number: u64) -> Result<u32, StorageError> {
         if anchor_number < self.header.id_range_lo || anchor_number >= self.header.id_range_hi {
             return Err(StorageError::AnchorNumberOutOfRange {
@@ -392,6 +469,18 @@ impl<M: Memory + Clone> Storage<M> {
 
     fn record_address(&self, record_number: u32) -> u64 {
         record_number as u64 * self.header.entry_size as u64
+    }
+
+    fn init_archive_entries_buffer<T: Memory>(
+        memory_manager: &MemoryManager<T>,
+    ) -> StableBTreeMap<u64, BufferedEntryWrapper, RestrictedMemory<VirtualMemory<T>>> {
+        // A single archive entry takes on average 476 bytes of space.
+        // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or 5 MB.
+        // Since the memory manager allocates memory in buckets of 128 pages, we round up to 128 pages.
+        StableBTreeMap::init(RestrictedMemory::new(
+            memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
+            0..BUCKET_SIZE_IN_PAGES as u64,
+        ))
     }
 
     /// Returns the address of the first byte not yet allocated to a anchor.

@@ -91,7 +91,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )?;
         w.encode_gauge(
             "internet_identity_buffered_archive_entries",
-            data.entries_buffer.len() as f64,
+            data.buffered_entries_count() as f64,
             "The number of buffered archive entries.",
         )?;
         w.encode_gauge(
