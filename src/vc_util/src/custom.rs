@@ -1,13 +1,8 @@
 //! Custom utils for handling specific VCs/VPs.
 
 use crate::issuer_api::{ArgumentValue, CredentialSpec};
-use crate::{
-    inconsistent_jwt_claims, validate_claim, validate_claims_match_spec,
-    verify_ii_presentation_jwt_with_canister_ids, CredentialVerificationError,
-    PresentationVerificationError, VcFlowSigners,
-};
+use crate::{validate_ii_presentation_and_claims, PresentationVerificationError, VcFlowSigners};
 use candid::Principal;
-use identity_credential::validator::JwtValidationError;
 use std::collections::HashMap;
 
 /// Validates the provided presentation `vp_jwt`, checking the following conditions:
@@ -23,28 +18,13 @@ pub fn validate_verified_adult_presentation(
     root_pk_raw: &[u8],
     current_time_ns: u128,
 ) -> Result<(), PresentationVerificationError> {
-    let (_alias_tuple, claims) = verify_ii_presentation_jwt_with_canister_ids(
+    validate_ii_presentation_and_claims(
         vp_jwt,
         effective_vc_subject,
         vc_flow_signers,
+        &verified_adult_vc_spec(),
         root_pk_raw,
         current_time_ns,
-    )?;
-    validate_claim("iss", &vc_flow_signers.issuer_origin, claims.iss())
-        .map_err(invalid_requested_vc)?;
-    let vc_claims = claims
-        .vc()
-        .ok_or(invalid_requested_vc(inconsistent_jwt_claims(
-            "missing vc in id_alias JWT claims",
-        )))?;
-    validate_claims_match_spec(vc_claims, &verified_adult_vc_spec())
-        .map_err(invalid_requested_vc)?;
-    Ok(())
-}
-
-fn invalid_requested_vc(e: JwtValidationError) -> PresentationVerificationError {
-    PresentationVerificationError::InvalidRequestedCredential(
-        CredentialVerificationError::InvalidClaims(e),
     )
 }
 
