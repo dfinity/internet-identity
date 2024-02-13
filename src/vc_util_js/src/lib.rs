@@ -1,4 +1,6 @@
 use candid::Principal;
+use std::collections::HashMap;
+use vc_util::issuer_api::{ArgumentValue, CredentialSpec};
 use vc_util::VcFlowSigners;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -20,10 +22,19 @@ pub fn validate_verified_adult_presentation(
         issuer_canister_id: Principal::from_slice(issuer_canister_id),
         issuer_origin: String::from_utf8(issuer_origin.to_vec()).expect("wrong issuer origin"),
     };
-    vc_util::custom::validate_verified_adult_presentation(
+    let credential_spec = {
+        let mut args = HashMap::new();
+        args.insert("minAge".to_string(), ArgumentValue::Int(18));
+        CredentialSpec {
+            credential_type: "VerifiedAdult".to_string(),
+            arguments: Some(args),
+        }
+    };
+    vc_util::validate_ii_presentation_and_claims(
         &vp_jwt,
         effective_vc_subject,
         &vc_flow_signers,
+        &credential_spec,
         root_pk_raw,
         current_time_ns as u128,
     )

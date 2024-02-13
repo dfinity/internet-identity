@@ -21,7 +21,6 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::ops::{Add, Deref, DerefMut};
 
-pub mod custom;
 pub mod issuer_api;
 
 pub const II_CREDENTIAL_URL_PREFIX: &str = "https://identity.ic0.app/credential/";
@@ -590,11 +589,13 @@ mod tests {
     const TEST_CREDENTIAL_JWT: &str = r#"{"iss":"https://employment.info/","nbf":1620328630,"jti":"https://employment.info/credentials/42","sub":"did:icp:igfpm-3fhrp-syqme-4i4xk-o4pgd-5xdh4-fbbgw-jnxm5-bvou4-ljt52-kqe","vc":{"@context":"https://www.w3.org/2018/credentials/v1","type":["VerifiableCredential","VerifiedEmployee"],"credentialSubject":{"employee_of":{"employerId":"did:web:dfinity.org","employerName":"DFINITY Foundation"}}}}"#;
 
     // Test data used for verifiable presentation tests.
+    const AGE_VERIFIER_URL: &str = "https://age_verifier.info/";
     const TEST_ISSUER_SIGNING_CANISTER_ID: &str = "rrkah-fqaaa-aaaaa-aaaaq-cai";
-    const ID_ALIAS_FOR_VP: &str = "vhbib-m4hm6-hpvyc-7prd2-siivo-nbd7r-67o5x-n3awh-qsmqz-wznjf-tqe";
+    const ID_ALIAS_FOR_VP: &str = "jkk22-zqdxc-kgpez-6sv2m-5pby4-wi4t2-prmoq-gf2ih-i2qtc-v37ac-5ae";
     const ID_RP_FOR_VP: &str = "p2nlc-3s5ul-lcu74-t6pn2-ui5im-i4a5f-a4tga-e6znf-tnvlh-wkmjs-dqe";
-    const ID_ALIAS_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCRVNzWHp2bTEzd1BkRTVZSndvLTBCYkdBTHdCN0J2bW1LZUxramFUUTdkQSJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOnAybmxjLTNzNXVsLWxjdTc0LXQ2cG4yLXVpNWltLWk0YTVmLWE0dGdhLWU2em5mLXRudmxoLXdrbWpzLWRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDp2aGJpYi1tNGhtNi1ocHZ5Yy03cHJkMi1zaWl2by1uYmQ3ci02N281eC1uM2F3aC1xc21xei13em5qZi10cWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1gg_I-cV8ZPkoVyh_WcilMFKcpT5cH2-oyCoRTh7llUZeyCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggkzS0s8W3-LMHUd6MNFx8vCZvWiTSFRorIEMWhTwPnnmCBFggnrchOFTbl4uvnyde_cSNSJyYA1bRSyy00Wc9euCSodyCBFggIujS7mOdXhfJUJZBqbtLm22ZyONdyVFbAnpVPc30ZBCCBFggQkuzJEh6pJ0g-QNG7IbT7mnxW4XJSKdeWGVTxAw3jiaCBFggwQi-CzFufoFsQD0tmyYIhiaRNWLbADbGQmT6CchuXqSDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDC5hBVS08Sf6LMHt1w84qtUQ_ELlYt494xOwPQ9_a45cQ2YbpXovT2OohCzC0Rtfk5kdHJlZYMBggRYIDUbro13tGgB_Yqf9JhMW8pvpzCvCBJY_J0CfFMPNBthgwJDc2lngwJYIFcsa4eb-HMrTnmGWNje_RfErQYi0wNCJvGDrzqazq0OgwGDAlggltI_YbE4mukz0q2BJuH-cIbYTjmBOZbpwqiCPgURrdqCA0CCBFggq2BLsFnxNQd_gswt0oE2oBJO-Cwaey9RhEs4XhsPT2w";
-    const REQUESTED_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCeUk3dlEyOGVybHFnVjVMck03dTNIOUlaeGVwcUxzQkdnSjFyTldaX0tfQSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvLyIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9lbXBsb3ltZW50LmluZm8vY3JlZGVudGlhbHMvNDIiLCJzdWIiOiJkaWQ6aWNwOnZoYmliLW00aG02LWhwdnljLTdwcmQyLXNpaXZvLW5iZDdyLTY3bzV4LW4zYXdoLXFzbXF6LXd6bmpmLXRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVmVyaWZpZWRFbXBsb3llZSJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJlbXBsb3llZV9vZiI6eyJlbXBsb3llcklkIjoiZGlkOndlYjpkZmluaXR5Lm9yZyIsImVtcGxveWVyTmFtZSI6IkRGSU5JVFkgRm91bmRhdGlvbiJ9fX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggqJgFhbOSOgOY-buXQFiOROH05grMrWl8vT4tcEIPiq6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggQ4oRC4U7Lky7wzOfBg9VDx119qT8VxNIS_--J9EL4o6CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggxZtR4JD8cPLlnq01PLx8CEHFa79R67oIdK_dBGpq6mmCBFggdUc130tu5B34n_1cMDNiJCbEamgKPeRmzOso7AmvmWqCBFggs_FSiRZluL8IU_a-voSJLAO8z2nvX1MmJCq_Tz0e1amCBFggqSI6U4ChzjO4YJ_NvOqGukyHIfX-3UYcYgkyTLgF9D6DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDC0pP0klDiTh8fvUkKDDcrCjECDHalcBWLYKVzYy6Sm2rMZ2tsXvCbtf2fraClWVipkdHJlZYMBggRYICk5fdPgBGT68fKT0kj59h1zod2tut7mB0DAKhosc6-igwJDc2lngwJYIHGZW4y0kE1oq6oGYkhXj36h1sNPmG2jwFX6tPGiRkfXgwJYIOHTIYnxMIa4fJPR4CTYus-9YPlhsgAYJwpj0j9Jx3NcggNA";
+    const ID_ALIAS_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCMGd6TTVJeXFMYUhyMDhtQTRWd2J5SmRxQTFyRVFUX2xNQnVVbmN5UDVVYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOnAybmxjLTNzNXVsLWxjdTc0LXQ2cG4yLXVpNWltLWk0YTVmLWE0dGdhLWU2em5mLXRudmxoLXdrbWpzLWRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDpqa2syMi16cWR4Yy1rZ3Blei02c3YybS01cGJ5NC13aTR0Mi1wcm1vcS1nZjJpaC1pMnF0Yy12MzdhYy01YWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1gg4TNRYHd-8aiik7eFIFlUffIauc26_S_Cbfu5lrH6WG-CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg_KZ0TVqubo_EGWoMUPA35BYZ4B5ZRkR_zDfNIQCwa46CBFggQ32YxfhviZ3hMsTqcHLG7NvrNFYPeR86ayjF9kSIHR6CBFgg9MK-22EcX2HLbVDFBwSSVfBEi0MJrir_V8D4mSrs8W2CBFgguVqxODxxmD13JWUJh9h0fLIZ5knKseqhi6RzHTwFOeCCBFgggnfiF6BqnRcJrN4b5QOatcBHi7CoNcEnqJQpdgTFewWDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCjAL-A0R8pOvIRouUEI_zmS1PElQ1g7sJKgMb--60Tw399DUME-pKPFCEWQSpqEWFkdHJlZYMBggRYICk50o-r4OkMNAjh7eU61FNy0ARr-X3mLJdhUWMQAMr7gwJDc2lngwJYIIOQR7wl3Ws9Jb8VP4rhIb37XKLMkkZ2P7WaZ5we60WGgwGCBFggsvWfw_9l6MdknYq3zHvk8WyFan5Rxsb-dfI-p_IA_g6DAlgg_OG2VoT11h2BQfYTnf83Y9blXTdGnmKGRe3SJAvV8h2CA0A";
+    const VERIFIED_ADULT_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCMzdLQ29yYjQ2OUVFZ19uYzVvTFI5RHNoSy1SOEhXUUNMN05VMDcwa1R0WSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vYWdlX3ZlcmlmaWVyLmluZm8vIiwibmJmIjoxNjIwMzI4NjMwLCJqdGkiOiJodHRwczovL2FnZV92ZXJpZmllci5pbmZvL2NyZWRlbnRpYWxzLzQyIiwic3ViIjoiZGlkOmljcDpqa2syMi16cWR4Yy1rZ3Blei02c3YybS01cGJ5NC13aTR0Mi1wcm1vcS1nZjJpaC1pMnF0Yy12MzdhYy01YWUiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlZlcmlmaWVkQWR1bHQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiVmVyaWZpZWRBZHVsdCI6eyJtaW5BZ2UiOjE4fX19fQ.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggt424dJpC6sjdhsBc8wD1SOiv5OM8gAKL00RP3F_1Wz6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggZDN-5FgR1a-r1vFcUM-_aSwM9WBkrfG-PjnkpDfd_a6CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg7KwVkmHXh_bkpjrNamLjBaVHnx8ygOov12v70RCCnauCBFgg4JfM61UN0ijoPEaD4V4vo3MD34QmoPRJ7NgRMR94NAKCBFggsSTfdsBa0-yHxDCqvaUlOO6rC4ipHUqkr1P3AAvz1KmCBFggACrZEhXi64qQOi0WG2dobr3wU-nz1EYrzkHUnKwm2euDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCDsLi8fdzb5mhTyUFJZUrsWcnfsriPBHFpPemY723yTxgIEExP76d4fzMu7xWXtqZkdHJlZYMBggRYIF8C4f7jFXIgbB8sfB9qSnjcDPIah96xJMJ-lkUV3es5gwJDc2lngwJYIPL9DVTa-kaJmcs0Khp5uNdi4aZ5Dnt_kCORxF48UNPjgwGCBFggH7DURumpKFxQSDZEQz_Z4OgXTAqhI4PT_qJtGsQwcL-DAYMCWCA87aI24qiaIQsjHtFMJRESwnEV9Ukj8lAJ3b1CaT84joIDQIIEWCAkNVdgMuWn2EpNNTPe7jaX3h93D4ijH2Sg8oRYhXBwDQ";
+    const VERIFIED_EMPLOYEE_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCMzdLQ29yYjQ2OUVFZ19uYzVvTFI5RHNoSy1SOEhXUUNMN05VMDcwa1R0WSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvLyIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9lbXBsb3ltZW50LmluZm8vY3JlZGVudGlhbHMvNDIiLCJzdWIiOiJkaWQ6aWNwOmprazIyLXpxZHhjLWtncGV6LTZzdjJtLTVwYnk0LXdpNHQyLXBybW9xLWdmMmloLWkycXRjLXYzN2FjLTVhZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVmVyaWZpZWRFbXBsb3llZSJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJWZXJpZmllZEVtcGxveWVlIjp7ImVtcGxveWVySWQiOiJkaWQ6d2ViOmRmaW5pdHkub3JnIiwiZW1wbG95ZXJOYW1lIjoiREZJTklUWSBGb3VuZGF0aW9uIn19fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggt424dJpC6sjdhsBc8wD1SOiv5OM8gAKL00RP3F_1Wz6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggD8f87lse4wbqTJzVzzHL0KLYglxk_3Bqu_L9BYW1_82CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg7KwVkmHXh_bkpjrNamLjBaVHnx8ygOov12v70RCCnauCBFgg4JfM61UN0ijoPEaD4V4vo3MD34QmoPRJ7NgRMR94NAKCBFggldPzhEqB2ndq8dydYB14vltPlqh94grYUzSUEDT8-jeCBFgg4EA8lx4d8URjaaYFi_87OeQ1dcAcz4fOFXAjLqWWs22DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCPZahVmdM4-1Y-c-Pzn701gIIVShPPcWD3_ZFJggWwiShD5Fq8i0ZPSC5YJqZ8d5xkdHJlZYMBggRYIF8C4f7jFXIgbB8sfB9qSnjcDPIah96xJMJ-lkUV3es5gwJDc2lngwJYIPL9DVTa-kaJmcs0Khp5uNdi4aZ5Dnt_kCORxF48UNPjgwJYIOotDCfm4T5b3qxy9vMUmKVHMantmISW7lOuF2fwoO9tggNA";
 
     fn test_ic_root_pk_raw() -> Vec<u8> {
         let pk_der = decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk");
@@ -840,7 +841,7 @@ mod tests {
             ii_canister_id: test_canister_sig_pk().canister_id,
             ii_origin: II_ISSUER_URL.to_string(),
             issuer_canister_id: test_issuer_canister_sig_pk().canister_id,
-            issuer_origin: "https://vc_issuer.com".to_string(),
+            issuer_origin: AGE_VERIFIER_URL.to_string(),
         }
     }
 
@@ -852,7 +853,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -875,7 +876,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -896,7 +897,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
                 "an extra vc".to_string(),
             ],
         )
@@ -936,7 +937,7 @@ mod tests {
             wrong_subject,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -959,7 +960,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_CREDENTIAL_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -981,7 +982,7 @@ mod tests {
         bad_id_alias_vc.insert(42, 'a');
         let vp_jwt = create_verifiable_presentation_jwt_for_test(
             id_dapp,
-            vec![bad_id_alias_vc, REQUESTED_VC_FOR_VP_JWS.to_string()],
+            vec![bad_id_alias_vc, VERIFIED_ADULT_VC_FOR_VP_JWS.to_string()],
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -998,7 +999,7 @@ mod tests {
     fn should_fail_verify_ii_presentation_with_invalid_requested_vc() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
 
-        let mut bad_requested_vc = REQUESTED_VC_FOR_VP_JWS.to_string();
+        let mut bad_requested_vc = VERIFIED_ADULT_VC_FOR_VP_JWS.to_string();
         bad_requested_vc.insert(42, 'a');
         let vp_jwt = create_verifiable_presentation_jwt_for_test(
             id_dapp,
@@ -1023,7 +1024,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -1048,7 +1049,7 @@ mod tests {
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
             ],
         )
         .expect("vp creation failed");
@@ -1073,7 +1074,7 @@ mod tests {
         let vp_jwt = create_verifiable_presentation_jwt_for_test(
             id_dapp,
             vec![
-                REQUESTED_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
             ],
         )
@@ -1252,5 +1253,158 @@ mod tests {
             let result = validate_claims_match_spec(&claims, &spec);
             assert_matches!(result, Err(e) if format!("{:?}", e).contains("wrong value in credential_type argument"));
         }
+    }
+
+    fn verified_adult_vc_spec() -> CredentialSpec {
+        let mut args = HashMap::new();
+        args.insert("minAge".to_string(), ArgumentValue::Int(18));
+        CredentialSpec {
+            credential_type: "VerifiedAdult".to_string(),
+            arguments: Some(args),
+        }
+    }
+
+    #[test]
+    fn should_validate_ii_presentation_and_claims() {
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+        validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &default_test_vc_flow_signers(),
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        )
+        .expect("VP verification failed");
+    }
+
+    #[test]
+    fn should_fail_validate_ii_presentation_and_claims_if_wrong_vc_flow_signers() {
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+
+        // wrong ii_canister_id
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &VcFlowSigners {
+                ii_canister_id: test_issuer_canister_sig_pk().canister_id,
+                ..default_test_vc_flow_signers()
+            },
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InvalidSignature"));
+
+        // wrong issuer_canister_id
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &VcFlowSigners {
+                issuer_canister_id: test_canister_sig_pk().canister_id,
+                ..default_test_vc_flow_signers()
+            },
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InvalidSignature"));
+
+        // wrong issuer_origin
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &VcFlowSigners {
+                issuer_origin: "https://wrong.origin.com".to_string(),
+                ..default_test_vc_flow_signers()
+            },
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InconsistentCredentialJwtClaims"));
+    }
+
+    #[test]
+    fn should_fail_validate_ii_presentation_and_claims_if_wrong_effective_subject() {
+        let id_alias = Principal::from_text(ID_ALIAS_FOR_VP).expect("wrong principal");
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_alias, // wrong effective subject
+            &default_test_vc_flow_signers(),
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("unexpected vc subject"));
+    }
+
+    #[test]
+    fn should_fail_validate_ii_presentation_and_claims_if_expired() {
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &default_test_vc_flow_signers(),
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_AFTER_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("credential expired"));
+    }
+
+    #[test]
+    fn should_fail_validate_ii_presentation_and_claims_if_wrong_vcs() {
+        let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
+        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+            id_dapp,
+            vec![
+                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+                VERIFIED_EMPLOYEE_VC_FOR_VP_JWS.to_string(),
+            ],
+        )
+        .expect("vp-creation failed");
+        let result = validate_ii_presentation_and_claims(
+            &vp_jwt,
+            id_dapp,
+            &default_test_vc_flow_signers(),
+            &verified_adult_vc_spec(),
+            &test_ic_root_pk_raw(),
+            CURRENT_TIME_BEFORE_EXPIRY_NS,
+        );
+        assert_matches!(result, Err(e) if format!("{:?}", e).to_string().contains("InconsistentCredentialJwtClaims"));
     }
 }
