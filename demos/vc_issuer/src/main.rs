@@ -482,7 +482,7 @@ fn prepare_credential_jwt(
             })?;
             Ok(dfinity_employment_credential(
                 alias_tuple.id_alias,
-                &credential_spec,
+                credential_spec,
             ))
         }
         UniversityDegree(_) => {
@@ -491,7 +491,7 @@ fn prepare_credential_jwt(
             })?;
             Ok(bachelor_degree_credential(
                 alias_tuple.id_alias,
-                &credential_spec,
+                credential_spec,
             ))
         }
         VerifiedAdult(_) => {
@@ -500,7 +500,7 @@ fn prepare_credential_jwt(
             })?;
             Ok(verified_adult_credential(
                 alias_tuple.id_alias,
-                &credential_spec,
+                credential_spec,
             ))
         }
     }
