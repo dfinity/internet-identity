@@ -3261,6 +3261,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sig_verifier_js"
+version = "1.0.0"
+dependencies = [
+ "candid",
+ "canister_sig_util",
+ "ic-crypto-standalone-sig-verifier",
+ "ic-types",
+ "vc_util",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

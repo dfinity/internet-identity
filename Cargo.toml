@@ -7,7 +7,8 @@ members = [
     "src/internet_identity_interface",
     "src/archive",
     "src/vc_util",
-    "src/vc_util_js"
+    "src/vc_util_js",
+    "src/sig-verifier-js"
 ]
 resolver = "2"
 
