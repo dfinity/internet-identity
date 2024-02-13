@@ -12,7 +12,7 @@
     "showcase": "astro dev --root ./src/showcase",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --project ./tsconfig.all.json --noEmit",
-    "watch:showcase": "astro check --root ./src/showcase --watch",
+    "check:showcase": "astro check --root ./src/showcase --tsconfig ./tsconfig.all.json",
     "watch": "npm run check -- --watch",
     "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "generate": "npm run generate:types && npm run generate:js && npm run generate:types-issuer && npm run generate:js-issuer",
@@ -20,7 +20,7 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
     "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts > src/vc-api/src/generated/vc_issuer_types.ts",
     "generate:js-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t js > src/frontend/generated/vc_issuer_idl.js",
-    "build:showcase": "tsc --noEmit && astro check --root ./src/showcase && astro build --root ./src/showcase",
+    "build:showcase": "npm run check:showcase && astro build --root ./src/showcase",
     "preview:showcase": "astro preview --root ./src/showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "vitest --config ./vitest.config.ts",
@@ -34,6 +34,8 @@
     "format-check": "prettier --check src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.5.3",
+    "@dfinity/internet-identity-vite-plugins": "*",
     "@types/dompurify": "^3.0.5",
     "@types/node": "*",
     "@types/ua-parser-js": "^0.7.36",
@@ -41,7 +43,7 @@
     "@typescript-eslint/parser": "6.7.5",
     "@vitejs/plugin-basic-ssl": "^1.0.1",
     "@wdio/globals": "^8.6.9",
-    "astro": "^2.4.1",
+    "astro": "4.3.6",
     "eslint": "8.51.0",
     "fake-indexeddb": "^4.0.2",
     "lit-analyzer": "^2.0.2",
@@ -52,18 +54,15 @@
     "typescript": "5.2.2",
     "vite": "^4.5.2",
     "vitest": "^0.34.0",
-    "webdriverio": "^8.21.0",
-
-    "@dfinity/internet-identity-vite-plugins": "*"
+    "webdriverio": "^8.21.0"
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
     "@dfinity/auth-client": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
-    "@dfinity/principal": "^0.19.2",
-
     "@dfinity/internet-identity-vc-api": "*",
+    "@dfinity/principal": "^0.19.2",
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
