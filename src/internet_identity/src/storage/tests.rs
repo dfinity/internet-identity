@@ -30,7 +30,7 @@ fn should_match_actual_header_size() {
 fn should_report_max_number_of_entries_for_32gb() {
     let memory = VectorMemory::default();
     let storage = Storage::new((1, 2), memory);
-    assert_eq!(storage.max_entries(), 8_178_860);
+    assert_eq!(storage.max_entries(), 8_388_576);
 }
 
 #[test]

@@ -171,7 +171,11 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
 #[test]
 fn metrics_should_list_expected_user_range() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        arg_with_anchor_range((10_000, 8_188_860)),
+    );
 
     let metrics = get_metrics(&env, canister_id);
 

@@ -63,6 +63,7 @@
 //! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
 //! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
 //! were used instead).
+use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
 use std::fmt;
 use std::io::{Read, Write};
@@ -94,22 +95,18 @@ mod tests;
 // version  8+: invalid
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=7;
 
-const WASM_PAGE_SIZE: u64 = 65_536;
-
 /// Reserved space for the header before the anchor records start.
-const ENTRY_OFFSET: u64 = 2 * WASM_PAGE_SIZE; // 1 page reserved for II config, 1 for memory manager
+const ENTRY_OFFSET: u64 = 2 * WASM_PAGE_SIZE_IN_BYTES as u64; // 1 page reserved for II config, 1 for memory manager
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
 const MAX_STABLE_MEMORY_SIZE: u64 = 32 * GB;
-const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
+const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES as u64;
 
 /// In practice, II has 48 GB of stable memory available.
 /// This limit has last been raised when it was still 32 GB.
 const STABLE_MEMORY_SIZE: u64 = 32 * GB;
-/// We reserve the last ~800 MB of stable memory for later new features.
-const STABLE_MEMORY_RESERVE: u64 = 8 * GB / 10;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
@@ -123,8 +120,7 @@ const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const BUCKET_SIZE_IN_PAGES: u16 = 128;
 
 /// The maximum number of anchors this canister can store.
-pub const DEFAULT_RANGE_SIZE: u64 =
-    (STABLE_MEMORY_SIZE - ENTRY_OFFSET - STABLE_MEMORY_RESERVE) / DEFAULT_ENTRY_SIZE as u64;
+pub const DEFAULT_RANGE_SIZE: u64 = (STABLE_MEMORY_SIZE - ENTRY_OFFSET) / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
@@ -334,8 +330,8 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Returns the maximum number of entries that this storage can fit.
     pub fn max_entries(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - self.header.first_entry_offset - STABLE_MEMORY_RESERVE)
-            / self.header.entry_size as u64) as usize
+        ((STABLE_MEMORY_SIZE - self.header.first_entry_offset) / self.header.entry_size as u64)
+            as usize
     }
 
     pub fn assigned_anchor_number_range(&self) -> (AnchorNumber, AnchorNumber) {
