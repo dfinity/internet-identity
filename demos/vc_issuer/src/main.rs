@@ -19,8 +19,8 @@ use vc_util::issuer_api::{
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
-    did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
-    vc_signing_input_hash, AliasTuple,
+    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
+    vc_signing_input, vc_signing_input_hash, AliasTuple, CredentialParams,
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
@@ -273,7 +273,10 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
 async fn vc_consent_message(
     req: Icrc21VcConsentMessageRequest,
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
-    get_vc_consent_message(&req.credential_spec, &SupportedLanguage::from(req.preferences))
+    get_vc_consent_message(
+        &req.credential_spec,
+        &SupportedLanguage::from(req.preferences),
+    )
 }
 
 fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
@@ -416,80 +419,46 @@ fn calculate_seed(principal: &Principal) -> Hash {
     hash_bytes(bytes)
 }
 
-mod jwt_util {
-    use super::*;
-    use identity_core::common::{Timestamp, Url};
-    use identity_core::convert::FromJson;
-    use identity_credential::credential::{Credential, CredentialBuilder, Subject};
-    use serde_json::json;
-
-    pub struct CredentialParams {
-        pub spec: CredentialSpec,
-        pub subject_id: String,
-        pub credential_id_url: String,
-        pub issuer_url: String,
-        pub expiration_timestamp_s: u32,
-    }
-
-    fn credential_args_to_json(spec: &CredentialSpec) -> serde_json::Value {
-        let mut args_map = serde_json::Map::new();
-        if let Some(args) = spec.arguments.as_ref() {
-            for arg in args {
-                args_map.insert(arg.0.clone(), arg.1.clone().into());
-            }
-        }
-        serde_json::Value::Object(args_map)
-    }
-
-    pub fn build_credential_jwt(params: CredentialParams) -> String {
-        let mut subject_json = json!({"id": params.subject_id});
-        subject_json.as_object_mut().unwrap().insert(params.spec.credential_type.clone(), credential_args_to_json(&params.spec));
-        let subject = Subject::from_json_value(subject_json).unwrap();
-        let expiration_date = Timestamp::from_unix(params.expiration_timestamp_s as i64)
-            .expect("internal: failed computing expiration timestamp");
-        let credential: Credential = CredentialBuilder::default()
-            .id(Url::parse(params.credential_id_url).unwrap())
-            .issuer(Url::parse(params.issuer_url).unwrap())
-            .type_(params.spec.credential_type)
-            .subject(subject)
-            .expiration_date(expiration_date)
-            .build()
-            .unwrap();
-        credential.serialize_jwt().unwrap()
-    }
-}
-
-fn bachelor_degree_credential(subject_principal: Principal, credential_spec: &CredentialSpec) -> String {
-    let params = jwt_util::CredentialParams {
+fn bachelor_degree_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
         spec: credential_spec.clone(),
         subject_id: did_for_principal(subject_principal),
         credential_id_url: "https://example.edu/credentials/3732".to_string(),
         issuer_url: "https://example.edu".to_string(),
-        expiration_timestamp_s: exp_timestamp_s() ,
+        expiration_timestamp_s: exp_timestamp_s(),
     };
-    jwt_util::build_credential_jwt(params)
+    build_credential_jwt(params)
 }
 
-fn dfinity_employment_credential(subject_principal: Principal, credential_spec: &CredentialSpec) -> String {
-    let params = jwt_util::CredentialParams {
+fn dfinity_employment_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
         spec: credential_spec.clone(),
         subject_id: did_for_principal(subject_principal),
         credential_id_url: "https://employment.info/credentials/42".to_string(),
         issuer_url: "https://employment.info".to_string(),
-        expiration_timestamp_s: exp_timestamp_s() ,
+        expiration_timestamp_s: exp_timestamp_s(),
     };
-    jwt_util::build_credential_jwt(params)
+    build_credential_jwt(params)
 }
 
-fn verified_adult_credential(subject_principal: Principal, credential_spec: &CredentialSpec) -> String {
-    let params = jwt_util::CredentialParams {
+fn verified_adult_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
         spec: credential_spec.clone(),
         subject_id: did_for_principal(subject_principal),
         credential_id_url: "https://age_verifier.info/credentials/42".to_string(),
         issuer_url: "https://age_verifier.info".to_string(),
         expiration_timestamp_s: exp_timestamp_s(),
     };
-    jwt_util::build_credential_jwt(params)
+    build_credential_jwt(params)
 }
 
 fn exp_timestamp_s() -> u32 {
@@ -529,7 +498,10 @@ fn prepare_credential_jwt(
             ADULTS.with_borrow(|adults| {
                 verify_authorized_principal(credential_type, alias_tuple, adults)
             })?;
-            Ok(verified_adult_credential(alias_tuple.id_alias, &credential_spec))
+            Ok(verified_adult_credential(
+                alias_tuple.id_alias,
+                &credential_spec,
+            ))
         }
     }
 }

@@ -4,8 +4,9 @@ use canister_sig_util::{extract_raw_canister_sig_pk_from_der, CanisterSigPublicK
 use ic_certification::Hash;
 use ic_crypto_standalone_sig_verifier::verify_canister_sig;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
+use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
-use identity_credential::credential::{Jwt, Subject};
+use identity_credential::credential::{Credential, CredentialBuilder, Jwt, Subject};
 use identity_credential::error::Error as JwtVcError;
 use identity_credential::presentation::{Presentation, PresentationJwtClaims};
 use identity_credential::validator::JwtValidationError;
@@ -16,7 +17,7 @@ use identity_jose::jws::{
 };
 use identity_jose::jwt::JwtClaims;
 use identity_jose::jwu::{decode_b64, encode_b64};
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::ops::{Add, Deref, DerefMut};
 
@@ -295,6 +296,45 @@ pub fn validate_ii_presentation_and_claims(
     Ok(())
 }
 
+pub struct CredentialParams {
+    pub spec: CredentialSpec,
+    pub subject_id: String,
+    pub credential_id_url: String,
+    pub issuer_url: String,
+    pub expiration_timestamp_s: u32,
+}
+
+/// Builds a verifiable credential with the given parameters and returns the credential as a JWT-string.
+pub fn build_credential_jwt(params: CredentialParams) -> String {
+    let mut subject_json = json!({"id": params.subject_id});
+    subject_json.as_object_mut().unwrap().insert(
+        params.spec.credential_type.clone(),
+        credential_spec_args_to_json(&params.spec),
+    );
+    let subject = Subject::from_json_value(subject_json).unwrap();
+    let expiration_date = Timestamp::from_unix(params.expiration_timestamp_s as i64)
+        .expect("internal: failed computing expiration timestamp");
+    let credential: Credential = CredentialBuilder::default()
+        .id(Url::parse(params.credential_id_url).unwrap())
+        .issuer(Url::parse(params.issuer_url).unwrap())
+        .type_(params.spec.credential_type)
+        .subject(subject)
+        .expiration_date(expiration_date)
+        .build()
+        .unwrap();
+    credential.serialize_jwt().unwrap()
+}
+
+fn credential_spec_args_to_json(spec: &CredentialSpec) -> serde_json::Value {
+    let mut args_map = serde_json::Map::new();
+    if let Some(args) = spec.arguments.as_ref() {
+        for arg in args {
+            args_map.insert(arg.0.clone(), arg.1.clone().into());
+        }
+    }
+    serde_json::Value::Object(args_map)
+}
+
 /// Returns the given `signing_input` prefixed with
 ///      length(VC_SIGNING_INPUT_DOMAIN) || VC_SIGNING_INPUT_DOMAIN
 /// (for domain separation).
@@ -388,7 +428,7 @@ fn validate_expiration(
 //  - `vc_claims` contain "type"-claim that contains `spec.credential_type`
 //  - `vc_claims` contain claim named `spec.credential_type` with arguments that match `spec.arguments`,
 //     cf. a convention at https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md#recommended-convention-connecting-credential-specification-with-the-returned-credentials
-fn validate_claims_match_spec(
+pub fn validate_claims_match_spec(
     vc_claims: &Map<String, Value>,
     spec: &CredentialSpec,
 ) -> Result<(), JwtValidationError> {
@@ -1075,12 +1115,12 @@ mod tests {
     fn credential_spec_with_2_args() -> CredentialSpec {
         let mut args = HashMap::new();
         args.insert(
-            "firstArg".to_string(),
+            "anotherFirstArg".to_string(),
             ArgumentValue::String("string arg value".to_string()),
         );
         args.insert("secondArg".to_string(), ArgumentValue::Int(42));
         CredentialSpec {
-            credential_type: "vcWithOneArg".to_string(),
+            credential_type: "vcWithTwoArgs".to_string(),
             arguments: Some(args),
         }
     }

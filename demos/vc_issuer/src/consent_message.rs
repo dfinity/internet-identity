@@ -1,7 +1,7 @@
 //! This module contains the various consent messages that is displayed to the user when they are asked to consent to the issuance of a credential.
 
-use crate::SupportedCredentialType;
 use crate::verify_credential_spec;
+use crate::SupportedCredentialType;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
@@ -146,7 +146,10 @@ fn render_consent_message(
         }
     };
     let template = CONSENT_MESSAGE_TEMPLATES
-        .get(&(CredentialTemplateType::from(&credential_type), language.clone()))
+        .get(&(
+            CredentialTemplateType::from(&credential_type),
+            language.clone(),
+        ))
         .ok_or(Icrc21Error::ConsentMessageUnavailable(Icrc21ErrorInfo {
             description: "Consent message template not found".to_string(),
         }))?;

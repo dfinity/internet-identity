@@ -12,8 +12,6 @@ use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
-use identity_core::common::Value;
-use identity_jose::jwt::JwtClaims;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, PrepareIdAliasRequest,
@@ -31,7 +29,8 @@ use vc_util::issuer_api::{
     SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
-    did_for_principal, get_verified_id_alias_from_jws, verify_credential_jws_with_canister_id,
+    get_verified_id_alias_from_jws, validate_claims_match_spec,
+    verify_credential_jws_with_canister_id,
 };
 
 const DUMMY_ROOT_KEY: &str ="308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c05030201036100adf65638a53056b2222c91bb2457b0274bca95198a5acbdadfe7fd72178f069bdea8d99e9479d8087a2686fc81bf3c4b11fe275570d481f1698f79d468afe0e57acc1e298f8b69798da7a891bbec197093ec5f475909923d48bfed6843dbed1f";
@@ -624,36 +623,11 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
         )
         .expect("credential verification failed");
-        validate_vc_claims(
-            &claims,
-            &credential_spec,
-            id_alias_credentials.issuer_id_alias_credential.id_alias,
-        );
+        let vc_claims = claims.vc().expect("missing VC claims");
+        validate_claims_match_spec(vc_claims, &credential_spec).expect("Clam validation failed");
     }
 
     Ok(())
-}
-
-/// Validates that the given claims are consistent with the credential spec and the
-/// requesting principal.
-fn validate_vc_claims(
-    claims: &JwtClaims<Value>,
-    credential_spec: &CredentialSpec,
-    subject_principal: Principal,
-) {
-    assert_eq!(
-        claims.sub(),
-        Some(did_for_principal(subject_principal)).as_deref()
-    );
-    let vc = claims.vc().expect("missing vc in id_alias JWT claims");
-    assert_eq!(
-        vc.get("type"),
-        Some(Value::Array(vec![
-            Value::String("VerifiableCredential".to_string()),
-            Value::String(credential_spec.credential_type.clone())
-        ]))
-        .as_ref()
-    );
 }
 
 #[test]
