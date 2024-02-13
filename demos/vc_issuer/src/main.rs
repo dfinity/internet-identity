@@ -7,24 +7,20 @@ use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
-use identity_core::common::{Timestamp, Url};
-use identity_core::convert::FromJson;
-use identity_credential::credential::{Credential, CredentialBuilder, Subject};
 use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
-    Icrc21ErrorInfo, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
-    did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws, vc_signing_input,
-    vc_signing_input_hash, AliasTuple,
+    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
+    vc_signing_input, vc_signing_input_hash, AliasTuple, CredentialParams,
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
@@ -180,23 +176,14 @@ async fn prepare_credential(
         Ok(alias_tuple) => alias_tuple,
         Err(err) => return Err(err),
     };
-    let credential_type = match verify_credential_spec(&req.credential_spec) {
-        Ok(credential_type) => credential_type,
-        Err(err) => {
-            return Err(IssueCredentialError::UnsupportedCredentialSpec(err));
-        }
-    };
 
-    let credential = match prepare_credential_payload(&credential_type, &alias_tuple) {
+    let credential_jwt = match prepare_credential_jwt(&req.credential_spec, &alias_tuple) {
         Ok(credential) => credential,
         Err(err) => return Result::<PreparedCredentialData, IssueCredentialError>::Err(err),
     };
     let seed = calculate_seed(&alias_tuple.id_alias);
     let canister_id = ic_cdk::id();
     let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
-    let credential_jwt = credential
-        .serialize_jwt()
-        .expect("internal: JWT serialization failure");
     let signing_input =
         vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
     let msg_hash = vc_signing_input_hash(&signing_input);
@@ -286,15 +273,10 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
 async fn vc_consent_message(
     req: Icrc21VcConsentMessageRequest,
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
-    let credential_type = match verify_credential_spec(&req.credential_spec) {
-        Ok(credential_type) => credential_type,
-        Err(err) => {
-            return Err(Icrc21Error::UnsupportedCanisterCall(Icrc21ErrorInfo {
-                description: err,
-            }));
-        }
-    };
-    get_vc_consent_message(&credential_type, &SupportedLanguage::from(req.preferences))
+    get_vc_consent_message(
+        &req.credential_spec,
+        &SupportedLanguage::from(req.preferences),
+    )
 }
 
 fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
@@ -437,108 +419,95 @@ fn calculate_seed(principal: &Principal) -> Hash {
     hash_bytes(bytes)
 }
 
-fn bachelor_degree_credential(subject_principal: Principal, institution_name: &str) -> Credential {
-    let subject: Subject = Subject::from_json_value(json!({
-      "id": did_for_principal(subject_principal),
-      "VerifiedDegree": {
-        "type": "BachelorDegree",
-        "name": "Bachelor of Engineering",
-        "institutionName": institution_name,
-      },
-    }))
-    .unwrap();
-
-    // Build credential using subject above and issuer.
-    CredentialBuilder::default()
-        .id(Url::parse("https://example.edu/credentials/3732").unwrap())
-        .issuer(Url::parse("https://example.edu").unwrap())
-        .type_("UniversityDegreeCredential")
-        .subject(subject)
-        .expiration_date(exp_timestamp())
-        .build()
-        .unwrap()
+fn bachelor_degree_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
+        spec: credential_spec.clone(),
+        subject_id: did_for_principal(subject_principal),
+        credential_id_url: "https://example.edu/credentials/3732".to_string(),
+        issuer_url: "https://example.edu".to_string(),
+        expiration_timestamp_s: exp_timestamp_s(),
+    };
+    build_credential_jwt(params)
 }
 
-fn dfinity_employment_credential(subject_principal: Principal, employer_name: &str) -> Credential {
-    let subject: Subject = Subject::from_json_value(json!({
-      "id": did_for_principal(subject_principal),
-      "VerifiedEmployee": {
-            "employerId" : "did:web:dfinity.org",
-            "employerName": employer_name,
-      },
-    }))
-    .unwrap();
-
-    // Build credential using subject above and issuer.
-    CredentialBuilder::default()
-        .id(Url::parse("https://employment.info/credentials/42").unwrap())
-        .issuer(Url::parse("https://employment.info").unwrap())
-        .type_("VerifiedEmployee")
-        .subject(subject)
-        .expiration_date(exp_timestamp())
-        .build()
-        .unwrap()
+fn dfinity_employment_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
+        spec: credential_spec.clone(),
+        subject_id: did_for_principal(subject_principal),
+        credential_id_url: "https://employment.info/credentials/42".to_string(),
+        issuer_url: "https://employment.info".to_string(),
+        expiration_timestamp_s: exp_timestamp_s(),
+    };
+    build_credential_jwt(params)
 }
 
-fn verified_adult_credential(subject_principal: Principal, min_age: u16) -> Credential {
-    let subject: Subject = Subject::from_json_value(json!({
-      "id": did_for_principal(subject_principal),
-      "VerifiedAdult": {
-          "minAge": min_age,
-      },
-    }))
-    .unwrap();
-
-    // Build credential using subject above and issuer.
-    CredentialBuilder::default()
-        .id(Url::parse("https://age_verifier.info/credentials/42").unwrap())
-        .issuer(Url::parse("https://age_verifier.info").unwrap())
-        .type_("VerifiedAdult")
-        .subject(subject)
-        .expiration_date(exp_timestamp())
-        .build()
-        .unwrap()
+fn verified_adult_credential(
+    subject_principal: Principal,
+    credential_spec: &CredentialSpec,
+) -> String {
+    let params = CredentialParams {
+        spec: credential_spec.clone(),
+        subject_id: did_for_principal(subject_principal),
+        credential_id_url: "https://age_verifier.info/credentials/42".to_string(),
+        issuer_url: "https://age_verifier.info".to_string(),
+        expiration_timestamp_s: exp_timestamp_s(),
+    };
+    build_credential_jwt(params)
 }
 
-fn exp_timestamp() -> Timestamp {
-    Timestamp::from_unix(((time() + VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as i64)
-        .expect("internal: failed computing expiration timestamp")
+fn exp_timestamp_s() -> u32 {
+    ((time() + VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as u32
 }
 
-fn prepare_credential_payload(
-    credential_type: &SupportedCredentialType,
+fn prepare_credential_jwt(
+    credential_spec: &CredentialSpec,
     alias_tuple: &AliasTuple,
-) -> Result<Credential, IssueCredentialError> {
+) -> Result<String, IssueCredentialError> {
+    let credential_type = match verify_credential_spec(credential_spec) {
+        Ok(credential_type) => credential_type,
+        Err(err) => {
+            return Err(IssueCredentialError::UnsupportedCredentialSpec(err));
+        }
+    };
     match credential_type {
-        VerifiedEmployee(employer_name) => {
+        VerifiedEmployee(_) => {
             EMPLOYEES.with_borrow(|employees| {
                 verify_authorized_principal(credential_type, alias_tuple, employees)
             })?;
             Ok(dfinity_employment_credential(
                 alias_tuple.id_alias,
-                employer_name.as_str(),
+                credential_spec,
             ))
         }
-        UniversityDegree(institution_name) => {
+        UniversityDegree(_) => {
             GRADUATES.with_borrow(|graduates| {
                 verify_authorized_principal(credential_type, alias_tuple, graduates)
             })?;
             Ok(bachelor_degree_credential(
                 alias_tuple.id_alias,
-                institution_name.as_str(),
+                credential_spec,
             ))
         }
-        VerifiedAdult(min_age) => {
+        VerifiedAdult(_) => {
             ADULTS.with_borrow(|adults| {
                 verify_authorized_principal(credential_type, alias_tuple, adults)
             })?;
-            Ok(verified_adult_credential(alias_tuple.id_alias, *min_age))
+            Ok(verified_adult_credential(
+                alias_tuple.id_alias,
+                credential_spec,
+            ))
         }
     }
 }
 
 fn verify_authorized_principal(
-    credential_type: &SupportedCredentialType,
+    credential_type: SupportedCredentialType,
     alias_tuple: &AliasTuple,
     authorized_principals: &HashSet<Principal>,
 ) -> Result<(), IssueCredentialError> {

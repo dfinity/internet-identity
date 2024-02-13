@@ -1,12 +1,13 @@
 //! This module contains the various consent messages that is displayed to the user when they are asked to consent to the issuance of a credential.
 
+use crate::verify_credential_spec;
 use crate::SupportedCredentialType;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use strfmt::strfmt;
 use vc_util::issuer_api::{
-    Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo,
+    CredentialSpec, Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo,
 };
 use SupportedLanguage::{English, German};
 
@@ -123,26 +124,37 @@ impl Display for SupportedLanguage {
 }
 
 pub fn get_vc_consent_message(
-    credential_type: &SupportedCredentialType,
+    credential_spec: &CredentialSpec,
     language: &SupportedLanguage,
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
-    render_consent_message(credential_type, language).map(|message| Icrc21ConsentInfo {
+    render_consent_message(credential_spec, language).map(|message| Icrc21ConsentInfo {
         consent_message: message,
         language: format!("{}", language),
     })
 }
 
 fn render_consent_message(
-    credential: &SupportedCredentialType,
+    credential_spec: &CredentialSpec,
     language: &SupportedLanguage,
 ) -> Result<String, Icrc21Error> {
+    let credential_type = match verify_credential_spec(credential_spec) {
+        Ok(credential_type) => credential_type,
+        Err(err) => {
+            return Err(Icrc21Error::UnsupportedCanisterCall(Icrc21ErrorInfo {
+                description: err,
+            }));
+        }
+    };
     let template = CONSENT_MESSAGE_TEMPLATES
-        .get(&(CredentialTemplateType::from(credential), language.clone()))
+        .get(&(
+            CredentialTemplateType::from(&credential_type),
+            language.clone(),
+        ))
         .ok_or(Icrc21Error::ConsentMessageUnavailable(Icrc21ErrorInfo {
             description: "Consent message template not found".to_string(),
         }))?;
 
-    strfmt(template, &HashMap::from([credential.to_param_tuple()])).map_err(|e| {
+    strfmt(template, &HashMap::from([credential_type.to_param_tuple()])).map_err(|e| {
         Icrc21Error::ConsentMessageUnavailable(Icrc21ErrorInfo {
             description: e.to_string(),
         })
