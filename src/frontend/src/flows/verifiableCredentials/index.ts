@@ -1,13 +1,10 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
-import {
-  CredentialSpec,
-  IssuedCredentialData,
-} from "$generated/vc_issuer_types";
-import { handleLogin } from "$src/components/authenticateBox";
+import { useIdentity } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
+import { validateDerivationOrigin } from "$src/flows/authorize/validateDerivationOrigin";
 import { getAnchorByPrincipal } from "$src/storage";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import {
@@ -16,8 +13,11 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@dfinity/identity";
+import {
+  CredentialSpec,
+  IssuedCredentialData,
+} from "@dfinity/internet-identity-vc-api";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { base64url } from "jose";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
 import { VcVerifiablePresentation, vcProtocol } from "./postMessageInterface";
@@ -70,8 +70,9 @@ const verifyCredentials = async ({
     credentialSubject: givenP_RP,
     issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId_ },
     credentialSpec,
+    derivationOrigin: rpDerivationOrigin,
   },
-  rpOrigin,
+  rpOrigin: rpOrigin_,
 }: { connection: Connection } & VerifyCredentialsArgs) => {
   // Look up the canister ID from the origin
   const lookedUp = await withLoader(() =>
@@ -90,6 +91,15 @@ const verifyCredentials = async ({
     }
   }
 
+  const validationResult = await withLoader(() =>
+    validateDerivationOrigin(rpOrigin_, rpDerivationOrigin)
+  );
+  if (validationResult.result === "invalid") {
+    return abortedCredentials({ reason: "bad_derivation_origin_rp" });
+  }
+  validationResult.result satisfies "valid";
+  const rpOrigin = rpDerivationOrigin ?? rpOrigin_;
+
   const vcIssuer = new VcIssuer(issuerCanisterId);
   // XXX: We don't check that the language matches the user's language. We need
   // to figure what to do UX-wise first.
@@ -100,13 +110,15 @@ const verifyCredentials = async ({
   }
 
   const userNumber_ = await getAnchorByPrincipal({
-    origin: rpOrigin,
+    origin:
+      rpOrigin_ /* NOTE: the storage uses the request origin, not the derivation origin */,
     principal: givenP_RP,
   });
 
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({
-    relyingOrigin: rpOrigin,
+    relyingOrigin:
+      rpOrigin_ /* NOTE: the design does not show the derivation origin (yet) */,
     providerOrigin: issuerOrigin,
     consentMessage: consentInfo.consent_message,
     userNumber: userNumber_,
@@ -119,12 +131,7 @@ const verifyCredentials = async ({
   const userNumber = allowed.userNumber;
 
   // For the rest of the flow we need to be authenticated, so authenticate
-  // XXX: this simply breaks for PIN identities
-  const authResult = await withLoader(() =>
-    handleLogin({
-      login: () => connection.login(userNumber),
-    })
-  );
+  const authResult = await useIdentity({ userNumber, connection });
 
   if (authResult.tag !== "ok") {
     return abortedCredentials({ reason: "auth_failed_ii" });
@@ -379,6 +386,18 @@ const authenticateForIssuer = async ({
   return { ok: DelegationIdentity.fromDelegation(tempIdentity, delegations) };
 };
 
+// Perform a "base64url" encoding, i.e. a URL-friendly variation of base64 encoding
+const base64UrlEncode = (x: unknown): string => {
+  const json = JSON.stringify(x);
+  // Pretend the json is binary and use btoa (binary-to-ascii as base64) to base64 encode
+  const b64 = btoa(json);
+  // make it URL friendly:
+  // '=': used as padding, just remove
+  // '/': Base64Url as per jwt.io's playground replaces it with '_'
+  // '+': Base64Url as per jwt.io's playground replaces it with '-'
+  return b64.replace(/=+$/, "").replace("/", "_").replace("+", "-");
+};
+
 // Create the final presentation (to be then returned to the RP)
 const createPresentation = ({
   issuerCanisterId,
@@ -404,8 +423,8 @@ const createPresentation = ({
     },
   };
 
-  const header = base64url.encode(JSON.stringify(headerObj));
-  const payload = base64url.encode(JSON.stringify(payloadObj));
+  const header = base64UrlEncode(headerObj);
+  const payload = base64UrlEncode(payloadObj);
 
   // NOTE: the JWT is not signed, as per the spec
   const signature = "";

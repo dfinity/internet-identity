@@ -1,16 +1,22 @@
-use crate::anchor_management::{post_operation_bookkeeping, tentative_device_registration};
+use crate::anchor_management::tentative_device_registration;
+use crate::anchor_management::tentative_device_registration::{
+    TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
+};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::ii_domain::IIDomain;
-use crate::storage::anchor::Anchor;
+use authz_utils::{
+    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
+};
 use candid::{candid_method, Principal};
 use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use internet_identity_interface::archive::types::{BufferedEntry, Operation};
+use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
+    PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
@@ -21,6 +27,10 @@ mod activity_stats;
 mod anchor_management;
 mod archive;
 mod assets;
+mod authz_utils;
+
+/// Type conversions between internal and external types.
+mod conversions;
 mod delegation;
 mod hash;
 mod http;
@@ -52,14 +62,14 @@ async fn init_salt() {
 #[update]
 #[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    authenticate_and_record_activity(anchor_number);
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
 #[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    authenticate_and_record_activity(anchor_number);
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
@@ -69,7 +79,29 @@ async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    tentative_device_registration::add_tentative_device(anchor_number, device_data).await
+    let result =
+        tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
+    match result {
+        Ok(TentativeRegistrationInfo {
+            verification_code,
+            device_registration_timeout,
+        }) => AddTentativeDeviceResponse::AddedTentatively {
+            verification_code,
+            device_registration_timeout,
+        },
+        Err(err) => match err {
+            TentativeDeviceRegistrationError::DeviceRegistrationModeOff => {
+                AddTentativeDeviceResponse::DeviceRegistrationModeOff
+            }
+            TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
+                AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
+            }
+            TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
+                // Legacy API traps instead of returning an error.
+                trap(String::from(err).as_str())
+            }
+        },
+    }
 }
 
 #[update]
@@ -78,13 +110,31 @@ fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
 ) -> VerifyTentativeDeviceResponse {
-    authenticated_anchor_operation(anchor_number, |anchor| {
+    let result = anchor_operation_with_authz_check(anchor_number, |anchor| {
         tentative_device_registration::verify_tentative_device(
             anchor,
             anchor_number,
             user_verification_code,
         )
-    })
+    });
+    match result {
+        Ok(()) => VerifyTentativeDeviceResponse::Verified,
+        Err(err) => match err {
+            VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+                VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
+            }
+            VerifyTentativeDeviceError::NoDeviceToVerify => {
+                VerifyTentativeDeviceResponse::NoDeviceToVerify
+            }
+            VerifyTentativeDeviceError::WrongCode { retries_left } => {
+                VerifyTentativeDeviceResponse::WrongCode { retries_left }
+            }
+            VerifyTentativeDeviceError::IdentityUpdateError(err) => {
+                // Legacy API traps instead of returning an error.
+                trap(String::from(err).as_str())
+            }
+        },
+    }
 }
 
 #[update]
@@ -106,42 +156,46 @@ fn register(
 #[update]
 #[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok(((), anchor_management::add(anchor, device_data)))
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
+        Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
     })
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
+        Ok::<_, String>((
             (),
             anchor_management::update(anchor, device_key, device_data),
         ))
     })
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
+        Ok::<_, String>((
             (),
             anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
 #[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    authenticated_anchor_operation(anchor_number, |anchor| {
-        Ok((
+    anchor_operation_with_authz_check(anchor_number, |anchor| {
+        Ok::<_, String>((
             (),
             anchor_management::remove(anchor_number, anchor, device_key),
         ))
     })
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
@@ -149,26 +203,28 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 #[query]
 #[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
-    state::storage_borrow(|storage| {
-        storage
-            .read(anchor_number)
-            .unwrap_or_default()
-            .into_devices()
-            .into_iter()
-            .map(DeviceData::from)
-            .map(|mut d| {
-                // Remove non-public fields.
-                d.alias = "".to_string();
-                d
-            })
-            .collect()
-    })
+    let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
+        return vec![];
+    };
+    anchor
+        .into_devices()
+        .into_iter()
+        .map(DeviceData::from)
+        .map(|mut d| {
+            // Remove non-public fields.
+            d.alias = "".to_string();
+            d.metadata = None;
+            d
+        })
+        .collect()
 }
 
 #[query]
 #[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
-    let anchor = state::storage_borrow(|storage| storage.read(anchor_number).unwrap_or_default());
+    let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
+        return AnchorCredentials::default();
+    };
 
     anchor.into_devices().into_iter().fold(
         AnchorCredentials {
@@ -198,14 +254,14 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 #[update] // this is an update call because queries are not (yet) certified
 #[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    authenticate_and_record_activity(anchor_number);
+    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
 #[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    let Ok(_) = check_authentication(anchor_number) else {
+    let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_principal(anchor_number, frontend)
@@ -219,7 +275,8 @@ async fn prepare_delegation(
     session_key: SessionKey,
     max_time_to_live: Option<u64>,
 ) -> (UserKey, Timestamp) {
-    let ii_domain = authenticate_and_record_activity(anchor_number);
+    let ii_domain = check_authz_and_record_activity(anchor_number)
+        .unwrap_or_else(|err| trap(&format!("{err}")));
     delegation::prepare_delegation(
         anchor_number,
         frontend,
@@ -238,7 +295,7 @@ fn get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> GetDelegationResponse {
-    let Ok(_) = check_authentication(anchor_number) else {
+    let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
@@ -418,83 +475,25 @@ fn update_root_hash() {
     })
 }
 
-/// Authenticates the caller (traps if not authenticated) and updates the device used to authenticate
-/// reflecting the current activity. Also updates the aggregated stats on daily and monthly active users.
-///
-/// Note: this function reads / writes the anchor from / to stable memory. It is intended to be used by functions that
-/// do not further modify the anchor.
-fn authenticate_and_record_activity(anchor_number: AnchorNumber) -> Option<IIDomain> {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
+/// Calls raw rand to retrieve a random salt (32 bytes).
+async fn random_salt() -> Salt {
+    let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
+        Ok((res,)) => res,
+        Err((_, err)) => trap(&format!("failed to get salt: {err}")),
     };
-    let domain = anchor.device(&device_key).unwrap().ii_domain();
-    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
-        |err| panic!("last_usage_timestamp update: unable to update anchor {anchor_number}: {err}"),
-    );
-    domain
-}
-
-/// Authenticates the caller (traps if not authenticated) calls the provided function and handles all
-/// the necessary bookkeeping for anchor operations.
-///
-/// * anchor_number: indicates the anchor to be provided op should be called on
-/// * op: Function that modifies an anchor and returns a value `R` wrapped in a [Result] indicating
-///       success or failure which determines whether additional bookkeeping (on success) is required.
-///       On success, the function must also return an [Operation] which is used for archiving purposes.
-///       The type `R` is usually bound to an interface type specified in the candid file. This type
-///       is either unit or a variant unifying success and error cases (which is why the [Result] has
-///       `R` in both success and error positions).
-fn authenticated_anchor_operation<R>(
-    anchor_number: AnchorNumber,
-    op: impl FnOnce(&mut Anchor) -> Result<(R, Operation), R>,
-) -> R {
-    let Ok((mut anchor, device_key)) = check_authentication(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-
-    let result = op(&mut anchor);
-
-    // write back anchor
-    state::storage_borrow_mut(|storage| storage.write(anchor_number, anchor)).unwrap_or_else(
-        |err| panic!("unable to update anchor {anchor_number} in stable memory: {err}"),
-    );
-
-    match result {
-        Ok((ret, operation)) => {
-            post_operation_bookkeeping(anchor_number, operation);
-            ret
-        }
-        Err(err) => err,
-    }
-}
-
-/// Checks if the caller is authenticated against the anchor provided and returns a reference to the device used.
-/// Returns an error if the caller cannot be authenticated.
-fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKey), ()> {
-    let anchor = state::anchor(anchor_number);
-    let caller = caller();
-
-    for device in anchor.devices() {
-        if caller == Principal::self_authenticating(&device.pubkey)
-            || state::with_temp_keys_mut(|temp_keys| {
-                temp_keys
-                    .check_temp_key(&caller, &device.pubkey, anchor_number)
-                    .is_ok()
-            })
-        {
-            return Ok((anchor.clone(), device.pubkey.clone()));
-        }
-    }
-    Err(())
+    let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
+        trap(&format!(
+            "expected raw randomness to be of length 32, got {}",
+            res.len()
+        ));
+    });
+    salt
 }
 
 /// New v2 API that aims to eventually replace the current API.
 /// The v2 API:
 /// * uses terminology more aligned with the front-end and is more consistent in its naming.
-/// * uses opt variant return types consistently in order to by able to extend / change return types
-///   in the future without breaking changes.
+/// * uses [Result] return types consistently.
 ///
 /// TODO, API v2 rollout plan:
 /// 1. Develop API v2 far enough so that front-ends can switch to it.
@@ -505,11 +504,49 @@ fn check_authentication(anchor_number: AnchorNumber) -> Result<(Anchor, DeviceKe
 mod v2_api {
     use super::*;
 
+    #[query]
+    #[candid_method(query)]
+    fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
+        let Ok(anchor) = state::storage_borrow(|storage| storage.read(identity_number)) else {
+            return Ok(IdentityAuthnInfo {
+                authn_methods: vec![],
+                recovery_authn_methods: vec![],
+            });
+        };
+
+        let authn_info = anchor.into_devices().into_iter().fold(
+            IdentityAuthnInfo {
+                authn_methods: vec![],
+                recovery_authn_methods: vec![],
+            },
+            |mut authn_info, device| {
+                let purpose = device.purpose;
+
+                let authn_method = if let Some(credential_id) = device.credential_id {
+                    AuthnMethod::WebAuthn(WebAuthn {
+                        credential_id,
+                        pubkey: device.pubkey,
+                    })
+                } else {
+                    AuthnMethod::PubKey(PublicKeyAuthn {
+                        pubkey: device.pubkey,
+                    })
+                };
+                match purpose {
+                    Purpose::Authentication => authn_info.authn_methods.push(authn_method),
+                    Purpose::Recovery => authn_info.recovery_authn_methods.push(authn_method),
+                }
+                authn_info
+            },
+        );
+        Ok(authn_info)
+    }
+
     #[update]
     #[candid_method]
-    async fn captcha_create() -> Option<CaptchaCreateResponse> {
+    async fn captcha_create() -> Result<Challenge, ()> {
         let challenge = anchor_management::registration::create_challenge().await;
-        Some(CaptchaCreateResponse::Ok(challenge))
+        Ok(challenge)
     }
 
     #[update]
@@ -518,29 +555,30 @@ mod v2_api {
         authn_method: AuthnMethodData,
         challenge_result: ChallengeAttempt,
         temp_key: Option<Principal>,
-    ) -> Option<IdentityRegisterResponse> {
-        let result = match DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| IdentityRegisterResponse::InvalidMetadata(err.to_string()))
-        {
-            Ok(device) => IdentityRegisterResponse::from(register(
-                DeviceData::from(device),
-                challenge_result,
-                temp_key,
-            )),
-            Err(err) => err,
-        };
-        Some(result)
+    ) -> Result<IdentityNumber, IdentityRegisterError> {
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| IdentityRegisterError::InvalidMetadata(err.to_string()))?;
+
+        match register(DeviceData::from(device), challenge_result, temp_key) {
+            RegisterResponse::Registered { user_number } => Ok(user_number),
+            RegisterResponse::CanisterFull => Err(IdentityRegisterError::CanisterFull),
+            RegisterResponse::BadChallenge => Err(IdentityRegisterError::BadCaptcha),
+        }
     }
 
     #[update]
     #[candid_method]
-    fn identity_info(identity_number: IdentityNumber) -> Option<IdentityInfoResponse> {
-        authenticate_and_record_activity(identity_number);
+    fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
+        check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
         let anchor_info = anchor_management::get_anchor_info(identity_number);
+
         let metadata = state::anchor(identity_number)
             .identity_metadata()
             .clone()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, MetadataEntryV2::from(v)))
+            .collect();
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
@@ -553,7 +591,7 @@ mod v2_api {
                 .map(AuthnMethodRegistration::from),
             metadata,
         };
-        Some(IdentityInfoResponse::Ok(identity_info))
+        Ok(identity_info)
     }
 
     #[update]
@@ -561,17 +599,10 @@ mod v2_api {
     fn authn_method_add(
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
-    ) -> Option<AuthnMethodAddResponse> {
-        let result = match DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| AuthnMethodAddResponse::InvalidMetadata(err.to_string()))
-        {
-            Ok(device) => {
-                add(identity_number, DeviceData::from(device));
-                AuthnMethodAddResponse::Ok
-            }
-            Err(err) => err,
-        };
-        Some(result)
+    ) -> Result<(), AuthnMethodAddError> {
+        DeviceWithUsage::try_from(authn_method)
+            .map(|device| add(identity_number, DeviceData::from(device)))
+            .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))
     }
 
     #[update]
@@ -579,24 +610,156 @@ mod v2_api {
     fn authn_method_remove(
         identity_number: IdentityNumber,
         public_key: PublicKey,
-    ) -> Option<AuthnMethodRemoveResponse> {
+    ) -> Result<(), ()> {
         remove(identity_number, public_key);
-        Some(AuthnMethodRemoveResponse::Ok)
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_replace(
+        identity_number: IdentityNumber,
+        authn_method_pk: PublicKey,
+        new_authn_method: AuthnMethodData,
+    ) -> Result<(), AuthnMethodReplaceError> {
+        let new_device = DeviceWithUsage::try_from(new_authn_method)
+            .map(DeviceData::from)
+            .map_err(|err| AuthnMethodReplaceError::InvalidMetadata(err.to_string()))?;
+        replace(identity_number, authn_method_pk, new_device);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_metadata_replace(
+        identity_number: IdentityNumber,
+        authn_method_pk: PublicKey,
+        new_metadata: HashMap<String, MetadataEntryV2>,
+    ) -> Result<(), AuthnMethodMetadataReplaceError> {
+        let anchor_info = get_anchor_info(identity_number);
+        let Some(device) = anchor_info
+            .into_device_data()
+            .into_iter()
+            .find(|d| d.pubkey == authn_method_pk)
+        else {
+            return Err(AuthnMethodMetadataReplaceError::AuthnMethodNotFound);
+        };
+
+        // We need to assign the metadata to an AuthnMethodData and then convert that to DeviceData in order to get
+        // the correct metadata validation with respect to reserved keys, etc.
+        let mut authn_method = AuthnMethodData::from(device);
+        authn_method.metadata = new_metadata;
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map(DeviceData::from)
+            .map_err(|err| AuthnMethodMetadataReplaceError::InvalidMetadata(err.to_string()))?;
+        update(identity_number, authn_method_pk, device);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_security_settings_replace(
+        identity_number: IdentityNumber,
+        authn_method_pk: PublicKey,
+        new_security_settings: AuthnMethodSecuritySettings,
+    ) -> Result<(), AuthnMethodSecuritySettingsReplaceError> {
+        let anchor_info = get_anchor_info(identity_number);
+        let Some(mut device) = anchor_info
+            .into_device_data()
+            .into_iter()
+            .find(|d| d.pubkey == authn_method_pk)
+        else {
+            return Err(AuthnMethodSecuritySettingsReplaceError::AuthnMethodNotFound);
+        };
+
+        device.protection = DeviceProtection::from(new_security_settings.protection);
+        device.purpose = Purpose::from(new_security_settings.purpose);
+        update(identity_number, authn_method_pk, device);
+        Ok(())
     }
 
     #[update]
     #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
-        metadata: HashMap<String, MetadataEntry>,
-    ) -> Option<IdentityMetadataReplaceResponse> {
-        let result = authenticated_anchor_operation(identity_number, |anchor| {
-            Ok((
-                IdentityMetadataReplaceResponse::Ok,
-                anchor_management::identity_metadata_replace(anchor, metadata),
+        metadata: HashMap<String, MetadataEntryV2>,
+    ) -> Result<(), IdentityMetadataReplaceError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            let metadata = metadata
+                .into_iter()
+                .map(|(k, v)| (k, MetadataEntry::from(v)))
+                .collect();
+            Ok::<_, IdentityMetadataReplaceError>((
+                (),
+                anchor_management::identity_metadata_replace(anchor, metadata)
+                    .map_err(IdentityMetadataReplaceError::from)?,
             ))
-        });
-        Some(result)
+        })
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_registration_mode_enter(
+        identity_number: IdentityNumber,
+    ) -> Result<RegistrationModeInfo, ()> {
+        let timeout = enter_device_registration_mode(identity_number);
+        Ok(RegistrationModeInfo {
+            expiration: timeout,
+        })
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
+        exit_device_registration_mode(identity_number);
+        Ok(())
+    }
+
+    #[update]
+    #[candid_method]
+    async fn authn_method_register(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
+        let result = add_tentative_device(identity_number, DeviceData::from(device)).await;
+        match result {
+            AddTentativeDeviceResponse::AddedTentatively {
+                device_registration_timeout,
+                verification_code,
+            } => Ok(AuthnMethodConfirmationCode {
+                expiration: device_registration_timeout,
+                confirmation_code: verification_code,
+            }),
+            AddTentativeDeviceResponse::DeviceRegistrationModeOff => {
+                Err(AuthnMethodRegisterError::RegistrationModeOff)
+            }
+            AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
+                Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
+            }
+        }
+    }
+
+    #[update]
+    #[candid_method]
+    fn authn_method_confirm(
+        identity_number: IdentityNumber,
+        confirmation_code: String,
+    ) -> Result<(), AuthnMethodConfirmationError> {
+        let response = verify_tentative_device(identity_number, confirmation_code);
+        match response {
+            VerifyTentativeDeviceResponse::Verified => Ok(()),
+            VerifyTentativeDeviceResponse::WrongCode { retries_left } => {
+                Err(AuthnMethodConfirmationError::WrongCode { retries_left })
+            }
+            VerifyTentativeDeviceResponse::DeviceRegistrationModeOff => {
+                Err(AuthnMethodConfirmationError::RegistrationModeOff)
+            }
+            VerifyTentativeDeviceResponse::NoDeviceToVerify => {
+                Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
+            }
+        }
     }
 }
 
@@ -606,8 +769,10 @@ mod attribute_sharing_mvp {
 
     #[update]
     #[candid_method]
-    async fn prepare_id_alias(req: PrepareIdAliasRequest) -> Option<PrepareIdAliasResponse> {
-        let _maybe_ii_domain = authenticate_and_record_activity(req.identity_number);
+    async fn prepare_id_alias(
+        req: PrepareIdAliasRequest,
+    ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
+        check_authz_and_record_activity(req.identity_number).map_err(PrepareIdAliasError::from)?;
         let prepared_id_alias = vc_mvp::prepare_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
@@ -616,19 +781,14 @@ mod attribute_sharing_mvp {
             },
         )
         .await;
-        Some(PrepareIdAliasResponse::Ok(prepared_id_alias))
+        Ok(prepared_id_alias)
     }
 
     #[query]
     #[candid_method(query)]
-    fn get_id_alias(req: GetIdAliasRequest) -> Option<GetIdAliasResponse> {
-        let Ok(_) = check_authentication(req.identity_number) else {
-            return Some(GetIdAliasResponse::AuthenticationFailed(format!(
-                "{} could not be authenticated.",
-                caller()
-            )));
-        };
-        let response = vc_mvp::get_id_alias(
+    fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
+        check_authorization(req.identity_number).map_err(GetIdAliasError::from)?;
+        vc_mvp::get_id_alias(
             req.identity_number,
             vc_mvp::InvolvedDapps {
                 relying_party: req.relying_party,
@@ -636,8 +796,7 @@ mod attribute_sharing_mvp {
             },
             &req.rp_id_alias_jwt,
             &req.issuer_id_alias_jwt,
-        );
-        Some(response)
+        )
     }
 }
 
@@ -649,7 +808,7 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is

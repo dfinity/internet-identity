@@ -1,7 +1,7 @@
 [
   {
     "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on chain",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
     "website": "https://dscvr.one/",
     "logo": "dscvr_logo.webp"
   },
@@ -25,8 +25,14 @@
   {
     "name": "NFID",
     "oneLiner": "Your digital identity for the modern world.",
-    "website": "https://t.co/FDpvRjszU3/",
+    "website": "https://nfid.one/",
     "logo": "nfid_logo.webp"
+  },
+  {
+    "name": "Trax",
+    "oneLiner": "Trax is the world's first artist and fan-owned music platform.",
+    "website": "https://trax.so/",
+    "logo": "trax_logo.webp"
   },
   {
     "name": "Dmail",
@@ -68,6 +74,12 @@
     "logo": "yumi_logo.webp"
   },
   {
+    "name": "Sonic DEX",
+    "oneLiner": "Sonic DEX is an AMM and Perpetual trading platform",
+    "website": "https://sonic.ooo/",
+    "logo": "sonic-dex_logo.webp"
+  },
+  {
     "name": "Stoic Wallet",
     "website": "https://www.stoicwallet.com/",
     "logo": "stoicwallet_logo.webp"
@@ -92,7 +104,7 @@
   },
   {
     "name": "Modclub",
-    "oneLiner": "The world's first AI powered Web3 crowdwork platform",
+    "oneLiner": "The world's first AI-powered Web3 crowdwork platform",
     "website": "https://modclub.ai",
     "logo": "modclub_logo.webp"
   },
@@ -128,7 +140,7 @@
   {
     "name": "Arth",
     "oneLiner": "Arth ckBTC wallet and swap btc<>ckBtc",
-    "website": "https://arth.foo",
+    "website": "https://play.google.com/store/apps/details?id=com.foo.arth&pli=1",
     "logo": "arth_logo.png"
   },
   {
@@ -178,7 +190,7 @@
   },
   {
     "name": "IC Drive",
-    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/#/",
+    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/",
     "logo": "icdrive_logo.webp"
   },
   {
@@ -188,7 +200,7 @@
   },
   {
     "name": "CrowdGov.org",
-    "oneLiner": "The simplified, one stop shop for IC Governance.",
+    "oneLiner": "The simplified, one-stop shop for IC Governance.",
     "website": "https://crowdgov.org",
     "logo": "crowdgovorg_logo.webp"
   },
@@ -302,7 +314,7 @@
   },
   {
     "name": "Vibeverse",
-    "oneLiner": "Where AI magic meets creative play in a universe of endless possibilities",
+    "oneLiner": "a learning mobile app that teaches ppl how to be creative with ai",
     "website": "https://vibeverse.xyz/",
     "logo": "vibeverse_logo.png"
   },
@@ -322,7 +334,7 @@
     "name": "Rakeoff",
     "website": "https://rakeoff.io/",
     "logo": "rakeoff_logo.webp",
-    "oneLiner": "Rakeoff is a user-friendly crypto staking rewards platform on ICP."
+    "oneLiner": "Rakeoff is a cryptocurrency staking rewards application built on the ICP blockchain."
   },
   {
     "name": "Tswaanda",
@@ -404,9 +416,39 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
+    "name": "TaxLint",
+    "oneLiner": "Your automated tax reporting IC assistant.",
+    "website": "https://vresg-vyaaa-aaaag-qcj2q-cai.icp0.io/",
+    "logo": "taxlint_logo.png"
+  },
+  {
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
     "logo": "icpsig_logo.png"
+  },
+  {
+    "name": "icRouter",
+    "website": "https://iclight.io/account",
+    "logo": "icrouter_logo.webp",
+    "oneLiner": "icRouter: A cross-chain network of assets"
+  },
+  {
+    "name": "The Asset App",
+    "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
+    "logo": "asset-app_logo.png",
+    "oneLiner": "Allows any user to generate their own file canister smart contract and visually manage their files on the Internet Computer without requiring any code"
+  },
+  {
+    "name": "icgpt",
+    "oneLiner": "A fun dApp to demonstrate on-chain LLMs",
+    "website": "https://icgpt.icpp.world/",
+    "logo": "icpp-logo.dracula-cyan.112x112.png"
+  },
+  {
+    "name": "Ping",
+    "website": "https://h7jna-pqaaa-aaaak-afgiq-cai.icp0.io/",
+    "logo": "ping_logo.webp",
+    "oneLiner": "Stay updated on ICP dapps with Ping!"
   }
 ]

@@ -1,7 +1,5 @@
-use crate::assets::{JS_SETUP_SCRIPT1_SRI_HASH, JS_SETUP_SCRIPT2_SRI_HASH};
 use crate::http::metrics::metrics;
 use crate::state;
-use asset_util::CertifiedAsset;
 use canister_sig_util::signature_map::LABEL_SIG;
 use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
@@ -36,7 +34,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     ),
                     ("Content-Length".to_string(), body.len().to_string()),
                 ];
-                headers.append(&mut security_headers());
+                headers.append(&mut security_headers(vec![]));
                 HttpResponse {
                     status_code: 200,
                     headers,
@@ -47,29 +45,23 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             }
             Err(err) => HttpResponse {
                 status_code: 500,
-                headers: security_headers(),
+                headers: security_headers(vec![]),
                 body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                 upgrade: None,
                 streaming_strategy: None,
             },
         },
-        probably_an_asset => match certified_asset(probably_an_asset, req.certificate_version) {
-            Some(CertifiedAsset {
-                mut headers,
-                content,
-            }) => {
-                headers.append(&mut security_headers());
-                HttpResponse {
-                    status_code: 200,
-                    headers,
-                    body: ByteBuf::from(content),
-                    upgrade: None,
-                    streaming_strategy: None,
-                }
-            }
+        probably_an_asset => match get_asset(probably_an_asset, req.certificate_version) {
+            Some((status_code, content, headers)) => HttpResponse {
+                status_code,
+                headers,
+                body: ByteBuf::from(content),
+                upgrade: None,
+                streaming_strategy: None,
+            },
             None => HttpResponse {
                 status_code: 404,
-                headers: security_headers(),
+                headers: security_headers(vec![]),
                 body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                 upgrade: None,
                 streaming_strategy: None,
@@ -81,13 +73,15 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 /// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
-pub fn security_headers() -> Vec<HeaderField> {
+///
+/// Integrity hashes for scripts must be speficied.
+pub fn security_headers(integrity_hashes: Vec<String>) -> Vec<HeaderField> {
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         (
             "Content-Security-Policy".to_string(),
-            content_security_policy_header(),
+            content_security_policy_header(integrity_hashes),
         ),
         (
             "Strict-Transport-Security".to_string(),
@@ -146,9 +140,9 @@ pub fn security_headers() -> Vec<HeaderField> {
 
 /// Full content security policy delivered via HTTP response header.
 ///
-/// The sha256 hash matches the inline script in index.html. This inline script is a workaround
-/// for Firefox not supporting SRI (recommended here https://csp.withgoogle.com/docs/faq.html#static-content).
-/// This also prevents use of trusted-types. See https://bugzilla.mozilla.org/show_bug.cgi?id=1409200.
+/// script-src 'strict-dynamic' ensures that only scripts with hashes listed here (through
+/// 'integrity_hashes') can be loaded. Transitively loaded scripts don't need their hashes
+/// listed.
 ///
 /// script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
 /// validation of bls signatures.
@@ -169,21 +163,29 @@ pub fn security_headers() -> Vec<HeaderField> {
 /// application. Adding hashes would require a big restructuring of the application and build
 /// infrastructure.
 ///
-/// NOTE about `script-src`: we cannot use a normal script tag like this
-///   <script src="index.js" integrity="sha256-..." defer></script>
-/// because Firefox does not support SRI with CSP: https://bugzilla.mozilla.org/show_bug.cgi?id=1409200
-/// Instead, we add the hash of the inline script to the CSP policy.
-///
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
-pub fn content_security_policy_header() -> String {
-    let hash1 = JS_SETUP_SCRIPT1_SRI_HASH.to_string();
-    let hash2 = JS_SETUP_SCRIPT2_SRI_HASH.to_string();
+fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
+    // Always include 'strict-dynamic', but only include integrity hashes if there are some
+    // (i.e. by default deny scripts and only allow whitelist)
+    let strict_dynamic = if integrity_hashes.is_empty() {
+        "'strict-dynamic'".to_string()
+    } else {
+        format!(
+            "'strict-dynamic' {}",
+            integrity_hashes
+                .into_iter()
+                .map(|x| format!("'{x}'"))
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
+    };
+
     let csp = format!(
         "default-src 'none';\
          connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
          img-src 'self' data:;\
-         script-src '{hash1}' '{hash2}' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+         script-src {strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:;\
          base-uri 'none';\
          form-action 'none';\
          style-src 'self' 'unsafe-inline';\
@@ -196,12 +198,23 @@ pub fn content_security_policy_header() -> String {
     csp
 }
 
-fn certified_asset(asset_name: &str, certificate_version: Option<u16>) -> Option<CertifiedAsset> {
+/// Read an asset from memory, returning the associated HTTP code, content and full list of
+/// headers that were certified with the asset.
+fn get_asset(
+    asset_name: &str,
+    certificate_version: Option<u16>,
+) -> Option<(u16, Vec<u8>, Vec<HeaderField>)> {
     state::assets_and_signatures(|assets, sigs| {
-        assets.certified_asset(
+        let asset = assets.get_certified_asset(
             asset_name,
             certificate_version,
             Some(pruned(labeled_hash(LABEL_SIG, &sigs.root_hash()))),
-        )
+        )?;
+        let shared_headers = assets.shared_headers.clone();
+
+        let mut headers = asset.headers.clone();
+        headers.append(&mut shared_headers.to_vec());
+
+        Some((asset.status_code, asset.content, headers))
     })
 }

@@ -416,11 +416,11 @@ xr-spatial-tracking=()",
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
         .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
-    assert!(Regex::new(
+    let rgx = Regex::new(
         "^default-src 'none';\
 connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://\\*\\.icp0.io https://\\*\\.ic0.app;\
 img-src 'self' data:;\
-script-src 'sha256-[a-zA-Z0-9/=+]+' 'sha256-[a-zA-Z0-9/=+]+' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https:;\
+script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
 base-uri 'none';\
 form-action 'none';\
 style-src 'self' 'unsafe-inline';\
@@ -429,8 +429,12 @@ font-src 'self';\
 frame-ancestors 'none';\
 upgrade-insecure-requests;$"
     )
-    .unwrap()
-    .is_match(csp));
+    .unwrap();
+
+    assert!(
+        rgx.is_match(csp),
+        "CSP header did not match expected. Expected: {rgx} \n Actual: {csp}"
+    );
 }
 
 pub fn get_metrics(env: &StateMachine, canister_id: CanisterId) -> String {
@@ -683,28 +687,4 @@ pub fn test_principal(n: u64) -> Principal {
     let mut bytes = n.to_le_bytes().to_vec();
     bytes.push(0xfe); // internal marker for user test ids
     Principal::from_slice(&bytes[..])
-}
-
-/// Macro to easily match a value against a pattern, and panic if the match fails.
-///
-/// This makes API v2 return types easier to handle.
-/// API v2 calls all return variants, requiring a match on the result.
-/// This macro allows to write the match in terms of the expected variant, with a fallback
-/// on unexpected variants.
-/// Example:
-/// ```
-/// use canister_tests::match_value;
-/// match_value!(
-///     api_v2::identity_info(&env, canister_id, principal, identity_number)?, // value
-///     Some(IdentityInfoResponse::Ok(identity_info)) // expected pattern, with binding to identity_info
-/// );
-/// ```
-#[macro_export]
-#[rustfmt::skip] // cargo fmt seems to have a bug with this macro (it indents the panic! way too far)
-macro_rules! match_value {
-    ($target: expr, $pat: pat_param) => {
-        let $pat = $target else {
-            panic!("expected {}", stringify!($pat));
-        };
-    };
 }

@@ -33,7 +33,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
       "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
     const authenticatorId3 = await switchToPopup(browser);
@@ -71,7 +71,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
       "redirect"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
     const authenticatorId3 = await switchToPopup(browser);
@@ -109,7 +109,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL_RAW);
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
     const authenticatorId2 = await switchToPopup(browser);

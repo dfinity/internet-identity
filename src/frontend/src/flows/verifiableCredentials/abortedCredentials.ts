@@ -15,7 +15,8 @@ export type AbortReason =
   | "issuer_api_error"
   | "bad_principal_rp"
   | "no_canister_id"
-  | "bad_canister_id";
+  | "bad_canister_id"
+  | "bad_derivation_origin_rp";
 
 /* A screen telling the user the flow was aborted and giving information
  * on why it was aborted and what they can do about it. */
@@ -42,7 +43,8 @@ const abortedCredentialsTemplate = ({
 
   const slot = html`
     <hgroup
-      data-page="vc-allow"
+      data-page="vc-aborted"
+      data-abort-reason=${reason}
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
     >
       <h1 class="t-title t-title--main">${copy.title}</h1>

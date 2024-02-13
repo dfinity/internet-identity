@@ -569,13 +569,33 @@ export class AboutView extends View {
 }
 
 export class VcAllowView extends View {
-  async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$('[data-page="vc-allow"]')
-      .waitForDisplayed({ timeout: 10_000 });
+  async waitForDisplay(): Promise<"ok" | "aborted"> {
+    const elem = await this.browser.$(
+      '[data-page="vc-allow"],[data-page="vc-aborted"]'
+    );
+    await elem.waitForDisplayed({ timeout: 10_000 });
+    const page = await elem.getAttribute("data-page");
+
+    if (page === "vc-allow") {
+      return "ok";
+    }
+
+    if (page === "vc-aborted") {
+      return "aborted";
+    }
+
+    throw new Error("Unexpected page: " + page);
+  }
+
+  async getAbortReason(): Promise<string> {
+    return await this.browser
+      .$("[data-abort-reason]")
+      .getAttribute("data-abort-reason");
   }
 
   async allow(): Promise<void> {
+    await this.browser.$('[data-action="allow"]').waitForDisplayed();
+    await this.browser.$('[data-action="allow"]').scrollIntoView();
     await this.browser.$('[data-action="allow"]').click();
   }
 
@@ -715,7 +735,7 @@ export class VcTestAppView extends View {
         return false;
       }
 
-      if (principal === Principal.anonymous().toText()) {
+      if (principal === "") {
         return false;
       }
 
@@ -725,6 +745,22 @@ export class VcTestAppView extends View {
 
   getPrincipal(): Promise<string> {
     return this.browser.$('[data-role="principal"]').getText();
+  }
+
+  setAlternativeOrigin(origin: string) {
+    return setInputValue(
+      this.browser,
+      '[data-role="derivation-origin-rp"]',
+      origin
+    );
+  }
+
+  getPresentationAlias(): Promise<string> {
+    return this.browser.$('[data-role="presentation-alias"]').getText();
+  }
+
+  getPresentationCredential(): Promise<string> {
+    return this.browser.$('[data-role="presentation-credential"]').getText();
   }
 }
 
@@ -742,7 +778,6 @@ export class DemoAppView extends View {
   }
 
   async waitForDisplay(): Promise<void> {
-    await this.browser.$("#principal").waitForDisplayed({ timeout: 10_000 });
     // wait for the slowest element to appear
     await this.browser.waitUntil(
       async () =>
@@ -767,14 +802,11 @@ export class DemoAppView extends View {
     await waitToClose(this.browser);
     // wait for the demo app to update the principal
     await this.browser.waitUntil(
-      async () => (await this.getPrincipal()) !== Principal.anonymous().toText()
+      async () => (await this.getPrincipal()) !== ""
     );
     return this.getPrincipal();
   }
 
-  async signout(): Promise<void> {
-    await this.browser.$("#signoutBtn").click();
-  }
   async setMaxTimeToLive(mttl: bigint): Promise<void> {
     await fillText(this.browser, "maxTimeToLive", String(mttl));
   }

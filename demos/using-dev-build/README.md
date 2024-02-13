@@ -48,7 +48,7 @@ This section explains how to add Internet Identity to your (local) project. Add 
 "internet_identity": {
   "type": "custom",
   "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm",
+  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
   "remote": {
     "id": {
       "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
@@ -128,7 +128,10 @@ You might get different canister IDs (and that's totally fine). If the `webapp` 
 
 ![](./webapp.png)
 
-_If you actually use the webapp, make sure that the "Internet Identity URL" field points to `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`._
+_If you actually use the webapp, make sure that the "Internet Identity URL" field points to one of these URLS_:
+
+- Chrome, Firefox: `http://<canister ID of the internet_identity canister>.localhost:4943/`.
+- Safari: `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`.
 
 ## Helpers
 

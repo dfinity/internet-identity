@@ -1,14 +1,14 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity as api;
+use canister_tests::flows;
 use canister_tests::framework::*;
-use canister_tests::{flows, match_value};
 use ic_test_state_machine_client::CallError;
 use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
 use identity_jose::jwu::encode_b64;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasError, GetIdAliasRequest, PrepareIdAliasError, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use std::ops::Deref;
@@ -41,15 +41,9 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         issuer: issuer.clone(),
     };
 
-    let prepare_response =
+    let prepared_id_alias =
         api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), prepare_id_alias_req)?
-            .expect("Got 'None' from prepare_id_alias");
-
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared) = prepare_response {
-        prepared
-    } else {
-        panic!("prepare id_alias failed")
-    };
+            .expect("prepare id_alias failed");
 
     let get_id_alias_req = GetIdAliasRequest {
         identity_number,
@@ -59,17 +53,8 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
     };
     let id_alias_credentials =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
+            .expect("failed to get id_alias credentials");
 
     assert_eq!(
         id_alias_credentials.rp_id_alias_credential.id_alias,
@@ -104,6 +89,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_id_alias_credential_via_env(
@@ -118,6 +104,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
             .credential_jws,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     Ok(())
@@ -143,80 +130,54 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
     };
 
     let (get_id_alias_req_1, canister_sig_pk_1) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_1 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_1,
         )?
         .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number: identity_number_1,
-                    relying_party: relying_party.clone(),
-                    issuer: issuer.clone(),
-                    rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        (
+            GetIdAliasRequest {
+                identity_number: identity_number_1,
+                relying_party: relying_party.clone(),
+                issuer: issuer.clone(),
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let (get_id_alias_req_2, canister_sig_pk_2) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_2 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_2,
         )?
-        .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number: identity_number_2,
-                    relying_party,
-                    issuer,
-                    rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        .expect("prepare id_alias failed");
+        (
+            GetIdAliasRequest {
+                identity_number: identity_number_2,
+                relying_party,
+                issuer,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
+            .expect("failed to get id_alias credentials");
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
+            .expect("failed to get id_alias credentials");
 
     assert_eq!(
         id_alias_credentials_1.rp_id_alias_credential.id_alias,
@@ -241,6 +202,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -249,12 +211,14 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -263,6 +227,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     Ok(())
@@ -288,80 +253,54 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
     };
 
     let (get_id_alias_req_1, canister_sig_pk_1) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_1 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_1,
         )?
         .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number,
-                    relying_party: relying_party_1,
-                    issuer: issuer.clone(),
-                    rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party: relying_party_1,
+                issuer: issuer.clone(),
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let (get_id_alias_req_2, canister_sig_pk_2) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_2 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_2,
         )?
         .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number,
-                    relying_party: relying_party_2,
-                    issuer,
-                    rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party: relying_party_2,
+                issuer,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
+            .expect("failed to get id_alias credentials");
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
+            .expect("failed to get id_alias credentials");
 
     assert_eq!(
         id_alias_credentials_1.rp_id_alias_credential.id_alias,
@@ -389,6 +328,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -397,12 +337,14 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -411,6 +353,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
 
@@ -437,80 +380,54 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
     };
 
     let (get_id_alias_req_1, canister_sig_pk_1) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_1 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_1,
         )?
         .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_1) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number,
-                    relying_party: relying_party.clone(),
-                    issuer: issuer_1,
-                    rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party: relying_party.clone(),
+                issuer: issuer_1,
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let (get_id_alias_req_2, canister_sig_pk_2) = {
-        let prepare_response = api::vc_mvp::prepare_id_alias(
+        let prepared_id_alias_2 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
             principal_1(),
             prepare_id_alias_req_2,
         )?
         .expect("Got 'None' from prepare_id_alias");
-        if let PrepareIdAliasResponse::Ok(prepared_id_alias_2) = prepare_response {
-            (
-                GetIdAliasRequest {
-                    identity_number,
-                    relying_party,
-                    issuer: issuer_2,
-                    rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                    issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
-                },
-                CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
-                    .expect("failed parsing canister sig pk"),
-            )
-        } else {
-            panic!("prepare id_alias failed")
-        }
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party,
+                issuer: issuer_2,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
     };
 
     let id_alias_credentials_1 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
+            .expect("failed to get id_alias credentials");
 
     let id_alias_credentials_2 =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
+            .expect("failed to get id_alias credentials");
 
     assert_eq!(
         id_alias_credentials_1.rp_id_alias_credential.id_alias,
@@ -538,6 +455,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -546,12 +464,14 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_1.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
     verify_credential_jws_with_canister_id(
@@ -560,6 +480,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
             .credential_jws,
         &canister_sig_pk_2.canister_id,
         &root_pk_raw,
+        time(&env) as u128,
     )
     .expect("external verification failed");
 
@@ -567,15 +488,131 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
 }
 
 #[test]
-#[should_panic(expected = "could not be authenticated")]
-fn should_not_prepare_id_alias_for_different_user() {
+fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let relying_party = FrontendHostname::from("https://some-dapp.com");
+    let issuer = FrontendHostname::from("https://some-issuer-1.com");
+    let prepare_id_alias_req = PrepareIdAliasRequest {
+        identity_number,
+        relying_party: relying_party.clone(),
+        issuer: issuer.clone(),
+    };
+
+    let (get_id_alias_req_1, canister_sig_pk_1) = {
+        let prepared_id_alias_1 = api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req.clone(),
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party: relying_party.clone(),
+                issuer: issuer.clone(),
+                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
+    };
+
+    let (get_id_alias_req_2, canister_sig_pk_2) = {
+        let prepared_id_alias_2 =
+            api::vc_mvp::prepare_id_alias(&env, canister_id, principal_1(), prepare_id_alias_req)?
+                .expect("Got 'None' from prepare_id_alias");
+        (
+            GetIdAliasRequest {
+                identity_number,
+                relying_party,
+                issuer,
+                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
+                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+            },
+            CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
+                .expect("failed parsing canister sig pk"),
+        )
+    };
+
+    let id_alias_credentials_1 =
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_1)?
+            .expect("failed to get id_alias credentials");
+
+    let id_alias_credentials_2 =
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
+            .expect("failed to get id_alias credentials");
+
+    assert_eq!(
+        id_alias_credentials_1.rp_id_alias_credential.id_alias,
+        id_alias_credentials_1.issuer_id_alias_credential.id_alias
+    );
+
+    assert_eq!(
+        id_alias_credentials_2.rp_id_alias_credential.id_alias,
+        id_alias_credentials_2.issuer_id_alias_credential.id_alias
+    );
+
+    assert_ne!(
+        id_alias_credentials_1.rp_id_alias_credential.id_alias,
+        id_alias_credentials_2.rp_id_alias_credential.id_alias
+    );
+
+    assert_ne!(
+        id_alias_credentials_1.issuer_id_alias_credential.id_alias,
+        id_alias_credentials_2.issuer_id_alias_credential.id_alias
+    );
+
+    let root_pk_raw =
+        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    verify_credential_jws_with_canister_id(
+        &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
+        &canister_sig_pk_1.canister_id,
+        &root_pk_raw,
+        time(&env) as u128,
+    )
+    .expect("external verification failed");
+    verify_credential_jws_with_canister_id(
+        &id_alias_credentials_1
+            .issuer_id_alias_credential
+            .credential_jws,
+        &canister_sig_pk_1.canister_id,
+        &root_pk_raw,
+        time(&env) as u128,
+    )
+    .expect("external verification failed");
+    verify_credential_jws_with_canister_id(
+        &id_alias_credentials_2.rp_id_alias_credential.credential_jws,
+        &canister_sig_pk_2.canister_id,
+        &root_pk_raw,
+        time(&env) as u128,
+    )
+    .expect("external verification failed");
+    verify_credential_jws_with_canister_id(
+        &id_alias_credentials_2
+            .issuer_id_alias_credential
+            .credential_jws,
+        &canister_sig_pk_2.canister_id,
+        &root_pk_raw,
+        time(&env) as u128,
+    )
+    .expect("external verification failed");
+
+    Ok(())
+}
+
+#[test]
+fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
 
-    let _ = api::vc_mvp::prepare_id_alias(
+    let result = api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_2(),
@@ -584,8 +621,9 @@ fn should_not_prepare_id_alias_for_different_user() {
             relying_party,
             issuer,
         },
-    )
-    .expect("Got 'None' from prepare_id_alias");
+    )?;
+    assert!(matches!(result, Err(PrepareIdAliasError::Unauthorized(_))));
+    Ok(())
 }
 
 #[test]
@@ -596,7 +634,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
 
-    let prepare_response = api::vc_mvp::prepare_id_alias(
+    api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_1(),
@@ -606,13 +644,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
             issuer: issuer.clone(),
         },
     )?
-    .expect("Got 'None' from prepare_id_alias");
-
-    let _canister_sig_key = if let PrepareIdAliasResponse::Ok(key) = prepare_response {
-        key
-    } else {
-        panic!("prepare id_alias failed")
-    };
+    .expect("prepare id_alias failed");
 
     let response = api::vc_mvp::get_id_alias(
         &env,
@@ -625,14 +657,10 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
             rp_id_alias_jwt: "dummy_jwt".to_string(),
             issuer_id_alias_jwt: "another_dummy_jwt".to_string(),
         },
-    )?
-    .expect("Got 'None' from get_id_alias");
+    )?;
 
-    if let GetIdAliasResponse::AuthenticationFailed(_err) = response {
-        Ok(())
-    } else {
-        panic!("Expected a failed authentication, got {:?}", response);
-    }
+    assert!(matches!(response, Err(GetIdAliasError::Unauthorized(_))));
+    Ok(())
 }
 
 #[test]
@@ -655,14 +683,13 @@ fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
             rp_id_alias_jwt: "dummy jwt".to_string(),
             issuer_id_alias_jwt: "another dummy jwt".to_string(),
         },
-    )?
-    .expect("Got 'None' from get_id_alias");
+    )?;
 
-    if let GetIdAliasResponse::NoSuchCredentials(_err) = response {
-        Ok(())
-    } else {
-        panic!("Expected that credentials not found, got {:?}", response);
-    }
+    assert!(matches!(
+        response,
+        Err(GetIdAliasError::NoSuchCredentials(_))
+    ));
+    Ok(())
 }
 
 /// Verifies that there is a graceful failure if II gets upgraded between prepare_id_alias
@@ -680,20 +707,13 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
         issuer: issuer.clone(),
     };
 
-    let prepare_response = api::vc_mvp::prepare_id_alias(
+    let prepared_id_alias = api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_1(),
         prepare_id_alias_req.clone(),
     )?
-    .expect("Got 'None' from prepare_id_alias");
-
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(prepared_id_alias) = prepare_response
-    {
-        prepared_id_alias
-    } else {
-        panic!("prepare id_alias failed")
-    };
+    .expect("prepare id_alias failed");
 
     // upgrade, even with the same WASM clears non-stable memory
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -705,11 +725,10 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
         rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
         issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
     };
-    let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
-        .expect("Got 'None' from get_id_alias");
+    let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?;
     assert!(matches!(
         response,
-        GetIdAliasResponse::NoSuchCredentials(_err)
+        Err(GetIdAliasError::NoSuchCredentials(_))
     ));
     Ok(())
 }
@@ -728,19 +747,14 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
         issuer: issuer.clone(),
     };
 
-    let prepare_response = api::vc_mvp::prepare_id_alias(
+    let prepared_id_alias = api::vc_mvp::prepare_id_alias(
         &env,
         canister_id,
         principal_1(),
         prepare_id_alias_req.clone(),
     )
     .expect("Result of prepare_id_alias is not Ok")
-    .expect("Got 'None' from prepare_id_alias");
-
-    match_value!(
-        prepare_response,
-        PrepareIdAliasResponse::Ok(prepared_id_alias)
-    );
+    .expect("prepare_id_alias failed");
 
     let get_id_alias_req = GetIdAliasRequest {
         identity_number,
@@ -751,18 +765,9 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
     };
 
     let id_alias_credentials =
-        match api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)
             .expect("Result of get_id_alias is not Ok")
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+            .expect("get_id_alias failed");
 
     assert_eq!(
         id_alias_credentials.rp_id_alias_credential.id_alias,

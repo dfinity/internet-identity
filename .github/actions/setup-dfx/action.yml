@@ -2,13 +2,13 @@ name: 'Setup DFX'
 description: Setup DFX
 inputs:
   dfx-version:
-    default: 0.14.0
+    default: 0.15.3
     description: The dfx version to be installed or loaded from cache.
     required: true
 runs:
   using: "composite"
   steps:
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: |
           /usr/local/bin/dfx

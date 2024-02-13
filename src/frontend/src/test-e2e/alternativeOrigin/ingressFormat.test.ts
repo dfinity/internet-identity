@@ -29,7 +29,7 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.resetAlternativeOrigins();
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
     const authenticatorId3 = await switchToPopup(browser);
@@ -66,7 +66,7 @@ test("Should not issue delegation when derivationOrigin is malformed", async () 
     await niceDemoAppView.setDerivationOrigin(
       "https://some-random-disallowed-url.com"
     );
-    expect(await niceDemoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
     const authenticatorId3 = await switchToPopup(browser);

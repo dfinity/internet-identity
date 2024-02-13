@@ -1,15 +1,13 @@
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
-use asset_util::CertifiedAssets;
 use candid::Principal;
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
+use canister_sig_util::signature_map::SignatureMap;
 use canister_sig_util::CanisterSigPublicKey;
-use ic_cdk::api::{data_certificate, time};
+use ic_cdk::api::time;
 use ic_cdk::{id, trap};
-use ic_certification::{fork, labeled, pruned, Hash, HashTree};
+use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -22,10 +20,6 @@ const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 // (calculated as now() + this)
 const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
-// The expiration used for signatures
-#[allow(clippy::identity_op)]
-const SIGNATURE_EXPIRATION_PERIOD_NS: u64 = 1 * MINUTE_NS;
-
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -34,7 +28,6 @@ pub async fn prepare_delegation(
     ii_domain: &Option<IIDomain>,
 ) -> (UserKey, Timestamp) {
     state::ensure_salt_set().await;
-    prune_expired_signatures();
     check_frontend_length(&frontend);
 
     let delta = u64::min(
@@ -45,7 +38,7 @@ pub async fn prepare_delegation(
     let seed = calculate_seed(anchor_number, &frontend);
 
     state::signature_map_mut(|sigs| {
-        add_signature(sigs, session_key, seed, expiration);
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
     });
     update_root_hash();
 
@@ -128,15 +121,18 @@ pub fn get_delegation(
 ) -> GetDelegationResponse {
     check_frontend_length(&frontend);
 
-    state::assets_and_signatures(|asset_hashes, sigs| {
-        match get_signature(
-            asset_hashes,
-            sigs,
-            session_key.clone(),
-            calculate_seed(anchor_number, &frontend),
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let message_hash = delegation_signature_msg_hash(&Delegation {
+            pubkey: session_key.clone(),
             expiration,
+            targets: None,
+        });
+        match sigs.get_signature_as_cbor(
+            &calculate_seed(anchor_number, &frontend),
+            message_hash,
+            Some(certified_assets.root_hash()),
         ) {
-            Some(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+            Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                 delegation: Delegation {
                     pubkey: session_key,
                     expiration,
@@ -144,7 +140,7 @@ pub fn get_delegation(
                 },
                 signature: ByteBuf::from(signature),
             }),
-            None => GetDelegationResponse::NoSuchDelegation,
+            Err(_) => GetDelegationResponse::NoSuchDelegation,
         }
     })
 }
@@ -197,73 +193,18 @@ fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
     hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
-fn get_signature(
-    assets: &CertifiedAssets,
-    sigs: &SignatureMap,
+fn add_delegation_signature(
+    sigs: &mut SignatureMap,
     pk: PublicKey,
-    seed: Hash,
+    seed: &[u8],
     expiration: Timestamp,
-) -> Option<Vec<u8>> {
-    let certificate = data_certificate().unwrap_or_else(|| {
-        trap("data certificate is only available in query calls");
-    });
+) {
     let msg_hash = delegation_signature_msg_hash(&Delegation {
         pubkey: pk,
         expiration,
         targets: None,
     });
-    let witness = sigs.witness(hash::hash_bytes(seed), msg_hash)?;
-
-    let witness_hash = witness.digest();
-    let root_hash = sigs.root_hash();
-    if witness_hash != root_hash {
-        trap(&format!(
-            "internal error: signature map computed an invalid hash tree, witness hash is {}, root hash is {}",
-            hex::encode(witness_hash),
-            hex::encode(root_hash)
-        ));
-    }
-
-    let tree = fork(pruned(assets.root_hash()), labeled(LABEL_SIG, witness));
-
-    #[derive(Serialize)]
-    struct Sig {
-        certificate: ByteBuf,
-        tree: HashTree,
-    }
-
-    let sig = Sig {
-        certificate: ByteBuf::from(certificate),
-        tree,
-    };
-
-    let mut cbor = serde_cbor::ser::Serializer::new(Vec::new());
-    cbor.self_describe().unwrap();
-    sig.serialize(&mut cbor).unwrap();
-    Some(cbor.into_inner())
-}
-
-fn add_signature(sigs: &mut SignatureMap, pk: PublicKey, seed: Hash, expiration: Timestamp) {
-    let msg_hash = delegation_signature_msg_hash(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    });
-    let expires_at = time().saturating_add(SIGNATURE_EXPIRATION_PERIOD_NS);
-    sigs.put(hash::hash_bytes(seed), msg_hash, expires_at);
-}
-
-/// Removes a batch of expired signatures from the signature map.
-///
-/// This function piggy-backs on update calls that create new signatures to
-/// amortize the cost of tree pruning. Each operation on the signature map
-/// will prune at most MAX_SIGS_TO_PRUNE other signatures.
-pub fn prune_expired_signatures() {
-    const MAX_SIGS_TO_PRUNE: usize = 50;
-    let num_pruned = state::signature_map_mut(|sigs| sigs.prune_expired(time(), MAX_SIGS_TO_PRUNE));
-    if num_pruned > 0 {
-        update_root_hash();
-    }
+    sigs.add_signature(seed, msg_hash);
 }
 
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {

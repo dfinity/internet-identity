@@ -1,27 +1,25 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { execSync } from "child_process";
 import { minify } from "html-minifier-terser";
-import httpProxy from "http-proxy";
 import { extname } from "path";
-import { Plugin, ViteDevServer } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { readCanisterId } from "./utils";
+import { forwardToReplica, readCanisterId } from "./utils.js";
+
+export * from "./utils.js";
 
 /**
- * Inject the II canister ID as a <script /> tag in index.html for local development. Will process
+ * Inject the canister ID of 'canisterName' as a <script /> tag in index.html for local development. Will process
  * at most 1 script tag.
  */
-export const injectCanisterIdPlugin = (): {
-  name: "html-transform";
-  transformIndexHtml(html: string): string;
-} => ({
-  name: "html-transform",
+export const injectCanisterIdPlugin = ({
+  canisterName,
+}: {
+  canisterName: string;
+}): Plugin => ({
+  name: "inject-canister-id",
   transformIndexHtml(html): string {
     const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
-    const canisterId = readCanisterId({
-      canisterName: "internet_identity",
-    });
-
+    const canisterId = readCanisterId({ canisterName });
     return html.replace(rgx, (_match, src) => {
       return `<script data-canister-id="${canisterId}" type="module" src="${src}"></script>`;
     });
@@ -36,19 +34,14 @@ export const compression = (): Plugin =>
     // II canister only supports one content type per resource. That is why we remove the original file.
     deleteOriginFile: true,
     filter: (file: string): boolean =>
-      ![".html", ".css", ".webp", ".png", ".ico", ".svg"].includes(
-        extname(file)
-      ),
+      [".js", ".woff2"].includes(extname(file)),
   });
 
 /**
  * Minify HTML
  */
-export const minifyHTML = (): {
-  name: "html-transform";
-  transformIndexHtml(html: string): Promise<string>;
-} => ({
-  name: "html-transform",
+export const minifyHTML = (): Plugin => ({
+  name: "minify-html",
   async transformIndexHtml(html): Promise<string> {
     return minify(html, { collapseWhitespace: true });
   },
@@ -73,10 +66,6 @@ export const replicaForwardPlugin = ({
 }) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
-    const proxy = httpProxy.createProxyServer({
-      secure: false,
-    });
-
     server.middlewares.use((req, res, next) => {
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
@@ -99,32 +88,6 @@ export const replicaForwardPlugin = ({
 
       const [host, _port] = host_.split(":");
 
-      // forward to the specified canister (served by the replica)
-      const forwardToReplica = ({ canisterId }: { canisterId: string }) => {
-        console.log(
-          `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`
-        );
-        req.headers["host"] = `${canisterId}.localhost`;
-        proxy.web(req, res, {
-          target: `http://${replicaOrigin}`,
-        });
-
-        proxy.on("error", (err: Error) => {
-          res.statusCode = 500;
-          res.end("Replica forwarding failed: " + err.message);
-        });
-
-        /* Add a 'x-ic-canister-id' header like the BNs do */
-        proxy.on("proxyRes", (res) => {
-          res.headers["x-ic-canister-id"] = canisterId;
-
-          // Ensure the browser accepts the response
-          res.headers["access-control-allow-origin"] = "*";
-          res.headers["access-control-expose-headers"] = "*";
-          res.headers["access-control-allow-headers"] = "*";
-        });
-      };
-
       const matchingRule = forwardRules.find((rule) =>
         rule.hosts.includes(host)
       );
@@ -133,7 +96,8 @@ export const replicaForwardPlugin = ({
         const canisterId = readCanisterId({
           canisterName: matchingRule.canisterName,
         });
-        return forwardToReplica({ canisterId });
+        console.log("Host matches forward rule", host);
+        return forwardToReplica({ canisterId, req, res, replicaOrigin });
       }
 
       // split the subdomain & domain by splitting on the first dot
@@ -152,18 +116,22 @@ export const replicaForwardPlugin = ({
         ) /* fast check for principal-ish */
       ) {
         // Assume the principal-ish thing is a canister ID
-        return forwardToReplica({ canisterId: subdomain });
+        console.log("Domain matches list to forward", domain);
+        return forwardToReplica({
+          canisterId: subdomain,
+          req,
+          res,
+          replicaOrigin,
+        });
       }
 
       // Try to read the canister ID of a potential canister called <subdomain>
       // and if found forward to that
       if (nonNullish(subdomain) && domain === "localhost") {
         try {
-          const canisterId = execSync(`dfx canister id ${subdomain}`)
-            .toString()
-            .trim();
-          console.log("Forwarding to", canisterId);
-          return forwardToReplica({ canisterId });
+          const canisterId = readCanisterId({ canisterName: subdomain });
+          console.log("Subdomain is a canister", subdomain, canisterId);
+          return forwardToReplica({ canisterId, req, res, replicaOrigin });
         } catch {}
       }
 
@@ -171,3 +139,24 @@ export const replicaForwardPlugin = ({
     });
   },
 });
+
+/** Update the HTML files to inline script imports.
+ * i.e.: `<script src="foo.js"></script>` becomes `<script>... insert new script node...</script>`.
+ *
+ * This allows us to use the `strict-dynamic` CSP directive.
+ * Otherwise, the directive requires `integrity=...` attributes which (in Chrome) does not easily allow importing
+ * other scripts. https://github.com/WICG/import-maps/issues/174#issuecomment-987678704
+ */
+export const inlineScriptsPlugin: Plugin = {
+  name: "integrity",
+  apply: "build" /* only use during build, not serve */,
+
+  transformIndexHtml(html: string): string {
+    const rgx =
+      /<script(?<attrs>(?<beforesrc>\s+[^>]+)*\s+src="?(?<src>[^"]+)"?(?<aftersrc>\s+[^>]+)*)>/g;
+    return html.replace(rgx, (match, _attrs, beforesrc, src, aftersrc) => {
+      const tag = ["script", beforesrc, aftersrc].filter(Boolean).join(" ");
+      return `<${tag}>let s = document.createElement('script');s.type = 'module';s.src = '${src}';document.head.appendChild(s);`;
+    });
+  },
+};

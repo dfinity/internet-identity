@@ -10,7 +10,7 @@ jobs:
   ic-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
         # First, check if there is a newer version and update the file referencing the version
       - name: Check new ic version

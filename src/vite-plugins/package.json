@@ -1,0 +1,32 @@
+{
+  "name": "@dfinity/internet-identity-vite-plugins",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "check": "tsc --noEmit",
+    "postinstall": "npm run build"
+  },
+  "license": "SEE LICENSE IN LICENSE.md",
+  "exports": {
+    ".": "dist/index.js",
+    "./utils": "dist/utils.js",
+    "./package.json": "package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "utils": [
+        "dist/utils.d.ts"
+      ]
+    }
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vite": "^4.5.2",
+    "undici": "*",
+    "vite-plugin-compression": "^0.5.1",
+    "@dfinity/utils": "^0.0.20",
+    "@types/html-minifier-terser": "^7.0.0",
+    "html-minifier-terser": "^7.2.0"
+  }
+}

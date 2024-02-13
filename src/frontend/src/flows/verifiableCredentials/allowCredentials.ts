@@ -8,13 +8,33 @@ import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 
+import { getDapps, KnownDapp } from "../dappsExplorer/dapps";
+import { dappTemplate } from "../dappsExplorer/index";
+
 import DOMPurify from "dompurify";
 
 import copyJson from "./allowCredentials.json";
 
+/*
+ * Get the dapp that corresponds to the origin, or create a new one if it's
+ * unknown
+ */
+const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
+  let foundDapp = dapplist.find((dapp) => dapp.hasOrigin(origin));
+
+  if (!foundDapp) {
+    foundDapp = new KnownDapp({
+      name: origin,
+      website: origin,
+      logo: "../unknowndapp.png",
+    });
+  }
+
+  return foundDapp;
+};
+
 /* A screen prompting the user to allow (or cancel) issuing verified
  * credentials */
-
 const allowCredentialsTemplate = ({
   i18n,
   relyingOrigin,
@@ -41,6 +61,7 @@ const allowCredentialsTemplate = ({
     onSubmit: (userNumber) => onAllow(userNumber),
   });
 
+  const knownDapps = getDapps();
   const consentMessage = new Chan<TemplateElement>(html`${consentMessage_}`);
 
   // Kickstart markdown parsing & sanitizing; once done, replace the consent message
@@ -50,6 +71,10 @@ const allowCredentialsTemplate = ({
     consentMessage.send(unsafeHTML(sanitized));
   })();
 
+  const originDapp = getOrigin(providerOrigin, knownDapps);
+  const relyingDapp = getOrigin(relyingOrigin, knownDapps);
+
+  // copy.relying_party as string
   const slot = html`
     <hgroup
       data-page="vc-allow"
@@ -57,18 +82,31 @@ const allowCredentialsTemplate = ({
     >
       <h1 class="t-title t-title--main">${copy.title}</h1>
     </hgroup>
-
+    <article class="l-stack c-card c-card--consent">
+      <div class="t-formatted t-formatted--monospace">
+        ${asyncReplace(consentMessage)}
+      </div>
+    </article>
     ${anchorInput.template}
-
-    <p class="t-paragraph">
-      ${copy.allow_start}
-      <strong class="t-strong">${providerOrigin}</strong> ${copy.allow_sep_with}
-      <strong class="t-strong">${relyingOrigin}</strong>?
-    </p>
-
-    <div class="l-stack c-input c-input--readonly">
-      <pre class="c-consent-message">${asyncReplace(consentMessage)}</pre>
-    </div>
+    <h2 class="c-card__label l-stack">${copy.allow_start}</h2>
+    <ul class="c-action-list">
+      <li class="c-action-list__item">
+        ${dappTemplate({
+          logoSrc: originDapp.logoSrc,
+          name: originDapp.name,
+          oneLinerAboveTitle: true,
+          oneLiner: copy.issued_by as string,
+        })}
+      </li>
+      <li class="c-action-list__item">
+        ${dappTemplate({
+          logoSrc: relyingDapp.logoSrc,
+          name: relyingDapp.name,
+          oneLinerAboveTitle: true,
+          oneLiner: copy.relying_party as string,
+        })}
+      </li>
+    </ul>
 
     <div class="c-button-group">
       <button

@@ -50,8 +50,8 @@ Use the Internet Identity canister in your local dfx project by adding the follo
   "canisters": {
     "internet_identity": {
       "type": "custom",
-      "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2023-11-17/internet_identity.did",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2023-11-17/internet_identity_dev.wasm.gz",
+      "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2024-02-02/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2024-02-02/internet_identity_dev.wasm.gz",
       "remote": {
         "id": {
           "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
@@ -62,6 +62,11 @@ Use the Internet Identity canister in your local dfx project by adding the follo
   }
 }
 ```
+To deploy, run `dfx deploy`.
+
+To access Internet Identity or configure it for your dapp, use one of the following URLs:
+* Chrome, Firefox: `http://<canister_id>.localhost:4943`
+* Safari: `http://localhost:4943?canisterId=<canister_id>`
 
 ### Architecture Overview
 

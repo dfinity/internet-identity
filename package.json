@@ -18,7 +18,7 @@
     "generate": "npm run generate:types && npm run generate:js && npm run generate:types-issuer && npm run generate:js-issuer",
     "generate:types": "didc bind ./src/internet_identity/internet_identity.did -t ts > src/frontend/generated/internet_identity_types.d.ts",
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js > src/frontend/generated/internet_identity_idl.js",
-    "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts > src/frontend/generated/vc_issuer_types.d.ts",
+    "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts > src/vc-api/src/generated/vc_issuer_types.ts",
     "generate:js-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t js > src/frontend/generated/vc_issuer_idl.js",
     "build:showcase": "tsc --noEmit && astro check --root ./src/showcase && astro build --root ./src/showcase",
     "preview:showcase": "astro preview --root ./src/showcase",
@@ -27,15 +27,15 @@
     "test:e2e": "vitest --mode e2e --config ./vitest.config.ts --threads=false",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
-    "lint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
-    "format": "prettier --write src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos",
-    "format-check": "prettier --check src/showcase src/frontend tsconfig.json .eslintrc.json vite.config.ts vite.plugins.ts vitest.config.ts demos"
+    "lint": "npm run lint:eslint && npm run lint:lit",
+    "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
+    "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
+    "format": "prettier --write src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos",
+    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/vite-plugins tsconfig.json tsconfig.all.json .eslintrc.json vite.config.ts vitest.config.ts demos"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
-    "@types/html-minifier-terser": "^7.0.0",
-    "@types/http-proxy": "^1.17.14",
-    "@types/selenium-standalone": "^7.0.1",
+    "@types/node": "*",
     "@types/ua-parser-js": "^0.7.36",
     "@typescript-eslint/eslint-plugin": "6.7.5",
     "@typescript-eslint/parser": "6.7.5",
@@ -44,39 +44,47 @@
     "astro": "^2.4.1",
     "eslint": "8.51.0",
     "fake-indexeddb": "^4.0.2",
-    "html-minifier-terser": "^7.2.0",
-    "http-proxy": "^1.18.1",
+    "lit-analyzer": "^2.0.2",
     "prettier": "2.8.0",
     "prettier-plugin-organize-imports": "^3.2.2",
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
-    "vite": "^4.2.1",
-    "vite-plugin-compression": "^0.5.1",
+    "vite": "^4.5.2",
     "vitest": "^0.34.0",
-    "webdriverio": "^8.21.0"
+    "webdriverio": "^8.21.0",
+
+    "@dfinity/internet-identity-vite-plugins": "*"
   },
   "dependencies": {
     "@dfinity/agent": "^0.19.2",
+    "@dfinity/auth-client": "^0.19.2",
     "@dfinity/candid": "^0.19.2",
     "@dfinity/identity": "^0.19.2",
     "@dfinity/principal": "^0.19.2",
+
+    "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/utils": "^0.0.20",
     "bip39": "^3.0.4",
     "buffer": "^6.0.3",
     "dompurify": "^3.0.6",
     "idb-keyval": "^6.2.1",
-    "jose": "^5.1.3",
     "lit-html": "^2.7.2",
     "marked": "^11.0.0",
-    "process": "^0.11.10",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
     "ua-parser-js": "^1.0.35",
     "zod": "^3.22.3"
   },
   "engines": {
-    "npm": ">=9.0.0 <10.0.0",
-    "node": ">=18.0.0 <19.0.0"
-  }
+    "npm": ">=10.0.0 <11.0.0",
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "workspaces": [
+    "src/vc-api",
+    "demos/test-app",
+    "demos/vc_issuer",
+    "src/vite-plugins",
+    "src/vc_util_js"
+  ]
 }

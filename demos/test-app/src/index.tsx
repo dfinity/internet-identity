@@ -1,8 +1,8 @@
+import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
+
 import type { Identity, SignIdentity } from "@dfinity/agent";
 import { Actor, HttpAgent } from "@dfinity/agent";
-import { AuthClient } from "@dfinity/auth-client";
 import {
-  Delegation,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -14,10 +14,11 @@ import ReactDOM from "react-dom/client";
 
 import { decodeJwt } from "jose";
 
+import { authWithII, extractDelegation } from "./auth";
+
 import "./main.css";
 
 const signInBtn = document.getElementById("signinBtn") as HTMLButtonElement;
-const signOutBtn = document.getElementById("signoutBtn") as HTMLButtonElement;
 const whoamiBtn = document.getElementById("whoamiBtn") as HTMLButtonElement;
 const updateAlternativeOriginsBtn = document.getElementById(
   "updateNewAlternativeOrigins"
@@ -65,9 +66,19 @@ const derivationOriginEl = document.getElementById(
   "derivationOrigin"
 ) as HTMLInputElement;
 
-let authClient: AuthClient;
 let iiProtocolTestWindow: Window | undefined;
-let localIdentity: SignIdentity;
+
+// The identity set by the authentication
+let delegationIdentity: DelegationIdentity | undefined = undefined;
+
+// The local, ephemeral key-pair
+let localIdentity_: SignIdentity | undefined = undefined;
+function getLocalIdentity(): SignIdentity {
+  if (localIdentity_ === undefined) {
+    localIdentity_ = Ed25519KeyIdentity.generate();
+  }
+  return localIdentity_;
+}
 
 const idlFactory = ({ IDL }: { IDL: any }) => {
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
@@ -127,7 +138,13 @@ const updateAlternativeOriginsView = async () => {
   alternativeOriginsEl.innerText = await response.text();
 };
 
-function addMessageElement(message: unknown, received: boolean) {
+function addMessageElement({
+  message,
+  ty,
+}: {
+  message: unknown;
+  ty: "received" | "sent";
+}) {
   const messageContainer = document.createElement("div");
   messageContainer.classList.add("postMessage");
   const messageTitle = document.createElement("div");
@@ -136,7 +153,7 @@ function addMessageElement(message: unknown, received: boolean) {
   messageContent.innerText = JSON.stringify(message, (_, v) =>
     typeof v === "bigint" ? v.toString() : v
   );
-  if (received) {
+  if (ty === "received") {
     messageTitle.innerText = "Message Received";
     messageContainer.classList.add("received");
   } else {
@@ -149,30 +166,24 @@ function addMessageElement(message: unknown, received: boolean) {
 }
 
 window.addEventListener("message", (event) => {
-  if (event.source === iiProtocolTestWindow) {
-    addMessageElement(event.data, true);
-    if (event?.data?.kind === "authorize-client-success") {
-      const delegations = event.data.delegations.map(
-        (signedDelegation: any) => {
-          return {
-            delegation: new Delegation(
-              signedDelegation.delegation.pubkey,
-              signedDelegation.delegation.expiration,
-              signedDelegation.delegation.targets
-            ),
-            signature: signedDelegation.signature.buffer,
-          };
-        }
-      );
-      const delegationChain = DelegationChain.fromDelegations(
-        delegations,
-        event.data.userPublicKey.buffer
-      );
-      updateDelegationView(
-        DelegationIdentity.fromDelegation(localIdentity, delegationChain)
-      );
-    }
+  if (!event.source || event.source !== iiProtocolTestWindow) {
+    return;
   }
+
+  addMessageElement({ message: event.data, ty: "received" });
+
+  if (event?.data?.kind !== "authorize-client-success") {
+    return;
+  }
+
+  const delegations = event.data.delegations.map(extractDelegation);
+  const delegationChain = DelegationChain.fromDelegations(
+    delegations,
+    event.data.userPublicKey.buffer
+  );
+  updateDelegationView(
+    DelegationIdentity.fromDelegation(getLocalIdentity(), delegationChain)
+  );
 });
 
 const readCanisterId = (): string => {
@@ -181,31 +192,28 @@ const readCanisterId = (): string => {
 };
 
 const init = async () => {
-  authClient = await AuthClient.create();
-  updateDelegationView(authClient.getIdentity());
   await updateAlternativeOriginsView();
   signInBtn.onclick = async () => {
-    let derivationOrigin =
+    const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
+    // The default max TTL setin the @dfinity/auth-client library
+    const authClientDefaultMaxTTL =
+      /* hours */ BigInt(8) * /* nanoseconds */ BigInt(3_600_000_000_000);
+    const maxTimeToLive =
+      maxTimeToLive_ > BigInt(0) ? maxTimeToLive_ : authClientDefaultMaxTTL;
+    const derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
-    if (BigInt(maxTimeToLiveEl.value) > BigInt(0)) {
-      authClient.login({
-        identityProvider: iiUrlEl.value,
-        maxTimeToLive: BigInt(maxTimeToLiveEl.value),
-        derivationOrigin,
-        onSuccess: () => updateDelegationView(authClient.getIdentity()),
-      });
-    } else {
-      authClient.login({
-        identityProvider: iiUrlEl.value,
-        derivationOrigin,
-        onSuccess: () => updateDelegationView(authClient.getIdentity()),
-      });
-    }
-  };
 
-  signOutBtn.onclick = async () => {
-    await authClient.logout();
-    updateDelegationView(authClient.getIdentity());
+    try {
+      delegationIdentity = await authWithII({
+        url: iiUrlEl.value,
+        maxTimeToLive,
+        derivationOrigin,
+        sessionIdentity: getLocalIdentity(),
+      });
+      updateDelegationView(delegationIdentity);
+    } catch (e) {
+      showError(JSON.stringify(e));
+    }
   };
 
   openIiWindowBtn.onclick = () => {
@@ -229,7 +237,7 @@ const init = async () => {
       return;
     }
     const invalidData = "some invalid data";
-    addMessageElement(invalidData, false);
+    addMessageElement({ message: invalidData, ty: "sent" });
     iiProtocolTestWindow.postMessage(invalidData, iiUrlEl.value);
   };
 
@@ -239,7 +247,7 @@ const init = async () => {
       return;
     }
     const incompleteMessage = { kind: "authorize-client" };
-    addMessageElement(incompleteMessage, false);
+    addMessageElement({ message: incompleteMessage, ty: "sent" });
     iiProtocolTestWindow.postMessage(incompleteMessage, iiUrlEl.value);
   };
 
@@ -248,7 +256,6 @@ const init = async () => {
       alert("Open II tab first");
       return;
     }
-    localIdentity = Ed25519KeyIdentity.generate();
     let derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
     let maxTimeToLive =
@@ -257,11 +264,13 @@ const init = async () => {
         : undefined;
     const validMessage = {
       kind: "authorize-client",
-      sessionPublicKey: new Uint8Array(localIdentity.getPublicKey().toDer()),
+      sessionPublicKey: new Uint8Array(
+        getLocalIdentity().getPublicKey().toDer()
+      ),
       derivationOrigin,
       maxTimeToLive,
     };
-    addMessageElement(validMessage, false);
+    addMessageElement({ message: validMessage, ty: "sent" });
     iiProtocolTestWindow.postMessage(validMessage, iiUrlEl.value);
   };
 
@@ -271,7 +280,7 @@ const init = async () => {
       return;
     }
     let message = JSON.parse(customMessageEl.value);
-    addMessageElement(message, false);
+    addMessageElement({ message, ty: "sent" });
     iiProtocolTestWindow.postMessage(message, iiUrlEl.value);
   };
 
@@ -308,12 +317,11 @@ const init = async () => {
 init();
 
 whoamiBtn.addEventListener("click", async () => {
-  const identity = await authClient.getIdentity();
   const canisterId = Principal.fromText(readCanisterId());
   const actor = Actor.createActor(idlFactory, {
     agent: new HttpAgent({
       host: hostUrlEl.value,
-      identity,
+      identity: delegationIdentity,
     }),
     canisterId,
   });
@@ -345,6 +353,10 @@ const credentialSpecs = {
     credentialType: "UniversityDegreeCredential",
     arguments: { institutionName: "DFINITY College of Engineering" },
   },
+  adult: {
+    credentialType: "VerifiedAdult",
+    arguments: { minAge: 18 },
+  },
 } as const;
 
 type CredType = keyof typeof credentialSpecs;
@@ -354,13 +366,17 @@ let latestOpts:
   | undefined
   | {
       issuerOrigin: string;
+      derivationOrigin?: string;
       credTy: CredType;
       flowId: number;
       win: Window;
     };
 
 /* Callback for setting the latest received presentation. Set by React when it boots. */
-let setLatestPresentation: (pres: string) => void = (_) => {
+let setLatestPresentation: (pres: {
+  alias: string;
+  credential: string;
+}) => void = (_) => {
   /* */
 };
 
@@ -389,9 +405,7 @@ function handleFlowReady(evnt: MessageEvent) {
     return showError(`"${principal}" is not a principal`);
   }
 
-  // XXX: we don't export the VC-relevant types from the II codebase
-  // so we cannot typecheck this
-  const req = {
+  const req: VcFlowRequestWire = {
     id: opts.flowId.toString(),
     jsonrpc: "2.0",
     method: "request_credential",
@@ -401,6 +415,7 @@ function handleFlowReady(evnt: MessageEvent) {
       },
       credentialSpec: credentialSpecs[opts.credTy],
       credentialSubject: principal,
+      derivationOrigin: opts.derivationOrigin,
     },
   };
 
@@ -434,11 +449,11 @@ function handleFlowFinished(evnt: MessageEvent) {
 
     const ver = decodeJwt(verifiablePresentation) as any;
     const creds = ver.vp.verifiableCredential;
-    const pretty = creds.map((cred: string) =>
+    const [alias, credential] = creds.map((cred: string) =>
       JSON.stringify(decodeJwt(cred), null, 2)
     );
 
-    setLatestPresentation(pretty.join("\n"));
+    setLatestPresentation({ alias, credential });
     latestOpts?.win.close();
   } finally {
     window.removeEventListener("message", handleFlowFinished);
@@ -451,12 +466,15 @@ const App = () => {
     "http://issuer.localhost:5173"
   );
 
+  // Alternative origin for the RP, if any
+  const [derivationOrigin, setDerivationOrigin] = useState<string>("");
+
   // Continuously incrementing flow IDs used in the JSON RPC messages
   const [nextFlowId, setNextFlowId] = useState(0);
 
   // Latest presentation generated by a VC flow
   const [latestPresentation, setLatestPresentation_] = useState<
-    undefined | string
+    undefined | { alias: string; credential: string }
   >(undefined);
   setLatestPresentation = setLatestPresentation_;
 
@@ -479,6 +497,7 @@ const App = () => {
       flowId,
       credTy,
       issuerOrigin: issuerUrl,
+      derivationOrigin: derivationOrigin !== "" ? derivationOrigin : undefined,
       win: iiWindow,
     };
 
@@ -497,6 +516,15 @@ const App = () => {
           onChange={(evt) => setIssuerUrl(evt.target.value)}
         />
       </label>
+      <label>
+        Alternative Derivation Origin:
+        <input
+          data-role="derivation-origin-rp"
+          type="text"
+          placeholder="(use default)"
+          onChange={(evt) => setDerivationOrigin(evt.target.value)}
+        />
+      </label>
 
       <button
         data-action="verify-employee"
@@ -507,8 +535,18 @@ const App = () => {
       <button data-action="verify-grad" onClick={() => startVcFlow("grad")}>
         Verify Graduate Credential
       </button>
+      <button data-action="verify-adult" onClick={() => startVcFlow("adult")}>
+        Verify Adult Person Credential
+      </button>
 
-      <pre data-role="presentation">{latestPresentation}</pre>
+      {latestPresentation && (
+        <>
+          <pre data-role="presentation-alias">{latestPresentation.alias}</pre>
+          <pre data-role="presentation-credential">
+            {latestPresentation.credential}
+          </pre>
+        </>
+      )}
     </>
   );
 };

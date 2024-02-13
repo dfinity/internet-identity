@@ -3,14 +3,11 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
-};
-use canister_tests::match_value;
+use canister_tests::framework::{env, install_ii_canister, II_WASM};
 use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use internet_identity_interface::internet_identity::types::{IdentityInfoResponse, MetadataEntry};
-use regex::Regex;
+use internet_identity_interface::internet_identity::types::{
+    IdentityMetadataReplaceError, MetadataEntryV2,
+};
 use std::collections::HashMap;
 
 #[test]
@@ -22,15 +19,14 @@ fn should_write_metadata() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity info failed");
     assert!(identity_info.metadata.is_empty());
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("some value".to_string()),
+        MetadataEntryV2::String("some value".to_string()),
     )]);
 
     api_v2::identity_metadata_replace(
@@ -39,18 +35,18 @@ fn should_write_metadata() -> Result<(), CallError> {
         authn_method.principal(),
         identity_number,
         &metadata,
-    )?;
+    )?
+    .expect("identity metadata replace failed");
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity info failed");
     assert_eq!(identity_info.metadata, metadata);
     Ok(())
 }
 
 #[test]
-fn should_require_authentication_to_replace_identity_metadata() {
+fn should_require_authentication_to_replace_identity_metadata() -> Result<(), CallError> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -60,7 +56,7 @@ fn should_require_authentication_to_replace_identity_metadata() {
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("some value".to_string()),
+        MetadataEntryV2::String("some value".to_string()),
     )]);
 
     let result = api_v2::identity_metadata_replace(
@@ -69,12 +65,12 @@ fn should_require_authentication_to_replace_identity_metadata() {
         Principal::anonymous(),
         identity_number,
         &metadata,
-    );
-    expect_user_error_with_message(
+    )?;
+    assert!(matches!(
         result,
-        CanisterCalledTrap,
-        Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
-    );
+        Err(IdentityMetadataReplaceError::Unauthorized(_))
+    ));
+    Ok(())
 }
 
 #[test]
@@ -86,15 +82,14 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    match_value!(
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?,
-        Some(IdentityInfoResponse::Ok(identity_info))
-    );
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity info failed");
     assert!(identity_info.metadata.is_empty());
 
     let metadata = HashMap::from_iter(vec![(
         METADATA_KEY.to_string(),
-        MetadataEntry::String("a".repeat(3000)),
+        MetadataEntryV2::String("a".repeat(3000)),
     )]);
 
     let result = api_v2::identity_metadata_replace(
@@ -103,11 +98,10 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
         authn_method.principal(),
         identity_number,
         &metadata,
-    );
-    expect_user_error_with_message(
+    )?;
+    assert!(matches!(
         result,
-        CanisterCalledTrap,
-        Regex::new("failed to write identity metadata: Cumulative size of variable sized fields exceeds limit: length \\d+, limit \\d+\\.").unwrap(),
-    );
+        Err(IdentityMetadataReplaceError::StorageSpaceExceeded { .. })
+    ));
     Ok(())
 }

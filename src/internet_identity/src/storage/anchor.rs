@@ -1,10 +1,11 @@
 use crate::ii_domain::IIDomain;
+use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::*;
 use std::collections::HashMap;
-use std::{fmt, iter};
+use std::fmt;
 
 #[cfg(test)]
 mod tests;
@@ -13,8 +14,9 @@ mod tests;
 /// The anchor has limited visibility for the constructor to make sure it is loaded from storage.
 /// The devices can only be modified by the exposed functions which keeps invariant checking local
 /// to this module.
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Anchor {
+    anchor_number: AnchorNumber,
     devices: Vec<Device>,
     metadata: Option<HashMap<String, MetadataEntry>>,
 }
@@ -97,14 +99,38 @@ impl From<Device> for DeviceDataWithoutAlias {
     }
 }
 
+impl From<Anchor> for StorableAnchor {
+    fn from(anchor: Anchor) -> Self {
+        Self {
+            devices: anchor.devices,
+            metadata: anchor.metadata,
+        }
+    }
+}
+
+impl From<(AnchorNumber, StorableAnchor)> for Anchor {
+    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
+        Anchor {
+            anchor_number,
+            devices: storable_anchor.devices,
+            metadata: storable_anchor.metadata,
+        }
+    }
+}
+
 impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
-    pub(super) fn new() -> Anchor {
+    pub(super) fn new(anchor_number: AnchorNumber) -> Anchor {
         Self {
+            anchor_number,
             devices: vec![],
             metadata: None,
         }
+    }
+
+    pub fn anchor_number(&self) -> AnchorNumber {
+        self.anchor_number
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {
@@ -114,11 +140,11 @@ impl Anchor {
             });
         }
         check_device_invariants(&device)?;
-        check_anchor_invariants(
-            &self.devices.iter().chain(iter::once(&device)).collect(),
-            &self.metadata,
-        )?;
-        self.devices.push(device);
+        // Check the new set of devices is consistent
+        let mut devices = self.devices.clone();
+        devices.push(device);
+        check_anchor_invariants(&devices[..], &self.metadata)?;
+        self.devices = devices;
         Ok(())
     }
 
@@ -148,21 +174,17 @@ impl Anchor {
             return Err(AnchorError::CannotModifyDeviceKey);
         }
         check_device_invariants(&modified_device)?;
+        // Ensure the old device can be mutated
         let index = self.device_index(device_key)?;
         check_mutation_allowed(&self.devices[index])?;
-        check_anchor_invariants(
-            &self
-                .devices
-                .iter()
-                // filter out the device before modification
-                .filter(|e| e.pubkey != device_key)
-                // append the device with modification
-                .chain(iter::once(&modified_device))
-                .collect(),
-            &self.metadata,
-        )?;
 
-        self.devices[index] = modified_device;
+        // Check the new set of devices is consistent
+        let mut devices = self.devices.clone();
+        devices[index] = modified_device;
+        check_anchor_invariants(&devices[..], &self.metadata)?;
+
+        // Replace devices
+        self.devices = devices;
         Ok(())
     }
 
@@ -284,7 +306,7 @@ impl Anchor {
         metadata: HashMap<String, MetadataEntry>,
     ) -> Result<(), AnchorError> {
         let metadata = Some(metadata);
-        check_anchor_invariants(&self.devices.iter().collect(), &metadata)?;
+        check_anchor_invariants(&self.devices[..], &metadata)?;
         self.metadata = metadata;
         Ok(())
     }
@@ -390,7 +412,7 @@ fn caller() -> Principal {
 /// To allow that transition, [remove_device](Anchor::remove_device) does _not_ check the invariants based on the assumption
 /// that the state of an anchor cannot get worse by removing a device.
 fn check_anchor_invariants(
-    devices: &Vec<&Device>,
+    devices: &[Device],
     identity_metadata: &Option<HashMap<String, MetadataEntry>>,
 ) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further

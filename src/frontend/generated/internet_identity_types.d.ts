@@ -27,31 +27,50 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
-export type AuthnMethod = { 'webauthn' : WebAuthn } |
-  { 'pubkey' : PublicKeyAuthn };
-export type AuthnMethodAddResponse = { 'ok' : null } |
-  { 'invalid_metadata' : string };
+export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
+  { 'WebAuthn' : WebAuthn };
+export type AuthnMethodAddError = { 'InvalidMetadata' : string };
+export interface AuthnMethodConfirmationCode {
+  'confirmation_code' : string,
+  'expiration' : Timestamp,
+}
+export type AuthnMethodConfirmationError = { 'RegistrationModeOff' : null } |
+  { 'NoAuthnMethodToConfirm' : null } |
+  { 'WrongCode' : { 'retries_left' : number } };
 export interface AuthnMethodData {
-  'metadata' : MetadataMap,
-  'protection' : AuthnMethodProtection,
+  'security_settings' : AuthnMethodSecuritySettings,
+  'metadata' : MetadataMapV2,
   'last_authentication' : [] | [Timestamp],
   'authn_method' : AuthnMethod,
-  'purpose' : Purpose,
 }
-export type AuthnMethodProtection = { 'unprotected' : null } |
-  { 'protected' : null };
+export type AuthnMethodMetadataReplaceError = { 'AuthnMethodNotFound' : null } |
+  { 'InvalidMetadata' : string };
+export type AuthnMethodProtection = { 'Protected' : null } |
+  { 'Unprotected' : null };
+export type AuthnMethodPurpose = { 'Recovery' : null } |
+  { 'Authentication' : null };
+export type AuthnMethodRegisterError = { 'RegistrationModeOff' : null } |
+  { 'RegistrationAlreadyInProgress' : null } |
+  { 'InvalidMetadata' : string };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
-export type AuthnMethodRemoveResponse = { 'ok' : null };
+export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
+  { 'InvalidMetadata' : string };
+export interface AuthnMethodSecuritySettings {
+  'protection' : AuthnMethodProtection,
+  'purpose' : AuthnMethodPurpose,
+}
+export type AuthnMethodSecuritySettingsReplaceError = {
+    'AuthnMethodNotFound' : null
+  };
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
   'anchor_number' : UserNumber,
   'timestamp' : Timestamp,
 }
-export type CaptchaCreateResponse = { 'ok' : Challenge };
 export type CaptchaResult = ChallengeResult;
 export interface Challenge {
   'png_base64' : string,
@@ -99,6 +118,9 @@ export interface DeviceWithUsage {
 export type FrontendHostname = string;
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
+export type GetIdAliasError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  { 'NoSuchCredentials' : string };
 export interface GetIdAliasRequest {
   'rp_id_alias_jwt' : string,
   'issuer' : FrontendHostname,
@@ -106,9 +128,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type GetIdAliasResponse = { 'ok' : IdAliasCredentials } |
-  { 'authentication_failed' : string } |
-  { 'no_such_credentials' : string };
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -132,18 +151,31 @@ export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
+export interface IdentityAuthnInfo {
+  'authn_methods' : Array<AuthnMethod>,
+  'recovery_authn_methods' : Array<AuthnMethod>,
+}
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
-  'metadata' : MetadataMap,
+  'metadata' : MetadataMapV2,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
 }
-export type IdentityInfoResponse = { 'ok' : IdentityInfo };
-export type IdentityMetadataReplaceResponse = { 'ok' : null };
+export type IdentityInfoError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export type IdentityMetadataReplaceError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal } |
+  {
+    'StorageSpaceExceeded' : {
+      'space_required' : bigint,
+      'space_available' : bigint,
+    }
+  };
 export type IdentityNumber = bigint;
-export type IdentityRegisterResponse = { 'ok' : IdentityNumber } |
-  { 'invalid_metadata' : string } |
-  { 'bad_captcha' : null } |
-  { 'canister_full' : null };
+export type IdentityRegisterError = { 'BadCaptcha' : null } |
+  { 'CanisterFull' : null } |
+  { 'InvalidMetadata' : string };
 export interface InternetIdentityInit {
   'max_num_latest_delegation_origins' : [] | [bigint],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
@@ -174,13 +206,21 @@ export type MetadataMap = Array<
       { 'bytes' : Uint8Array | number[] },
   ]
 >;
+export type MetadataMapV2 = Array<
+  [
+    string,
+    { 'Map' : MetadataMapV2 } |
+      { 'String' : string } |
+      { 'Bytes' : Uint8Array | number[] },
+  ]
+>;
+export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
   'issuer' : FrontendHostname,
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type PrepareIdAliasResponse = { 'ok' : PreparedIdAlias } |
-  { 'authentication_failed' : string };
 export interface PreparedIdAlias {
   'rp_id_alias_jwt' : string,
   'issuer_id_alias_jwt' : string,
@@ -241,13 +281,50 @@ export interface _SERVICE {
   >,
   'authn_method_add' : ActorMethod<
     [IdentityNumber, AuthnMethodData],
-    [] | [AuthnMethodAddResponse]
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodAddError }
+  >,
+  'authn_method_confirm' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodConfirmationError }
+  >,
+  'authn_method_metadata_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, MetadataMapV2],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodMetadataReplaceError }
+  >,
+  'authn_method_register' : ActorMethod<
+    [IdentityNumber, AuthnMethodData],
+    { 'Ok' : AuthnMethodConfirmationCode } |
+      { 'Err' : AuthnMethodRegisterError }
+  >,
+  'authn_method_registration_mode_enter' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : { 'expiration' : Timestamp } } |
+      { 'Err' : null }
+  >,
+  'authn_method_registration_mode_exit' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : null } |
+      { 'Err' : null }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],
-    [] | [AuthnMethodRemoveResponse]
+    { 'Ok' : null } |
+      { 'Err' : null }
   >,
-  'captcha_create' : ActorMethod<[], [] | [CaptchaCreateResponse]>,
+  'authn_method_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthnMethodData],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodReplaceError }
+  >,
+  'authn_method_security_settings_replace' : ActorMethod<
+    [IdentityNumber, PublicKey, AuthnMethodSecuritySettings],
+    { 'Ok' : null } |
+      { 'Err' : AuthnMethodSecuritySettingsReplaceError }
+  >,
+  'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
@@ -259,18 +336,33 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_id_alias' : ActorMethod<[GetIdAliasRequest], [] | [GetIdAliasResponse]>,
+  'get_id_alias' : ActorMethod<
+    [GetIdAliasRequest],
+    { 'Ok' : IdAliasCredentials } |
+      { 'Err' : GetIdAliasError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
-  'identity_info' : ActorMethod<[IdentityNumber], [] | [IdentityInfoResponse]>,
+  'identity_authn_info' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : IdentityAuthnInfo } |
+      { 'Err' : null }
+  >,
+  'identity_info' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : IdentityInfo } |
+      { 'Err' : IdentityInfoError }
+  >,
   'identity_metadata_replace' : ActorMethod<
-    [IdentityNumber, MetadataMap],
-    [] | [IdentityMetadataReplaceResponse]
+    [IdentityNumber, MetadataMapV2],
+    { 'Ok' : null } |
+      { 'Err' : IdentityMetadataReplaceError }
   >,
   'identity_register' : ActorMethod<
     [AuthnMethodData, CaptchaResult, [] | [Principal]],
-    [] | [IdentityRegisterResponse]
+    { 'Ok' : IdentityNumber } |
+      { 'Err' : IdentityRegisterError }
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
@@ -280,7 +372,8 @@ export interface _SERVICE {
   >,
   'prepare_id_alias' : ActorMethod<
     [PrepareIdAliasRequest],
-    [] | [PrepareIdAliasResponse]
+    { 'Ok' : PreparedIdAlias } |
+      { 'Err' : PrepareIdAliasError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
@@ -296,3 +389,4 @@ export interface _SERVICE {
   >,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];

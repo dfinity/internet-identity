@@ -3,6 +3,7 @@ use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivi
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
+use crate::storage::storable_anchor::StorableAnchor;
 use crate::storage::{Header, PersistentStateError, StorageError};
 use crate::Storage;
 use candid::Principal;
@@ -59,13 +60,13 @@ fn should_recover_header_from_memory_v7() {
 
 fn add_test_anchor_data<M: Memory + Clone>(storage: &mut Storage<M>, number_of_anchors: usize) {
     for _ in 0..number_of_anchors {
-        let (anchor_number, mut anchor) = storage
+        let mut anchor = storage
             .allocate_anchor()
             .expect("Failure allocating an anchor.");
         anchor
-            .add_device(sample_unique_device(anchor_number as usize))
+            .add_device(sample_unique_device(anchor.anchor_number() as usize))
             .expect("Failure adding a device");
-        storage.write(anchor_number, anchor.clone()).unwrap();
+        storage.write(anchor.clone()).unwrap();
     }
 }
 
@@ -92,10 +93,11 @@ fn should_allocate_new_bucket_after_2048_anchors_v7() {
 fn should_read_previous_write() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((12345, 678910), memory);
-    let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
+    let mut anchor = storage.allocate_anchor().unwrap();
+    let anchor_number = anchor.anchor_number();
 
     anchor.add_device(sample_device()).unwrap();
-    storage.write(anchor_number, anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
 
     let read_anchor = storage.read(anchor_number).unwrap();
     assert_eq!(anchor, read_anchor);
@@ -105,18 +107,20 @@ fn should_read_previous_write() {
 fn should_serialize_first_record() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory.clone());
-    let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
-    assert_eq!(anchor_number, 123u64);
+    let mut anchor = storage.allocate_anchor().unwrap();
+    assert_eq!(anchor.anchor_number(), 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&anchor).unwrap().len();
+    let expected_length = candid::encode_one(StorableAnchor::from(anchor.clone()))
+        .unwrap()
+        .len();
 
-    storage.write(anchor_number, anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
 
     let mut buf = vec![0u8; expected_length];
     memory.read(RESERVED_HEADER_BYTES + LENGTH_OFFSET, &mut buf);
-    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
-    assert_eq!(decoded_from_memory, anchor);
+    let decoded_from_memory: StorableAnchor = candid::decode_one(&buf).unwrap();
+    assert_eq!(Anchor::from((123u64, decoded_from_memory)), anchor);
 }
 
 #[test]
@@ -127,30 +131,34 @@ fn should_serialize_subsequent_record_to_expected_memory_location() {
     for _ in 0..100 {
         storage.allocate_anchor().unwrap();
     }
-    let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
-    assert_eq!(anchor_number, 223u64);
+    let mut anchor = storage.allocate_anchor().unwrap();
+    assert_eq!(anchor.anchor_number(), 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let expected_length = candid::encode_one(&anchor).unwrap().len();
+    let expected_length = candid::encode_one(StorableAnchor::from(anchor.clone()))
+        .unwrap()
+        .len();
 
-    storage.write(anchor_number, anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
 
     let mut buf = vec![0u8; expected_length];
     memory.read(
         RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET + LENGTH_OFFSET,
         &mut buf,
     );
-    let decoded_from_memory: Anchor = candid::decode_one(&buf).unwrap();
-    assert_eq!(decoded_from_memory, anchor);
+    let decoded_from_memory: StorableAnchor = candid::decode_one(&buf).unwrap();
+    assert_eq!(Anchor::from((223u64, decoded_from_memory)), anchor);
 }
 
 #[test]
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory);
-    let (_, anchor) = storage.allocate_anchor().unwrap();
+    storage.allocate_anchor().unwrap();
 
-    let result = storage.write(222, anchor);
+    let anchor = Anchor::new(222);
+
+    let result = storage.write(anchor);
     assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
 }
 
@@ -159,16 +167,16 @@ fn should_deserialize_first_record() {
     let memory = VectorMemory::default();
     memory.grow(3);
     let mut storage = Storage::new((123, 456), memory.clone());
-    let (anchor_number, mut anchor) = storage
+    let mut anchor = storage
         .allocate_anchor()
         .expect("Failed to allocate an anchor");
     storage
-        .write(anchor_number, anchor.clone())
+        .write(anchor.clone())
         .expect("Failed to write anchor");
-    assert_eq!(anchor_number, 123u64);
+    assert_eq!(anchor.anchor_number(), 123u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&anchor).unwrap();
+    let buf = candid::encode_one(StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(RESERVED_HEADER_BYTES, &(buf.len() as u16).to_le_bytes());
     memory.write(RESERVED_HEADER_BYTES + 2, &buf);
 
@@ -183,18 +191,16 @@ fn should_deserialize_subsequent_record_at_expected_memory_location() {
     memory.grow(9); // grow memory to accommodate a write to record 100
     let mut storage = Storage::new((123, 456), memory.clone());
     for _ in 0..100 {
-        let (anchor_number, anchor) = storage
+        let anchor = storage
             .allocate_anchor()
             .expect("Failed to allocate an anchor");
-        storage
-            .write(anchor_number, anchor)
-            .expect("Failed to write anchor");
+        storage.write(anchor).expect("Failed to write anchor");
     }
-    let (anchor_number, mut anchor) = storage.allocate_anchor().unwrap();
-    assert_eq!(anchor_number, 223u64);
+    let mut anchor = storage.allocate_anchor().unwrap();
+    assert_eq!(anchor.anchor_number(), 223u64);
 
     anchor.add_device(sample_device()).unwrap();
-    let buf = candid::encode_one(&anchor).unwrap();
+    let buf = candid::encode_one(StorableAnchor::from(anchor.clone())).unwrap();
     memory.write(
         RESERVED_HEADER_BYTES + EXPECTED_RECORD_OFFSET,
         &(buf.len() as u16).to_le_bytes(),
@@ -334,8 +340,8 @@ fn should_overwrite_persistent_state_with_next_anchor() {
     memory.read(EXPECTED_ADDRESS, &mut buf);
     assert_eq!(buf, PERSISTENT_STATE_MAGIC);
 
-    let (anchor_number, anchor) = storage.allocate_anchor().unwrap();
-    storage.write(anchor_number, anchor).unwrap();
+    let anchor = storage.allocate_anchor().unwrap();
+    storage.write(anchor).unwrap();
 
     let mut buf = vec![0u8; 4];
     memory.read(EXPECTED_ADDRESS, &mut buf);
@@ -357,10 +363,8 @@ fn should_read_previously_stored_persistent_state() {
     // Create storage, and add anchors (so that MemoryManager allocates a memory block for anchors).
     let mut storage = Storage::new((1, 100), memory.clone());
     for _ in 0..NUM_ANCHORS {
-        let (anchor_number, anchor) = storage.allocate_anchor().expect("Failed allocating anchor");
-        storage
-            .write(anchor_number, anchor)
-            .expect("Failed writing anchor");
+        let anchor = storage.allocate_anchor().expect("Failed allocating anchor");
+        storage.write(anchor).expect("Failed writing anchor");
     }
 
     memory.write(EXPECTED_ADDRESS, b"IIPS".as_ref());

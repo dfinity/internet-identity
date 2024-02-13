@@ -11,7 +11,7 @@ jobs:
   node-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
         # First, check node's releases for a new version.
       - name: Check new node version
@@ -20,10 +20,10 @@ jobs:
           current_node_version=$(cat ./.node-version)
           echo "current node version '$current_node_version'"
 
-          # We look for the last released version that starts with "prefix", and then drop the
-          # "v" prefix (which .node-version doesn't use)
+          # We look for the last released version that starts with the currently used major
+          # version, and then drop the "v" prefix (which .node-version doesn't use)
           latest_node_version=$(curl -sSl https://nodejs.org/download/release/index.json \
-            | jq -cMr --arg prefix v18 \
+            | jq -cMr --arg prefix "v${current_node_version%%.*}" \
             'sort_by(.data) | [.[] | select(.lts) | select(.version | startswith($prefix))][0] | .version | sub("^v"; "")')
           echo "latest node version '$latest_node_version'"
 

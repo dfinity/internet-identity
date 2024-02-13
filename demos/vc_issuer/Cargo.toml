@@ -11,11 +11,12 @@ edition = "2021"
 canister_sig_util = { path = "../../src/canister_sig_util" }
 internet_identity_interface = { path = "../../src/internet_identity_interface" }
 vc_util = { path = "../../src/vc_util" }
+asset_util = { path = "../../src/asset_util" }
 # ic dependencies
-candid = "0.9"
-ic-cdk = "0.10"
-ic-cdk-macros = "0.7"
-ic-certification = "1.3"
+candid = "0.10"
+ic-cdk = "0.12"
+ic-cdk-macros = "0.8"
+ic-certification = "2.2"
 ic-stable-structures = "0.6.0"
 # vc dependencies
 identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false}
@@ -31,9 +32,12 @@ serde_json = "1"
 sha2 = "^0.10" # set bound to match ic-certified-map bound
 strfmt = "0.2"
 lazy_static = "1.4"
-base64 = "0.21"
+include_dir = "0.7"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
+candid_parser = "0.1"
+ic-http-certification = "2.2"
 ic-test-state-machine-client = "3"
+ic-response-verification = "2.2"
 canister_tests = { path = "../../src/canister_tests" }

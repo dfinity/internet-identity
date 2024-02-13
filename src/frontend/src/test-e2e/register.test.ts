@@ -49,7 +49,7 @@ test("Log into client application, after registration", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(browser);
@@ -75,7 +75,7 @@ test("Register first then log into client application", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("2vxsx-fae");
+    expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.signin();
 
     const authenticatorId2 = await switchToPopup(browser);

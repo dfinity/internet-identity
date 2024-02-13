@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
     "wdio": "wdio run ./wdio.conf.ts",
-    "test": "ts-node --esm ./test.ts",
+    "test": "npm run opts -- ./test.ts",
     "format": "prettier --write --plugin-search-dir=. .",
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
-    "proxy": "ts-node --esm ./test.ts --no-run"
+    "proxy": "npm run opts -- ./test.ts --no-run"
   },
   "devDependencies": {
     "@wdio/cli": "^8.22.1",
@@ -21,7 +22,7 @@
     "proxy": "git+https://github.com/nmattia/dfx-proxy",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4",
-    "vite": "^4.3.9"
+    "vite": "^4.5.2"
   },
   "dependencies": {
     "@dfinity/auth-client": "^0.15.5"

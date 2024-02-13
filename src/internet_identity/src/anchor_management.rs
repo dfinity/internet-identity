@@ -1,7 +1,7 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::{Anchor, AnchorError, Device};
 use crate::{activity_stats, state};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
@@ -160,10 +160,8 @@ pub fn remove(
 pub fn identity_metadata_replace(
     anchor: &mut Anchor,
     metadata: HashMap<String, MetadataEntry>,
-) -> Operation {
+) -> Result<Operation, AnchorError> {
     let metadata_keys = metadata.keys().cloned().collect();
-    anchor
-        .replace_identity_metadata(metadata)
-        .unwrap_or_else(|err| trap(&format!("failed to write identity metadata: {err}")));
-    Operation::IdentityMetadataReplace { metadata_keys }
+    anchor.replace_identity_metadata(metadata)?;
+    Ok(Operation::IdentityMetadataReplace { metadata_keys })
 }

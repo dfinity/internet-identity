@@ -1,5 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src", "./*.ts"],
-  "exclude": [ "src/frontend/generated/*" ]
+  "include": ["src/frontend"],
+  "exclude": ["src/frontend/generated/*"],
+  "references": [
+    { "path": "./src/vc-api" },
+    { "path": "./demos/test-app" },
+    { "path": "./demos/vc_issuer" },
+    { "path": "./src/vite-plugins" }
+  ]
 }

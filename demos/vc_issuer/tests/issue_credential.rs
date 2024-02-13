@@ -3,26 +3,32 @@
 use assert_matches::assert_matches;
 use candid::{CandidType, Deserialize, Principal};
 use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
+use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
-use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, II_WASM};
-use canister_tests::{flows, match_value};
+use canister_tests::flows;
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
+use ic_response_verification::types::VerificationInfo;
+use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{call_candid, call_candid_as};
 use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use identity_core::common::Value;
 use identity_jose::jwt::JwtClaims;
+use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasRequest, GetIdAliasResponse, PrepareIdAliasRequest, PrepareIdAliasResponse,
+    GetIdAliasRequest, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, GetCredentialResponse,
-    Icrc21ConsentMessageResponse, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, PrepareCredentialRequest,
-    PrepareCredentialResponse, SignedIdAlias as SignedIssuerIdAlias,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo,
+    Icrc21ConsentPreferences, Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError,
+    IssuedCredentialData, PrepareCredentialRequest, PreparedCredentialData,
+    SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
     did_for_principal, get_verified_id_alias_from_jws, verify_credential_jws_with_canister_id,
@@ -100,7 +106,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         consent_message_request: &Icrc21VcConsentMessageRequest,
-    ) -> Result<Option<Icrc21ConsentMessageResponse>, CallError> {
+    ) -> Result<Result<Icrc21ConsentInfo, Icrc21Error>, CallError> {
         call_candid_as(
             env,
             canister_id,
@@ -140,7 +146,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         prepare_credential_request: &PrepareCredentialRequest,
-    ) -> Result<PrepareCredentialResponse, CallError> {
+    ) -> Result<Result<PreparedCredentialData, IssueCredentialError>, CallError> {
         call_candid_as(
             env,
             canister_id,
@@ -156,7 +162,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         get_credential_request: &GetCredentialRequest,
-    ) -> Result<GetCredentialResponse, CallError> {
+    ) -> Result<Result<IssuedCredentialData, IssueCredentialError>, CallError> {
         query_candid_as(
             env,
             canister_id,
@@ -198,11 +204,12 @@ fn should_return_vc_consent_message_for_employment_vc() {
         let response =
             api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
                 .expect("API call failed")
-                .expect("Got 'None' from vc_consent_message");
+                .expect("Consent message error");
 
-        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
-        assert_eq!(info.language, actual_language);
-        assert!(info.consent_message.starts_with(consent_message_snippet));
+        assert_eq!(response.language, actual_language);
+        assert!(response
+            .consent_message
+            .starts_with(consent_message_snippet));
     }
 }
 
@@ -218,7 +225,7 @@ fn should_return_vc_consent_message_for_adult_vc() {
 
     for (requested_language, actual_language, consent_message_snippet) in test_cases {
         let mut args = HashMap::new();
-        args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+        args.insert("minAge".to_string(), ArgumentValue::Int(18));
         let consent_message_request = Icrc21VcConsentMessageRequest {
             credential_spec: CredentialSpec {
                 credential_type: "VerifiedAdult".to_string(),
@@ -232,10 +239,11 @@ fn should_return_vc_consent_message_for_adult_vc() {
         let response =
             api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
                 .expect("API call failed")
-                .expect("Got 'None' from vc_consent_message");
-        match_value!(response, Icrc21ConsentMessageResponse::Ok(info));
-        assert_eq!(info.language, actual_language);
-        assert!(info.consent_message.starts_with(consent_message_snippet));
+                .expect("Consent message error");
+        assert_eq!(response.language, actual_language);
+        assert!(response
+            .consent_message
+            .starts_with(consent_message_snippet));
     }
 }
 
@@ -256,12 +264,8 @@ fn should_fail_vc_consent_message_if_not_supported() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 #[test]
@@ -281,12 +285,8 @@ fn should_fail_vc_consent_message_if_missing_arguments() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 #[test]
@@ -309,12 +309,8 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
 
     let response =
         api::vc_consent_message(&env, canister_id, principal_1(), &consent_message_request)
-            .expect("API call failed")
-            .expect("Got 'None' from vc_consent_message");
-    assert_matches!(
-        response,
-        Icrc21ConsentMessageResponse::Err(Icrc21Error::UnsupportedCanisterCall(_))
-    );
+            .expect("API call failed");
+    assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
 fn employee_credential_spec() -> CredentialSpec {
@@ -343,7 +339,7 @@ fn degree_credential_spec() -> CredentialSpec {
 
 fn adult_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
-    args.insert("age_at_least".to_string(), ArgumentValue::Int(18));
+    args.insert("minAge".to_string(), ArgumentValue::Int(18));
     CredentialSpec {
         credential_type: "VerifiedAdult".to_string(),
         arguments: Some(args),
@@ -364,7 +360,7 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+    assert_matches!(response, Err(e) if format!("{:?}", e).contains("unauthorized principal"));
 }
 
 #[test]
@@ -384,7 +380,7 @@ fn should_fail_prepare_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", principal_1(), DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -397,18 +393,18 @@ fn should_fail_get_credential_for_wrong_sender() {
     api::add_employee(&env, issuer_id, authorized_principal).expect("failed to add employee");
     let unauthorized_principal = test_principal(2);
 
-    match_value!(
-        api::prepare_credential(
-            &env,
-            issuer_id,
-            authorized_principal,
-            &PrepareCredentialRequest {
-                credential_spec: employee_credential_spec(),
-                signed_id_alias: signed_id_alias.clone(),
-            },
-        ),
-        Ok(PrepareCredentialResponse::Ok(prepare_credential_response))
-    );
+    let prepare_credential_response = api::prepare_credential(
+        &env,
+        issuer_id,
+        authorized_principal,
+        &PrepareCredentialRequest {
+            credential_spec: employee_credential_spec(),
+            signed_id_alias: signed_id_alias.clone(),
+        },
+    )
+    .expect("API call failed")
+    .expect("failed to prepare credential");
+
     let get_credential_response = api::get_credential(
         &env,
         issuer_id,
@@ -421,7 +417,7 @@ fn should_fail_get_credential_for_wrong_sender() {
     )
     .expect("API call failed");
     assert_matches!(get_credential_response,
-        GetCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller {} does not match id alias dapp principal {}.", unauthorized_principal, authorized_principal))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -440,7 +436,7 @@ fn should_fail_prepare_credential_for_anonymous_caller() {
     )
     .expect("API call failed");
     assert_matches!(response,
-        PrepareCredentialResponse::Err(IssueCredentialError::UnauthorizedSubject(e)) if e.contains(&format!("Caller 2vxsx-fae does not match id alias dapp principal {}.", DUMMY_ALIAS_ID_DAPP_PRINCIPAL))
+        Err(IssueCredentialError::InvalidIdAlias(e)) if e.contains("id alias could not be verified")
     );
 }
 
@@ -464,10 +460,7 @@ fn should_fail_prepare_credential_for_wrong_root_key() {
         },
     )
     .expect("API call failed");
-    assert_matches!(
-        response,
-        PrepareCredentialResponse::Err(IssueCredentialError::InvalidIdAlias(_))
-    );
+    assert_matches!(response, Err(IssueCredentialError::InvalidIdAlias(_)));
 }
 
 #[test]
@@ -490,10 +483,7 @@ fn should_fail_prepare_credential_for_wrong_idp_canister_id() {
         },
     )
     .expect("API call failed");
-    assert_matches!(
-        response,
-        PrepareCredentialResponse::Err(IssueCredentialError::InvalidIdAlias(_))
-    );
+    assert_matches!(response, Err(IssueCredentialError::InvalidIdAlias(_)));
 }
 
 #[test]
@@ -512,7 +502,7 @@ fn should_prepare_employee_credential_for_authorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Ok(_));
+    assert_matches!(response, Ok(_));
 }
 
 #[test]
@@ -531,7 +521,7 @@ fn should_prepare_degree_credential_for_authorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, PrepareCredentialResponse::Ok(_));
+    assert_matches!(response, Ok(_));
 }
 
 /// Verifies that different credentials are being created including II interactions.
@@ -556,15 +546,10 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         issuer: issuer.clone(),
     };
 
-    let prepare_response =
+    let prepared_id_alias =
         ii_api::prepare_id_alias(&env, ii_id, principal_1(), prepare_id_alias_req)?
-            .expect("Got 'None' from prepare_id_alias");
+            .expect("prepare id_alias failed");
 
-    let prepared_id_alias = if let PrepareIdAliasResponse::Ok(response) = prepare_response {
-        response
-    } else {
-        panic!("prepare id_alias failed")
-    };
     let canister_sig_pk =
         CanisterSigPublicKey::try_from(prepared_id_alias.canister_sig_pk_der.as_ref())
             .expect("failed parsing canister sig pk");
@@ -576,18 +561,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
         issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
     };
-    let id_alias_credentials =
-        match ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
-            .expect("Got 'None' from get_id_alias")
-        {
-            GetIdAliasResponse::Ok(credentials) => credentials,
-            GetIdAliasResponse::NoSuchCredentials(err) => {
-                panic!("{}", format!("failed to get id_alias credentials: {}", err))
-            }
-            GetIdAliasResponse::AuthenticationFailed(err) => {
-                panic!("{}", format!("failed authentication: {}", err))
-            }
-        };
+    let id_alias_credentials = ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
+        .expect("get id_alias failed");
 
     let root_pk_raw =
         extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
@@ -595,8 +570,10 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &id_alias_credentials
             .issuer_id_alias_credential
             .credential_jws,
+        &id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
+        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
     )
     .expect("Invalid ID alias");
 
@@ -609,7 +586,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         degree_credential_spec(),
         adult_credential_spec(),
     ] {
-        let prepare_credential_response = api::prepare_credential(
+        let prepared_credential = api::prepare_credential(
             &env,
             issuer_id,
             id_alias_credentials.issuer_id_alias_credential.id_dapp,
@@ -622,16 +599,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                         .clone(),
                 },
             },
-        )?;
-        let prepared_credential =
-            if let PrepareCredentialResponse::Ok(data) = prepare_credential_response {
-                data
-            } else {
-                panic!(
-                    "Prepare credential failed: {:?}",
-                    prepare_credential_response
-                );
-            };
+        )?
+        .expect("failed to prepare credential");
 
         let get_credential_response = api::get_credential(
             &env,
@@ -648,14 +617,11 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
                 prepared_context: prepared_credential.prepared_context,
             },
         )?;
-        match_value!(
-            get_credential_response,
-            GetCredentialResponse::Ok(credential_data)
-        );
         let claims = verify_credential_jws_with_canister_id(
-            &credential_data.vc_jws,
+            &get_credential_response.unwrap().vc_jws,
             &issuer_id,
             &root_pk_raw,
+            env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
         )
         .expect("credential verification failed");
         validate_vc_claims(
@@ -695,4 +661,64 @@ fn should_configure() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
+}
+
+/// Verifies that the expected assets is delivered and certified.
+#[test]
+fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
+    fn verify_response_certification(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        request: HttpRequest,
+        http_response: HttpResponse,
+        min_certification_version: u16,
+    ) -> VerificationInfo {
+        verify_request_response_pair(
+            ic_http_certification::HttpRequest {
+                method: request.method,
+                url: request.url,
+                headers: request.headers,
+                body: request.body.into_vec(),
+            },
+            ic_http_certification::HttpResponse {
+                status_code: http_response.status_code,
+                headers: http_response.headers,
+                body: http_response.body.into_vec(),
+            },
+            canister_id.as_slice(),
+            time(env) as u128,
+            Duration::from_secs(300).as_nanos(),
+            &env.root_key(),
+            min_certification_version as u8,
+        )
+        .unwrap_or_else(|e| panic!("validation failed: {e}"))
+    }
+
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+
+    // for each asset and certification version, fetch the asset, check the HTTP status code, headers and certificate.
+
+    for certification_version in 1..=2 {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: "/".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(certification_version),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
+        assert_eq!(http_response.status_code, 200);
+
+        let result = verify_response_certification(
+            &env,
+            canister_id,
+            request,
+            http_response,
+            certification_version,
+        );
+        assert_eq!(result.verification_version, certification_version);
+    }
+
+    Ok(())
 }

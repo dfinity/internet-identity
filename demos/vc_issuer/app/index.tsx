@@ -73,6 +73,13 @@ const App = () => {
       const res: string = await vcIssuer.addEmployee({ principal });
       setCanisterLogs([...canisterLogs, res]);
     });
+  const addAdult = (principal: string) =>
+    withDisabled(async () => {
+      const canisterId = readCanisterId();
+      const vcIssuer = new VcIssuer(canisterId);
+      const res: string = await vcIssuer.addAdult({ principal });
+      setCanisterLogs([...canisterLogs, res]);
+    });
 
   return (
     <main data-page="add-employee">
@@ -129,6 +136,19 @@ const App = () => {
         ) : (
           <button data-action="add-employee" disabled={dsbld || !principal}>
             Add employee
+          </button>
+        )}
+        {principal ? (
+          <button
+            data-action="add-adult"
+            disabled={dsbld}
+            onClick={() => addAdult(principal)}
+          >
+            Add Adult
+          </button>
+        ) : (
+          <button data-action="add-adult" disabled={dsbld || !principal}>
+            Add Adult
           </button>
         )}
       </section>

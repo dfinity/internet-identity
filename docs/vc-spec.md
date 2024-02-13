@@ -154,6 +154,45 @@ This call must be authenticated, i.e. the sender must match the principal for wh
 
 Upon successful checks, issuer returns the signed credential in JWS-format.
 
+### Recommended convention connecting credential specification with the returned credentials.
+
+Service discovery and syntax of the claims in the returned credentials are out of scope
+of this spec (of the MVP service).  However, an issuer may follow the convention below,
+for an easier verification of the returned credentials.
+
+Given a credential spec like
+```json
+    "credentialSpec": {
+        "credentialType": "SomeVerifiedProperty",
+        "arguments": {
+            "argument_1": "value_1",
+            "another_argument": 42,
+        }
+```
+the returned JWT should contain in `credentialSubject` a property
+named by the value of `credentialType` from the spec, with key-value
+entries listing the arguments from the spec, namely
+```json
+    "SomeVerifiedProperty": {
+        "argument_1": "value_1",
+        "another_argument": 42,
+    }
+```
+
+For example, for `VerifiedAdult`-credential we'd use the following credential spec
+```json
+    "credentialSpec": {
+        "credentialType": "VerifiedAdult",
+        "arguments": {
+            "minAge": 18,
+    }
+```
+and a compliant issuer would issue a VC that contains `credentialSubject` with the property
+```json
+    "VerifiedAdult": {
+        "minAge": 18,
+    }
+```
 
 ##  Identity Provider API
 
@@ -186,6 +225,8 @@ After receiving the notification that II is ready, the relying party can request
     * `credentialType`: The type of the requested credential.
     * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
   * `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
+  * `derivationOrigin`: (optional) The origin that should be used for principal derivation (instead of the client origin) during the verification of `credentialSubject` (applicable if the relying party
+        uses the [Alternative Frontend Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature).
 
 #### Examples
 
@@ -226,7 +267,8 @@ After receiving the notification that II is ready, the relying party can request
             "minAge": 21
         }
     },
-    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae"
+    "credentialSubject": "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae",
+    "derivationOrigin": "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io"
   }
 }
 ```

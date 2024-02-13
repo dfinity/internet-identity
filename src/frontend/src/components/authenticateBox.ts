@@ -185,76 +185,15 @@ export const authenticateBoxFlow = async <T, I>({
     };
   };
 
-  const doLogin = async ({
-    userNumber,
-  }: {
-    userNumber: bigint;
-  }): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
-    const pinIdentityMaterial = await withLoader(() =>
-      retrievePinIdentityMaterial({
-        userNumber,
-      })
-    );
+  const doLogin = ({ userNumber }: { userNumber: bigint }) =>
+    useIdentityFlow({
+      userNumber,
+      retrievePinIdentityMaterial,
 
-    const doLoginPasskey = async () => {
-      const result = await withLoader(() => loginPasskey(userNumber));
-      return { newAnchor: false, ...result };
-    };
-
-    if (isNullish(pinIdentityMaterial)) {
-      // this user number does not have a browser storage identity
-      return doLoginPasskey();
-    }
-
-    // Here we ensure the PIN identity is still valid, i.e. the user did not explicitly delete
-    // that "passkey" (DeviceData).
-    // XXX: we don't actually delete the identity material, because the current implementation
-    // cannot certify the response from the node and a malicious node might pretend the PIN has
-    // been removed.
-    const isValid = await withLoader(() =>
-      verifyPinValidity({
-        pinIdentityMaterial,
-        userNumber,
-      })
-    );
-    if (isValid === "expired") {
-      // the PIN identity seems to have been expired
-      return doLoginPasskey();
-    }
-    isValid satisfies "valid";
-
-    // Otherwise, attempt login with PIN
-    const result = await usePin({
-      verifyPin: async (pin) => {
-        const result = await loginPinIdentityMaterial({
-          userNumber,
-          pin,
-          pinIdentityMaterial,
-        });
-        if (result.tag === "err") {
-          return { ok: false, error: result.message };
-        }
-        return { ok: true, value: result };
-      },
+      loginPasskey,
+      loginPinIdentityMaterial,
+      verifyPinValidity,
     });
-
-    if (result.kind === "canceled") {
-      return {
-        newAnchor: false,
-        tag: "canceled",
-      } as const;
-    }
-
-    if (result.kind === "passkey") {
-      // User still decided to use a passkey
-      return doLoginPasskey();
-    }
-
-    result satisfies { kind: "pin" };
-    const { result: pinResult } = result;
-
-    return { newAnchor: false, ...pinResult };
-  };
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
@@ -649,3 +588,120 @@ const pinIdentityToDerPubkey = async (
     pinIdentity.publicKey
   )) as DerEncodedPublicKey;
 };
+
+// Find and use a passkey, whether PIN or webauthn
+const useIdentityFlow = async <T, I>({
+  userNumber,
+  retrievePinIdentityMaterial,
+  verifyPinValidity,
+  loginPasskey,
+  loginPinIdentityMaterial,
+}: {
+  userNumber: bigint;
+  retrievePinIdentityMaterial: ({
+    userNumber,
+  }: {
+    userNumber: bigint;
+  }) => Promise<I | undefined>;
+  loginPasskey: (
+    userNumber: bigint
+  ) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  verifyPinValidity: (opts: {
+    userNumber: bigint;
+    pinIdentityMaterial: I;
+  }) => Promise<"valid" | "expired">;
+  loginPinIdentityMaterial: ({
+    userNumber,
+    pin,
+    pinIdentityMaterial,
+  }: {
+    userNumber: bigint;
+    pin: string;
+    pinIdentityMaterial: I;
+  }) => Promise<LoginFlowResult<T> | { tag: "err"; message: string }>;
+}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
+  const pinIdentityMaterial: I | undefined = await withLoader(() =>
+    retrievePinIdentityMaterial({
+      userNumber,
+    })
+  );
+
+  const doLoginPasskey = async () => {
+    const result = await withLoader(() => loginPasskey(userNumber));
+    return { newAnchor: false, ...result };
+  };
+
+  if (isNullish(pinIdentityMaterial)) {
+    // this user number does not have a browser storage identity
+    return doLoginPasskey();
+  }
+
+  // Here we ensure the PIN identity is still valid, i.e. the user did not explicitly delete
+  // that "passkey" (DeviceData).
+  // XXX: we don't actually delete the identity material, because the current implementation
+  // cannot certify the response from the node and a malicious node might pretend the PIN has
+  // been removed.
+  const isValid = await withLoader(() =>
+    verifyPinValidity({
+      pinIdentityMaterial,
+      userNumber,
+    })
+  );
+  if (isValid === "expired") {
+    // the PIN identity seems to have been expired
+    return doLoginPasskey();
+  }
+  isValid satisfies "valid";
+
+  // Otherwise, attempt login with PIN
+  const result = await usePin({
+    verifyPin: async (pin) => {
+      const result = await loginPinIdentityMaterial({
+        userNumber,
+        pin,
+        pinIdentityMaterial,
+      });
+      if (result.tag === "err") {
+        return { ok: false, error: result.message };
+      }
+      return { ok: true, value: result };
+    },
+  });
+
+  if (result.kind === "canceled") {
+    return {
+      newAnchor: false,
+      tag: "canceled",
+    } as const;
+  }
+
+  if (result.kind === "passkey") {
+    // User still decided to use a passkey
+    return doLoginPasskey();
+  }
+
+  result satisfies { kind: "pin" };
+  const { result: pinResult } = result;
+
+  return { newAnchor: false, ...pinResult };
+};
+
+// Use a passkey, with concrete impl.
+export const useIdentity = ({
+  userNumber,
+  connection,
+}: {
+  userNumber: bigint;
+  connection: Connection;
+}) =>
+  useIdentityFlow({
+    userNumber,
+    retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
+
+    verifyPinValidity: (opts) =>
+      pinIdentityAuthenticatorValidity({ ...opts, connection }),
+
+    loginPasskey: (userNumber) => loginPasskey({ connection, userNumber }),
+    loginPinIdentityMaterial: (opts) =>
+      loginPinIdentityMaterial({ ...opts, connection }),
+  });

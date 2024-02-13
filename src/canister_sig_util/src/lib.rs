@@ -1,5 +1,9 @@
 use candid::Principal;
+use ic_certification::{Hash, HashTree};
 use lazy_static::lazy_static;
+use serde::Serialize;
+use serde_bytes::ByteBuf;
+use sha2::{Digest, Sha256};
 
 pub mod signature_map;
 
@@ -123,6 +127,18 @@ pub fn extract_raw_canister_sig_pk_from_der(pk_der: &[u8]) -> Result<Vec<u8>, St
         return Err(String::from("canister sig pk too short"));
     }
     Ok(pk_der[(bitstring_offset)..].to_vec())
+}
+
+pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_ref());
+    hasher.finalize().into()
+}
+
+#[derive(Serialize)]
+struct CanisterSig {
+    certificate: ByteBuf,
+    tree: HashTree,
 }
 
 #[cfg(test)]
