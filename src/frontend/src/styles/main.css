@@ -194,7 +194,7 @@
   --rc-line-inverted: var(--rc-dark);
 
   --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--vc-brand-purple);
+  --rc-interaction-text: var(--vc-brand-purple-light);
   --rc-interactionHighlight-text: var(--vc-brand-purple-light);
   --rc-loading: var(--vc-brand-purple);
 
