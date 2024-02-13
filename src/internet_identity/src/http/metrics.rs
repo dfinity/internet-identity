@@ -31,7 +31,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )?;
         w.encode_gauge(
             "internet_identity_max_user_number",
-            (hi - 1) as f64,
+            hi as f64,
             "The highest Identity Anchor that can be served by this canister.",
         )
     })?;
