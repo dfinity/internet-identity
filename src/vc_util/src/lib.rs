@@ -1432,7 +1432,7 @@ mod tests {
         let credential = build_credential_jwt(params);
         assert_eq!(credential.len(), example_jwt.len());
         assert_ne!(credential, example_jwt);
-        // build credential should differ from the expected one only by the nbf-entry.
+        // The built credential should differ from the expected one only by the nbf-entry.
         assert_eq!(remove_nbf(credential.as_str()), example_jwt_without_nbf);
     }
 }
