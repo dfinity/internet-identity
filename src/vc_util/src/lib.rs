@@ -1431,8 +1431,9 @@ mod tests {
         };
         let credential = build_credential_jwt(params);
         assert_eq!(credential.len(), example_jwt.len());
+        // First check that the built credential differs from the example one (they have different nbf-entries).
         assert_ne!(credential, example_jwt);
-        // The built credential should differ from the expected one only by the nbf-entry.
+        // After the removal of the nbf-entries, all the remaining information should be identical.
         assert_eq!(remove_nbf(credential.as_str()), example_jwt_without_nbf);
     }
 }
