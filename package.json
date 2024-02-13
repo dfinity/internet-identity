@@ -81,10 +81,11 @@
   },
   "workspaces": [
     "src/vc-api",
+    "demos/web2-auth",
     "demos/test-app",
     "demos/vc_issuer",
     "src/vite-plugins",
-    "src/vc_util_js",
-    "src/sig-verifier-js"
+    "src/sig-verifier-js",
+    "src/vc_util_js"
   ]
 }
