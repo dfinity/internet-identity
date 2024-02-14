@@ -167,22 +167,37 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Verifies that the metrics list the expected user range.
+/// Verifies that the metrics list the expected user range as configured.
 #[test]
-fn metrics_should_list_expected_user_range() -> Result<(), CallError> {
+fn metrics_should_list_configured_user_range() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),
-        arg_with_anchor_range((10_000, 8_188_860)),
+        arg_with_anchor_range((10_123, 8_188_860)),
     );
 
     let metrics = get_metrics(&env, canister_id);
 
     let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
     let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
-    assert_eq!(min_user_number, 10_000f64);
+    assert_eq!(min_user_number, 10_123f64);
     assert_eq!(max_user_number, 8_188_859f64);
+    Ok(())
+}
+
+/// Verifies that the metrics list the default user range if none is configured.
+#[test]
+fn metrics_should_list_default_user_range() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let metrics = get_metrics(&env, canister_id);
+
+    let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
+    let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
+    assert_eq!(min_user_number, 10_000f64);
+    assert_eq!(max_user_number, 8_398_575f64);
     Ok(())
 }
 
