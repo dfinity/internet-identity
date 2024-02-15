@@ -95,9 +95,10 @@ type SignedIdAlias = record {
     credential_jws : text;
 };
 
-type PrepareCredentialRequest = record {
-    signed_id_alias : SignedIdAlias;
-    credential_spec : CredentialSpec;
+type ArgumentValue = variant { "Int" : int32; String : text };
+type CredentialSpec = record {
+    arguments : opt vec record { text; ArgumentValue };
+    credential_type : text;
 };
 
 type PrepareCredentialResponse = variant {
@@ -108,7 +109,7 @@ type PrepareCredentialResponse = variant {
 type PreparedCredentialData = record { prepared_context : opt blob };
 ```
 
-Specifically, the issuer checks via `prepared_id_alias.credential_jws` that user identified by its `sub` claim on the
+Specifically, the issuer checks via `signed_id_alias.credential_jws` that user identified by its `sub` claim on the
 issuer side has a valid `has_id_alias` principal for the purpose of attribute sharing, and that the credential
 described by `credential_spec` does apply to the `caller`.  When these checks are successful, the issuer
 prepares and returns a context in `PreparedCredentialData.prepared_context` (if any).  The returned prepared context is then
