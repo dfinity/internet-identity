@@ -56,6 +56,8 @@ The `dfx` executable can proxy queries to the canister. To view it, run the foll
 echo "http://$(dfx canister id internet_identity).localhost:4943"
 ```
 
+*Note: The URL doesn't work for safari.*
+
 ### Building the frontend
 
 The fastest workflow to get the development environment running is to deploy once with
