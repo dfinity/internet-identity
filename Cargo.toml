@@ -7,7 +7,8 @@ members = [
     "src/internet_identity_interface",
     "src/archive",
     "src/vc_util",
-    "src/vc_util_js"
+    "src/vc_util_js",
+    "src/sig-verifier-js"
 ]
 resolver = "2"
 
@@ -37,6 +38,8 @@ ic-representation-independent-hash = "2.2"
 ic-response-verification = "2.2"
 ic-stable-structures = "0.6"
 ic-test-state-machine-client = "3"
+ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
+ic-types = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
 
 # other dependencies
 assert_matches = "1.5.0"
