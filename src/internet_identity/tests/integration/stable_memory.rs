@@ -3,18 +3,13 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
-use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_test_state_machine_client::CallError;
 use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
-use rand::Rng;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
-
-#[cfg(test)]
-mod test_setup_helpers;
 
 /// Known devices that exist in the genesis memory backups.
 fn known_devices() -> [DeviceData; 6] {
