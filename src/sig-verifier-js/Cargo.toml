@@ -1,0 +1,13 @@
+[package]
+name = "sig_verifier_js"
+description = "JavaScript Wasm wrapper for verifying signatures"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ic-crypto-standalone-sig-verifier.workspace = true
+ic-types.workspace = true
+wasm-bindgen = "0.2"

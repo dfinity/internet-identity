@@ -8,8 +8,8 @@ edition = "2021"
 # ic dependencies
 candid.workspace = true
 ic-certification.workspace = true
-ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
-ic-types = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
+ic-crypto-standalone-sig-verifier.workspace = true
+ic-types.workspace = true
 canister_sig_util.workspace = true
 
 # vc dependencies
