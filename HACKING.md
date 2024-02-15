@@ -53,7 +53,7 @@ See `dfx canister call --help` and [the documentation](https://sdk.dfinity.org/d
 The `dfx` executable can proxy queries to the canister. To view it, run the following and open the resulting link in your browser:
 
 ```bash
-echo "http://localhost:4943?canisterId=$(dfx canister id internet_identity)"
+echo "http://$(dfx canister id internet_identity).localhost:8080"
 ```
 
 ### Building the frontend
