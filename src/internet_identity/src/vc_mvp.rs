@@ -178,7 +178,7 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
 // Prepares a unique id for the given alias_tuple.
 // The returned URL has the format: "data:text/plain;charset=UTF-8,timestamp_sec:...,alias_hash:..."
 fn prepare_credential_id(alias_tuple: &AliasTuple) -> Url {
-    let timestamp = format!("timestamp_ns:{}", time().to_string());
+    let timestamp = format!("timestamp_ns:{}", time());
     let mut hasher = Sha256::new();
     hasher.update("id_dapp=");
     hasher.update(alias_tuple.id_dapp.to_text());
