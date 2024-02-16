@@ -23,7 +23,7 @@ use std::ops::{Add, Deref, DerefMut};
 
 pub mod issuer_api;
 
-pub const II_CREDENTIAL_URL_PREFIX: &str = "https://identity.ic0.app/credential/";
+pub const II_CREDENTIAL_URL_PREFIX: &str = "data:text/plain;charset=UTF-8,";
 pub const II_ISSUER_URL: &str = "https://identity.ic0.app/";
 pub const VC_SIGNING_INPUT_DOMAIN: &[u8; 26] = b"iccs_verifiable_credential";
 pub const DID_ICP_PREFIX: &str = "did:icp:";

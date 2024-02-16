@@ -4,6 +4,7 @@ use crate::{delegation, random_salt, state, update_root_hash, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::CanisterSigPublicKey;
 use ic_cdk::api::time;
+use ic_certification::Hash;
 use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Subject};
@@ -14,6 +15,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::{FrontendHostname, IdentityNumber};
 use serde_bytes::ByteBuf;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use vc_util::{
     did_for_principal, get_canister_sig_pk_raw, vc_signing_input, vc_signing_input_hash,
     AliasTuple, II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
@@ -163,7 +165,7 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
             .expect("internal: failed computing expiration timestamp");
 
     let credential: Credential = CredentialBuilder::default()
-        .id(prepare_credential_id())
+        .id(prepare_credential_id(alias_tuple))
         .issuer(Url::parse(II_ISSUER_URL).expect("internal: bad issuer url"))
         .type_("InternetIdentityIdAlias")
         .subject(subject)
@@ -173,10 +175,22 @@ fn id_alias_credential(alias_tuple: &AliasTuple) -> Credential {
     credential
 }
 
-fn prepare_credential_id() -> Url {
-    let url = Url::parse(II_CREDENTIAL_URL_PREFIX).expect("internal: bad credential id base url");
-    url.join(time().to_string())
-        .expect("internal: bad credential id extension")
+// Prepares a unique id for the given alias_tuple.
+// The returned URL has the format: "data:text/plain;charset=UTF-8,timestamp_sec:...,alias_hash:..."
+fn prepare_credential_id(alias_tuple: &AliasTuple) -> Url {
+    let timestamp = format!("timestamp_ns:{}", time());
+    let mut hasher = Sha256::new();
+    hasher.update("id_dapp=");
+    hasher.update(alias_tuple.id_dapp.to_text());
+    hasher.update(",id_alias=");
+    hasher.update(alias_tuple.id_alias.to_text());
+    let hash: Hash = hasher.finalize().into();
+    let alias_hash = format!("alias_hash:{}", hex::encode(hash));
+    Url::parse(format!(
+        "{}{},{}",
+        II_CREDENTIAL_URL_PREFIX, timestamp, alias_hash
+    ))
+    .expect("internal: bad credential id base url")
 }
 
 fn prepare_id_alias_jwt(alias_tuple: &AliasTuple) -> String {
