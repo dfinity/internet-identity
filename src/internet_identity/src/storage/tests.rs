@@ -3,7 +3,7 @@ use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivi
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::{Header, PersistentStateError, StorageError};
+use crate::storage::{Header, PersistentStateError, StorageError, MAX_ENTRIES};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 use std::rc::Rc;
 
-const HEADER_SIZE: usize = 66;
+const HEADER_SIZE: usize = 58;
 
 #[test]
 fn should_match_actual_header_size() {
@@ -22,10 +22,11 @@ fn should_match_actual_header_size() {
 }
 
 #[test]
-fn should_report_max_number_of_entries_for_32gb() {
-    let memory = VectorMemory::default();
-    let storage = Storage::new((1, 2), memory);
-    assert_eq!(storage.max_entries(), 8_388_576);
+fn should_report_max_number_of_entries_for_256gb() {
+    // The maximum number of entries that could be supported by the canister without making any changes
+    // is constant. This test now exists to make sure any dev is aware of the limit if making changes
+    // to the underlying constants.
+    assert_eq!(MAX_ENTRIES, 67_106_816);
 }
 
 #[test]
@@ -38,7 +39,7 @@ fn should_serialize_header_v8() {
     assert_eq!(storage.version(), 8);
     let mut buf = vec![0; HEADER_SIZE];
     memory.read(0, &mut buf);
-    assert_eq!(buf, hex::decode("494943080000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
+    assert_eq!(buf, hex::decode("49494308000000000100000000000000020000000000000000100505050505050505050505050505050505050505050505050505050505050505").unwrap());
 }
 
 #[test]
