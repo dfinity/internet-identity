@@ -69,6 +69,30 @@ pub fn verify_ic_signature(
     result.map_err(|e| e.to_string())
 }
 
+/// Verifies the validity of the given signed delegation chain wrt. the challenge, and the other parameters.
+/// Specifically:
+///  * `signed_delegation_chain` contains exactly one delegation, denoted below as `delegations[0]`
+///  * `delegations[0].pubkey` equals `challenge` (i.e. challenge is the "session key")
+///  * `signed_delegation_chain.publicKey` is a public key for canister signatures of `ii_canister_id`
+///  * `delegations[0].signature` is a valid canister signature on a representation-independent hash of `delegations[0]`,
+///    wrt. `signed_delegation_chain.publicKey` and `ic_root_public_key_raw`
+///  * `current_time_ns` denotes point in time before `delegations[0].expiration`
+///  * `current_time_ns` denotes point in time is not more than 5min after signature creation time
+///     (as specified in certified tree in Certificate embedded in the signature)
+///
+/// On success returns the public key `signed_delegation_chain.publicKey` that identifies the user
+/// (via a self-authenticating Principal)
+#[wasm_bindgen(js_name = validateDelegationAndGetPrincipal)]
+pub fn validate_delegation_and_get_principal(
+    _challenge: &[u8],
+    _signed_delegation_chain: &[u8],  // JSON
+    _current_time_ns: u64,
+    _ii_canister_id: &[u8],
+    _ic_root_public_key_raw: &[u8],
+) -> Result<Vec<u8>, String> {  // TBD: maybe return the self-auth Principal?
+    Err("not implemented yet".to_string())
+}
+
 fn root_public_key_from_bytes(ic_root_public_key: &[u8]) -> Result<IcRootOfTrust, String> {
     let root_key_bytes: [u8; 96] = ic_root_public_key.try_into().map_err(|_| {
         format!(
