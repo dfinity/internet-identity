@@ -2,19 +2,19 @@ import { DynamicKey } from "$src/utils/i18n";
 import { ApiResult, AuthenticatedConnection } from "./iiConnection";
 import { webAuthnErrorCopy } from "./webAuthnErrorUtils";
 
-export type LoginFlowResult<T = AuthenticatedConnection> =
-  | LoginFlowSuccess<T>
+export type LoginFlowResult<T = AuthenticatedConnection, E = object> =
+  | LoginFlowSuccess<T, E>
   | LoginFlowError
   | LoginFlowCanceled;
 
-export type LoginFlowSuccess<T = AuthenticatedConnection> = {
+export type LoginFlowSuccess<T = AuthenticatedConnection, E = object> = {
   tag: "ok";
-} & LoginData<T>;
+} & LoginData<T, E>;
 
-export type LoginData<T = AuthenticatedConnection> = {
+export type LoginData<T = AuthenticatedConnection, E = object> = {
   userNumber: bigint;
   connection: T;
-};
+} & E;
 
 export type LoginFlowError = {
   tag: "err";

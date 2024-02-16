@@ -92,11 +92,11 @@ export const authenticateBox = async ({
 
   // Retry until user has successfully authenticated
   for (;;) {
-    const { newAnchor, ...result } = await promptAuth();
+    const result = await promptAuth();
     const loginData = await handleLoginFlowResult(result);
 
     if (nonNullish(loginData)) {
-      return { ...loginData, newAnchor };
+      return loginData;
     }
   }
 };
@@ -163,7 +163,7 @@ export const authenticateBoxFlow = async <T, I>({
     pinIdentityMaterial: I;
   }) => Promise<"valid" | "expired">;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
-}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
+}): Promise<LoginFlowResult<T, { newAnchor: boolean }>> => {
   const pages = authnScreens(i18n, { ...templates });
 
   // The registration flow for a new identity
@@ -197,7 +197,7 @@ export const authenticateBoxFlow = async <T, I>({
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
-    LoginFlowResult<T> & { newAnchor: boolean }
+    LoginFlowResult<T, { newAnchor: boolean }>
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
@@ -219,11 +219,17 @@ export const authenticateBoxFlow = async <T, I>({
     }
 
     result satisfies { tag: "recover" };
-    const result2 = await recover();
-    return {
-      newAnchor: false,
-      ...result2,
-    };
+
+    const recoverResult = await recover();
+    if (recoverResult.tag === "ok") {
+      // If an anchor was recovered, then it's _not_ a new anchor
+      return {
+        newAnchor: false,
+        ...recoverResult,
+      };
+    } else {
+      return recoverResult;
+    }
   };
 
   // If there _are_ some anchors, then we show the "pick" screen, otherwise
@@ -250,9 +256,9 @@ export const authenticateBoxFlow = async <T, I>({
   }
 };
 
-export const handleLoginFlowResult = async <T>(
-  result: LoginFlowResult<T>
-): Promise<LoginData<T> | undefined> => {
+export const handleLoginFlowResult = async <T, E>(
+  result: LoginFlowResult<T, E>
+): Promise<LoginData<T, E> | undefined> => {
   switch (result.tag) {
     case "ok":
       await setAnchorUsed(result.userNumber);
@@ -619,7 +625,7 @@ const useIdentityFlow = async <T, I>({
     pin: string;
     pinIdentityMaterial: I;
   }) => Promise<LoginFlowResult<T> | { tag: "err"; message: string }>;
-}): Promise<LoginFlowResult<T> & { newAnchor: boolean }> => {
+}): Promise<LoginFlowResult<T, { newAnchor: boolean }>> => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
       userNumber,
@@ -669,10 +675,7 @@ const useIdentityFlow = async <T, I>({
   });
 
   if (result.kind === "canceled") {
-    return {
-      newAnchor: false,
-      tag: "canceled",
-    } as const;
+    return { tag: "canceled" } as const;
   }
 
   if (result.kind === "passkey") {
@@ -683,7 +686,12 @@ const useIdentityFlow = async <T, I>({
   result satisfies { kind: "pin" };
   const { result: pinResult } = result;
 
-  return { newAnchor: false, ...pinResult };
+  if (pinResult.tag === "ok") {
+    // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
+    return { newAnchor: false, ...pinResult };
+  } else {
+    return pinResult;
+  }
 };
 
 // Use a passkey, with concrete impl.
