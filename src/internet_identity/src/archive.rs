@@ -62,6 +62,16 @@ pub struct ArchiveData {
     pub entries_buffer: Rc<Vec<BufferedEntry>>,
 }
 
+impl ArchiveData {
+    pub fn buffered_entries_count(&self) -> usize {
+        state::storage_borrow(|s| match s.version() {
+            7 => self.entries_buffer.len(),
+            8 => s.archive_entries_count(),
+            _ => trap("unsupported storage version"),
+        })
+    }
+}
+
 /// Cached archive status information
 #[derive(Clone, CandidType, Debug, Deserialize)]
 pub struct ArchiveStatusCache {
@@ -330,17 +340,25 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
         caller,
         sequence_number: data.sequence_number,
     };
-    let encoded_entry = candid::encode_one(entry).expect("failed to encode archive entry");
+    let buffered_entry = BufferedEntry {
+        anchor_number,
+        timestamp,
+        entry: ByteBuf::from(candid::encode_one(entry).expect("failed to encode archive entry")),
+        sequence_number: data.sequence_number,
+    };
 
     // add entry to buffer (which is emptied by the archive periodically, see fetch_entries and acknowledge entries)
-    state::archive_data_mut(|data| {
-        Rc::make_mut(&mut data.entries_buffer).push(BufferedEntry {
-            anchor_number,
-            timestamp,
-            entry: ByteBuf::from(encoded_entry),
-            sequence_number: data.sequence_number,
-        });
-    });
+    match state::storage_borrow(|s| s.version()) {
+        7 => {
+            state::archive_data_mut(|data| {
+                Rc::make_mut(&mut data.entries_buffer).push(buffered_entry);
+            });
+        }
+        8 => state::storage_borrow_mut(|s| {
+            s.add_archive_entry(buffered_entry);
+        }),
+        _ => trap("unsupported storage version"),
+    }
 
     state::archive_data_mut(|data| {
         data.sequence_number += 1;
@@ -354,12 +372,17 @@ pub fn fetch_entries() -> Vec<BufferedEntry> {
     trap_if_caller_not_archive(&data);
 
     // buffered entries are ordered by sequence number
-    // i.e. this takes the lowest entries_fetch_limit many entries
-    data.entries_buffer
-        .iter()
-        .take(config.entries_fetch_limit as usize)
-        .cloned()
-        .collect()
+    // i.e. this takes the first (by sequence numbers) entries_fetch_limit many entries
+    match state::storage_borrow(|s| s.version()) {
+        7 => data
+            .entries_buffer
+            .iter()
+            .take(config.entries_fetch_limit as usize)
+            .cloned()
+            .collect(),
+        8 => state::storage_borrow_mut(|s| s.get_archive_entries(config.entries_fetch_limit)),
+        _ => trap("unsupported storage version"),
+    }
 }
 
 pub fn acknowledge_entries(sequence_number: u64) {
@@ -370,7 +393,12 @@ pub fn acknowledge_entries(sequence_number: u64) {
         trap_if_caller_not_archive(data);
 
         // Only keep entries with higher sequence number as the highest acknowledged.
-        Rc::make_mut(&mut data.entries_buffer).retain(|e| e.sequence_number > sequence_number)
+        match state::storage_borrow(|s| s.version()) {
+            7 => Rc::make_mut(&mut data.entries_buffer)
+                .retain(|e| e.sequence_number > sequence_number),
+            8 => state::storage_borrow_mut(|s| s.prune_archive_entries(sequence_number)),
+            _ => trap("unsupported storage version"),
+        }
     });
 }
 
