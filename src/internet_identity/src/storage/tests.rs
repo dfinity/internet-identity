@@ -29,17 +29,6 @@ fn should_report_max_number_of_entries_for_32gb() {
 }
 
 #[test]
-fn should_deserialize_header_v7() {
-    let memory = VectorMemory::default();
-    memory.grow(1);
-    memory.write(0, &hex::decode("494943070000000001000000000000000200000000000000001005050505050505050505050505050505050505050505050505050505050505050000020000000000").unwrap());
-    let storage = Storage::from_memory(memory.clone()).unwrap();
-
-    assert_eq!(storage.version(), 7);
-    assert_eq!(storage.assigned_anchor_number_range(), (1, 2));
-}
-
-#[test]
 fn should_serialize_header_v8() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
@@ -63,6 +52,19 @@ fn should_recover_header_from_memory_v7() {
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.anchor_count(), 5);
     assert_eq!(storage.version(), 7);
+}
+
+#[test]
+fn should_recover_header_from_memory_v8() {
+    let memory = VectorMemory::default();
+    memory.grow(1);
+    memory.write(0, &hex::decode("494943080500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+
+    let storage = Storage::from_memory(memory).unwrap();
+    assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
+    assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
+    assert_eq!(storage.anchor_count(), 5);
+    assert_eq!(storage.version(), 8);
 }
 
 #[test]

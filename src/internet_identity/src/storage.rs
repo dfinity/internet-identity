@@ -422,12 +422,22 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Add a new archive entry to the buffer.
     pub fn add_archive_entry(&mut self, entry: BufferedEntry) {
+        assert_eq!(
+            self.version(),
+            8,
+            "archive entry buffer is only supported in version 8"
+        );
         self.archive_entries_buffer
             .insert(entry.sequence_number, BufferedEntryWrapper(entry));
     }
 
     /// Get the first `max_entries` archive entries from the buffer.
     pub fn get_archive_entries(&mut self, max_entries: u16) -> Vec<BufferedEntry> {
+        assert_eq!(
+            self.version(),
+            8,
+            "archive entry buffer is only supported in version 8"
+        );
         self.archive_entries_buffer
             .iter()
             .take(max_entries as usize)
@@ -437,6 +447,11 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
     pub fn prune_archive_entries(&mut self, sequence_number: u64) {
+        assert_eq!(
+            self.version(),
+            8,
+            "archive entry buffer is only supported in version 8"
+        );
         let entries_to_prune = self
             .archive_entries_buffer
             .range(..=sequence_number)
