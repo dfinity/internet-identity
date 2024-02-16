@@ -85,11 +85,12 @@ pub fn verify_ic_signature(
 #[wasm_bindgen(js_name = validateDelegationAndGetPrincipal)]
 pub fn validate_delegation_and_get_principal(
     _challenge: &[u8],
-    _signed_delegation_chain: &[u8],  // JSON
+    _signed_delegation_chain: &[u8], // JSON
     _current_time_ns: u64,
     _ii_canister_id: &[u8],
     _ic_root_public_key_raw: &[u8],
-) -> Result<Vec<u8>, String> {  // TBD: maybe return the self-auth Principal?
+) -> Result<Vec<u8>, String> {
+    // TBD: maybe return the self-auth Principal?
     Err("not implemented yet".to_string())
 }
 
