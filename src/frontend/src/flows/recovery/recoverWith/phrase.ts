@@ -3,14 +3,7 @@ import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { RECOVERYPHRASE_WORDCOUNT } from "$src/crypto/mnemonic";
-import type {
-  LoginFlowCanceled,
-  LoginFlowError,
-  LoginFlowSuccess,
-} from "$src/utils/flowResult";
-import { apiResultToLoginFlowResult } from "$src/utils/flowResult";
-import { DynamicKey } from "$src/utils/i18n";
-import { Connection } from "$src/utils/iiConnection";
+import { Connection, LoginSuccess } from "$src/utils/iiConnection";
 import { renderPage, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
 import { Chan, withInputElement } from "$src/utils/utils";
@@ -21,19 +14,17 @@ import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
-const recoverWithPhraseTemplate = <
-  /* The successful return type on verification */
-  T extends { tag: "ok" },
-  /* The error return type on verification */
-  E extends { tag: "err"; message: string | DynamicKey }
->({
+const recoverWithPhraseTemplate = <T>({
   confirm,
   verify,
   back,
   message,
 }: {
   confirm: (result: T) => void;
-  verify: (phrase: { userNumber: bigint; words: string[] }) => Promise<T | E>;
+  verify: (phrase: {
+    userNumber: bigint;
+    words: string[];
+  }) => Promise<{ ok: true; value: T } | { ok: false; err: string }>;
   back: () => void;
   message: TemplateResult | string;
 }) => {
@@ -92,13 +83,13 @@ const recoverWithPhraseTemplate = <
       return;
     }
     const result = await verify(phrase);
-    if (result.tag === "err") {
-      toast.error("Could not use recovery phrase: " + result.message);
-      console.warn(result);
+    if (!result.ok) {
+      toast.error("Could not use recovery phrase: " + result.err);
+      console.warn(result.err);
       return;
     }
 
-    confirm(result satisfies { tag: "ok" });
+    confirm(result.value satisfies T);
   };
 
   const pageContentSlot = html`
@@ -312,18 +303,12 @@ export const wordTemplate = ({
   </li>`;
 };
 
-type TemplateProps<
-  T extends { tag: "ok" },
-  E extends { tag: "err"; message: string | DynamicKey }
-> = Parameters<typeof recoverWithPhraseTemplate<T, E>>[0];
+type TemplateProps<T> = Parameters<typeof recoverWithPhraseTemplate<T>>[0];
 
-export const recoverWithPhrasePage = <
-  T extends { tag: "ok" },
-  E extends { tag: "err"; message: string | DynamicKey }
->(
-  props: TemplateProps<T, E>,
+export const recoverWithPhrasePage = <T>(
+  props: TemplateProps<T>,
   container?: HTMLElement
-) => renderPage(recoverWithPhraseTemplate<T, E>)(props, container);
+) => renderPage(recoverWithPhraseTemplate<T>)(props, container);
 
 export const recoverWithPhrase = ({
   connection,
@@ -331,17 +316,27 @@ export const recoverWithPhrase = ({
 }: {
   connection: Connection;
   message: TemplateResult | string;
-}): Promise<LoginFlowSuccess | LoginFlowCanceled> => {
+}): Promise<LoginSuccess | { tag: "canceled" }> => {
   return new Promise((resolve) => {
-    recoverWithPhrasePage<LoginFlowSuccess, LoginFlowError>({
+    recoverWithPhrasePage<LoginSuccess>({
       confirm: (result) => resolve(result),
       verify: async ({ userNumber, words }) => {
-        const result = await withLoader(async () =>
-          apiResultToLoginFlowResult(
-            await connection.fromSeedPhrase(userNumber, words.join(" "))
-          )
+        const result = await withLoader(() =>
+          connection.fromSeedPhrase(userNumber, words.join(" "))
         );
-        return result;
+        if (result.kind !== "loginSuccess") {
+          const msg = {
+            noSeedPhrase:
+              "No recovery phrase: there is no recovery phrase associated with this identity. Cancel and recover another way.",
+            seedPhraseFail:
+              "Invalid Seed Phrase: Failed to authenticate using this seed phrase. Did you enter it correctly?",
+          }[result.kind];
+
+          return { ok: false, err: msg };
+        }
+        result.kind satisfies "loginSuccess";
+
+        return { ok: true, value: result };
       },
       back: () => resolve({ tag: "canceled" }),
       message,

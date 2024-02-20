@@ -1,10 +1,11 @@
 import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
 import { toast } from "$src/components/toast";
 import {
-  apiResultToLoginFlowResult,
-  LoginFlowResult,
-} from "$src/utils/flowResult";
-import { Connection } from "$src/utils/iiConnection";
+  AuthFail,
+  Connection,
+  LoginSuccess,
+  WebAuthnFailed,
+} from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 
 export const recoverWithDeviceTemplate = ({
@@ -28,23 +29,31 @@ export const recoverWithDevice = ({
   connection,
 }: {
   connection: Connection;
-}): Promise<LoginFlowResult> => {
+}): Promise<LoginSuccess | { tag: "canceled" }> => {
   return new Promise((resolve) => {
     return recoverWithDevicePage({
       next: async (userNumber: bigint) => {
         const result = await attemptRecovery({ userNumber, connection });
 
-        if (result.tag === "err") {
-          toast.error([result.title, result.message].join(": "));
+        if (result.kind === "tooManyRecovery") {
+          toast.error(
+            "This identity has more than one recovery devices, which is not expected"
+          );
           return;
         }
 
-        if (result.tag === "canceled") {
-          toast.error("Authentication was canceled");
+        if (result.kind === "noRecovery") {
+          toast.error("This identity does not have a recovery device");
           return;
         }
 
-        result.tag satisfies "ok";
+        if (result.kind !== "loginSuccess") {
+          result satisfies AuthFail | WebAuthnFailed;
+          toast.error("Could not authenticate using the device");
+          return;
+        }
+
+        result satisfies LoginSuccess;
         return resolve(result);
       },
       cancel: () => resolve({ tag: "canceled" }),
@@ -58,28 +67,25 @@ const attemptRecovery = async ({
 }: {
   userNumber: bigint;
   connection: Connection;
-}): Promise<LoginFlowResult> => {
+}): Promise<
+  | LoginSuccess
+  | WebAuthnFailed
+  | AuthFail
+  | { kind: "noRecovery" }
+  | { kind: "tooManyRecovery" }
+> => {
   const { recovery_credentials: recoveryCredentials } =
     await connection.lookupCredentials(userNumber);
 
   if (recoveryCredentials.length === 0) {
-    const title = "No recovery device";
-    const message = "This identity does not have a recovery device";
-    return { tag: "err", title, message };
+    return { kind: "noRecovery" };
   }
 
   if (recoveryCredentials.length > 1) {
-    const title = "Too many recovery devices";
-    const message =
-      "This identity has more than one recovery devices, which is not expected";
-    return { tag: "err", title, message };
+    return { kind: "tooManyRecovery" };
   }
 
-  const result = apiResultToLoginFlowResult(
-    await connection.fromWebauthnCredentials(userNumber, [
-      recoveryCredentials[0],
-    ])
-  );
-
-  return result;
+  return await connection.fromWebauthnCredentials(userNumber, [
+    recoveryCredentials[0],
+  ]);
 };

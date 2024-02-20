@@ -1,7 +1,6 @@
 import { Challenge } from "$generated/internet_identity_types";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
-import { LoginFlowCanceled, cancel } from "$src/utils/flowResult";
 import { mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
@@ -268,13 +267,13 @@ export const promptCaptcha = <T>({
     chars: string;
     challenge: Challenge;
   }) => Promise<T | typeof badChallenge>;
-}): Promise<T | LoginFlowCanceled> => {
+}): Promise<T | { tag: "canceled" }> => {
   return new Promise((resolve) => {
     const i18n = new I18n();
     promptCaptchaPage({
       verifyChallengeChars: register,
       requestChallenge: () => createChallenge(),
-      cancel: () => resolve(cancel),
+      cancel: () => resolve({ tag: "canceled" }),
       onContinue: resolve,
       i18n,
       stepper,

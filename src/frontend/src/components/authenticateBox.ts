@@ -1,3 +1,4 @@
+import { ErrorOptions, displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import {
   PinIdentityMaterial,
@@ -11,26 +12,25 @@ import { getRegisterFlowOpts, registerFlow } from "$src/flows/register";
 import { I18n } from "$src/i18n";
 import { getAnchors, setAnchorUsed } from "$src/storage";
 import {
-  LoginData,
-  LoginFlowError,
-  LoginFlowResult,
-  LoginFlowSuccess,
-  apiResultToLoginFlowResult,
-} from "$src/utils/flowResult";
-import {
+  ApiError,
+  AuthFail,
   AuthenticatedConnection,
+  BadChallenge,
+  BadPin,
   Connection,
-  LoginResult,
+  LoginSuccess,
+  RegisterNoSpace,
+  UnknownUser,
+  WebAuthnFailed,
   bufferEqual,
 } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
-import { NonEmptyArray, isNonEmptyArray, unreachable } from "$src/utils/utils";
+import { NonEmptyArray, isNonEmptyArray } from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
-import { displayError } from "./displayError";
 import {
   controlIcon,
   githubBigIcon,
@@ -69,7 +69,11 @@ export const authenticateBox = async ({
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
-}): Promise<LoginData & { newAnchor: boolean }> => {
+}): Promise<{
+  userNumber: bigint;
+  connection: AuthenticatedConnection;
+  newAnchor: boolean;
+}> => {
   const promptAuth = () =>
     authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
       i18n,
@@ -93,6 +97,13 @@ export const authenticateBox = async ({
   // Retry until user has successfully authenticated
   for (;;) {
     const result = await promptAuth();
+
+    // If the user canceled, we retry
+    if ("tag" in result) {
+      result satisfies { tag: "canceled" };
+      continue;
+    }
+
     const loginData = await handleLoginFlowResult(result);
 
     if (nonNullish(loginData)) {
@@ -142,7 +153,9 @@ export const authenticateBoxFlow = async <T, I>({
   addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
   loginPasskey: (
     userNumber: bigint
-  ) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  ) => Promise<
+    LoginSuccess<T> | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+  >;
   loginPinIdentityMaterial: ({
     userNumber,
     pin,
@@ -151,8 +164,8 @@ export const authenticateBoxFlow = async <T, I>({
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
-  }) => Promise<LoginFlowResult<T> | { tag: "err"; message: string }>;
-  recover: () => Promise<LoginFlowResult<T>>;
+  }) => Promise<LoginSuccess<T> | BadPin>;
+  recover: () => Promise<LoginSuccess<T> | { tag: "canceled" }>;
   retrievePinIdentityMaterial: ({
     userNumber,
   }: {
@@ -163,25 +176,34 @@ export const authenticateBoxFlow = async <T, I>({
     pinIdentityMaterial: I;
   }) => Promise<"valid" | "expired">;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
-}): Promise<LoginFlowResult<T, { newAnchor: boolean }>> => {
+}): Promise<
+  (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
+> => {
   const pages = authnScreens(i18n, { ...templates });
 
   // The registration flow for a new identity
   const doRegister = async (): Promise<
-    LoginFlowResult<T> & { newAnchor: boolean }
+    | (LoginSuccess<T> & { newAnchor: true })
+    | BadChallenge
+    | ApiError
+    | AuthFail
+    | RegisterNoSpace
+    | { tag: "canceled" }
   > => {
     const result2 = await registerFlow<T>(registerFlowOpts);
 
     if (result2 === "canceled") {
-      return {
-        newAnchor: true,
-        tag: "canceled",
-      } as const;
+      return { tag: "canceled" } as const;
     }
 
+    if (result2.kind !== "loginSuccess") {
+      return result2;
+    }
+
+    result2 satisfies LoginSuccess<T>;
     return {
       newAnchor: true,
-      ...apiResultToLoginFlowResult<T>(result2),
+      ...result2,
     };
   };
 
@@ -197,7 +219,7 @@ export const authenticateBoxFlow = async <T, I>({
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
-    LoginFlowResult<T, { newAnchor: boolean }>
+    (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
@@ -221,15 +243,17 @@ export const authenticateBoxFlow = async <T, I>({
     result satisfies { tag: "recover" };
 
     const recoverResult = await recover();
-    if (recoverResult.tag === "ok") {
-      // If an anchor was recovered, then it's _not_ a new anchor
-      return {
-        newAnchor: false,
-        ...recoverResult,
-      };
-    } else {
-      return recoverResult;
+    if ("tag" in recoverResult) {
+      recoverResult satisfies { tag: "canceled" };
+      return { tag: "canceled" } as const;
     }
+
+    recoverResult satisfies LoginSuccess<T>;
+    // If an anchor was recovered, then it's _not_ a new anchor
+    return {
+      newAnchor: false,
+      ...recoverResult,
+    };
   };
 
   // If there _are_ some anchors, then we show the "pick" screen, otherwise
@@ -256,27 +280,83 @@ export const authenticateBoxFlow = async <T, I>({
   }
 };
 
+// A type representing flow errors present in most flows
+type FlowError =
+  | AuthFail
+  | BadPin
+  | BadChallenge
+  | WebAuthnFailed
+  | UnknownUser
+  | ApiError
+  | RegisterNoSpace;
+
+// Type machinery to allow translating error code (e.g. kind: "authFail") using the actual data
+// contained in the error objects (e.g. authFail: (authFail: AuthFail) => ...).
+type ErrorKind = FlowError["kind"]; // all known error tags for FlowError
+type KindToError = { [P in ErrorKind]: Omit<FlowError & { kind: P }, "kind"> }; // Look up from err. kind to object
+type AssociatedError<K extends ErrorKind> = {
+  [P in K]: { kind: P } & KindToError[P];
+}[K]; // Helper for adding the kind to the object (otherwise TS gets a bit lost)
+
+// Makes the error human readable
+const clarifyError: {
+  [K in FlowError["kind"]]: (err: AssociatedError<K>) => {
+    title: string;
+    message: string;
+    detail?: string;
+  };
+} = {
+  authFail: (err) => ({
+    title: "Failed to authenticate",
+    message:
+      "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
+    detail: err.error.message,
+  }),
+  webAuthnFailed: () => ({
+    title: "Operation canceled",
+    message:
+      "The interaction with your security device was canceled or timed out. Please try again.",
+  }),
+  unknownUser: (err) => ({
+    title: "Unknown Internet Identity",
+    message: `Failed to find Internet Identity ${err.userNumber}. Please check your Internet Identity and try again.`,
+  }),
+  apiError: (err) => ({
+    title: "We couldn't reach Internet Identity",
+    message:
+      "We failed to call the Internet Identity service, please try again.",
+    detail: err.error.message,
+  }),
+  badPin: () => ({ title: "Could not authenticate", message: "Invalid PIN" }),
+  badChallenge: () => ({
+    title: "Failed to register",
+    message:
+      "Failed to register with Internet Identity, because the CAPTCHA challenge wasn't successful",
+  }),
+  registerNoSpace: () => ({
+    title: "Failed to register",
+    message:
+      "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+  }),
+};
+
+const clarifyError_ = <K extends keyof KindToError>(
+  flowError: AssociatedError<K>
+): Omit<ErrorOptions, "primaryButton"> =>
+  clarifyError[flowError.kind](flowError);
+
 export const handleLoginFlowResult = async <T, E>(
-  result: LoginFlowResult<T, E>
-): Promise<LoginData<T, E> | undefined> => {
-  switch (result.tag) {
-    case "ok":
-      await setAnchorUsed(result.userNumber);
-      return result;
-    case "err":
-      await displayError({
-        title: result.title,
-        message: result.message,
-        detail: result.detail !== "" ? result.detail : undefined,
-        primaryButton: "Try again",
-      });
-      break;
-    case "canceled":
-      break;
-    default:
-      unreachable(result);
-      break;
+  result: (LoginSuccess<T> & E) | FlowError
+): Promise<({ userNumber: bigint; connection: T } & E) | undefined> => {
+  if (result.kind === "loginSuccess") {
+    await setAnchorUsed(result.userNumber);
+    return result;
   }
+
+  result satisfies FlowError;
+
+  await displayError({ ...clarifyError_(result), primaryButton: "Try again" });
+  return undefined;
 };
 
 /** The templates for the authentication pages */
@@ -487,24 +567,6 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
   };
 };
 
-export const handleLogin = async <T>({
-  login,
-}: {
-  login: () => Promise<LoginResult<T>>;
-}): Promise<LoginFlowSuccess<T> | LoginFlowError> => {
-  try {
-    const result = await login();
-    return apiResultToLoginFlowResult<T>(result);
-  } catch (error) {
-    return {
-      tag: "err",
-      title: "Authentication Failed",
-      message: "An error occurred during authentication.",
-      detail: error instanceof Error ? error.message : JSON.stringify(error),
-    };
-  }
-};
-
 // Wrap the template with header & footer and render the page
 const page = (slot: TemplateResult) => {
   const template = mainWindow({
@@ -522,10 +584,7 @@ const loginPasskey = ({
 }: {
   connection: Connection;
   userNumber: bigint;
-}) =>
-  handleLogin({
-    login: () => connection.login(userNumber),
-  });
+}) => connection.login(userNumber);
 
 const loginPinIdentityMaterial = ({
   connection,
@@ -537,22 +596,21 @@ const loginPinIdentityMaterial = ({
   userNumber: bigint;
   pin: string;
   pinIdentityMaterial: PinIdentityMaterial;
-}): Promise<LoginFlowResult | { tag: "err"; message: string }> => {
+}): Promise<LoginSuccess | BadPin> => {
   return withLoader(async () => {
     try {
       const identity = await reconstructPinIdentity({
         pin,
         pinIdentityMaterial,
       });
-      return handleLogin({
-        login: () => connection.fromIdentity(userNumber, identity),
-      });
+
+      return connection.fromIdentity(userNumber, identity);
     } catch {
       // We handle all exceptions as wrong PIN because there is no nice way to check for that particular failure.
       // The best we could do is check that the error is a DOMException and that the name is "OperationError". However,
       // the "OperationError" names is still marked as experimental, so we should not rely on that.
       // See https://developer.mozilla.org/en-US/docs/Web/API/DOMException
-      return { tag: "err", message: "Invalid PIN" };
+      return { kind: "badPin" };
     }
   });
 };
@@ -611,7 +669,9 @@ const useIdentityFlow = async <T, I>({
   }) => Promise<I | undefined>;
   loginPasskey: (
     userNumber: bigint
-  ) => Promise<LoginFlowSuccess<T> | LoginFlowError>;
+  ) => Promise<
+    LoginSuccess<T> | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+  >;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -624,8 +684,16 @@ const useIdentityFlow = async <T, I>({
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
-  }) => Promise<LoginFlowResult<T> | { tag: "err"; message: string }>;
-}): Promise<LoginFlowResult<T, { newAnchor: boolean }>> => {
+  }) => Promise<LoginSuccess<T> | BadPin>;
+}): Promise<
+  | (LoginSuccess<T> & { newAnchor: boolean })
+  | AuthFail
+  | WebAuthnFailed
+  | UnknownUser
+  | ApiError
+  | BadPin
+  | { tag: "canceled" }
+> => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
       userNumber,
@@ -660,16 +728,19 @@ const useIdentityFlow = async <T, I>({
   isValid satisfies "valid";
 
   // Otherwise, attempt login with PIN
-  const result = await usePin({
+  const result = await usePin<LoginSuccess<T> | BadPin>({
     verifyPin: async (pin) => {
       const result = await loginPinIdentityMaterial({
         userNumber,
         pin,
         pinIdentityMaterial,
       });
-      if (result.tag === "err") {
-        return { ok: false, error: result.message };
+
+      if (result.kind !== "loginSuccess") {
+        return { ok: false, error: "Invalid PIN" };
       }
+
+      result satisfies LoginSuccess<T>;
       return { ok: true, value: result };
     },
   });
@@ -686,12 +757,15 @@ const useIdentityFlow = async <T, I>({
   result satisfies { kind: "pin" };
   const { result: pinResult } = result;
 
-  if (pinResult.tag === "ok") {
-    // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
-    return { newAnchor: false, ...pinResult };
-  } else {
-    return pinResult;
+  if (pinResult.kind !== "loginSuccess") {
+    pinResult satisfies BadPin;
+    return { ...pinResult };
   }
+
+  pinResult satisfies LoginSuccess<T>;
+
+  // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
+  return { newAnchor: false, ...pinResult };
 };
 
 // Use a passkey, with concrete impl.

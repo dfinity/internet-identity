@@ -10,6 +10,7 @@ import {
   AuthenticatedConnection,
   bufferEqual,
   Connection,
+  LoginSuccess,
 } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import {
@@ -17,7 +18,7 @@ import {
   isRecoveryDevice,
   RecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { unknownToString, unreachable } from "$src/utils/utils";
+import { unknownToString } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 
 import copyJson from "./deviceSettings.json";
@@ -416,15 +417,14 @@ const deviceConnection = async (
       connection,
       message: recoveryPhraseMessage,
     });
-    switch (loginResult.tag) {
-      case "ok":
-        return loginResult.connection;
-      case "canceled":
-        return null;
-      default:
-        unreachable(loginResult);
-        break;
+
+    if ("tag" in loginResult) {
+      loginResult satisfies { tag: "canceled" };
+      return null;
     }
+
+    loginResult satisfies LoginSuccess;
+    return loginResult.connection;
   } catch (error: unknown) {
     await displayError({
       title: "Could not modify device",

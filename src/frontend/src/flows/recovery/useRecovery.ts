@@ -3,8 +3,11 @@ import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
-import { LoginFlowResult } from "$src/utils/flowResult";
-import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  LoginSuccess,
+} from "$src/utils/iiConnection";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import {
@@ -21,7 +24,7 @@ import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
   connection: Connection
-): Promise<LoginFlowResult> => {
+): Promise<LoginSuccess | { tag: "canceled" }> => {
   const res = await promptRecovery();
 
   if (res === "forgotten") {
@@ -36,23 +39,25 @@ export const useRecovery = async (
 
   res satisfies "phrase" | "device";
 
-  const op =
-    res === "phrase"
-      ? recoverWithPhrase({
-          connection,
-          message: html`Your recovery phrase includes your Internet Identity
-          number and a unique combination of 24 words that represent your
-          private key`,
-        })
-      : recoverWithDevice({ connection });
+  const op = await (res === "phrase"
+    ? recoverWithPhrase({
+        connection,
+        message: html`Your recovery phrase includes your Internet Identity
+        number and a unique combination of 24 words that represent your private
+        key`,
+      })
+    : recoverWithDevice({ connection }));
 
-  const flowResult = await op;
-
-  if (flowResult.tag === "ok") {
-    await postRecoveryFlow(flowResult);
+  if ("tag" in op) {
+    op satisfies { tag: "canceled" };
+    return { tag: "canceled" };
   }
 
-  return flowResult;
+  op satisfies LoginSuccess;
+
+  await postRecoveryFlow(op);
+
+  return op;
 };
 
 // Show the user that the recovery was successful and offer to enroll a new device

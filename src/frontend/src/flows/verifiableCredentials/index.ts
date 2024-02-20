@@ -133,7 +133,14 @@ const verifyCredentials = async ({
   // For the rest of the flow we need to be authenticated, so authenticate
   const authResult = await useIdentity({ userNumber, connection });
 
-  if (authResult.tag !== "ok") {
+  if ("tag" in authResult) {
+    authResult satisfies { tag: "canceled" };
+    return "aborted";
+  }
+
+  authResult satisfies { kind: unknown };
+
+  if (authResult.kind !== "loginSuccess") {
     return abortedCredentials({ reason: "auth_failed_ii" });
   }
   const authenticatedConnection = authResult.connection;
