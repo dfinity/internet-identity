@@ -119,18 +119,9 @@ mod tests;
 /// * version   8: same as 7, but archive entries buffer in stable memory
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=8;
 
-/// Reserved space for the header before the anchor records start.
-const ENTRY_OFFSET: u64 = 2 * WASM_PAGE_SIZE_IN_BYTES as u64; // 1 page reserved for II config, 1 for memory manager
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
-
-const MAX_STABLE_MEMORY_SIZE: u64 = 32 * GB;
-const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES as u64;
-
-/// In practice, II has 48 GB of stable memory available.
-/// This limit has last been raised when it was still 32 GB.
-const STABLE_MEMORY_SIZE: u64 = 32 * GB;
 
 const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
@@ -144,9 +135,13 @@ const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_I
 // This value results in 256 GB of total managed memory, which should be enough
 // for the foreseeable future.
 const BUCKET_SIZE_IN_PAGES: u16 = 128;
+const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
+const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES as u64;
 
 /// The maximum number of anchors this canister can store.
-pub const DEFAULT_RANGE_SIZE: u64 = (STABLE_MEMORY_SIZE - ENTRY_OFFSET) / DEFAULT_ENTRY_SIZE as u64;
+pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u64) // deduct one bucket for the archive entries buffer
+    * WASM_PAGE_SIZE_IN_BYTES as u64
+    / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
 
@@ -189,7 +184,6 @@ struct Header {
     id_range_hi: u64,
     entry_size: u16,
     salt: [u8; 32],
-    first_entry_offset: u64,
 }
 
 impl<M: Memory + Clone> Storage<M> {
@@ -202,14 +196,14 @@ impl<M: Memory + Clone> Storage<M> {
             ));
         }
 
-        if (id_range_hi - id_range_lo) > DEFAULT_RANGE_SIZE {
+        if (id_range_hi - id_range_lo) > MAX_ENTRIES {
             trap(&format!(
-                "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {DEFAULT_RANGE_SIZE} entries)",
+                "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {MAX_ENTRIES} entries)",
             ));
         }
         let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
         let memory_manager = MemoryManager::init_with_bucket_size(
-            RestrictedMemory::new(memory, 1..MAX_WASM_PAGES),
+            RestrictedMemory::new(memory, 1..MAX_MANAGED_WASM_PAGES),
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
@@ -224,7 +218,6 @@ impl<M: Memory + Clone> Storage<M> {
                 id_range_hi,
                 entry_size: DEFAULT_ENTRY_SIZE,
                 salt: EMPTY_SALT,
-                first_entry_offset: ENTRY_OFFSET,
             },
             header_memory,
             anchor_memory,
@@ -292,7 +285,7 @@ impl<M: Memory + Clone> Storage<M> {
         match header.version {
             7 | 8 => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
-                let managed_memory = RestrictedMemory::new(memory, 1..MAX_WASM_PAGES);
+                let managed_memory = RestrictedMemory::new(memory, 1..MAX_MANAGED_WASM_PAGES);
                 let memory_manager =
                     MemoryManager::init_with_bucket_size(managed_memory, BUCKET_SIZE_IN_PAGES);
                 let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
@@ -373,12 +366,6 @@ impl<M: Memory + Clone> Storage<M> {
         self.header.num_anchors as usize
     }
 
-    /// Returns the maximum number of entries that this storage can fit.
-    pub fn max_entries(&self) -> usize {
-        ((STABLE_MEMORY_SIZE - self.header.first_entry_offset) / self.header.entry_size as u64)
-            as usize
-    }
-
     pub fn assigned_anchor_number_range(&self) -> (AnchorNumber, AnchorNumber) {
         (self.header.id_range_lo, self.header.id_range_hi)
     }
@@ -389,11 +376,10 @@ impl<M: Memory + Clone> Storage<M> {
                 "set_anchor_number_range: improper Identity Anchor range [{lo}, {hi})"
             ));
         }
-        let max_entries = self.max_entries() as u64;
-        if (hi - lo) > max_entries {
+        if (hi - lo) > MAX_ENTRIES {
             trap(&format!(
                 "set_anchor_number_range: specified range [{lo}, {hi}) is too large for this canister \
-                 (max {max_entries} entries)"
+                 (max {MAX_ENTRIES} entries)"
             ));
         }
 
@@ -403,7 +389,7 @@ impl<M: Memory + Clone> Storage<M> {
                 trap(&format!(
                     "set_anchor_number_range: specified range [{lo}, {hi}) does not start from the same number ({}) \
                      as the existing range thus would make existing anchors invalid"
-                    , {self.header.id_range_lo}));
+                    , { self.header.id_range_lo }));
             }
             // Check that all _existing_ anchors fit into the new range. I.e. making the range smaller
             // is ok as long as the range reduction only affects _unused_ anchor number.
@@ -411,7 +397,7 @@ impl<M: Memory + Clone> Storage<M> {
                 trap(&format!(
                     "set_anchor_number_range: specified range [{lo}, {hi}) does not accommodate all {} anchors \
                      thus would make existing anchors invalid"
-                    , {self.header.num_anchors}));
+                    , { self.header.num_anchors }));
             }
         }
 

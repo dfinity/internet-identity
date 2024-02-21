@@ -5,7 +5,7 @@ use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::temp_keys::TempKeys;
 use crate::storage::anchor::Anchor;
-use crate::storage::DEFAULT_RANGE_SIZE;
+use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize};
@@ -212,7 +212,7 @@ pub fn init_new() {
     let storage = Storage::new(
         (
             FIRST_ANCHOR_NUMBER,
-            FIRST_ANCHOR_NUMBER.saturating_add(DEFAULT_RANGE_SIZE),
+            FIRST_ANCHOR_NUMBER.saturating_add(MAX_ENTRIES),
         ),
         memory,
     );
