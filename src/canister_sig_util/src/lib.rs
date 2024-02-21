@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 
 pub mod signature_map;
 
@@ -19,7 +20,7 @@ pub const CANISTER_SIG_PK_DER_OID: &[u8; 14] =
 
 lazy_static! {
     /// The IC root public key used when verifying canister signatures.
-    static ref IC_ROOT_PUBLIC_KEY: Vec<u8> =
+    pub static ref IC_ROOT_PUBLIC_KEY: Vec<u8> =
         extract_raw_root_pk_from_der(IC_ROOT_PK_DER).expect("Failed decoding IC root key.");
 }
 
@@ -133,6 +134,133 @@ pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(value.as_ref());
     hasher.finalize().into()
+}
+
+pub fn delegation_signature_msg(
+    pubkey: &[u8],
+    expiration: u64,
+    targets: Option<&Vec<Vec<u8>>>,
+) -> Vec<u8> {
+    use hash::Value;
+
+    let mut m = HashMap::new();
+    m.insert("pubkey", Value::Bytes(pubkey));
+    m.insert("expiration", Value::U64(expiration));
+    if let Some(targets) = targets.as_ref() {
+        let mut arr = Vec::with_capacity(targets.len());
+        for t in targets.iter() {
+            arr.push(Value::Bytes(t.as_ref()));
+        }
+        m.insert("targets", Value::Array(arr));
+    }
+    let map_hash = hash::hash_of_map(m);
+    msg_with_domain(b"ic-request-auth-delegation", &map_hash)
+}
+
+pub fn msg_with_domain(sep: &[u8], bytes: &[u8]) -> Vec<u8> {
+    let mut msg = vec![sep.len() as u8];
+    msg.append(&mut sep.to_vec());
+    msg.append(&mut bytes.to_vec());
+    msg
+}
+
+// This is a copy or II's hash.rs, to avoid dependency on II's code.
+// TODO: remove the copy and use ic_representation_independent_hash-crate
+//       once ic_representation_independent_hash::Value supports Array-values.
+mod hash {
+    use ic_certification::Hash;
+    use serde::{Deserialize, Serialize};
+    use sha2::{Digest, Sha256};
+    use std::collections::HashMap;
+    use std::convert::AsRef;
+
+    #[derive(Clone, Serialize, Deserialize)]
+    pub enum Value<'a> {
+        Bytes(#[serde(with = "serde_bytes")] &'a [u8]),
+        String(&'a str),
+        U64(u64),
+        Array(Vec<Value<'a>>),
+    }
+
+    pub fn hash_of_map<S: AsRef<str>>(map: HashMap<S, Value>) -> Hash {
+        let mut hashes: Vec<Vec<u8>> = Vec::new();
+        for (key, val) in map.into_iter() {
+            hashes.push(hash_key_val(key.as_ref(), val));
+        }
+
+        // Computes hash by first sorting by "field name" hash, which is the
+        // same as sorting by concatenation of H(field name) · H(field value)
+        // (although in practice it's actually more stable in the presence of
+        // duplicated field names). Then concatenate all the hashes.
+        hashes.sort();
+
+        let mut hasher = Sha256::new();
+        for hash in hashes {
+            hasher.update(&hash);
+        }
+
+        hasher.finalize().into()
+    }
+
+    fn hash_key_val(key: &str, val: Value<'_>) -> Vec<u8> {
+        let mut key_hash = hash_string(key).to_vec();
+        let val_hash = hash_val(val);
+        key_hash.extend_from_slice(&val_hash[..]);
+        key_hash
+    }
+
+    pub fn hash_string(value: &str) -> Hash {
+        hash_bytes(value.as_bytes())
+    }
+
+    pub fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
+        let mut hasher = Sha256::new();
+        hasher.update(value.as_ref());
+        hasher.finalize().into()
+    }
+
+    fn hash_u64(value: u64) -> Hash {
+        // We need at most ⌈ 64 / 7 ⌉ = 10 bytes to encode a 64 bit
+        // integer in LEB128.
+        let mut buf = [0u8; 10];
+        let mut n = value;
+        let mut i = 0;
+
+        loop {
+            let byte = (n & 0x7f) as u8;
+            n >>= 7;
+
+            if n == 0 {
+                buf[i] = byte;
+                break;
+            } else {
+                buf[i] = byte | 0x80;
+                i += 1;
+            }
+        }
+
+        hash_bytes(&buf[..=i])
+    }
+
+    // Arrays encoded as the concatenation of the hashes of the encodings of the
+    // array elements.
+    fn hash_array(elements: Vec<Value<'_>>) -> Hash {
+        let mut hasher = Sha256::new();
+        elements
+            .into_iter()
+            // Hash the encoding of all the array elements.
+            .for_each(|e| hasher.update(&hash_val(e)[..]));
+        hasher.finalize().into() // hash the concatenation of the hashes.
+    }
+
+    fn hash_val(val: Value<'_>) -> Hash {
+        match val {
+            Value::String(string) => hash_string(string),
+            Value::Bytes(bytes) => hash_bytes(bytes),
+            Value::U64(integer) => hash_u64(integer),
+            Value::Array(elements) => hash_array(elements),
+        }
+    }
 }
 
 #[derive(Serialize)]
