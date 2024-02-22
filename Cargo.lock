@@ -1275,6 +1275,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -3264,8 +3267,14 @@ dependencies = [
 name = "sig_verifier_js"
 version = "1.0.0"
 dependencies = [
+ "assert_matches",
+ "candid",
+ "canister_sig_util",
+ "hex",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
+ "serde",
+ "serde_json",
  "wasm-bindgen",
 ]
 
