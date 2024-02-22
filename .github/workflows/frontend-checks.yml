@@ -58,7 +58,7 @@ jobs:
       # to match the deploy URL: https://dfinity.github.io/internet-identity/
       - run: npm run build:showcase -- --base '/internet-identity/'
       - name: Setup Pages
-        uses: actions/configure-pages@v2
+        uses: actions/configure-pages@v4
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v1
         with:

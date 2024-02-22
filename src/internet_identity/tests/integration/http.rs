@@ -197,7 +197,7 @@ fn metrics_should_list_default_user_range() -> Result<(), CallError> {
     let (min_user_number, _) = parse_metric(&metrics, "internet_identity_min_user_number");
     let (max_user_number, _) = parse_metric(&metrics, "internet_identity_max_user_number");
     assert_eq!(min_user_number, 10_000f64);
-    assert_eq!(max_user_number, 8_398_575f64);
+    assert_eq!(max_user_number, 67_116_815f64);
     Ok(())
 }
 
