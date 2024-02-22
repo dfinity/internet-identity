@@ -55,7 +55,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
   // attributes, which we gather as the list of page names.
   const pageLinks = await browser.$$("[data-page-name]");
   const pageNames = await Promise.all(
-    pageLinks.map(async (link) => {
+    await pageLinks.map(async (link) => {
       const pageName = await link.getAttribute("data-page-name");
       return pageName;
     })
