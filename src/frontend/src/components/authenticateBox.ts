@@ -293,10 +293,17 @@ type FlowError =
 // Type machinery to allow translating error code (e.g. kind: "authFail") using the actual data
 // contained in the error objects (e.g. authFail: (authFail: AuthFail) => ...).
 type ErrorKind = FlowError["kind"]; // all known error tags for FlowError
-type KindToError = { [P in ErrorKind]: Omit<FlowError & { kind: P }, "kind"> }; // Look up from err. kind to object
+
+// Look up an error type from an error kind, i.e.:
+//  type AssociatedError<"authFail"> = AuthFail
 type AssociatedError<K extends ErrorKind> = {
   [P in K]: { kind: P } & KindToError[P];
-}[K]; // Helper for adding the kind to the object (otherwise TS gets a bit lost)
+}[K];
+// Maps all errors kinds to their error types (without kind field):
+//  { authFail: { ...fields of AuthFail with kind...}, badPin: ... }
+// This seems to be a necessary step while looking up the error, otherwise typescript
+// fails: 'Expression produces a union type that is too complex to represent.'
+type KindToError = { [P in ErrorKind]: Omit<FlowError & { kind: P }, "kind"> };
 
 // Makes the error human readable
 const clarifyError: {
