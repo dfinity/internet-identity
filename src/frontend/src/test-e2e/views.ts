@@ -130,7 +130,7 @@ export class PinRegistrationView extends View {
 
   async setPin(pin: string): Promise<void> {
     const inputs = await this.browser.$('[data-role="set-pin"]').$$("input");
-    for (const [input, digit] of zip(inputs, pin.split(""))) {
+    for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
     }
   }
@@ -144,7 +144,7 @@ export class PinRegistrationView extends View {
     const inputs = await this.browser
       .$('[data-role="confirm-pin"]')
       .$$("input");
-    for (const [input, digit] of zip(inputs, pin.split(""))) {
+    for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
     }
   }
@@ -160,7 +160,7 @@ export class PinAuthView extends View {
 
   async enterPin(pin: string): Promise<void> {
     const inputs = await this.browser.$('[data-role="pin"]').$$("input");
-    for (const [input, digit] of zip(inputs, pin.split(""))) {
+    for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
     }
   }
@@ -462,7 +462,7 @@ export class VerifyRemoteDeviceView extends View {
     const inputs = await this.browser
       .$('[data-role="verification-code"]')
       .$$("input");
-    for (const [input, digit] of zip(inputs, code.split(""))) {
+    for (const [input, digit] of zip(Array.from(inputs), code.split(""))) {
       await input.setValue(digit);
     }
   }
