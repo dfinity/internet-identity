@@ -774,7 +774,7 @@ jobs:
       - name: Create sha for dfx pull
         run: |
           shasum -a 256 \
-            ./internet_identity_dev.wasm.gz \
+            ./internet_identity_dev.wasm.gz > \
             ./internet_identity_dev.wasm.gz.sha256
 
       - name: Publish release
