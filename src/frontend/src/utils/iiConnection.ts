@@ -76,39 +76,21 @@ export class DummyIdentity
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
-export type ApiResult<T = AuthenticatedConnection> =
-  | LoginResult<T>
-  | RegisterResult<T>;
-export type LoginResult<T = AuthenticatedConnection> =
-  | LoginSuccess<T>
-  | UnknownUser
-  | AuthFail
-  | ApiError
-  | NoSeedPhrase
-  | SeedPhraseFail
-  | WebAuthnFailed;
-export type RegisterResult<T = AuthenticatedConnection> =
-  | LoginSuccess<T>
-  | AuthFail
-  | ApiError
-  | RegisterNoSpace
-  | BadChallenge
-  | WebAuthnFailed;
-
-type LoginSuccess<T = AuthenticatedConnection> = {
+export type LoginSuccess<T = AuthenticatedConnection> = {
   kind: "loginSuccess";
   connection: T;
   userNumber: bigint;
 };
 
-type BadChallenge = { kind: "badChallenge" };
-type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
-type AuthFail = { kind: "authFail"; error: Error };
-type ApiError = { kind: "apiError"; error: Error };
-type RegisterNoSpace = { kind: "registerNoSpace" };
-type NoSeedPhrase = { kind: "noSeedPhrase" };
-type SeedPhraseFail = { kind: "seedPhraseFail" };
-type WebAuthnFailed = { kind: "webAuthnFailed" };
+export type BadChallenge = { kind: "badChallenge" };
+export type BadPin = { kind: "badPin" };
+export type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
+export type AuthFail = { kind: "authFail"; error: Error };
+export type ApiError = { kind: "apiError"; error: Error };
+export type RegisterNoSpace = { kind: "registerNoSpace" };
+export type NoSeedPhrase = { kind: "noSeedPhrase" };
+export type SeedPhraseFail = { kind: "seedPhraseFail" };
+export type WebAuthnFailed = { kind: "webAuthnFailed" };
 
 export type { ChallengeResult } from "$generated/internet_identity_types";
 
@@ -139,21 +121,10 @@ export class Connection {
     keyType: KeyType;
     alias: string;
     challengeResult: ChallengeResult;
-  }): Promise<RegisterResult> => {
-    let delegationIdentity: DelegationIdentity;
-    try {
-      delegationIdentity = await this.requestFEDelegation(tempIdentity);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        return { kind: "authFail", error };
-      } else {
-        return {
-          kind: "authFail",
-          error: new Error("Unknown error when requesting delegation"),
-        };
-      }
-    }
-
+  }): Promise<
+    LoginSuccess | ApiError | AuthFail | RegisterNoSpace | BadChallenge
+  > => {
+    const delegationIdentity = await this.requestFEDelegation(tempIdentity);
     const actor = await this.createActor(delegationIdentity);
     const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
 
@@ -208,19 +179,20 @@ export class Connection {
     }
   };
 
-  login = async (userNumber: bigint): Promise<LoginResult> => {
+  login = async (
+    userNumber: bigint
+  ): Promise<
+    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+  > => {
     let devices: Omit<DeviceData, "alias">[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        return { kind: "apiError", error: e };
-      } else {
-        return {
-          kind: "apiError",
-          error: new Error("Unknown error when looking up authenticators"),
-        };
-      }
+      const errObj =
+        e instanceof Error
+          ? e
+          : new Error("Unknown error when looking up authenticators");
+      return { kind: "apiError", error: errObj };
     }
 
     if (devices.length === 0) {
@@ -240,7 +212,7 @@ export class Connection {
   fromWebauthnCredentials = async (
     userNumber: bigint,
     credentials: WebAuthnCredential[]
-  ): Promise<LoginResult> => {
+  ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
@@ -254,20 +226,17 @@ export class Connection {
           }))
         );
     let delegationIdentity: DelegationIdentity;
+
+    // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
+    // "sign" inside the webauthn identity), and if so bubble it up
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
         return { kind: "webAuthnFailed" };
       }
-      if (e instanceof Error) {
-        return { kind: "authFail", error: e };
-      } else {
-        return {
-          kind: "authFail",
-          error: new Error("Unknown error when requesting delegation"),
-        };
-      }
+
+      throw e;
     }
 
     const actor = await this.createActor(delegationIdentity);
@@ -310,7 +279,7 @@ export class Connection {
   fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string
-  ): Promise<LoginResult> => {
+  ): Promise<LoginSuccess | NoSeedPhrase | SeedPhraseFail> => {
     const pubkeys = (await this.lookupCredentials(userNumber)).recovery_phrases;
     if (pubkeys.length === 0) {
       return {

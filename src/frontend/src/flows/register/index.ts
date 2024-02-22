@@ -17,12 +17,15 @@ import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
-import { LoginFlowCanceled } from "$src/utils/flowResult";
 import {
+  ApiError,
+  AuthFail,
   AuthenticatedConnection,
+  BadChallenge,
   Connection,
   IIWebAuthnIdentity,
-  RegisterResult,
+  LoginSuccess,
+  RegisterNoSpace,
 } from "$src/utils/iiConnection";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
@@ -49,7 +52,9 @@ export const registerFlow = async <T>({
     keyType: KeyType;
     credentialId?: CredentialId;
     challengeResult: { chars: string; challenge: Challenge };
-  }) => Promise<RegisterResult<T>>;
+  }) => Promise<
+    LoginSuccess<T> | BadChallenge | ApiError | AuthFail | RegisterNoSpace
+  >;
   storePinIdentity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: PinIdentityMaterial;
@@ -57,10 +62,17 @@ export const registerFlow = async <T>({
   registrationAllowed: boolean;
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
-}): Promise<RegisterResult<T> | "canceled"> => {
+}): Promise<
+  | LoginSuccess<T>
+  | BadChallenge
+  | ApiError
+  | AuthFail
+  | RegisterNoSpace
+  | "canceled"
+> => {
   if (!registrationAllowed) {
     const result = await registerDisabled();
-    result satisfies LoginFlowCanceled;
+    result satisfies { tag: "canceled" };
     return "canceled";
   }
 

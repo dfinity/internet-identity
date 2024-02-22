@@ -14,7 +14,10 @@ test("user number is set", () => {
       },
       verify: ({ userNumber }) => {
         f(userNumber);
-        return Promise.resolve({ tag: "err", message: "this is a test" });
+        return Promise.resolve({
+          ok: false,
+          err: "this is a test",
+        });
       },
       message: "",
     },

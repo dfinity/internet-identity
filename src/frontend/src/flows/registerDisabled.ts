@@ -1,7 +1,6 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { warnBox } from "$src/components/warnBox";
 import { LEGACY_II_URL } from "$src/config";
-import { cancel, LoginFlowCanceled } from "$src/utils/flowResult";
 import { html, render } from "lit-html";
 
 const pageContent = (onCancel: () => void) => {
@@ -40,12 +39,12 @@ const pageContent = (onCancel: () => void) => {
   });
 };
 
-export const registerDisabled = (): Promise<LoginFlowCanceled> => {
+export const registerDisabled = (): Promise<{ tag: "canceled" }> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(
       pageContent(() => {
-        resolve(cancel);
+        resolve({ tag: "canceled" });
       }),
       container
     );

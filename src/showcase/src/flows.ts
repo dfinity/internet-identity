@@ -63,7 +63,7 @@ export const iiFlows: Record<string, () => void> = {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         toast.info(html`Logged in`);
         return Promise.resolve({
-          tag: "ok",
+          kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: null,
         });
@@ -74,15 +74,11 @@ export const iiFlows: Record<string, () => void> = {
           () => new Promise((resolve) => setTimeout(resolve, 2000))
         );
         if (pin !== "123456") {
-          return Promise.resolve({
-            tag: "err",
-            title: "Invalid PIN",
-            message: "Invalid PIN",
-          });
+          return Promise.resolve({ kind: "badPin" });
         }
         toast.info(html`Logged in`);
         return Promise.resolve({
-          tag: "ok",
+          kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: null,
         });
@@ -90,7 +86,7 @@ export const iiFlows: Record<string, () => void> = {
       recover: () => {
         toast.info(html`Recovered`);
         return Promise.resolve({
-          tag: "ok",
+          kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: null,
         });

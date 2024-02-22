@@ -285,12 +285,12 @@ export const iiPages: Record<string, () => void> = {
     }),
 
   recoverWithPhrase: () =>
-    recoverWithPhrasePage<
-      { tag: "ok"; userNumber: bigint; words: string[] },
-      { tag: "err"; message: string }
-    >({
+    recoverWithPhrasePage({
       verify: ({ userNumber, words }) =>
-        Promise.resolve({ tag: "ok", userNumber, words }),
+        Promise.resolve({
+          ok: true,
+          value: { kind: "loginSuccess", userNumber, words },
+        }),
       confirm: ({ userNumber, words }) =>
         console.log("confirmed: ", userNumber, words),
       back: () => console.log("remove"),

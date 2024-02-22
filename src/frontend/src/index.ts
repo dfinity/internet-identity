@@ -1,7 +1,4 @@
-import {
-  handleLogin,
-  handleLoginFlowResult,
-} from "$src/components/authenticateBox";
+import { handleLoginFlowResult } from "$src/components/authenticateBox";
 import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
@@ -27,9 +24,7 @@ void createSpa(async (connection) => {
     const renderManage = renderManageWarmup();
 
     // If user "Click" continue in success page, proceed with authentication
-    const result = await handleLogin({
-      login: () => connection.login(userNumber),
-    });
+    const result = await connection.login(userNumber);
     const loginData = await handleLoginFlowResult(result);
 
     // User have successfully signed-in we can jump to manage page
