@@ -33,7 +33,17 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_max_user_number",
             (hi - 1) as f64,
             "The highest Identity Anchor that can be served by this canister.",
-        )
+        )?;
+
+        let mut virtual_memory_stats_builder = w.gauge_vec(
+            "internet_identity_virtual_memory_size_pages",
+            "Size of the managed memory in pages.",
+        )?;
+        for (memory, memory_size) in storage.memory_sizes() {
+            virtual_memory_stats_builder =
+                virtual_memory_stats_builder.value(&[("memory", &memory)], memory_size as f64)?;
+        }
+        Ok::<(), std::io::Error>(())
     })?;
     state::signature_map(|sigs| {
         w.encode_gauge(

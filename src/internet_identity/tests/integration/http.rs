@@ -1,6 +1,9 @@
 //! Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
+use crate::v2_api::authn_method_test_helpers::{
+    create_identity_with_authn_method, test_authn_method,
+};
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -480,6 +483,55 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
         &get_metrics(&env, canister_id),
         "internet_identity_anchor_operations_counter",
         4f64,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"header\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
+        0f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
+        1f64,
+    );
+
+    let authn_method = test_authn_method();
+    create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"header\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
+        1f64,
+    );
+    // To test the archive buffer memory metric growing, we would need to spawn an archive and then
+    // create a large number of entries to be archived. Or load a prepared state with a large number
+    // of entries. This is not done here, as it would either require brittle setup or a long-running
+    // test.
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
+        1f64,
     );
 
     Ok(())

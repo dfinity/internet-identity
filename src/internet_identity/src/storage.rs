@@ -87,6 +87,7 @@
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
@@ -170,6 +171,10 @@ pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: VirtualMemory<RestrictedMemory<M>>,
+    /// This memory is entirely owned by the [archive_entries_buffer] and must never be written to.
+    /// The only reason it is stored here is to have a reference to it so that we can provide stats
+    /// about its size.
+    archive_buffer_memory: ArchiveBufferMemory<M>,
     archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, ArchiveBufferMemory<M>>,
 }
 
@@ -207,6 +212,7 @@ impl<M: Memory + Clone> Storage<M> {
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
+        let archive_buffer_memory = Self::init_archive_buffer_memory(&memory_manager);
         let version: u8 = 8;
 
         let mut storage = Self {
@@ -221,7 +227,8 @@ impl<M: Memory + Clone> Storage<M> {
             },
             header_memory,
             anchor_memory,
-            archive_entries_buffer: Self::init_archive_entries_buffer(&memory_manager),
+            archive_buffer_memory: archive_buffer_memory.clone(),
+            archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
         };
         storage.flush();
         storage
@@ -289,11 +296,13 @@ impl<M: Memory + Clone> Storage<M> {
                 let memory_manager =
                     MemoryManager::init_with_bucket_size(managed_memory, BUCKET_SIZE_IN_PAGES);
                 let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
+                let archive_buffer_memory = Self::init_archive_buffer_memory(&memory_manager);
                 Some(Self {
                     header,
                     header_memory,
                     anchor_memory,
-                    archive_entries_buffer: Self::init_archive_entries_buffer(&memory_manager),
+                    archive_buffer_memory: archive_buffer_memory.clone(),
+                    archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
                 })
             }
             _ => trap(&format!("unsupported header version: {}", header.version)),
@@ -472,16 +481,16 @@ impl<M: Memory + Clone> Storage<M> {
         record_number as u64 * self.header.entry_size as u64
     }
 
-    fn init_archive_entries_buffer<T: Memory>(
-        memory_manager: &MemoryManager<T>,
-    ) -> StableBTreeMap<u64, BufferedEntryWrapper, RestrictedMemory<VirtualMemory<T>>> {
+    fn init_archive_buffer_memory(
+        memory_manager: &MemoryManager<RestrictedMemory<M>>,
+    ) -> ArchiveBufferMemory<M> {
         // A single archive entry takes on average 476 bytes of space.
         // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or 5 MB.
         // Since the memory manager allocates memory in buckets of 128 pages, we round up to 128 pages.
-        StableBTreeMap::init(RestrictedMemory::new(
+        RestrictedMemory::new(
             memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
             0..BUCKET_SIZE_IN_PAGES as u64,
-        ))
+        )
     }
 
     /// Returns the address of the first byte not yet allocated to a anchor.
@@ -554,6 +563,17 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
+    }
+
+    pub fn memory_sizes(&self) -> HashMap<String, u64> {
+        HashMap::from_iter(vec![
+            ("header".to_string(), self.header_memory.size()),
+            ("identities".to_string(), self.anchor_memory.size()),
+            (
+                "archive_buffer".to_string(),
+                self.archive_buffer_memory.size(),
+            ),
+        ])
     }
 }
 
