@@ -9,9 +9,9 @@ test("Wasm can be loaded", async () => {
       Uint8Array.from([1, 2, 3, 5]),
       Uint8Array.from([1, 2, 3, 5])
     );
-  } catch (e) {
+  } catch (e: unknown) {
     // Expect an error string generated from the Wasm module
-    expect(e.toString()).toContain(
+    expect(e).toContain(
       "Error in DER encoding: Bad length field in boolean block: 2"
     );
   }

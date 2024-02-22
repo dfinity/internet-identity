@@ -16,6 +16,7 @@
     }
   },
   "scripts": {
+    "check": "tsc --noEmit",
     "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json",
     "test": "vitest --config ./vitest.config.ts"
   },

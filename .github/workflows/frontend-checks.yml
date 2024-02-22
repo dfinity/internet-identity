@@ -14,7 +14,10 @@ jobs:
       - uses: ./.github/actions/setup-node
       - run: npm ci
       - name: Run tsc
-        run: npm run check
+        run: |
+          npm run check
+          npm run --workspace ./src/vc-api check
+          npm run --workspace ./src/sig-verifier-js check
       - name: Run ESLint
         run: npm run lint
       - name: Check formatting
