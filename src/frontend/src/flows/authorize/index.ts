@@ -156,7 +156,12 @@ const authenticate = async (
   connection: Connection,
   authContext: AuthContext
 ): Promise<
-  | { kind: "success"; delegations: Delegation[]; userPublicKey: Uint8Array }
+  | {
+      kind: "success";
+      delegations: Delegation[];
+      userPublicKey: Uint8Array;
+      authnMethod: "pin" | "passkey" | "recovery";
+    }
   | { kind: "failure"; text: string }
 > => {
   const i18n = new I18n();
@@ -193,6 +198,8 @@ const authenticate = async (
         dapp.hasOrigin(authContext.requestOrigin)
       ),
     }),
+    allowPinAuthentication:
+      authContext.authRequest.allowPinAuthentication ?? true,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
@@ -238,6 +245,7 @@ const authenticate = async (
     kind: "success",
     delegations: [parsed_signed_delegation],
     userPublicKey: Uint8Array.from(userKey),
+    authnMethod: authSuccess.authnMethod,
   };
 };
 /** Run the authentication flow, including postMessage protocol, offering to authenticate

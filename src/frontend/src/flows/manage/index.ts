@@ -114,6 +114,7 @@ export const authFlowManage = async (connection: Connection) => {
     connection,
     i18n,
     templates: authnTemplateManage({ dapps }),
+    allowPinAuthentication: true,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add

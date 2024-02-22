@@ -53,11 +53,21 @@
             placeholder="(use default)"
           />
         </div>
+        <div>
+          <label
+            for="allowPinAuthentication"
+            style="display: inline-block; width: 200px"
+            >PIN Authentication allowed:</label
+          >
+          <input type="checkbox" checked id="allowPinAuthentication" />
+        </div>
         <button data-action="authenticate" id="signinBtn">Sign In</button>
         <h3>/.well-known/ii-alternative-origins</h3>
         <div id="alternativeOrigins"></div>
         <h3>Principal:</h3>
         <div data-role="principal" id="principal"></div>
+        <h3>Authentication Method:</h3>
+        <div data-role="authn-method"></div>
         <h3>Delegation:</h3>
         <pre id="delegation"></pre>
         <h3>Expiry (ns from now):</h3>

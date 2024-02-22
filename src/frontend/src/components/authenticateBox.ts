@@ -65,14 +65,17 @@ export const authenticateBox = async ({
   connection,
   i18n,
   templates,
+  allowPinAuthentication,
 }: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
+  allowPinAuthentication: boolean;
 }): Promise<{
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
+  authnMethod: "pin" | "passkey" | "recovery";
 }> => {
   const promptAuth = () =>
     authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
@@ -92,6 +95,7 @@ export const authenticateBox = async ({
         }),
       retrievePinIdentityMaterial: ({ userNumber }) =>
         idbRetrievePinIdentityMaterial({ userNumber }),
+      allowPinAuthentication,
     });
 
   // Retry until user has successfully authenticated
@@ -147,6 +151,7 @@ export const authenticateBoxFlow = async <T, I>({
   registerFlowOpts,
   verifyPinValidity,
   retrievePinIdentityMaterial,
+  allowPinAuthentication,
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
@@ -171,19 +176,28 @@ export const authenticateBoxFlow = async <T, I>({
   }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
+  allowPinAuthentication: boolean;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
   }) => Promise<"valid" | "expired">;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
 }): Promise<
-  (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
+  | (LoginSuccess<T> & {
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
+  | FlowError
+  | { tag: "canceled" }
 > => {
   const pages = authnScreens(i18n, { ...templates });
 
   // The registration flow for a new identity
   const doRegister = async (): Promise<
-    | (LoginSuccess<T> & { newAnchor: true })
+    | (LoginSuccess<T> & {
+        newAnchor: true;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
     | BadChallenge
     | ApiError
     | AuthFail
@@ -203,6 +217,7 @@ export const authenticateBoxFlow = async <T, I>({
     result2 satisfies LoginSuccess<T>;
     return {
       newAnchor: true,
+      authnMethod: "passkey" /* TODO: remove me or fix me */,
       ...result2,
     };
   };
@@ -215,11 +230,17 @@ export const authenticateBoxFlow = async <T, I>({
       loginPasskey,
       loginPinIdentityMaterial,
       verifyPinValidity,
+      allowPinAuthentication,
     });
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
-    (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
+    | (LoginSuccess<T> & {
+        newAnchor: boolean;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
+    | FlowError
+    | { tag: "canceled" }
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
@@ -252,6 +273,7 @@ export const authenticateBoxFlow = async <T, I>({
     // If an anchor was recovered, then it's _not_ a new anchor
     return {
       newAnchor: false,
+      authnMethod: "recovery" /* TODO: set something meaningful */,
       ...recoverResult,
     };
   };
@@ -284,6 +306,7 @@ export const authenticateBoxFlow = async <T, I>({
 type FlowError =
   | AuthFail
   | BadPin
+  | { kind: "pinNotAllowed" }
   | BadChallenge
   | WebAuthnFailed
   | UnknownUser
@@ -344,6 +367,11 @@ const clarifyError: {
     title: "Failed to register",
     message:
       "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
+  }),
+  pinNotAllowed: () => ({
+    title: "PIN method not allowed",
+    message:
+      "You cannot use PIN. Open a new page, add a passkey and retry. Also, improve this UX.",
   }),
 };
 
@@ -667,6 +695,7 @@ const useIdentityFlow = async <T, I>({
   verifyPinValidity,
   loginPasskey,
   loginPinIdentityMaterial,
+  allowPinAuthentication,
 }: {
   userNumber: bigint;
   retrievePinIdentityMaterial: ({
@@ -692,13 +721,18 @@ const useIdentityFlow = async <T, I>({
     pin: string;
     pinIdentityMaterial: I;
   }) => Promise<LoginSuccess<T> | BadPin>;
+  allowPinAuthentication: boolean;
 }): Promise<
-  | (LoginSuccess<T> & { newAnchor: boolean })
+  | (LoginSuccess<T> & {
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
   | AuthFail
   | WebAuthnFailed
   | UnknownUser
   | ApiError
   | BadPin
+  | { kind: "pinNotAllowed" }
   | { tag: "canceled" }
 > => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
@@ -709,7 +743,7 @@ const useIdentityFlow = async <T, I>({
 
   const doLoginPasskey = async () => {
     const result = await withLoader(() => loginPasskey(userNumber));
-    return { newAnchor: false, ...result };
+    return { newAnchor: false, authnMethod: "passkey", ...result } as const;
   };
 
   if (isNullish(pinIdentityMaterial)) {
@@ -733,6 +767,11 @@ const useIdentityFlow = async <T, I>({
     return doLoginPasskey();
   }
   isValid satisfies "valid";
+
+  // if there is a PIN but allowPinAuth is false, then warn use and then do passkey auth
+  if (!allowPinAuthentication) {
+    return { kind: "pinNotAllowed" };
+  }
 
   // Otherwise, attempt login with PIN
   const result = await usePin<LoginSuccess<T> | BadPin>({
@@ -772,20 +811,23 @@ const useIdentityFlow = async <T, I>({
   pinResult satisfies LoginSuccess<T>;
 
   // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
-  return { newAnchor: false, ...pinResult };
+  return { newAnchor: false, authnMethod: "pin", ...pinResult };
 };
 
 // Use a passkey, with concrete impl.
 export const useIdentity = ({
   userNumber,
   connection,
+  allowPinAuthentication,
 }: {
   userNumber: bigint;
   connection: Connection;
+  allowPinAuthentication: boolean;
 }) =>
   useIdentityFlow({
     userNumber,
     retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
+    allowPinAuthentication,
 
     verifyPinValidity: (opts) =>
       pinIdentityAuthenticatorValidity({ ...opts, connection }),

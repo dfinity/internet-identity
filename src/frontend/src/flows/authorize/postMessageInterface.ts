@@ -40,6 +40,7 @@ export const AuthRequest = z.object({
       return val;
     }),
   derivationOrigin: z.optional(z.string()),
+  allowPinAuthentication: z.optional(z.boolean()),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;
@@ -53,6 +54,7 @@ export type AuthResponse =
       kind: "authorize-client-success";
       delegations: Delegation[];
       userPublicKey: Uint8Array;
+      authnMethod: "pin" | "passkey" | "recovery";
     };
 
 /**
@@ -67,7 +69,12 @@ export async function authenticationProtocol({
     authRequest: AuthRequest;
     requestOrigin: string;
   }) => Promise<
-    | { kind: "success"; delegations: Delegation[]; userPublicKey: Uint8Array }
+    | {
+        kind: "success";
+        delegations: Delegation[];
+        userPublicKey: Uint8Array;
+        authnMethod: "pin" | "passkey" | "recovery";
+      }
     | { kind: "failure"; text: string }
   >;
   /* Progress update messages to let the user know what's happening. */
@@ -109,6 +116,7 @@ export async function authenticationProtocol({
       kind: "authorize-client-success",
       delegations: result.delegations,
       userPublicKey: result.userPublicKey,
+      authnMethod: result.authnMethod,
     } satisfies AuthResponse,
     authContext.requestOrigin
   );

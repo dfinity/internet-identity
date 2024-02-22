@@ -19,6 +19,7 @@ interface AuthResponseSuccess {
     signature: Uint8Array;
   }[];
   userPublicKey: Uint8Array;
+  authType: "pin" | "passkey" /* TODO: recovery? */;
 }
 
 // Perform a sign in to II using parameters set in this app
@@ -27,12 +28,14 @@ export const authWithII = async ({
   maxTimeToLive,
   derivationOrigin,
   sessionIdentity,
+  allowPinAuthentication,
 }: {
   url: string;
   maxTimeToLive?: bigint;
   derivationOrigin?: string;
   sessionIdentity: SignIdentity;
-}): Promise<DelegationIdentity> => {
+  allowPinAuthentication?: boolean;
+}): Promise<{ identity: DelegationIdentity; authnMethod: string }> => {
   // Figure out the II URL to use
   const iiUrl = new URL(url_);
   iiUrl.hash = "#authorize";
@@ -66,6 +69,7 @@ export const authWithII = async ({
     sessionPublicKey,
     maxTimeToLive,
     derivationOrigin,
+    allowPinAuthentication,
   };
 
   win.postMessage(request, iiUrl.origin);
@@ -85,10 +89,12 @@ export const authWithII = async ({
     throw new Error("Bad reply: " + JSON.stringify(message));
   }
 
-  return identityFromResponse({
+  const identity = identityFromResponse({
     response: message as AuthResponseSuccess,
     sessionIdentity,
   });
+
+  return { identity, authnMethod: message.authnMethod };
 };
 
 // Read delegations the delegations from the response

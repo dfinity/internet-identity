@@ -131,7 +131,11 @@ const verifyCredentials = async ({
   const userNumber = allowed.userNumber;
 
   // For the rest of the flow we need to be authenticated, so authenticate
-  const authResult = await useIdentity({ userNumber, connection });
+  const authResult = await useIdentity({
+    userNumber,
+    connection,
+    allowPinAuthentication: true,
+  });
 
   if ("tag" in authResult) {
     authResult satisfies { tag: "canceled" };
