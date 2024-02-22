@@ -1,13 +1,15 @@
-import { verifyIcSignature, validateDelegationAndGetPrincipal } from "@dfinity/sig-verifier-js/sig_verifier_js";
-import {Principal} from "@dfinity/principal";
+import { validateDelegationAndGetPrincipal } from "@dfinity/sig-verifier-js/sig_verifier_js";
 
 const CHALLENGE = new Uint8Array([
-   0xe7, 0x87, 0x5e, 0x69, 0xce, 0x7b, 0xed, 0xa6, 0xfc, 0x7b, 0x6d, 0xfb, 0xd9, 0xb7, 0x5b, 0xe1,
-   0xc6, 0xf6, 0xd5, 0xde, 0xba, 0xe3, 0xae, 0x1e, 0xd7, 0xc7, 0xf8, 0x73, 0xde, 0x1b, 0x6f, 0x9f,
-   0x75, 0xe9, 0xe7, 0xdc, 0xdd, 0xcf, 0x37, 0xef, 0xad, 0xdc, 0xdf, 0x6f, 0x7b, 0x69, 0xa7, 0xb5,
-   0x73, 0x77, 0xb5, 0xdd, 0xae, 0xf8, 0x7d, 0xee, 0x38, 0x6d, 0xdd, 0x75, 0xe3, 0x9e, 0x9c, 0xd3,
-   0x9d, 0x7d, 0x77, 0xde, 0xbc, 0x79, 0xdf, 0x1b, 0x7b, 0x46, 0x9d, 0xf3, 0x6e, 0xb8, 0xe7, 0xce,
-   0xf4, 0x7b, 0x4d, 0x5c, 0xef, 0xa7, 0xf5, 0xdf, 0x67, 0xdb, 0xef, 0xc7, 0x3d, 0xeb, 0xdf, 0x5c]);
+  0xe7, 0x87, 0x5e, 0x69, 0xce, 0x7b, 0xed, 0xa6, 0xfc, 0x7b, 0x6d, 0xfb, 0xd9,
+  0xb7, 0x5b, 0xe1, 0xc6, 0xf6, 0xd5, 0xde, 0xba, 0xe3, 0xae, 0x1e, 0xd7, 0xc7,
+  0xf8, 0x73, 0xde, 0x1b, 0x6f, 0x9f, 0x75, 0xe9, 0xe7, 0xdc, 0xdd, 0xcf, 0x37,
+  0xef, 0xad, 0xdc, 0xdf, 0x6f, 0x7b, 0x69, 0xa7, 0xb5, 0x73, 0x77, 0xb5, 0xdd,
+  0xae, 0xf8, 0x7d, 0xee, 0x38, 0x6d, 0xdd, 0x75, 0xe3, 0x9e, 0x9c, 0xd3, 0x9d,
+  0x7d, 0x77, 0xde, 0xbc, 0x79, 0xdf, 0x1b, 0x7b, 0x46, 0x9d, 0xf3, 0x6e, 0xb8,
+  0xe7, 0xce, 0xf4, 0x7b, 0x4d, 0x5c, 0xef, 0xa7, 0xf5, 0xdf, 0x67, 0xdb, 0xef,
+  0xc7, 0x3d, 0xeb, 0xdf, 0x5c,
+]);
 
 const DELEGATION_CHAIN_JSON: string = `{
 "delegations": [
@@ -21,26 +23,29 @@ const DELEGATION_CHAIN_JSON: string = `{
 ],
     "publicKey":"303c300c060a2b0601040183b8430102032c000a00000000006000270101f3ffab2278616508ad5ebfa0cb79a21e08dbb7132f6875b95f81e72067f31302"
 }`;
-const EXPIRATION : bigint = BigInt(1708469015156620577);
-const II_CANISTER_ID : string = "fgte5-ciaaa-aaaad-aaatq-cai";
-const USER_PRINCIPAL_ID : string =
-    "hf7wk-a35mp-bc6eb-ntvr2-aeu3d-naglw-n6ea3-qn5ps-jcanu-p2vro-5ae";
+const EXPIRATION: bigint = BigInt(1708469015156620577);
+const II_CANISTER_ID: string = "fgte5-ciaaa-aaaad-aaatq-cai";
+const USER_PRINCIPAL_ID: string =
+  "hf7wk-a35mp-bc6eb-ntvr2-aeu3d-naglw-n6ea3-qn5ps-jcanu-p2vro-5ae";
 
 export var ROOT_PUBLIC_KEY_RAW = new Uint8Array([
-  0x81, 0x4c, 0x0e, 0x6e, 0xc7, 0x1f, 0xab, 0x58, 0x3b, 0x08, 0xbd, 0x81, 0x37, 0x3c, 0x25, 0x5c, 0x3c,
-  0x37, 0x1b, 0x2e, 0x84, 0x86, 0x3c, 0x98, 0xa4, 0xf1, 0xe0, 0x8b, 0x74, 0x23, 0x5d, 0x14, 0xfb, 0x5d,
-  0x9c, 0x0c, 0xd5, 0x46, 0xd9, 0x68, 0x5f, 0x91, 0x3a, 0x0c, 0x0b, 0x2c, 0xc5, 0x34, 0x15, 0x83, 0xbf,
-  0x4b, 0x43, 0x92, 0xe4, 0x67, 0xdb, 0x96, 0xd6, 0x5b, 0x9b, 0xb4, 0xcb, 0x71, 0x71, 0x12, 0xf8, 0x47,
-  0x2e, 0x0d, 0x5a, 0x4d, 0x14, 0x50, 0x5f, 0xfd, 0x74, 0x84, 0xb0, 0x12, 0x91, 0x09, 0x1c, 0x5f, 0x87,
-  0xb9, 0x88, 0x83, 0x46, 0x3f, 0x98, 0x09, 0x1a, 0x0b, 0xaa, 0xae]);
+  0x81, 0x4c, 0x0e, 0x6e, 0xc7, 0x1f, 0xab, 0x58, 0x3b, 0x08, 0xbd, 0x81, 0x37,
+  0x3c, 0x25, 0x5c, 0x3c, 0x37, 0x1b, 0x2e, 0x84, 0x86, 0x3c, 0x98, 0xa4, 0xf1,
+  0xe0, 0x8b, 0x74, 0x23, 0x5d, 0x14, 0xfb, 0x5d, 0x9c, 0x0c, 0xd5, 0x46, 0xd9,
+  0x68, 0x5f, 0x91, 0x3a, 0x0c, 0x0b, 0x2c, 0xc5, 0x34, 0x15, 0x83, 0xbf, 0x4b,
+  0x43, 0x92, 0xe4, 0x67, 0xdb, 0x96, 0xd6, 0x5b, 0x9b, 0xb4, 0xcb, 0x71, 0x71,
+  0x12, 0xf8, 0x47, 0x2e, 0x0d, 0x5a, 0x4d, 0x14, 0x50, 0x5f, 0xfd, 0x74, 0x84,
+  0xb0, 0x12, 0x91, 0x09, 0x1c, 0x5f, 0x87, 0xb9, 0x88, 0x83, 0x46, 0x3f, 0x98,
+  0x09, 0x1a, 0x0b, 0xaa, 0xae,
+]);
 
 test("Should validateDelegationAndGetPrincipal", async () => {
   let principal = await validateDelegationAndGetPrincipal(
-        CHALLENGE,
-        DELEGATION_CHAIN_JSON,
-        EXPIRATION - BigInt(42),
-        II_CANISTER_ID,
-        ROOT_PUBLIC_KEY_RAW,
+    CHALLENGE,
+    DELEGATION_CHAIN_JSON,
+    EXPIRATION - BigInt(42),
+    II_CANISTER_ID,
+    ROOT_PUBLIC_KEY_RAW
   );
   expect(principal).toEqual(USER_PRINCIPAL_ID);
 });
@@ -48,20 +53,19 @@ test("Should validateDelegationAndGetPrincipal", async () => {
 test("Should fail validateDelegationAndGetPrincipal with wrong challenge", async () => {
   try {
     await validateDelegationAndGetPrincipal(
-      Uint8Array.from([1, 2, 3, 5]),  // wrong challenge
+      Uint8Array.from([1, 2, 3, 5]), // wrong challenge
       DELEGATION_CHAIN_JSON,
       EXPIRATION - BigInt(42),
       II_CANISTER_ID,
-      ROOT_PUBLIC_KEY_RAW,
+      ROOT_PUBLIC_KEY_RAW
     );
   } catch (e) {
     expect(e.toString()).toContain("does not match the challenge");
   }
 });
 
-
 test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain", async () => {
-    let WRONG_DELEGATION_CHAIN_JSON: string = `{
+  let WRONG_DELEGATION_CHAIN_JSON: string = `{
 "delegations": [
   {
     "delegation":{
@@ -71,61 +75,60 @@ test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain"
   }
 ],
     "publicKey":"deadbeef"
-}`;  // missing "signature" after "delegation"
-    try {
-        await validateDelegationAndGetPrincipal(
-            CHALLENGE,
-            WRONG_DELEGATION_CHAIN_JSON,
-            EXPIRATION - BigInt(42),
-            II_CANISTER_ID,
-            ROOT_PUBLIC_KEY_RAW,
-        );
-    } catch (e) {
-        expect(e.toString()).toContain("Error parsing delegation_chain");
-    }
+}`; // missing "signature" after "delegation"
+  try {
+    await validateDelegationAndGetPrincipal(
+      CHALLENGE,
+      WRONG_DELEGATION_CHAIN_JSON,
+      EXPIRATION - BigInt(42),
+      II_CANISTER_ID,
+      ROOT_PUBLIC_KEY_RAW
+    );
+  } catch (e) {
+    expect(e.toString()).toContain("Error parsing delegation_chain");
+  }
 });
 
 test("Should fail validateDelegationAndGetPrincipal with expired delegation", async () => {
-    try {
-        await validateDelegationAndGetPrincipal(
-            CHALLENGE,
-            DELEGATION_CHAIN_JSON,
-            EXPIRATION + BigInt(42),  // past expiration
-            II_CANISTER_ID,
-            ROOT_PUBLIC_KEY_RAW,
-        );
-    } catch (e) {
-        expect(e.toString()).toContain("delegation expired");
-    }
+  try {
+    await validateDelegationAndGetPrincipal(
+      CHALLENGE,
+      DELEGATION_CHAIN_JSON,
+      EXPIRATION + BigInt(42), // past expiration
+      II_CANISTER_ID,
+      ROOT_PUBLIC_KEY_RAW
+    );
+  } catch (e) {
+    expect(e.toString()).toContain("delegation expired");
+  }
 });
 
 test("Should fail validateDelegationAndGetPrincipal with wrong II canister id", async () => {
-    try {
-        await validateDelegationAndGetPrincipal(
-            CHALLENGE,
-            DELEGATION_CHAIN_JSON,
-            EXPIRATION - BigInt(42),
-            "jqajs-xiaaa-aaaad-aab5q-cai",  // wrong canister id
-            ROOT_PUBLIC_KEY_RAW,
-        );
-    } catch (e) {
-        expect(e.toString()).toContain("does not match II canister id");
-    }
+  try {
+    await validateDelegationAndGetPrincipal(
+      CHALLENGE,
+      DELEGATION_CHAIN_JSON,
+      EXPIRATION - BigInt(42),
+      "jqajs-xiaaa-aaaad-aab5q-cai", // wrong canister id
+      ROOT_PUBLIC_KEY_RAW
+    );
+  } catch (e) {
+    expect(e.toString()).toContain("does not match II canister id");
+  }
 });
 
 test("Should fail validateDelegationAndGetPrincipal with wrong IC root public key", async () => {
-    let BAD_ROOT_PK = ROOT_PUBLIC_KEY_RAW;
-    BAD_ROOT_PK[42] += 1;  // corrupt the public key
-    try {
-        await validateDelegationAndGetPrincipal(
-            CHALLENGE,
-            DELEGATION_CHAIN_JSON,
-            EXPIRATION - BigInt(42),
-            II_CANISTER_ID,
-            ROOT_PUBLIC_KEY_RAW,
-        );
-    } catch (e) {
-        expect(e.toString()).toContain("signature could not be verified");
-    }
+  let BAD_ROOT_PK = ROOT_PUBLIC_KEY_RAW;
+  BAD_ROOT_PK[42] += 1; // corrupt the public key
+  try {
+    await validateDelegationAndGetPrincipal(
+      CHALLENGE,
+      DELEGATION_CHAIN_JSON,
+      EXPIRATION - BigInt(42),
+      II_CANISTER_ID,
+      ROOT_PUBLIC_KEY_RAW
+    );
+  } catch (e) {
+    expect(e.toString()).toContain("signature could not be verified");
+  }
 });
-
