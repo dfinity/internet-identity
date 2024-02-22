@@ -282,7 +282,7 @@ mod tests {
         let result = validate_delegation_and_get_principal(
             challenge().as_slice(),
             DELEGATION_CHAIN_JSON,
-            EXPIRATION + 42,  // past expiration
+            EXPIRATION + 42, // past expiration
             II_CANISTER_ID,
             IC_ROOT_PUBLIC_KEY.as_slice(),
         );
@@ -295,7 +295,7 @@ mod tests {
             challenge().as_slice(),
             DELEGATION_CHAIN_JSON,
             EXPIRATION - 42,
-            "jqajs-xiaaa-aaaad-aab5q-cai",  // wrong canister id
+            "jqajs-xiaaa-aaaad-aab5q-cai", // wrong canister id
             IC_ROOT_PUBLIC_KEY.as_slice(),
         );
         assert_matches!(result, Err(msg) if msg.contains("does not match II canister id"));
