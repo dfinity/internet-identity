@@ -104,6 +104,34 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
+  // TODO: use this in other fn
+  loginPinAuthenticateView_: async (
+    userNumber: string,
+    pin: string,
+    browser: WebdriverIO.Browser
+  ): Promise<"ok" | "pin_disallowed"> => {
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
+    const pinAuthView = new PinAuthView(browser);
+    const result = await Promise.race([
+      pinAuthView.waitForDisplay().then(() => "pin_allowed" as const),
+      // TODO: double check error is shown for the right reason
+      browser
+        .$("#errorContainer")
+        .waitForDisplayed()
+        .then(() => "pin_disallowed" as const),
+    ]);
+    if (result === "pin_disallowed") {
+      return "pin_disallowed";
+    }
+    result satisfies "pin_allowed";
+
+    await pinAuthView.enterPin(pin);
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
+    await FLOWS.skipRecoveryNag(browser);
+    return "ok";
+  },
   loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,

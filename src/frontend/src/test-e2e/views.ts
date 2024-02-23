@@ -152,6 +152,11 @@ export class PinRegistrationView extends View {
 
 export class PinAuthView extends View {
   private readonly ERROR_SELECTOR = '[data-haserror="true"]';
+
+  element(): Promise<WebdriverIO.Element> {
+    return this.browser.$('[data-role="pin"]');
+  }
+
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="pin"]')
@@ -788,6 +793,15 @@ export class DemoAppView extends View {
 
   async getPrincipal(): Promise<string> {
     return await this.browser.$("#principal").getText();
+  }
+
+  async setAllowPin(allowed: boolean): Promise<void> {
+    const checkbox = await this.browser.$("#allowPinAuthentication");
+    const selected = await checkbox.isSelected();
+
+    if (allowed !== selected) {
+      await checkbox.click();
+    }
   }
 
   async signin(): Promise<void> {
