@@ -86,7 +86,10 @@ export const authenticateBox = async ({
       loginPinIdentityMaterial: (opts) =>
         loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
-      registerFlowOpts: getRegisterFlowOpts({ connection }),
+      registerFlowOpts: getRegisterFlowOpts({
+        connection,
+        allowPinAuthentication,
+      }),
       verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
         pinIdentityAuthenticatorValidity({
           userNumber,
@@ -217,7 +220,6 @@ export const authenticateBoxFlow = async <T, I>({
     result2 satisfies LoginSuccess<T>;
     return {
       newAnchor: true,
-      authnMethod: "passkey" /* TODO: remove me or fix me */,
       ...result2,
     };
   };
@@ -270,10 +272,10 @@ export const authenticateBoxFlow = async <T, I>({
     }
 
     recoverResult satisfies LoginSuccess<T>;
-    // If an anchor was recovered, then it's _not_ a new anchor
     return {
-      newAnchor: false,
-      authnMethod: "recovery" /* TODO: set something meaningful */,
+      newAnchor:
+        false /* If an anchor was recovered, then it's _not_ a new anchor */,
+      authnMethod: "recovery",
       ...recoverResult,
     };
   };

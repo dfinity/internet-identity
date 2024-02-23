@@ -33,7 +33,6 @@ const savePasskeyTemplate = ({
   scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
-  // TODO: remove this if PIN is not allowed
   const createPinButton = (constructPin: () => void) => html`
     <button
       @click=${() => constructPin()}

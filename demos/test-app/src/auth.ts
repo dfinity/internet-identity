@@ -19,7 +19,7 @@ interface AuthResponseSuccess {
     signature: Uint8Array;
   }[];
   userPublicKey: Uint8Array;
-  authType: "pin" | "passkey" /* TODO: recovery? */;
+  authnMethod: "pin" | "passkey" | "recovery" /* TODO: extract types from II */;
 }
 
 // Perform a sign in to II using parameters set in this app

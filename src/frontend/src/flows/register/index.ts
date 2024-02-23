@@ -63,7 +63,7 @@ export const registerFlow = async <T>({
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
 }): Promise<
-  | (LoginSuccess<T> & { method: "passkey" | "pin" })
+  | (LoginSuccess<T> & { authnMethod: "passkey" | "pin" })
   | BadChallenge
   | ApiError
   | AuthFail
@@ -113,7 +113,7 @@ export const registerFlow = async <T>({
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
-        method: "pin" as const,
+        authnMethod: "pin" as const,
       };
     } else {
       const identity = savePasskeyResult;
@@ -131,7 +131,7 @@ export const registerFlow = async <T>({
         keyType: authenticatorAttachmentToKeyType(
           identity.getAuthenticatorAttachment()
         ),
-        method: "passkey" as const,
+        authnMethod: "passkey" as const,
       };
     }
   })();
@@ -149,7 +149,7 @@ export const registerFlow = async <T>({
     keyType,
     finalizeIdentity,
     finishSlot,
-    method,
+    authnMethod,
   }: {
     identity: SignIdentity;
     alias: string;
@@ -159,7 +159,7 @@ export const registerFlow = async <T>({
     keyType: KeyType;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
-    method: "pin" | "passkey";
+    authnMethod: "pin" | "passkey";
   } = result_;
 
   const result = await promptCaptcha({
@@ -199,7 +199,7 @@ export const registerFlow = async <T>({
     stepper: finishStepper,
     marketingIntroSlot: finishSlot,
   });
-  return { ...result, method };
+  return { ...result, authnMethod };
 };
 
 export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
@@ -208,8 +208,10 @@ export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
 
 export const getRegisterFlowOpts = ({
   connection,
+  allowPinAuthentication,
 }: {
   connection: Connection;
+  allowPinAuthentication: boolean;
 }): RegisterFlowOpts => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
@@ -224,7 +226,11 @@ export const getRegisterFlowOpts = ({
       ),
     createChallenge: () => connection.createChallenge(),
     pinAllowed: () =>
-      pinRegisterAllowed({ userAgent: navigator.userAgent, uaParser }),
+      // If pin auth is disallowed by the authenticating dapp then abort, otherwise check
+      // if pin auth is allowed for the user agent
+      allowPinAuthentication
+        ? pinRegisterAllowed({ userAgent: navigator.userAgent, uaParser })
+        : Promise.resolve(false),
     register: async ({
       identity,
       alias,

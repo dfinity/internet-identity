@@ -114,7 +114,8 @@ export const authFlowManage = async (connection: Connection) => {
     connection,
     i18n,
     templates: authnTemplateManage({ dapps }),
-    allowPinAuthentication: true,
+    allowPinAuthentication:
+      true /* when authenticating to II directly we always allow pin */,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
