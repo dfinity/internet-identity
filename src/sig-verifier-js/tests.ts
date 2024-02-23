@@ -44,8 +44,8 @@ const ROOT_PUBLIC_KEY_RAW = new Uint8Array([
   0x09, 0x1a, 0x0b, 0xaa, 0xae,
 ]);
 
-test("Should validateDelegationAndGetPrincipal", async () => {
-  let principal = await validateDelegationAndGetPrincipal(
+test("Should validateDelegationAndGetPrincipal", () => {
+  const principal = validateDelegationAndGetPrincipal(
     CHALLENGE,
     DELEGATION_CHAIN_JSON,
     EXPIRATION - BigInt(42),
@@ -55,7 +55,7 @@ test("Should validateDelegationAndGetPrincipal", async () => {
   expect(principal).toEqual(USER_PRINCIPAL_ID);
 });
 
-test("Should fail validateDelegationAndGetPrincipal with wrong challenge", async () => {
+test("Should fail validateDelegationAndGetPrincipal with wrong challenge", () => {
   const call = () =>
     validateDelegationAndGetPrincipal(
       Uint8Array.from([1, 2, 3, 5]), // wrong challenge
@@ -67,18 +67,18 @@ test("Should fail validateDelegationAndGetPrincipal with wrong challenge", async
   expect(call).toThrow(expect.stringContaining("does not match the challenge"));
 });
 
-test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain", async () => {
-  let WRONG_DELEGATION_CHAIN_JSON: string = `{
-    "delegations": [
+test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain", () => {
+  const WRONG_DELEGATION_CHAIN_JSON: string = JSON.stringify({
+    delegations: [
       {
-        "delegation":{
-          "expiration":"17b5b384762bfd21",
-          "pubkey":"e7875e69ce7beda6fc7b6d"
+        delegation: {
+          expiration: "17b5b384762bfd21",
+          pubkey: "e7875e69ce7beda6fc7b6d",
         },
-      }
+      },
     ],
-    "publicKey":"deadbeef"
-  }`; // missing "signature" after "delegation"
+    publicKey: "deadbeef",
+  }); // missing "signature" after "delegation"
   const call = () =>
     validateDelegationAndGetPrincipal(
       CHALLENGE,
@@ -92,7 +92,7 @@ test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain"
   );
 });
 
-test("Should fail validateDelegationAndGetPrincipal with expired delegation", async () => {
+test("Should fail validateDelegationAndGetPrincipal with expired delegation", () => {
   const call = () =>
     validateDelegationAndGetPrincipal(
       CHALLENGE,
@@ -104,7 +104,7 @@ test("Should fail validateDelegationAndGetPrincipal with expired delegation", as
   expect(call).toThrow(expect.stringContaining("delegation expired"));
 });
 
-test("Should fail validateDelegationAndGetPrincipal with wrong II canister id", async () => {
+test("Should fail validateDelegationAndGetPrincipal with wrong II canister id", () => {
   const call = () =>
     validateDelegationAndGetPrincipal(
       CHALLENGE,
@@ -118,8 +118,8 @@ test("Should fail validateDelegationAndGetPrincipal with wrong II canister id", 
   );
 });
 
-test("Should fail validateDelegationAndGetPrincipal with wrong IC root public key", async () => {
-  let BAD_ROOT_PK = new Uint8Array(ROOT_PUBLIC_KEY_RAW);
+test("Should fail validateDelegationAndGetPrincipal with wrong IC root public key", () => {
+  const BAD_ROOT_PK = Uint8Array.from(ROOT_PUBLIC_KEY_RAW);
   BAD_ROOT_PK[42] += 1; // corrupt the public key
   const call = () =>
     validateDelegationAndGetPrincipal(
