@@ -75,7 +75,7 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/genesis-layout-migrated-to-v7.bin.gz",
+        "stable_memory/genesis-layout-migrated-to-v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -110,7 +110,7 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/genesis-layout-migrated-to-v7.bin.gz",
+        "stable_memory/genesis-layout-migrated-to-v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -144,7 +144,7 @@ fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallErro
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/multiple-recovery-phrases-v7.bin.gz",
+        "stable_memory/multiple-recovery-phrases-v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -179,7 +179,7 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/multiple-recovery-phrases-v7.bin.gz",
+        "stable_memory/multiple-recovery-phrases-v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -227,7 +227,7 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/persistent_state_no_archive_v7.bin.gz",
+        "stable_memory/persistent_state_no_archive_v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -237,7 +237,6 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
-    // after upgrade II auto-migrates to v8
     assert_eq!(8, stats.storage_layout_version);
     Ok(())
 }
@@ -251,7 +250,7 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/persistent_state_archive_v7.bin.gz",
+        "stable_memory/persistent_state_archive_v8.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -308,7 +307,7 @@ fn should_trap_on_missing_persistent_state() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/no-persistent-state-v7.bin.gz",
+        "stable_memory/no-persistent-state-v8.bin.gz",
     );
 
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
