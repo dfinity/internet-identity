@@ -158,7 +158,7 @@ function build_canister() {
           # Write metadata for dfx.
           # The metadata includes a link to the release, which only exists if this is a release build.
           # In case of a release build, the version looks like this: <commit>,<release>,<dirty>
-          # We include (the URL of) a checksum file URL so that dfx clients can check the hash
+          # We include the URL of a checksum file so that dfx clients can check the hash
           # of the build (for caching & integrity checking)
           IFS=,
           read -r -a version_parts <<< "$II_VERSION"
