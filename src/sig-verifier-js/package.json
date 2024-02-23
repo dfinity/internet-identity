@@ -17,7 +17,8 @@
   },
   "scripts": {
     "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json",
-    "test": "vitest --config ./vitest.config.ts"
+    "test": "tsc --noEmit && vitest --config ./vitest.config.ts",
+    "postinstall": "npm run build"
   },
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",
