@@ -19,6 +19,7 @@ interface AuthResponseSuccess {
     signature: Uint8Array;
   }[];
   userPublicKey: Uint8Array;
+  authnMethod: "pin" | "passkey" | "recovery";
 }
 
 // Perform a sign in to II using parameters set in this app
@@ -32,7 +33,7 @@ export const authWithII = async ({
   maxTimeToLive?: bigint;
   derivationOrigin?: string;
   sessionIdentity: SignIdentity;
-}): Promise<DelegationIdentity> => {
+}): Promise<{ identity: DelegationIdentity; authnMethod: string }> => {
   // Figure out the II URL to use
   const iiUrl = new URL(url_);
   iiUrl.hash = "#authorize";
@@ -85,10 +86,12 @@ export const authWithII = async ({
     throw new Error("Bad reply: " + JSON.stringify(message));
   }
 
-  return identityFromResponse({
+  const identity = identityFromResponse({
     response: message as AuthResponseSuccess,
     sessionIdentity,
   });
+
+  return { identity, authnMethod: message.authnMethod };
 };
 
 // Read delegations the delegations from the response
