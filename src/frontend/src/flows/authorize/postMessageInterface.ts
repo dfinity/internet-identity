@@ -40,6 +40,7 @@ export const AuthRequest = z.object({
       return val;
     }),
   derivationOrigin: z.optional(z.string()),
+  allowPinAuthentication: z.optional(z.boolean()),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;

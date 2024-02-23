@@ -148,6 +148,7 @@ This section describes the Internet Identity Service from the point of view of a
           kind: "authorize-client";
           sessionPublicKey: Uint8Array;
           maxTimeToLive?: bigint;
+          allowPinAuthentication?: boolean;
           derivationOrigin?: string;
         }
 
@@ -156,6 +157,8 @@ This section describes the Internet Identity Service from the point of view of a
     -   the `sessionPublicKey` contains the public key of the session key pair.
 
     -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a one larger.
+
+    -   the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
 
     -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.(ic0\.app|icp0\.io)$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 

@@ -65,6 +65,9 @@ const maxTimeToLiveEl = document.getElementById(
 const derivationOriginEl = document.getElementById(
   "derivationOrigin"
 ) as HTMLInputElement;
+const allowPinAuthenticationEl = document.getElementById(
+  "allowPinAuthentication"
+) as HTMLInputElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
@@ -203,11 +206,16 @@ const init = async () => {
     const derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
 
+    const allowPinAuthentication = allowPinAuthenticationEl.checked
+      ? undefined
+      : false;
+
     try {
       delegationIdentity = await authWithII({
         url: iiUrlEl.value,
         maxTimeToLive,
         derivationOrigin,
+        allowPinAuthentication,
         sessionIdentity: getLocalIdentity(),
       });
       updateDelegationView(delegationIdentity);

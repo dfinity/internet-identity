@@ -68,6 +68,7 @@ export const iiFlows: Record<string, () => void> = {
           connection: null,
         });
       },
+      allowPinAuthentication: true,
       loginPinIdentityMaterial: async ({ pin }) => {
         toast.info(html`Valid PIN is '123456'`);
         await withLoader(

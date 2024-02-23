@@ -25,11 +25,13 @@ interface AuthResponseSuccess {
 export const authWithII = async ({
   url: url_,
   maxTimeToLive,
+  allowPinAuthentication,
   derivationOrigin,
   sessionIdentity,
 }: {
   url: string;
   maxTimeToLive?: bigint;
+  allowPinAuthentication?: boolean;
   derivationOrigin?: string;
   sessionIdentity: SignIdentity;
 }): Promise<DelegationIdentity> => {
@@ -66,6 +68,7 @@ export const authWithII = async ({
     sessionPublicKey,
     maxTimeToLive,
     derivationOrigin,
+    allowPinAuthentication,
   };
 
   win.postMessage(request, iiUrl.origin);
