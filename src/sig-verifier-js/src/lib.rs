@@ -88,14 +88,14 @@ pub fn verify_ic_signature(
 #[wasm_bindgen(js_name = validateDelegationAndGetPrincipal)]
 pub fn validate_delegation_and_get_principal(
     challenge: &[u8],
-    signed_delegation_chain_json: &[u8],
+    signed_delegation_chain_json: &str,
     current_time_ns: u64,
     ii_canister_id: &str, // textural representation of the principal
     ic_root_public_key_raw: &[u8],
 ) -> Result<String, String> {
     // Signed delegation chain contains exactly one delegation.
     let signed_delegation_chain: DelegationChain =
-        serde_json::from_slice(signed_delegation_chain_json)
+        serde_json::from_str(signed_delegation_chain_json)
             .map_err(|e| format!("Error parsing delegation_chain: {}", e).to_string())?;
     if signed_delegation_chain.delegations.len() != 1 {
         return Err("Expected exactly one signed delegation".to_string());
@@ -233,7 +233,7 @@ mod tests {
     fn should_validate_delegation_and_get_principal() {
         let principal = validate_delegation_and_get_principal(
             challenge().as_slice(),
-            DELEGATION_CHAIN_JSON.as_bytes(),
+            DELEGATION_CHAIN_JSON,
             EXPIRATION - 42,
             II_CANISTER_ID,
             IC_ROOT_PUBLIC_KEY.as_slice(),
@@ -246,7 +246,7 @@ mod tests {
     fn should_fail_validate_delegation_and_get_principal_with_wrong_challenge() {
         let result = validate_delegation_and_get_principal(
             [1, 2, 3].as_slice(),
-            DELEGATION_CHAIN_JSON.as_bytes(),
+            DELEGATION_CHAIN_JSON,
             EXPIRATION - 42,
             II_CANISTER_ID,
             IC_ROOT_PUBLIC_KEY.as_slice(),
@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn should_fail_validate_delegation_and_get_principal_with_delegation_chain() {
+    fn should_fail_validate_delegation_and_get_principal_with_wrong_delegation_chain() {
         let wrong_json: &str = r#"{
         "delegations": [
           {
@@ -269,7 +269,7 @@ mod tests {
         }"#; // missing "publicKey"-entry
         let result = validate_delegation_and_get_principal(
             challenge().as_slice(),
-            wrong_json.as_bytes(),
+            wrong_json,
             EXPIRATION - 42,
             II_CANISTER_ID,
             IC_ROOT_PUBLIC_KEY.as_slice(),
@@ -281,8 +281,8 @@ mod tests {
     fn should_fail_validate_delegation_and_get_principal_with_expired_delegation() {
         let result = validate_delegation_and_get_principal(
             challenge().as_slice(),
-            DELEGATION_CHAIN_JSON.as_bytes(),
-            EXPIRATION + 42,
+            DELEGATION_CHAIN_JSON,
+            EXPIRATION + 42, // past expiration
             II_CANISTER_ID,
             IC_ROOT_PUBLIC_KEY.as_slice(),
         );
@@ -293,9 +293,9 @@ mod tests {
     fn should_fail_validate_delegation_and_get_principal_with_wrong_ii_canister_id() {
         let result = validate_delegation_and_get_principal(
             challenge().as_slice(),
-            DELEGATION_CHAIN_JSON.as_bytes(),
+            DELEGATION_CHAIN_JSON,
             EXPIRATION - 42,
-            "jqajs-xiaaa-aaaad-aab5q-cai",
+            "jqajs-xiaaa-aaaad-aab5q-cai", // wrong canister id
             IC_ROOT_PUBLIC_KEY.as_slice(),
         );
         assert_matches!(result, Err(msg) if msg.contains("does not match II canister id"));
@@ -307,7 +307,7 @@ mod tests {
         wrong_ic_root_pk[IC_ROOT_PUBLIC_KEY.len() - 42] += 1; // change the root pk value
         let result = validate_delegation_and_get_principal(
             challenge().as_slice(),
-            DELEGATION_CHAIN_JSON.as_bytes(),
+            DELEGATION_CHAIN_JSON,
             EXPIRATION - 42,
             II_CANISTER_ID,
             wrong_ic_root_pk.as_slice(),

@@ -10,7 +10,10 @@ runs:
 
     - name: Install wasm-pack
       shell: bash
-      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      run: |
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        cargo --version
+        wasm-pack --version
 
     - uses: actions/setup-node@v4
       with:
