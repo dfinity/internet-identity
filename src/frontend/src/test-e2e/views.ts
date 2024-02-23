@@ -24,7 +24,7 @@ export class WelcomeView extends View {
     await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
     await this.typeUserNumber(userNumber);
-    await this.browser.$('[data-action="continue"').click();
+    await this.browser.$('[data-action="continue"]').click();
   }
 
   async register(): Promise<void> {
@@ -58,16 +58,16 @@ export class RenameView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-action="construct-identity"')
+      .$('[data-action="construct-identity"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async create(): Promise<void> {
-    await this.browser.$('[data-action="construct-identity"').click();
+    await this.browser.$('[data-action="construct-identity"]').click();
   }
 
   async createPin(): Promise<void> {
-    await this.browser.$('[data-action="construct-pin-identity"').click();
+    await this.browser.$('[data-action="construct-pin-identity"]').click();
   }
 
   // View: Register confirmation
@@ -107,7 +107,7 @@ export class RegisterView extends View {
 
   async assertPinRegistrationNotShown(): Promise<void> {
     await this.browser
-      .$('[data-action="construct-pin-identity"')
+      .$('[data-action="construct-pin-identity"]')
       .waitForDisplayed({ reverse: true });
   }
 }
@@ -120,7 +120,7 @@ export class PinRegistrationView extends View {
   }
 
   async pinInfoContinue(): Promise<void> {
-    await this.browser.$('[data-action="continue-pin"').click();
+    await this.browser.$('[data-action="continue-pin"]').click();
   }
   async waitForSetPin(): Promise<void> {
     await this.browser
