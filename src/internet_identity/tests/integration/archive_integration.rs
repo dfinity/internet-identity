@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
-fn setup_ii_v7(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) {
+fn setup_ii_from_v7(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) {
     let env = env();
     let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
     // since II by default initializes to v8, we load a v7 state
@@ -25,11 +25,12 @@ fn setup_ii_v7(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) 
         arg.or(arg_with_wasm_hash(ARCHIVE_WASM.clone())),
     )
     .expect("II upgrade failed");
+    // II will migrate automatically to v8
     assert_eq!(
         ii_api::stats(&env, ii_canister)
             .unwrap()
             .storage_layout_version,
-        7
+        8
     );
     (env, ii_canister)
 }
@@ -57,7 +58,7 @@ mod deployment_tests {
 
     #[test]
     fn should_deploy_archive_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_deploy_archive(&env, ii_canister);
     }
 
@@ -75,7 +76,7 @@ mod deployment_tests {
 
     #[test]
     fn should_deploy_archive_with_cycles_v7() {
-        let (env, ii_canister) = setup_ii_v7(Some(InternetIdentityInit {
+        let (env, ii_canister) = setup_ii_from_v7(Some(InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
                 module_hash: archive_wasm_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 0,
@@ -116,7 +117,7 @@ mod deployment_tests {
 
     #[test]
     fn should_not_deploy_wrong_wasm_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_not_deploy_wrong_wasm(&env, ii_canister);
     }
 
@@ -137,7 +138,7 @@ mod deployment_tests {
 
     #[test]
     fn should_not_deploy_archive_when_disabled_v7() {
-        let (env, ii_canister) = setup_ii_v7(Some(InternetIdentityInit::default()));
+        let (env, ii_canister) = setup_ii_from_v7(Some(InternetIdentityInit::default()));
         should_not_deploy_archive_when_disabled(&env, ii_canister);
     }
 
@@ -158,7 +159,7 @@ mod deployment_tests {
 
     #[test]
     fn should_keep_archive_module_hash_across_upgrades_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_keep_archive_module_hash_across_upgrades(&env, ii_canister);
     }
 
@@ -181,7 +182,7 @@ mod deployment_tests {
 
     #[test]
     fn should_upgrade_the_archive_v7() {
-        let (env, ii_canister) = setup_ii_v7(arg_with_wasm_hash(EMPTY_WASM.clone()));
+        let (env, ii_canister) = setup_ii_from_v7(arg_with_wasm_hash(EMPTY_WASM.clone()));
         should_upgrade_the_archive(&env, ii_canister);
     }
 
@@ -218,7 +219,7 @@ mod deployment_tests {
 
     #[test]
     fn should_upgrade_archive_with_only_config_changed_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_upgrade_archive_with_only_config_changed(&env, ii_canister);
     }
 
@@ -274,7 +275,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_record_anchor_operations_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_record_anchor_operations(&env, ii_canister)
     }
 
@@ -322,6 +323,52 @@ mod pull_entries_tests {
         env.tick();
 
         let entries = archive_api::get_entries(env, archive_canister, None, None)?;
+        assert_expected_entries(timestamp, entries)
+    }
+
+    #[test]
+    fn should_migrate_stable_memory_with_archive_buffer() -> Result<(), CallError> {
+        let (env, ii_canister) = setup_ii_from_v7(None);
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+
+        // restore stable memory backup with buffered entries in persistent state
+        restore_compressed_stable_memory(
+            &env,
+            ii_canister,
+            "stable_memory/buffered_archive_entries_v7.bin.gz",
+        );
+        upgrade_ii_canister_with_arg(
+            &env,
+            ii_canister,
+            II_WASM.clone(),
+            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
+        )
+        .expect("II upgrade failed");
+        assert_eq!(
+            ii_api::stats(&env, ii_canister)
+                .unwrap()
+                .storage_layout_version,
+            8
+        );
+
+        let timestamp = env
+            .time()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        // have the archive fetch the (restored) buffered entries
+        env.advance_time(Duration::from_secs(2));
+        // execute the timer
+        env.tick();
+
+        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
+        assert_expected_entries(timestamp, entries)
+    }
+
+    fn assert_expected_entries(timestamp: u64, entries: Entries) -> Result<(), CallError> {
+        let anchor = 10_000;
+        let pubkey = device_data_2().pubkey.clone();
         assert_eq!(entries.entries.len(), 5);
 
         let register_entry = Entry {
@@ -414,7 +461,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_record_metadata_for_new_device_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_record_metadata_for_new_device(&env, ii_canister)
     }
 
@@ -471,7 +518,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_record_metadata_change_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_record_metadata_change(&env, ii_canister)
     }
 
@@ -547,7 +594,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_record_identity_metadata_replace_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_record_identity_metadata_replace(&env, ii_canister)
     }
 
@@ -614,7 +661,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_fetch_multiple_times_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_fetch_multiple_times(&env, ii_canister)
     }
 
@@ -656,7 +703,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_succeed_on_empty_fetch_result_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_succeed_on_empty_fetch_result(&env, ii_canister)
     }
 
@@ -696,7 +743,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_report_correct_number_of_fetched_entries_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_report_correct_number_of_fetched_entries(&env, ii_canister)
     }
 
@@ -759,7 +806,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_report_archive_config_metrics_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_report_archive_config_metrics(&env, ii_canister)
     }
     #[test]
@@ -801,7 +848,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_report_archive_entries_metrics_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_report_archive_entries_metrics(&env, ii_canister)
     }
     #[test]
@@ -876,7 +923,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_report_call_errors_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_report_call_errors(&env, ii_canister)
     }
     #[test]
@@ -925,7 +972,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_recover_after_error_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_recover_after_error(&env, ii_canister)
     }
     #[test]
@@ -967,7 +1014,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_return_entries_ordered_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_return_entries_ordered(&env, ii_canister)
     }
     #[test]
@@ -997,7 +1044,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_not_allow_wrong_caller_to_fetch_entries_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_not_allow_wrong_caller_to_fetch_entries(&env, ii_canister);
     }
     #[test]
@@ -1023,7 +1070,7 @@ mod pull_entries_tests {
 
     #[test]
     fn should_not_allow_wrong_caller_to_acknowledge_entries_v7() {
-        let (env, ii_canister) = setup_ii_v7(None);
+        let (env, ii_canister) = setup_ii_from_v7(None);
         should_not_allow_wrong_caller_to_acknowledge_entries(&env, ii_canister);
     }
     #[test]
