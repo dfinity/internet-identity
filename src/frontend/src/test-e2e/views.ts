@@ -790,6 +790,10 @@ export class DemoAppView extends View {
     return await this.browser.$("#principal").getText();
   }
 
+  async getAuthnMethod(): Promise<string> {
+    return await this.browser.$('[data-role="authn-method"]').getText();
+  }
+
   async signin(): Promise<void> {
     await this.browser.$("#signinBtn").click();
   }

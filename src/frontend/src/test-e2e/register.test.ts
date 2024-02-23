@@ -50,11 +50,14 @@ test("Log into client application, after registration", async () => {
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("");
+    expect(await demoAppView.getAuthnMethod()).toBe("");
     await demoAppView.signin();
     await switchToPopup(browser);
     await FLOWS.registerNewIdentityAuthenticateView(browser);
     const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami()).toBe(principal);
+    // The default authn method is passkey
+    expect(await demoAppView.getAuthnMethod()).toBe("passkey");
 
     // default value
     const exp = await browser.$("#expiration").getText();
