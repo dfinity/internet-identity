@@ -13,28 +13,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
-fn setup_ii_from_v7(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) {
-    let env = env();
-    let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
-    // since II by default initializes to v8, we load a v7 state
-    restore_compressed_stable_memory(&env, ii_canister, "stable_memory/clean_init_v7.bin.gz");
-    upgrade_ii_canister_with_arg(
-        &env,
-        ii_canister,
-        II_WASM.clone(),
-        arg.or(arg_with_wasm_hash(ARCHIVE_WASM.clone())),
-    )
-    .expect("II upgrade failed");
-    // II will migrate automatically to v8
-    assert_eq!(
-        ii_api::stats(&env, ii_canister)
-            .unwrap()
-            .storage_layout_version,
-        8
-    );
-    (env, ii_canister)
-}
-
 fn setup_ii_v8(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) {
     let env = env();
     let ii_canister = install_ii_canister_with_arg(
@@ -57,12 +35,6 @@ mod deployment_tests {
     use super::*;
 
     #[test]
-    fn should_deploy_archive_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_deploy_archive(&env, ii_canister);
-    }
-
-    #[test]
     fn should_deploy_archive_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
         should_deploy_archive(&env, ii_canister);
@@ -72,22 +44,6 @@ mod deployment_tests {
         let result = ii_api::deploy_archive(env, ii_canister, &ARCHIVE_WASM)
             .expect("archive deployment failed");
         assert!(matches!(result, DeployArchiveResult::Success(_)));
-    }
-
-    #[test]
-    fn should_deploy_archive_with_cycles_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(Some(InternetIdentityInit {
-            archive_config: Some(ArchiveConfig {
-                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
-                entries_buffer_limit: 0,
-                polling_interval_ns: 0,
-                entries_fetch_limit: 0,
-            }),
-            canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
-            ..InternetIdentityInit::default()
-        }));
-
-        should_deploy_archive_with_cycles(&env, ii_canister);
     }
 
     #[test]
@@ -116,12 +72,6 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_not_deploy_wrong_wasm_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_not_deploy_wrong_wasm(&env, ii_canister);
-    }
-
-    #[test]
     fn should_not_deploy_wrong_wasm_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
         should_not_deploy_wrong_wasm(&env, ii_canister);
@@ -134,12 +84,6 @@ mod deployment_tests {
         assert!(matches!(result, DeployArchiveResult::Failed(_)));
         let stats = ii_api::stats(env, ii_canister).expect("failed to get stats");
         assert!(stats.archive_info.archive_canister.is_none());
-    }
-
-    #[test]
-    fn should_not_deploy_archive_when_disabled_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(Some(InternetIdentityInit::default()));
-        should_not_deploy_archive_when_disabled(&env, ii_canister);
     }
 
     #[test]
@@ -158,12 +102,6 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_keep_archive_module_hash_across_upgrades_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_keep_archive_module_hash_across_upgrades(&env, ii_canister);
-    }
-
-    #[test]
     fn should_keep_archive_module_hash_across_upgrades_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
         should_keep_archive_module_hash_across_upgrades(&env, ii_canister);
@@ -178,12 +116,6 @@ mod deployment_tests {
         let result = ii_api::deploy_archive(env, ii_canister, &ARCHIVE_WASM)
             .expect("archive deployment failed");
         assert!(matches!(result, DeployArchiveResult::Success(_)));
-    }
-
-    #[test]
-    fn should_upgrade_the_archive_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(arg_with_wasm_hash(EMPTY_WASM.clone()));
-        should_upgrade_the_archive(&env, ii_canister);
     }
 
     #[test]
@@ -215,12 +147,6 @@ mod deployment_tests {
         let entries = archive_api::get_entries(env, archive_canister, None, None)
             .expect("failed to get entries");
         assert_eq!(entries.entries.len(), 0);
-    }
-
-    #[test]
-    fn should_upgrade_archive_with_only_config_changed_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_upgrade_archive_with_only_config_changed(&env, ii_canister);
     }
 
     #[test]
@@ -274,12 +200,6 @@ mod pull_entries_tests {
     use super::*;
 
     #[test]
-    fn should_record_anchor_operations_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_record_anchor_operations(&env, ii_canister)
-    }
-
-    #[test]
     fn should_record_anchor_operations_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_record_anchor_operations(&env, ii_canister)
@@ -327,15 +247,17 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_migrate_stable_memory_with_archive_buffer() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+    fn should_restore_archive_buffer_from_stable_memory_backup() -> Result<(), CallError> {
+        let env = env();
+        let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
+        // re-create the archive canister with the new II to match the restored backup
+        env.create_canister(Some(ii_canister));
 
         // restore stable memory backup with buffered entries in persistent state
         restore_compressed_stable_memory(
             &env,
             ii_canister,
-            "stable_memory/buffered_archive_entries_v7.bin.gz",
+            "stable_memory/buffered_archive_entries_v8.bin.gz",
         );
         upgrade_ii_canister_with_arg(
             &env,
@@ -350,6 +272,8 @@ mod pull_entries_tests {
                 .storage_layout_version,
             8
         );
+        // deploy the actual archive wasm
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
 
         let timestamp = env
             .time()
@@ -460,12 +384,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_metadata_for_new_device_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_record_metadata_for_new_device(&env, ii_canister)
-    }
-
-    #[test]
     fn should_record_metadata_for_new_device_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_record_metadata_for_new_device(&env, ii_canister)
@@ -514,12 +432,6 @@ mod pull_entries_tests {
             &expected_register_entry
         );
         Ok(())
-    }
-
-    #[test]
-    fn should_record_metadata_change_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_record_metadata_change(&env, ii_canister)
     }
 
     #[test]
@@ -593,12 +505,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_identity_metadata_replace_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_record_identity_metadata_replace(&env, ii_canister)
-    }
-
-    #[test]
     fn should_record_identity_metadata_replace_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_record_identity_metadata_replace(&env, ii_canister)
@@ -660,12 +566,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_fetch_multiple_times_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_fetch_multiple_times(&env, ii_canister)
-    }
-
-    #[test]
     fn should_fetch_multiple_times_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_fetch_multiple_times(&env, ii_canister)
@@ -702,12 +602,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_succeed_on_empty_fetch_result_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_succeed_on_empty_fetch_result(&env, ii_canister)
-    }
-
-    #[test]
     fn should_succeed_on_empty_fetch_result_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_succeed_on_empty_fetch_result(&env, ii_canister)
@@ -739,12 +633,6 @@ mod pull_entries_tests {
             })
         );
         Ok(())
-    }
-
-    #[test]
-    fn should_report_correct_number_of_fetched_entries_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_report_correct_number_of_fetched_entries(&env, ii_canister)
     }
 
     #[test]
@@ -805,11 +693,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_archive_config_metrics_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_report_archive_config_metrics(&env, ii_canister)
-    }
-    #[test]
     fn should_report_archive_config_metrics_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
         should_report_archive_config_metrics(&env, ii_canister)
@@ -846,11 +729,6 @@ mod pull_entries_tests {
         );
     }
 
-    #[test]
-    fn should_report_archive_entries_metrics_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_report_archive_entries_metrics(&env, ii_canister)
-    }
     #[test]
     fn should_report_archive_entries_metrics_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
@@ -922,11 +800,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_call_errors_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_report_call_errors(&env, ii_canister)
-    }
-    #[test]
     fn should_report_call_errors_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_report_call_errors(&env, ii_canister)
@@ -971,11 +844,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_recover_after_error_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_recover_after_error(&env, ii_canister)
-    }
-    #[test]
     fn should_recover_after_error_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_recover_after_error(&env, ii_canister)
@@ -1013,11 +881,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_return_entries_ordered_v7() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_return_entries_ordered(&env, ii_canister)
-    }
-    #[test]
     fn should_return_entries_ordered_v8() -> Result<(), CallError> {
         let (env, ii_canister) = setup_ii_v8(None);
         should_return_entries_ordered(&env, ii_canister)
@@ -1043,11 +906,6 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_not_allow_wrong_caller_to_fetch_entries_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_not_allow_wrong_caller_to_fetch_entries(&env, ii_canister);
-    }
-    #[test]
     fn should_not_allow_wrong_caller_to_fetch_entries_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
         should_not_allow_wrong_caller_to_fetch_entries(&env, ii_canister);
@@ -1068,11 +926,6 @@ mod pull_entries_tests {
         );
     }
 
-    #[test]
-    fn should_not_allow_wrong_caller_to_acknowledge_entries_v7() {
-        let (env, ii_canister) = setup_ii_from_v7(None);
-        should_not_allow_wrong_caller_to_acknowledge_entries(&env, ii_canister);
-    }
     #[test]
     fn should_not_allow_wrong_caller_to_acknowledge_entries_v8() {
         let (env, ii_canister) = setup_ii_v8(None);
