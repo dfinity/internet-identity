@@ -115,6 +115,11 @@ export const FLOWS = {
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
     const pinAuthView = new PinAuthView(browser);
+    // Here we race two things:
+    // * The PIN authn view
+    // * Expecting an error because PIN is not allowed
+    // If the PIN authn view is returned then carry forward;
+    // otherwise return that PIN is not allowed
     const result = await Promise.race([
       pinAuthView.waitForDisplay().then(() => "pin_allowed" as const),
       browser
