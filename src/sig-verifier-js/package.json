@@ -22,9 +22,6 @@
   },
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",
-    "@types/react": "^18.2.38",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.0",
     "typescript": "5.2.2",
     "vite": "^4.5.2",
     "vite-plugin-wasm": "^3.3.0",
