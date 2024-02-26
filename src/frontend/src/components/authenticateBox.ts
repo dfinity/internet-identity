@@ -290,24 +290,18 @@ type FlowError =
   | ApiError
   | RegisterNoSpace;
 
-// Type machinery to allow translating error code (e.g. kind: "authFail") using the actual data
-// contained in the error objects (e.g. authFail: (authFail: AuthFail) => ...).
-type ErrorKind = FlowError["kind"]; // all known error tags for FlowError
-
-// Look up an error type from an error kind, i.e.:
-//  type AssociatedError<"authFail"> = AuthFail
-type AssociatedError<K extends ErrorKind> = {
-  [P in K]: { kind: P } & KindToError[P];
-}[K];
 // Maps all errors kinds to their error types (without kind field):
-//  { authFail: { ...fields of AuthFail with kind...}, badPin: ... }
-// This seems to be a necessary step while looking up the error, otherwise typescript
-// fails: 'Expression produces a union type that is too complex to represent.'
-type KindToError = { [P in ErrorKind]: Omit<FlowError & { kind: P }, "kind"> };
+//  KindToError<'authFail'> = { ...fields of AuthFail with kind...};
+// The 'Omit' seems to be a necessary step while looking up the error, otherwise typescript
+// thinks the types conflict
+type KindToError<K extends FlowError["kind"]> = Omit<
+  FlowError & { kind: K },
+  "kind"
+>;
 
 // Makes the error human readable
 const clarifyError: {
-  [K in FlowError["kind"]]: (err: AssociatedError<K>) => {
+  [K in FlowError["kind"]]: (err: KindToError<K>) => {
     title: string;
     message: string;
     detail?: string;
@@ -347,8 +341,8 @@ const clarifyError: {
   }),
 };
 
-const clarifyError_ = <K extends keyof KindToError>(
-  flowError: AssociatedError<K>
+const clarifyError_ = <K extends FlowError["kind"]>(
+  flowError: KindToError<K> & { kind: K }
 ): Omit<ErrorOptions, "primaryButton"> =>
   clarifyError[flowError.kind](flowError);
 
