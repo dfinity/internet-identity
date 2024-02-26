@@ -5,6 +5,17 @@ These tests serve two purposes:
 * Show that we can indeed fully recover in case of a disaster, assuming
   we have a backup of the stable memory.
 
+## Stable Memory Backups
+
+The following stable memory backups are currently used:
+* `buffered_archive_entries_v8.bin.gz`: a backup with buffered archive entries.
+* `genesis-layout-migrated-to-v8.bin.gz`: a backup initially created with the first version of the stable memory layout and then incrementally migrated to the v8 layout. It contains a few well-known identities / devices, see `known_devices` in `tests/integration/stable_memory.rs`.
+* `genesis-memory-layout.bin`: a backup of the initial memory layout. Not migrated. Mainly used to test behavior with respect to outdated / unsupported memory layouts.
+* `multiple-recovery-phrases-v8.bin.gz`: a backup with an identity that has multiple recovery phrases. The input validation does no longer allow to create such an identity (only one recovery phrase is allowed). However, legacy users that are in that state need a way to make their identity consistent again. This backup is used to test exactly that.
+* `no-persistent-state-v8.bin.gz`: a backup without persistent state. Used to check that II indeed fails to upgrade from such a state.
+* `persistent_state_archive_v8.bin.gz`: a backup to check that archive state and configuration are restored correctly.
+* `persistent_state_no_archive_v8.bin.gz`: a backup to check that persistent state without an archive is restored correctly. 
+
 ## Creating New Test Memory Backups
 
 ### Using Canister Test Infrastructure
