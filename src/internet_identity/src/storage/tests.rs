@@ -11,7 +11,6 @@ use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, DeviceProtection, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
-use std::rc::Rc;
 
 const HEADER_SIZE: usize = 58;
 
@@ -40,19 +39,6 @@ fn should_serialize_header_v8() {
     let mut buf = vec![0; HEADER_SIZE];
     memory.read(0, &mut buf);
     assert_eq!(buf, hex::decode("49494308000000000100000000000000020000000000000000100505050505050505050505050505050505050505050505050505050505050505").unwrap());
-}
-
-#[test]
-fn should_recover_header_from_memory_v7() {
-    let memory = VectorMemory::default();
-    memory.grow(1);
-    memory.write(0, &hex::decode("494943070500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
-
-    let storage = Storage::from_memory(memory).unwrap();
-    assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
-    assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
-    assert_eq!(storage.anchor_count(), 5);
-    assert_eq!(storage.version(), 7);
 }
 
 #[test]
@@ -164,7 +150,6 @@ fn sample_persistent_state() -> PersistentState {
             data: ArchiveData {
                 sequence_number: 39,
                 archive_canister: Principal::from_text("2h5ob-7aaaa-aaaad-aacya-cai").unwrap(),
-                entries_buffer: Rc::new(vec![]),
             },
             config: ArchiveConfig {
                 module_hash: [99u8; 32],

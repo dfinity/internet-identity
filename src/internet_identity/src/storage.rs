@@ -114,11 +114,10 @@ mod storable_anchor;
 mod tests;
 
 /// * version   0: invalid
-/// * version 1-6: no longer supported
-/// * version   7: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
-///                with memory manager (from 2nd page on)
-/// * version   8: same as 7, but archive entries buffer in stable memory
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 7..=8;
+/// * version 1-7: no longer supported
+/// * version   8: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
+///                with memory manager (from 2nd page on), archive entries buffer in stable memory
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 8..=8;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
@@ -290,7 +289,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         match header.version {
-            7 | 8 => {
+            8 => {
                 let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
                 let managed_memory = RestrictedMemory::new(memory, 1..MAX_MANAGED_WASM_PAGES);
                 let memory_manager =
@@ -417,22 +416,12 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Add a new archive entry to the buffer.
     pub fn add_archive_entry(&mut self, entry: BufferedEntry) {
-        assert_eq!(
-            self.version(),
-            8,
-            "archive entry buffer is only supported in version 8"
-        );
         self.archive_entries_buffer
             .insert(entry.sequence_number, BufferedEntryWrapper(entry));
     }
 
     /// Get the first `max_entries` archive entries from the buffer.
     pub fn get_archive_entries(&mut self, max_entries: u16) -> Vec<BufferedEntry> {
-        assert_eq!(
-            self.version(),
-            8,
-            "archive entry buffer is only supported in version 8"
-        );
         self.archive_entries_buffer
             .iter()
             .take(max_entries as usize)
@@ -442,11 +431,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
     pub fn prune_archive_entries(&mut self, sequence_number: u64) {
-        assert_eq!(
-            self.version(),
-            8,
-            "archive entry buffer is only supported in version 8"
-        );
         let entries_to_prune = self
             .archive_entries_buffer
             .range(..=sequence_number)
@@ -460,21 +444,6 @@ impl<M: Memory + Clone> Storage<M> {
     /// Returns the number of entries in the archive buffer.
     pub fn archive_entries_count(&self) -> usize {
         self.archive_entries_buffer.iter().count()
-    }
-
-    /// Migrates storage to version 8, by adding all pending archive entries to the archive buffer.
-    pub fn migrate_to_stable_memory_archive_buffer(&mut self, entries: Vec<BufferedEntry>) {
-        assert_eq!(
-            self.version(),
-            7,
-            "migration to stable memory archive entry buffer is only supported from version 7"
-        );
-        for entry in entries {
-            self.archive_entries_buffer
-                .insert(entry.sequence_number, BufferedEntryWrapper(entry));
-        }
-        self.header.version = 8;
-        self.flush();
     }
 
     fn anchor_number_to_record(&self, anchor_number: u64) -> Result<u32, StorageError> {
