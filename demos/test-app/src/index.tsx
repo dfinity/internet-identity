@@ -56,6 +56,9 @@ const newAlternativeOriginsEl = document.getElementById(
   "newAlternativeOrigins"
 ) as HTMLInputElement;
 const principalEl = document.getElementById("principal") as HTMLDivElement;
+const authnMethodEl = document.querySelector(
+  '[data-role="authn-method"]'
+) as HTMLDivElement;
 const delegationEl = document.getElementById("delegation") as HTMLPreElement;
 const expirationEl = document.getElementById("expiration") as HTMLDivElement;
 const iiUrlEl = document.getElementById("iiUrl") as HTMLInputElement;
@@ -112,8 +115,19 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
   });
 };
 
-const updateDelegationView = (identity: Identity) => {
+const updateDelegationView = ({
+  authnMethod,
+  identity,
+}: {
+  authnMethod?: string;
+  identity: Identity;
+}) => {
   principalEl.innerText = identity.getPrincipal().toText();
+
+  if (authnMethod !== undefined) {
+    authnMethodEl.innerText = authnMethod;
+  }
+
   if (identity instanceof DelegationIdentity) {
     delegationEl.innerText = JSON.stringify(
       identity.getDelegation().toJSON(),
@@ -184,9 +198,12 @@ window.addEventListener("message", (event) => {
     delegations,
     event.data.userPublicKey.buffer
   );
-  updateDelegationView(
-    DelegationIdentity.fromDelegation(getLocalIdentity(), delegationChain)
-  );
+  updateDelegationView({
+    identity: DelegationIdentity.fromDelegation(
+      getLocalIdentity(),
+      delegationChain
+    ),
+  });
 });
 
 const readCanisterId = (): string => {
@@ -211,14 +228,18 @@ const init = async () => {
       : false;
 
     try {
-      delegationIdentity = await authWithII({
+      const result = await authWithII({
         url: iiUrlEl.value,
         maxTimeToLive,
         derivationOrigin,
         allowPinAuthentication,
         sessionIdentity: getLocalIdentity(),
       });
-      updateDelegationView(delegationIdentity);
+      delegationIdentity = result.identity;
+      updateDelegationView({
+        identity: delegationIdentity,
+        authnMethod: result.authnMethod,
+      });
     } catch (e) {
       showError(JSON.stringify(e));
     }

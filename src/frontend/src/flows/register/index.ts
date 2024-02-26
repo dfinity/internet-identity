@@ -63,7 +63,7 @@ export const registerFlow = async <T>({
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
 }): Promise<
-  | LoginSuccess<T>
+  | (LoginSuccess<T> & { authnMethod: "passkey" | "pin" })
   | BadChallenge
   | ApiError
   | AuthFail
@@ -113,6 +113,7 @@ export const registerFlow = async <T>({
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
+        authnMethod: "pin" as const,
       };
     } else {
       const identity = savePasskeyResult;
@@ -130,6 +131,7 @@ export const registerFlow = async <T>({
         keyType: authenticatorAttachmentToKeyType(
           identity.getAuthenticatorAttachment()
         ),
+        authnMethod: "passkey" as const,
       };
     }
   })();
@@ -147,6 +149,7 @@ export const registerFlow = async <T>({
     keyType,
     finalizeIdentity,
     finishSlot,
+    authnMethod,
   }: {
     identity: SignIdentity;
     alias: string;
@@ -156,6 +159,7 @@ export const registerFlow = async <T>({
     keyType: KeyType;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
+    authnMethod: "pin" | "passkey";
   } = result_;
 
   const result = await promptCaptcha({
@@ -183,17 +187,19 @@ export const registerFlow = async <T>({
     return "canceled";
   }
 
-  if (result.kind === "loginSuccess") {
-    const userNumber = result.userNumber;
-    await finalizeIdentity?.(userNumber);
-    await setAnchorUsed(userNumber);
-    await displayUserNumber({
-      userNumber,
-      stepper: finishStepper,
-      marketingIntroSlot: finishSlot,
-    });
+  if (result.kind !== "loginSuccess") {
+    return result;
   }
-  return result;
+  result.kind satisfies "loginSuccess";
+  const userNumber = result.userNumber;
+  await finalizeIdentity?.(userNumber);
+  await setAnchorUsed(userNumber);
+  await displayUserNumber({
+    userNumber,
+    stepper: finishStepper,
+    marketingIntroSlot: finishSlot,
+  });
+  return { ...result, authnMethod };
 };
 
 export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<

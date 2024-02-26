@@ -75,6 +75,7 @@ export const authenticateBox = async ({
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
+  authnMethod: "pin" | "passkey" | "recovery";
 }> => {
   const promptAuth = () =>
     authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
@@ -185,13 +186,21 @@ export const authenticateBoxFlow = async <T, I>({
   }) => Promise<"valid" | "expired">;
   registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
 }): Promise<
-  (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
+  | (LoginSuccess<T> & {
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
+  | FlowError
+  | { tag: "canceled" }
 > => {
   const pages = authnScreens(i18n, { ...templates });
 
   // The registration flow for a new identity
   const doRegister = async (): Promise<
-    | (LoginSuccess<T> & { newAnchor: true })
+    | (LoginSuccess<T> & {
+        newAnchor: true;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
     | BadChallenge
     | ApiError
     | AuthFail
@@ -228,7 +237,12 @@ export const authenticateBoxFlow = async <T, I>({
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
-    (LoginSuccess<T> & { newAnchor: boolean }) | FlowError | { tag: "canceled" }
+    | (LoginSuccess<T> & {
+        newAnchor: boolean;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
+    | FlowError
+    | { tag: "canceled" }
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
@@ -258,9 +272,10 @@ export const authenticateBoxFlow = async <T, I>({
     }
 
     recoverResult satisfies LoginSuccess<T>;
-    // If an anchor was recovered, then it's _not_ a new anchor
     return {
-      newAnchor: false,
+      newAnchor:
+        false /* If an anchor was recovered, then it's _not_ a new anchor */,
+      authnMethod: "recovery",
       ...recoverResult,
     };
   };
@@ -300,24 +315,18 @@ type FlowError =
   | ApiError
   | RegisterNoSpace;
 
-// Type machinery to allow translating error code (e.g. kind: "authFail") using the actual data
-// contained in the error objects (e.g. authFail: (authFail: AuthFail) => ...).
-type ErrorKind = FlowError["kind"]; // all known error tags for FlowError
-
-// Look up an error type from an error kind, i.e.:
-//  type AssociatedError<"authFail"> = AuthFail
-type AssociatedError<K extends ErrorKind> = {
-  [P in K]: { kind: P } & KindToError[P];
-}[K];
 // Maps all errors kinds to their error types (without kind field):
-//  { authFail: { ...fields of AuthFail with kind...}, badPin: ... }
-// This seems to be a necessary step while looking up the error, otherwise typescript
-// fails: 'Expression produces a union type that is too complex to represent.'
-type KindToError = { [P in ErrorKind]: Omit<FlowError & { kind: P }, "kind"> };
+//  KindToError<'authFail'> = { ...fields of AuthFail with kind...};
+// The 'Omit' seems to be a necessary step while looking up the error, otherwise typescript
+// thinks the types conflict
+type KindToError<K extends FlowError["kind"]> = Omit<
+  FlowError & { kind: K },
+  "kind"
+>;
 
 // Makes the error human readable
 const clarifyError: {
-  [K in FlowError["kind"]]: (err: AssociatedError<K>) => {
+  [K in FlowError["kind"]]: (err: KindToError<K>) => {
     title: string;
     message: string;
     detail?: string;
@@ -362,8 +371,8 @@ const clarifyError: {
   }),
 };
 
-const clarifyError_ = <K extends keyof KindToError>(
-  flowError: AssociatedError<K>
+const clarifyError_ = <K extends FlowError["kind"]>(
+  flowError: KindToError<K> & { kind: K }
 ): Omit<ErrorOptions, "primaryButton"> =>
   clarifyError[flowError.kind](flowError);
 
@@ -714,7 +723,10 @@ const useIdentityFlow = async <T, I>({
     pinIdentityMaterial: I;
   }) => Promise<LoginSuccess<T> | BadPin>;
 }): Promise<
-  | (LoginSuccess<T> & { newAnchor: boolean })
+  | (LoginSuccess<T> & {
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
   | AuthFail
   | WebAuthnFailed
   | UnknownUser
@@ -731,7 +743,7 @@ const useIdentityFlow = async <T, I>({
 
   const doLoginPasskey = async () => {
     const result = await withLoader(() => loginPasskey(userNumber));
-    return { newAnchor: false, ...result };
+    return { newAnchor: false, authnMethod: "passkey", ...result } as const;
   };
 
   if (isNullish(pinIdentityMaterial)) {
@@ -799,7 +811,7 @@ const useIdentityFlow = async <T, I>({
   pinResult satisfies LoginSuccess<T>;
 
   // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
-  return { newAnchor: false, ...pinResult };
+  return { newAnchor: false, authnMethod: "pin", ...pinResult };
 };
 
 // Use a passkey, with concrete impl.

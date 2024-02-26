@@ -457,9 +457,24 @@ impl<M: Memory + Clone> Storage<M> {
         });
     }
 
-    /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
+    /// Returns the number of entries in the archive buffer.
     pub fn archive_entries_count(&self) -> usize {
         self.archive_entries_buffer.iter().count()
+    }
+
+    /// Migrates storage to version 8, by adding all pending archive entries to the archive buffer.
+    pub fn migrate_to_stable_memory_archive_buffer(&mut self, entries: Vec<BufferedEntry>) {
+        assert_eq!(
+            self.version(),
+            7,
+            "migration to stable memory archive entry buffer is only supported from version 7"
+        );
+        for entry in entries {
+            self.archive_entries_buffer
+                .insert(entry.sequence_number, BufferedEntryWrapper(entry));
+        }
+        self.header.version = 8;
+        self.flush();
     }
 
     fn anchor_number_to_record(&self, anchor_number: u64) -> Result<u32, StorageError> {

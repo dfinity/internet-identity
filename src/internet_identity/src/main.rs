@@ -21,6 +21,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::ops::Deref;
 use storage::{Salt, Storage};
 
 mod activity_stats;
@@ -408,6 +409,24 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     update_root_hash();
     // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
     state::load_persistent_state();
+
+    // Migrate the archive entries buffer if necessary.
+    state::storage_borrow_mut(|storage| {
+        if storage.version() == 7 {
+            // We need to update the storage layout to version 8.
+            let entries = match state::archive_state() {
+                // If the archive has been created, we need to migrate the entries to the archive buffer.
+                // The buffer in persistent state is not modified yet. It will be cleaned up when it
+                // is moved into its own stable memory.
+                ArchiveState::Created { data, .. } => data.entries_buffer.deref().clone(),
+                // If not, we migrate using the empty buffer.
+                ArchiveState::NotConfigured
+                | ArchiveState::Configured { .. }
+                | ArchiveState::CreationInProgress { .. } => vec![],
+            };
+            storage.migrate_to_stable_memory_archive_buffer(entries);
+        }
+    });
 
     apply_install_arg(maybe_arg);
 }

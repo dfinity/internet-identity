@@ -178,6 +178,12 @@
     "logo": "seers_logo.webp"
   },
   {
+    "name": "Caniplay",
+    "oneLiner": "The world's First NFT Broadcast Station",
+    "website": "https://u6i3f-pyaaa-aaaao-a2hca-cai.icp0.io",
+    "logo": "CaniPlay_logo.png"
+  },
+  {
     "name": "Nuance",
     "website": "https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app/",
     "logo": "nuance_logo.webp"
@@ -456,5 +462,11 @@
     "website": "https://eakazi.africa",
     "logo": "ea-kazi_logo.webp",
     "oneLiner": "Elevating freelancing with trust and verifiability"
+  },
+  {
+    "name": "Virtuaseal",
+    "website": "https://p3cwv-2aaaa-aaaap-abwba-cai.icp0.io/",
+    "logo": "virtuaseal.png",
+    "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
   }
 ]
