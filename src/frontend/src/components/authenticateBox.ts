@@ -65,10 +65,12 @@ export const authenticateBox = async ({
   connection,
   i18n,
   templates,
+  allowPinAuthentication,
 }: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
+  allowPinAuthentication: boolean;
 }): Promise<{
   userNumber: bigint;
   connection: AuthenticatedConnection;
@@ -84,7 +86,10 @@ export const authenticateBox = async ({
       loginPinIdentityMaterial: (opts) =>
         loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
-      registerFlowOpts: getRegisterFlowOpts({ connection }),
+      registerFlowOpts: getRegisterFlowOpts({
+        connection,
+        allowPinAuthentication,
+      }),
       verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
         pinIdentityAuthenticatorValidity({
           userNumber,
@@ -93,6 +98,7 @@ export const authenticateBox = async ({
         }),
       retrievePinIdentityMaterial: ({ userNumber }) =>
         idbRetrievePinIdentityMaterial({ userNumber }),
+      allowPinAuthentication,
     });
 
   // Retry until user has successfully authenticated
@@ -148,6 +154,7 @@ export const authenticateBoxFlow = async <T, I>({
   registerFlowOpts,
   verifyPinValidity,
   retrievePinIdentityMaterial,
+  allowPinAuthentication,
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
@@ -172,6 +179,7 @@ export const authenticateBoxFlow = async <T, I>({
   }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
+  allowPinAuthentication: boolean;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -224,6 +232,7 @@ export const authenticateBoxFlow = async <T, I>({
       loginPasskey,
       loginPinIdentityMaterial,
       verifyPinValidity,
+      allowPinAuthentication,
     });
 
   // Prompt for an identity number
@@ -299,6 +308,7 @@ export const authenticateBoxFlow = async <T, I>({
 type FlowError =
   | AuthFail
   | BadPin
+  | { kind: "pinNotAllowed" }
   | BadChallenge
   | WebAuthnFailed
   | UnknownUser
@@ -354,6 +364,11 @@ const clarifyError: {
     message:
       "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
   }),
+  pinNotAllowed: () => ({
+    title: "PIN method not allowed",
+    message:
+      "The Dapp you are authenticating to does not allow PIN identities and you only have a PIN identity. Please retry using a Passkey: open a new Internet Identity page, add a passkey and retry.",
+  }),
 };
 
 const clarifyError_ = <K extends FlowError["kind"]>(
@@ -371,7 +386,11 @@ export const handleLoginFlowResult = async <T, E>(
 
   result satisfies FlowError;
 
-  await displayError({ ...clarifyError_(result), primaryButton: "Try again" });
+  await displayError({
+    ...clarifyError_(result),
+    errorCode: result.kind,
+    primaryButton: "Try again",
+  });
   return undefined;
 };
 
@@ -672,6 +691,7 @@ const pinIdentityToDerPubkey = async (
 // Find and use a passkey, whether PIN or webauthn
 const useIdentityFlow = async <T, I>({
   userNumber,
+  allowPinAuthentication,
   retrievePinIdentityMaterial,
   verifyPinValidity,
   loginPasskey,
@@ -688,6 +708,7 @@ const useIdentityFlow = async <T, I>({
   ) => Promise<
     LoginSuccess<T> | AuthFail | WebAuthnFailed | UnknownUser | ApiError
   >;
+  allowPinAuthentication: boolean;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -711,6 +732,7 @@ const useIdentityFlow = async <T, I>({
   | UnknownUser
   | ApiError
   | BadPin
+  | { kind: "pinNotAllowed" }
   | { tag: "canceled" }
 > => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
@@ -745,6 +767,11 @@ const useIdentityFlow = async <T, I>({
     return doLoginPasskey();
   }
   isValid satisfies "valid";
+
+  // if there is a PIN but allowPinAuth is false, then error out
+  if (!allowPinAuthentication) {
+    return { kind: "pinNotAllowed" };
+  }
 
   // Otherwise, attempt login with PIN
   const result = await usePin<LoginSuccess<T> | BadPin>({
@@ -791,13 +818,16 @@ const useIdentityFlow = async <T, I>({
 export const useIdentity = ({
   userNumber,
   connection,
+  allowPinAuthentication,
 }: {
   userNumber: bigint;
   connection: Connection;
+  allowPinAuthentication: boolean;
 }) =>
   useIdentityFlow({
     userNumber,
     retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
+    allowPinAuthentication,
 
     verifyPinValidity: (opts) =>
       pinIdentityAuthenticatorValidity({ ...opts, connection }),

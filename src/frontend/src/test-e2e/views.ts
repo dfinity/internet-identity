@@ -790,6 +790,15 @@ export class DemoAppView extends View {
     return await this.browser.$("#principal").getText();
   }
 
+  async setAllowPin(allowed: boolean): Promise<void> {
+    const checkbox = await this.browser.$("#allowPinAuthentication");
+    const selected = await checkbox.isSelected();
+
+    if (allowed !== selected) {
+      await checkbox.click();
+    }
+  }
+
   async getAuthnMethod(): Promise<string> {
     return await this.browser.$('[data-role="authn-method"]').getText();
   }

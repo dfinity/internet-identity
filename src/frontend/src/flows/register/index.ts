@@ -208,8 +208,10 @@ export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
 
 export const getRegisterFlowOpts = ({
   connection,
+  allowPinAuthentication,
 }: {
   connection: Connection;
+  allowPinAuthentication: boolean;
 }): RegisterFlowOpts => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
@@ -224,7 +226,11 @@ export const getRegisterFlowOpts = ({
       ),
     createChallenge: () => connection.createChallenge(),
     pinAllowed: () =>
-      pinRegisterAllowed({ userAgent: navigator.userAgent, uaParser }),
+      // If pin auth is disallowed by the authenticating dapp then abort, otherwise check
+      // if pin auth is allowed for the user agent
+      allowPinAuthentication
+        ? pinRegisterAllowed({ userAgent: navigator.userAgent, uaParser })
+        : Promise.resolve(false),
     register: async ({
       identity,
       alias,

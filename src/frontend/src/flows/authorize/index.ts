@@ -198,6 +198,8 @@ const authenticate = async (
         dapp.hasOrigin(authContext.requestOrigin)
       ),
     }),
+    allowPinAuthentication:
+      authContext.authRequest.allowPinAuthentication ?? true,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
