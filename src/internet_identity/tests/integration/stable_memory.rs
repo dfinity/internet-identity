@@ -237,7 +237,8 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
-    assert_eq!(7, stats.storage_layout_version);
+    // after upgrade II auto-migrates to v8
+    assert_eq!(8, stats.storage_layout_version);
     Ok(())
 }
 
@@ -273,7 +274,7 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
             .to_vec(),
         hex::decode("12e2c2bd05dfcd86e3004ecd5f00533e6120e7bcf82bac0753af0a7fe14bfea1").unwrap()
     );
-    assert_eq!(stats.storage_layout_version, 7);
+    assert_eq!(stats.storage_layout_version, 8);
     Ok(())
 }
 
