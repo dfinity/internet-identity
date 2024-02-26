@@ -155,11 +155,13 @@ test("Register with PIN then log into client application", async () => {
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("");
+    expect(await demoAppView.getAuthnMethod()).toBe("");
     await demoAppView.signin();
 
     await switchToPopup(browser);
 
     await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await demoAppView.waitForAuthenticated();
+    expect(await demoAppView.getAuthnMethod()).toBe("pin");
   }, APPLE_USER_AGENT);
 }, 300_000);
