@@ -399,7 +399,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     }
 }
 
-fn static_headers() -> Vec<(String, String)> {
+fn static_headers() -> Vec<HeaderField> {
     vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
 }
 

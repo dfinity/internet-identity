@@ -268,7 +268,7 @@ impl CertifiedAssets {
         &self,
         absolute_path: &str,
         sigs_tree: Option<HashTree>,
-    ) -> Vec<(String, String)> {
+    ) -> Vec<HeaderField> {
         let certificate = data_certificate().unwrap_or_else(|| {
             trap("data certificate is only available in query calls");
         });
