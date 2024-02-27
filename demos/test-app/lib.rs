@@ -60,7 +60,7 @@ pub type HeaderField = (String, String);
 pub struct HttpRequest {
     pub method: String,
     pub url: String,
-    pub headers: Vec<(String, String)>,
+    pub headers: Vec<HeaderField>,
     pub body: ByteBuf,
     pub certificate_version: Option<u16>,
 }
@@ -142,7 +142,7 @@ fn not_found_response(path: &str) -> HttpResponse {
     }
 }
 
-fn static_headers() -> Vec<(String, String)> {
+fn static_headers() -> Vec<HeaderField> {
     vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
 }
 

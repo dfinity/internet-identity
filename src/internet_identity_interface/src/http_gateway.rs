@@ -29,7 +29,7 @@ pub struct StreamingCallbackHttpResponse {
 pub struct HttpRequest {
     pub method: String,
     pub url: String,
-    pub headers: Vec<(String, String)>,
+    pub headers: Vec<HeaderField>,
     pub body: ByteBuf,
     pub certificate_version: Option<u16>,
 }
