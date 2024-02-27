@@ -140,6 +140,11 @@ pub struct Icrc21ConsentInfo {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DerivationOriginRequest {
+    pub frontend_hostname: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DerivationOriginData {
     pub origin: String,
 }

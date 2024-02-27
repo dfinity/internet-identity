@@ -24,8 +24,8 @@ use std::path::PathBuf;
 use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences,
+    Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
@@ -128,14 +128,14 @@ mod api {
         env: &StateMachine,
         canister_id: CanisterId,
         sender: Principal,
-        hostname: &str,
+        derivation_origin_req: &DerivationOriginRequest,
     ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
         call_candid_as(
             env,
             canister_id,
             sender,
             "derivation_origin",
-            (hostname.to_string(),),
+            (derivation_origin_req,),
         )
         .map(|(x,)| x)
     }
@@ -341,11 +341,11 @@ fn should_return_derivation_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let frontend_hostname = format!("https://{}.ic0.app", canister_id.to_text());
-
-    let response = api::derivation_origin(&env, canister_id, principal_1(), &frontend_hostname)
+    let req = DerivationOriginRequest { frontend_hostname };
+    let response = api::derivation_origin(&env, canister_id, principal_1(), &req)
         .expect("API call failed")
         .expect("derivation_origin error");
-    assert_eq!(response.origin, frontend_hostname);
+    assert_eq!(response.origin, req.frontend_hostname);
 }
 
 #[test]
@@ -362,7 +362,9 @@ fn should_return_derivation_origin_with_custom_init() {
         &env,
         issuer_id,
         principal_1(),
-        &custom_init.frontend_hostname,
+        &DerivationOriginRequest {
+            frontend_hostname: custom_init.frontend_hostname.clone(),
+        },
     )
     .expect("API call failed")
     .expect("derivation_origin error");
@@ -373,13 +375,15 @@ fn should_return_derivation_origin_with_custom_init() {
 fn should_fail_derivation_origin_if_unsupported_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
-    let unsupported_origin = "https://wrong.fe.host";
-    let response = api::derivation_origin(&env, canister_id, principal_1(), unsupported_origin)
-        .expect("API call failed");
+    let req = DerivationOriginRequest {
+        frontend_hostname: "https://wrong.fe.host".to_string(),
+    };
+    let response =
+        api::derivation_origin(&env, canister_id, principal_1(), &req).expect("API call failed");
     assert_eq!(
         response,
         Err(DerivationOriginError::UnsupportedOrigin(
-            unsupported_origin.to_string()
+            req.frontend_hostname
         ))
     );
 }

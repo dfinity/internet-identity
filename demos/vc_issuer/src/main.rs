@@ -15,9 +15,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error, Icrc21VcConsentMessageRequest,
-    IssueCredentialError, IssuedCredentialData, PrepareCredentialRequest, PreparedCredentialData,
-    SignedIdAlias,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
 use vc_util::{
     build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
@@ -78,7 +78,7 @@ struct IssuerConfig {
     idp_canister_ids: Vec<Principal>,
     /// The derivation origin to be used by the issuer.
     derivation_origin: String,
-    /// Frontend hostname be used by the issuer.
+    /// Frontend hostname to be used by the issuer.
     frontend_hostname: String,
 }
 
@@ -296,9 +296,9 @@ async fn vc_consent_message(
 #[update]
 #[candid_method]
 async fn derivation_origin(
-    hostname: String,
+    req: DerivationOriginRequest,
 ) -> Result<DerivationOriginData, DerivationOriginError> {
-    get_derivation_origin(&hostname)
+    get_derivation_origin(&req.frontend_hostname)
 }
 
 fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, DerivationOriginError> {

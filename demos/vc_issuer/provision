@@ -61,12 +61,12 @@ do
             shift;
             ;;
         --issuer-derivation-origin)
-            DERIVATION_ORIGIN="${2:?missing value for '--issuer-canister'}"
+            DERIVATION_ORIGIN="${2:?missing value for '--issuer-derivation-origin'}"
             shift; # shift past --issuer-canister & value
             shift;
             ;;
         --issuer-frontend-hostname)
-            FRONTEND_HOSTNAME="${2:?missing value for '--issuer-canister'}"
+            FRONTEND_HOSTNAME="${2:?missing value for '--issuer-frontend-hostname'}"
             shift; # shift past --issuer-canister & value
             shift;
             ;;

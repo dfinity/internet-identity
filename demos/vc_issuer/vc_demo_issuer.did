@@ -69,6 +69,9 @@ type IssueCredentialError = variant {
 };
 
 /// Messages for `derivation_origin`.
+type DerivationOriginRequest = record {
+    frontend_hostname : text;
+};
 type DerivationOriginData = record { origin : text };
 type DerivationOriginError = variant {
   Internal : text;
@@ -113,7 +116,7 @@ service: (opt IssuerConfig) -> {
     vc_consent_message : (Icrc21VcConsentMessageRequest) -> (variant { Ok : Icrc21ConsentInfo; Err : Icrc21Error;});
     prepare_credential : (PrepareCredentialRequest) -> (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
     get_credential : (GetCredentialRequest) -> (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
-    derivation_origin : (text) -> (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
+    derivation_origin : (DerivationOriginRequest) -> (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
 
     /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();
