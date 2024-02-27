@@ -11,60 +11,82 @@ The Candid interface is as follows, and the subsequent sections describe the
 services and the corresponding messages in more detail.
 
 ```candid
-type ArgumentValue = variant { "Int" : int32; String : text };
+// Specification of a requested credential.
 type CredentialSpec = record {
-    arguments : opt vec record { text; ArgumentValue };
     credential_type : text;
+    /// arguments are optional, and specific to the credential_type
+    arguments : opt vec record { text; ArgumentValue };
 };
-type GetCredentialRequest = record {
-    signed_id_alias : SignedIdAlias;
-    prepared_context : opt blob;
-    credential_spec : CredentialSpec;
-};
-type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError;
-};
+type ArgumentValue = variant { "Int" : int32; String : text };
+
+/// Types for ICRC-21 consent message, cf.
+/// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
+type Icrc21ConsentPreferences = record { language : text };
+type Icrc21Error = variant {
+    GenericError : record { description : text; error_code : nat };
+    UnsupportedCanisterCall : Icrc21ErrorInfo;
+    ConsentMessageUnavailable : Icrc21ErrorInfo;
+};
+type Icrc21ErrorInfo = record { description : text };
 type Icrc21VcConsentMessageRequest = record {
     preferences : Icrc21ConsentPreferences;
     credential_spec : CredentialSpec;
 };
-type Icrc21ConsentMessageResponse = variant {
-    Ok : Icrc21ConsentInfo;
-    Err : Icrc21Error;
-};
-type Icrc21ConsentPreferences = record { language : text };
-type Icrc21Error = variant {
-    GenericError : Icrc21ErrorInfo;
-    UnsupportedCanisterCall : Icrc21ErrorInfo;
-    ConsentMessageUnavailable : Icrc21ErrorInfo;
-};
-type Icrc21ErrorInfo = record { description : text; error_code : nat64 };
-type IssueCredentialError = variant {
-    Internal : text;
-    SignatureNotFound : text;
-    InvalidIdAlias : text;
-    UnauthorizedSubject : text;
-    UnknownSubject : text;
-};
-type IssuedCredentialData = record { vc_jws : text };
+
+/// Types for `prepare_credential`.
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
 };
-type PrepareCredentialResponse = variant {
-    Ok : PreparedCredentialData;
-    Err : IssueCredentialError;
-};
-type PreparedCredentialData = record { prepared_context : opt blob };
 type SignedIdAlias = record {
     credential_jws : text;
 };
-service : {
-    get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
-    prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
-    vc_consent_message : (Icrc21VcConsentMessageRequest) -> (Icrc21ConsentMessageResponse);
+type PreparedCredentialData = record { prepared_context : opt vec nat8 };
+
+/// Types for `get_credential`.
+type GetCredentialRequest = record {
+    signed_id_alias : SignedIdAlias;
+    credential_spec : CredentialSpec;
+    prepared_context : opt blob;
+};
+type IssuedCredentialData = record { vc_jws : text };
+
+type IssueCredentialError = variant {
+    /// The caller is not known to the issuer.  Caller should register first with the issuer before retrying.
+    UnknownSubject : text;
+    /// The caller is not authorized to obtain the requested credential.  Caller requested a credential
+    /// for a different principal, or the issuer does not have sufficient knowledge about the caller
+    /// to issue the requested credential.
+    UnauthorizedSubject : text;
+    /// The id_alias credential provided by the identity provider is invalid.
+    InvalidIdAlias : text;
+    /// The issuer does not issue credentials described in the credential spec.
+    UnsupportedCredentialSpec : text;
+    /// Internal errors, indicate malfunctioning of the issuer.
+    SignatureNotFound : text;
+    Internal : text;
+};
+
+/// Types for `derivation_origin`.
+type DerivationOriginRequest = record {
+    frontend_hostname : text;
+};
+type DerivationOriginData = record { origin : text };
+type DerivationOriginError = variant {
+  Internal : text;
+  UnsupportedOrigin : text;
+};
+
+service: {
+    derivation_origin : (DerivationOriginRequest) ->
+        (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
+    vc_consent_message : (Icrc21VcConsentMessageRequest) ->
+        (variant { Ok : Icrc21ConsentInfo; Err : Icrc21Error;});
+    prepare_credential : (PrepareCredentialRequest) ->
+        (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
+    get_credential : (GetCredentialRequest) ->
+        (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
 }
 ```
 
@@ -76,14 +98,39 @@ credential by an issuer, and this happens by approving a human-readable consent 
 Identity provider uses a VC-extension of  [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md), and requests the consent message via `Icrc21VcConsentMessageRequest`,
 Upon successful response idenity provider displays the consent message from `Icrc21ConsentInfo` to the user.
 
-### 2: Prepare Credential
+### 2: Derivation Origin (optional)
+
+If an issuer wants to take advantage of the [Alternative Derivation Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature,
+it must implement `derivation_origin`-API, which then is called by the identity provider to
+obtain an URL to be used as the derivation origin for user's principal.
+```candid
+service: {
+    derivation_origin : (DerivationOriginRequest) ->
+        (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
+}
+
+type DerivationOriginRequest = record {
+    frontend_hostname : text;
+};
+type DerivationOriginData = record { origin : text };
+type DerivationOriginError = variant {
+  Internal : text;
+  UnsupportedOrigin : text;
+};
+```
+
+Please note that the returned derivation origin is subject to verification via
+`.well-known/ii-alternative-origins`, as described in the [feature-description](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins).
+
+### 3: Prepare Credential
 
 Preparation of a credential involves checking the validity of the request,
 and upon success, preparation of the actual credential requested by the user.
 
 ```candid
 service : {
-  prepare_credential : (PrepareCredentialRequest) -> (PrepareCredentialResponse);
+    prepare_credential : (PrepareCredentialRequest) ->
+        (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
 };
 
 type PrepareCredentialRequest = record {
@@ -94,19 +141,14 @@ type PrepareCredentialRequest = record {
 type SignedIdAlias = record {
     credential_jws : text;
 };
+type PreparedCredentialData = record { prepared_context : opt vec nat8 };
 
-type ArgumentValue = variant { "Int" : int32; String : text };
 type CredentialSpec = record {
-    arguments : opt vec record { text; ArgumentValue };
     credential_type : text;
+    /// arguments are optional, and specific to the credential_type
+    arguments : opt vec record { text; ArgumentValue };
 };
-
-type PrepareCredentialResponse = variant {
-    ok : PreparedCredentialData;
-    err : IssueCredentialError;
-};
-
-type PreparedCredentialData = record { prepared_context : opt blob };
+type ArgumentValue = variant { "Int" : int32; String : text };
 ```
 
 Specifically, the issuer checks via `signed_id_alias.credential_jws` that user identified by its `sub` claim on the
@@ -124,27 +166,22 @@ consumes it.  For example, when using [canister signatures](https://internetcomp
 the context contains a time-stamped yet unsigned VC, for which the canister signature will be
 available only at `get_credential`-call.
 
-
-### 3: Get Credential
+### 4: Get Credential
 
 `get_credential`-service issues the actual credential requested by the user.
 
 ```candid
 service : {
-  get_credential : (GetCredentialRequest) -> (GetCredentialResponse) query;
+    get_credential : (GetCredentialRequest) ->
+        (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
 };
 
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
-    prepared_context : opt blob;
     credential_spec : CredentialSpec;
-};
-type GetCredentialResponse = variant {
-    Ok : IssuedCredentialData;
-    Err : IssueCredentialError;
+    prepared_context : opt blob;
 };
 type IssuedCredentialData = record { vc_jws : text };
-
 ```
 
 `GetCredentialRequest` should contain the same parameters as `PrepareCredentialRequest`, plus the
