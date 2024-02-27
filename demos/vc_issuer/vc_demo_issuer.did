@@ -11,7 +11,7 @@ type CredentialSpec = record {
 };
 type ArgumentValue = variant { "Int" : int32; String : text };
 
-/// Messages for ICRC-21 consent message, cf.
+/// Types for ICRC-21 consent message, cf.
 /// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentPreferences = record { language : text };
@@ -26,7 +26,7 @@ type Icrc21VcConsentMessageRequest = record {
     credential_spec : CredentialSpec;
 };
 
-/// Messages for requesting issuance of a credential.
+/// Types for requesting issuance of a credential.
 /// The issuance proceeds in two steps:
 ///  - `prepare_credential`, and
 ///  - `get_credential`
@@ -34,14 +34,14 @@ type Icrc21VcConsentMessageRequest = record {
 /// and the second second step returns the actual credential (if any).
 /// The two steps can use `prepared_context`-value to transfer information between them.
 
-/// Messages for `prepare_credential`.
+/// Types for `prepare_credential`.
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
 };
 type PreparedCredentialData = record { prepared_context : opt vec nat8 };
 
-/// Messages for `get_credential`.
+/// Types for `get_credential`.
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
@@ -68,7 +68,7 @@ type IssueCredentialError = variant {
     Internal : text;
 };
 
-/// Messages for `derivation_origin`.
+/// Types for `derivation_origin`.
 type DerivationOriginRequest = record {
     frontend_hostname : text;
 };

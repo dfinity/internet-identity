@@ -19,7 +19,7 @@ type CredentialSpec = record {
 };
 type ArgumentValue = variant { "Int" : int32; String : text };
 
-/// Messages for ICRC-21 consent message, cf.
+/// Types for ICRC-21 consent message, cf.
 /// https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md
 type Icrc21ConsentInfo = record { consent_message : text; language : text };
 type Icrc21ConsentPreferences = record { language : text };
@@ -34,7 +34,7 @@ type Icrc21VcConsentMessageRequest = record {
     credential_spec : CredentialSpec;
 };
 
-/// Messages for `prepare_credential`.
+/// Types for `prepare_credential`.
 type PrepareCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
@@ -44,11 +44,11 @@ type SignedIdAlias = record {
 };
 type PreparedCredentialData = record { prepared_context : opt vec nat8 };
 
-/// Messages for `get_credential`.
+/// Types for `get_credential`.
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
-    prepared_context : opt vec nat8;
+    prepared_context : opt blob;
 };
 type IssuedCredentialData = record { vc_jws : text };
 
@@ -68,7 +68,7 @@ type IssueCredentialError = variant {
     Internal : text;
 };
 
-/// Messages for `derivation_origin`.
+/// Types for `derivation_origin`.
 type DerivationOriginRequest = record {
     frontend_hostname : text;
 };
@@ -179,7 +179,7 @@ service : {
 type GetCredentialRequest = record {
     signed_id_alias : SignedIdAlias;
     credential_spec : CredentialSpec;
-    prepared_context : opt vec nat8;
+    prepared_context : opt blob;
 };
 type IssuedCredentialData = record { vc_jws : text };
 ```
