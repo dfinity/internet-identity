@@ -305,13 +305,13 @@ fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, Derivat
     CONFIG.with_borrow(|config| {
         let config = config.get();
         if hostname == config.frontend_hostname {
-            return Ok(DerivationOriginData {
+            Ok(DerivationOriginData {
                 origin: config.derivation_origin.clone(),
-            });
+            })
         } else {
-            return Err(DerivationOriginError::UnsupportedOrigin(
+            Err(DerivationOriginError::UnsupportedOrigin(
                 hostname.to_string(),
-            ));
+            ))
         }
     })
 }
