@@ -1,6 +1,14 @@
 ---
 import Layout from "../layouts/Layout.astro";
 
+interface Props {
+  title: string;
+  pageName: string;
+  // This means that the children prop is required
+  // https://docs.astro.build/en/guides/typescript/#common-prop-type-patterns
+  children: any;
+}
+
 const { title, pageName } = Astro.props;
 ---
 
