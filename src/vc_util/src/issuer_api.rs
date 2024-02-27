@@ -139,6 +139,22 @@ pub struct Icrc21ConsentInfo {
     pub language: String,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DerivationOriginRequest {
+    pub frontend_hostname: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DerivationOriginData {
+    pub origin: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum DerivationOriginError {
+    UnsupportedOrigin(String),
+    Internal(String),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

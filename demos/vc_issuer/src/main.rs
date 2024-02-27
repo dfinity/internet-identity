@@ -14,7 +14,8 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
     Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
@@ -75,6 +76,10 @@ struct IssuerConfig {
     ic_root_key_raw: Vec<u8>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
+    /// The derivation origin to be used by the issuer.
+    derivation_origin: String,
+    /// Frontend hostname to be used by the issuer.
+    frontend_hostname: String,
 }
 
 impl Storable for IssuerConfig {
@@ -89,10 +94,13 @@ impl Storable for IssuerConfig {
 
 impl Default for IssuerConfig {
     fn default() -> Self {
+        let derivation_origin = format!("https://{}.ic0.app", ic_cdk::id().to_text());
         Self {
             ic_root_key_raw: extract_raw_root_pk_from_der(IC_ROOT_PK_DER)
                 .expect("failed to extract raw root pk from der"),
             idp_canister_ids: vec![Principal::from_text(PROD_II_CANISTER_ID).unwrap()],
+            derivation_origin: derivation_origin.clone(),
+            frontend_hostname: derivation_origin, // by default, use DERIVATION_ORIGIN as frontend-hostname
         }
     }
 }
@@ -103,6 +111,8 @@ impl From<IssuerInit> for IssuerConfig {
             ic_root_key_raw: extract_raw_root_pk_from_der(&init.ic_root_key_der)
                 .expect("failed to extract raw root pk from der"),
             idp_canister_ids: init.idp_canister_ids,
+            derivation_origin: init.derivation_origin,
+            frontend_hostname: init.frontend_hostname,
         }
     }
 }
@@ -113,6 +123,10 @@ struct IssuerInit {
     ic_root_key_der: Vec<u8>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
+    /// The derivation origin to be used by the issuer.
+    derivation_origin: String,
+    /// Frontend hostname be used by the issuer.
+    frontend_hostname: String,
 }
 
 #[init]
@@ -277,6 +291,29 @@ async fn vc_consent_message(
         &req.credential_spec,
         &SupportedLanguage::from(req.preferences),
     )
+}
+
+#[update]
+#[candid_method]
+async fn derivation_origin(
+    req: DerivationOriginRequest,
+) -> Result<DerivationOriginData, DerivationOriginError> {
+    get_derivation_origin(&req.frontend_hostname)
+}
+
+fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, DerivationOriginError> {
+    CONFIG.with_borrow(|config| {
+        let config = config.get();
+        if hostname == config.frontend_hostname {
+            Ok(DerivationOriginData {
+                origin: config.derivation_origin.clone(),
+            })
+        } else {
+            Err(DerivationOriginError::UnsupportedOrigin(
+                hostname.to_string(),
+            ))
+        }
+    })
 }
 
 fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialType, String> {
