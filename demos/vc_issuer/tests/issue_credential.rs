@@ -23,10 +23,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, UNIX_EPOCH};
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo,
-    Icrc21ConsentPreferences, Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError,
-    IssuedCredentialData, PrepareCredentialRequest, PreparedCredentialData,
-    SignedIdAlias as SignedIssuerIdAlias,
+    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
+    GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias as SignedIssuerIdAlias,
 };
 use vc_util::{
     get_verified_id_alias_from_jws, validate_claims_match_spec,
@@ -35,6 +35,8 @@ use vc_util::{
 
 const DUMMY_ROOT_KEY: &str ="308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c05030201036100adf65638a53056b2222c91bb2457b0274bca95198a5acbdadfe7fd72178f069bdea8d99e9479d8087a2686fc81bf3c4b11fe275570d481f1698f79d468afe0e57acc1e298f8b69798da7a891bbec197093ec5f475909923d48bfed6843dbed1f";
 const DUMMY_II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
+const DUMMY_DERIVATION_ORIGIN: &str = "https://y2aaj-miaaa-aaaad-aacxq-cai.ic0.app";
+const DUMMY_FRONTEND_HOSTNAME: &str = "https://y2aaj-miaaa-aaaad-aacxq-cai.ic0.app";
 
 /// Dummy alias JWS for testing, valid wrt DUMMY_ROOT_KEY and DUMMY_II_CANISTER_ID.
 /// id dapp: nugva-s7c6v-4yszt-koycv-5b623-an7q6-ha2nz-kz6rs-hawgl-nznbe-rqe
@@ -60,6 +62,8 @@ lazy_static! {
     pub static ref DUMMY_ISSUER_INIT: IssuerInit = IssuerInit {
         ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
         idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
+        derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
+        frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
     };
 
     pub static ref DUMMY_SIGNED_ID_ALIAS: SignedIssuerIdAlias = SignedIssuerIdAlias {
@@ -80,6 +84,10 @@ pub struct IssuerInit {
     ic_root_key_der: Vec<u8>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
+    /// The derivation origin to be used by the issuer.
+    derivation_origin: String,
+    /// Frontend hostname be used by the issuer.
+    frontend_hostname: String,
 }
 
 pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
@@ -112,6 +120,22 @@ mod api {
             sender,
             "vc_consent_message",
             (consent_message_request,),
+        )
+        .map(|(x,)| x)
+    }
+
+    pub fn derivation_origin(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        sender: Principal,
+        hostname: &str,
+    ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
+        call_candid_as(
+            env,
+            canister_id,
+            sender,
+            "derivation_origin",
+            (hostname.to_string(),),
         )
         .map(|(x,)| x)
     }
@@ -312,6 +336,54 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
     assert_matches!(response, Err(Icrc21Error::UnsupportedCanisterCall(_)));
 }
 
+#[test]
+fn should_return_derivation_origin() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let frontend_hostname = format!("https://{}.ic0.app", canister_id.to_text());
+
+    let response = api::derivation_origin(&env, canister_id, principal_1(), &frontend_hostname)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    assert_eq!(response.origin, frontend_hostname);
+}
+
+#[test]
+fn should_return_derivation_origin_with_custom_init() {
+    let env = env();
+    let custom_init = IssuerInit {
+        ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
+        idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
+        derivation_origin: "https://derivation_origin".to_string(),
+        frontend_hostname: "https://frontend.host.name".to_string(),
+    };
+    let issuer_id = install_issuer(&env, &custom_init);
+    let response = api::derivation_origin(
+        &env,
+        issuer_id,
+        principal_1(),
+        &custom_init.frontend_hostname,
+    )
+    .expect("API call failed")
+    .expect("derivation_origin error");
+    assert_eq!(response.origin, custom_init.derivation_origin);
+}
+
+#[test]
+fn should_fail_derivation_origin_if_unsupported_origin() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let unsupported_origin = "https://wrong.fe.host";
+    let response = api::derivation_origin(&env, canister_id, principal_1(), unsupported_origin)
+        .expect("API call failed");
+    assert_eq!(
+        response,
+        Err(DerivationOriginError::UnsupportedOrigin(
+            unsupported_origin.to_string()
+        ))
+    );
+}
+
 fn employee_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
     args.insert(
@@ -447,6 +519,8 @@ fn should_fail_prepare_credential_for_wrong_root_key() {
         &IssuerInit {
             ic_root_key_der: canister_sig_util::IC_ROOT_PK_DER.to_vec(), // does not match the DUMMY_ROOT_KEY, which is used in DUMMY_ALIAS_JWS
             idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
+            derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
+            frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
         },
     );
     let response = api::prepare_credential(
@@ -470,6 +544,8 @@ fn should_fail_prepare_credential_for_wrong_idp_canister_id() {
         &IssuerInit {
             ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
             idp_canister_ids: vec![Principal::from_text("rdmx6-jaaaa-aaaaa-aaadq-cai").unwrap()], // does not match the DUMMY_II_CANISTER_ID, which is used in DUMMY_ALIAS_JWS
+            derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
+            frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
         },
     );
     let response = api::prepare_credential(
@@ -533,6 +609,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &IssuerInit {
             ic_root_key_der: env.root_key().to_vec(),
             idp_canister_ids: vec![ii_id],
+            derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
+            frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
         },
     );
     let identity_number = flows::register_anchor(&env, ii_id);

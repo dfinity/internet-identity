@@ -17,9 +17,11 @@ Usage:
   $0 [--ii-canister-id CANISTER_ID] [--dfx-network NETWORK]
 
 Options:
-  --ii-canister-id CANISTER_ID  The canister ID to use as IDP, defaults to the local internet_identity canister
-  --dfx-network NETWORK         The network to use (typically "local" or "ic"), defaults to "local"
-  --issuer-canister CANISTER    The canister to configure (name or canister ID), defaults to "issuer"
+  --ii-canister-id CANISTER_ID    The canister ID to use as IDP, defaults to the local internet_identity canister
+  --dfx-network NETWORK           The network to use (typically "local" or "ic"), defaults to "local"
+  --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
+  --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.ic0.app
+  --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
 EOF
 }
 
@@ -58,6 +60,16 @@ do
             shift; # shift past --issuer-canister & value
             shift;
             ;;
+        --issuer-derivation-origin)
+            DERIVATION_ORIGIN="${2:?missing value for '--issuer-canister'}"
+            shift; # shift past --issuer-canister & value
+            shift;
+            ;;
+        --issuer-frontend-hostname)
+            FRONTEND_HOSTNAME="${2:?missing value for '--issuer-canister'}"
+            shift; # shift past --issuer-canister & value
+            shift;
+            ;;
         *)
             echo "ERROR: unknown argument $1"
             usage
@@ -72,6 +84,10 @@ done
 DFX_NETWORK="${DFX_NETWORK:-local}"
 II_CANISTER_ID="${II_CANISTER_ID:-$(dfx canister id internet_identity)}"
 ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
+ISSUER_CANISTER_ID=$(dfx canister id $ISSUER_CANISTER)
+DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.ic0.app"
+ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
+ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
 
 echo "Using DFX network: $DFX_NETWORK" >&2
 
@@ -89,5 +105,8 @@ rootkey_did=$(dfx ping "$DFX_NETWORK" \
 echo "Parsed rootkey: ${rootkey_did:0:20}..." >&2
 
 echo "Using II canister: $II_CANISTER_ID" >&2
+echo "Using issuer derivation origin: $ISSUER_DERIVATION_ORIGIN" >&2
+echo "Using issuer frontend_hostname: $ISSUER_FRONTEND_HOSTNAME" >&2
 
-dfx canister call --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = vec '"$rootkey_did"' })'
+dfx canister call --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
+    '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'

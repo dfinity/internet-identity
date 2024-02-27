@@ -68,12 +68,23 @@ type IssueCredentialError = variant {
     Internal : text;
 };
 
+/// Messages for `derivation_origin`.
+type DerivationOriginData = record { origin : text };
+type DerivationOriginError = variant {
+  Internal : text;
+  UnsupportedOrigin : text;
+};
+
 /// Configuration specific to this issuer.
 type IssuerConfig = record {
     /// Root of trust for checking canister signatures.
     ic_root_key_der : blob;
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids : vec principal;
+    /// The derivation origin to be used by the issuer.
+    derivation_origin : text;
+    /// Frontend hostname be used by the issuer.
+    frontend_hostname : text;
 };
 
 /// Options related to HTTP handling
@@ -102,6 +113,7 @@ service: (opt IssuerConfig) -> {
     vc_consent_message : (Icrc21VcConsentMessageRequest) -> (variant { Ok : Icrc21ConsentInfo; Err : Icrc21Error;});
     prepare_credential : (PrepareCredentialRequest) -> (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
     get_credential : (GetCredentialRequest) -> (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
+    derivation_origin : (text) -> (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
 
     /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();
@@ -111,7 +123,6 @@ service: (opt IssuerConfig) -> {
     add_employee : (principal) -> (text);
     add_graduate : (principal) -> (text);
     add_adult : (principal) -> (text);
-
 
     /// Serve the app
     http_request: (request: HttpRequest) -> (HttpResponse) query;
