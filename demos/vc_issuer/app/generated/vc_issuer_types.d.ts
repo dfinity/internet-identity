@@ -8,6 +8,9 @@ export interface CredentialSpec {
   'arguments' : [] | [Array<[string, ArgumentValue]>],
   'credential_type' : string,
 }
+export interface DerivationOriginData { 'origin' : string }
+export type DerivationOriginError = { 'Internal' : string } |
+  { 'UnsupportedOrigin' : string };
 export interface GetCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'prepared_context' : [] | [Uint8Array | number[]],
@@ -49,8 +52,10 @@ export type IssueCredentialError = { 'Internal' : string } |
   { 'UnsupportedCredentialSpec' : string };
 export interface IssuedCredentialData { 'vc_jws' : string }
 export interface IssuerConfig {
+  'derivation_origin' : string,
   'idp_canister_ids' : Array<Principal>,
   'ic_root_key_der' : Uint8Array | number[],
+  'frontend_hostname' : string,
 }
 export interface PrepareCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
@@ -65,6 +70,11 @@ export interface _SERVICE {
   'add_employee' : ActorMethod<[Principal], string>,
   'add_graduate' : ActorMethod<[Principal], string>,
   'configure' : ActorMethod<[IssuerConfig], undefined>,
+  'derivation_origin' : ActorMethod<
+    [string],
+    { 'Ok' : DerivationOriginData } |
+      { 'Err' : DerivationOriginError }
+  >,
   'get_credential' : ActorMethod<
     [GetCredentialRequest],
     { 'Ok' : IssuedCredentialData } |
