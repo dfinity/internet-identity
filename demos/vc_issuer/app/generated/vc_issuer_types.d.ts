@@ -11,6 +11,7 @@ export interface CredentialSpec {
 export interface DerivationOriginData { 'origin' : string }
 export type DerivationOriginError = { 'Internal' : string } |
   { 'UnsupportedOrigin' : string };
+export interface DerivationOriginRequest { 'frontend_hostname' : string }
 export interface GetCredentialRequest {
   'signed_id_alias' : SignedIdAlias,
   'prepared_context' : [] | [Uint8Array | number[]],
@@ -71,7 +72,7 @@ export interface _SERVICE {
   'add_graduate' : ActorMethod<[Principal], string>,
   'configure' : ActorMethod<[IssuerConfig], undefined>,
   'derivation_origin' : ActorMethod<
-    [string],
+    [DerivationOriginRequest],
     { 'Ok' : DerivationOriginData } |
       { 'Err' : DerivationOriginError }
   >,

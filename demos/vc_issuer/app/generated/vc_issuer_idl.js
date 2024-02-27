@@ -5,6 +5,9 @@ export const idlFactory = ({ IDL }) => {
     'ic_root_key_der' : IDL.Vec(IDL.Nat8),
     'frontend_hostname' : IDL.Text,
   });
+  const DerivationOriginRequest = IDL.Record({
+    'frontend_hostname' : IDL.Text,
+  });
   const DerivationOriginData = IDL.Record({ 'origin' : IDL.Text });
   const DerivationOriginError = IDL.Variant({
     'Internal' : IDL.Text,
@@ -74,7 +77,7 @@ export const idlFactory = ({ IDL }) => {
     'add_graduate' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'configure' : IDL.Func([IssuerConfig], [], []),
     'derivation_origin' : IDL.Func(
-        [IDL.Text],
+        [DerivationOriginRequest],
         [
           IDL.Variant({
             'Ok' : DerivationOriginData,
