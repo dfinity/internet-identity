@@ -1,5 +1,9 @@
+use crate::v2_api::authn_method_test_helpers::{
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
+};
 use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
+use canister_tests::api::internet_identity::api_v2;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
@@ -947,6 +951,55 @@ mod pull_entries_tests {
                 "only the archive canister [a-z0-9-]+ is allowed to fetch and acknowledge entries",
             )
             .unwrap(),
+        );
+    }
+
+    #[test]
+    fn should_not_accept_changes_if_archive_buffer_full() {
+        let env = env();
+        let ii_canister = install_ii_canister_with_arg(
+            &env,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                archive_config: Some(ArchiveConfig {
+                    module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                    entries_buffer_limit: 3,
+                    polling_interval_ns: 0,
+                    entries_fetch_limit: 0,
+                }),
+                ..InternetIdentityInit::default()
+            }),
+        );
+        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
+        // stop the archive so that the entries start piling up in the buffer
+        env.stop_canister(archive_canister, Some(ii_canister))
+            .expect("failed to stop archive");
+
+        let authn_method = test_authn_method();
+        let identity = create_identity_with_authn_method(&env, ii_canister, &authn_method);
+        for i in 0..2 {
+            api_v2::authn_method_add(
+                &env,
+                ii_canister,
+                authn_method.principal(),
+                identity,
+                &sample_webauthn_authn_method(i + 1),
+            )
+            .expect("API call failed")
+            .expect("authn_method_add failed");
+        }
+
+        let result = api_v2::authn_method_add(
+            &env,
+            ii_canister,
+            authn_method.principal(),
+            identity,
+            &sample_webauthn_authn_method(3),
+        );
+        expect_user_error_with_message(
+            result,
+            CanisterCalledTrap,
+            Regex::new("cannot archive operation, archive entries buffer limit reached").unwrap(),
         );
     }
 }
