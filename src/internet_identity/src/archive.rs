@@ -14,7 +14,6 @@ use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
-use std::rc::Rc;
 use std::time::Duration;
 use ArchiveState::{Configured, Created, CreationInProgress, NotConfigured};
 use CanisterInstallMode::Upgrade;
@@ -54,21 +53,11 @@ pub struct ArchiveData {
     pub sequence_number: u64,
     // Canister id of the archive canister
     pub archive_canister: Principal,
-    // Entries to be fetched by the archive canister sorted in ascending order by sequence_number.
-    // Once the limit has been reached, II will refuse further changes to anchors in stable memory
-    // until the archive acknowledges entries and they can safely be deleted from this buffer.
-    // The limit is configurable (entries_buffer_limit).
-    // This is an Rc to avoid unnecessary copies of (potentially) a lot of data when cloning.
-    pub entries_buffer: Rc<Vec<BufferedEntry>>,
 }
 
 impl ArchiveData {
     pub fn buffered_entries_count(&self) -> usize {
-        state::storage_borrow(|s| match s.version() {
-            7 => self.entries_buffer.len(),
-            8 => s.archive_entries_count(),
-            _ => trap("unsupported storage version"),
-        })
+        state::storage_borrow(|s| s.archive_entries_count())
     }
 }
 
@@ -200,7 +189,6 @@ async fn create_archive(config: ArchiveConfig) -> Result<Principal, String> {
                     data: ArchiveData {
                         sequence_number: 0,
                         archive_canister: canister_id,
-                        entries_buffer: Rc::new(vec![]),
                     },
                     config,
                 }
@@ -327,8 +315,7 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
         return;
     };
 
-    // For layout versions < 6 this will always be false because nothing is ever added to the buffer
-    if data.entries_buffer.len() as u64 >= config.entries_buffer_limit {
+    if data.buffered_entries_count() as u64 >= config.entries_buffer_limit {
         trap("cannot archive operation, archive entries buffer limit reached")
     }
 
@@ -348,17 +335,9 @@ pub fn archive_operation(anchor_number: AnchorNumber, caller: Principal, operati
     };
 
     // add entry to buffer (which is emptied by the archive periodically, see fetch_entries and acknowledge entries)
-    match state::storage_borrow(|s| s.version()) {
-        7 => {
-            state::archive_data_mut(|data| {
-                Rc::make_mut(&mut data.entries_buffer).push(buffered_entry);
-            });
-        }
-        8 => state::storage_borrow_mut(|s| {
-            s.add_archive_entry(buffered_entry);
-        }),
-        _ => trap("unsupported storage version"),
-    }
+    state::storage_borrow_mut(|s| {
+        s.add_archive_entry(buffered_entry);
+    });
 
     state::archive_data_mut(|data| {
         data.sequence_number += 1;
@@ -373,16 +352,7 @@ pub fn fetch_entries() -> Vec<BufferedEntry> {
 
     // buffered entries are ordered by sequence number
     // i.e. this takes the first (by sequence numbers) entries_fetch_limit many entries
-    match state::storage_borrow(|s| s.version()) {
-        7 => data
-            .entries_buffer
-            .iter()
-            .take(config.entries_fetch_limit as usize)
-            .cloned()
-            .collect(),
-        8 => state::storage_borrow_mut(|s| s.get_archive_entries(config.entries_fetch_limit)),
-        _ => trap("unsupported storage version"),
-    }
+    state::storage_borrow_mut(|s| s.get_archive_entries(config.entries_fetch_limit))
 }
 
 pub fn acknowledge_entries(sequence_number: u64) {
@@ -393,12 +363,7 @@ pub fn acknowledge_entries(sequence_number: u64) {
         trap_if_caller_not_archive(data);
 
         // Only keep entries with higher sequence number as the highest acknowledged.
-        match state::storage_borrow(|s| s.version()) {
-            7 => Rc::make_mut(&mut data.entries_buffer)
-                .retain(|e| e.sequence_number > sequence_number),
-            8 => state::storage_borrow_mut(|s| s.prune_archive_entries(sequence_number)),
-            _ => trap("unsupported storage version"),
-        }
+        state::storage_borrow_mut(|s| s.prune_archive_entries(sequence_number))
     });
 }
 

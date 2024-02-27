@@ -10,7 +10,7 @@ internet_identity_interface.workspace = true
 hex.workspace = true
 include_dir.workspace = true
 lazy_static.workspace = true
-serde = { version = "1", features = ["rc"] }
+serde.workspace = true
 serde_bytes.workspace = true
 serde_cbor.workspace = true
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
