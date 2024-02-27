@@ -1,0 +1,11 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Forgot II Number" pageName="forgotNumber">
+  <script>
+    import { forgotNumberPage } from "$src/flows/recovery/forgotNumber";
+
+    forgotNumberPage({ cancel: () => console.log("cancel") });
+  </script>
+</Screen>

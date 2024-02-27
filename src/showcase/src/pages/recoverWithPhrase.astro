@@ -1,0 +1,21 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Recover With Phrase" pageName="recoverWithPhrase">
+  <script>
+    import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+
+    recoverWithPhrasePage({
+      verify: ({ userNumber, words }) =>
+        Promise.resolve({
+          ok: true,
+          value: { kind: "loginSuccess", userNumber, words },
+        }),
+      confirm: ({ userNumber, words }) =>
+        console.log("confirmed: ", userNumber, words),
+      back: () => console.log("remove"),
+      message: "Something cool will happen if you type your anchor",
+    });
+  </script>
+</Screen>
