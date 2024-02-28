@@ -5,6 +5,7 @@ import {
   minifyHTML,
   replicaForwardPlugin,
 } from "@dfinity/internet-identity-vite-plugins";
+import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
@@ -18,7 +19,7 @@ export const aliasConfig: AliasOptions = {
   $showcase: resolve(__dirname, "src/showcase/src"),
 };
 
-export default defineConfig(({ mode }: UserConfig): UserConfig => {
+export default defineConfig(({ command, mode }): UserConfig => {
   // Expand process.env variables with default values to ensure build reproducibility
   process.env = {
     ...process.env,
@@ -27,6 +28,13 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
     II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
+
+  // Astro gets a bit confused and tries to load the server config (including devserver-only
+  // plugins) on build. This ensures that plugins that need dfx are only invoked on serve.
+  // https://github.com/withastro/astro/issues/10262
+  const isAstro =
+    process.env["npm_lifecycle_script"]?.includes("astro") === true;
+  const isServe = command === "serve" && !isAstro;
 
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
@@ -72,24 +80,29 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
       ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
-      replicaForwardPlugin({
-        replicaOrigin: "127.0.0.1:4943",
-        forwardDomains: ["icp0.io", "ic0.app"],
-        forwardRules: [
-          {
-            hosts: ["nice-name.com"],
-            canisterName: "test_app",
-          },
-          ...(process.env.NO_HOT_RELOAD === "1"
-            ? [
-                {
-                  hosts: ["identity.ic0.app", "identity.internetcomputer.org"],
-                  canisterName: "internet_identity",
-                },
-              ]
-            : []),
-        ],
-      }),
+      {
+        ...replicaForwardPlugin({
+          forwardDomains: ["icp0.io", "ic0.app"],
+          forwardRules: [
+            {
+              hosts: ["nice-name.com"],
+              canisterName: "test_app",
+            },
+            ...(process.env.NO_HOT_RELOAD === "1"
+              ? [
+                  {
+                    hosts: [
+                      "identity.ic0.app",
+                      "identity.internetcomputer.org",
+                    ],
+                    canisterName: "internet_identity",
+                  },
+                ]
+              : []),
+          ],
+        }),
+        apply: () => isServe,
+      },
     ],
     optimizeDeps: {
       esbuildOptions: {
@@ -98,11 +111,13 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => {
         },
       },
     },
-    server: {
-      https: process.env.TLS_DEV_SERVER === "1",
-      proxy: {
-        "/api": "http://127.0.0.1:4943",
-      },
-    },
+    server: !isServe
+      ? {}
+      : {
+          https: process.env.TLS_DEV_SERVER === "1",
+          proxy: {
+            "/api": `http://127.0.0.1:${readReplicaPort()}`,
+          },
+        },
   };
 });

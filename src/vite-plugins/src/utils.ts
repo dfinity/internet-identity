@@ -5,6 +5,14 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
 /**
+ * Read the replica port from dfx's local state
+ */
+export const readReplicaPort = (): string => {
+  const stdout = execSync("dfx info webserver-port");
+  return stdout.toString().trim();
+};
+
+/**
  * Read a canister ID from dfx's local state
  */
 export const readCanisterId = ({
