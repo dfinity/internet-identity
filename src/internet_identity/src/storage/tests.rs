@@ -47,7 +47,7 @@ fn should_recover_header_from_memory_v8() {
     memory.grow(1);
     memory.write(0, &hex::decode("494943080500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
 
-    let storage = Storage::from_memory(memory).unwrap();
+    let storage = Storage::from_memory(memory);
     assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.anchor_count(), 5);

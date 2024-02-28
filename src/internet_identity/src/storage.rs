@@ -205,6 +205,23 @@ impl<M: Memory + Clone> Storage<M> {
                 "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {MAX_ENTRIES} entries)",
             ));
         }
+        let version: u8 = 8;
+        let header = Header {
+            magic: *b"IIC",
+            version,
+            num_anchors: 0,
+            id_range_lo,
+            id_range_hi,
+            entry_size: DEFAULT_ENTRY_SIZE,
+            salt: EMPTY_SALT,
+        };
+
+        let mut storage = Self::init_with_header(memory, header);
+        storage.flush();
+        storage
+    }
+
+    fn init_with_header(memory: M, header: Header) -> Self {
         let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
         let memory_manager = MemoryManager::init_with_bucket_size(
             RestrictedMemory::new(memory, 1..MAX_MANAGED_WASM_PAGES),
@@ -212,25 +229,14 @@ impl<M: Memory + Clone> Storage<M> {
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
         let archive_buffer_memory = Self::init_archive_buffer_memory(&memory_manager);
-        let version: u8 = 8;
 
-        let mut storage = Self {
-            header: Header {
-                magic: *b"IIC",
-                version,
-                num_anchors: 0,
-                id_range_lo,
-                id_range_hi,
-                entry_size: DEFAULT_ENTRY_SIZE,
-                salt: EMPTY_SALT,
-            },
+        Self {
+            header,
             header_memory,
             anchor_memory,
             archive_buffer_memory: archive_buffer_memory.clone(),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
-        };
-        storage.flush();
-        storage
+        }
     }
 
     pub fn salt(&self) -> Option<&Salt> {
@@ -251,13 +257,11 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Initializes storage by reading the given memory.
     ///
-    /// Returns None if the memory is empty.
-    ///
-    /// Panics if the memory is not empty but cannot be
+    /// Panics if the memory is empty or cannot be
     /// decoded.
-    pub fn from_memory(memory: M) -> Option<Self> {
+    pub fn from_memory(memory: M) -> Self {
         if memory.size() < 1 {
-            return None;
+            trap("stable memory is empty, cannot initialize");
         }
 
         let mut header: Header = unsafe { std::mem::zeroed() };
@@ -288,24 +292,7 @@ impl<M: Memory + Clone> Storage<M> {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
-        match header.version {
-            8 => {
-                let header_memory = RestrictedMemory::new(memory.clone(), 0..1);
-                let managed_memory = RestrictedMemory::new(memory, 1..MAX_MANAGED_WASM_PAGES);
-                let memory_manager =
-                    MemoryManager::init_with_bucket_size(managed_memory, BUCKET_SIZE_IN_PAGES);
-                let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
-                let archive_buffer_memory = Self::init_archive_buffer_memory(&memory_manager);
-                Some(Self {
-                    header,
-                    header_memory,
-                    anchor_memory,
-                    archive_buffer_memory: archive_buffer_memory.clone(),
-                    archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
-                })
-            }
-            _ => trap(&format!("unsupported header version: {}", header.version)),
-        }
+        Self::init_with_header(memory, header)
     }
 
     /// Allocates a fresh Identity Anchor.

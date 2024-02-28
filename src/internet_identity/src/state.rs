@@ -223,15 +223,8 @@ pub fn init_from_stable_memory() {
     STATE.with(|s| {
         s.last_upgrade_timestamp.set(time());
     });
-    let maybe_new_storage = Storage::from_memory(DefaultMemoryImpl::default());
-    match maybe_new_storage {
-        Some(new_storage) => {
-            storage_replace(new_storage);
-        }
-        None => {
-            storage_borrow_mut(|storage| storage.flush());
-        }
-    }
+    let storage = Storage::from_memory(DefaultMemoryImpl::default());
+    storage_replace(storage);
 }
 
 pub fn save_persistent_state() {
