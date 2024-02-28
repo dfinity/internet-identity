@@ -5,6 +5,7 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Recover With Phrase" pageName="recoverWithPhrase">
   <script>
     import { recoverWithPhrasePage } from "$src/flows/recovery/recoverWith/phrase";
+    import { toast } from "$src/components/toast";
 
     recoverWithPhrasePage({
       verify: ({ userNumber, words }) =>
@@ -13,8 +14,8 @@ import Screen from "../layouts/Screen.astro";
           value: { kind: "loginSuccess", userNumber, words },
         }),
       confirm: ({ userNumber, words }) =>
-        console.log("confirmed: ", userNumber, words),
-      back: () => console.log("remove"),
+        toast.info("confirmed: ", userNumber, words),
+      back: () => toast.info("remove"),
       message: "Something cool will happen if you type your anchor",
     });
   </script>

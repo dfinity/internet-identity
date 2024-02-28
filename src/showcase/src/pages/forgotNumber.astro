@@ -5,7 +5,8 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Forgot II Number" pageName="forgotNumber">
   <script>
     import { forgotNumberPage } from "$src/flows/recovery/forgotNumber";
+    import { toast } from "$src/components/toast";
 
-    forgotNumberPage({ cancel: () => console.log("cancel") });
+    forgotNumberPage({ cancel: () => toast.info("cancel") });
   </script>
 </Screen>
