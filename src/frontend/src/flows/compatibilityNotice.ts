@@ -11,7 +11,7 @@ const pageContent = () =>
         Internet Identity is not supported by your browser.
       </p>
       <p class="t-paragraph">
-        This device does not offer
+        This device <strong class="t-strong">does</strong> offer
         <a
           href="https://fidoalliance.org/passkeys/"
           rel="noopener noreferrer"
