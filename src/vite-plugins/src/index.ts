@@ -3,7 +3,7 @@ import { minify } from "html-minifier-terser";
 import { extname } from "path";
 import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression";
-import { forwardToReplica, readCanisterId } from "./utils.js";
+import { forwardToReplica, readCanisterId, readReplicaPort } from "./utils.js";
 
 export * from "./utils.js";
 
@@ -56,16 +56,15 @@ export const minifyHTML = (): Plugin => ({
  *                     to forward requests to a specific canister
  */
 export const replicaForwardPlugin = ({
-  replicaOrigin,
   forwardDomains /* note: will match exactly on <canister>.<domain> */,
   forwardRules,
 }: {
-  replicaOrigin: string;
   forwardDomains?: string[];
   forwardRules: Array<{ canisterName: string; hosts: string[] }>;
 }) => ({
   name: "replica-forward",
   configureServer(server: ViteDevServer) {
+    const replicaOrigin = `127.0.0.1:${readReplicaPort()}`;
     server.middlewares.use((req, res, next) => {
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
