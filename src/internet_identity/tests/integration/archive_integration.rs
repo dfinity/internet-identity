@@ -17,20 +17,38 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
-fn setup_ii_v8(arg: Option<InternetIdentityInit>) -> (StateMachine, CanisterId) {
-    let env = env();
-    let ii_canister = install_ii_canister_with_arg(
-        &env,
-        II_WASM.clone(),
-        arg.or(arg_with_wasm_hash(ARCHIVE_WASM.clone())),
-    );
+fn setup_ii_v8(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
+    let ii_canister = install_ii_canister(env, EMPTY_WASM.clone());
+    restore_compressed_stable_memory(env, ii_canister, "stable_memory/clean_init_v8.bin.gz");
+    upgrade_ii_canister_with_arg(env, ii_canister, II_WASM.clone(), arg)
+        .expect("II upgrade failed");
     assert_eq!(
-        ii_api::stats(&env, ii_canister)
+        ii_api::stats(env, ii_canister)
             .unwrap()
             .storage_layout_version,
         8
     );
-    (env, ii_canister)
+    ii_canister
+}
+
+fn setup_ii_v9(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
+    let ii_canister = install_ii_canister_with_arg(env, II_WASM.clone(), arg);
+    assert_eq!(
+        ii_api::stats(env, ii_canister)
+            .unwrap()
+            .storage_layout_version,
+        9
+    );
+    ii_canister
+}
+
+fn ii_canisters_under_test(
+    env: &StateMachine,
+    arg: Option<InternetIdentityInit>,
+) -> Vec<CanisterId> {
+    // the default arg for this test suite configures the archive
+    let arg = arg.or(arg_with_wasm_hash(ARCHIVE_WASM.clone()));
+    vec![setup_ii_v8(env, arg.clone()), setup_ii_v9(env, arg)]
 }
 
 /// Tests related to archive deployment (using II).
@@ -39,9 +57,11 @@ mod deployment_tests {
     use super::*;
 
     #[test]
-    fn should_deploy_archive_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_deploy_archive(&env, ii_canister);
+    fn should_deploy_archive_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_deploy_archive(&env, ii_canister);
+        }
     }
 
     fn should_deploy_archive(env: &StateMachine, ii_canister: CanisterId) {
@@ -51,8 +71,9 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_deploy_archive_with_cycles_v8() {
-        let (env, ii_canister) = setup_ii_v8(Some(InternetIdentityInit {
+    fn should_deploy_archive_with_cycles_all_versions() {
+        let env = env();
+        let arg = Some(InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
                 module_hash: archive_wasm_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 0,
@@ -61,9 +82,10 @@ mod deployment_tests {
             }),
             canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
             ..InternetIdentityInit::default()
-        }));
-
-        should_deploy_archive_with_cycles(&env, ii_canister);
+        });
+        for ii_canister in ii_canisters_under_test(&env, arg) {
+            should_deploy_archive_with_cycles(&env, ii_canister);
+        }
     }
 
     fn should_deploy_archive_with_cycles(env: &StateMachine, ii_canister: CanisterId) {
@@ -76,9 +98,11 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_not_deploy_wrong_wasm_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_not_deploy_wrong_wasm(&env, ii_canister);
+    fn should_not_deploy_wrong_wasm_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_not_deploy_wrong_wasm(&env, ii_canister);
+        }
     }
 
     fn should_not_deploy_wrong_wasm(env: &StateMachine, ii_canister: CanisterId) {
@@ -91,9 +115,11 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_not_deploy_archive_when_disabled_v8() {
-        let (env, ii_canister) = setup_ii_v8(Some(InternetIdentityInit::default()));
-        should_not_deploy_archive_when_disabled(&env, ii_canister);
+    fn should_not_deploy_archive_when_disabled_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, Some(InternetIdentityInit::default())) {
+            should_not_deploy_archive_when_disabled(&env, ii_canister);
+        }
     }
 
     fn should_not_deploy_archive_when_disabled(env: &StateMachine, ii_canister: CanisterId) {
@@ -106,9 +132,11 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_keep_archive_module_hash_across_upgrades_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_keep_archive_module_hash_across_upgrades(&env, ii_canister);
+    fn should_keep_archive_module_hash_across_upgrades_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_keep_archive_module_hash_across_upgrades(&env, ii_canister);
+        }
     }
 
     fn should_keep_archive_module_hash_across_upgrades(
@@ -123,9 +151,11 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_upgrade_the_archive_v8() {
-        let (env, ii_canister) = setup_ii_v8(arg_with_wasm_hash(EMPTY_WASM.clone()));
-        should_upgrade_the_archive(&env, ii_canister);
+    fn should_upgrade_the_archive_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, arg_with_wasm_hash(EMPTY_WASM.clone())) {
+            should_upgrade_the_archive(&env, ii_canister);
+        }
     }
 
     fn should_upgrade_the_archive(env: &StateMachine, ii_canister: CanisterId) {
@@ -154,9 +184,11 @@ mod deployment_tests {
     }
 
     #[test]
-    fn should_upgrade_archive_with_only_config_changed_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_upgrade_archive_with_only_config_changed(&env, ii_canister);
+    fn should_upgrade_archive_with_only_config_changed_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_upgrade_archive_with_only_config_changed(&env, ii_canister);
+        }
     }
 
     fn should_upgrade_archive_with_only_config_changed(
@@ -204,9 +236,12 @@ mod pull_entries_tests {
     use super::*;
 
     #[test]
-    fn should_record_anchor_operations_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_record_anchor_operations(&env, ii_canister)
+    fn should_record_anchor_operations_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_record_anchor_operations(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_record_anchor_operations(
@@ -388,9 +423,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_metadata_for_new_device_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_record_metadata_for_new_device(&env, ii_canister)
+    fn should_record_metadata_for_new_device_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_record_metadata_for_new_device(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_record_metadata_for_new_device(
@@ -439,9 +477,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_metadata_change_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_record_metadata_change(&env, ii_canister)
+    fn should_record_metadata_change_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_record_metadata_change(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_record_metadata_change(
@@ -509,9 +550,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_identity_metadata_replace_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_record_identity_metadata_replace(&env, ii_canister)
+    fn should_record_identity_metadata_replace_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_record_identity_metadata_replace(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_record_identity_metadata_replace(
@@ -570,9 +614,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_fetch_multiple_times_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_fetch_multiple_times(&env, ii_canister)
+    fn should_fetch_multiple_times_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_fetch_multiple_times(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_fetch_multiple_times(
@@ -606,9 +653,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_succeed_on_empty_fetch_result_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_succeed_on_empty_fetch_result(&env, ii_canister)
+    fn should_succeed_on_empty_fetch_result_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_succeed_on_empty_fetch_result(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_succeed_on_empty_fetch_result(
@@ -640,9 +690,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_correct_number_of_fetched_entries_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_report_correct_number_of_fetched_entries(&env, ii_canister)
+    fn should_report_correct_number_of_fetched_entries_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_report_correct_number_of_fetched_entries(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_report_correct_number_of_fetched_entries(
@@ -697,9 +750,11 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_archive_config_metrics_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_report_archive_config_metrics(&env, ii_canister)
+    fn should_report_archive_config_metrics_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_report_archive_config_metrics(&env, ii_canister);
+        }
     }
 
     fn should_report_archive_config_metrics(env: &StateMachine, ii_canister: CanisterId) {
@@ -734,9 +789,11 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_archive_entries_metrics_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_report_archive_entries_metrics(&env, ii_canister)
+    fn should_report_archive_entries_metrics_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_report_archive_entries_metrics(&env, ii_canister)
+        }
     }
 
     fn should_report_archive_entries_metrics(env: &StateMachine, ii_canister: CanisterId) {
@@ -804,9 +861,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_call_errors_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_report_call_errors(&env, ii_canister)
+    fn should_report_call_errors_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_report_call_errors(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_report_call_errors(
@@ -848,9 +908,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_recover_after_error_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_recover_after_error(&env, ii_canister)
+    fn should_recover_after_error_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_recover_after_error(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_recover_after_error(
@@ -885,9 +948,12 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_return_entries_ordered_v8() -> Result<(), CallError> {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_return_entries_ordered(&env, ii_canister)
+    fn should_return_entries_ordered_all_versions() -> Result<(), CallError> {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_return_entries_ordered(&env, ii_canister)?;
+        }
+        Ok(())
     }
 
     fn should_return_entries_ordered(
@@ -910,9 +976,11 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_not_allow_wrong_caller_to_fetch_entries_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_not_allow_wrong_caller_to_fetch_entries(&env, ii_canister);
+    fn should_not_allow_wrong_caller_to_fetch_entries_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_not_allow_wrong_caller_to_fetch_entries(&env, ii_canister);
+        }
     }
 
     fn should_not_allow_wrong_caller_to_fetch_entries(env: &StateMachine, ii_canister: CanisterId) {
@@ -931,9 +999,11 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_not_allow_wrong_caller_to_acknowledge_entries_v8() {
-        let (env, ii_canister) = setup_ii_v8(None);
-        should_not_allow_wrong_caller_to_acknowledge_entries(&env, ii_canister);
+    fn should_not_allow_wrong_caller_to_acknowledge_entries_all_versions() {
+        let env = env();
+        for ii_canister in ii_canisters_under_test(&env, None) {
+            should_not_allow_wrong_caller_to_acknowledge_entries(&env, ii_canister);
+        }
     }
 
     fn should_not_allow_wrong_caller_to_acknowledge_entries(

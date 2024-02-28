@@ -29,16 +29,16 @@ fn should_report_max_number_of_entries_for_256gb() {
 }
 
 #[test]
-fn should_serialize_header_v8() {
+fn should_serialize_header_v9() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
     storage.update_salt([5u8; 32]);
     storage.flush();
 
-    assert_eq!(storage.version(), 8);
+    assert_eq!(storage.version(), 9);
     let mut buf = vec![0; HEADER_SIZE];
     memory.read(0, &mut buf);
-    assert_eq!(buf, hex::decode("49494308000000000100000000000000020000000000000000100505050505050505050505050505050505050505050505050505050505050505").unwrap());
+    assert_eq!(buf, hex::decode("49494309000000000100000000000000020000000000000000100505050505050505050505050505050505050505050505050505050505050505").unwrap());
 }
 
 #[test]
@@ -52,6 +52,19 @@ fn should_recover_header_from_memory_v8() {
     assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
     assert_eq!(storage.anchor_count(), 5);
     assert_eq!(storage.version(), 8);
+}
+
+#[test]
+fn should_recover_header_from_memory_v9() {
+    let memory = VectorMemory::default();
+    memory.grow(1);
+    memory.write(0, &hex::decode("494943090500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+
+    let storage = Storage::from_memory(memory);
+    assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
+    assert_eq!(storage.salt().unwrap(), &[67u8; 32]);
+    assert_eq!(storage.anchor_count(), 5);
+    assert_eq!(storage.version(), 9);
 }
 
 #[test]
@@ -104,9 +117,11 @@ fn should_save_and_restore_persistent_state() {
 }
 
 #[test]
-fn should_not_find_persistent_state_if_it_does_not_exist() {
+fn should_not_find_persistent_state_if_it_does_not_exist_v8() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    memory.grow(1);
+    memory.write(0, &hex::decode("494943080500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+    let mut storage = Storage::from_memory(memory.clone());
     storage.flush();
 
     let result = storage.read_persistent_state();
@@ -114,9 +129,20 @@ fn should_not_find_persistent_state_if_it_does_not_exist() {
 }
 
 #[test]
-fn should_overwrite_persistent_state_with_next_anchor() {
+fn should_always_find_persistent_state_v9() {
     let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.flush();
+
+    assert!(storage.read_persistent_state().is_ok());
+}
+
+#[test]
+fn should_overwrite_persistent_state_with_next_anchor_v8() {
+    let memory = VectorMemory::default();
+    memory.grow(1);
+    memory.write(0, &hex::decode("494943080500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+    let mut storage = Storage::from_memory(memory.clone());
     storage.flush();
 
     storage.allocate_anchor().unwrap();
@@ -128,6 +154,22 @@ fn should_overwrite_persistent_state_with_next_anchor() {
 
     let result = storage.read_persistent_state();
     assert!(matches!(result, Err(PersistentStateError::NotFound)));
+}
+
+#[test]
+fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    storage.allocate_anchor().unwrap();
+    storage.write_persistent_state(&sample_persistent_state());
+    assert!(storage.read_persistent_state().is_ok());
+
+    let anchor = storage.allocate_anchor().unwrap();
+    storage.write(anchor).unwrap();
+
+    assert!(storage.read_persistent_state().is_ok());
 }
 
 fn sample_device() -> Device {

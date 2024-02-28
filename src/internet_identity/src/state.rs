@@ -12,8 +12,10 @@ use candid::{CandidType, Deserialize};
 use canister_sig_util::signature_map::SignatureMap;
 use ic_cdk::api::time;
 use ic_cdk::trap;
-use ic_stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::storable::Bound;
+use ic_stable_structures::{DefaultMemoryImpl, Storable};
 use internet_identity_interface::internet_identity::types::*;
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -113,6 +115,18 @@ impl Default for PersistentState {
             max_inflight_captchas: Some(MAX_INFLIGHT_CAPTCHAS),
         }
     }
+}
+
+impl Storable for PersistentState {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).expect("failed to serialize persistent state"))
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).expect("failed to deserialize persistent state")
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

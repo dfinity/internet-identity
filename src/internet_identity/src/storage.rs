@@ -68,16 +68,14 @@
 //! ## Persistent State
 //!
 //! In order to keep state across upgrades that is not related to specific anchors (such as archive
-//! information) Internet Identity will serialize the [PersistentState] into the first unused memory
-//! location (after the anchor record of the highest allocated anchor number). The [PersistentState]
-//! will be read in `post_upgrade` after which the data can be safely overwritten by the next anchor
-//! to be registered.
+//! information) Internet Identity will serialize the [PersistentState] on upgrade and restore it
+//! again after the upgrade.
 //!
-//! The [PersistentState] is serialized at the end of stable memory to allow for variable sized data
-//! without the risk of running out of space (which might easily happen if the RESERVED_HEADER_BYTES
-//! were used instead).
+//! The storage layout v8 and earlier use the first unused memory
+//! location (after the anchor record of the highest allocated anchor number) to store it.
+//! The storage layout v9 uses a separate virtual memory.
 //!
-//! ### Archive buffer memory
+//! ## Archive buffer memory
 //!
 //! The archive buffer memory is entirely owned by a [StableBTreeMap] used to store the buffered
 //! entries. The entries are indexed by their sequence number.
@@ -97,7 +95,7 @@ use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemor
 use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::writer::{BufferedWriter, Writer};
-use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, Storable};
+use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use internet_identity_interface::internet_identity::types::*;
@@ -116,8 +114,9 @@ mod tests;
 /// * version   0: invalid
 /// * version 1-7: no longer supported
 /// * version   8: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
-///                with memory manager (from 2nd page on), archive entries buffer in stable memory
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 8..=8;
+///                with memory manager (from 2nd page on), archive entries buffer in stable memory1
+/// * version   9: same as 8, but with persistent state in separate virtual memory
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 8..=9;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
@@ -128,8 +127,10 @@ const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 /// MemoryManager parameters.
 const ANCHOR_MEMORY_INDEX: u8 = 0u8;
 const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
+const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
+const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -145,7 +146,7 @@ pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u
 
 pub type Salt = [u8; 32];
 
-type ArchiveBufferMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
+type SingleBucketMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
 
 /// The [BufferedEntry] is wrapped to allow this crate to implement [Storable].
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -173,8 +174,17 @@ pub struct Storage<M: Memory> {
     /// This memory is entirely owned by the [archive_entries_buffer] and must never be written to.
     /// The only reason it is stored here is to have a reference to it so that we can provide stats
     /// about its size.
-    archive_buffer_memory: ArchiveBufferMemory<M>,
-    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, ArchiveBufferMemory<M>>,
+    ///
+    /// A single archive entry takes on average 476 bytes of space.
+    /// To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
+    /// Since the memory manager allocates memory in buckets of 128 pages, we round up to 128 pages.
+    archive_buffer_memory: SingleBucketMemory<M>,
+    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, SingleBucketMemory<M>>,
+    /// This memory is entirely owned by the [persistent_state] and must never be written to.
+    /// The only reason it is stored here is to have a reference to it so that we can provide stats
+    /// about its size.
+    persistent_state_memory: SingleBucketMemory<M>,
+    persistent_state: StableCell<PersistentState, SingleBucketMemory<M>>,
 }
 
 #[repr(packed)]
@@ -205,7 +215,7 @@ impl<M: Memory + Clone> Storage<M> {
                 "id range [{id_range_lo}, {id_range_hi}) is too large for a single canister (max {MAX_ENTRIES} entries)",
             ));
         }
-        let version: u8 = 8;
+        let version: u8 = 9;
         let header = Header {
             magic: *b"IIC",
             version,
@@ -228,14 +238,18 @@ impl<M: Memory + Clone> Storage<M> {
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
-        let archive_buffer_memory = Self::init_archive_buffer_memory(&memory_manager);
-
+        let archive_buffer_memory = single_bucket_memory(&memory_manager, ARCHIVE_BUFFER_MEMORY_ID);
+        let persistent_state_memory =
+            single_bucket_memory(&memory_manager, PERSISTENT_STATE_MEMORY_ID);
         Self {
             header,
             header_memory,
             anchor_memory,
             archive_buffer_memory: archive_buffer_memory.clone(),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
+            persistent_state_memory: persistent_state_memory.clone(),
+            persistent_state: StableCell::init(persistent_state_memory, PersistentState::default())
+                .expect("failed to initialize persistent state"),
         }
     }
 
@@ -452,18 +466,6 @@ impl<M: Memory + Clone> Storage<M> {
         record_number as u64 * self.header.entry_size as u64
     }
 
-    fn init_archive_buffer_memory(
-        memory_manager: &MemoryManager<RestrictedMemory<M>>,
-    ) -> ArchiveBufferMemory<M> {
-        // A single archive entry takes on average 476 bytes of space.
-        // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or 5 MB.
-        // Since the memory manager allocates memory in buckets of 128 pages, we round up to 128 pages.
-        RestrictedMemory::new(
-            memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
-            0..BUCKET_SIZE_IN_PAGES as u64,
-        )
-    }
-
     /// Returns the address of the first byte not yet allocated to a anchor.
     /// This address exists even if the max anchor number has been reached, because there is a memory
     /// reserve at the end of stable memory.
@@ -471,9 +473,21 @@ impl<M: Memory + Clone> Storage<M> {
         self.record_address(self.header.num_anchors)
     }
 
-    /// Writes the persistent state to stable memory just outside of the space allocated to the highest anchor number.
-    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
+        match self.version() {
+            8 => self.write_persistent_state_v8(state),
+            9 => {
+                self.persistent_state
+                    .set(state.clone())
+                    .expect("failed to write persistent state");
+            }
+            version => trap(&format!("unsupported version: {}", version)),
+        };
+    }
+
+    /// Writes the persistent state to stable memory just outside the space allocated to the highest anchor number.
+    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
+    fn write_persistent_state_v8(&mut self, state: &PersistentState) {
         let address = self.unused_memory_start();
 
         // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
@@ -492,12 +506,19 @@ impl<M: Memory + Clone> Storage<M> {
         writer.write_all(&encoded_state).unwrap();
     }
 
-    /// Reads the persistent state from stable memory just outside of the space allocated to the highest anchor number.
-    /// This is only used to restore state in `post_upgrade`.
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
-        const WASM_PAGE_SIZE: u64 = 65536;
+        match self.version() {
+            8 => self.read_persistent_state_v8(),
+            9 => Ok(self.persistent_state.get().clone()),
+            version => trap(&format!("unsupported version: {}", version)),
+        }
+    }
+
+    /// Reads the persistent state from stable memory just outside the space allocated to the highest anchor number.
+    /// This is only used to restore state in `post_upgrade`.
+    fn read_persistent_state_v8(&self) -> Result<PersistentState, PersistentStateError> {
         let address = self.unused_memory_start();
-        if address > self.anchor_memory.size() * WASM_PAGE_SIZE {
+        if address > self.anchor_memory.size() * WASM_PAGE_SIZE_IN_BYTES as u64 {
             // the address where the persistent state would be is not allocated yet
             return Err(PersistentStateError::NotFound);
         }
@@ -544,8 +565,23 @@ impl<M: Memory + Clone> Storage<M> {
                 "archive_buffer".to_string(),
                 self.archive_buffer_memory.size(),
             ),
+            (
+                "persistent_state".to_string(),
+                self.persistent_state_memory.size(),
+            ),
         ])
     }
+}
+
+/// Creates a new virtual memory corresponding to the given ID that is limited to a single bucket.
+fn single_bucket_memory<M: Memory>(
+    memory_manager: &MemoryManager<RestrictedMemory<M>>,
+    memory_id: MemoryId,
+) -> SingleBucketMemory<M> {
+    RestrictedMemory::new(
+        memory_manager.get(memory_id),
+        0..BUCKET_SIZE_IN_PAGES as u64,
+    )
 }
 
 #[derive(Debug)]
