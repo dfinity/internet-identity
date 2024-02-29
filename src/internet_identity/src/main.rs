@@ -345,10 +345,7 @@ fn stats() -> InternetIdentityStats {
                     latest_delegation_origins.keys().cloned().collect()
                 })
                 .unwrap_or_default();
-            (
-                origins,
-                persistent_state.max_num_latest_delegation_origins.unwrap(),
-            )
+            (origins, persistent_state.max_num_latest_delegation_origins)
         });
 
     state::storage_borrow(|storage| InternetIdentityStats {
@@ -434,7 +431,7 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         }
         if let Some(limit) = arg.max_num_latest_delegation_origins {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_num_latest_delegation_origins = Some(limit);
+                persistent_state.max_num_latest_delegation_origins = limit;
             })
         }
         if let Some(limit) = arg.max_inflight_captchas {

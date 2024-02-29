@@ -231,14 +231,11 @@ fn persistent_state_metrics(
             Ok(())
         })?;
     };
-    if let Some(delegation_origins_limit) = persistent_state.max_num_latest_delegation_origins {
-        w.encode_gauge(
-            "internet_identity_max_num_latest_delegation_origins",
-            delegation_origins_limit as f64,
-            "The maximum number of latest delegation origins that were used with II bound devices.",
-        )?;
-    }
-    Ok(())
+    w.encode_gauge(
+        "internet_identity_max_num_latest_delegation_origins",
+        persistent_state.max_num_latest_delegation_origins as f64,
+        "The maximum number of latest delegation origins that were used with II bound devices.",
+    )
 }
 
 struct ActivityMetricsLabels<'a> {

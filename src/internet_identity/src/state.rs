@@ -96,7 +96,7 @@ pub struct PersistentState {
     // Hashmap of last used delegation origins
     pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
     // Maximum number of latest delegation origins to store
-    pub max_num_latest_delegation_origins: Option<u64>,
+    pub max_num_latest_delegation_origins: u64,
     // Maximum number of inflight captchas
     pub max_inflight_captchas: Option<u64>,
 }
@@ -111,7 +111,7 @@ impl Default for PersistentState {
             domain_active_anchor_stats: None,
             active_authn_method_stats: None,
             latest_delegation_origins: None,
-            max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
+            max_num_latest_delegation_origins: MAX_NUM_DELEGATION_ORIGINS,
             max_inflight_captchas: Some(MAX_INFLIGHT_CAPTCHAS),
         }
     }
@@ -253,15 +253,6 @@ pub fn load_persistent_state() {
             Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
             Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
         })
-    });
-
-    // Initialize a sensible default for max_latest_delegation_origins
-    // if it is not set in the persistent state.
-    // This will allow us to later drop the opt and make the field u64.
-    persistent_state_mut(|persistent_state| {
-        persistent_state
-            .max_num_latest_delegation_origins
-            .get_or_insert(MAX_NUM_DELEGATION_ORIGINS);
     });
 }
 

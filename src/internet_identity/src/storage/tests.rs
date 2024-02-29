@@ -220,7 +220,7 @@ fn sample_persistent_state() -> PersistentState {
                 }],
             },
         }),
-        max_num_latest_delegation_origins: None,
+        max_num_latest_delegation_origins: 1000,
         ..PersistentState::default()
     }
 }
