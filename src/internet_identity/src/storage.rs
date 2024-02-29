@@ -102,6 +102,7 @@ use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
+use crate::storage::size_ref::MemorySizeRef;
 use crate::storage::storable_anchor::StorableAnchor;
 
 pub mod anchor;
@@ -146,7 +147,7 @@ pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u
 
 pub type Salt = [u8; 32];
 
-type SingleBucketMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
+type NestedRestrictedMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
 
 /// The [BufferedEntry] is wrapped to allow this crate to implement [Storable].
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -171,20 +172,10 @@ pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: VirtualMemory<RestrictedMemory<M>>,
-    /// This memory is entirely owned by the [archive_entries_buffer] and must never be written to.
-    /// The only reason it is stored here is to have a reference to it so that we can provide stats
-    /// about its size.
-    ///
-    /// A single archive entry takes on average 476 bytes of space.
-    /// To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
-    /// Since the memory manager allocates memory in buckets of 128 pages, we round up to 128 pages.
-    archive_buffer_memory: SingleBucketMemory<M>,
-    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, SingleBucketMemory<M>>,
-    /// This memory is entirely owned by the [persistent_state] and must never be written to.
-    /// The only reason it is stored here is to have a reference to it so that we can provide stats
-    /// about its size.
-    persistent_state_memory: SingleBucketMemory<M>,
-    persistent_state: StableCell<PersistentState, SingleBucketMemory<M>>,
+    archive_buffer_size_ref: MemorySizeRef<NestedRestrictedMemory<M>>,
+    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, NestedRestrictedMemory<M>>,
+    persistent_state_size_ref: MemorySizeRef<NestedRestrictedMemory<M>>,
+    persistent_state: StableCell<PersistentState, NestedRestrictedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -238,6 +229,10 @@ impl<M: Memory + Clone> Storage<M> {
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
+
+        // A single archive entry takes on average 476 bytes of space.
+        // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
+        // Since the memory manager allocates memory in buckets of 128 pages, we use a full bucket here.
         let archive_buffer_memory = single_bucket_memory(&memory_manager, ARCHIVE_BUFFER_MEMORY_ID);
         let persistent_state_memory =
             single_bucket_memory(&memory_manager, PERSISTENT_STATE_MEMORY_ID);
@@ -245,9 +240,9 @@ impl<M: Memory + Clone> Storage<M> {
             header,
             header_memory,
             anchor_memory,
-            archive_buffer_memory: archive_buffer_memory.clone(),
+            archive_buffer_size_ref: MemorySizeRef::new(archive_buffer_memory.clone()),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
-            persistent_state_memory: persistent_state_memory.clone(),
+            persistent_state_size_ref: MemorySizeRef::new(persistent_state_memory.clone()),
             persistent_state: StableCell::init(persistent_state_memory, PersistentState::default())
                 .expect("failed to initialize persistent state"),
         }
@@ -563,11 +558,11 @@ impl<M: Memory + Clone> Storage<M> {
             ("identities".to_string(), self.anchor_memory.size()),
             (
                 "archive_buffer".to_string(),
-                self.archive_buffer_memory.size(),
+                self.archive_buffer_size_ref.size(),
             ),
             (
                 "persistent_state".to_string(),
-                self.persistent_state_memory.size(),
+                self.persistent_state_size_ref.size(),
             ),
         ])
     }
@@ -577,7 +572,7 @@ impl<M: Memory + Clone> Storage<M> {
 fn single_bucket_memory<M: Memory>(
     memory_manager: &MemoryManager<RestrictedMemory<M>>,
     memory_id: MemoryId,
-) -> SingleBucketMemory<M> {
+) -> NestedRestrictedMemory<M> {
     RestrictedMemory::new(
         memory_manager.get(memory_id),
         0..BUCKET_SIZE_IN_PAGES as u64,
@@ -632,6 +627,27 @@ impl fmt::Display for StorageError {
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
             ),
+        }
+    }
+}
+
+/// Helper module to hide internal memory of the memory size reference.
+mod size_ref {
+    use ic_stable_structures::Memory;
+
+    /// Struct that holds a memory with the sole purpose to provide a function to get
+    /// the size of the memory.
+    pub struct MemorySizeRef<M: Memory> {
+        memory: M,
+    }
+
+    impl<M: Memory> MemorySizeRef<M> {
+        pub fn new(memory: M) -> Self {
+            Self { memory }
+        }
+
+        pub fn size(&self) -> u64 {
+            self.memory.size()
         }
     }
 }
