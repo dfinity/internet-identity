@@ -1,8 +1,8 @@
 import { authnPages } from "$src/components/authenticateBox";
 import { toast } from "$src/components/toast";
 import { authnTemplateAuthorize } from "$src/flows/authorize";
-import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { authnTemplateManage } from "$src/flows/manage";
+import { dapps } from "./constants";
 import { i18n } from "./i18n";
 
 /* Various values used for showcasing both authz & manage authentication flows */
@@ -13,8 +13,6 @@ const authnCnfg = {
   recover: () => toast.info("Recover requested"),
   onSubmit: (anchor: bigint) => toast.info(`Submitting anchor ${anchor}`),
 };
-
-export const dapps = getDapps();
 
 const authzTemplates = authnTemplateAuthorize({
   origin: "https://nowhere.com",

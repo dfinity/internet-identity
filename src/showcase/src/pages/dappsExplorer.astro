@@ -7,7 +7,7 @@ import Screen from "../layouts/Screen.astro";
     import { toast } from "$src/components/toast";
     import { i18n } from "../i18n";
     import { dappsExplorerPage } from "$src/flows/dappsExplorer";
-    import { dapps } from "../templates";
+    import { dapps } from "../constants";
 
     dappsExplorerPage({ dapps, i18n, back: () => toast.info("back") });
   </script>
