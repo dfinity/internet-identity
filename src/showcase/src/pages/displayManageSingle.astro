@@ -1,0 +1,40 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display Manage Single" pageName="displayManageSingle">
+  <script>
+    import { toast } from "$src/components/toast";
+    import { userNumber, identityBackground } from "../constants";
+    import { dapps } from "../constants";
+    import { displayManagePage } from "$src/flows/manage";
+
+    displayManagePage({
+      identityBackground,
+      userNumber,
+      devices: {
+        authenticators: [
+          {
+            alias: "Chrome on iPhone",
+            rename: () => toast.info("rename"),
+          },
+        ],
+        recoveries: {},
+        pinAuthenticators: [],
+      },
+      onAddDevice: () => {
+        toast.info("add device requested");
+      },
+      addRecoveryPhrase: () => {
+        toast.info("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        toast.info("add recovery key");
+      },
+      dapps,
+      exploreDapps: () => {
+        toast.info("explore dapps");
+      },
+    });
+  </script>
+</Screen>
