@@ -102,7 +102,7 @@ use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
-use crate::storage::size_ref::MemorySizeRef;
+use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::storable_anchor::StorableAnchor;
 
 pub mod anchor;
@@ -172,9 +172,11 @@ pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
     anchor_memory: VirtualMemory<RestrictedMemory<M>>,
-    archive_buffer_size_ref: MemorySizeRef<NestedRestrictedMemory<M>>,
+    /// Memory wrapper used to report the size of the archive buffer memory.
+    archive_buffer_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
     archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, NestedRestrictedMemory<M>>,
-    persistent_state_size_ref: MemorySizeRef<NestedRestrictedMemory<M>>,
+    /// Memory wrapper used to report the size of the persistent state memory.
+    persistent_state_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
     persistent_state: StableCell<PersistentState, NestedRestrictedMemory<M>>,
 }
 
@@ -240,9 +242,9 @@ impl<M: Memory + Clone> Storage<M> {
             header,
             header_memory,
             anchor_memory,
-            archive_buffer_size_ref: MemorySizeRef::new(archive_buffer_memory.clone()),
+            archive_buffer_memory_wrapper: MemoryWrapper::new(archive_buffer_memory.clone()),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
-            persistent_state_size_ref: MemorySizeRef::new(persistent_state_memory.clone()),
+            persistent_state_memory_wrapper: MemoryWrapper::new(persistent_state_memory.clone()),
             persistent_state: StableCell::init(persistent_state_memory, PersistentState::default())
                 .expect("failed to initialize persistent state"),
         }
@@ -558,11 +560,11 @@ impl<M: Memory + Clone> Storage<M> {
             ("identities".to_string(), self.anchor_memory.size()),
             (
                 "archive_buffer".to_string(),
-                self.archive_buffer_size_ref.size(),
+                self.archive_buffer_memory_wrapper.size(),
             ),
             (
                 "persistent_state".to_string(),
-                self.persistent_state_size_ref.size(),
+                self.persistent_state_memory_wrapper.size(),
             ),
         ])
     }
@@ -631,17 +633,17 @@ impl fmt::Display for StorageError {
     }
 }
 
-/// Helper module to hide internal memory of the memory size reference.
-mod size_ref {
+/// Helper module to hide internal memory of the memory wrapper.
+mod memory_wrapper {
     use ic_stable_structures::Memory;
 
     /// Struct that holds a memory with the sole purpose to provide a function to get
     /// the size of the memory.
-    pub struct MemorySizeRef<M: Memory> {
+    pub struct MemoryWrapper<M: Memory> {
         memory: M,
     }
 
-    impl<M: Memory> MemorySizeRef<M> {
+    impl<M: Memory> MemoryWrapper<M> {
         pub fn new(memory: M) -> Self {
             Self { memory }
         }
