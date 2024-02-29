@@ -11,7 +11,7 @@ import Screen from "../layouts/Screen.astro";
     promptDeviceAliasPage({
       title: "Register this device",
       cancel: () => toast.info("canceled"),
-      continue: (alias) => toast.info("device alias:", alias),
+      continue: (alias) => toast.info(`device alias: ${alias}`),
       i18n,
     });
   </script>
