@@ -1,0 +1,28 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt Captch" pageName="promptCaptcha">
+  <script>
+    import { toast } from "$src/components/toast";
+    import { i18n } from "../i18n";
+    import { registerStepper } from "$src/flows/register/stepper";
+    import { promptCaptchaPage } from "$src/flows/register/captcha";
+
+    promptCaptchaPage({
+      cancel: () => toast.info("canceled"),
+      focus: true,
+      requestChallenge: () =>
+        new Promise(() => {
+          /* noop */
+        }),
+      verifyChallengeChars: () =>
+        new Promise(() => {
+          /* noop */
+        }),
+      stepper: registerStepper({ current: "captcha" }),
+      onContinue: () => toast.info("Done"),
+      i18n,
+    });
+  </script>
+</Screen>
