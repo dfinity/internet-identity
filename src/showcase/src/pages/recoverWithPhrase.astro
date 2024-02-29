@@ -14,7 +14,7 @@ import Screen from "../layouts/Screen.astro";
           value: { kind: "loginSuccess", userNumber, words },
         }),
       confirm: ({ userNumber, words }) =>
-        toast.info("confirmed: ", userNumber, words),
+        toast.info(`confirmed: ${userNumber} ${words.join(" ")}`),
       back: () => toast.info("remove"),
       message: "Something cool will happen if you type your anchor",
     });
