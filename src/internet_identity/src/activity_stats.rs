@@ -18,7 +18,7 @@ pub struct ActivityStats<T: ActivityCounter> {
 }
 
 impl<T: ActivityCounter> ActivityStats<T> {
-    fn new(time: Timestamp) -> Self {
+    pub fn new(time: Timestamp) -> Self {
         Self {
             completed: CompletedActivityStats {
                 daily_events: None,
