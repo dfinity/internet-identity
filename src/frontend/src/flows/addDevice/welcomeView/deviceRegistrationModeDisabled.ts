@@ -74,7 +74,7 @@ export const deviceRegistrationDisabledInfo = (
   return new Promise((resolve) =>
     deviceRegistrationDisabledInfoPage({
       userNumber,
-      iiUrl: window.origin,
+      origin: window.origin,
       cancel: () => resolve("canceled"),
       retry: () => resolve("retry"),
     })
