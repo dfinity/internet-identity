@@ -1,5 +1,4 @@
 import { mainWindow } from "$src/components/mainWindow";
-import { LEGACY_II_URL_NO_PROTOCOL } from "$src/config";
 import { renderPage } from "$src/utils/lit-html";
 import { html } from "lit-html";
 
@@ -22,8 +21,8 @@ const deviceRegistrationDisabledInfoTemplate = ({
     </hgroup>
     <ol class="c-list c-list--numbered l-stack">
       <li>
-        Connect to ${LEGACY_II_URL_NO_PROTOCOL} on a recognized device using
-        Internet Identity ${userNumber}
+        Connect to ${window.origin} on a recognized device using Internet
+        Identity ${userNumber}
       </li>
       <li>
         Once you are connected, select “<strong class="t-string"
