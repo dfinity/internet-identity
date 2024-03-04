@@ -4,6 +4,8 @@ import { getDapps } from "$src/flows/dappsExplorer/dapps";
 
 export const dapps = getDapps();
 
+export const iiLegacyOrigin = "https://identity.ic0.app";
+
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
