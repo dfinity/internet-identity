@@ -3,6 +3,7 @@ use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivi
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
 use crate::storage::anchor::{Anchor, Device};
+use crate::storage::storable_persistent_state::StorablePersistentState;
 use crate::storage::{Header, PersistentStateError, StorageError, MAX_ENTRIES};
 use crate::Storage;
 use candid::Principal;
@@ -220,7 +221,6 @@ fn sample_persistent_state() -> PersistentState {
                 }],
             },
         }),
-        max_num_latest_delegation_origins: None,
-        ..PersistentState::default()
+        ..PersistentState::from(StorablePersistentState::default())
     }
 }

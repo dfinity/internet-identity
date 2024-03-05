@@ -104,11 +104,13 @@ use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::storable_anchor::StorableAnchor;
+use crate::storage::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
 
 /// module for the internal serialization format of anchors
 mod storable_anchor;
+mod storable_persistent_state;
 #[cfg(test)]
 mod tests;
 
@@ -177,7 +179,7 @@ pub struct Storage<M: Memory> {
     archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, NestedRestrictedMemory<M>>,
     /// Memory wrapper used to report the size of the persistent state memory.
     persistent_state_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
-    persistent_state: StableCell<PersistentState, NestedRestrictedMemory<M>>,
+    persistent_state: StableCell<StorablePersistentState, NestedRestrictedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -245,8 +247,11 @@ impl<M: Memory + Clone> Storage<M> {
             archive_buffer_memory_wrapper: MemoryWrapper::new(archive_buffer_memory.clone()),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
             persistent_state_memory_wrapper: MemoryWrapper::new(persistent_state_memory.clone()),
-            persistent_state: StableCell::init(persistent_state_memory, PersistentState::default())
-                .expect("failed to initialize persistent state"),
+            persistent_state: StableCell::init(
+                persistent_state_memory,
+                StorablePersistentState::default(),
+            )
+            .expect("failed to initialize persistent state"),
         }
     }
 
@@ -475,7 +480,7 @@ impl<M: Memory + Clone> Storage<M> {
             8 => self.write_persistent_state_v8(state),
             9 => {
                 self.persistent_state
-                    .set(state.clone())
+                    .set(StorablePersistentState::from(state.clone()))
                     .expect("failed to write persistent state");
             }
             version => trap(&format!("unsupported version: {}", version)),
@@ -506,7 +511,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
         match self.version() {
             8 => self.read_persistent_state_v8(),
-            9 => Ok(self.persistent_state.get().clone()),
+            9 => Ok(PersistentState::from(self.persistent_state.get().clone())),
             version => trap(&format!("unsupported version: {}", version)),
         }
     }
