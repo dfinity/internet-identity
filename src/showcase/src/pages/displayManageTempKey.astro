@@ -1,0 +1,45 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display Manage Temp Key" pageName="displayManageTempKey">
+  <script>
+    import { toast } from "$src/components/toast";
+    import { userNumber, identityBackground } from "../constants";
+    import { dapps } from "../constants";
+    import { displayManagePage } from "$src/flows/manage";
+
+    displayManagePage({
+      identityBackground,
+      userNumber,
+      devices: {
+        authenticators: [],
+        recoveries: {},
+        pinAuthenticators: [
+          {
+            alias: "Chrome on iPhone",
+            rename: () => toast.info("rename"),
+            remove: () => toast.info("remove"),
+          },
+        ],
+      },
+      onAddDevice: () => {
+        toast.info("add device requested");
+      },
+      addRecoveryPhrase: () => {
+        toast.info("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        toast.info("add recovery key");
+      },
+      dapps,
+      exploreDapps: () => {
+        toast.info("explore dapps");
+      },
+      tempKeysWarning: {
+        tag: "add_recovery",
+        action: () => toast.info("add recovery phrase"),
+      },
+    });
+  </script>
+</Screen>

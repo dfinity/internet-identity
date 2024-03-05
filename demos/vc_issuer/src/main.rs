@@ -28,6 +28,7 @@ use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee}
 use asset_util::{collect_assets, CertifiedAssets};
 use ic_cdk::api;
 use ic_cdk_macros::post_upgrade;
+use lazy_static::lazy_static;
 
 mod consent_message;
 
@@ -60,6 +61,12 @@ thread_local! {
 
     // Assets for the management app
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
+}
+
+lazy_static! {
+    // Seed and public key used for signing the credentials.
+    static ref CANISTER_SIG_SEED: Vec<u8> = hash_bytes("vc_demo_issuer").to_vec();
+    static ref CANISTER_SIG_PK: CanisterSigPublicKey = CanisterSigPublicKey::new(ic_cdk::id(), CANISTER_SIG_SEED.clone());
 }
 
 /// Reserve the first stable memory page for the configuration stable cell.
@@ -195,16 +202,13 @@ async fn prepare_credential(
         Ok(credential) => credential,
         Err(err) => return Result::<PreparedCredentialData, IssueCredentialError>::Err(err),
     };
-    let seed = calculate_seed(&alias_tuple.id_alias);
-    let canister_id = ic_cdk::id();
-    let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
     let signing_input =
-        vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
+        vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
     let msg_hash = vc_signing_input_hash(&signing_input);
 
     SIGNATURES.with(|sigs| {
         let mut sigs = sigs.borrow_mut();
-        sigs.add_signature(seed.as_ref(), msg_hash);
+        sigs.add_signature(&CANISTER_SIG_SEED, msg_hash);
     });
     update_root_hash();
     Ok(PreparedCredentialData {
@@ -229,19 +233,14 @@ fn update_root_hash() {
 #[query]
 #[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
-    let alias_tuple = match authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
-        Ok(alias_tuple) => alias_tuple,
-        Err(err) => return Result::<IssuedCredentialData, IssueCredentialError>::Err(err),
+    if let Err(err) = authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
+        return Result::<IssuedCredentialData, IssueCredentialError>::Err(err);
     };
     if let Err(err) = verify_credential_spec(&req.credential_spec) {
         return Result::<IssuedCredentialData, IssueCredentialError>::Err(
             IssueCredentialError::UnsupportedCredentialSpec(err),
         );
     }
-    let subject_principal = alias_tuple.id_alias;
-    let seed = calculate_seed(&subject_principal);
-    let canister_id = ic_cdk::id();
-    let canister_sig_pk = CanisterSigPublicKey::new(canister_id, seed.to_vec());
     let prepared_context = match req.prepared_context {
         Some(context) => context,
         None => {
@@ -259,12 +258,16 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
         }
     };
     let signing_input =
-        vc_signing_input(&credential_jwt, &canister_sig_pk).expect("failed getting signing_input");
+        vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
     let message_hash = vc_signing_input_hash(&signing_input);
     let sig_result = SIGNATURES.with(|sigs| {
         let sig_map = sigs.borrow();
         let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
-        sig_map.get_signature_as_cbor(&seed, message_hash, Some(certified_assets_root_hash))
+        sig_map.get_signature_as_cbor(
+            &CANISTER_SIG_SEED,
+            message_hash,
+            Some(certified_assets_root_hash),
+        )
     });
     let sig = match sig_result {
         Ok(sig) => sig,
@@ -278,7 +281,7 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
         }
     };
     let vc_jws =
-        vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, &sig).expect("failed constructing JWS");
+        vc_jwt_to_jws(&credential_jwt, &CANISTER_SIG_PK, &sig).expect("failed constructing JWS");
     Result::<IssuedCredentialData, IssueCredentialError>::Ok(IssuedCredentialData { vc_jws })
 }
 
@@ -441,20 +444,6 @@ fn static_headers() -> Vec<HeaderField> {
 }
 
 fn main() {}
-
-fn calculate_seed(principal: &Principal) -> Hash {
-    // IMPORTANT: In a real dapp the salt should be set to a random value.
-    let dummy_salt = [5u8; 32];
-
-    let mut bytes: Vec<u8> = vec![];
-    bytes.push(dummy_salt.len() as u8);
-    bytes.extend_from_slice(&dummy_salt);
-
-    let principal_bytes = principal.as_slice();
-    bytes.push(principal_bytes.len() as u8);
-    bytes.extend(principal_bytes);
-    hash_bytes(bytes)
-}
 
 fn bachelor_degree_credential(
     subject_principal: Principal,

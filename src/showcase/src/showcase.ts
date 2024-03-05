@@ -520,6 +520,7 @@ export const iiPages: Record<string, () => void> = {
   deviceRegistrationDisabledInfo: () =>
     deviceRegistrationDisabledInfoPage({
       userNumber,
+      origin: "https://identity.ic0.app",
       retry: () => console.log("retry"),
       cancel: () => console.log("canceled"),
     }),
