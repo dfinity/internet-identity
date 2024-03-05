@@ -22,7 +22,7 @@ use std::time::Duration;
 mod temp_keys;
 
 /// Default value for max number of delegation origins to store in the list of latest used delegation origins
-pub const DEFAULT_MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
+pub const DEFAULT_MAX_DELEGATION_ORIGINS: u64 = 1000;
 
 /// Default value for max number of inflight captchas.
 pub const DEFAULT_MAX_INFLIGHT_CAPTCHAS: u64 = 500;
@@ -115,7 +115,7 @@ impl Default for PersistentState {
             domain_active_anchor_stats: None,
             active_authn_method_stats: None,
             latest_delegation_origins: None,
-            max_num_latest_delegation_origins: Some(DEFAULT_MAX_NUM_DELEGATION_ORIGINS),
+            max_num_latest_delegation_origins: Some(DEFAULT_MAX_DELEGATION_ORIGINS),
             max_inflight_captchas: Some(DEFAULT_MAX_INFLIGHT_CAPTCHAS),
         }
     }
@@ -253,7 +253,7 @@ pub fn load_persistent_state() {
     persistent_state_mut(|persistent_state| {
         persistent_state
             .max_num_latest_delegation_origins
-            .get_or_insert(DEFAULT_MAX_NUM_DELEGATION_ORIGINS);
+            .get_or_insert(DEFAULT_MAX_DELEGATION_ORIGINS);
     });
 }
 

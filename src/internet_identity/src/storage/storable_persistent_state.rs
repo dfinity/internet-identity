@@ -4,7 +4,7 @@ use crate::activity_stats::activity_counter::domain_active_anchor_counter::Domai
 use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
 use crate::state::{
-    PersistentState, DEFAULT_MAX_INFLIGHT_CAPTCHAS, DEFAULT_MAX_NUM_DELEGATION_ORIGINS,
+    PersistentState, DEFAULT_MAX_DELEGATION_ORIGINS, DEFAULT_MAX_INFLIGHT_CAPTCHAS,
     DEFAULT_RATE_LIMIT_CONFIG,
 };
 use candid::{CandidType, Deserialize};
@@ -56,7 +56,7 @@ impl Default for StorablePersistentState {
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
             latest_delegation_origins: HashMap::new(),
-            max_num_latest_delegation_origins: DEFAULT_MAX_NUM_DELEGATION_ORIGINS,
+            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
         }
     }
@@ -85,7 +85,7 @@ impl From<PersistentState> for StorablePersistentState {
                 .unwrap_or_default(),
             max_num_latest_delegation_origins: persistent_state
                 .max_num_latest_delegation_origins
-                .unwrap_or(DEFAULT_MAX_NUM_DELEGATION_ORIGINS),
+                .unwrap_or(DEFAULT_MAX_DELEGATION_ORIGINS),
             max_inflight_captchas: persistent_state
                 .max_inflight_captchas
                 .unwrap_or(DEFAULT_MAX_INFLIGHT_CAPTCHAS),
@@ -101,10 +101,8 @@ fn time() -> Timestamp {
 /// This is required because [ic_cdk::api::time()] traps when executed in a non-canister environment.
 #[cfg(test)]
 fn time() -> Timestamp {
-    std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64
+    // Return a fixed time for testing
+    1709647706487990000 // Tue Mar 05 2024 14:08:26 GMT+0000
 }
 
 impl From<StorablePersistentState> for PersistentState {
@@ -122,5 +120,60 @@ impl From<StorablePersistentState> for PersistentState {
             ),
             max_inflight_captchas: Some(storable_persistent_state.max_inflight_captchas),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_convert_storable_persistent_state_to_persistent_state() {
+        let storable_persistent_state = StorablePersistentState::default();
+        let persistent_state = PersistentState::from(storable_persistent_state.clone());
+        assert_eq!(
+            storable_persistent_state,
+            StorablePersistentState::from(persistent_state)
+        );
+    }
+
+    #[test]
+    fn should_have_expected_default_values() {
+        let expected_defaults = StorablePersistentState {
+            archive_state: ArchiveState::default(),
+            canister_creation_cycles_cost: 0,
+            registration_rate_limit: RateLimitConfig {
+                time_per_token_ns: Duration::from_secs(10).as_nanos() as u64,
+                max_tokens: 20_000,
+            },
+            active_anchor_stats: ActivityStats::new(time()),
+            domain_active_anchor_stats: ActivityStats::new(time()),
+            active_authn_method_stats: ActivityStats::new(time()),
+            latest_delegation_origins: HashMap::new(),
+            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
+            max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+        };
+
+        let storable_persistent_state = StorablePersistentState::default();
+        assert_eq!(storable_persistent_state, expected_defaults);
+
+        let expected_defaults = PersistentState {
+            archive_state: ArchiveState::default(),
+            canister_creation_cycles_cost: 0,
+            registration_rate_limit: Some(RateLimitConfig {
+                time_per_token_ns: Duration::from_secs(10).as_nanos() as u64,
+                max_tokens: 20_000,
+            }),
+            active_anchor_stats: Some(ActivityStats::new(time())),
+            domain_active_anchor_stats: Some(ActivityStats::new(time())),
+            active_authn_method_stats: Some(ActivityStats::new(time())),
+            latest_delegation_origins: Some(HashMap::new()),
+            max_num_latest_delegation_origins: Some(DEFAULT_MAX_DELEGATION_ORIGINS),
+            max_inflight_captchas: Some(DEFAULT_MAX_INFLIGHT_CAPTCHAS),
+        };
+        assert_eq!(
+            PersistentState::from(storable_persistent_state),
+            expected_defaults
+        );
     }
 }
