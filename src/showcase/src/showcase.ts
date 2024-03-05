@@ -83,10 +83,10 @@ const chromeDevice: DeviceData = {
   origin: [],
   metadata: [],
 };
-export const defaultPage = () => {
+export const defaultPage = (navbarItems: string[]) => {
   document.title = "Showcase";
   const container = document.getElementById("pageContent") as HTMLElement;
-  render(pageContent, container);
+  render(pageContent(navbarItems), container);
 };
 
 // A challenge with a base64 CAPTCHA, apologies for the length
@@ -707,10 +707,12 @@ Test link: [Visit website](https://www.example.com)
     }),
 };
 
-const showcase: TemplateResult = html`
+const showcase: (navbarItems: string[]) => TemplateResult = (
+  pages: string[]
+) => html`
   <h1 class="t-title t-title--main">showcase</h1>
   <div class="showcase-grid l-stack">
-    ${Object.entries(iiPages).map(([pageName, _]) => {
+    ${pages.map((pageName) => {
       // '/' or '/internet-identity/'
       const baseUrl = import.meta.env.BASE_URL ?? "/";
       // '/myPage' or '/internet-identity/myPage'
@@ -776,7 +778,7 @@ const i18nExample = () => {
 };
 
 // The showcase
-const pageContent = html`
+const pageContent = (navbarItems: string[]) => html`
   <style>
     .showcase-grid {
       display: grid;
@@ -821,7 +823,7 @@ const pageContent = html`
       font-size: 1.25rem;
     }
   </style>
-  ${showcase} ${i18nExample()} ${styleguide}
+  ${showcase(navbarItems)} ${i18nExample()} ${styleguide}
 `;
 
 // The 404 page
