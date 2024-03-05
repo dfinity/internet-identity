@@ -61,12 +61,12 @@ do
             shift;
             ;;
         --issuer-derivation-origin)
-            DERIVATION_ORIGIN="${2:?missing value for '--issuer-derivation-origin'}"
+            ISSUER_DERIVATION_ORIGIN="${2:?missing value for '--issuer-derivation-origin'}"
             shift; # shift past --issuer-canister & value
             shift;
             ;;
         --issuer-frontend-hostname)
-            FRONTEND_HOSTNAME="${2:?missing value for '--issuer-frontend-hostname'}"
+            ISSUER_FRONTEND_HOSTNAME="${2:?missing value for '--issuer-frontend-hostname'}"
             shift; # shift past --issuer-canister & value
             shift;
             ;;
@@ -84,11 +84,12 @@ done
 DFX_NETWORK="${DFX_NETWORK:-local}"
 II_CANISTER_ID="${II_CANISTER_ID:-$(dfx canister id internet_identity)}"
 ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
-ISSUER_CANISTER_ID=$(dfx canister id $ISSUER_CANISTER)
+ISSUER_CANISTER_ID=$(dfx canister id "$ISSUER_CANISTER")
 DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.ic0.app"
 ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
 ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
 
+echo "Provisioning canister $ISSUER_CANISTER"
 echo "Using DFX network: $DFX_NETWORK" >&2
 
 # At the time of writing dfx outputs incorrect JSON with dfx ping (commas between object

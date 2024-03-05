@@ -37,7 +37,7 @@ export const validateDerivationOrigin = async (
   if (matches === null) {
     return {
       result: "invalid",
-      message: `derivationOrigin does not match regex ${ORIGIN_VALIDATION_REGEX.toString()}`,
+      message: `derivationOrigin ${derivationOrigin} does not match regex ${ORIGIN_VALIDATION_REGEX.toString()}`,
     };
   }
 

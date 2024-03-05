@@ -24,10 +24,12 @@ import { nonNullish } from "@dfinity/utils";
 export const registerWithIssuer = async ({
   browser,
   issuer,
+  principal: principal_,
   authConfig: { setupAuth, finalizeAuth, userNumber },
 }: {
   browser: WebdriverIO.Browser;
   issuer: string;
+  principal?: string;
   authConfig: AuthConfig;
 }): Promise<{ msg: string; principal: string }> => {
   const issuerAppView = new IssuerAppView(browser);
@@ -36,6 +38,13 @@ export const registerWithIssuer = async ({
     iiUrl: II_URL,
   });
   await issuerAppView.waitForDisplay();
+
+  if (nonNullish(principal_)) {
+    const principal = principal_;
+    await issuerAppView.setPrincipal({ principal });
+    const msg = await issuerAppView.addEmployee();
+    return { principal, msg };
+  }
 
   expect(await issuerAppView.isAuthenticated()).toBe(false);
 

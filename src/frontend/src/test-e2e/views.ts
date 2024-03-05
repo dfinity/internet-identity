@@ -623,6 +623,14 @@ export class IssuerAppView extends View {
     await iiUrlInput.setValue(iiUrl);
   }
 
+  async setPrincipal({ principal }: { principal: string }): Promise<void> {
+    const principalInput = await this.browser.$(
+      '[data-role="custom-principal"]'
+    );
+    await principalInput.clearValue();
+    await principalInput.setValue(principal);
+  }
+
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-page="add-employee"]')

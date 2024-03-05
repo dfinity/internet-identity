@@ -88,6 +88,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
               hosts: ["nice-name.com"],
               canisterName: "test_app",
             },
+            {
+              hosts: ["nice-issuer-custom-orig.com"],
+              canisterName: "issuer_custom_origin",
+            },
             ...(process.env.NO_HOT_RELOAD === "1"
               ? [
                   {
