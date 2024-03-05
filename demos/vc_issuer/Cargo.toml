@@ -37,3 +37,6 @@ ic-http-certification = "2.2"
 ic-test-state-machine-client = "3"
 ic-response-verification = "2.2"
 canister_tests = { path = "../../src/canister_tests" }
+
+[features]
+custom_origin = []

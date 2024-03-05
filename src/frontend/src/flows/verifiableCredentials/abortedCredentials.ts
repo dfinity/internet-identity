@@ -12,6 +12,8 @@ export type AbortReason =
   | "internal_error"
   | "auth_failed_ii"
   | "auth_failed_issuer"
+  | "derivation_origin_issuer_error"
+  | "invalid_derivation_origin_issuer"
   | "issuer_api_error"
   | "bad_principal_rp"
   | "no_canister_id"

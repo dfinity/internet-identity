@@ -54,7 +54,9 @@ export class VcIssuer {
     });
 
     if ("Err" in result) {
-      console.error("Could not prepare credential", result.Err);
+      console.error(
+        "Could not prepare credential: " + JSON.stringify(result.Err)
+      );
       return "error";
     }
 
@@ -106,5 +108,52 @@ export class VcIssuer {
     }
 
     return result.Ok;
+  };
+
+  getDerivationOrigin = async ({
+    origin,
+  }: {
+    origin: string;
+  }): Promise<
+    | { kind: "origin"; origin: string }
+    | { kind: "use_default" }
+    | { kind: "error" }
+  > => {
+    const actor = await this.createActor();
+
+    const methodName = "derivation_origin" as const;
+
+    let result;
+    try {
+      result = await actor[methodName]({
+        frontend_hostname: origin,
+      });
+    } catch (e: unknown) {
+      try {
+        // XXX: this "ensures" that the error is the one expected by the issuer spec.
+        // This unfortunately depends on the exact method name, only works for query calls and
+        // heavily relies on the format of agent-js' errors. The safest bet hence seems to be
+        // to convert the error to string and perform a match.
+        // eslint-disable-next-line
+        const str = (e as any).toString();
+        const isMethodUndefined =
+          str.match(`has no.*method '${methodName}'`) !== null;
+        if (!isMethodUndefined) {
+          console.error(e);
+          throw e;
+        }
+      } catch {
+        console.error(e);
+        throw e;
+      }
+      return { kind: "use_default" };
+    }
+
+    if ("Err" in result) {
+      console.error("Could not get derivation origin", result.Err);
+      return { kind: "error" };
+    }
+
+    return { kind: "origin", origin: result.Ok.origin };
   };
 }
