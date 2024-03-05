@@ -5,7 +5,8 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Display User Number Temp Key" pageName="displayUserNumberTempKey">
   <script>
     import { toast } from "$src/components/toast";
-    import { identityBackground, userNumber } from "../constants";
+    import { identityBackground } from "../backgrounds";
+    import { userNumber } from "../constants";
     import { i18n } from "../i18n";
     import { displayUserNumberPage } from "$src/flows/register/finish";
     import { registerStepper } from "$src/flows/register/stepper";
