@@ -1,0 +1,13 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Loader" pageName="loader">
+  <script>
+    import { withLoader } from "$src/components/loader";
+    import { showMessage } from "$src/components/message";
+
+    // TODO: Fix loader image not loading
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." })))
+  </script>
+</Screen>
