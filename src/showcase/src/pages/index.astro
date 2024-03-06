@@ -13,7 +13,6 @@ import {
 import "$src/styles/main.css";
 import { recoveryWords } from "../constants";
 
-// We might need
 const files = readdirSync("./src/showcase/src/pages/");
 const fileNames = files.map((file) => file.replace(".astro", ""));
 const NO_NAVBAR_ITESM = ["index", "404"];
@@ -501,21 +500,7 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
             </li>
           </ul>
 
-          <!-- ${warnBox({
-            title: "Devices",
-            message:
-              "We recommend that you have at least two devices (for example, your computer and your phone).",
-            additionalClasses: ["l-stack"],
-            slot: html` <ul class="c-action-list">
-              <li class="c-action-list__item">
-                <span class="c-action-list__label">Single Device</span>
-                <button class="c-action-list__action">${settingsIcon}</button>
-              </li>
-              <li class="c-action-list__actions">
-                <button class="c-button c-button--primary">Some action</button>
-              </li>
-            </ul>`,
-          })} -->
+          <div id="warn-box"></div>
         </section>
         <p class="t-lead"></p>
       </aside>
@@ -563,7 +548,7 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
     import { toast } from "$src/components/toast";
     import { formModal } from "$src/components/modal";
     import { warnBox } from "$src/components/warnBox";
-    import { warningIcon } from "$src/components/icons";
+    import { warningIcon, settingsIcon } from "$src/components/icons";
 
     const i18nExample = () => {
       type Lang = "en" | "fr";
@@ -674,5 +659,25 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
           })}
       `
     render(cardsDemoTemplate, cardsDemoElement);
+
+    const warnBoxElement = document.getElementById("warn-box") as HTMLElement;
+    render(
+      warnBox({
+        title: "Devices",
+        message:
+          "We recommend that you have at least two devices (for example, your computer and your phone).",
+        additionalClasses: ["l-stack"],
+        slot: html` <ul class="c-action-list">
+          <li class="c-action-list__item">
+            <span class="c-action-list__label">Single Device</span>
+            <button class="c-action-list__action">${settingsIcon}</button>
+          </li>
+          <li class="c-action-list__actions">
+            <button class="c-button c-button--primary">Some action</button>
+          </li>
+        </ul>`,
+      }),
+      warnBoxElement
+    );
   </script>
 </Layout>
