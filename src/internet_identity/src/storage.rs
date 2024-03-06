@@ -178,8 +178,8 @@ pub struct Storage<M: Memory> {
     archive_buffer_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
     archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, NestedRestrictedMemory<M>>,
     /// Memory wrapper used to report the size of the persistent state memory.
-    persistent_state_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
-    persistent_state: StableCell<StorablePersistentState, NestedRestrictedMemory<M>>,
+    persistent_state_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
+    persistent_state: StableCell<StorablePersistentState, VirtualMemory<RestrictedMemory<M>>>,
 }
 
 #[repr(packed)]
@@ -238,8 +238,7 @@ impl<M: Memory + Clone> Storage<M> {
         // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
         // Since the memory manager allocates memory in buckets of 128 pages, we use a full bucket here.
         let archive_buffer_memory = single_bucket_memory(&memory_manager, ARCHIVE_BUFFER_MEMORY_ID);
-        let persistent_state_memory =
-            single_bucket_memory(&memory_manager, PERSISTENT_STATE_MEMORY_ID);
+        let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
         Self {
             header,
             header_memory,
