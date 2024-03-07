@@ -12,10 +12,8 @@ use candid::{CandidType, Deserialize};
 use canister_sig_util::signature_map::SignatureMap;
 use ic_cdk::api::time;
 use ic_cdk::trap;
-use ic_stable_structures::storable::Bound;
-use ic_stable_structures::{DefaultMemoryImpl, Storable};
+use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::*;
-use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -23,11 +21,17 @@ use std::time::Duration;
 
 mod temp_keys;
 
-// Default value for max number of delegation origins to store in the list of latest used delegation origins
-const MAX_NUM_DELEGATION_ORIGINS: u64 = 1000;
+/// Default value for max number of delegation origins to store in the list of latest used delegation origins
+pub const DEFAULT_MAX_DELEGATION_ORIGINS: u64 = 1000;
 
-// Default value for max number of inflight captchas.
-pub const MAX_INFLIGHT_CAPTCHAS: u64 = 500;
+/// Default value for max number of inflight captchas.
+pub const DEFAULT_MAX_INFLIGHT_CAPTCHAS: u64 = 500;
+
+/// Default registration rate limit config.
+pub const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = RateLimitConfig {
+    time_per_token_ns: Duration::from_secs(10).as_nanos() as u64,
+    max_tokens: 20_000,
+};
 
 thread_local! {
     static STATE: State = State::default();
@@ -111,22 +115,10 @@ impl Default for PersistentState {
             domain_active_anchor_stats: None,
             active_authn_method_stats: None,
             latest_delegation_origins: None,
-            max_num_latest_delegation_origins: Some(MAX_NUM_DELEGATION_ORIGINS),
-            max_inflight_captchas: Some(MAX_INFLIGHT_CAPTCHAS),
+            max_num_latest_delegation_origins: Some(DEFAULT_MAX_DELEGATION_ORIGINS),
+            max_inflight_captchas: Some(DEFAULT_MAX_INFLIGHT_CAPTCHAS),
         }
     }
-}
-
-impl Storable for PersistentState {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(candid::encode_one(self).expect("failed to serialize persistent state"))
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        candid::decode_one(&bytes).expect("failed to deserialize persistent state")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -261,7 +253,7 @@ pub fn load_persistent_state() {
     persistent_state_mut(|persistent_state| {
         persistent_state
             .max_num_latest_delegation_origins
-            .get_or_insert(MAX_NUM_DELEGATION_ORIGINS);
+            .get_or_insert(DEFAULT_MAX_DELEGATION_ORIGINS);
     });
 }
 

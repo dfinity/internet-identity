@@ -105,9 +105,9 @@ export const authenticateBox = async ({
   for (;;) {
     const result = await promptAuth();
 
-    // If the user canceled, we retry
+    // If the user canceled or just added a device, we retry
     if ("tag" in result) {
-      result satisfies { tag: "canceled" };
+      result satisfies { tag: "canceled" | "deviceAdded" };
       continue;
     }
 
@@ -158,7 +158,9 @@ export const authenticateBoxFlow = async <T, I>({
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
-  addDevice: (userNumber?: bigint) => Promise<{ alias: string }>;
+  addDevice: (
+    userNumber?: bigint
+  ) => Promise<{ alias: string; userNumber: bigint }>;
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
@@ -192,6 +194,7 @@ export const authenticateBoxFlow = async <T, I>({
     })
   | FlowError
   | { tag: "canceled" }
+  | { tag: "deviceAdded" }
 > => {
   const pages = authnScreens(i18n, { ...templates });
 
@@ -243,6 +246,7 @@ export const authenticateBoxFlow = async <T, I>({
       })
     | FlowError
     | { tag: "canceled" }
+    | { tag: "deviceAdded" }
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
@@ -250,13 +254,10 @@ export const authenticateBoxFlow = async <T, I>({
     }
 
     if (result.tag === "add_device") {
-      const _ = await addDevice(result.userNumber);
-      // XXX: we don't currently do anything with the result from adding a device and
-      // we let the flow hang.
-      const hang = await new Promise<never>((_) => {
-        /* hang forever */
-      });
-      return hang;
+      const { userNumber } = await addDevice(result.userNumber);
+      // The user number now has a passkey associated and hence should be remembered
+      await setAnchorUsed(userNumber);
+      return { tag: "deviceAdded" } as const;
     }
 
     if (result.tag === "register") {
@@ -654,7 +655,7 @@ const loginPinIdentityMaterial = ({
 const asNewDevice = async (
   connection: Connection,
   prefilledUserNumber?: bigint
-) => {
+): Promise<{ alias: string; userNumber: bigint }> => {
   // Prompt the user for an anchor and provide additional information about the flow.
   // If the user number is already known, it is prefilled in the screen.
   const promptUserNumberWithInfo = async (prefilledUserNumber?: bigint) => {
@@ -672,10 +673,11 @@ const asNewDevice = async (
     return result;
   };
 
-  return registerTentativeDevice(
-    await promptUserNumberWithInfo(prefilledUserNumber),
-    connection
-  );
+  const userNumber = await promptUserNumberWithInfo(prefilledUserNumber);
+  return {
+    userNumber,
+    ...(await registerTentativeDevice(userNumber, connection)),
+  };
 };
 
 // Helper to convert PIN identity material to a Der public-key

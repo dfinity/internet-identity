@@ -495,6 +495,10 @@ export class AuthenticateView extends View {
     await this.browser.$(`[data-anchor-id="${anchor}"]`).click();
   }
 
+  async expectAnchor(anchor: string): Promise<void> {
+    await this.browser.$(`[data-anchor-id="${anchor}"]`).waitForDisplayed();
+  }
+
   async expectAnchorInputField(): Promise<void> {
     await this.browser
       .$('[data-role="anchor-input"]')
