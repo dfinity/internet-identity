@@ -181,9 +181,14 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
         )
     };
 
+    let connect_src = "'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app";
+
+    // Allow connecting to localhost, including subdomains, on http and https for local development purposes
+    #[cfg(feature = "dev_csp")]
+        let connect_src = format!("{connect_src} http://localhost:* http://*.localhost:* https://localhost:* https://*.localhost:*");
     let csp = format!(
         "default-src 'none';\
-         connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app;\
+         connect-src {connect_src};\
          img-src 'self' data:;\
          script-src {strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:;\
          base-uri 'none';\
@@ -193,7 +198,8 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
          font-src 'self';\
          frame-ancestors 'none';"
     );
-    #[cfg(not(feature = "insecure_requests"))]
+    // for the dev build skip upgrading all connections to II to https
+    #[cfg(not(feature = "dev_csp"))]
     let csp = format!("{csp}upgrade-insecure-requests;");
     csp
 }
