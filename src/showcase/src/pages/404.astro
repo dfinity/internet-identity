@@ -4,7 +4,11 @@ import "$src/styles/main.css";
 
 <div id="pageContent"></div>
 <script>
-  import { notFound } from "$showcase/showcase";
+  import { showMessagePage } from "$src/components/message";
+  import { html } from "lit-html";
 
-  notFound();
+  showMessagePage({
+    message: html`<h1>404 not found</h1>
+      <p class="t-paragraph">Page was not found</p> `,
+  });
 </script>
