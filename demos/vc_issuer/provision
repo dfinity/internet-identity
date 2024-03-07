@@ -20,7 +20,7 @@ Options:
   --ii-canister-id CANISTER_ID    The canister ID to use as IDP, defaults to the local internet_identity canister
   --dfx-network NETWORK           The network to use (typically "local" or "ic"), defaults to "local"
   --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
-  --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.ic0.app
+  --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.icp0.io
   --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
 EOF
 }
@@ -85,7 +85,7 @@ DFX_NETWORK="${DFX_NETWORK:-local}"
 II_CANISTER_ID="${II_CANISTER_ID:-$(dfx canister id internet_identity)}"
 ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
 ISSUER_CANISTER_ID=$(dfx canister id $ISSUER_CANISTER)
-DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.ic0.app"
+DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.icp0.io"
 ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
 ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
 
