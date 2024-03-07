@@ -5,9 +5,11 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Display Manage" pageName="displayManage">
   <script>
     import { toast } from "$src/components/toast";
-    import { userNumber, identityBackground } from "../constants";
+    import { userNumber } from "../constants";
+    import { identityBackground } from "../backgrounds";
     import { dapps } from "../constants";
     import { displayManagePage } from "$src/flows/manage";
+    import { html } from "lit-html";
 
     displayManagePage({
       identityBackground,
@@ -28,7 +30,7 @@ import Screen from "../layouts/Screen.astro";
             alias: "Yubikey Blue",
             remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
-            warn: "Something is rotten in the state of Device",
+            warn: html`Something is rotten in the state of Device`,
           },
         ],
         recoveries: {

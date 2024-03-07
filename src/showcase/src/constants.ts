@@ -1,5 +1,4 @@
 import { Challenge, DeviceData } from "$generated/internet_identity_types";
-import { loadIdentityBackground } from "$src/components/identityCard";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 
 export const dapps = getDapps();
@@ -24,8 +23,6 @@ export const chromeDevice: DeviceData = {
   origin: [],
   metadata: [],
 };
-
-export const identityBackground = loadIdentityBackground();
 
 export const dummyChallenge: Challenge = {
   png_base64:
