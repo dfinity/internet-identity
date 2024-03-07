@@ -18,7 +18,7 @@ use vc_util::issuer_api::{
     Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
-#[cfg(feature = "custom_origin")]
+#[cfg(not(feature = "exclude_custom_origin"))]
 use vc_util::issuer_api::{DerivationOriginData, DerivationOriginError, DerivationOriginRequest};
 use vc_util::{
     build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
@@ -298,7 +298,7 @@ async fn vc_consent_message(
     )
 }
 
-#[cfg(feature = "custom_origin")]
+#[cfg(not(feature = "exclude_custom_origin"))]
 #[update]
 #[candid_method]
 async fn derivation_origin(
@@ -307,7 +307,7 @@ async fn derivation_origin(
     get_derivation_origin(&req.frontend_hostname)
 }
 
-#[cfg(feature = "custom_origin")]
+#[cfg(not(feature = "exclude_custom_origin"))]
 fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, DerivationOriginError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
@@ -618,7 +618,6 @@ mod test {
     /// Checks candid interface type equality by making sure that the service in the did file is
     /// equal to the generated interface.
     #[test]
-    #[cfg_attr(not(feature = "custom_origin"), ignore)]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
         service_equal(

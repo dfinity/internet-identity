@@ -90,7 +90,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
             },
             {
               hosts: ["nice-issuer-custom-orig.com"],
-              canisterName: "issuer_custom_origin",
+              canisterName: "issuer",
             },
             ...(process.env.NO_HOT_RELOAD === "1"
               ? [

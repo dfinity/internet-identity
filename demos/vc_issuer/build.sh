@@ -13,10 +13,10 @@ function usage() {
     cat >&2 << EOF
 
 Usage:
-  $0 [--custom-origin] [-o FILENAME}
+  $0 [--exclude-custom-origin] [-o FILENAME}
 
 Options:
-  --custom-origin                 When set, the canister will support querying its derivation origin
+  --exclude-custom-origin         When set, the canister will NOT support querying its derivation origin
   -o                              When set, specifies the file to write the built Wasm to
 EOF
 }
@@ -39,9 +39,9 @@ do
             shift; # shift past -o and value
             shift;
             ;;
-        --custom-origin)
-            ISSUER_FEATURES+=("custom_origin")
-            shift; # shift past --custom-origin
+        --exclude-custom-origin)
+            ISSUER_FEATURES+=("exclude_custom_origin")
+            shift; # shift past --exclude-custom-origin
             ;;
         *)
             echo "ERROR: unknown argument $1"

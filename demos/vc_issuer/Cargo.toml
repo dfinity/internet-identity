@@ -39,4 +39,5 @@ ic-response-verification = "2.2"
 canister_tests = { path = "../../src/canister_tests" }
 
 [features]
-custom_origin = []
+# Builds the issuer without support for alternative derivaiton origin feature, for testing only.
+exclude_custom_origin = []

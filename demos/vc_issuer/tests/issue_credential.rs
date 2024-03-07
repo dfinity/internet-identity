@@ -124,6 +124,7 @@ mod api {
         .map(|(x,)| x)
     }
 
+    #[cfg_attr(not(feature = "exclude_custom_origin"), ignore)]
     pub fn derivation_origin(
         env: &StateMachine,
         canister_id: CanisterId,
@@ -337,6 +338,7 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "exclude_custom_origin"), ignore)]
 fn should_return_derivation_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
@@ -349,6 +351,7 @@ fn should_return_derivation_origin() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "exclude_custom_origin"), ignore)]
 fn should_return_derivation_origin_with_custom_init() {
     let env = env();
     let custom_init = IssuerInit {
@@ -372,6 +375,7 @@ fn should_return_derivation_origin_with_custom_init() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "exclude_custom_origin"), ignore)]
 fn should_fail_derivation_origin_if_unsupported_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
