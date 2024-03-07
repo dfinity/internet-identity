@@ -290,7 +290,7 @@ jobs:
           mkdir dist
           touch dist/index.{html,css,js}
           touch dist/index2.js
-          cargo test --features 'exclude_custom_origin'
+          cargo test
 
   ###########################
   # The Rust canister tests #
