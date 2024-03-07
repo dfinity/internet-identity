@@ -199,13 +199,12 @@ function build_internet_identity() {
       echo "USING DUMMY CAPTCHA"
       extra_build_args+=( --features dummy_captcha )
   fi
-  # This enables the "insecure_requests" feature which disables the content security policy directive
-  # 'upgrade-insecure-requests'.
+  # This enables the "dev_csp" feature which weakens the content security policy to facilitate local development.
   # WARNING: this MUST be opt-in, because we DO NOT want this in production.
-  if [ "${II_INSECURE_REQUESTS:-}" == "1" ]
+  if [ "${II_DEV_CSP:-}" == "1" ]
   then
-      echo "ALLOWING INSECURE REQUESTS"
-      extra_build_args+=( --features insecure_requests )
+      echo "USING DEV CONTENT SECURITY POLICY"
+      extra_build_args+=( --features dev_csp )
   fi
   # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
   build_canister "internet_identity" ${extra_build_args[@]+"${extra_build_args[@]}"}

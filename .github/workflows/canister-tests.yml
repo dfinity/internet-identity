@@ -50,7 +50,7 @@ jobs:
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_CAPTCHA: 0
             II_DUMMY_AUTH: 0
-            II_INSECURE_REQUESTS: 0
+            II_DEV_CSP: 0
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # e2e.
@@ -58,7 +58,7 @@ jobs:
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 0
-            II_INSECURE_REQUESTS: 0
+            II_DEV_CSP: 0
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
@@ -66,7 +66,7 @@ jobs:
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 1
-            II_INSECURE_REQUESTS: 1
+            II_DEV_CSP: 1
 
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +90,7 @@ jobs:
             II_FETCH_ROOT_KEY=${{ matrix.II_FETCH_ROOT_KEY }}
             II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
-            II_INSECURE_REQUESTS=${{ matrix.II_INSECURE_REQUESTS }}
+            II_DEV_CSP=${{ matrix.II_DEV_CSP }}
             II_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
@@ -860,7 +860,7 @@ jobs:
           II_FETCH_ROOT_KEY: 1
           II_DUMMY_CAPTCHA: 1
           II_DUMMY_AUTH: 0
-          II_INSECURE_REQUESTS: 0
+          II_DEV_CSP: 0
         run: ./scripts/build
 
       - run: mv internet_identity.wasm.gz internet_identity_test.wasm.gz
