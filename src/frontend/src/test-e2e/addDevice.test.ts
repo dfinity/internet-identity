@@ -10,6 +10,7 @@ import {
   AddIdentityAnchorView,
   AddRemoteDeviceInstructionsView,
   AddRemoteDeviceVerificationCodeView,
+  AuthenticateView,
   MainView,
   NotInRegistrationModeView,
   VerifyRemoteDeviceView,
@@ -151,6 +152,14 @@ test("Add remote device starting on new device", async () => {
       const addDeviceSuccessView = new AddDeviceSuccessView(browser);
       await addDeviceSuccessView.waitForDisplay();
       await addDeviceSuccessView.continue();
+
+      // browser 2 again
+      // make sure the browser now shows the sign-in screen with the user number
+      // pre-filled
+      await focusBrowser(browser2);
+      const authView = new AuthenticateView(browser2);
+      await authView.waitForDisplay();
+      await authView.expectAnchor(userNumber);
     });
 
     await mainView.waitForDisplay();

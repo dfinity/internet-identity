@@ -57,7 +57,10 @@ export const iiFlows: Record<string, () => void> = {
       templates: manageTemplates,
       addDevice: () => {
         toast.info(html`Added device`);
-        return Promise.resolve({ alias: "My Device" });
+        return Promise.resolve({
+          alias: "My Device",
+          userNumber: BigInt(1234),
+        });
       },
       loginPasskey: async () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
