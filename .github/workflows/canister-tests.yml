@@ -506,11 +506,8 @@ jobs:
           dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
           dfx canister install issuer_exclude_custom_origin --wasm demos/vc_issuer/vc_demo_issuer_exclude_custom_origin.wasm.gz
 
-      - name: Provision issuer canister
-        run: ./demos/vc_issuer/provision
-
       - name: Provision issuer canister with custom origin
-        run: ./demos/vc_issuer/provision --issuer-frontend-hostname https://nice-issuer-custom-orig.com --issuer-canister --issuer-derivation-origin https://$(dfx canister id test_app).icp0.io
+        run: ./demos/vc_issuer/provision --issuer-frontend-hostname https://nice-issuer-custom-orig.com --issuer-derivation-origin https://$(dfx canister id test_app).icp0.io
       # Check the return code of npm ci
       - name: Check on npm ci
         # make sure we don't wait too long if for some unlikely reason the npm status file doesn't get created
