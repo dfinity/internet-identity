@@ -131,7 +131,7 @@ export class VcIssuer {
     } catch (e: unknown) {
       try {
         // XXX: this "ensures" that the error is the one expected by the issuer spec.
-        // This unfortunately depends on the exact method name, only works for query calls and
+        // This unfortunately depends on the exact method name, only works for update calls and
         // heavily relies on the format of agent-js' errors. The safest bet hence seems to be
         // to convert the error to string and perform a match.
         // eslint-disable-next-line
