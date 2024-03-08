@@ -43,7 +43,7 @@
     "@typescript-eslint/parser": "6.7.5",
     "@vitejs/plugin-basic-ssl": "^1.0.1",
     "@wdio/globals": "8.32.3",
-    "astro": "4.3.6",
+    "astro": "4.5.0",
     "eslint": "8.51.0",
     "fake-indexeddb": "^4.0.2",
     "lit-analyzer": "^2.0.2",
