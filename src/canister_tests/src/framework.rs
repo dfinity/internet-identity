@@ -418,7 +418,7 @@ xr-spatial-tracking=()",
 
     let rgx = Regex::new(
         "^default-src 'none';\
-connect-src 'self' https://identity.internetcomputer.org https://icp-api.io https://\\*\\.icp0.io https://\\*\\.ic0.app;\
+connect-src 'self' https:;\
 img-src 'self' data:;\
 script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
 base-uri 'none';\
@@ -427,7 +427,7 @@ style-src 'self' 'unsafe-inline';\
 style-src-elem 'self' 'unsafe-inline';\
 font-src 'self';\
 frame-ancestors 'none';\
-upgrade-insecure-requests;$"
+upgrade-insecure-requests;$",
     )
     .unwrap();
 

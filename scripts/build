@@ -199,7 +199,7 @@ function build_internet_identity() {
       echo "USING DUMMY CAPTCHA"
       extra_build_args+=( --features dummy_captcha )
   fi
-  # This enables the "dev_csp" feature which weakens the content security policy to facilitate local development.
+  # This enables the "dev_csp" feature which weakens the content security policy to facilitate development.
   # WARNING: this MUST be opt-in, because we DO NOT want this in production.
   if [ "${II_DEV_CSP:-}" == "1" ]
   then
