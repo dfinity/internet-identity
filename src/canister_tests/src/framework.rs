@@ -427,7 +427,7 @@ style-src 'self' 'unsafe-inline';\
 style-src-elem 'self' 'unsafe-inline';\
 font-src 'self';\
 frame-ancestors 'none';\
-upgrade-insecure-requests;$"
+upgrade-insecure-requests;$",
     )
     .unwrap();
 
