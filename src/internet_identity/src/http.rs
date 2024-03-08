@@ -183,7 +183,7 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
 
     let connect_src = "'self' https:";
 
-    // Allow connecting to localhost, including subdomains, on http and https for local development purposes
+    // Allow connecting via http for development purposes
     #[cfg(feature = "dev_csp")]
     let connect_src = format!("{connect_src} http:");
     let csp = format!(
