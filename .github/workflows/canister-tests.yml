@@ -290,6 +290,7 @@ jobs:
           mkdir dist
           touch dist/index.{html,css,js}
           touch dist/index2.js
+          cp vc_demo_issuer_custom_origin.wasm.gz vc_demo_issuer.wasm.gz
           cargo test --features 'custom_origin'
 
   ###########################
