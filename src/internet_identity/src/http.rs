@@ -181,11 +181,11 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
         )
     };
 
-    let connect_src = "'self' https://identity.internetcomputer.org https://icp-api.io https://*.icp0.io https://*.ic0.app";
+    let connect_src = "'self' https:";
 
     // Allow connecting to localhost, including subdomains, on http and https for local development purposes
     #[cfg(feature = "dev_csp")]
-        let connect_src = format!("{connect_src} http://localhost:* http://*.localhost:* https://localhost:* https://*.localhost:*");
+    let connect_src = format!("{connect_src} http://localhost:* http://*.localhost:*");
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
