@@ -164,6 +164,33 @@ jobs:
             exit 1
           fi
 
+  vc_demo_issuer_exclude_custom_origin-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            demos/vc_issuer/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}-exclude-custom-origin
+      - uses: ./.github/actions/bootstrap
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+      - name: "Build VC issuer canister without custom origin"
+        working-directory: demos/vc_issuer
+        run: |
+          ./build.sh --exclude-custom-origin -o ./vc_demo_issuer_exclude_custom_origin.wasm.gz
+      - name: 'Upload VC issuer without custom origin'
+        uses: actions/upload-artifact@v4
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: vc_demo_issuer_exclude_custom_origin.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # downloaded file
+          path: ./demos/vc_issuer/vc_demo_issuer_exclude_custom_origin.wasm.gz
+
   vc_demo_issuer-build:
     runs-on: ubuntu-latest
     steps:
@@ -404,7 +431,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [cached-build, test-app-build, vc_demo_issuer-build]
+    needs: [cached-build, test-app-build, vc_demo_issuer-build, vc_demo_issuer_exclude_custom_origin-build]
     strategy:
       matrix:
         device: [ 'desktop', 'mobile' ]
@@ -463,6 +490,12 @@ jobs:
           name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
 
+      - name: 'Download VC issuer without custom origin wasm'
+        uses: actions/download-artifact@v4
+        with:
+          name: vc_demo_issuer_exclude_custom_origin.wasm.gz
+          path: demos/vc_issuer
+
       - name: Create Canisters
         run: dfx canister create --all
 
@@ -471,9 +504,13 @@ jobs:
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
           dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
+          dfx canister install issuer_exclude_custom_origin --wasm demos/vc_issuer/vc_demo_issuer_exclude_custom_origin.wasm.gz
 
       - name: Provision issuer canister
-        run: ./demos/vc_issuer/provision
+        run: ./demos/vc_issuer/provision --issuer-canister issuer --issuer-frontend-hostname https://nice-issuer-custom-orig.com --issuer-derivation-origin https://$(dfx canister id test_app).icp0.io
+
+      - name: Provision issuer canister that excludes custom origin
+        run: ./demos/vc_issuer/provision --issuer-canister issuer_exclude_custom_origin
 
       # Check the return code of npm ci
       - name: Check on npm ci

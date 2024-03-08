@@ -6,6 +6,10 @@ description = "Verifiable Credentials Issuer"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+# Builds the issuer without support for alternative derivaiton origin feature, for testing only.
+exclude_custom_origin = []
+
 [dependencies]
 # local dependencies
 canister_sig_util = { path = "../../src/canister_sig_util" }

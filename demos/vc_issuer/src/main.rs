@@ -14,11 +14,12 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    ArgumentValue, CredentialSpec, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
     Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
     PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
 };
+#[cfg(not(feature = "exclude_custom_origin"))]
+use vc_util::issuer_api::{DerivationOriginData, DerivationOriginError, DerivationOriginRequest};
 use vc_util::{
     build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
     vc_signing_input, vc_signing_input_hash, AliasTuple, CredentialParams,
@@ -172,14 +173,15 @@ fn authorize_vc_request(
         let config = config.get();
 
         for idp_canister_id in &config.idp_canister_ids {
-            if let Ok(alias_tuple) = get_verified_id_alias_from_jws(
+            match get_verified_id_alias_from_jws(
                 &alias.credential_jws,
                 expected_vc_subject,
                 idp_canister_id,
                 &config.ic_root_key_raw,
                 current_time_ns,
             ) {
-                return Ok(alias_tuple);
+                Ok(alias_tuple) => return Ok(alias_tuple),
+                Err(err) => println!("*** bad alias {:?}", err),
             }
         }
         Err(IssueCredentialError::InvalidIdAlias(
@@ -296,6 +298,7 @@ async fn vc_consent_message(
     )
 }
 
+#[cfg(not(feature = "exclude_custom_origin"))]
 #[update]
 #[candid_method]
 async fn derivation_origin(
@@ -304,6 +307,7 @@ async fn derivation_origin(
     get_derivation_origin(&req.frontend_hostname)
 }
 
+#[cfg(not(feature = "exclude_custom_origin"))]
 fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, DerivationOriginError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
@@ -614,6 +618,7 @@ mod test {
     /// Checks candid interface type equality by making sure that the service in the did file is
     /// equal to the generated interface.
     #[test]
+    #[cfg_attr(feature = "exclude_custom_origin", ignore)]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
         service_equal(

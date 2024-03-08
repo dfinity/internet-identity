@@ -17,8 +17,16 @@
       "type": "custom",
       "candid": "demos/vc_issuer/vc_demo_issuer.did",
       "wasm": "demos/vc_issuer/vc_demo_issuer.wasm.gz",
-      "build": "demos/vc_issuer/build.sh",
-      "post_install": "demos/vc_issuer/provision",
+      "build": "demos/vc_issuer/build.sh -o demos/vc_issuer/vc_demo_issuer.wasm.gz",
+      "post_install": "bash -c 'demos/vc_issuer/provision --issuer-frontend-hostname https://nice-issuer-custom-orig.com --issuer-canister issuer --issuer-derivation-origin https://$(dfx canister id test_app).icp0.io'",
+      "dependencies": [ "internet_identity" ]
+    },
+    "issuer_exclude_custom_origin": {
+      "type": "custom",
+      "candid": "demos/vc_issuer/vc_demo_issuer.did",
+      "wasm": "demos/vc_issuer/vc_demo_issuer_exclude_custom_origin.wasm.gz",
+      "build": "demos/vc_issuer/build.sh --exclude-custom-origin -o demos/vc_issuer/vc_demo_issuer_exclude_custom_origin.wasm.gz",
+      "post_install": "demos/vc_issuer/provision --issuer-canister issuer_exclude_custom_origin",
       "dependencies": [ "internet_identity" ]
     }
   },
