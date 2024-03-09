@@ -3,7 +3,9 @@ import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
 import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
 import { html, render, TemplateResult } from "lit-html";
-import { dummyChallenge, i18n, manageTemplates } from "./showcase";
+import { dummyChallenge } from "./constants";
+import { i18n } from "./i18n";
+import { manageTemplates } from "./templates";
 
 const registerSuccessToastTemplate = (result: unknown) => html`
   Identity successfully created!<br />
