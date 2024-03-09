@@ -6,6 +6,8 @@ import "$src/styles/main.css";
 import Styleguide from "../components/Styleguide.astro";
 
 const files = readdirSync("./src/showcase/src/pages/");
+// This also includes the folders which is ok becuause they have an index.astro
+// file that can then be used to link from this home to their pages.
 const fileNames = files.map((file) => file.replace(".astro", ""));
 const NO_NAVBAR_ITESM = ["index", "404"];
 const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
