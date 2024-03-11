@@ -307,15 +307,16 @@ async fn derivation_origin(
 fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, DerivationOriginError> {
     CONFIG.with_borrow(|config| {
         let config = config.get();
-        if hostname == config.frontend_hostname {
-            Ok(DerivationOriginData {
-                origin: config.derivation_origin.clone(),
-            })
-        } else {
-            Err(DerivationOriginError::UnsupportedOrigin(
-                hostname.to_string(),
-            ))
+
+        // We don't currently rely on the value provided, so if it doesn't match
+        // we just print a warning
+        if hostname != config.frontend_hostname {
+            println!("*** achtung! bad frontend hostname {}", hostname,);
         }
+
+        Ok(DerivationOriginData {
+            origin: config.derivation_origin.clone(),
+        })
     })
 }
 

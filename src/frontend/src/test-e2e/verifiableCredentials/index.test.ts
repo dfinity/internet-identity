@@ -8,6 +8,7 @@ import {
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
 } from "$src/test-e2e/constants";
+import { DemoAppView } from "$src/test-e2e/views";
 
 import {
   authenticateToRelyingParty,
@@ -70,29 +71,41 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
 
           const authConfig = await register[authType](browser);
 
-          // 1. Add employee
+          // Auth to RP
+
+          let vcTestApp = await authenticateToRelyingParty({
+            browser,
+            issuer,
+            authConfig,
+            relyingParty,
+          });
+          const principalRP = await vcTestApp.getPrincipal();
+
+          // Add employee
 
           const { msg: _msg, principal: _principal } = await registerWithIssuer(
             {
               browser,
               issuer,
               authConfig,
+              principal: principalRP /* issuer uses test app as origin */,
             }
           );
 
-          // 2. Auth to RP
+          // Get VC presentation
 
-          const vcTestApp = await authenticateToRelyingParty({
+          vcTestApp = await authenticateToRelyingParty({
             browser,
             issuer,
             authConfig,
             relyingParty,
           });
 
-          const principalRP = await vcTestApp.getPrincipal();
-
-          // 3. Get VC presentation
-
+          const demoAppView = new DemoAppView(browser);
+          await demoAppView.updateAlternativeOrigins(
+            `{"alternativeOrigins":["${issuer}"]}`,
+            "certified"
+          );
           const { alias } = await getVCPresentation({
             vcTestApp,
             browser,

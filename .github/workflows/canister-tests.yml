@@ -468,12 +468,10 @@ jobs:
 
       - name: Deploy canisters
         run: |
+          # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
           dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
-
-      - name: Provision issuer canister
-        run: ./demos/vc_issuer/provision
 
       # Check the return code of npm ci
       - name: Check on npm ci

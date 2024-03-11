@@ -91,16 +91,32 @@ const verifyCredentials = async ({
     }
   }
 
-  const validationResult = await withLoader(() =>
+  // Verify that principals may be issued to RP using the specified
+  // derivation origin
+  const validRpDerivationOrigin = await withLoader(() =>
     validateDerivationOrigin(rpOrigin_, rpDerivationOrigin)
   );
-  if (validationResult.result === "invalid") {
+  if (validRpDerivationOrigin.result === "invalid") {
     return abortedCredentials({ reason: "bad_derivation_origin_rp" });
   }
-  validationResult.result satisfies "valid";
+  validRpDerivationOrigin.result satisfies "valid";
   const rpOrigin = rpDerivationOrigin ?? rpOrigin_;
 
   const vcIssuer = new VcIssuer(issuerCanisterId);
+
+  const issuerDerivationOriginResult = await getValidatedIssuerDerivationOrigin(
+    {
+      vcIssuer,
+      issuerOrigin,
+    }
+  );
+
+  if (issuerDerivationOriginResult.kind === "error") {
+    return abortedCredentials({ reason: issuerDerivationOriginResult.err });
+  }
+
+  const issuerDerivationOrigin = issuerDerivationOriginResult.origin;
+
   // XXX: We don't check that the language matches the user's language. We need
   // to figure what to do UX-wise first.
   const consentInfo = await vcIssuer.getConsentMessage({ credentialSpec });
@@ -164,7 +180,7 @@ const verifyCredentials = async ({
 
   const pAliasPending = getAliasCredentials({
     rpOrigin,
-    issuerOrigin,
+    issuerOrigin: issuerDerivationOrigin /* Use the actual derivation origin */,
     authenticatedConnection,
   });
 
@@ -180,7 +196,7 @@ const verifyCredentials = async ({
 
     const issuedCredential = await issueCredential({
       vcIssuer,
-      issuerOrigin,
+      issuerOrigin: issuerDerivationOrigin,
       issuerAliasCredential: pAlias.issuerAliasCredential,
       credentialSpec,
       authenticatedConnection,
@@ -300,6 +316,46 @@ const getAliasCredentials = async ({
   } = result;
 
   return { ok: { rpAliasCredential, issuerAliasCredential } };
+};
+
+// Looks up and verify the derivation origin to be used by the issuer
+const getValidatedIssuerDerivationOrigin = async ({
+  vcIssuer,
+  issuerOrigin,
+}: {
+  vcIssuer: VcIssuer;
+  issuerOrigin: string;
+}): Promise<
+  | {
+      kind: "error";
+      err:
+        | "derivation_origin_issuer_error"
+        | "invalid_derivation_origin_issuer";
+    }
+  | { kind: "ok"; origin: string }
+> => {
+  const result = await vcIssuer.getDerivationOrigin({ origin: issuerOrigin });
+
+  if (result.kind === "error") {
+    return { kind: "error", err: "derivation_origin_issuer_error" };
+  }
+
+  result.kind satisfies "origin";
+
+  const validDerivationOrigin = await validateDerivationOrigin(
+    issuerOrigin,
+    result.origin
+  );
+  if (validDerivationOrigin.result === "invalid") {
+    console.error(
+      "Invalid derivation origin for issuer",
+      JSON.stringify(validDerivationOrigin)
+    );
+    return { kind: "error", err: "invalid_derivation_origin_issuer" };
+  }
+  validDerivationOrigin.result satisfies "valid";
+
+  return { kind: "ok", origin: result.origin };
 };
 
 // Contact the issuer to issue the credentials
