@@ -94,7 +94,7 @@ use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::reader::{BufferedReader, Reader};
 use ic_stable_structures::storable::Bound;
-use ic_stable_structures::writer::{BufferedWriter, Writer};
+use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
 use internet_identity_interface::archive::types::BufferedEntry;
 
@@ -476,7 +476,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
         match self.version() {
-            8 => self.write_persistent_state_v8(state),
+            8 => trap("persistent state must not be written before migration to layout version 9"),
             9 => {
                 self.persistent_state
                     .set(StorablePersistentState::from(state.clone()))
@@ -486,25 +486,19 @@ impl<M: Memory + Clone> Storage<M> {
         };
     }
 
-    /// Writes the persistent state to stable memory just outside the space allocated to the highest anchor number.
-    /// This is only used to _temporarily_ save state during upgrades. It will be overwritten on next anchor registration.
-    fn write_persistent_state_v8(&mut self, state: &PersistentState) {
-        let address = self.unused_memory_start();
-
-        // In practice, candid encoding is infallible. The Result is an artifact of the serde API.
-        let encoded_state = candid::encode_one(state).unwrap();
-
-        // In practice, for all reasonably sized persistent states (<800MB) the writes are
-        // infallible because we have a stable memory reserve (i.e. growing the memory will succeed).
-        let mut writer = BufferedWriter::new(
-            self.header.entry_size as usize,
-            Writer::new(&mut self.anchor_memory, address),
-        );
-        writer.write_all(&PERSISTENT_STATE_MAGIC).unwrap();
-        writer
-            .write_all(&(encoded_state.len() as u64).to_le_bytes())
-            .unwrap();
-        writer.write_all(&encoded_state).unwrap();
+    pub fn migrate_persistent_state(&mut self) {
+        let version = self.version();
+        if version == 9 {
+            // nothing to migrate
+            return;
+        }
+        assert_eq!(version, 8);
+        let persistent_state = self
+            .read_persistent_state_v8()
+            .expect("failed to recover persistent state!");
+        self.header.version = 9;
+        self.flush();
+        self.write_persistent_state(&persistent_state);
     }
 
     pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {

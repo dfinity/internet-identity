@@ -220,7 +220,7 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
 }
 
 #[test]
-fn should_read_persistent_state_v7() -> Result<(), CallError> {
+fn should_read_persistent_state_v8() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -237,7 +237,8 @@ fn should_read_persistent_state_v7() -> Result<(), CallError> {
     let stats = api::stats(&env, canister_id)?;
     assert!(stats.archive_info.archive_canister.is_none());
     assert!(stats.archive_info.archive_config.is_none());
-    assert_eq!(8, stats.storage_layout_version);
+    // auto-migration to v9
+    assert_eq!(stats.storage_layout_version, 9);
     Ok(())
 }
 
@@ -273,7 +274,8 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
             .to_vec(),
         hex::decode("12e2c2bd05dfcd86e3004ecd5f00533e6120e7bcf82bac0753af0a7fe14bfea1").unwrap()
     );
-    assert_eq!(stats.storage_layout_version, 8);
+    // auto-migration to v9
+    assert_eq!(stats.storage_layout_version, 9);
     Ok(())
 }
 
@@ -320,7 +322,7 @@ fn should_trap_on_missing_persistent_state() -> Result<(), CallError> {
             assert_eq!(err.code, CanisterCalledTrap);
             assert!(err
                 .description
-                .contains("failed to recover persistent state! Err: NotFound"));
+                .contains("failed to recover persistent state!"));
         }
     }
     Ok(())

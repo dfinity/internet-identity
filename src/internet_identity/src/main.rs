@@ -402,6 +402,8 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     state::init_from_stable_memory();
+    // immediately migrate the persistent state to the new layout
+    state::storage_borrow_mut(|storage| storage.migrate_persistent_state());
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
