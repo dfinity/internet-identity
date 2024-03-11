@@ -29,13 +29,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
 
-  // Astro gets a bit confused and tries to load the server config (including devserver-only
-  // plugins) on build. This ensures that plugins that need dfx are only invoked on serve.
-  // https://github.com/withastro/astro/issues/10262
-  const isAstro =
-    process.env["npm_lifecycle_script"]?.includes("astro") === true;
-  const isServe = command === "serve" && !isAstro;
-
   // Path "../../" have to be expressed relative to the "root".
   // e.g.
   // root = src/frontend
@@ -101,7 +94,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
               : []),
           ],
         }),
-        apply: () => isServe,
+        apply: "serve",
       },
     ],
     optimizeDeps: {
@@ -111,13 +104,14 @@ export default defineConfig(({ command, mode }): UserConfig => {
         },
       },
     },
-    server: !isServe
-      ? {}
-      : {
-          https: process.env.TLS_DEV_SERVER === "1",
-          proxy: {
-            "/api": `http://127.0.0.1:${readReplicaPort()}`,
+    server:
+      command !== "serve"
+        ? {}
+        : {
+            https: process.env.TLS_DEV_SERVER === "1",
+            proxy: {
+              "/api": `http://127.0.0.1:${readReplicaPort()}`,
+            },
           },
-        },
   };
 });
