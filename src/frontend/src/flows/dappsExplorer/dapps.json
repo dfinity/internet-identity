@@ -468,5 +468,11 @@
     "website": "https://p3cwv-2aaaa-aaaap-abwba-cai.icp0.io/",
     "logo": "virtuaseal.png",
     "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
+  },
+  {
+    "name": "UncensoredGreats",
+    "website": "https://www.uncensoredgreats.com/",
+    "logo": "UncensoredGreatsLogo.png",
+    "oneLiner": "Migrating all the World's Books to NFT-form for use in domain-specific AI"
   }
 ]
