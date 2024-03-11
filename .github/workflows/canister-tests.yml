@@ -812,7 +812,7 @@ jobs:
 
       - name: Create Pull Request
         if: startsWith(github.ref, 'refs/tags/release-')
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main

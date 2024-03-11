@@ -26,7 +26,7 @@ jobs:
       # If the dapps changed, create a PR.
       # This action creates a PR only if there are changes.
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
