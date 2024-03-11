@@ -22,6 +22,7 @@ jobs:
 
       # Run the formatter so that the dapps.json file is formatted
       - run: npm run format
+      - run: git status
 
       # If the dapps changed, create a PR.
       # This action creates a PR only if there are changes.
@@ -42,9 +43,9 @@ jobs:
 
             # Since the this is a scheduled job, a failure won't be shown on any
             # PR status. To notify the team, we send a message to our Slack channel on failure.
-      - name: Notify Slack on failure
-        uses: ./.github/actions/slack
-        if: ${{ failure() }}
-        with:
-          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Dapps update failed"
+#      - name: Notify Slack on failure
+#        uses: ./.github/actions/slack
+#        if: ${{ failure() }}
+#        with:
+#          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#          MESSAGE: "Dapps update failed"
