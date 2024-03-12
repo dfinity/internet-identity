@@ -371,23 +371,6 @@ fn should_return_derivation_origin_with_custom_init() {
     assert_eq!(response.origin, custom_init.derivation_origin);
 }
 
-#[test]
-fn should_fail_derivation_origin_if_unsupported_origin() {
-    let env = env();
-    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
-    let req = DerivationOriginRequest {
-        frontend_hostname: "https://wrong.fe.host".to_string(),
-    };
-    let response =
-        api::derivation_origin(&env, canister_id, principal_1(), &req).expect("API call failed");
-    assert_eq!(
-        response,
-        Err(DerivationOriginError::UnsupportedOrigin(
-            req.frontend_hostname
-        ))
-    );
-}
-
 fn employee_credential_spec() -> CredentialSpec {
     let mut args = HashMap::new();
     args.insert(

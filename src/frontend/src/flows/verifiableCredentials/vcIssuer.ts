@@ -54,7 +54,9 @@ export class VcIssuer {
     });
 
     if ("Err" in result) {
-      console.error("Could not prepare credential", result.Err);
+      console.error(
+        "Could not prepare credential: " + JSON.stringify(result.Err)
+      );
       return "error";
     }
 
@@ -106,5 +108,33 @@ export class VcIssuer {
     }
 
     return result.Ok;
+  };
+
+  getDerivationOrigin = async ({
+    origin,
+  }: {
+    origin: string;
+  }): Promise<{ kind: "origin"; origin: string } | { kind: "error" }> => {
+    const actor = await this.createActor();
+
+    let result;
+    try {
+      result = await actor.derivation_origin({
+        frontend_hostname: origin,
+      });
+    } catch (e: unknown) {
+      console.error("Could not get derivation origin (unexpected error)", e);
+      return { kind: "error" };
+    }
+
+    if ("Err" in result) {
+      console.error(
+        "Could not get derivation origin (issuer error)",
+        JSON.stringify(result.Err)
+      );
+      return { kind: "error" };
+    }
+
+    return { kind: "origin", origin: result.Ok.origin };
   };
 }

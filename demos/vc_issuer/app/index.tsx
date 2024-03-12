@@ -118,6 +118,16 @@ const App = () => {
         </label>
       </section>
       <section>
+        <label>
+          Custom principal:
+          <input
+            data-role="custom-principal"
+            type="text"
+            onChange={(evt) => setPrincipal(evt.target.value)}
+          />
+        </label>
+      </section>
+      <section>
         <button
           data-action="authenticate"
           disabled={dsbld}

@@ -13,6 +13,9 @@ export const TEST_APP_NICE_URL = "https://nice-name.com";
 export const ISSUER_APP_URL = `https://${issuerAppCanisterId}.icp0.io`;
 export const ISSUER_APP_URL_LEGACY = `https://${issuerAppCanisterId}.ic0.app`;
 
+// Value needs to match how the canister was provisioned
+export const ISSUER_CUSTOM_ORIGIN_NICE_URL = `https://nice-issuer-custom-orig.com`;
+
 export const II_URL =
   process.env.II_URL ?? "https://identity.internetcomputer.org";
 
