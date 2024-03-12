@@ -43,7 +43,7 @@ test("Can issue credential with alternative RP derivation origin", async () => {
     });
     const principalRP = await vcTestApp.getPrincipal();
 
-    // Add employee & and set up issuer
+    // Add employee and set up issuer
     const { msg: _msg, principal: _principal } = await registerWithIssuer({
       browser,
       issuer: ISSUER_APP_URL,
