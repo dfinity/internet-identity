@@ -30,14 +30,14 @@ export class IdentityBackground {
 
   // Only the src attribute is used so the same Element can be shared across Templates
   public static singleton?: IdentityBackground;
-  public static getSingleton(): IdentityBackground {
-    IdentityBackground.singleton ??= new IdentityBackground();
+  public static getSingleton(image?: string): IdentityBackground {
+    IdentityBackground.singleton ??= new IdentityBackground(image);
     return IdentityBackground.singleton;
   }
 
-  constructor() {
+  constructor(image?: string) {
     const img = new Image();
-    img.src = identityCardImage; // Setting the src kicks off the fetching
+    img.src = image ?? identityCardImage; // Setting the src kicks off the fetching
     this.img = img;
   }
 }
