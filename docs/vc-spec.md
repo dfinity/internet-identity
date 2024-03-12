@@ -98,11 +98,14 @@ credential by an issuer, and this happens by approving a human-readable consent 
 Identity provider uses a VC-extension of  [ICRC-21](https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_21_consent_msg.md), and requests the consent message via `Icrc21VcConsentMessageRequest`,
 Upon successful response idenity provider displays the consent message from `Icrc21ConsentInfo` to the user.
 
-### 2: Derivation Origin (optional)
+### 2: Derivation Origin
 
-If an issuer wants to take advantage of the [Alternative Derivation Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature,
-it must implement `derivation_origin`-API, which then is called by the identity provider to
-obtain an URL to be used as the derivation origin for user's principal.
+The issuer must implement also `derivation_origin`-API, which allows for taking the advantage
+of the [Alternative Derivation Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature.
+`derivation_origin` is called by the identity provider to obtain an URL to be used as the derivation origin
+for user's principal.  If an issuer doesn't use the _Alternative Derivation Origins_-feature,
+the function should return just the default value, namely the canister's URL: `https://<issuer-canister-id>.icp0.io`.
+
 ```candid
 service: {
     derivation_origin : (DerivationOriginRequest) ->

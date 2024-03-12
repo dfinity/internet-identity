@@ -340,7 +340,7 @@ fn should_fail_vc_consent_message_if_missing_required_argument() {
 fn should_return_derivation_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
-    let frontend_hostname = format!("https://{}.ic0.app", canister_id.to_text());
+    let frontend_hostname = format!("https://{}.icp0.io", canister_id.to_text());
     let req = DerivationOriginRequest { frontend_hostname };
     let response = api::derivation_origin(&env, canister_id, principal_1(), &req)
         .expect("API call failed")
