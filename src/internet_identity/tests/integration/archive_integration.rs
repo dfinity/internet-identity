@@ -20,13 +20,15 @@ use std::time::SystemTime;
 fn setup_ii_v8(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
     let ii_canister = install_ii_canister(env, EMPTY_WASM.clone());
     restore_compressed_stable_memory(env, ii_canister, "stable_memory/clean_init_v8.bin.gz");
+
+    // upgrade now auto-migrates to storage v9
     upgrade_ii_canister_with_arg(env, ii_canister, II_WASM.clone(), arg)
         .expect("II upgrade failed");
     assert_eq!(
         ii_api::stats(env, ii_canister)
             .unwrap()
             .storage_layout_version,
-        8
+        9
     );
     ii_canister
 }
@@ -305,11 +307,12 @@ mod pull_entries_tests {
             arg_with_wasm_hash(ARCHIVE_WASM.clone()),
         )
         .expect("II upgrade failed");
+        // the upgrade auto-migrates the storage layout to v9
         assert_eq!(
             ii_api::stats(&env, ii_canister)
                 .unwrap()
                 .storage_layout_version,
-            8
+            9
         );
         // deploy the actual archive wasm
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);

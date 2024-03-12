@@ -139,25 +139,6 @@ fn should_always_find_persistent_state_v9() {
 }
 
 #[test]
-fn should_overwrite_persistent_state_with_next_anchor_v8() {
-    let memory = VectorMemory::default();
-    memory.grow(1);
-    memory.write(0, &hex::decode("494943080500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
-    let mut storage = Storage::from_memory(memory.clone());
-    storage.flush();
-
-    storage.allocate_anchor().unwrap();
-    storage.write_persistent_state(&sample_persistent_state());
-    assert!(storage.read_persistent_state().is_ok());
-
-    let anchor = storage.allocate_anchor().unwrap();
-    storage.write(anchor).unwrap();
-
-    let result = storage.read_persistent_state();
-    assert!(matches!(result, Err(PersistentStateError::NotFound)));
-}
-
-#[test]
 fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
