@@ -84,7 +84,7 @@ export const showVerificationCode = async (
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
   credentialToBeVerified: CredentialId
-): Promise<"ok"> => {
+): Promise<"ok" | "canceled"> => {
   const countdown: AsyncCountdown<"match" | "canceled"> =
     AsyncCountdown.fromNanos(
       tentativeRegistrationInfo.device_registration_timeout
@@ -96,7 +96,7 @@ export const showVerificationCode = async (
     remaining: countdown.remainingFormattedAsync(),
     cancel: () => {
       countdown.stop("canceled");
-      window.location.reload();
+      return "canceled";
     },
   });
 
@@ -166,7 +166,7 @@ const handlePollResult = async ({
 }: {
   userNumber: bigint;
   result: "match" | "canceled" | typeof AsyncCountdown.timeout;
-}): Promise<"ok"> => {
+}): Promise<"ok" | "canceled"> => {
   if (result === "match") {
     await setAnchorUsed(userNumber);
     return "ok";
@@ -177,10 +177,10 @@ const handlePollResult = async ({
         'The timeout has been reached. For security reasons the "add device" process has been aborted.',
       primaryButton: "Ok",
     });
-    return window.location.reload as never;
+    return "canceled";
   } else {
     result satisfies "canceled";
-    return window.location.reload as never;
+    return "canceled";
   }
 };
 

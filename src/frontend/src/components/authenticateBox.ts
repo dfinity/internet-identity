@@ -160,7 +160,7 @@ export const authenticateBoxFlow = async <T, I>({
   templates: AuthnTemplates;
   addDevice: (
     userNumber?: bigint
-  ) => Promise<{ alias: string; userNumber: bigint }>;
+  ) => Promise<{ tag: "deviceAdded"; alias: string } | { tag: "canceled" }>;
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
@@ -254,10 +254,7 @@ export const authenticateBoxFlow = async <T, I>({
     }
 
     if (result.tag === "add_device") {
-      const { userNumber } = await addDevice(result.userNumber);
-      // The user number now has a passkey associated and hence should be remembered
-      await setAnchorUsed(userNumber);
-      return { tag: "deviceAdded" } as const;
+      return await addDevice(result.userNumber);
     }
 
     if (result.tag === "register") {
@@ -655,29 +652,19 @@ const loginPinIdentityMaterial = ({
 const asNewDevice = async (
   connection: Connection,
   prefilledUserNumber?: bigint
-): Promise<{ alias: string; userNumber: bigint }> => {
+): Promise<{ tag: "deviceAdded"; alias: string } | { tag: "canceled" }> => {
   // Prompt the user for an anchor and provide additional information about the flow.
   // If the user number is already known, it is prefilled in the screen.
-  const promptUserNumberWithInfo = async (prefilledUserNumber?: bigint) => {
-    const result = await promptUserNumber({
-      title: "Continue with another device",
-      message:
-        "Is this your first time connecting to Internet Identity on this device? In the next steps, you will add this device as an Internet Identity passkey. Do you wish to continue?",
-      userNumber: prefilledUserNumber,
-    });
-    if (result === "canceled") {
-      // TODO L2-309: do this without reload
-      return window.location.reload() as never;
-    }
-
-    return result;
-  };
-
-  const userNumber = await promptUserNumberWithInfo(prefilledUserNumber);
-  return {
-    userNumber,
-    ...(await registerTentativeDevice(userNumber, connection)),
-  };
+  const userNumberResult = await promptUserNumber({
+    title: "Continue with another device",
+    message:
+      "Is this your first time connecting to Internet Identity on this device? In the next steps, you will add this device as an Internet Identity passkey. Do you wish to continue?",
+    userNumber: prefilledUserNumber,
+  });
+  if (userNumberResult === "canceled") {
+    return { tag: "canceled" };
+  }
+  return await registerTentativeDevice(userNumberResult, connection);
 };
 
 // Helper to convert PIN identity material to a Der public-key

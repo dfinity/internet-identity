@@ -60,8 +60,8 @@ export const iiFlows: Record<string, () => void> = {
       addDevice: () => {
         toast.info(html`Added device`);
         return Promise.resolve({
+          tag: "deviceAdded",
           alias: "My Device",
-          userNumber: BigInt(1234),
         });
       },
       loginPasskey: async () => {

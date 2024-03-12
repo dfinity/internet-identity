@@ -13,10 +13,16 @@ void createSpa(async (connection) => {
   if (nonNullish(addDeviceAnchor)) {
     const userNumber = addDeviceAnchor;
     // Register this device (tentatively)
-    const { alias: deviceAlias } = await registerTentativeDevice(
+    const registerDeviceResult = await registerTentativeDevice(
       addDeviceAnchor,
       connection
     );
+    if (registerDeviceResult.tag === "canceled") {
+      // Adding a device was canceled, fall back into default flow
+      return authFlowManage(connection);
+    }
+    registerDeviceResult satisfies { tag: "deviceAdded" };
+    const { alias: deviceAlias } = registerDeviceResult;
 
     // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
     await addDeviceSuccess({ deviceAlias });
