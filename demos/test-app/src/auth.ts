@@ -49,6 +49,10 @@ export const authWithII = async ({
   // Wait for II to say it's ready
   const evnt = await new Promise<MessageEvent>((resolve) => {
     const readyHandler = (e: MessageEvent) => {
+      if (e.origin !== iiUrl.origin) {
+        // Ignore messages from other origins (e.g. from a metamask extension)
+        return;
+      }
       window.removeEventListener("message", readyHandler);
       resolve(e);
     };
@@ -77,6 +81,10 @@ export const authWithII = async ({
   // Wait for the II response and update the local state
   const response = await new Promise<MessageEvent>((resolve) => {
     const responseHandler = (e: MessageEvent) => {
+      if (e.origin !== iiUrl.origin) {
+        // Ignore messages from other origins (e.g. from a metamask extension)
+        return;
+      }
       window.removeEventListener("message", responseHandler);
       win.close();
       resolve(e);
