@@ -131,6 +131,11 @@ const waitForRequest = (): Promise<{
 }> => {
   return new Promise((resolve) => {
     const messageEventHandler = (evnt: MessageEvent) => {
+      if (evnt.origin === window.location.origin) {
+        // Ignore messages from own origin (e.g. from browser extensions)
+        console.warn("Ignoring message from own origin", evnt);
+        return;
+      }
       const message: unknown = evnt.data;
       const result = AuthRequest.safeParse(message);
 
