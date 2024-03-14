@@ -104,56 +104,19 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
-
-  // A PIN auth view that's allowed to fail
-  loginPinAuthenticateView_: async (
-    userNumber: string,
-    pin: string,
-    browser: WebdriverIO.Browser
-  ): Promise<"ok" | "pin_disallowed"> => {
-    const authenticateView = new AuthenticateView(browser);
-    await authenticateView.waitForDisplay();
-    await authenticateView.pickAnchor(userNumber);
-    const pinAuthView = new PinAuthView(browser);
-    // Here we race two things:
-    // * The PIN authn view
-    // * Expecting an error because PIN is not allowed
-    // If the PIN authn view is returned then carry forward;
-    // otherwise return that PIN is not allowed
-    const result = await Promise.race([
-      pinAuthView.waitForDisplay().then(() => "pin_allowed" as const),
-      browser
-        .$('#errorContainer [data-error-code="pinNotAllowed"]')
-        .waitForDisplayed()
-        .then(() => "pin_disallowed" as const),
-    ]);
-    if (result === "pin_disallowed") {
-      return "pin_disallowed";
-    }
-    result satisfies "pin_allowed";
-
-    await pinAuthView.enterPin(pin);
-    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
-    await FLOWS.skipRecoveryNag(browser);
-    return "ok";
-  },
   loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,
     browser: WebdriverIO.Browser
   ): Promise<void> => {
-    const result = await FLOWS.loginPinAuthenticateView_(
-      userNumber,
-      pin,
-      browser
-    );
-    if (result === "pin_disallowed") {
-      throw new Error(
-        "Expected successful pin authentication, got PIN disallowed"
-      );
-    }
-
-    result satisfies "ok";
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
+    const pinAuthView = new PinAuthView(browser);
+    await pinAuthView.waitForDisplay();
+    await pinAuthView.enterPin(pin);
+    // This flow assumes no recovery phrase, so we explicitly skip the recovery nag here
+    await FLOWS.skipRecoveryNag(browser);
   },
   loginPinWelcomeView: async (
     userNumber: string,
