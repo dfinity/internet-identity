@@ -156,12 +156,15 @@ test("Register with PIN then log into client application", async () => {
     await demoAppView.waitForDisplay();
     expect(await demoAppView.getPrincipal()).toBe("");
     expect(await demoAppView.getAuthnMethod()).toBe("");
+    console.log("Before sign-in");
     await demoAppView.signin();
-
     await switchToPopup(browser);
-
+    console.log("after switch before flow");
     await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await demoAppView.waitForAuthenticated();
-    expect(await demoAppView.getAuthnMethod()).toBe("pin");
+    console.log("After auth before authn method");
+    const authnMethod = await demoAppView.getAuthnMethod();
+    console.log("After auth after authn method");
+    expect(authnMethod).toBe("pin");
   }, APPLE_USER_AGENT);
 }, 300_000);
