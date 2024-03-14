@@ -120,18 +120,19 @@ export const FLOWS = {
     // * Expecting an error because PIN is not allowed
     // If the PIN authn view is returned then carry forward;
     // otherwise return that PIN is not allowed
-    console.error("before promise race")
+    console.error("before promise race");
     const result = await Promise.race([
-      pinAuthView.waitForDisplay()
+      pinAuthView
+        .waitForDisplay()
         .then(() => console.error("Race: promise pin_allowed settled"))
         .then(() => "pin_allowed" as const),
       browser
-        .$("#errorContainer [data-error-code=\"pinNotAllowed\"]")
+        .$('#errorContainer [data-error-code="pinNotAllowed"]')
         .waitForDisplayed()
         .then(() => console.error("Race: promise pin_disallowed settled"))
-        .then(() => "pin_disallowed" as const)
+        .then(() => "pin_disallowed" as const),
     ]);
-    console.error("after promise race")
+    console.error("after promise race");
     if (result === "pin_disallowed") {
       return "pin_disallowed";
     }
