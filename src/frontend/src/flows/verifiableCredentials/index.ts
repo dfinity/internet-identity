@@ -17,6 +17,7 @@ import {
   CredentialSpec,
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
+import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
@@ -76,7 +77,7 @@ const verifyCredentials = async ({
 }: { connection: Connection } & VerifyCredentialsArgs) => {
   // Look up the canister ID from the origin
   const lookedUp = await withLoader(() =>
-    lookupCanister({ origin: issuerOrigin })
+    resolveIssuerCanisterId({ origin: issuerOrigin })
   );
   if (lookedUp === "not_found") {
     return abortedCredentials({ reason: "no_canister_id" });
@@ -222,6 +223,36 @@ const verifyCredentials = async ({
   });
 };
 
+const resolveIssuerCanisterId = ({
+  origin,
+}: {
+  origin: string;
+}): Promise<{ ok: string } | "not_found"> => {
+  const url = new URL(origin);
+
+  if (url.hostname.endsWith("localhost")) {
+    // The issuer is running on a local development environment, infer the canister ID from the hostname directly
+    // (e.g. http://bd3sg-teaaa-aaaaa-qaaba-cai.localhost:4943 -> bd3sg-teaaa-aaaaa-qaaba-cai)
+    const domainParts = url.hostname.split(".");
+
+    // If there is no subdomain, we cannot infer the canister id
+    if (domainParts.length > 1) {
+      const canisterId = domainParts[0];
+      try {
+        Principal.fromText(canisterId); // make sure the inferred part is actually a canister id, throws if not
+        return Promise.resolve({ ok: canisterId });
+      } catch (e) {
+        console.warn(
+          `Unable to infer issuer canister id from origin ${origin}: ${e}`
+        );
+      }
+    }
+  }
+
+  // Look up the canister id by performing a request to the origin
+  return lookupCanister({ origin });
+};
+
 // Lookup the canister by performing a request to the origin and check
 // if the server (probably BN) set a header to inform us of the canister ID
 const lookupCanister = async ({
@@ -334,28 +365,28 @@ const getValidatedIssuerDerivationOrigin = async ({
     }
   | { kind: "ok"; origin: string }
 > => {
-  const result = await vcIssuer.getDerivationOrigin({ origin: issuerOrigin });
+  const derivationOriginResult = await vcIssuer.getDerivationOrigin({
+    origin: issuerOrigin,
+  });
 
-  if (result.kind === "error") {
+  if (derivationOriginResult.kind === "error") {
     return { kind: "error", err: "derivation_origin_issuer_error" };
   }
+  derivationOriginResult.kind satisfies "origin";
 
-  result.kind satisfies "origin";
-
-  const validDerivationOrigin = await validateDerivationOrigin(
+  const validationResult = await validateDerivationOrigin(
     issuerOrigin,
-    result.origin
+    derivationOriginResult.origin
   );
-  if (validDerivationOrigin.result === "invalid") {
+  if (validationResult.result === "invalid") {
     console.error(
-      "Invalid derivation origin for issuer",
-      JSON.stringify(validDerivationOrigin)
+      `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`
     );
     return { kind: "error", err: "invalid_derivation_origin_issuer" };
   }
-  validDerivationOrigin.result satisfies "valid";
+  validationResult.result satisfies "valid";
 
-  return { kind: "ok", origin: result.origin };
+  return { kind: "ok", origin: derivationOriginResult.origin };
 };
 
 // Contact the issuer to issue the credentials
