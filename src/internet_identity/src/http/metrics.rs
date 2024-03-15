@@ -138,106 +138,103 @@ fn persistent_state_metrics(
     w: &mut MetricsEncoder<Vec<u8>>,
     persistent_state: &PersistentState,
 ) -> Result<(), std::io::Error> {
-    if let Some(ref register_rate_limit_config) = persistent_state.registration_rate_limit {
-        w.encode_gauge(
-            "internet_identity_register_rate_limit_max_tokens",
-            register_rate_limit_config.max_tokens as f64,
-            "The maximum number of `register` calls that are allowed in any time window.",
-        )?;
-        w.encode_gauge(
-            "internet_identity_register_rate_limit_time_per_tokens_seconds",
-            Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
-            "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
-        )?;
-    }
-    if let Some(ref stats) = persistent_state.active_anchor_stats {
-        if let Some(ref daily_active_anchor_stats) = stats.completed.daily_events {
-            w.encode_gauge(
-                "internet_identity_daily_active_anchors",
-                daily_active_anchor_stats.counter as f64,
-                "The number of unique active anchors in the last completed 24h collection window.",
-            )?;
-            w.encode_gauge(
-                "internet_identity_daily_active_anchors_start_timestamp_seconds",
-                Duration::from_nanos(daily_active_anchor_stats.start_timestamp).as_secs() as f64,
-                "Timestamp of the last completed 24h collection window for unique active anchors.",
-            )?;
-        }
-        if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_events {
-            w.encode_gauge(
-                "internet_identity_monthly_active_anchors",
-                monthly_active_anchor_stats.counter as f64,
-                "The number of unique active anchors in the last completed 30-day collection window.",
-            )?;
-            w.encode_gauge(
-                "internet_identity_monthly_active_anchors_start_timestamp_seconds",
-                Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
-                "Timestamp of the last completed 30-day collection window for unique active anchors.",
-            )?;
-        }
-    };
-    if let Some(ref stats) = persistent_state.domain_active_anchor_stats {
-        const BOTH_DOMAINS: &str = "both_ii_domains";
+    let register_rate_limit_config = &persistent_state.registration_rate_limit;
+    w.encode_gauge(
+        "internet_identity_register_rate_limit_max_tokens",
+        register_rate_limit_config.max_tokens as f64,
+        "The maximum number of `register` calls that are allowed in any time window.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_register_rate_limit_time_per_tokens_seconds",
+        Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
+        "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
+    )?;
 
-        let labels = ActivityMetricsLabels {
-            daily_stats_label: "internet_identity_daily_active_anchors_by_domain",
-            daily_stats_doc: "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.",
-            monthly_stats_label: "internet_identity_monthly_active_anchors_by_domain",
-            monthly_stats_doc: "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.",
-        };
-        labelled_activity_metrics(w, stats, labels, |counter, encoder| {
-            encoder
-                .value(
-                    &[("domain", IC0_APP_DOMAIN)],
-                    counter.ic0_app_counter as f64,
-                )?
-                .value(
-                    &[("domain", INTERNETCOMPUTER_ORG_DOMAIN)],
-                    counter.internetcomputer_org_counter as f64,
-                )?
-                .value(
-                    &[("domain", BOTH_DOMAINS)],
-                    counter.both_ii_domains_counter as f64,
-                )?;
-            Ok(())
-        })?;
-    };
-    if let Some(ref stats) = persistent_state.active_authn_method_stats {
-        let labels = ActivityMetricsLabels {
-            daily_stats_label: "internet_identity_daily_active_authn_methods",
-            daily_stats_doc: "The number of unique authentication methods used in the last completed 24h collection window on II domains.",
-            monthly_stats_label: "internet_identity_monthly_active_authn_methods",
-            monthly_stats_doc: "The number of unique authentication methods used in the last completed 30-day collection window on II domains.",
-        };
-        labelled_activity_metrics(w, stats, labels, |counter, encoder| {
-            encoder
-                .value(
-                    &[("type", "webauthn_auth")],
-                    counter.webauthn_auth_counter as f64,
-                )?
-                .value(
-                    &[("type", "webauthn_recovery")],
-                    counter.webauthn_recovery_counter as f64,
-                )?
-                .value(
-                    &[("type", "recovery_phrase")],
-                    counter.recovery_phrase_counter as f64,
-                )?
-                .value(
-                    &[("type", "browser_storage_key")],
-                    counter.browser_storage_key_counter as f64,
-                )?
-                .value(&[("type", "other")], counter.other_counter as f64)?;
-            Ok(())
-        })?;
-    };
-    if let Some(delegation_origins_limit) = persistent_state.max_num_latest_delegation_origins {
+    let stats = &persistent_state.active_anchor_stats;
+    if let Some(ref daily_active_anchor_stats) = stats.completed.daily_events {
         w.encode_gauge(
-            "internet_identity_max_num_latest_delegation_origins",
-            delegation_origins_limit as f64,
-            "The maximum number of latest delegation origins that were used with II bound devices.",
+            "internet_identity_daily_active_anchors",
+            daily_active_anchor_stats.counter as f64,
+            "The number of unique active anchors in the last completed 24h collection window.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_daily_active_anchors_start_timestamp_seconds",
+            Duration::from_nanos(daily_active_anchor_stats.start_timestamp).as_secs() as f64,
+            "Timestamp of the last completed 24h collection window for unique active anchors.",
         )?;
     }
+    if let Some(ref monthly_active_anchor_stats) = stats.completed.monthly_events {
+        w.encode_gauge(
+            "internet_identity_monthly_active_anchors",
+            monthly_active_anchor_stats.counter as f64,
+            "The number of unique active anchors in the last completed 30-day collection window.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_monthly_active_anchors_start_timestamp_seconds",
+            Duration::from_nanos(monthly_active_anchor_stats.start_timestamp).as_secs() as f64,
+            "Timestamp of the last completed 30-day collection window for unique active anchors.",
+        )?;
+    }
+    let stats = &persistent_state.domain_active_anchor_stats;
+    const BOTH_DOMAINS: &str = "both_ii_domains";
+
+    let labels = ActivityMetricsLabels {
+        daily_stats_label: "internet_identity_daily_active_anchors_by_domain",
+        daily_stats_doc: "The number of unique active anchors in the last completed 24h collection window aggregated by II domains used.",
+        monthly_stats_label: "internet_identity_monthly_active_anchors_by_domain",
+        monthly_stats_doc: "The number of unique active anchors in the last completed 30-day collection window aggregated by II domains used.",
+    };
+    labelled_activity_metrics(w, stats, labels, |counter, encoder| {
+        encoder
+            .value(
+                &[("domain", IC0_APP_DOMAIN)],
+                counter.ic0_app_counter as f64,
+            )?
+            .value(
+                &[("domain", INTERNETCOMPUTER_ORG_DOMAIN)],
+                counter.internetcomputer_org_counter as f64,
+            )?
+            .value(
+                &[("domain", BOTH_DOMAINS)],
+                counter.both_ii_domains_counter as f64,
+            )?;
+        Ok(())
+    })?;
+
+    let stats = &persistent_state.active_authn_method_stats;
+    let labels = ActivityMetricsLabels {
+        daily_stats_label: "internet_identity_daily_active_authn_methods",
+        daily_stats_doc: "The number of unique authentication methods used in the last completed 24h collection window on II domains.",
+        monthly_stats_label: "internet_identity_monthly_active_authn_methods",
+        monthly_stats_doc: "The number of unique authentication methods used in the last completed 30-day collection window on II domains.",
+    };
+    labelled_activity_metrics(w, stats, labels, |counter, encoder| {
+        encoder
+            .value(
+                &[("type", "webauthn_auth")],
+                counter.webauthn_auth_counter as f64,
+            )?
+            .value(
+                &[("type", "webauthn_recovery")],
+                counter.webauthn_recovery_counter as f64,
+            )?
+            .value(
+                &[("type", "recovery_phrase")],
+                counter.recovery_phrase_counter as f64,
+            )?
+            .value(
+                &[("type", "browser_storage_key")],
+                counter.browser_storage_key_counter as f64,
+            )?
+            .value(&[("type", "other")], counter.other_counter as f64)?;
+        Ok(())
+    })?;
+
+    w.encode_gauge(
+        "internet_identity_max_num_latest_delegation_origins",
+        persistent_state.max_num_latest_delegation_origins as f64,
+        "The maximum number of latest delegation origins that were used with II bound devices.",
+    )?;
     Ok(())
 }
 

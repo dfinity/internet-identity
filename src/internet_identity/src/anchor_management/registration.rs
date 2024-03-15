@@ -1,5 +1,5 @@
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
-use crate::state::{ChallengeInfo, DEFAULT_MAX_INFLIGHT_CAPTCHAS};
+use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use crate::{random_salt, secs_to_nanos, state};
 use candid::Principal;
@@ -26,11 +26,7 @@ pub async fn create_challenge() -> Challenge {
 
         // Error out if there are too many inflight challenges
         if inflight_challenges.len()
-            >= state::persistent_state_mut(|state| {
-                *state
-                    .max_inflight_captchas
-                    .get_or_insert(DEFAULT_MAX_INFLIGHT_CAPTCHAS)
-            }) as usize
+            >= state::persistent_state(|s| s.max_inflight_captchas) as usize
         {
             trap("too many inflight captchas");
         }

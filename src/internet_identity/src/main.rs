@@ -340,15 +340,10 @@ fn stats() -> InternetIdentityStats {
         state::persistent_state(|persistent_state| {
             let origins = persistent_state
                 .latest_delegation_origins
-                .as_ref()
-                .map(|latest_delegation_origins| {
-                    latest_delegation_origins.keys().cloned().collect()
-                })
-                .unwrap_or_default();
-            (
-                origins,
-                persistent_state.max_num_latest_delegation_origins.unwrap(),
-            )
+                .keys()
+                .cloned()
+                .collect();
+            (origins, persistent_state.max_num_latest_delegation_origins)
         });
 
     state::storage_borrow(|storage| InternetIdentityStats {
@@ -402,15 +397,12 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     state::init_from_stable_memory();
-    // immediately migrate the persistent state to the new layout
-    state::storage_borrow_mut(|storage| storage.migrate_persistent_state());
+    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
+    state::load_persistent_state();
 
     // We drop all the signatures on upgrade, users will
     // re-request them if needed.
     update_root_hash();
-    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
-    state::load_persistent_state();
-
     apply_install_arg(maybe_arg);
 }
 
@@ -431,17 +423,17 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         }
         if let Some(rate_limit) = arg.register_rate_limit {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.registration_rate_limit = Some(rate_limit);
+                persistent_state.registration_rate_limit = rate_limit;
             })
         }
         if let Some(limit) = arg.max_num_latest_delegation_origins {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_num_latest_delegation_origins = Some(limit);
+                persistent_state.max_num_latest_delegation_origins = limit;
             })
         }
         if let Some(limit) = arg.max_inflight_captchas {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_inflight_captchas = Some(limit);
+                persistent_state.max_inflight_captchas = limit;
             })
         }
     }

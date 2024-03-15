@@ -10,7 +10,6 @@ use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize};
 use canister_sig_util::signature_map::SignatureMap;
-use ic_cdk::api::time;
 use ic_cdk::trap;
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::*;
@@ -90,35 +89,48 @@ pub struct PersistentState {
     // Amount of cycles that need to be attached when II creates a canister
     pub canister_creation_cycles_cost: u64,
     // Configuration for the rate limit on `register`, if any.
-    pub registration_rate_limit: Option<RateLimitConfig>,
+    pub registration_rate_limit: RateLimitConfig,
     // Daily and monthly active anchor statistics
-    pub active_anchor_stats: Option<ActivityStats<ActiveAnchorCounter>>,
+    pub active_anchor_stats: ActivityStats<ActiveAnchorCounter>,
     // Daily and monthly active anchor statistics (filtered by domain)
-    pub domain_active_anchor_stats: Option<ActivityStats<DomainActiveAnchorCounter>>,
+    pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
     // Daily and monthly active authentication methods on the II domains.
-    pub active_authn_method_stats: Option<ActivityStats<AuthnMethodCounter>>,
+    pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
     // Hashmap of last used delegation origins
-    pub latest_delegation_origins: Option<HashMap<FrontendHostname, Timestamp>>,
+    pub latest_delegation_origins: HashMap<FrontendHostname, Timestamp>,
     // Maximum number of latest delegation origins to store
-    pub max_num_latest_delegation_origins: Option<u64>,
+    pub max_num_latest_delegation_origins: u64,
     // Maximum number of inflight captchas
-    pub max_inflight_captchas: Option<u64>,
+    pub max_inflight_captchas: u64,
 }
 
 impl Default for PersistentState {
     fn default() -> Self {
+        let time = time();
         Self {
             archive_state: ArchiveState::default(),
             canister_creation_cycles_cost: 0,
-            registration_rate_limit: None,
-            active_anchor_stats: None,
-            domain_active_anchor_stats: None,
-            active_authn_method_stats: None,
-            latest_delegation_origins: None,
-            max_num_latest_delegation_origins: Some(DEFAULT_MAX_DELEGATION_ORIGINS),
-            max_inflight_captchas: Some(DEFAULT_MAX_INFLIGHT_CAPTCHAS),
+            registration_rate_limit: DEFAULT_RATE_LIMIT_CONFIG,
+            active_anchor_stats: ActivityStats::new(time),
+            domain_active_anchor_stats: ActivityStats::new(time),
+            active_authn_method_stats: ActivityStats::new(time),
+            latest_delegation_origins: HashMap::new(),
+            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
+            max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
         }
     }
+}
+
+#[cfg(not(test))]
+fn time() -> Timestamp {
+    ic_cdk::api::time()
+}
+
+/// This is required because [ic_cdk::api::time()] traps when executed in a non-canister environment.
+#[cfg(test)]
+fn time() -> Timestamp {
+    // Return a fixed time for testing
+    1709647706487990000 // Tue Mar 05 2024 14:08:26 GMT+0000
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -241,19 +253,7 @@ pub fn save_persistent_state() {
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        storage_borrow(|storage| match storage.read_persistent_state() {
-            Ok(loaded_state) => *s.persistent_state.borrow_mut() = loaded_state,
-            Err(err) => trap(&format!("failed to recover persistent state! Err: {err:?}")),
-        })
-    });
-
-    // Initialize a sensible default for max_latest_delegation_origins
-    // if it is not set in the persistent state.
-    // This will allow us to later drop the opt and make the field u64.
-    persistent_state_mut(|persistent_state| {
-        persistent_state
-            .max_num_latest_delegation_origins
-            .get_or_insert(DEFAULT_MAX_DELEGATION_ORIGINS);
+        storage_borrow(|storage| *s.persistent_state.borrow_mut() = storage.read_persistent_state())
     });
 }
 
