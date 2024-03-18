@@ -75,7 +75,7 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/genesis-layout-migrated-to-v8.bin.gz",
+        "stable_memory/genesis-layout-migrated-to-v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -110,7 +110,7 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/genesis-layout-migrated-to-v8.bin.gz",
+        "stable_memory/genesis-layout-migrated-to-v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -144,7 +144,7 @@ fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallErro
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/multiple-recovery-phrases-v8.bin.gz",
+        "stable_memory/multiple-recovery-phrases-v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -179,7 +179,7 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/multiple-recovery-phrases-v8.bin.gz",
+        "stable_memory/multiple-recovery-phrases-v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -220,14 +220,14 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
 }
 
 #[test]
-fn should_read_persistent_state_v8() -> Result<(), CallError> {
+fn should_read_persistent_state_without_archive() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/persistent_state_no_archive_v8.bin.gz",
+        "stable_memory/persistent_state_no_archive_v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -251,7 +251,7 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
     restore_compressed_stable_memory(
         &env,
         canister_id,
-        "stable_memory/persistent_state_archive_v8.bin.gz",
+        "stable_memory/persistent_state_archive_v9.bin.gz",
     );
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -296,33 +296,6 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
         CallError::UserError(err) => {
             assert_eq!(err.code, CanisterCalledTrap);
             assert!(err.description.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version"));
-        }
-    }
-    Ok(())
-}
-
-/// Tests that II will refuse to upgrade on stable memory without persistent state.
-#[test]
-fn should_trap_on_missing_persistent_state() -> Result<(), CallError> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/no-persistent-state-v8.bin.gz",
-    );
-
-    let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
-
-    assert!(result.is_err());
-    let err = result.err().unwrap();
-    match err {
-        CallError::Reject(err) => panic!("unexpected error {err}"),
-        CallError::UserError(err) => {
-            assert_eq!(err.code, CanisterCalledTrap);
-            assert!(err
-                .description
-                .contains("failed to recover persistent state!"));
         }
     }
     Ok(())

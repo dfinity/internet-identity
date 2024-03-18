@@ -298,7 +298,7 @@ mod pull_entries_tests {
         restore_compressed_stable_memory(
             &env,
             ii_canister,
-            "stable_memory/buffered_archive_entries_v8.bin.gz",
+            "stable_memory/buffered_archive_entries_v9.bin.gz",
         );
         upgrade_ii_canister_with_arg(
             &env,
