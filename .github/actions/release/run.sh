@@ -40,6 +40,8 @@ git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
 ./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1)
 \`\`\`
+
+Make sure to compare the hashes also with the proposal payload when verifying canister upgrade proposals.
 EOF
 
 # Read all "INPUT_ASSETS" (where "ASSETS" is the input specified in action.yml)
