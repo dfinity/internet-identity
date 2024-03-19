@@ -347,11 +347,13 @@ init();
 
 whoamiBtn.addEventListener("click", async () => {
   const canisterId = Principal.fromText(readCanisterId());
+  let agent = new HttpAgent({
+    host: hostUrlEl.value,
+    identity: delegationIdentity,
+  });
+  await agent.fetchRootKey();
   const actor = Actor.createActor(idlFactory, {
-    agent: new HttpAgent({
-      host: hostUrlEl.value,
-      identity: delegationIdentity,
-    }),
+    agent,
     canisterId,
   });
 

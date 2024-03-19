@@ -43,7 +43,6 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import * as tweetnacl from "tweetnacl";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
@@ -719,7 +718,7 @@ export const creationOptions = (
       name: "Internet Identity Service",
     },
     user: {
-      id: tweetnacl.randomBytes(16),
+      id: window.crypto.getRandomValues(new Uint8Array(16)),
       name: "Internet Identity",
       displayName: "Internet Identity",
     },

@@ -1,5 +1,5 @@
+import { fromHex } from "@dfinity/agent";
 import { Ed25519PublicKey } from "@dfinity/identity";
-import { fromHexString } from "@dfinity/identity/lib/cjs/buffer";
 import * as ed25519 from "./ed25519";
 
 type TestVector = {
@@ -66,9 +66,9 @@ const testVectorsSLIP10 = [
 test("derive Ed25519 via SLIP 0010", async () => {
   await Promise.all(
     testVectorsSLIP10.map(async (testVector: TestVector) => {
-      const seedBlob = fromHexString(testVector.seed);
-      const expectedPrivateKey = fromHexString(testVector.privateKey);
-      const expectedPublicKey = fromHexString(testVector.publicKey);
+      const seedBlob = fromHex(testVector.seed);
+      const expectedPrivateKey = fromHex(testVector.privateKey);
+      const expectedPublicKey = fromHex(testVector.publicKey);
 
       const identity = await ed25519.fromSeedWithSlip0010(
         new Uint8Array(seedBlob),
