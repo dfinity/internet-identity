@@ -3,7 +3,6 @@ use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::state;
 use crate::storage::anchor::{Anchor, Device};
 use candid::{CandidType, Deserialize};
-use ic_cdk::api::time;
 use internet_identity_interface::internet_identity::types::Timestamp;
 
 pub mod activity_counter;
@@ -86,10 +85,9 @@ pub struct OngoingActivityStats<T: ActivityCounter> {
 pub fn update_activity_stats(anchor: &Anchor, current_device: &Device) {
     state::persistent_state_mut(|persistent_state| {
         // Active anchor stats across all domains
-        let active_anchor_stats = persistent_state
+        persistent_state
             .active_anchor_stats
-            .get_or_insert_with(|| ActivityStats::new(time()));
-        active_anchor_stats.update_counters(&anchor.last_activity());
+            .update_counters(&anchor.last_activity());
 
         // Active anchor stats, II domains only
         if let Some(domain) = current_device.ii_domain() {
@@ -97,17 +95,14 @@ pub fn update_activity_stats(anchor: &Anchor, current_device: &Device) {
                 anchor,
                 current_domain: domain,
             };
-            let domain_active_anchor_stats = persistent_state
+            persistent_state
                 .domain_active_anchor_stats
-                .get_or_insert_with(|| ActivityStats::new(time()));
-            domain_active_anchor_stats.update_counters(&context);
+                .update_counters(&context);
 
             // Active authn methods stats, II domains only
-            let authn_method_stats = persistent_state
+            persistent_state
                 .active_authn_method_stats
-                .get_or_insert_with(|| ActivityStats::new(time()));
-
-            authn_method_stats.update_counters(&current_device);
+                .update_counters(&current_device);
         }
     })
 }

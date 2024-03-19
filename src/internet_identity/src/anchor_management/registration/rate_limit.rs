@@ -16,10 +16,7 @@ use std::cmp::min;
 /// There is a maximum of `max_tokens` tokens, when reached the tokens not increase any further.
 /// This is the maximum number of calls that can be handled in a burst.
 pub fn process_rate_limit() {
-    let Some(config) = state::persistent_state(|ps| ps.registration_rate_limit.clone()) else {
-        // rate limit disabled -> nothing to do
-        return;
-    };
+    let config = state::persistent_state(|ps| ps.registration_rate_limit.clone());
 
     state::registration_rate_limit_mut(|state_opt| {
         let state = if let Some(state) = state_opt {

@@ -17,22 +17,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::time::SystemTime;
 
-fn setup_ii_v8(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
-    let ii_canister = install_ii_canister(env, EMPTY_WASM.clone());
-    restore_compressed_stable_memory(env, ii_canister, "stable_memory/clean_init_v8.bin.gz");
-
-    // upgrade now auto-migrates to storage v9
-    upgrade_ii_canister_with_arg(env, ii_canister, II_WASM.clone(), arg)
-        .expect("II upgrade failed");
-    assert_eq!(
-        ii_api::stats(env, ii_canister)
-            .unwrap()
-            .storage_layout_version,
-        9
-    );
-    ii_canister
-}
-
 fn setup_ii_v9(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
     let ii_canister = install_ii_canister_with_arg(env, II_WASM.clone(), arg);
     assert_eq!(
@@ -50,7 +34,7 @@ fn ii_canisters_under_test(
 ) -> Vec<CanisterId> {
     // the default arg for this test suite configures the archive
     let arg = arg.or(arg_with_wasm_hash(ARCHIVE_WASM.clone()));
-    vec![setup_ii_v8(env, arg.clone()), setup_ii_v9(env, arg)]
+    vec![setup_ii_v9(env, arg)]
 }
 
 /// Tests related to archive deployment (using II).

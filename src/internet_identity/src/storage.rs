@@ -32,10 +32,11 @@
 //! ------------------------------------------- <- Start of wasm memory page 1
 //! ```
 //!
-//! The second page and onwards is managed by the [MemoryManager] and is currently split into two
-//! managed memories:
+//! The second page and onwards is managed by the [MemoryManager] and is currently split into the
+//! following managed memories:
 //! * Anchor memory: used to store the candid encoded anchors
 //! * Archive buffer memory: used to store the archive entries yet to be pulled by the archive canister
+//! * Persistent state memory: used to store the [PersistentState]
 //!
 //! ### Anchor memory
 //!
@@ -67,13 +68,9 @@
 //!
 //! ## Persistent State
 //!
-//! In order to keep state across upgrades that is not related to specific anchors (such as archive
-//! information) Internet Identity will serialize the [PersistentState] on upgrade and restore it
-//! again after the upgrade.
-//!
-//! The storage layout v8 and earlier use the first unused memory
-//! location (after the anchor record of the highest allocated anchor number) to store it.
-//! The storage layout v9 uses a separate virtual memory.
+//! Internet Identity maintains a [PersistentState] for config and stats purposes which stored in a
+//! [StableCell] in the virtual memory with id 2 managed using the [MemoryManager].
+//! The [PersistentState] is currently only written to stable memory in the pre_upgrade hook.
 //!
 //! ## Archive buffer memory
 //!
@@ -92,7 +89,7 @@ use std::ops::RangeInclusive;
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::reader::{BufferedReader, Reader};
+use ic_stable_structures::reader::Reader;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
@@ -115,17 +112,14 @@ mod storable_persistent_state;
 mod tests;
 
 /// * version   0: invalid
-/// * version 1-7: no longer supported
-/// * version   8: 4KB anchors, candid anchor record layout, persistent state with archive pull config,
-///                with memory manager (from 2nd page on), archive entries buffer in stable memory1
-/// * version   9: same as 8, but with persistent state in separate virtual memory
-const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 8..=9;
+/// * version 1-8: no longer supported
+/// * version   9: 4KB anchors, candid anchor record layout, persistent state in virtual memory,
+///                with memory manager (from 2nd page on), archive entries buffer in stable memory
+const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 9..=9;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
-
-const PERSISTENT_STATE_MAGIC: [u8; 4] = *b"IIPS"; // II Persistent State
 
 /// MemoryManager parameters.
 const ANCHOR_MEMORY_INDEX: u8 = 0u8;
@@ -467,85 +461,17 @@ impl<M: Memory + Clone> Storage<M> {
         record_number as u64 * self.header.entry_size as u64
     }
 
-    /// Returns the address of the first byte not yet allocated to a anchor.
-    /// This address exists even if the max anchor number has been reached, because there is a memory
-    /// reserve at the end of stable memory.
-    fn unused_memory_start(&self) -> u64 {
-        self.record_address(self.header.num_anchors)
-    }
-
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
-        match self.version() {
-            8 => trap("persistent state must not be written before migration to layout version 9"),
-            9 => {
-                self.persistent_state
-                    .set(StorablePersistentState::from(state.clone()))
-                    .expect("failed to write persistent state");
-            }
-            version => trap(&format!("unsupported version: {}", version)),
-        };
+        // The virtual memory is not limited in size, so for the expected size of the persistent state
+        // this operation is infallible. The size of the persistent state is monitored and an alert
+        // is raised if the size exceeds the expected size.
+        self.persistent_state
+            .set(StorablePersistentState::from(state.clone()))
+            .expect("failed to write persistent state");
     }
 
-    pub fn migrate_persistent_state(&mut self) {
-        let version = self.version();
-        if version == 9 {
-            // nothing to migrate
-            return;
-        }
-        assert_eq!(version, 8);
-        let persistent_state = self
-            .read_persistent_state_v8()
-            .expect("failed to recover persistent state!");
-        self.header.version = 9;
-        self.flush();
-        self.write_persistent_state(&persistent_state);
-    }
-
-    pub fn read_persistent_state(&self) -> Result<PersistentState, PersistentStateError> {
-        match self.version() {
-            8 => self.read_persistent_state_v8(),
-            9 => Ok(PersistentState::from(self.persistent_state.get().clone())),
-            version => trap(&format!("unsupported version: {}", version)),
-        }
-    }
-
-    /// Reads the persistent state from stable memory just outside the space allocated to the highest anchor number.
-    /// This is only used to restore state in `post_upgrade`.
-    fn read_persistent_state_v8(&self) -> Result<PersistentState, PersistentStateError> {
-        let address = self.unused_memory_start();
-        if address > self.anchor_memory.size() * WASM_PAGE_SIZE_IN_BYTES as u64 {
-            // the address where the persistent state would be is not allocated yet
-            return Err(PersistentStateError::NotFound);
-        }
-
-        let mut reader = BufferedReader::new(
-            self.header.entry_size as usize,
-            Reader::new(&self.anchor_memory, address),
-        );
-        let mut magic_buf: [u8; 4] = [0; 4];
-        reader
-            .read_exact(&mut magic_buf)
-            // if we hit out of bounds here, this means that the persistent state has not been
-            // written at the expected location and thus cannot be found
-            .map_err(|_| PersistentStateError::NotFound)?;
-
-        if magic_buf != PERSISTENT_STATE_MAGIC {
-            // magic does not match --> this is not the persistent state
-            return Err(PersistentStateError::NotFound);
-        }
-
-        let mut size_buf: [u8; 8] = [0; 8];
-        reader
-            .read_exact(&mut size_buf)
-            .map_err(PersistentStateError::ReadError)?;
-
-        let size = u64::from_le_bytes(size_buf);
-        let mut data_buf = vec![0; size as usize];
-        reader
-            .read_exact(data_buf.as_mut_slice())
-            .map_err(PersistentStateError::ReadError)?;
-
-        candid::decode_one(&data_buf).map_err(PersistentStateError::CandidError)
+    pub fn read_persistent_state(&self) -> PersistentState {
+        PersistentState::from(self.persistent_state.get().clone())
     }
 
     pub fn version(&self) -> u8 {
@@ -577,13 +503,6 @@ fn single_bucket_memory<M: Memory>(
         memory_manager.get(memory_id),
         0..BUCKET_SIZE_IN_PAGES as u64,
     )
-}
-
-#[derive(Debug)]
-pub enum PersistentStateError {
-    CandidError(candid::error::Error),
-    NotFound,
-    ReadError(std::io::Error),
 }
 
 #[derive(Debug)]

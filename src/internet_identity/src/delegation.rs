@@ -87,9 +87,7 @@ fn update_latest_delegation_origins(frontend: FrontendHostname) {
     let now_ns = time();
 
     persistent_state_mut(|persistent_state| {
-        let latest_delegation_origins = persistent_state
-            .latest_delegation_origins
-            .get_or_insert(HashMap::new());
+        let latest_delegation_origins = &mut persistent_state.latest_delegation_origins;
 
         if let Some(timestamp_ns) = latest_delegation_origins.get_mut(&frontend) {
             *timestamp_ns = now_ns;
@@ -102,7 +100,7 @@ fn update_latest_delegation_origins(frontend: FrontendHostname) {
 
         // if we still have too many entries, drop the oldest
         if latest_delegation_origins.len() as u64
-            > persistent_state.max_num_latest_delegation_origins.unwrap()
+            > persistent_state.max_num_latest_delegation_origins
         {
             // if this case is hit often (i.e. we routinely have more than 1000 entries), we should
             // consider using a more efficient data structure
