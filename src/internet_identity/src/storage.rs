@@ -68,11 +68,9 @@
 //!
 //! ## Persistent State
 //!
-//! In order to keep state across upgrades that is not related to specific anchors (such as archive
-//! information) Internet Identity will serialize the [PersistentState] on upgrade and restore it
-//! again after the upgrade.
-//! The [PersistentState] is stored in a [StableCell] in the virtual memory with id 2 managed using
-//! the [MemoryManager].
+//! Internet Identity maintains a [PersistentState] for config and stats purposes which stored in a
+//! [StableCell] in the virtual memory with id 2 managed using the [MemoryManager].
+//! The [PersistentState] is currently only written to stable memory in the pre_upgrade hook.
 //!
 //! ## Archive buffer memory
 //!
@@ -464,7 +462,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
-        // The virtual memory is not limited in size, so for the expected size of the persistent
+        // The virtual memory is not limited in size, so for the expected size of the persistent state
         // this operation is infallible. The size of the persistent state is monitored and an alert
         // is raised if the size exceeds the expected size.
         self.persistent_state
