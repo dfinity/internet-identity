@@ -1,5 +1,5 @@
 import { isUserNumber } from "$src/utils/userNumber";
-import { toHex } from "@dfinity/agent";
+import { toHexString } from "@dfinity/candid";
 import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
 
 /**
@@ -8,7 +8,10 @@ import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
 export function generate(): string {
   const entropy = new Uint32Array(8); // NOTE: please change RECOVERYPHRASE_WORDCOUNT if this changes
   crypto.getRandomValues(entropy);
-  return entropyToMnemonic(toHex(entropy.buffer), RECOVERYPHRASE_WORDLIST);
+  return entropyToMnemonic(
+    toHexString(entropy.buffer),
+    RECOVERYPHRASE_WORDLIST
+  );
 }
 
 /** How many words are expected in the recovery phrase */
