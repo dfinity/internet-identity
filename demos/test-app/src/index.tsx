@@ -347,7 +347,7 @@ init();
 
 whoamiBtn.addEventListener("click", async () => {
   const canisterId = Principal.fromText(readCanisterId());
-  let agent = new HttpAgent({
+  const agent = new HttpAgent({
     host: hostUrlEl.value,
     identity: delegationIdentity,
   });
