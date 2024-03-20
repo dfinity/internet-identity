@@ -1,5 +1,5 @@
 import { isUserNumber } from "$src/utils/userNumber";
-import { toHexString } from "@dfinity/identity/lib/cjs/buffer";
+import { toHexString } from "@dfinity/candid";
 import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
 
 /**
