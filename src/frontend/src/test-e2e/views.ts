@@ -472,6 +472,18 @@ export class VerifyRemoteDeviceView extends View {
   }
 }
 
+export class PromptDeviceTrustedView extends View {
+  private readonly SELECTOR = "#trustDeviceConfirm";
+
+  async waitForDisplay(): Promise<void> {
+    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async confirmTrusted(): Promise<void> {
+    await this.browser.$(this.SELECTOR).click();
+  }
+}
+
 export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 

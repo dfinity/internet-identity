@@ -5,10 +5,11 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Verify Tentative Device" pageName="verifyTentativeDevice">
   <script>
     import { toast } from "$src/components/toast";
-    import { chromeDevice } from "../constants";
+    import { chromeDevice, userNumber } from "../constants";
     import { verifyTentativeDevicePage } from "$src/flows/addDevice/manage/verifyTentativeDevice";
 
     verifyTentativeDevicePage({
+      userNumber,
       alias: chromeDevice.alias,
       cancel: () => toast.info("canceled"),
       // We accept anything that ends with "2"

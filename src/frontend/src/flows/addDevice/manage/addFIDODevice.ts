@@ -78,7 +78,7 @@ export const addFIDODevice = async (
       )
     );
 
-    await addDeviceSuccess({ deviceAlias: deviceName });
+    await addDeviceSuccess({ userNumber, deviceAlias: deviceName });
   } catch (error: unknown) {
     await displayFailedToAddDevice(
       error instanceof Error ? error : unknownError()

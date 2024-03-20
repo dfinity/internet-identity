@@ -3,6 +3,7 @@ import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
 import { pinInput } from "$src/components/pinInput";
+import { tentativeDeviceStepper } from "$src/flows/addDevice/stepper";
 import { AsyncCountdown } from "$src/utils/countdown";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
@@ -22,12 +23,14 @@ type VerifyResultOrRetry =
   | { retry: true };
 
 const verifyTentativeDeviceTemplate = <T>({
+  userNumber,
   alias,
   remaining,
   verify,
   doContinue,
   cancel,
 }: {
+  userNumber: bigint;
   alias: string;
   remaining: AsyncIterable<string>;
   cancel: () => void;
@@ -51,9 +54,14 @@ const verifyTentativeDeviceTemplate = <T>({
     onSubmit: doContinue,
   });
 
-  const pageContentSlot = html`<h1 class="t-title t-title--main">
-      Do you want to create this Passkey for your Internet Identity?
-    </h1>
+  const pageContentSlot = html`<article>
+    ${tentativeDeviceStepper({ step: "verify" })}
+    <hgroup>
+      <div class="c-card__label">
+        <h2>Internet Identity ${userNumber}</h2>
+      </div>
+      <h1 class="t-title t-title--main">Activate Passkey</h1>
+    </hgroup>
     <output
       class="c-input c-input--fullwidth c-input--stack c-input--readonly t-vip t-vip--small"
       >${alias}</output
@@ -85,7 +93,8 @@ const verifyTentativeDeviceTemplate = <T>({
       <button @click=${() => cancel()} class="c-button c-button--secondary">
         Cancel
       </button>
-    </div>`;
+    </div>
+  </article>`;
 
   return mainWindow({
     showLogo: false,
@@ -124,6 +133,7 @@ export const verifyTentativeDevice = async ({
     AsyncCountdown.fromNanos(endTimestamp);
 
   verifyTentativeDevicePage<VerifyResult>({
+    userNumber: connection.userNumber,
     alias,
     cancel: async () => {
       await withLoader(() => connection.exitDeviceRegistrationMode());

@@ -4,6 +4,7 @@ import {
 } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { tentativeDeviceStepper } from "$src/flows/addDevice/stepper";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { addDeviceSuccess } from "../addDeviceSuccess";
@@ -70,6 +71,10 @@ export const addDevice = async ({
   });
 
   if (result === "verified") {
-    await addDeviceSuccess({ deviceAlias: alias });
+    await addDeviceSuccess({
+      userNumber,
+      deviceAlias: alias,
+      stepper: tentativeDeviceStepper({ step: "success" }),
+    });
   }
 };

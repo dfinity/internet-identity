@@ -5,6 +5,7 @@ import {
 import { displayError } from "$src/components/displayError";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
+import { tentativeDeviceStepper } from "$src/flows/addDevice/stepper";
 import { setAnchorUsed } from "$src/storage";
 import { AsyncCountdown } from "$src/utils/countdown";
 import { Connection } from "$src/utils/iiConnection";
@@ -20,17 +21,24 @@ type TentativeRegistrationInfo = Extract<
 >["added_tentatively"];
 
 const showVerificationCodeTemplate = ({
+  userNumber,
   alias,
   tentativeRegistrationInfo,
   remaining,
   cancel,
 }: {
+  userNumber: bigint;
   alias: string;
   tentativeRegistrationInfo: TentativeRegistrationInfo;
   remaining: AsyncIterable<string>;
   cancel: () => void;
 }) => {
-  const pageContentSlot = html` <hgroup>
+  const pageContentSlot = html`<article>
+    ${tentativeDeviceStepper({ step: "verify" })}
+    <hgroup>
+      <div class="c-card__label">
+        <h2>Internet Identity ${userNumber}</h2>
+      </div>
       <h1 class="t-title t-title--main">Verify New Passkey</h1>
       <p class="t-paragraph">Your new Passkey:</p>
       <output
@@ -58,7 +66,8 @@ const showVerificationCodeTemplate = ({
           Cancel
         </button>
       </div>
-    </div>`;
+    </div>
+  </article>`;
 
   return mainWindow({
     showLogo: false,
@@ -91,6 +100,7 @@ export const showVerificationCode = async (
     );
 
   showVerificationCodePage({
+    userNumber,
     alias,
     tentativeRegistrationInfo,
     remaining: countdown.remainingFormattedAsync(),

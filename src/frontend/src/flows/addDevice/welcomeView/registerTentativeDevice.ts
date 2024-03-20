@@ -6,6 +6,8 @@ import {
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { addDeviceSuccess } from "$src/flows/addDevice/addDeviceSuccess";
+import { tentativeDeviceStepper } from "$src/flows/addDevice/stepper";
+import { promptDeviceTrusted } from "$src/flows/addDevice/welcomeView/promptDeviceTrusted";
 import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
@@ -23,11 +25,12 @@ import { showVerificationCode } from "./showVerificationCode";
 
 /**
  * Runs the tentative device registration flow on a _new_ device:
- *  1. The user interacts with the authenticator to create a new credential.
- *  2. After adding it tentatively, the user is prompted to enter the verification
+ *  1. The user is prompted to confirm this device is trusted.
+ *  2. The user interacts with the authenticator to create a new credential.
+ *  3. After adding it tentatively, the user is prompted to enter the verification
  *     code on an existing device.
- *  3. This flows polls for the user to complete the verification.
- *  4. Once verification is completed, a success screen is shown.
+ *  4. This flows polls for the user to complete the verification.
+ *  5. Once verification is completed, a success screen is shown.
  *
  *  If the user cancels at any point, the flow is aborted.
  *
@@ -40,6 +43,12 @@ export const registerTentativeDevice = async (
 ): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
+
+  const deviceTrusted = await promptDeviceTrusted({ userNumber });
+  if (deviceTrusted === "canceled") {
+    return { tag: "canceled" };
+  }
+  deviceTrusted satisfies "confirmed";
 
   // Then, we create local WebAuthn credentials for the device
   const result = await withLoader(() =>
@@ -111,7 +120,11 @@ export const registerTentativeDevice = async (
 
   verificationCodeResult satisfies "ok";
 
-  await addDeviceSuccess({ deviceAlias: alias });
+  await addDeviceSuccess({
+    userNumber,
+    deviceAlias: alias,
+    stepper: tentativeDeviceStepper({ step: "success" }),
+  });
   return { tag: "deviceAdded" };
 };
 

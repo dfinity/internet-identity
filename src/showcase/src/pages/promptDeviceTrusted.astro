@@ -1,0 +1,12 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt for Device Trusted" pageName="promptDeviceTrusted">
+  <script>
+    import { promptDeviceTrusted } from "$src/flows/addDevice/welcomeView/promptDeviceTrusted";
+    import {userNumber} from "../constants";
+
+    promptDeviceTrusted({userNumber})
+  </script>
+</Screen>
