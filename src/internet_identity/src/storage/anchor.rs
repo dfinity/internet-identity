@@ -515,7 +515,7 @@ fn check_device_limits(device: &Device) -> Result<(), AnchorError> {
     const ORIGIN_LEN_LIMIT: usize = 50;
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;
-    const CREDENTIAL_ID_LEN_LIMIT: usize = 200;
+    const CREDENTIAL_ID_LEN_LIMIT: usize = 350;
 
     let n = device.alias.len();
     if n > ALIAS_LEN_LIMIT {

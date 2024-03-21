@@ -75,7 +75,7 @@ fn should_enforce_pubkey_limit() {
 fn should_enforce_credential_id_limit() {
     let mut anchor = Anchor::new(ANCHOR_NUMBER);
     let mut device = sample_device();
-    device.credential_id = Some(ByteBuf::from([0; 201]));
+    device.credential_id = Some(ByteBuf::from([0; 351]));
 
     let result = anchor.add_device(device);
 
