@@ -154,6 +154,10 @@ test("Add remote device starting on new device", async () => {
       await addDeviceSuccessView.continue();
 
       // browser 2 again
+      const addDeviceSuccessView2 = new AddDeviceSuccessView(browser2);
+      await addDeviceSuccessView2.waitForDisplay();
+      await addDeviceSuccessView2.continue();
+
       // make sure the browser now shows the sign-in screen with the user number
       // pre-filled
       await focusBrowser(browser2);

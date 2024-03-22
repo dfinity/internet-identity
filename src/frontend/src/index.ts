@@ -1,5 +1,4 @@
 import { handleLoginFlowResult } from "$src/components/authenticateBox";
-import { addDeviceSuccess } from "$src/flows/addDevice/manage/addDeviceSuccess";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
@@ -22,10 +21,6 @@ void createSpa(async (connection) => {
       return authFlowManage(connection);
     }
     registerDeviceResult satisfies { tag: "deviceAdded" };
-    const { alias: deviceAlias } = registerDeviceResult;
-
-    // Display a success page once device added (above registerTentativeDevice **never** returns if it fails)
-    await addDeviceSuccess({ deviceAlias });
 
     const renderManage = renderManageWarmup();
 
