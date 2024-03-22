@@ -390,6 +390,7 @@ dependencies = [
  "hex",
  "ic-cdk",
  "ic-certification 2.2.0",
+ "ic-representation-independent-hash",
  "lazy_static",
  "serde",
  "serde_bytes",
@@ -1682,9 +1683,9 @@ dependencies = [
 
 [[package]]
 name = "ic-representation-independent-hash"
-version = "2.2.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d15dde6234abad419d1871bba56f52c7af66dcaea144a8efdafa01bfec129460"
+checksum = "b4d9c969c80e9b445255341da79772680f503ef856b95b3ddf162b41d096df1f"
 dependencies = [
  "leb128",
  "sha2 0.10.8",

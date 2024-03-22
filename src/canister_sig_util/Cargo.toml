@@ -9,6 +9,7 @@ edition = "2021"
 candid.workspace = true
 ic-cdk.workspace = true
 ic-certification.workspace = true
+ic-representation-independent-hash = "2.5"
 
 # other dependencies
 hex.workspace = true
