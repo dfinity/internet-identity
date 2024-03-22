@@ -15,7 +15,7 @@ import {
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { addDeviceSuccess } from "./addDeviceSuccess";
+import { addDeviceSuccess } from "../addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
   displayError({

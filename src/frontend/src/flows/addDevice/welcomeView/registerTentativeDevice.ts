@@ -5,6 +5,7 @@ import {
 } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { addDeviceSuccess } from "$src/flows/addDevice/addDeviceSuccess";
 import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
@@ -21,14 +22,22 @@ import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled
 import { showVerificationCode } from "./showVerificationCode";
 
 /**
- * Prompts the user to enter a device alias. When clicking next, the device is added tentatively to the given identity anchor.
+ * Runs the tentative device registration flow on a _new_ device:
+ *  1. The user interacts with the authenticator to create a new credential.
+ *  2. After adding it tentatively, the user is prompted to enter the verification
+ *     code on an existing device.
+ *  3. This flows polls for the user to complete the verification.
+ *  4. Once verification is completed, a success screen is shown.
+ *
+ *  If the user cancels at any point, the flow is aborted.
+ *
  * @param userNumber anchor to add the tentative device to.
  * @param connection connection to interact with the II canister.
  */
 export const registerTentativeDevice = async (
   userNumber: bigint,
   connection: Connection
-): Promise<{ tag: "deviceAdded"; alias: string } | { tag: "canceled" }> => {
+): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
 
@@ -101,7 +110,9 @@ export const registerTentativeDevice = async (
   }
 
   verificationCodeResult satisfies "ok";
-  return { tag: "deviceAdded", alias };
+
+  await addDeviceSuccess({ deviceAlias: alias });
+  return { tag: "deviceAdded" };
 };
 
 /** Create new WebAuthn credentials */

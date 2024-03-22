@@ -160,7 +160,7 @@ export const authenticateBoxFlow = async <T, I>({
   templates: AuthnTemplates;
   addDevice: (
     userNumber?: bigint
-  ) => Promise<{ tag: "deviceAdded"; alias: string } | { tag: "canceled" }>;
+  ) => Promise<{ tag: "deviceAdded" } | { tag: "canceled" }>;
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
@@ -652,7 +652,7 @@ const loginPinIdentityMaterial = ({
 const asNewDevice = async (
   connection: Connection,
   prefilledUserNumber?: bigint
-): Promise<{ tag: "deviceAdded"; alias: string } | { tag: "canceled" }> => {
+): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Prompt the user for an anchor and provide additional information about the flow.
   // If the user number is already known, it is prefilled in the screen.
   const userNumberResult = await promptUserNumber({
