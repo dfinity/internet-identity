@@ -75,7 +75,7 @@ pub fn get_id_alias(
     check_frontend_length(&dapps.issuer);
 
     state::assets_and_signatures(|cert_assets, sigs| {
-        let canister_sig_pk = canister_sig_pk_from_vc_signing_input(rp_id_alias_jwt)
+        let canister_sig_pk = canister_sig_pk_from_vc_signing_input(rp_id_alias_jwt.as_bytes())
             .map_err(GetIdAliasError::NoSuchCredentials)?;
         let seed = canister_sig_pk.seed.as_slice();
 
@@ -89,8 +89,8 @@ pub fn get_id_alias(
             .map_err(|err| {
                 GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
             })?;
-        let rp_jws =
-            vc_signing_input_to_jws(rp_id_alias_jwt, &rp_sig).expect("failed constructing rp JWS");
+        let rp_jws = vc_signing_input_to_jws(rp_id_alias_jwt.as_bytes(), &rp_sig)
+            .expect("failed constructing rp JWS");
 
         let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
         let issuer_sig = sigs
@@ -102,7 +102,7 @@ pub fn get_id_alias(
             .map_err(|err| {
                 GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
             })?;
-        let issuer_jws = vc_signing_input_to_jws(issuer_id_alias_jwt, &issuer_sig)
+        let issuer_jws = vc_signing_input_to_jws(issuer_id_alias_jwt.as_bytes(), &issuer_sig)
             .expect("failed constructing issuer JWS");
 
         Ok(IdAliasCredentials {

@@ -85,6 +85,10 @@ pub fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
 }
 
 /// Constructs and returns a JWS (a signed JWT) from the given components.
+/// Specifically, it constructs a JWS-header with the given `canister_sig_pk`, and
+/// packages `credential_jwt`, the header, and the signature `sig` into a JWS.
+/// The given signature should be created over the bytes returned by `vc_signing_input()`.
+/// Note: the validity of the signature is not checked.
 pub fn vc_jwt_to_jws(
     credential_jwt: &str,
     canister_sig_pk: &CanisterSigPublicKey,
@@ -95,9 +99,13 @@ pub fn vc_jwt_to_jws(
 }
 
 /// Constructs and returns a JWS (a signed JWT) from the given components.
-pub fn vc_signing_input_to_jws(signing_input: &str, sig: &[u8]) -> Result<String, String> {
+/// The given `signing_input` should be a value returned by `vc_signing_input()`
+/// (which already contains a header with canister signatures public key), and
+/// `sig` should be valid canister signature over `signing_input`.
+/// Note: the validity of the signature is not checked.
+pub fn vc_signing_input_to_jws(signing_input: &[u8], sig: &[u8]) -> Result<String, String> {
     let decoder = Decoder::new();
-    let bytes_with_separators = [signing_input.as_bytes(), &[b'.']].concat();
+    let bytes_with_separators = [signing_input, &[b'.']].concat();
     let parsed_signing_input = decoder
         .decode_compact_serialization(&bytes_with_separators, None)
         .unwrap();
@@ -110,12 +118,12 @@ pub fn vc_signing_input_to_jws(signing_input: &str, sig: &[u8]) -> Result<String
     Ok(encoder.into_jws(sig))
 }
 
-/// Parses the canister signature public key from the given signing_input.
+/// Extracts the canister signature public key from the given signing_input.
 pub fn canister_sig_pk_from_vc_signing_input(
-    signing_input: &str,
+    signing_input: &[u8],
 ) -> Result<CanisterSigPublicKey, String> {
     let decoder = Decoder::new();
-    let bytes_with_separators = [signing_input.as_bytes(), &[b'.']].concat();
+    let bytes_with_separators = [signing_input, &[b'.']].concat();
     let parsed_signing_input = decoder
         .decode_compact_serialization(&bytes_with_separators, None)
         .map_err(|e| format!("internal: failed parsing signing_input: {:?}", e))?;
@@ -733,6 +741,13 @@ mod tests {
         let credential_jwt = String::from_utf8(TEST_CREDENTIAL_JWT.into()).expect("wrong JWT");
         let credential_jws = vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, dummy_sig.as_bytes())
             .expect("failed constructing JWS");
+        let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk)
+            .expect("failed constructing signing input");
+        let credential_jws_from_signing_input =
+            vc_signing_input_to_jws(signing_input.as_slice(), dummy_sig.as_bytes())
+                .expect("failed constructing JWS");
+        assert_eq!(credential_jws_from_signing_input, credential_jws);
+
         let decoder: Decoder = Decoder::new();
         let jws = decoder
             .decode_compact_serialization(credential_jws.as_ref(), None)
@@ -746,6 +761,18 @@ mod tests {
                 .expect("wrong canister sig pk");
         assert_eq!(canister_sig_pk_from_jws, canister_sig_pk_raw);
         assert_eq!(jws.claims(), TEST_CREDENTIAL_JWT.as_bytes());
+    }
+
+    #[test]
+    fn should_extract_canister_sig_pk_from_signing_input() {
+        let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
+        let canister_sig_pk = CanisterSigPublicKey::new(canister_id, TEST_SEED.to_vec());
+        let credential_jwt = String::from_utf8(TEST_CREDENTIAL_JWT.into()).expect("wrong JWT");
+        let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk)
+            .expect("failed constructing signing input");
+        let extracted_pk = canister_sig_pk_from_vc_signing_input(signing_input.as_slice())
+            .expect("failed extracting pk");
+        assert_eq!(extracted_pk, canister_sig_pk);
     }
 
     #[test]
