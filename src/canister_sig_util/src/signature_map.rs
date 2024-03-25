@@ -38,7 +38,7 @@ struct SigExpiration {
 impl Ord for SigExpiration {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // BinaryHeap is a max heap, but we want expired entries
-        // first, hence the inversed order.
+        // first, hence the inverted order.
         other.expires_at.cmp(&self.expires_at)
     }
 }

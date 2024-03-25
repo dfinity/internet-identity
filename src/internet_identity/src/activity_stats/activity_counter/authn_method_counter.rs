@@ -39,7 +39,7 @@ impl ActivityCounter for AuthnMethodCounter {
         self.start_timestamp
     }
 
-    /// Increases the counter for the corresponding authn_method of the provided devce, if there was
+    /// Increases the counter for the corresponding authn_method of the provided device, if there was
     /// no activity before.
     ///
     /// Only called if `current_domain` corresponds to an II domain.
