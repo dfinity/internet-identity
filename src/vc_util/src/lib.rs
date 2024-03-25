@@ -85,6 +85,10 @@ pub fn vc_signing_input_hash(signing_input: &[u8]) -> Hash {
 }
 
 /// Constructs and returns a JWS (a signed JWT) from the given components.
+/// Specifically, it constructs a JWS-header with the given `canister_sig_pk`, and
+/// packages `credential_jwt`, the header, and the signature `sig` into a JWS.
+/// The given signature should be created over the bytes returned by `vc_signing_input()`.
+/// Note: the validity of the signature is not checked.
 pub fn vc_jwt_to_jws(
     credential_jwt: &str,
     canister_sig_pk: &CanisterSigPublicKey,
@@ -92,6 +96,47 @@ pub fn vc_jwt_to_jws(
 ) -> Result<String, String> {
     let encoder = jws_encoder(credential_jwt, canister_sig_pk)?;
     Ok(encoder.into_jws(sig))
+}
+
+/// Constructs and returns a JWS (a signed JWT) from the given components.
+/// The given `signing_input` should be a value returned by `vc_signing_input()`
+/// (which already contains a header with canister signatures public key), and
+/// `sig` should be valid canister signature over `signing_input`.
+/// Note: the validity of the signature is not checked.
+pub fn vc_signing_input_to_jws(signing_input: &[u8], sig: &[u8]) -> Result<String, String> {
+    let decoder = Decoder::new();
+    let bytes_with_separators = [signing_input, &[b'.']].concat();
+    let parsed_signing_input = decoder
+        .decode_compact_serialization(&bytes_with_separators, None)
+        .unwrap();
+    let header = parsed_signing_input
+        .protected_header()
+        .expect("internal: failed getting protected header");
+
+    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(parsed_signing_input.claims(), header)
+        .map_err(|e| format!("internal: failed creating JWS encoder: {:?}", e))?;
+    Ok(encoder.into_jws(sig))
+}
+
+/// Extracts the canister signature public key from the given signing_input, which is the
+/// effective byte array that is signed when creating a JWS from a JWT.
+/// (essentially, it is a serialized JWT with JWS header, yet without a signature,
+/// cf. `vc_signing_input()`-function above).
+pub fn canister_sig_pk_from_vc_signing_input(
+    signing_input: &[u8],
+) -> Result<CanisterSigPublicKey, String> {
+    let decoder = Decoder::new();
+    let bytes_with_separators = [signing_input, &[b'.']].concat();
+    let parsed_signing_input = decoder
+        .decode_compact_serialization(&bytes_with_separators, None)
+        .map_err(|e| format!("internal: failed parsing signing_input: {:?}", e))?;
+    let header = parsed_signing_input
+        .protected_header()
+        .expect("internal: failed getting protected header");
+    let canister_sig_pk_raw = get_canister_sig_pk_raw(header)
+        .map_err(|e| format!("internal: failed getting canister_sig_pk_raw: {:?}", e))?;
+    CanisterSigPublicKey::try_from_raw(&canister_sig_pk_raw)
+        .map_err(|e| format!("internal: failed parsing canister_sig_pk: {}", e))
 }
 
 /// Returns a DID for the given `principal`.
@@ -371,13 +416,21 @@ fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidati
     let subject = Subject::from_json_value(subject_value.clone()).map_err(|_| {
         inconsistent_jwt_claims("malformed \"credentialSubject\" claim in id_alias JWT vc")
     })?;
-    let Value::String(ref alias) = subject.properties["has_id_alias"] else {
+    let Value::Object(ref spec) = subject.properties["InternetIdentityIdAlias"] else {
         return Err(inconsistent_jwt_claims(
-            "missing \"has_id_alias\" claim in id_alias JWT vc",
+            "missing \"InternetIdentityIdAlias\" claim in id_alias JWT vc",
         ));
     };
-    let id_alias = principal_for_did(alias).map_err(|_| {
-        inconsistent_jwt_claims("malformed \"has_id_alias\" claim in id_alias JWT vc")
+    let alias_value = spec.get("hasIdAlias").ok_or(inconsistent_jwt_claims(
+        "missing \"hasIdAlias\" parameter in id_alias JWT vc",
+    ))?;
+    let Value::String(alias) = alias_value else {
+        return Err(inconsistent_jwt_claims(
+            "wrong type of \"hasIdAlias\" value in id_alias JWT vc",
+        ));
+    };
+    let id_alias = Principal::from_text(alias).map_err(|_| {
+        inconsistent_jwt_claims("malformed \"hasIdAlias\"-value claim in id_alias JWT vc")
     })?;
     Ok(AliasTuple { id_alias, id_dapp })
 }
@@ -571,9 +624,10 @@ mod tests {
     use std::collections::HashMap;
 
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
-    const ALIAS_PRINCIPAL: &str = "s33qc-ctnp5-ubyz4-kubqo-p2tem-he4ls-6j23j-hwwba-37zbl-t2lv3-pae";
-    const DAPP_PRINCIPAL: &str = "cpehq-54hef-odjjt-bockl-3ldtg-jqle4-ysi5r-6bfah-v6lsa-xprdv-pqe";
-    const ID_ALIAS_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCamxUYzNvSzVRVU9SbUt0T3YyVXBhMnhlQW5vNEJ4RlFFYmY1VWRUSTZlYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOmNwZWhxLTU0aGVmLW9kamp0LWJvY2tsLTNsZHRnLWpxbGU0LXlzaTVyLTZiZmFoLXY2bHNhLXhwcmR2LXBxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDpzMzNxYy1jdG5wNS11Ynl6NC1rdWJxby1wMnRlbS1oZTRscy02ajIzai1od3diYS0zN3pibC10Mmx2My1wYWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBi9nZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwJKAAAAAAAAAAABAYMBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIPJBKvDetPwyft_h5oQ0nnxjTE_PNV3PrJy1qwKUrh0LggRYINLM_z_MXakw3sDoSiVB5lhRa0uxUB5w6LQQ5phqBX1gggRYIGgDAfUw2gIV3kD2PAwglKvdL6iSQ6qQwFcFPtFnQPTpggRYIBTRAqxOalCVKAHk5WxJ9MVl6VO8uaE3dqwFQzy-KkV_ggRYIPzx8nwybmJ4amD88KZwujDMw22rOmhXTr6RRf38pPV4ggRYIARJcosVL7413JPlfHGUgZQyu2CZ2XFVRnJBCkZSRjROgwGCBFggNVP2WB1Ts90nZG9hyLDaCww4gbhXxtw8R-poiMET62uDAkR0aW1lggNJgLiu1N2JpL4WaXNpZ25hdHVyZVgwr8xRG17_yzlaO2dIWFTQXGwPVPaAkD4P3hdjJyNmSRKDehzvWAShX03w9q_tZGlCZHRyZWWDAYIEWCAqgobdT9VjwJT-e8ou6LaCrL32vpKdLcqyN9RHVjBthIMCQ3NpZ4MCWCA6UuW6rWVPRqQn_k-pP9kMNe6RKs1gj7QVCsaG4Bx2OYMBggRYIFdVX_z6VIe33hrXKtxlLy8EZsv4_GNMMUXVF64TMzDqgwJYIF8bQCq3kGPfDU8PEiRnEmqgwwtHm3iGJeuwTLlxBocCggNA";
+    const ID_ALIAS_CREDENTIAL_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCN2ZMb3hfUUJraHpseExERE94Tk1iZW5fd19yRGVNSy1kQUt4RGRpcll5QSJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6ImRhdGE6dGV4dC9wbGFpbjtjaGFyc2V0PVVURi04LHRpbWVzdGFtcF9uczoxNjIwMzI4NjMwMDAwMDAwMDAwLGFsaWFzX2hhc2g6YjIwYjJhMGQ3MGExZWZjZGVmZWYwNGExYmY4YjMwOTVkMmJhNDIzYWM0ZDI1MzY3ZjI1YTkyZjNjYTc3NDY4NSIsInN1YiI6ImRpZDppY3A6bjZjbmktcGE0amctaHdheWQtcXlhbXUtNWU1bmYtbHlkcTctcnN1YnQtdmZ2eHYtb3Q0ejMtbnZ4NnEtZmFlIiwidmMiOnsiQGNvbnRleHQiOiJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJJbnRlcm5ldElkZW50aXR5SWRBbGlhcyJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJJbnRlcm5ldElkZW50aXR5SWRBbGlhcyI6eyJoYXNJZEFsaWFzIjoiZGF0ZXctZGp4eWQteXF1enYtZjRhazUtamZ0d3EtNHJ5ZW8tdXpldzYtNDc0bm0taW5neG8tMmlveHUtNGFlIn19fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggFdNWmGHa91EhiMxR0EKhKjvqyJ4dHR86sWNM7VOOeoGCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg_KZ0TVqubo_EGWoMUPA35BYZ4B5ZRkR_zDfNIQCwa46CBFggDxSoL5vzjhHDgnrdmgRhclanMmjjpWYL41-us6gEU6mCBFggXAzCWvb9h4qsVs41IUJBABzjSqAZ8DIzF_ghGHpGmHGCBFggkSLnf3jYhPk65LUQsbOYiY0865rVZ_oGp9dgdQUI4zyCBFgg1DPpoHCCNK_LriesDVYlyoELR3hdXKdRfBLgOtNMuDqDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCLSH_C_yh8NAElCHNRow7HVmn54FwWH2XKLlSTJlV7fWrcwOn0fUbtK9d5kkl9qBBkdHJlZYMBggRYIOGnlc_3yXPTVrEJ1p3dKX5HxkMOziUnpA1HeXiQW4O8gwJDc2lngwJYINga350VgbIt7J_tUkjxMijAfGnQAzfpL0LK-FNuYswHgwGDAlggKKAoHHmtclkvybvAtkqZyuyA-2IwxSm_PeIejRWVZjGCA0CCBFggHSycl7DEAOARm38YMr9aY5NWJYpzg2U8V9isy2zgccQ";
+    // ALIAS_PRINCIPAL and DAPP_PRINCIPAL match ID_ALIAS_CREDENTIAL_JWS defined above.
+    const ALIAS_PRINCIPAL: &str = "datew-djxyd-yquzv-f4ak5-jftwq-4ryeo-uzew6-474nm-ingxo-2ioxu-4ae";
+    const DAPP_PRINCIPAL: &str = "n6cni-pa4jg-hwayd-qyamu-5e5nf-lydq7-rsubt-vfvxv-ot4z3-nvx6q-fae";
     const EXPIRY_NS: u128 = 1620329530 * 1_000_000_000; // from ID_ALIAS_CREDENTIAL_JWS
     const MINUTE_NS: u128 = 60 * 1_000_000_000;
     const CURRENT_TIME_AFTER_EXPIRY_NS: u128 = EXPIRY_NS + MINUTE_NS;
@@ -593,9 +647,9 @@ mod tests {
     const TEST_ISSUER_SIGNING_CANISTER_ID: &str = "rrkah-fqaaa-aaaaa-aaaaq-cai";
     const ID_ALIAS_FOR_VP: &str = "jkk22-zqdxc-kgpez-6sv2m-5pby4-wi4t2-prmoq-gf2ih-i2qtc-v37ac-5ae";
     const ID_RP_FOR_VP: &str = "p2nlc-3s5ul-lcu74-t6pn2-ui5im-i4a5f-a4tga-e6znf-tnvlh-wkmjs-dqe";
-    const ID_ALIAS_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCMGd6TTVJeXFMYUhyMDhtQTRWd2J5SmRxQTFyRVFUX2xNQnVVbmN5UDVVYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC9jcmVkZW50aWFsLzE2MjAzMjg2MzAwMDAwMDAwMDAiLCJzdWIiOiJkaWQ6aWNwOnAybmxjLTNzNXVsLWxjdTc0LXQ2cG4yLXVpNWltLWk0YTVmLWE0dGdhLWU2em5mLXRudmxoLXdrbWpzLWRxZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSW50ZXJuZXRJZGVudGl0eUlkQWxpYXMiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaGFzX2lkX2FsaWFzIjoiZGlkOmljcDpqa2syMi16cWR4Yy1rZ3Blei02c3YybS01cGJ5NC13aTR0Mi1wcm1vcS1nZjJpaC1pMnF0Yy12MzdhYy01YWUifX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1gg4TNRYHd-8aiik7eFIFlUffIauc26_S_Cbfu5lrH6WG-CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg_KZ0TVqubo_EGWoMUPA35BYZ4B5ZRkR_zDfNIQCwa46CBFggQ32YxfhviZ3hMsTqcHLG7NvrNFYPeR86ayjF9kSIHR6CBFgg9MK-22EcX2HLbVDFBwSSVfBEi0MJrir_V8D4mSrs8W2CBFgguVqxODxxmD13JWUJh9h0fLIZ5knKseqhi6RzHTwFOeCCBFgggnfiF6BqnRcJrN4b5QOatcBHi7CoNcEnqJQpdgTFewWDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCjAL-A0R8pOvIRouUEI_zmS1PElQ1g7sJKgMb--60Tw399DUME-pKPFCEWQSpqEWFkdHJlZYMBggRYICk50o-r4OkMNAjh7eU61FNy0ARr-X3mLJdhUWMQAMr7gwJDc2lngwJYIIOQR7wl3Ws9Jb8VP4rhIb37XKLMkkZ2P7WaZ5we60WGgwGCBFggsvWfw_9l6MdknYq3zHvk8WyFan5Rxsb-dfI-p_IA_g6DAlgg_OG2VoT11h2BQfYTnf83Y9blXTdGnmKGRe3SJAvV8h2CA0A";
-    const VERIFIED_ADULT_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCMzdLQ29yYjQ2OUVFZ19uYzVvTFI5RHNoSy1SOEhXUUNMN05VMDcwa1R0WSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vYWdlX3ZlcmlmaWVyLmluZm8vIiwibmJmIjoxNjIwMzI4NjMwLCJqdGkiOiJodHRwczovL2FnZV92ZXJpZmllci5pbmZvL2NyZWRlbnRpYWxzLzQyIiwic3ViIjoiZGlkOmljcDpqa2syMi16cWR4Yy1rZ3Blei02c3YybS01cGJ5NC13aTR0Mi1wcm1vcS1nZjJpaC1pMnF0Yy12MzdhYy01YWUiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlZlcmlmaWVkQWR1bHQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiVmVyaWZpZWRBZHVsdCI6eyJtaW5BZ2UiOjE4fX19fQ.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggt424dJpC6sjdhsBc8wD1SOiv5OM8gAKL00RP3F_1Wz6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggZDN-5FgR1a-r1vFcUM-_aSwM9WBkrfG-PjnkpDfd_a6CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg7KwVkmHXh_bkpjrNamLjBaVHnx8ygOov12v70RCCnauCBFgg4JfM61UN0ijoPEaD4V4vo3MD34QmoPRJ7NgRMR94NAKCBFggsSTfdsBa0-yHxDCqvaUlOO6rC4ipHUqkr1P3AAvz1KmCBFggACrZEhXi64qQOi0WG2dobr3wU-nz1EYrzkHUnKwm2euDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCDsLi8fdzb5mhTyUFJZUrsWcnfsriPBHFpPemY723yTxgIEExP76d4fzMu7xWXtqZkdHJlZYMBggRYIF8C4f7jFXIgbB8sfB9qSnjcDPIah96xJMJ-lkUV3es5gwJDc2lngwJYIPL9DVTa-kaJmcs0Khp5uNdi4aZ5Dnt_kCORxF48UNPjgwGCBFggH7DURumpKFxQSDZEQz_Z4OgXTAqhI4PT_qJtGsQwcL-DAYMCWCA87aI24qiaIQsjHtFMJRESwnEV9Ukj8lAJ3b1CaT84joIDQIIEWCAkNVdgMuWn2EpNNTPe7jaX3h93D4ijH2Sg8oRYhXBwDQ";
-    const VERIFIED_EMPLOYEE_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCMzdLQ29yYjQ2OUVFZ19uYzVvTFI5RHNoSy1SOEhXUUNMN05VMDcwa1R0WSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvLyIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9lbXBsb3ltZW50LmluZm8vY3JlZGVudGlhbHMvNDIiLCJzdWIiOiJkaWQ6aWNwOmprazIyLXpxZHhjLWtncGV6LTZzdjJtLTVwYnk0LXdpNHQyLXBybW9xLWdmMmloLWkycXRjLXYzN2FjLTVhZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVmVyaWZpZWRFbXBsb3llZSJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJWZXJpZmllZEVtcGxveWVlIjp7ImVtcGxveWVySWQiOiJkaWQ6d2ViOmRmaW5pdHkub3JnIiwiZW1wbG95ZXJOYW1lIjoiREZJTklUWSBGb3VuZGF0aW9uIn19fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggt424dJpC6sjdhsBc8wD1SOiv5OM8gAKL00RP3F_1Wz6DAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggD8f87lse4wbqTJzVzzHL0KLYglxk_3Bqu_L9BYW1_82CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg7KwVkmHXh_bkpjrNamLjBaVHnx8ygOov12v70RCCnauCBFgg4JfM61UN0ijoPEaD4V4vo3MD34QmoPRJ7NgRMR94NAKCBFggldPzhEqB2ndq8dydYB14vltPlqh94grYUzSUEDT8-jeCBFgg4EA8lx4d8URjaaYFi_87OeQ1dcAcz4fOFXAjLqWWs22DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCPZahVmdM4-1Y-c-Pzn701gIIVShPPcWD3_ZFJggWwiShD5Fq8i0ZPSC5YJqZ8d5xkdHJlZYMBggRYIF8C4f7jFXIgbB8sfB9qSnjcDPIah96xJMJ-lkUV3es5gwJDc2lngwJYIPL9DVTa-kaJmcs0Khp5uNdi4aZ5Dnt_kCORxF48UNPjgwJYIOotDCfm4T5b3qxy9vMUmKVHMantmISW7lOuF2fwoO9tggNA";
+    const ID_ALIAS_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBQUVCMGd6TTVJeXFMYUhyMDhtQTRWd2J5SmRxQTFyRVFUX2xNQnVVbmN5UDVVYyJ9LCJraWQiOiJkaWQ6aWNwOnJ3bGd0LWlpYWFhLWFhYWFhLWFhYWFhLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vaWRlbnRpdHkuaWMwLmFwcC8iLCJuYmYiOjE2MjAzMjg2MzAsImp0aSI6ImRhdGE6dGV4dC9wbGFpbjtjaGFyc2V0PVVURi04LHRpbWVzdGFtcF9uczoxNjIwMzI4NjMwMDAwMDAwMDAwLGFsaWFzX2hhc2g6NThiYzcxMmYyMjFhOTJmMGE5OTRhZDZmN2JmOWVjNjc0MzBmMGFkMzNmYWVlZDAzZmUzZDU2NTYyMTliMjQ2MiIsInN1YiI6ImRpZDppY3A6cDJubGMtM3M1dWwtbGN1NzQtdDZwbjItdWk1aW0taTRhNWYtYTR0Z2EtZTZ6bmYtdG52bGgtd2ttanMtZHFlIiwidmMiOnsiQGNvbnRleHQiOiJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJJbnRlcm5ldElkZW50aXR5SWRBbGlhcyJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJJbnRlcm5ldElkZW50aXR5SWRBbGlhcyI6eyJoYXNJZEFsaWFzIjoiamtrMjItenFkeGMta2dwZXotNnN2Mm0tNXBieTQtd2k0dDItcHJtb3EtZ2YyaWgtaTJxdGMtdjM3YWMtNWFlIn19fX0.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGDAkoAAAAAAAAAAAEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggvlJBTZDgK1_9Vb3-18dWKIfy28WTjZ1YqdjFWWAIX96CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFgg_KZ0TVqubo_EGWoMUPA35BYZ4B5ZRkR_zDfNIQCwa46CBFggDxSoL5vzjhHDgnrdmgRhclanMmjjpWYL41-us6gEU6mCBFggXAzCWvb9h4qsVs41IUJBABzjSqAZ8DIzF_ghGHpGmHGCBFggRbE3sOaqi_9kL-Uz1Kmf_pCWt4FSRaHU9KLSFTT3eceCBFggQERIfN1eHBUYfQr2fOyI_nTKHS71uqu-wOAdYwqyUX-DAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCm_9R-rt9zbE2eP_WbCyFqO7txO86wNfBS1lyyJJ6gxy1D2Wnw5kNo2XUKUBmu9q5kdHJlZYMBggRYIOGnlc_3yXPTVrEJ1p3dKX5HxkMOziUnpA1HeXiQW4O8gwJDc2lngwJYIIOQR7wl3Ws9Jb8VP4rhIb37XKLMkkZ2P7WaZ5we60WGgwGDAlgg3DSOKS3cc99bdJqFjiOcs13PNpGSR8_5-UJsP23Ud0KCA0CCBFgg6wJlRmEtuY-LCp6ieeEdd6tO8_Hlct7H8VrW9DH7EaI";
+    const VERIFIED_ADULT_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCOEVpSWoyNkJxRWhic2ZQUW44TF9CNDJxc0JOeUdiT3ZLdlNENE9OUGhsSSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vYWdlX3ZlcmlmaWVyLmluZm8vIiwibmJmIjoxNjIwMzI4NjMwLCJqdGkiOiJodHRwczovL2FnZV92ZXJpZmllci5pbmZvL2NyZWRlbnRpYWxzLzQyIiwic3ViIjoiZGlkOmljcDpqa2syMi16cWR4Yy1rZ3Blei02c3YybS01cGJ5NC13aTR0Mi1wcm1vcS1nZjJpaC1pMnF0Yy12MzdhYy01YWUiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlZlcmlmaWVkQWR1bHQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiVmVyaWZpZWRBZHVsdCI6eyJtaW5BZ2UiOjE4fX19fQ.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggOnw-lESEpV-y1s0Lh9p1aY-XfYKBYzyHL_fmcTqp6PeDAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggO8I7YzRNmk_XVakRhuaOq1rdEj3vhLFt07YEWKwrfBSCBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggsN7BWldXUVrLUx_990beUdGHvTn5XEjFcgTxb8oXZZCCBFggNtRXohqxK3P8d6uyzQLSdJLBe5kv-Ng0gEHSR-OUmryCBFggiOn-4gDlCnp9jkq0VFtcJQPETxg1HnHwdHOddTpIlzWCBFggjFoCQNnMC4FEG3e2zATPdOyzWTcfRqu16bVgC18EQiCDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCrcgY2ne3OillJ6fz8uv6dhCykfT-u0ZSKyvXZVYS1zOtRCMOSYZju2k-LERBCmLNkdHJlZYMBggRYIJIlUxoU2qt4aTwzz90fB43OK9EFDzVls4N8OHepeuLpgwJDc2lngwJYIKhCHifwHS5DiNAL6bducWQ2AShCc2bN-TzPsBEl3ov2gwGCBFggCr5Roa_ACiP36lIIHDtA47bq8L7C_nH3Z0GGJrLnE6uDAYMCWCCzsKpLUCoF4k5X0pGLjWSca9QaCMj6-oXkkFtUO7kYtoIDQIIEWCBrqYIFsKJT6MmiyQ79ksiXynSLIxl4HdOrpgsXm4TVBw";
+    const VERIFIED_EMPLOYEE_VC_FOR_VP_JWS: &str = "eyJqd2siOnsia3R5Ijoib2N0IiwiYWxnIjoiSWNDcyIsImsiOiJNRHd3REFZS0t3WUJCQUdEdUVNQkFnTXNBQW9BQUFBQUFBQUFBUUVCOEVpSWoyNkJxRWhic2ZQUW44TF9CNDJxc0JOeUdiT3ZLdlNENE9OUGhsSSJ9LCJraWQiOiJkaWQ6aWNwOnJya2FoLWZxYWFhLWFhYWFhLWFhYWFxLWNhaSIsImFsZyI6IkljQ3MifQ.eyJleHAiOjE2MjAzMjk1MzAsImlzcyI6Imh0dHBzOi8vZW1wbG95bWVudC5pbmZvLyIsIm5iZiI6MTYyMDMyODYzMCwianRpIjoiaHR0cHM6Ly9lbXBsb3ltZW50LmluZm8vY3JlZGVudGlhbHMvNDIiLCJzdWIiOiJkaWQ6aWNwOmprazIyLXpxZHhjLWtncGV6LTZzdjJtLTVwYnk0LXdpNHQyLXBybW9xLWdmMmloLWkycXRjLXYzN2FjLTVhZSIsInZjIjp7IkBjb250ZXh0IjoiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVmVyaWZpZWRFbXBsb3llZSJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJWZXJpZmllZEVtcGxveWVlIjp7ImVtcGxveWVyTmFtZSI6IkRGSU5JVFkgRm91bmRhdGlvbiJ9fX19.2dn3omtjZXJ0aWZpY2F0ZVkBsdnZ96JkdHJlZYMBgwGDAYMCSGNhbmlzdGVygwGCBFggOnw-lESEpV-y1s0Lh9p1aY-XfYKBYzyHL_fmcTqp6PeDAkoAAAAAAAAAAQEBgwGDAYMBgwJOY2VydGlmaWVkX2RhdGGCA1ggRugFe6Ck7NbMysgwHrks4lNkVUqkKsicdx67D59fgr-CBFgg0sz_P8xdqTDewOhKJUHmWFFrS7FQHnDotBDmmGoFfWCCBFggsN7BWldXUVrLUx_990beUdGHvTn5XEjFcgTxb8oXZZCCBFggNtRXohqxK3P8d6uyzQLSdJLBe5kv-Ng0gEHSR-OUmryCBFggYufTG35dpmNH5pv3wq__HC7kJTW1cCcRWSdFQ__KV0-CBFggon3xKa1joPZ19Djixh8oDlBboiMi5lmgnM1HKeyZ4siDAYIEWCA1U_ZYHVOz3Sdkb2HIsNoLDDiBuFfG3DxH6miIwRPra4MCRHRpbWWCA0mAuK7U3YmkvhZpc2lnbmF0dXJlWDCGPK8MNU0Mc5oSLu9IKas2ASm40jNnz_iCOP3IByDW8AqG6cfRU9ZGP4IrFg9ECKhkdHJlZYMBggRYIJIlUxoU2qt4aTwzz90fB43OK9EFDzVls4N8OHepeuLpgwJDc2lngwJYIKhCHifwHS5DiNAL6bducWQ2AShCc2bN-TzPsBEl3ov2gwJYINHB_8EbKcY_Lfj5XYVCaN8msEm9ABXR6E3wqY7msxqrggNA";
 
     fn test_ic_root_pk_raw() -> Vec<u8> {
         let pk_der = decode_b64(TEST_IC_ROOT_PK_B64URL).expect("failure decoding canister pk");
@@ -690,6 +744,13 @@ mod tests {
         let credential_jwt = String::from_utf8(TEST_CREDENTIAL_JWT.into()).expect("wrong JWT");
         let credential_jws = vc_jwt_to_jws(&credential_jwt, &canister_sig_pk, dummy_sig.as_bytes())
             .expect("failed constructing JWS");
+        let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk)
+            .expect("failed constructing signing input");
+        let credential_jws_from_signing_input =
+            vc_signing_input_to_jws(signing_input.as_slice(), dummy_sig.as_bytes())
+                .expect("failed constructing JWS");
+        assert_eq!(credential_jws_from_signing_input, credential_jws);
+
         let decoder: Decoder = Decoder::new();
         let jws = decoder
             .decode_compact_serialization(credential_jws.as_ref(), None)
@@ -703,6 +764,18 @@ mod tests {
                 .expect("wrong canister sig pk");
         assert_eq!(canister_sig_pk_from_jws, canister_sig_pk_raw);
         assert_eq!(jws.claims(), TEST_CREDENTIAL_JWT.as_bytes());
+    }
+
+    #[test]
+    fn should_extract_canister_sig_pk_from_signing_input() {
+        let canister_id = Principal::from_text(TEST_SIGNING_CANISTER_ID).expect("wrong principal");
+        let canister_sig_pk = CanisterSigPublicKey::new(canister_id, TEST_SEED.to_vec());
+        let credential_jwt = String::from_utf8(TEST_CREDENTIAL_JWT.into()).expect("wrong JWT");
+        let signing_input = vc_signing_input(&credential_jwt, &canister_sig_pk)
+            .expect("failed constructing signing input");
+        let extracted_pk = canister_sig_pk_from_vc_signing_input(signing_input.as_slice())
+            .expect("failed extracting pk");
+        assert_eq!(extracted_pk, canister_sig_pk);
     }
 
     #[test]

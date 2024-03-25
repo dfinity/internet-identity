@@ -37,10 +37,6 @@ ic-stable-structures.workspace = true
 # VC deps
 canister_sig_util.workspace = true
 vc_util.workspace = true
-identity_core = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test" }
-identity_credential = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["credential"]}
-identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
-
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
@@ -53,6 +49,7 @@ canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true
 ic-response-verification.workspace = true
+identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
 
 
 [features]
