@@ -118,7 +118,10 @@ pub fn vc_signing_input_to_jws(signing_input: &[u8], sig: &[u8]) -> Result<Strin
     Ok(encoder.into_jws(sig))
 }
 
-/// Extracts the canister signature public key from the given signing_input.
+/// Extracts the canister signature public key from the given signing_input, which is the
+/// effective byte array that is signed when creating a JWS from a JWT.
+/// (essentially, it is a serialized JWT with JWS header, yet without a signature,
+/// cf. `vc_signing_input()`-function above).
 pub fn canister_sig_pk_from_vc_signing_input(
     signing_input: &[u8],
 ) -> Result<CanisterSigPublicKey, String> {
