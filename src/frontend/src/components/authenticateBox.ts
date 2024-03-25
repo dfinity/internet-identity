@@ -26,7 +26,11 @@ import {
 } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
 import { parseUserNumber } from "$src/utils/userNumber";
-import { NonEmptyArray, isNonEmptyArray } from "$src/utils/utils";
+import {
+  NonEmptyArray,
+  isNonEmptyArray,
+  unknownToString,
+} from "$src/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
@@ -103,18 +107,28 @@ export const authenticateBox = async ({
 
   // Retry until user has successfully authenticated
   for (;;) {
-    const result = await promptAuth();
+    try {
+      const result = await promptAuth();
 
-    // If the user canceled or just added a device, we retry
-    if ("tag" in result) {
-      result satisfies { tag: "canceled" | "deviceAdded" };
-      continue;
-    }
+      // If the user canceled or just added a device, we retry
+      if ("tag" in result) {
+        result satisfies { tag: "canceled" | "deviceAdded" };
+        continue;
+      }
 
-    const loginData = await handleLoginFlowResult(result);
+      const loginData = await handleLoginFlowResult(result);
 
-    if (nonNullish(loginData)) {
-      return loginData;
+      if (nonNullish(loginData)) {
+        return loginData;
+      }
+    } catch (err) {
+      await displayError({
+        title: "Authentication Failed",
+        message:
+          "Something went wrong during authentication. Please try again.",
+        detail: unknownToString(err, "unknown error"),
+        primaryButton: "Try again",
+      });
     }
   }
 };

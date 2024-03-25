@@ -51,5 +51,10 @@ export const isWebAuthnDuplicateDevice = (error: unknown): boolean => {
  * @param error error to check
  */
 export const isWebAuthnCancel = (error: unknown): boolean => {
-  return error instanceof DOMException && error.name === "NotAllowedError";
+  return (
+    error instanceof DOMException &&
+    // According to WebAuthn spec, the browser must throw a NotAllowedError when the user cancels the operation.
+    // However, some browsers (Firefox) throw an AbortError instead.
+    (error.name === "NotAllowedError" || error.name === "AbortError")
+  );
 };
