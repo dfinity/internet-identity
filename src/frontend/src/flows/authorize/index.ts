@@ -17,9 +17,9 @@ import { Chan } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
+import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 import { Delegation, fetchDelegation } from "./fetchDelegation";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
-import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
