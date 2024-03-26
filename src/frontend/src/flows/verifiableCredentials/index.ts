@@ -4,10 +4,10 @@ import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
-import { validateDerivationOrigin } from "$src/flows/authorize/validateDerivationOrigin";
 import { getAnchorByPrincipal } from "$src/storage";
 import { resolveIssuerCanisterId } from "$src/utils/canisterIdResolution";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
 import {
   Delegation,
   DelegationChain,
