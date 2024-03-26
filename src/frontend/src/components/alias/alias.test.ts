@@ -47,3 +47,77 @@ test("can be picked", () => {
   expect(ctn.mock.calls.length).toBe(1);
   expect(ctn.mock.calls[0][0]).toBe("foo");
 });
+
+test("alias can contain special characters", () => {
+  const cancel = vi.fn();
+  const ctn = vi.fn((_str) => {
+    /* */
+  });
+  promptDeviceAliasPage(
+    {
+      title: "Title",
+      continue: ctn,
+      cancel,
+      i18n: new I18n(),
+    },
+    document.body
+  );
+
+  const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
+  input.value = "paşśkey 🚀";
+
+  const button = document.querySelector("#pickAliasSubmit") as HTMLInputElement;
+  button.click();
+
+  expect(ctn.mock.calls.length).toBe(1);
+  expect(ctn.mock.calls[0][0]).toBe("paşśkey 🚀");
+});
+
+test("alias should be trimmed", () => {
+  const cancel = vi.fn();
+  const ctn = vi.fn((_str) => {
+    /* */
+  });
+  promptDeviceAliasPage(
+    {
+      title: "Title",
+      continue: ctn,
+      cancel,
+      i18n: new I18n(),
+    },
+    document.body
+  );
+
+  const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
+  input.value = " foo ";
+
+  const button = document.querySelector("#pickAliasSubmit") as HTMLInputElement;
+  button.click();
+
+  expect(ctn.mock.calls.length).toBe(1);
+  expect(ctn.mock.calls[0][0]).toBe("foo");
+});
+
+test("alias must not be whitespace only", () => {
+  const cancel = vi.fn();
+  const ctn = vi.fn((_str) => {
+    /* */
+  });
+  promptDeviceAliasPage(
+    {
+      title: "Title",
+      continue: ctn,
+      cancel,
+      i18n: new I18n(),
+    },
+    document.body
+  );
+
+  const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
+  input.value = "  ";
+
+  const button = document.querySelector("#pickAliasSubmit") as HTMLInputElement;
+  button.click();
+
+  expect(ctn.mock.calls.length).toBe(0);
+});
