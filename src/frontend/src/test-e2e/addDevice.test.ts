@@ -13,6 +13,7 @@ import {
   AuthenticateView,
   MainView,
   NotInRegistrationModeView,
+  PromptDeviceTrustedView,
   VerifyRemoteDeviceView,
   WelcomeView,
 } from "./views";
@@ -62,6 +63,10 @@ test("Add remote device", async () => {
     await runInBrowser(async (browser2: WebdriverIO.Browser) => {
       await addVirtualAuthenticator(browser2);
       await browser2.url(addDeviceLink);
+
+      const promptDeviceTrustedView = new PromptDeviceTrustedView(browser2);
+      await promptDeviceTrustedView.waitForDisplay();
+      await promptDeviceTrustedView.confirmTrusted();
 
       const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
         browser2
@@ -121,6 +126,10 @@ test("Add remote device starting on new device", async () => {
       const addIdentityAnchorView2 = new AddIdentityAnchorView(browser2);
       await addIdentityAnchorView2.waitForDisplay();
       await addIdentityAnchorView2.continue(userNumber);
+
+      const promptDeviceTrustedView = new PromptDeviceTrustedView(browser2);
+      await promptDeviceTrustedView.waitForDisplay();
+      await promptDeviceTrustedView.confirmTrusted();
 
       const notInRegistrationModeView = new NotInRegistrationModeView(browser2);
       await notInRegistrationModeView.waitForDisplay();

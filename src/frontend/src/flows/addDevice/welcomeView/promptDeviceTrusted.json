@@ -1,0 +1,9 @@
+{
+  "en": {
+    "internet_identity": "Internet Identity",
+    "activate_passkey": "Activate Passkey on this device",
+    "trust_this_device": "Do you trust this device to connect to your Internet Identity?",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

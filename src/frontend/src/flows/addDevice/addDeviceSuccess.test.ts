@@ -8,6 +8,7 @@ describe("addDeviceSuccess", () => {
 
     addDeviceSuccessPage(
       {
+        userNumber: BigInt(123456),
         i18n: new I18n(),
         deviceAlias: "Test device alias",
         onContinue,
