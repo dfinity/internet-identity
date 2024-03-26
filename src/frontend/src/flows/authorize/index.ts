@@ -19,7 +19,7 @@ import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Delegation, fetchDelegation } from "./fetchDelegation";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
-import { validateDerivationOrigin } from "./validateDerivationOrigin";
+import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
