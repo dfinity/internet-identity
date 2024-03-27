@@ -465,10 +465,7 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
 fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding) {
     let extension = asset_path
         .extension()
-        .expect(&format!(
-            "Unsupported file without extension: {:?}",
-            asset_path
-        ))
+        .unwrap_or_else(|| panic!("Unsupported file without extension: {:?}", asset_path))
         .to_str()
         .unwrap();
     let (extension, encoding) = if extension == "gz" {
