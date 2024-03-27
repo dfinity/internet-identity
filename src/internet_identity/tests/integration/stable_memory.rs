@@ -295,7 +295,7 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
         CallError::Reject(err) => panic!("unexpected error {err}"),
         CallError::UserError(err) => {
             assert_eq!(err.code, CanisterCalledTrap);
-            assert!(err.description.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or migrate using a previous II version"));
+            assert!(err.description.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or upgrade sequentially to the latest version of II by installing each intermediate version in turn"));
         }
     }
     Ok(())
