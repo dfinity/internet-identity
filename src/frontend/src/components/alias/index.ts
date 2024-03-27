@@ -1,7 +1,6 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
-import { validateAlias } from "$src/utils/validateAlias";
 import { TemplateResult, html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
@@ -34,7 +33,7 @@ export const promptDeviceAliasTemplate = (props: {
       @submit=${(e: SubmitEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        withRef(aliasInput, (alias) => props.continue(alias.value));
+        withRef(aliasInput, (alias) => props.continue(alias.value.trim()));
       }}
     >
       <input
@@ -51,10 +50,7 @@ export const promptDeviceAliasTemplate = (props: {
           if (!(e.currentTarget instanceof HTMLInputElement)) {
             return;
           }
-          const message = validateAlias(
-            e.currentTarget.validity,
-            e.currentTarget.value
-          );
+          const message = validationMessage(e.currentTarget.validity);
           e.currentTarget.setCustomValidity(message);
         }}
         placeholder=${copy.placeholder}
@@ -63,7 +59,7 @@ export const promptDeviceAliasTemplate = (props: {
         type="text"
         required
         maxlength="30"
-        pattern="^[A-Za-z0-9]+((-|\\s|_)*[A-Za-z0-9])*$"
+        pattern="^(\\s*\\S+\\s*)+$"
         spellcheck="false"
         class="c-input c-input--stack c-input--fullwidth"
       />
@@ -87,6 +83,29 @@ export const promptDeviceAliasTemplate = (props: {
     showFooter: false,
     slot: promptDeviceAliasSlot,
   });
+};
+
+/**
+ * Returns a validation message based on the validity of the input.
+ * The only constraint is that the name can't consist of only whitespace.
+ * Good examples: "2019_macbook", " 2019-Macböök  " (note: will be trimmed on submit), "🚀"
+ * Bad examples: "", "  "
+ * @param valueMissing Whether the input is empty.
+ * @param patternMismatch Whether the input consists of only whitespace.
+ */
+const validationMessage = ({
+  valueMissing,
+  patternMismatch,
+}: {
+  valueMissing: boolean;
+  patternMismatch: boolean;
+}): string => {
+  if (valueMissing) {
+    return "Name can't be empty.";
+  } else if (patternMismatch) {
+    return "Name can't consist of only whitespace.";
+  }
+  return "";
 };
 
 export const promptDeviceAliasPage = renderPage(promptDeviceAliasTemplate);
