@@ -292,7 +292,7 @@ impl<M: Memory + Clone> Storage<M> {
         if &header.version < SUPPORTED_LAYOUT_VERSIONS.start() {
             trap(&format!(
                 "stable memory layout version {} is no longer supported:\n\
-            Either reinstall (wiping stable memory) or migrate using a previous II version\n\
+            Either reinstall (wiping stable memory) or upgrade sequentially to the latest version of II by installing each intermediate version in turn.\n\
             See https://github.com/dfinity/internet-identity#stable-memory-compatibility for more information.",
                 header.version
             ));
