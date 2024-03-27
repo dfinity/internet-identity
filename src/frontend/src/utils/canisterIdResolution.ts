@@ -1,38 +1,53 @@
 import { Principal } from "@dfinity/principal";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 
 /**
  * Resolve the canister id of a canister based on the front-end origin.
  * @param origin The origin of the front-end to resolve the canister id of.
  */
-export const resolveIssuerCanisterId = ({
+export const resolveCanisterId = ({
   origin,
 }: {
   origin: string;
 }): Promise<{ ok: string } | "not_found"> => {
   const url = new URL(origin);
 
-  if (url.hostname.endsWith("localhost")) {
-    // The issuer is running on a local development environment, infer the canister ID from the hostname directly
-    // (e.g. http://bd3sg-teaaa-aaaaa-qaaba-cai.localhost:4943 -> bd3sg-teaaa-aaaaa-qaaba-cai)
-    const domainParts = url.hostname.split(".");
+  const maybeCanisterId = parseCanisterIdFromHostname(url.hostname);
+  if (nonNullish(maybeCanisterId)) {
+    return Promise.resolve({ ok: maybeCanisterId.toText() });
+  }
+
+  // Look up the canister id by performing a request to the origin
+  return lookupCanister({ origin });
+};
+
+const parseCanisterIdFromHostname = (
+  hostname: string
+): Principal | undefined => {
+  const wellKnownDomains = [
+    "ic0.app",
+    "icp0.io",
+    "internetcomputer.org",
+    "localhost",
+  ];
+
+  if (wellKnownDomains.some((domain) => hostname.endsWith(domain))) {
+    // The canister is running on a well-known domain, infer the canister ID from the hostname directly
+    // (e.g. bd3sg-teaaa-aaaaa-qaaba-cai.localhost -> bd3sg-teaaa-aaaaa-qaaba-cai)
+    const domainParts = hostname.split(".");
 
     // If there is no subdomain, we cannot infer the canister id
     if (domainParts.length > 1) {
       const canisterId = domainParts[0];
       try {
-        Principal.fromText(canisterId); // make sure the inferred part is actually a canister id, throws if not
-        return Promise.resolve({ ok: canisterId });
-      } catch (e) {
-        console.warn(
-          `Unable to infer issuer canister id from origin ${origin}: ${e}`
+        return Principal.fromText(canisterId); // make sure the inferred part is actually a canister id, throws if not
+      } catch {
+        console.info(
+          `Unable to infer canister id from hostname '${hostname}', falling back to BN lookup.}`
         );
       }
     }
   }
-
-  // Look up the canister id by performing a request to the origin
-  return lookupCanister({ origin });
 };
 
 // Lookup the canister by performing a request to the origin and check

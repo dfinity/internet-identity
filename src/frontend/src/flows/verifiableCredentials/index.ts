@@ -5,7 +5,7 @@ import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
 import { getAnchorByPrincipal } from "$src/storage";
-import { resolveIssuerCanisterId } from "$src/utils/canisterIdResolution";
+import { resolveCanisterId } from "$src/utils/canisterIdResolution";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
 import {
@@ -77,7 +77,7 @@ const verifyCredentials = async ({
 }: { connection: Connection } & VerifyCredentialsArgs) => {
   // Look up the canister ID from the origin
   const lookedUp = await withLoader(() =>
-    resolveIssuerCanisterId({ origin: issuerOrigin })
+    resolveCanisterId({ origin: issuerOrigin })
   );
   if (lookedUp === "not_found") {
     return abortedCredentials({ reason: "no_canister_id" });
