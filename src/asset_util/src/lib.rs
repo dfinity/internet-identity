@@ -463,7 +463,14 @@ fn collect_assets_rec(dir: &Dir, assets: &mut Vec<Asset>) {
 /// Otherwise the content type is determined by the text after the last dot in the file name,
 /// and the encoding is `ContentEncoding::Identity`.
 fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding) {
-    let extension = asset_path.extension().unwrap().to_str().unwrap();
+    let extension = asset_path
+        .extension()
+        .expect(&format!(
+            "Unsupported file without extension: {:?}",
+            asset_path
+        ))
+        .to_str()
+        .unwrap();
     let (extension, encoding) = if extension == "gz" {
         let type_extension = asset_path
             .file_name()
