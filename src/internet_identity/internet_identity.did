@@ -471,8 +471,8 @@ type PrepareIdAliasError = variant {
 /// The prepared id alias contains two (still unsigned) credentials in JWT format,
 /// certifying the id alias for the issuer resp. the relying party.
 type PreparedIdAlias = record {
-    rp_id_alias_jwt : text;
-    issuer_id_alias_jwt : text;
+    rp_id_alias_signing_input : text;
+    issuer_id_alias_signing_input : text;
     canister_sig_pk_der : PublicKey;
 };
 
@@ -480,10 +480,10 @@ type PreparedIdAlias = record {
 /// The field values should be equal to the values of corresponding
 /// fields from the preceding `PrepareIdAliasRequest` and `PrepareIdAliasResponse`.
 type GetIdAliasRequest = record {
-    rp_id_alias_jwt : text;
     issuer : FrontendHostname;
-    issuer_id_alias_jwt : text;
     relying_party : FrontendHostname;
+    rp_id_alias_signing_input : text;
+    issuer_id_alias_signing_input : text;
     identity_number : IdentityNumber;
 };
 

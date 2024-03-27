@@ -60,8 +60,8 @@ pub async fn prepare_id_alias(
     update_root_hash();
     PreparedIdAlias {
         canister_sig_pk_der: ByteBuf::from(canister_sig_pk.to_der()),
-        rp_id_alias_jwt: String::from_utf8(rp_signing_input).unwrap(),
-        issuer_id_alias_jwt: String::from_utf8(issuer_signing_input).unwrap(),
+        rp_id_alias_signing_input: String::from_utf8(rp_signing_input).unwrap(),
+        issuer_id_alias_signing_input: String::from_utf8(issuer_signing_input).unwrap(),
     }
 }
 

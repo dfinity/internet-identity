@@ -622,8 +622,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         identity_number,
         relying_party,
         issuer,
-        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
-        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+        rp_id_alias_signing_input: prepared_id_alias.rp_id_alias_signing_input,
+        issuer_id_alias_signing_input: prepared_id_alias.issuer_id_alias_signing_input,
     };
     let id_alias_credentials = ii_api::get_id_alias(&env, ii_id, principal_1(), get_id_alias_req)?
         .expect("get id_alias failed");
