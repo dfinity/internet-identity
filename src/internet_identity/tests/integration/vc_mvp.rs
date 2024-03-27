@@ -49,8 +49,8 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         identity_number,
         relying_party,
         issuer,
-        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
-        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+        rp_id_alias_signing_input: prepared_id_alias.rp_id_alias_signing_input,
+        issuer_id_alias_signing_input: prepared_id_alias.issuer_id_alias_signing_input,
     };
     let id_alias_credentials =
         api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?
@@ -142,8 +142,8 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
                 identity_number: identity_number_1,
                 relying_party: relying_party.clone(),
                 issuer: issuer.clone(),
-                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_1.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_1.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -163,8 +163,8 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
                 identity_number: identity_number_2,
                 relying_party,
                 issuer,
-                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_2.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_2.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -265,8 +265,8 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
                 identity_number,
                 relying_party: relying_party_1,
                 issuer: issuer.clone(),
-                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_1.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_1.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -286,8 +286,8 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
                 identity_number,
                 relying_party: relying_party_2,
                 issuer,
-                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_2.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_2.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -392,8 +392,8 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
                 identity_number,
                 relying_party: relying_party.clone(),
                 issuer: issuer_1,
-                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_1.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_1.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -413,8 +413,8 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
                 identity_number,
                 relying_party,
                 issuer: issuer_2,
-                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_2.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_2.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -513,8 +513,8 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
                 identity_number,
                 relying_party: relying_party.clone(),
                 issuer: issuer.clone(),
-                rp_id_alias_jwt: prepared_id_alias_1.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_1.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_1.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_1.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_1.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -530,8 +530,8 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
                 identity_number,
                 relying_party,
                 issuer,
-                rp_id_alias_jwt: prepared_id_alias_2.rp_id_alias_jwt,
-                issuer_id_alias_jwt: prepared_id_alias_2.issuer_id_alias_jwt,
+                rp_id_alias_signing_input: prepared_id_alias_2.rp_id_alias_signing_input,
+                issuer_id_alias_signing_input: prepared_id_alias_2.issuer_id_alias_signing_input,
             },
             CanisterSigPublicKey::try_from(prepared_id_alias_2.canister_sig_pk_der.as_ref())
                 .expect("failed parsing canister sig pk"),
@@ -654,8 +654,8 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
             identity_number, // belongs to principal_1
             relying_party,
             issuer,
-            rp_id_alias_jwt: "dummy_jwt".to_string(),
-            issuer_id_alias_jwt: "another_dummy_jwt".to_string(),
+            rp_id_alias_signing_input: "dummy_jwt".to_string(),
+            issuer_id_alias_signing_input: "another_dummy_jwt".to_string(),
         },
     )?;
 
@@ -680,8 +680,8 @@ fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
             identity_number,
             relying_party,
             issuer,
-            rp_id_alias_jwt: "dummy jwt".to_string(),
-            issuer_id_alias_jwt: "another dummy jwt".to_string(),
+            rp_id_alias_signing_input: "dummy signing input".to_string(),
+            issuer_id_alias_signing_input: "another dummy signing input".to_string(),
         },
     )?;
 
@@ -722,8 +722,8 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
         identity_number,
         relying_party,
         issuer,
-        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
-        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+        rp_id_alias_signing_input: prepared_id_alias.rp_id_alias_signing_input,
+        issuer_id_alias_signing_input: prepared_id_alias.issuer_id_alias_signing_input,
     };
     let response = api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req)?;
     assert!(matches!(
@@ -760,8 +760,8 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
         identity_number,
         relying_party,
         issuer,
-        rp_id_alias_jwt: prepared_id_alias.rp_id_alias_jwt,
-        issuer_id_alias_jwt: prepared_id_alias.issuer_id_alias_jwt,
+        rp_id_alias_signing_input: prepared_id_alias.rp_id_alias_signing_input,
+        issuer_id_alias_signing_input: prepared_id_alias.issuer_id_alias_signing_input,
     };
 
     let id_alias_credentials =

@@ -788,8 +788,8 @@ mod attribute_sharing_mvp {
                 relying_party: req.relying_party,
                 issuer: req.issuer,
             },
-            &req.rp_id_alias_jwt,
-            &req.issuer_id_alias_jwt,
+            &req.rp_id_alias_signing_input,
+            &req.issuer_id_alias_signing_input,
         )
     }
 }
