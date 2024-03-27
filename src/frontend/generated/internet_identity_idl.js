@@ -195,9 +195,9 @@ export const idlFactory = ({ IDL }) => {
     'signed_delegation' : SignedDelegation,
   });
   const GetIdAliasRequest = IDL.Record({
-    'rp_id_alias_jwt' : IDL.Text,
     'issuer' : FrontendHostname,
-    'issuer_id_alias_jwt' : IDL.Text,
+    'issuer_id_alias_signing_input' : IDL.Text,
+    'rp_id_alias_signing_input' : IDL.Text,
     'relying_party' : FrontendHostname,
     'identity_number' : IdentityNumber,
   });
@@ -287,9 +287,9 @@ export const idlFactory = ({ IDL }) => {
     'identity_number' : IdentityNumber,
   });
   const PreparedIdAlias = IDL.Record({
-    'rp_id_alias_jwt' : IDL.Text,
-    'issuer_id_alias_jwt' : IDL.Text,
+    'issuer_id_alias_signing_input' : IDL.Text,
     'canister_sig_pk_der' : PublicKey,
+    'rp_id_alias_signing_input' : IDL.Text,
   });
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,

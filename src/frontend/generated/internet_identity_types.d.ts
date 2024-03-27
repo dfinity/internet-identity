@@ -122,9 +122,9 @@ export type GetIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NoSuchCredentials' : string };
 export interface GetIdAliasRequest {
-  'rp_id_alias_jwt' : string,
   'issuer' : FrontendHostname,
-  'issuer_id_alias_jwt' : string,
+  'issuer_id_alias_signing_input' : string,
+  'rp_id_alias_signing_input' : string,
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
@@ -222,9 +222,9 @@ export interface PrepareIdAliasRequest {
   'identity_number' : IdentityNumber,
 }
 export interface PreparedIdAlias {
-  'rp_id_alias_jwt' : string,
-  'issuer_id_alias_jwt' : string,
+  'issuer_id_alias_signing_input' : string,
   'canister_sig_pk_der' : PublicKey,
+  'rp_id_alias_signing_input' : string,
 }
 export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
