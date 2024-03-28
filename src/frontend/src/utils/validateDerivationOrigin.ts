@@ -1,11 +1,7 @@
+import { resolveCanisterId as resolveCanisterIdFn } from "$src/utils/canisterIdResolution";
 import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
-
-// Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
-// Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
-const ORIGIN_VALIDATION_REGEX =
-  /^https:\/\/([\w-]+)(?:\.raw)?\.(?:ic0\.app|icp0\.io)$/;
 
 const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
@@ -18,57 +14,42 @@ type ValidationResult =
  * .well-known/ii-alternative-origins resource.
  * See the spec for more details: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#alternative-frontend-origins
  *
- * This feature is currently experimental and for now limited in scope:
- * - only URLs matching the {@link ORIGIN_VALIDATION_REGEX} are allowed
  * @param authRequestOrigin Origin of the application requesting a delegation
  * @param derivationOrigin Origin to use for the principal derivation for this delegation
  */
-export const validateDerivationOrigin = async (
-  authRequestOrigin: string,
-  derivationOrigin?: string
-): Promise<ValidationResult> => {
-  if (isNullish(derivationOrigin) || derivationOrigin === authRequestOrigin) {
+export const validateDerivationOrigin = async ({
+  requestOrigin,
+  derivationOrigin,
+  resolveCanisterId,
+}: {
+  requestOrigin: string;
+  derivationOrigin?: string;
+  resolveCanisterId: typeof resolveCanisterIdFn;
+}): Promise<ValidationResult> => {
+  if (isNullish(derivationOrigin) || derivationOrigin === requestOrigin) {
     // this is the default behaviour -> no further validation necessary
     return { result: "valid" };
   }
 
-  // check format of derivationOrigin
-  const matches = ORIGIN_VALIDATION_REGEX.exec(derivationOrigin);
-  if (matches === null) {
-    return {
-      result: "invalid",
-      message: `derivationOrigin does not match regex ${ORIGIN_VALIDATION_REGEX.toString()}`,
-    };
-  }
-
   try {
-    if (matches.length < 2) {
+    const canisterIdResult = await resolveCanisterId({
+      origin: derivationOrigin,
+    });
+    if (canisterIdResult === "not_found") {
       return {
         result: "invalid",
-        message: "invalid regex match result. No value for capture group 1.",
+        message: `Could not resolve canister id for derivationOrigin "${derivationOrigin}".`,
       };
     }
-    const subdomain = matches[1];
+    canisterIdResult satisfies { ok: Principal };
 
-    // We only allow alternative origins of the form <canister-id>.(ic0.app|icp0.io), but the nns dapp
-    // has always been on a custom domain (nns.ic0.app). This means instead of failing because the subdomain
-    // is not a canister id (when the subdomain is 'nns'), we instead swap it for the nns-dapp's canister ID.
-    const NNS_DAPP_CANISTER_ID = Principal.fromText(
-      "qoctq-giaaa-aaaaa-aaaea-cai"
-    );
-
-    // verifies that a valid principal id or the nns dapp was matched
-    // (canister ids must be valid principal ids), throw an error (caught above) otherwise
-    const canisterId =
-      subdomain === "nns"
-        ? NNS_DAPP_CANISTER_ID
-        : Principal.fromText(subdomain);
-
-    // Regardless of whether the _origin_ (from which principals are derived) is on ic0.app or icp0.io, we always
-    // query the list of alternative origins from icp0.io (official domain)
-    const alternativeOriginsUrl = `https://${canisterId.toText()}.icp0.io/.well-known/ii-alternative-origins`;
+    // We always query the list of alternative origins from a canister id based URL in order to make sure that the request
+    // is made through a BN that checks certification.
+    // Some flexibility is allowed by `inferAlternativeOriginsUrl` to allow for dev setups.
+    const alternativeOriginsUrl = inferAlternativeOriginsUrl({
+      canisterId: canisterIdResult.ok,
+    });
     const response = await fetch(
-      // always fetch non-raw
       alternativeOriginsUrl,
       // fail on redirects
       {
@@ -111,10 +92,10 @@ export const validateDerivationOrigin = async (
     }
 
     // check allowed alternative origins
-    if (!alternativeOriginsObj.alternativeOrigins.includes(authRequestOrigin)) {
+    if (!alternativeOriginsObj.alternativeOrigins.includes(requestOrigin)) {
       return {
         result: "invalid",
-        message: `"${authRequestOrigin}" is not listed in the list of allowed alternative origins. Allowed alternative origins: ${alternativeOriginsObj.alternativeOrigins}`,
+        message: `"${requestOrigin}" is not listed in the list of allowed alternative origins. Allowed alternative origins: ${alternativeOriginsObj.alternativeOrigins}`,
       };
     }
   } catch (e) {
@@ -128,4 +109,62 @@ export const validateDerivationOrigin = async (
 
   // all checks passed --> valid
   return { result: "valid" };
+};
+
+/**
+ * Infer the URL to fetch the alternative origins file from based on the canister id
+ * and the current location.
+ * Deployments on mainnet, (including production II hosted on ic0.app or internetcomputer.org) will always only use the
+ * official icp0.io HTTP gateway.
+ * Dev deployments hosted on localhost or custom domains will use the same domain as the current location.
+ *
+ * @param canisterId The canister id to fetch the alternative origins file from.
+ */
+const inferAlternativeOriginsUrl = ({
+  canisterId,
+}: {
+  canisterId: Principal;
+}): string => {
+  // The official HTTP gateway
+  // We never fetch from a custom domain or a raw URL in order to ensure that the request is made through a BN that checks certification.
+  const IC_HTTP_GATEWAY_DOMAIN = "icp0.io";
+  const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
+
+  const location = window?.location;
+  if (isNullish(location)) {
+    // If there is no location, then most likely this is a non-browser environment. All bets
+    // are off, but we return something valid just in case.
+    return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
+  }
+
+  if (
+    location.hostname.endsWith("icp0.io") ||
+    location.hostname.endsWith("ic0.app") ||
+    location.hostname.endsWith("internetcomputer.org")
+  ) {
+    // If this is a canister running on one of the official IC domains, then return the
+    // official canister id based API endpoint
+    return `https://${canisterId}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
+  }
+
+  // Local deployment -> add query parameter
+  // For this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
+  if (location.hostname.endsWith("localhost")) {
+    // on localhost, use `localhost` as the domain to avoid routing issues in case of canister id subdomain based routing
+
+    // preserve the port if it's not the default
+    const portSegment = location.port !== "" ? `:${location.port}` : "";
+
+    return `${location.protocol}//localhost${portSegment}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
+  }
+  // Preserve host when using IP addresses
+  if (location.hostname === "127.0.0.1" || location.hostname === "0.0.0.0") {
+    return `${location.protocol}//${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
+  }
+
+  // Otherwise assume it's a custom setup expecting the gateway
+  // - be on the same domain
+  // - to use HTTPS
+  // - support canister id based routing
+  return `https://${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
 };

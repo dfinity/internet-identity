@@ -21,6 +21,7 @@ import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 import { Delegation, fetchDelegation } from "./fetchDelegation";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 
+import { resolveCanisterId } from "$src/utils/canisterIdResolution";
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
 
@@ -167,10 +168,11 @@ const authenticate = async (
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
 
-  const validationResult = await validateDerivationOrigin(
-    authContext.requestOrigin,
-    authContext.authRequest.derivationOrigin
-  );
+  const validationResult = await validateDerivationOrigin({
+    requestOrigin: authContext.requestOrigin,
+    derivationOrigin: authContext.authRequest.derivationOrigin,
+    resolveCanisterId,
+  });
 
   if (validationResult.result === "invalid") {
     await displayError({

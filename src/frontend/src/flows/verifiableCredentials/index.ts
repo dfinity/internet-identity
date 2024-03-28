@@ -95,7 +95,11 @@ const verifyCredentials = async ({
   // Verify that principals may be issued to RP using the specified
   // derivation origin
   const validRpDerivationOrigin = await withLoader(() =>
-    validateDerivationOrigin(rpOrigin_, rpDerivationOrigin)
+    validateDerivationOrigin({
+      requestOrigin: rpOrigin_,
+      derivationOrigin: rpDerivationOrigin,
+      resolveCanisterId,
+    })
   );
   if (validRpDerivationOrigin.result === "invalid") {
     return abortedCredentials({ reason: "bad_derivation_origin_rp" });
@@ -307,10 +311,11 @@ const getValidatedIssuerDerivationOrigin = async ({
   }
   derivationOriginResult.kind satisfies "origin";
 
-  const validationResult = await validateDerivationOrigin(
-    issuerOrigin,
-    derivationOriginResult.origin
-  );
+  const validationResult = await validateDerivationOrigin({
+    requestOrigin: issuerOrigin,
+    derivationOrigin: derivationOriginResult.origin,
+    resolveCanisterId,
+  });
   if (validationResult.result === "invalid") {
     console.error(
       `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`
