@@ -160,7 +160,7 @@ This section describes the Internet Identity Service from the point of view of a
 
     -   the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
 
-    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Values must match the following regular expression: `^https:\/\/[\w-]+(\.raw)?\.(ic0\.app|icp0\.io)$`. Internet Identity will only accept values that are also listed in the HTTP resource `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will only accept values that are also listed in the HTTP resource `/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 
 
 6.  Now the client application window expects a message back, with data `event`.
@@ -212,11 +212,7 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 ## Alternative Frontend Origins
 
 
-To allow flexibility regarding the canister frontend URL, the client may choose to provide the canonical canister frontend URL (`https://<canister_id>.ic0.app` or `https://<canister_id>.raw.ic0.app`) as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using one of the canonical URLs.
-
-:::note
-This feature is also available for `https://<canister id>.icp0.io` (resp. `https://<canister id>.raw.icp0.io`).
-:::
+To allow flexibility regarding the canister frontend URL, the client may choose to provide another frontend URL as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using the `derivationOrigin` directly.
 
 :::caution
 This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
@@ -226,11 +222,7 @@ This feature is intended to allow more flexibility with respect to the origins o
 `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 :::
 
-:::note
-In general, Internet Identity only allows alternative origins of the form `<canister id>.ic0.app` or `<canister id>.icp0.io`. There is one exception: `nns.ic0.app`, which is treated as `<nns-dapp canister id>.icp0.io`.
-:::
-
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.ic0.app/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
 
 
 ### JSON Schema {#alternative-frontend-origins-schema}
@@ -240,7 +232,7 @@ In order for Internet Identity to accept the `derivationOrigin` the correspondin
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "II Alternative Origins Principal Derivation Origins",
-  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use a canonical canister URL (https://<canister_id>.ic0.app or https://<canister_id>.raw.ic0.app) for principal derivation.",
+  "description": "An object containing the alternative frontend origins of the given canister, which are allowed to use the URL this document is hosted on for principal derivation.",
   "type": "object",
   "properties": {
     "alternativeOrigins": {

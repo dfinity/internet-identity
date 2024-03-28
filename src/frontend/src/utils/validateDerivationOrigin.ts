@@ -1,6 +1,8 @@
 import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
+import { resolveCanisterId } from "$src/utils/canisterIdResolution";
+import { inferHost } from "$src/utils/iiConnection";
 
 // Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
 // Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
@@ -32,41 +34,19 @@ export const validateDerivationOrigin = async (
     return { result: "valid" };
   }
 
-  // check format of derivationOrigin
-  const matches = ORIGIN_VALIDATION_REGEX.exec(derivationOrigin);
-  if (matches === null) {
-    return {
-      result: "invalid",
-      message: `derivationOrigin does not match regex ${ORIGIN_VALIDATION_REGEX.toString()}`,
-    };
-  }
-
   try {
-    if (matches.length < 2) {
+    const canisterIdResult = await resolveCanisterId({origin: derivationOrigin})
+    if (canisterIdResult === "not_found") {
       return {
         result: "invalid",
-        message: "invalid regex match result. No value for capture group 1.",
+        message: `Could not resolve canister id for derivationOrigin "${derivationOrigin}".`,
       };
     }
-    const subdomain = matches[1];
+    canisterIdResult satisfies {ok: string};
 
-    // We only allow alternative origins of the form <canister-id>.(ic0.app|icp0.io), but the nns dapp
-    // has always been on a custom domain (nns.ic0.app). This means instead of failing because the subdomain
-    // is not a canister id (when the subdomain is 'nns'), we instead swap it for the nns-dapp's canister ID.
-    const NNS_DAPP_CANISTER_ID = Principal.fromText(
-      "qoctq-giaaa-aaaaa-aaaea-cai"
-    );
-
-    // verifies that a valid principal id or the nns dapp was matched
-    // (canister ids must be valid principal ids), throw an error (caught above) otherwise
-    const canisterId =
-      subdomain === "nns"
-        ? NNS_DAPP_CANISTER_ID
-        : Principal.fromText(subdomain);
-
-    // Regardless of whether the _origin_ (from which principals are derived) is on ic0.app or icp0.io, we always
-    // query the list of alternative origins from icp0.io (official domain)
-    const alternativeOriginsUrl = `https://${canisterId.toText()}.icp0.io/.well-known/ii-alternative-origins`;
+    // We always query the list of alternative origins from a canister id based URL in order to make sure that the request
+    // is made through a BN that checks certification. Some flexibility is allowed by `inferHost` to allow for dev setups.
+    const alternativeOriginsUrl = `https://${canisterIdResult.ok}.${inferHost()}/.well-known/ii-alternative-origins`;
     const response = await fetch(
       // always fetch non-raw
       alternativeOriginsUrl,
@@ -129,3 +109,39 @@ export const validateDerivationOrigin = async (
   // all checks passed --> valid
   return { result: "valid" };
 };
+
+const inferAlternativeOriginsUrl = (): string => {
+  // The domain used for the HTTP
+  const IC_HTTP_GATEWAY_DOMAIN = "icp0.io";
+
+  const location = window?.location;
+  if (isNullish(location)) {
+    // If there is no location, then most likely this is a non-browser environment. All bets
+    // are off, but we return something valid just in case.
+    return "https://" + IC_HTTP_GATEWAY_DOMAIN;
+  }
+
+  if (
+    location.hostname.endsWith("icp0.io") ||
+    location.hostname.endsWith("ic0.app") ||
+    location.hostname.endsWith("internetcomputer.org")
+  ) {
+    // If this is a canister running on one of the official IC domains, then return the
+    // official API endpoint
+    return "https://" + IC_HTTP_GATEWAY_DOMAIN;
+  }
+
+  if (
+    location.host === "127.0.0.1" /* typical development */ ||
+    location.host ===
+    "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
+    location.hostname.endsWith(
+      "localhost"
+    ) /* local canisters from icx-proxy like rdmx6-....-foo.localhost */
+  ) {
+    return "localhost"
+  }
+
+  // Otherwise assume it's a custom setup expecting the gateway to be on the same domain
+  return location.hostname;
+}
