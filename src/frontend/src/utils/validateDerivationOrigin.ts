@@ -131,8 +131,8 @@ const inferAlternativeOriginsUrl = ({
     return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
   }
 
-  // Local deployment _not_ using subdomain for routing -> add query parameter
-  // for this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
+  // Local deployment -> add query parameter
+  // For this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
   if (
     location.hostname === "127.0.0.1" /* typical development */ ||
     location.hostname ===
