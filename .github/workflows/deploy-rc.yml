@@ -58,7 +58,7 @@ jobs:
       - name: "Print shasum of found build"
         run: shasum -a 256 ./internet_identity_production.wasm.gz
 
-      - uses: dfinity/setup-dfx@0c1c03fb1a56008724b5d05ddfec0eef9479bdf8
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       - name: 'Install key'
         env:
