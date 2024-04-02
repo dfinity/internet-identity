@@ -87,7 +87,7 @@ const verifyCredentials = async ({
 
   // If the RP provided a canister ID, check that it matches what we got
   if (nonNullish(expectedIssuerCanisterId)) {
-    if (expectedIssuerCanisterId !== issuerCanisterId) {
+    if (expectedIssuerCanisterId.compareTo(issuerCanisterId) !== "eq") {
       return abortedCredentials({ reason: "bad_canister_id" });
     }
   }
