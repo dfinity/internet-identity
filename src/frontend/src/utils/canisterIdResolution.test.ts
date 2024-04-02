@@ -1,4 +1,5 @@
 import { resolveCanisterId } from "$src/utils/canisterIdResolution";
+import { Principal } from "@dfinity/principal";
 
 const HEADER_NAME = "x-ic-canister-id";
 
@@ -16,7 +17,7 @@ test("should resolve canister id", async () => {
     await resolveCanisterId({
       origin: "https://example.com",
     })
-  ).toEqual({ ok: "bkyz2-fmaaa-aaaaa-qaaaq-cai" });
+  ).toEqual({ ok: Principal.fromText("bkyz2-fmaaa-aaaaa-qaaaq-cai") });
 });
 
 test("should not resolve canister id on missing header", async () => {
@@ -51,13 +52,30 @@ test("should resolve canister id from well-known domain", async () => {
       await resolveCanisterId({
         origin: `https://${canisterId}.${domain}`,
       })
-    ).toEqual({ ok: canisterId });
+    ).toEqual({ ok: Principal.fromText(canisterId) });
     expect(
       await resolveCanisterId({
         origin: `https://${canisterId}.raw.${domain}`,
       })
-    ).toEqual({ ok: canisterId });
+    ).toEqual({ ok: Principal.fromText(canisterId) });
   }
   // make sure fetch was not called
   expect(global.fetch).toHaveBeenCalledTimes(0);
+});
+
+test("should not resolve canister id from malformed header", async () => {
+  const fetchMock = vi.fn();
+  fetchMock.mockReturnValueOnce(
+    new Response(null, {
+      status: 200,
+      headers: [[HEADER_NAME, "not_a_canister_id"]],
+    })
+  );
+  global.fetch = fetchMock;
+
+  expect(
+    await resolveCanisterId({
+      origin: "https://example.com",
+    })
+  ).toEqual("not_found");
 });
