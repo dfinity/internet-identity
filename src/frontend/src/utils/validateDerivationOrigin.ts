@@ -1,13 +1,7 @@
 import { resolveCanisterId } from "$src/utils/canisterIdResolution";
-import { inferHost } from "$src/utils/iiConnection";
 import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
-
-// Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
-// Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
-const ORIGIN_VALIDATION_REGEX =
-  /^https:\/\/([\w-]+)(?:\.raw)?\.(?:ic0\.app|icp0\.io)$/;
 
 const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
@@ -20,8 +14,6 @@ type ValidationResult =
  * .well-known/ii-alternative-origins resource.
  * See the spec for more details: https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc#alternative-frontend-origins
  *
- * This feature is currently experimental and for now limited in scope:
- * - only URLs matching the {@link ORIGIN_VALIDATION_REGEX} are allowed
  * @param authRequestOrigin Origin of the application requesting a delegation
  * @param derivationOrigin Origin to use for the principal derivation for this delegation
  */
