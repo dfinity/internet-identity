@@ -41,7 +41,9 @@ export const validateDerivationOrigin = async (
     // We always query the list of alternative origins from a canister id based URL in order to make sure that the request
     // is made through a BN that checks certification.
     // Some flexibility is allowed by `inferAlternativeOriginsUrl` to allow for dev setups.
-    const alternativeOriginsUrl = inferAlternativeOriginsUrl({canisterId: canisterIdResult.ok});
+    const alternativeOriginsUrl = inferAlternativeOriginsUrl({
+      canisterId: canisterIdResult.ok,
+    });
     const response = await fetch(
       alternativeOriginsUrl,
       // fail on redirects
@@ -134,9 +136,8 @@ const inferAlternativeOriginsUrl = ({
   // Local deployment -> add query parameter
   // For this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
   if (
-    location.hostname === "127.0.0.1" /* typical development */ ||
-    location.hostname ===
-      "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
+    location.hostname === "127.0.0.1" ||
+    location.hostname === "0.0.0.0" ||
     location.hostname.endsWith("localhost")
   ) {
     return `${location.protocol}${
