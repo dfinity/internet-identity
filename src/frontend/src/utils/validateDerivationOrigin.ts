@@ -120,7 +120,7 @@ const inferAlternativeOriginsUrl = ({
   if (isNullish(location)) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off, but we return something valid just in case.
-    return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}`;
+    return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
   }
 
   if (
@@ -141,7 +141,7 @@ const inferAlternativeOriginsUrl = ({
     location.hostname.endsWith("localhost")
   ) {
     return `${location.protocol}${
-      location.origin
+      location.host
     }${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId.toText()}`;
   }
 
