@@ -18,6 +18,7 @@ import {
   CredentialSpec,
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
@@ -69,7 +70,7 @@ const verifyCredentials = async ({
   connection,
   request: {
     credentialSubject: givenP_RP,
-    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId_ },
+    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId },
     credentialSpec,
     derivationOrigin: rpDerivationOrigin,
   },
@@ -85,9 +86,8 @@ const verifyCredentials = async ({
   const issuerCanisterId = lookedUp.ok;
 
   // If the RP provided a canister ID, check that it matches what we got
-  if (nonNullish(expectedIssuerCanisterId_)) {
-    const expectedCanisterId = expectedIssuerCanisterId_?.toText();
-    if (expectedCanisterId !== issuerCanisterId) {
+  if (nonNullish(expectedIssuerCanisterId)) {
+    if (expectedIssuerCanisterId.compareTo(issuerCanisterId) !== "eq") {
       return abortedCredentials({ reason: "bad_canister_id" });
     }
   }
@@ -435,7 +435,7 @@ const createPresentation = ({
   rpAliasCredential,
   issuedCredential,
 }: {
-  issuerCanisterId: string;
+  issuerCanisterId: Principal;
   rpAliasCredential: SignedIdAlias;
   issuedCredential: IssuedCredentialData;
 }): VcVerifiablePresentation => {
@@ -443,7 +443,7 @@ const createPresentation = ({
   const headerObj = { typ: "JWT", alg: "none" };
 
   const payloadObj = {
-    iss: `did:icp:${issuerCanisterId}` /* JWT Issuer is set to the issuer's canister ID as per spec */,
+    iss: `did:icp:${issuerCanisterId.toText()}` /* JWT Issuer is set to the issuer's canister ID as per spec */,
     vp: {
       "@context": "https://www.w3.org/2018/credentials/v1",
       type: "VerifiablePresentation",

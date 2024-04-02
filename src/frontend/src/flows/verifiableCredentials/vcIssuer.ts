@@ -12,10 +12,11 @@ import {
 } from "@dfinity/internet-identity-vc-api";
 
 import { inferHost } from "$src/utils/iiConnection";
+import { Principal } from "@dfinity/principal";
 
 // Boilerplate for contacting a canister implementing the Issuer API
 export class VcIssuer {
-  public constructor(readonly canisterId: string) {}
+  public constructor(readonly canisterId: Principal) {}
 
   // Create an actor representing the backend
   createActor = async (
