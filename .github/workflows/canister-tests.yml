@@ -432,7 +432,7 @@ jobs:
       - name: Kickstart npm ci
         run: '{ npm ci --no-audit --no-fund; echo "$?" > ~/npm-ci-status; } &'
 
-      - uses: dfinity/setup-dfx@0c1c03fb1a56008724b5d05ddfec0eef9479bdf8
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       # Helps with debugging
       - name: Show versions
@@ -543,7 +543,7 @@ jobs:
           google-chrome --version
 
       - uses: ./.github/actions/setup-node
-      - uses: dfinity/setup-dfx@0c1c03fb1a56008724b5d05ddfec0eef9479bdf8
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       # Helps with debugging
       - name: Show versions
@@ -598,7 +598,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dfinity/setup-dfx@0c1c03fb1a56008724b5d05ddfec0eef9479bdf8
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v4
