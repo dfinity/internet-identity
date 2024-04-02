@@ -43,7 +43,6 @@ export const validateDerivationOrigin = async (
     // Some flexibility is allowed by `inferAlternativeOriginsUrl` to allow for dev setups.
     const alternativeOriginsUrl = inferAlternativeOriginsUrl({canisterId: canisterIdResult.ok});
     const response = await fetch(
-      // always fetch non-raw
       alternativeOriginsUrl,
       // fail on redirects
       {
@@ -110,7 +109,8 @@ const inferAlternativeOriginsUrl = ({
 }: {
   canisterId: Principal;
 }): string => {
-  // The domain used for the HTTP
+  // The official HTTP gateway
+  // We never fetch from a custom domain or a raw URL in order to ensure that the request is made through a BN that checks certification.
   const IC_HTTP_GATEWAY_DOMAIN = "icp0.io";
   const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
 
