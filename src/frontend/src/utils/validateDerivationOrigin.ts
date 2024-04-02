@@ -1,8 +1,8 @@
+import { resolveCanisterId } from "$src/utils/canisterIdResolution";
+import { inferHost } from "$src/utils/iiConnection";
 import { wrapError } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
-import { resolveCanisterId } from "$src/utils/canisterIdResolution";
-import { inferHost } from "$src/utils/iiConnection";
 
 // Regex that's used to ensure an alternative origin is valid. We only allow canisters as alternative origins.
 // Note: this allows origins that are served both from the legacy domain (ic0.app) and the official domain (icp0.io).
@@ -35,18 +35,21 @@ export const validateDerivationOrigin = async (
   }
 
   try {
-    const canisterIdResult = await resolveCanisterId({origin: derivationOrigin})
+    const canisterIdResult = await resolveCanisterId({
+      origin: derivationOrigin,
+    });
     if (canisterIdResult === "not_found") {
       return {
         result: "invalid",
         message: `Could not resolve canister id for derivationOrigin "${derivationOrigin}".`,
       };
     }
-    canisterIdResult satisfies {ok: string};
+    canisterIdResult satisfies { ok: Principal };
 
     // We always query the list of alternative origins from a canister id based URL in order to make sure that the request
-    // is made through a BN that checks certification. Some flexibility is allowed by `inferHost` to allow for dev setups.
-    const alternativeOriginsUrl = `https://${canisterIdResult.ok}.${inferHost()}/.well-known/ii-alternative-origins`;
+    // is made through a BN that checks certification.
+    // Some flexibility is allowed by `inferAlternativeOriginsUrl` to allow for dev setups.
+    const alternativeOriginsUrl = inferAlternativeOriginsUrl({canisterId: canisterIdResult.ok});
     const response = await fetch(
       // always fetch non-raw
       alternativeOriginsUrl,
@@ -110,15 +113,20 @@ export const validateDerivationOrigin = async (
   return { result: "valid" };
 };
 
-const inferAlternativeOriginsUrl = (): string => {
+const inferAlternativeOriginsUrl = ({
+  canisterId,
+}: {
+  canisterId: Principal;
+}): string => {
   // The domain used for the HTTP
   const IC_HTTP_GATEWAY_DOMAIN = "icp0.io";
+  const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
 
   const location = window?.location;
   if (isNullish(location)) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off, but we return something valid just in case.
-    return "https://" + IC_HTTP_GATEWAY_DOMAIN;
+    return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}`;
   }
 
   if (
@@ -127,21 +135,28 @@ const inferAlternativeOriginsUrl = (): string => {
     location.hostname.endsWith("internetcomputer.org")
   ) {
     // If this is a canister running on one of the official IC domains, then return the
-    // official API endpoint
-    return "https://" + IC_HTTP_GATEWAY_DOMAIN;
+    // official canister id based API endpoint
+    return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
   }
 
+  // Local deployment _not_ using subdomain for routing -> add query parameter
+  // for this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
   if (
-    location.host === "127.0.0.1" /* typical development */ ||
-    location.host ===
-    "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
-    location.hostname.endsWith(
-      "localhost"
-    ) /* local canisters from icx-proxy like rdmx6-....-foo.localhost */
+    location.hostname === "127.0.0.1" /* typical development */ ||
+    location.hostname ===
+      "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
+    location.hostname.endsWith("localhost")
   ) {
-    return "localhost"
+    return `${location.protocol}${
+      location.origin
+    }${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId.toText()}`;
   }
 
-  // Otherwise assume it's a custom setup expecting the gateway to be on the same domain
-  return location.hostname;
-}
+  // Otherwise assume it's a custom setup expecting the gateway
+  // - be on the same domain
+  // - to use HTTPS
+  // - support canister id based routing
+  return `https://${
+    location.origin
+  }${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId.toText()}`;
+};
