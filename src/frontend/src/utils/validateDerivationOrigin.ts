@@ -162,9 +162,9 @@ const inferAlternativeOriginsUrl = ({
     return `${location.protocol}//${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
   }
 
-  // Otherwise assume it's a custom setup expecting the gateway
+  // Otherwise assume it's a custom setup expecting the gateway to
   // - be on the same domain
-  // - to use HTTPS
-  // - support canister id based routing
+  // - use HTTPS
+  // - support query parameter based routing
   return `https://${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
 };
