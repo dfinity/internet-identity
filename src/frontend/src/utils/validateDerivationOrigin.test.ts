@@ -108,7 +108,7 @@ test("should fetch alternative origins file from expected URL", async () => {
 
     const result = await validateDerivationOrigin({
       requestOrigin: "https://example.com",
-      derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
       resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
     });
 
@@ -127,7 +127,7 @@ test("should fetch alternative origins file using non-raw URL", async () => {
 
   const result = await validateDerivationOrigin({
     requestOrigin: `https://${TEST_CANISTER_ID}.raw.ic0.app`,
-    derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
     resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
   });
 
@@ -157,7 +157,7 @@ test("should not validate if origin not allowed", async () => {
 
   const result = await validateDerivationOrigin({
     requestOrigin: "https://example.com",
-    derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
     resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
   });
 
@@ -174,7 +174,7 @@ test("should not validate if alternative origins file malformed", async () => {
 
   const result = await validateDerivationOrigin({
     requestOrigin: "https://example.com",
-    derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
     resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
   });
 
@@ -189,7 +189,7 @@ test("should not validate on alternative origins redirect", async () => {
 
   const result = await validateDerivationOrigin({
     requestOrigin: "https://example.com",
-    derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
     resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
   });
 
@@ -204,7 +204,7 @@ test("should not validate on alternative origins error", async () => {
 
   const result = await validateDerivationOrigin({
     requestOrigin: "https://example.com",
-    derivationOrigin: `https://some-url.com`, // different from requestOrigin so that we need to fetch the alternative origins
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
     resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
   });
 
