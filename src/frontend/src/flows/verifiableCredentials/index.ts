@@ -98,7 +98,6 @@ const verifyCredentials = async ({
     validateDerivationOrigin({
       requestOrigin: rpOrigin_,
       derivationOrigin: rpDerivationOrigin,
-      resolveCanisterId,
     })
   );
   if (validRpDerivationOrigin.result === "invalid") {
@@ -314,7 +313,6 @@ const getValidatedIssuerDerivationOrigin = async ({
   const validationResult = await validateDerivationOrigin({
     requestOrigin: issuerOrigin,
     derivationOrigin: derivationOriginResult.origin,
-    resolveCanisterId,
   });
   if (validationResult.result === "invalid") {
     console.error(

@@ -20,11 +20,11 @@ type ValidationResult =
 export const validateDerivationOrigin = async ({
   requestOrigin,
   derivationOrigin,
-  resolveCanisterId,
+  resolveCanisterId = resolveCanisterIdFn,
 }: {
   requestOrigin: string;
   derivationOrigin?: string;
-  resolveCanisterId: typeof resolveCanisterIdFn;
+  resolveCanisterId?: typeof resolveCanisterIdFn;
 }): Promise<ValidationResult> => {
   if (isNullish(derivationOrigin) || derivationOrigin === requestOrigin) {
     // this is the default behaviour -> no further validation necessary
