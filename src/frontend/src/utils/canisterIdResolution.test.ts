@@ -78,3 +78,11 @@ test("should not resolve canister id from malformed header", async () => {
     })
   ).toEqual("not_found");
 });
+
+test("should not resolve canister id from malformed origin", async () => {
+  expect(
+    await resolveCanisterId({
+      origin: "not-an-origin",
+    })
+  ).toEqual("not_found");
+});
