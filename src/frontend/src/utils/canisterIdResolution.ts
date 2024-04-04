@@ -11,7 +11,18 @@ export const resolveCanisterId = ({
 }: {
   origin: string;
 }): Promise<{ ok: Principal } | "not_found"> => {
-  const url = new URL(origin);
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch (error) {
+    console.error(
+      `Failed to parse origin '${origin}' as URL: ${unknownToString(
+        error,
+        "unknown error"
+      )}`
+    );
+    return Promise.resolve("not_found");
+  }
 
   const maybeCanisterId = parseCanisterIdFromHostname(url.hostname);
   if (nonNullish(maybeCanisterId)) {
