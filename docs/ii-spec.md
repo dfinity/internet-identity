@@ -85,16 +85,19 @@ A user account is identified by a unique *Identity Anchor*, a smallish natural n
 A client application frontend is identified by its hostname (e.g., `abcde-efg.ic0.app`, `nice-name.ic0.app`, `non-ic-application.com`). Frontend application can be served by canisters or by websites that are not hosted on the Internet Computer.
 
 A user has a separate *user identity* for each client application frontend (i.e., per hostname). This identity is a [*self-authenticating id*](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the [DER encoded canister signature public key](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures) which has the form
-
-    user_id = SHA-224(DER encoded public key) · 0x02` (29 bytes)
+```
+user_id = SHA-224(DER encoded public key) · 0x02` (29 bytes)
+```
 
 and the `BIT STRING` field of the DER encoded public key has the form
-
-    bit_string = |ii_canister_id| · ii_canister_id · seed
+```
+bit_string = |ii_canister_id| · ii_canister_id · seed
+```
 
 where the `seed` is derived as follows
-
-    seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
+```
+seed = H(|salt| · salt · |user_number| · user_number · |frontend_host| · frontend_host)
+```
 
 where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representing the length of `…` in bytes, `user_number` is the ASCII-encoding of the Identity Anchor as a decimal number, and `frontend_host` is the ASCII-encoding of the client application frontend's hostname (at most 255 bytes).
 
@@ -129,28 +132,32 @@ This section describes the Internet Identity Service from the point of view of a
 3.  It loads the url `https://identity.ic0.app/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
 
 4.  In the `identityWindow`, the user logs in, and the `identityWindow` invokes
-
-        window.opener.postMessage(msg, "*")
+    ```ts
+    window.opener.postMessage(msg, "*")
+    ```
 
     where `msg` is
-
-        interface InternetIdentityReady {
-          kind: "authorize-ready"
-        }
+    ```ts
+    interface InternetIdentityReady {
+      kind: "authorize-ready"
+    }
+    ```
 
 5.  The client application, after receiving the `InternetIdentityReady`, invokes
-
-        identityWindow.postMessage(msg, "https://identity.ic0.app")
+    ```ts
+    identityWindow.postMessage(msg, "https://identity.ic0.app")
+    ```
 
     where `msg` is a value of type
-
-        interface InternetIdentityAuthRequest {
-          kind: "authorize-client";
-          sessionPublicKey: Uint8Array;
-          maxTimeToLive?: bigint;
-          allowPinAuthentication?: boolean;
-          derivationOrigin?: string;
-        }
+    ```ts
+    interface InternetIdentityAuthRequest {
+      kind: "authorize-client";
+      sessionPublicKey: Uint8Array;
+      maxTimeToLive?: bigint;
+      allowPinAuthentication?: boolean;
+      derivationOrigin?: string;
+    }
+    ```
 
     where
 
@@ -168,29 +175,31 @@ This section describes the Internet Identity Service from the point of view of a
 7.  If `event.origin` is not either `"https://identity.ic0.app"` or `"https://identity.internetcomputer.org"` (depending on which endpoint you are using), ignore this message.
 
 8.  The `event.data` value is a JS object with the following type:
-
-        interface InternetIdentityAuthResponse {
-          kind: "authorize-client-success";
-          delegations: [{
-            delegation: {
-              pubkey: Uint8Array;
-              expiration: bigint;
-              targets?: Principal[];
-            };
-            signature: Uint8Array;
-          }];
-          userPublicKey: Uint8Array;
-          authnMethod: "passkey";
-        }
+    ```ts
+    interface InternetIdentityAuthResponse {
+      kind: "authorize-client-success";
+      delegations: [{
+        delegation: {
+          pubkey: Uint8Array;
+          expiration: bigint;
+          targets?: Principal[];
+        };
+        signature: Uint8Array;
+      }];
+      userPublicKey: Uint8Array;
+      authnMethod: "passkey";
+    }
+    ```
 
     where the `userPublicKey` is the user's Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for [*authentication on the IC*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) and `authnMethod` is the method used by the user to authenticate (`passkey` for webauthn, `pin` for temporary key/PIN identity, and `recovery` for recovery phrase or recovery device).
 
 9.  It could also receive a failure message of the following type
-
-        interface InternetIdentityAuthResponse {
-          kind: "authorize-client-failure";
-          text: string;
-        }
+    ```ts
+    interface InternetIdentityAuthResponse {
+      kind: "authorize-client-failure";
+      text: string;
+    }
+    ```
 
     The client application frontend needs to be able to detect when any of the delegations in the chain has expired, and re-authorize the user in that case.
 
@@ -441,46 +450,49 @@ The primary data structure used by the backend is a map from Identity Anchor to 
 #### Stable memory layout
 
 All the integers (u64, u32, u16) are encoded in Little-Endian.
+```
+Storage ::= {
+  Header
+  UserRecords
+}
 
-    Storage ::= {
-      Header
-      UserRecords
-    }
+Header ::= {
+  magic : u8[3] = "IIC"
+  version : u8 = 1
+  number_of_user_records : u32
+  user_number_range_lo : u64
+  user_number_range_hi : u64
+  entry_size: u16
+  salt: u8[32]
+  padding : u8[454]
+}
 
-    Header ::= {
-      magic : u8[3] = "IIC"
-      version : u8 = 1
-      number_of_user_records : u32
-      user_number_range_lo : u64
-      user_number_range_hi : u64
-      entry_size: u16
-      salt: u8[32]
-      padding : u8[454]
-    }
+UserRecords ::= UserRecord*
 
-    UserRecords ::= UserRecord*
-
-    UserRecord ::= {
-      size : u16
-      candid_bytes: u8[510]
-    }
+UserRecord ::= {
+  size : u16
+  candid_bytes: u8[510]
+}
+```
 
 User record for Identity Anchor N is stored at offset `sizeof(Header) + (N - user_number_range_lo) * sizeof(UserRecord)`. Each record consists of a 16 bit `size` ∈ \[0..510\] followed by `size` bytes of Candid-serialized list of devices.
-
-    type UserDeviceList = vec(record {
-      pubkey : DeviceKey;
-      alias : text;
-      credential_id : opt CredentialId;
-    });
+```did
+type UserDeviceList = vec(record {
+  pubkey : DeviceKey;
+  alias : text;
+  credential_id : opt CredentialId;
+});
+```
 
 ### Initialization
 
 The Internet Identity canister is designed for sharded deployments. There can be many simultaneously installed instances of the canister code, each serving requests of a subset of users. As users are identified by their Identity Anchor, we split the range of Identity Anchors into continuous non-overlapping half-closed intervals and assign each region to one canister instance. The assigned range is passed to the canister as an init argument, encoded in Candid:
-
-    type InternetIdentityInit = record {
-      // Half-closed interval of Identity Anchors assigned to this canister, [ left_bound, right_bound )
-      assigned_user_number_range: record { nat64; nat64; };
-    };
+```did
+type InternetIdentityInit = record {
+  // Half-closed interval of Identity Anchors assigned to this canister, [ left_bound, right_bound )
+  assigned_user_number_range: record { nat64; nat64; };
+};
+```
 
 ### Approach to upgrades
 
