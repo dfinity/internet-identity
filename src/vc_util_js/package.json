@@ -21,6 +21,6 @@
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",
     "typescript": "5.2.2",
-    "vite": "^4.5.2"
+    "vite": "^4.5.3"
   }
 }

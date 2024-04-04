@@ -52,7 +52,7 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
-    "vite": "^4.5.2",
+    "vite": "^4.5.3",
     "vitest": "^0.34.0",
     "webdriverio": "8.32.3"
   },
