@@ -474,5 +474,23 @@
     "website": "https://www.uncensoredgreats.com/",
     "logo": "UncensoredGreatsLogo.png",
     "oneLiner": "Migrating all the World's Books to NFT-form for use in domain-specific AI"
+  },
+  {
+    "name": "ICP Governor",
+    "oneLiner": "ICP Governor is an application used to manage a single DAO: create proposals, vote, timelock and execute them.",
+    "website": "https://b4umt-saaaa-aaaak-afnpa-cai.icp0.io/",
+    "logo": "redsteep_logo.png"
+  },
+  {
+    "name": "Formyfi",
+    "oneLiner": "Decentralized & fully on-chain forms.",
+    "website": "https://formyfi.io",
+    "logo": "formify_logo.webp"
+  },
+  {
+    "name": "OpenFPL",
+    "oneLiner": "Decentralised Fantasy Football.",
+    "website": "https://openfpl.xyz/",
+    "logo": "openfpl_logo.png"
   }
 ]
