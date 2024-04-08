@@ -1,9 +1,9 @@
 [
   {
-    "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
-    "website": "https://dscvr.one/",
-    "logo": "dscvr_logo.webp"
+    "name": "Helix Markets",
+    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
+    "website": "https://www.helixmarkets.io/",
+    "logo": "helix_logo.webp"
   },
   {
     "name": "OpenChat",
@@ -46,10 +46,10 @@
     "logo": "icdex_logo.webp"
   },
   {
-    "name": "Helix Markets",
-    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
-    "website": "https://t.co/OcdISW1Xww",
-    "logo": "helix_logo.webp"
+    "name": "DSCVR",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
+    "website": "https://dscvr.one/",
+    "logo": "dscvr_logo.webp"
   },
   {
     "name": "distrikt",
@@ -492,5 +492,11 @@
     "oneLiner": "Decentralised Fantasy Football.",
     "website": "https://openfpl.xyz/",
     "logo": "openfpl_logo.png"
+  },
+  {
+    "name": "AllKinds",
+    "oneLiner": "A web3 social network where people find more meaningful connections.",
+    "website": "https://allkinds.xyz/",
+    "logo": "allkinds_logo.svg"
   }
 ]
