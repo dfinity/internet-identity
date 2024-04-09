@@ -147,8 +147,14 @@ export const getVCPresentation_ = async ({
     const reason = await vcAllow.getAbortReason();
     return { result: "aborted", reason };
   }
-  const userNumber_ = await vcAllow.getUserNumber();
-  expect(userNumber_).toBe(userNumber);
+
+  if (userNumber === undefined) {
+    const enteredUserNumber = "123456";
+    await vcAllow.typeUserNumber(enteredUserNumber);
+    const userNumber_ = await vcAllow.getUserNumber();
+    expect(userNumber_).toBe(enteredUserNumber);
+  }
+
   await vcAllow.allow();
 
   await finalizeAuth(browser);

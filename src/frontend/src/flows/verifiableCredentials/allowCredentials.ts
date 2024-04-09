@@ -149,7 +149,7 @@ const allowCredentialsTemplate = ({
         class="c-button"
         @click="${presentCredential}"
       >
-        ${copy.allow}
+        ${copy.present_credential}
       </button>
       <button
         data-action="cancel"
