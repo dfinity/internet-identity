@@ -9,7 +9,6 @@ import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 
 import { getDapps, KnownDapp } from "../dappsExplorer/dapps";
-import { dappTemplate } from "../dappsExplorer/index";
 
 import DOMPurify from "dompurify";
 
@@ -82,46 +81,72 @@ const allowCredentialsTemplate = ({
     >
       <h1 class="t-title t-title--main">${copy.title}</h1>
     </hgroup>
-    <article class="l-stack c-card c-card--consent">
-      <div class="t-formatted t-formatted--monospace">
-        ${asyncReplace(consentMessage)}
-      </div>
-    </article>
-    ${anchorInput.template}
-    <h2 class="c-card__label l-stack">${copy.allow_start}</h2>
-    <ul class="c-action-list">
-      <li class="c-action-list__item">
-        ${dappTemplate({
-          logoSrc: originDapp.logoSrc,
-          name: originDapp.name,
-          oneLinerAboveTitle: true,
-          oneLiner: copy.issued_by as string,
-        })}
-      </li>
-      <li class="c-action-list__item">
-        ${dappTemplate({
-          logoSrc: relyingDapp.logoSrc,
-          name: relyingDapp.name,
-          oneLinerAboveTitle: true,
-          oneLiner: copy.relying_party as string,
-        })}
-      </li>
-    </ul>
 
-    <div class="c-button-group">
-      <button
-        data-action="cancel"
-        class="c-button c-button--secondary"
-        @click="${() => onCancel()}"
-      >
-        ${copy.cancel}
-      </button>
+    <div class="c-card c-card--narrow c-card--warning l-stack">
+      <article class="c-card--consent">
+        <div class="t-formatted t-formatted--monospace">
+          ${asyncReplace(consentMessage)}
+        </div>
+      </article>
+      <div class="l-horizontal l-stack--small">
+        <div class="c-card__logo" aria-hidden="true">
+          <img
+            src=${relyingDapp.logoSrc}
+            alt=${relyingDapp.name}
+            loading="lazy"
+          />
+        </div>
+        <div class="l-vertical">
+          <div class="c-card__label">
+            <h3>${copy.issued_by}</h3>
+          </div>
+          <h2 class="t-title">${relyingDapp.name}</h2>
+        </div>
+      </div>
+    </div>
+
+    <div class="c-separator l-stack">
+      <div class="c-separator__dot--tiny"></div>
+      <div class="c-separator__dot--small"></div>
+      <div class="c-separator__dot"></div>
+      <div class="c-separator__dot--small"></div>
+      <div class="c-separator__dot--tiny"></div>
+    </div>
+
+    <div class="c-card c-card--narrow l-stack">
+      <div class="l-horizontal">
+        <div class="c-card__logo" aria-hidden="true">
+          <img
+            src=${originDapp.logoSrc}
+            alt=${originDapp.name}
+            loading="lazy"
+          />
+        </div>
+        <div class="l-vertical">
+          <div class="c-card__label">
+            <h3>${copy.relying_party}</h3>
+          </div>
+          <h2 class="t-title">${originDapp.name}</h2>
+        </div>
+      </div>
+    </div>
+
+    <p class="t-paragraph--weak t-centered l-stack">${copy.note}</p>
+
+    <div class="c-button-group--stack">
       <button
         data-action="allow"
         class="c-button"
         @click="${() => anchorInput.submit()}"
       >
         ${copy.allow}
+      </button>
+      <button
+        data-action="cancel"
+        class="c-button c-button--secondary"
+        @click="${() => onCancel()}"
+      >
+        ${copy.cancel}
       </button>
     </div>
   `;

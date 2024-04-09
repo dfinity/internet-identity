@@ -181,13 +181,11 @@
   --rc-onFooter: var(--rc-light);
 
   --rc-card: var(--rc-background-transparent);
-  --rc-card-background: var(--vc-mist);
 
   --rc-card-backdrop: transparent;
   --rc-background-card--background: transparent;
 
-  --rc-card--inverted: var(--vc-snow);
-  --rc-card--inverted-background: var(--vc-raven);
+  --rc-card--highlight-background: var(--vc-light-grey);
 
   --rc-line: var(--vc-light-grey);
   --rc-line-interaction: var(--vc-brand-purple);
@@ -262,6 +260,7 @@
   --rs-inline-button-gap: calc(var(--vs-inline) * 1.5);
 
   --rs-stack-section: calc(var(--vs-stack) * 4);
+  --rs-stack-section--small: calc(var(--vs-stack) * 2);
   --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
   --rs-stack-section--tight: var(--vs-stack);
 
@@ -771,6 +770,12 @@ a:hover,
   gap: var(--rs-inline-grid-gap);
 }
 
+.l-vertical {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .l-footer {
   position: absolute;
 
@@ -1036,45 +1041,15 @@ a:hover,
   --bezel-x: var(--rs-card-bezel-narrow);
   --bezel-y: var(--rs-card-bezel-narrow);
 
-  background-color: var(--rc-card--inverted-background);
-  color: var(--rc-card--inverted);
-
   max-height: 60vh;
 
   overflow-y: auto;
 
-  /* if the context is scrollable it will show with some fancy shadow in the direction of the scroll */
-  background:
-      /* Shadow Cover TOP */ linear-gradient(
-        var(--rc-card--inverted-background) 30%,
-        rgba(0, 0, 0, 0)
-      )
-      center top,
-    /* Shadow Cover BOTTOM */
-      linear-gradient(rgba(0, 0, 0, 0), var(--rc-card--inverted-background) 70%)
-      center bottom,
-    /* Shadow TOP */
-      radial-gradient(
-        farthest-side at 50% 0,
-        rgba(255, 255, 255, 0.6),
-        rgba(255, 255, 255, 0)
-      )
-      center top,
-    /* Shadow BOTTOM */
-      radial-gradient(
-        farthest-side at 50% 100%,
-        rgba(255, 255, 255, 0.6),
-        rgba(255, 255, 255, 0)
-      )
-      center bottom;
+  background-color: var(--rc-card--highlight-background);
 
-  background-color: var(--rc-card--inverted-background);
+  padding: var(--bezel-y) var(--bezel-x);
 
-  background-repeat: no-repeat;
-  background-size: 100% 2em, 100% 2em, 100% 1em, 100% 1em;
-  background-attachment: local, local, scroll, scroll;
-
-  border: var(--rs-line--thick) solid var(--rc-interaction-text);
+  border-radius: var(--rs-card-border-radius);
 }
 
 /* Card label/titles */
@@ -1106,6 +1081,22 @@ by all browsers (FF is missing) */
 
 .c-card__icon {
   height: 2rem;
+}
+
+.c-card__logo {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-card__logo img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .c-card__close {
@@ -1656,6 +1647,13 @@ by all browsers (FF is missing) */
 .c-button-group {
   display: flex;
   gap: var(--rs-inline-button-gap);
+  margin-top: var(--rs-button-stack);
+}
+
+.c-button-group--stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-list-gutter);
   margin-top: var(--rs-button-stack);
 }
 
@@ -3053,6 +3051,34 @@ input[type="checkbox"] {
   }
 }
 
+.c-separator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vs-stack);
+}
+
+.c-separator__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
+.c-separator__dot--small {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
+.c-separator__dot--tiny {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
 /*
  * stack helper classes
  *
@@ -3066,6 +3092,10 @@ input[type="checkbox"] {
 
 .l-stack--spacious {
   margin-top: var(--rs-stack-section--spacious);
+}
+
+.l-stack--small {
+  margin-top: var(--rs-stack-section--small);
 }
 
 .l-stack--tight {
