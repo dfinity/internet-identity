@@ -60,6 +60,14 @@ const allowCredentialsTemplate = ({
     onSubmit: (userNumber) => onAllow(userNumber),
   });
 
+  const presentCredential = () => {
+    if (userNumber === undefined) {
+      anchorInput.submit();
+      return;
+    }
+    onAllow(userNumber);
+  };
+
   const knownDapps = getDapps();
   const consentMessage = new Chan<TemplateElement>(html`${consentMessage_}`);
 
@@ -105,6 +113,8 @@ const allowCredentialsTemplate = ({
       </div>
     </div>
 
+    ${userNumber === undefined ? anchorInput.template : ""}
+
     <div class="c-separator l-stack">
       <div class="c-separator__dot--tiny"></div>
       <div class="c-separator__dot--small"></div>
@@ -137,7 +147,7 @@ const allowCredentialsTemplate = ({
       <button
         data-action="allow"
         class="c-button"
-        @click="${() => anchorInput.submit()}"
+        @click="${presentCredential}"
       >
         ${copy.allow}
       </button>
