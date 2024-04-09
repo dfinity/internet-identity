@@ -153,7 +153,7 @@ const allowCredentialsTemplate = ({
 
   return mainWindow({
     showFooter: false,
-    showLogo: false,
+    showLogo: true,
     slot,
   });
 };
