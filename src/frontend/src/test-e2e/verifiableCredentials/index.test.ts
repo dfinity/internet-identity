@@ -5,6 +5,7 @@ import {
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
+  KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
 } from "$src/test-e2e/constants";
@@ -112,6 +113,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             authConfig,
             relyingParty,
             issuer,
+            knownDapps: [KNOWN_TEST_DAPP],
           });
 
           // Perform a basic check on the alias

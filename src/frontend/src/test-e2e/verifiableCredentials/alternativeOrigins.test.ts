@@ -5,6 +5,7 @@ import {
   II_URL,
   ISSUER_APP_URL,
   ISSUER_CUSTOM_ORIGIN_NICE_URL,
+  KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
   TEST_APP_NICE_URL,
 } from "$src/test-e2e/constants";
@@ -90,6 +91,7 @@ test("Can issue credential with alternative RP derivation origin", async () => {
       authConfig,
       relyingParty: TEST_APP_NICE_URL,
       issuer: ISSUER_APP_URL,
+      knownDapps: [KNOWN_TEST_DAPP],
     });
 
     const aliasAlt = JSON.parse(aliasAlt_);
@@ -129,6 +131,7 @@ test("Cannot issue credential with bad alternative RP derivation origin", async 
       authConfig,
       relyingParty: TEST_APP_NICE_URL,
       issuer: ISSUER_APP_URL,
+      knownDapps: [KNOWN_TEST_DAPP],
     });
 
     expect(result.result).toBe("aborted");
@@ -196,6 +199,7 @@ test("Can issue credential with alternative issuer derivation origin", async () 
       authConfig,
       relyingParty,
       issuer,
+      knownDapps: [KNOWN_TEST_DAPP],
     });
   });
 }, 300_000);
