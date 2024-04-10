@@ -110,6 +110,8 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             vcTestApp,
             browser,
             authConfig,
+            relyingParty,
+            issuer,
           });
 
           // Perform a basic check on the alias

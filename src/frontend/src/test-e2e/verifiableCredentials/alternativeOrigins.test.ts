@@ -62,6 +62,8 @@ test("Can issue credential with alternative RP derivation origin", async () => {
       vcTestApp,
       browser,
       authConfig,
+      relyingParty: TEST_APP_CANONICAL_URL,
+      issuer: ISSUER_APP_URL,
     });
     const alias = JSON.parse(alias_);
 
@@ -86,6 +88,8 @@ test("Can issue credential with alternative RP derivation origin", async () => {
       vcTestApp: vcTestAppAlt,
       browser,
       authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      issuer: ISSUER_APP_URL,
     });
 
     const aliasAlt = JSON.parse(aliasAlt_);
@@ -188,6 +192,8 @@ test("Can issue credential with alternative issuer derivation origin", async () 
       vcTestApp,
       browser,
       authConfig,
+      relyingParty,
+      issuer,
     });
   });
 }, 300_000);
