@@ -113,6 +113,8 @@ export const getVCPresentation = async (args: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
+  relyingParty: string;
+  issuer: string;
 }): Promise<{ alias: string; credential: string }> => {
   const result = await getVCPresentation_(args);
   if (result.result === "aborted") {
@@ -129,10 +131,14 @@ export const getVCPresentation_ = async ({
   vcTestApp,
   browser,
   authConfig: { setupAuth, finalizeAuth },
+  relyingParty,
+  issuer,
 }: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
+  relyingParty: string;
+  issuer: string;
 }): Promise<
   | { result: "ok"; alias: string; credential: string }
   | { result: "aborted"; reason: string }
@@ -148,6 +154,8 @@ export const getVCPresentation_ = async ({
     return { result: "aborted", reason };
   }
 
+  expect(await vcAllow.getIssuer()).toBe(issuer);
+  expect(await vcAllow.getRelyingParty()).toBe(relyingParty);
   expect(await vcAllow.hasUserNumberInput()).toBe(false);
 
   await vcAllow.allow();
