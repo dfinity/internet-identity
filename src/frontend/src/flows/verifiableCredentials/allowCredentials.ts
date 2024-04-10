@@ -99,8 +99,8 @@ const allowCredentialsTemplate = ({
       <div class="l-horizontal l-stack--small">
         <div class="c-card__logo" aria-hidden="true">
           <img
-            src=${relyingDapp.logoSrc}
-            alt=${relyingDapp.name}
+            src=${originDapp.logoSrc}
+            alt=${originDapp.name}
             loading="lazy"
           />
         </div>
@@ -108,7 +108,7 @@ const allowCredentialsTemplate = ({
           <div class="c-card__label">
             <h3>${copy.issued_by}</h3>
           </div>
-          <h2 class="t-title">${relyingDapp.name}</h2>
+          <h2 class="t-title">${originDapp.name}</h2>
         </div>
       </div>
     </div>
@@ -127,8 +127,8 @@ const allowCredentialsTemplate = ({
       <div class="l-horizontal">
         <div class="c-card__logo" aria-hidden="true">
           <img
-            src=${originDapp.logoSrc}
-            alt=${originDapp.name}
+            src=${relyingDapp.logoSrc}
+            alt=${relyingDapp.name}
             loading="lazy"
           />
         </div>
@@ -136,7 +136,7 @@ const allowCredentialsTemplate = ({
           <div class="c-card__label">
             <h3>${copy.relying_party}</h3>
           </div>
-          <h2 class="t-title">${originDapp.name}</h2>
+          <h2 class="t-title">${relyingDapp.name}</h2>
         </div>
       </div>
     </div>
