@@ -128,7 +128,7 @@ export const getVCPresentation = async (args: {
 export const getVCPresentation_ = async ({
   vcTestApp,
   browser,
-  authConfig: { setupAuth, finalizeAuth, userNumber },
+  authConfig: { setupAuth, finalizeAuth },
 }: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
@@ -148,12 +148,7 @@ export const getVCPresentation_ = async ({
     return { result: "aborted", reason };
   }
 
-  if (userNumber === undefined) {
-    const enteredUserNumber = "123456";
-    await vcAllow.typeUserNumber(enteredUserNumber);
-    const userNumber_ = await vcAllow.getUserNumber();
-    expect(userNumber_).toBe(enteredUserNumber);
-  }
+  expect(await vcAllow.hasUserNumberInput()).toBe(false);
 
   await vcAllow.allow();
 
