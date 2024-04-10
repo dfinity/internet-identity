@@ -127,6 +127,8 @@ test("Cannot issue credential with bad alternative RP derivation origin", async 
       vcTestApp: vcTestAppAlt,
       browser,
       authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      issuer: ISSUER_APP_URL,
     });
 
     expect(result.result).toBe("aborted");
