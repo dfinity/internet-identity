@@ -35,12 +35,6 @@
     "logo": "trax_logo.webp"
   },
   {
-    "name": "Dmail",
-    "oneLiner": "Web3 Decentralized Email Client",
-    "website": "https://dmail.ai/",
-    "logo": "dmail_logo.webp"
-  },
-  {
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
     "logo": "icdex_logo.webp"
@@ -498,5 +492,11 @@
     "oneLiner": "A web3 social network where people find more meaningful connections.",
     "website": "https://allkinds.xyz/",
     "logo": "allkinds_logo.svg"
+  },
+  {
+    "name": "Dmail Network",
+    "oneLiner": "AI-powered decentralized messaging infrastructure.",
+    "website": "https://dmail.ai",
+    "logo": "dmail-network_logo.png"
   }
 ]
