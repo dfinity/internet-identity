@@ -481,6 +481,8 @@ jobs:
           until [ -f ~/npm-ci-status ]; do sleep 1; done
           exit $(cat ~/npm-ci-status)
 
+      - name: Build sig-verifier
+        run: npm run --workspace ./src/sig-verifier-js build
       - name: Run sig-verifier tests
         run: npm run --workspace ./src/sig-verifier-js test
 
