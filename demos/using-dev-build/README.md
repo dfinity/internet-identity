@@ -138,6 +138,7 @@ _If you actually use the webapp, make sure that the "Internet Identity URL" fiel
 Run `npm run dev` to build the app and serve it on `localhost:5173` with hot reload on code changes, ideal for hacking on the webapp.
 
 ## Running Tests
+
 Run `npm run test` to run browser tests against the `internet_identity` canister.
 
 ## More Information
