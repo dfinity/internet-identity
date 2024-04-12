@@ -108,7 +108,7 @@ const allowCredentialsTemplate = ({
           <div class="c-card__label">
             <h3>${copy.issued_by}</h3>
           </div>
-          <h2 class="t-title">${originDapp.name}</h2>
+          <h2 class="t-title" data-role="issuer">${originDapp.name}</h2>
         </div>
       </div>
     </div>
@@ -136,7 +136,7 @@ const allowCredentialsTemplate = ({
           <div class="c-card__label">
             <h3>${copy.relying_party}</h3>
           </div>
-          <h2 class="t-title">${relyingDapp.name}</h2>
+          <h2 class="t-title" data-role="relying-party">${relyingDapp.name}</h2>
         </div>
       </div>
     </div>

@@ -618,6 +618,14 @@ export class VcAllowView extends View {
   async hasUserNumberInput(): Promise<boolean> {
     return await this.browser.$('[data-role="anchor-input"]').isExisting();
   }
+
+  async getRelyingParty(): Promise<string> {
+    return await this.browser.$('[data-role="relying-party"]').getText();
+  }
+
+  async getIssuer(): Promise<string> {
+    return await this.browser.$('[data-role="issuer"]').getText();
+  }
 }
 
 export class IssuerAppView extends View {
