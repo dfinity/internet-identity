@@ -9,8 +9,7 @@
     "test": "npm run opts -- ./test.ts",
     "format": "prettier --write --plugin-search-dir=. .",
     "build": "tsc --noEmit && vite build",
-    "dev": "vite",
-    "proxy": "npm run opts -- ./test.ts --no-run"
+    "dev": "vite"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
