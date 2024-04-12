@@ -9,17 +9,17 @@
     "test": "npm run opts -- ./test.ts",
     "format": "prettier --write --plugin-search-dir=. .",
     "build": "tsc --noEmit && vite build",
-    "dev": "vite",
-    "proxy": "npm run opts -- ./test.ts --no-run"
+    "dev": "vite"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@wdio/globals": "8.32.3",
     "@wdio/cli": "8.32.3",
     "@wdio/local-runner": "8.32.3",
     "@wdio/mocha-framework": "8.32.3",
     "@wdio/spec-reporter": "^8.21.0",
     "prettier": "^2.7.1",
     "prettier-plugin-organize-imports": "^3.2.2",
-    "proxy": "git+https://github.com/nmattia/dfx-proxy",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4",
     "vite": "^4.5.3"
