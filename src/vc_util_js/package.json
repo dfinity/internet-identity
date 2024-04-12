@@ -15,8 +15,7 @@
     }
   },
   "scripts": {
-    "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json",
-    "postinstall": "npm run build"
+    "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json"
   },
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",
