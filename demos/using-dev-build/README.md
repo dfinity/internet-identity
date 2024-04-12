@@ -138,7 +138,6 @@ _If you actually use the webapp, make sure that the "Internet Identity URL" fiel
 Figuring the canister IDs, and using the `canisterId=...` query parameter is all a bit cumbersome. Here are some commands you might like:
 
 - `npm run dev`: Build the app and serve it on `localhost:5173` with hot reload on code changes, ideal for hacking on the webapp.
-- `npm run proxy`: Start a proxy that serves Internet Identity on `localhost:8086` and the webapp on `localhost:8087` for easy access.
-- `npm run test`: Start the proxy and run browser tests against the `internet_identity` canister.
+- `npm run test`: Run browser tests against the `internet_identity` canister.
 
-For more information, check the [`dfx.json`](./dfx.json) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [SDK documentation](https://smartcontracts.org/docs/quickstart/quickstart-intro.html). Not bored yet? Check out the [Internet Computer Specification](https://smartcontracts.org/docs/introduction/welcome.html) and the [Internet Identity Specification](../../docs/internet-identity-spec.adoc).
+For more information, check the [`dfx.json`](./dfx.json) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [Internet Computer documentation](https://internetcomputer.org/).

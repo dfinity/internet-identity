@@ -1,3 +1,5 @@
+import { browser } from "@wdio/globals";
+
 describe("authentication", () => {
   it("works without webauthn", async () => {
     await browser.url("/");
