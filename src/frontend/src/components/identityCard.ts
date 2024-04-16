@@ -9,7 +9,7 @@ export const identityCard = ({
   identityBackground: PreLoadImage;
 }): TemplateResult => {
   return html` <div class="c-input--id__wrap">
-    <img src=${identityBackground.img.src} class="c-input--id__art" />
+    <img src=${identityBackground.getSrc()} class="c-input--id__art" />
     <h2 class="c-input--id__caption">Internet Identity:</h2>
     <output
       class="c-input--id__value"
