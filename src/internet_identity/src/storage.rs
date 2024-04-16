@@ -234,7 +234,7 @@ impl<M: Memory + Clone> Storage<M> {
         // XX: Clean-up after incident
         let archive_buffer_memory = RestrictedMemory::new(
             memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
-            0..(10 * BUCKET_SIZE_IN_PAGES as u64),
+            0..(1_000 * BUCKET_SIZE_IN_PAGES as u64),
         );
         let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
         Self {
