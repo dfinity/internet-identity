@@ -1,9 +1,6 @@
+import identityBackground from "$src/assets/identityCardBackground.png";
 import { checkmarkIcon, copyIcon } from "$src/components/icons";
-import {
-  IdentityBackground,
-  identityCard,
-  loadIdentityBackground,
-} from "$src/components/identityCard";
+import { identityCard } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import {
@@ -26,7 +23,7 @@ export const displayUserNumberTemplate = ({
 }: {
   onContinue: () => void;
   userNumber: bigint;
-  identityBackground: IdentityBackground;
+  identityBackground: string;
   stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
   /* put the page into view */
@@ -119,7 +116,6 @@ export const displayUserNumberWarmup = (): OmitParams<
   typeof displayUserNumber,
   "identityBackground"
 > => {
-  const identityBackground = loadIdentityBackground();
   return async (opts) => {
     await displayUserNumber({ ...opts, identityBackground });
   };
@@ -132,7 +128,7 @@ export const displayUserNumber = ({
   marketingIntroSlot,
 }: {
   userNumber: bigint;
-  identityBackground: IdentityBackground;
+  identityBackground: string;
   stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
 }): Promise<void> => {

@@ -5,13 +5,13 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Display User Number" pageName="displayUserNumber">
   <script>
     import { toast } from "$src/components/toast";
-    import { identityBackground } from "../backgrounds";
+    import identityBackground from "$src/assets/identityCardBackground.png";
     import { userNumber } from "../constants";
     import { displayUserNumberPage } from "$src/flows/register/finish";
     import { registerStepper } from "$src/flows/register/stepper";
 
     displayUserNumberPage({
-      identityBackground,
+      identityBackground: identityBackground.src,
       userNumber,
       onContinue: () => toast.info("done"),
       stepper: registerStepper({ current: "finish" }),

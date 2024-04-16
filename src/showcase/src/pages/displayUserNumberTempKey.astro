@@ -5,7 +5,7 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Display User Number Temp Key" pageName="displayUserNumberTempKey">
   <script>
     import { toast } from "$src/components/toast";
-    import { identityBackground } from "../backgrounds";
+    import identityBackground from "$src/assets/identityCardBackground.png";
     import { userNumber } from "../constants";
     import { i18n } from "../i18n";
     import { displayUserNumberPage } from "$src/flows/register/finish";
@@ -13,7 +13,7 @@ import Screen from "../layouts/Screen.astro";
     import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
 
     displayUserNumberPage({
-      identityBackground,
+      identityBackground: identityBackground.src,
       userNumber,
       onContinue: () => toast.info("done"),
       stepper: registerStepper({ current: "finish" }),
