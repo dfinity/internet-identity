@@ -38,7 +38,7 @@ fn should_set_last_usage_on_add() -> Result<(), CallError> {
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::add(
         &env,
@@ -85,7 +85,7 @@ fn should_set_last_usage_on_remove() -> Result<(), CallError> {
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::remove(
         &env,
@@ -129,13 +129,13 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp_1 = time(&env);
+    let expected_timestamp_1 = time(&env) + 1; // +1 to account for the execution of the next call
 
     // use the device_to_be_updated to create a last usage timestamp
     api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp_2 = time(&env);
+    let expected_timestamp_2 = time(&env) + 1; // +1 to account for the execution of the next call
 
     device_to_be_updated.alias = "changed value".to_string();
 
@@ -191,7 +191,7 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::replace(
         &env,
@@ -233,7 +233,7 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::prepare_delegation(
         &env,
@@ -270,7 +270,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
 
@@ -290,7 +290,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
         };
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::verify_tentative_device(
         &env,
@@ -323,7 +323,7 @@ fn should_update_last_usage_on_exit_device_registration_mode() -> Result<(), Cal
     )?;
 
     env.advance_time(Duration::from_secs(1));
-    let expected_timestamp = time(&env);
+    let expected_timestamp = time(&env) + 1; // +1 to account for the execution of the next call
 
     api::exit_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
 

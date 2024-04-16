@@ -10,8 +10,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_canister, time, II_WASM};
 use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, AuthnMethodRegistration, DeviceData, DeviceWithUsage, IdentityInfoError,
-    MetadataEntry,
+    AuthnMethodData, DeviceData, DeviceWithUsage, IdentityInfoError, MetadataEntry,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -89,12 +88,19 @@ fn should_provide_authn_registration() -> Result<(), CallError> {
     )?
     .expect("identity info failed");
 
+    let authn_method_registration = identity_info
+        .authn_method_registration
+        .expect("no authn method registration");
     assert_eq!(
-        identity_info.authn_method_registration,
-        Some(AuthnMethodRegistration {
-            expiration: time(&env) + AUTHN_METHOD_REGISTRATION_TIMEOUT,
-            authn_method: Some(AuthnMethodData::from(device2))
-        })
+        authn_method_registration.authn_method,
+        Some(AuthnMethodData::from(device2))
+    );
+    assert!(
+        authn_method_registration
+            .expiration
+            .abs_diff(time(&env) + AUTHN_METHOD_REGISTRATION_TIMEOUT)
+            < Duration::from_secs(1).as_nanos() as u64,
+        "Expiration deviates from expected timestamp by more than one second"
     );
     Ok(())
 }

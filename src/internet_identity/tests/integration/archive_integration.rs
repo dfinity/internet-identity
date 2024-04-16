@@ -202,11 +202,7 @@ mod pull_entries_tests {
         )?;
 
         ii_api::remove(&env, ii_canister, principal_1(), anchor, &pubkey)?;
-        let timestamp = env
-            .time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let timestamp = time(&env);
 
         // the archive polls for entries once per second
         env.advance_time(Duration::from_secs(2));
@@ -247,12 +243,7 @@ mod pull_entries_tests {
         );
         // deploy the actual archive wasm
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-
-        let timestamp = env
-            .time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let timestamp = time(&env);
 
         // have the archive fetch the (restored) buffered entries
         env.advance_time(Duration::from_secs(2));
@@ -285,9 +276,9 @@ mod pull_entries_tests {
             caller: principal_1(),
             sequence_number: 0,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.first().unwrap().as_ref().unwrap(),
-            &register_entry
+            &register_entry,
         );
 
         let add_entry = Entry {
@@ -299,9 +290,9 @@ mod pull_entries_tests {
             caller: principal_1(),
             sequence_number: 1,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.get(1).unwrap().as_ref().unwrap(),
-            &add_entry
+            &add_entry,
         );
 
         let update_entry = Entry {
@@ -322,9 +313,9 @@ mod pull_entries_tests {
             caller: principal_1(),
             sequence_number: 2,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.get(2).unwrap().as_ref().unwrap(),
-            &update_entry
+            &update_entry,
         );
 
         let replace_entry = Entry {
@@ -337,9 +328,9 @@ mod pull_entries_tests {
             caller: principal_1(),
             sequence_number: 3,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.get(3).unwrap().as_ref().unwrap(),
-            &replace_entry
+            &replace_entry,
         );
 
         let delete_entry = Entry {
@@ -349,11 +340,25 @@ mod pull_entries_tests {
             caller: principal_1(),
             sequence_number: 4,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.get(4).unwrap().as_ref().unwrap(),
-            &delete_entry
+            &delete_entry,
         );
         Ok(())
+    }
+
+    fn assert_eq_with_lenient_timestamp(actual: &Entry, expected: &Entry) {
+        assert_eq!(actual.operation, expected.operation);
+        assert_eq!(actual.anchor, expected.anchor);
+        assert_eq!(actual.caller, expected.caller);
+        assert_eq!(actual.sequence_number, expected.sequence_number);
+        assert!(
+            actual.timestamp.abs_diff(expected.timestamp)
+                < Duration::from_secs(1).as_nanos() as u64,
+            "Timestamp difference is bigger than 1 second! actual: {}, expected: {}",
+            actual.timestamp,
+            expected.timestamp
+        );
     }
 
     #[test]
@@ -394,9 +399,9 @@ mod pull_entries_tests {
             caller: device.principal(),
             sequence_number: 0,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.first().unwrap().as_ref().unwrap(),
-            &expected_register_entry
+            &expected_register_entry,
         );
         Ok(())
     }
@@ -406,11 +411,7 @@ mod pull_entries_tests {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "key";
-        let timestamp = env
-            .time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let timestamp = time(&env);
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
         assert!(env.canister_exists(archive_canister));
@@ -458,9 +459,9 @@ mod pull_entries_tests {
             caller: device.principal(),
             sequence_number: 1,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.get(1).unwrap().as_ref().unwrap(),
-            &expected_update_entry
+            &expected_update_entry,
         );
         Ok(())
     }
@@ -513,9 +514,9 @@ mod pull_entries_tests {
             caller: device.principal(),
             sequence_number: 0,
         };
-        assert_eq!(
+        assert_eq_with_lenient_timestamp(
             entries.entries.first().unwrap().as_ref().unwrap(),
-            &expected_metadata_entry
+            &expected_metadata_entry,
         );
         Ok(())
     }
@@ -564,16 +565,13 @@ mod pull_entries_tests {
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(status.call_info.call_errors.is_empty());
-        assert_eq!(
-            status.call_info.last_successful_fetch,
-            Some(FetchInfo {
-                timestamp: env
-                    .time()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64,
-                number_of_entries: 0,
-            })
+        let fetch_info = status
+            .call_info
+            .last_successful_fetch
+            .expect("no fetch info");
+        assert_eq!(fetch_info.number_of_entries, 0);
+        assert!(
+            fetch_info.timestamp.abs_diff(time(&env)) < Duration::from_secs(1).as_nanos() as u64
         );
         Ok(())
     }
@@ -596,16 +594,13 @@ mod pull_entries_tests {
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(status.call_info.call_errors.is_empty());
-        assert_eq!(
-            status.call_info.last_successful_fetch,
-            Some(FetchInfo {
-                timestamp: env
-                    .time()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64,
-                number_of_entries: 3,
-            })
+        let fetch_info = status
+            .call_info
+            .last_successful_fetch
+            .expect("no fetch info");
+        assert_eq!(fetch_info.number_of_entries, 3);
+        assert!(
+            fetch_info.timestamp.abs_diff(time(&env)) < Duration::from_secs(1).as_nanos() as u64
         );
 
         assert_metric(
@@ -750,20 +745,25 @@ mod pull_entries_tests {
         assert_eq!(status.call_info.last_successful_fetch, None);
 
         let expected_error = CallErrorInfo {
-            time: env
-                .time()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64,
+            time: time(&env),
             canister: ii_canister,
             method: "fetch_entries".to_string(),
             argument: ByteBuf::from(candid::encode_one(()).unwrap()),
             rejection_code: 5,
             message: format!("Canister {} is stopped", ii_canister.to_text()),
         };
-        assert_eq!(
-            status.call_info.call_errors.first().unwrap(),
-            &expected_error
+        let actual_error = status.call_info.call_errors.first().unwrap();
+        assert_eq!(actual_error.canister, expected_error.canister);
+        assert_eq!(actual_error.method, expected_error.method);
+        assert_eq!(actual_error.argument, expected_error.argument);
+        assert_eq!(actual_error.rejection_code, expected_error.rejection_code);
+        assert_eq!(actual_error.message, expected_error.message);
+        assert!(
+            actual_error.time.abs_diff(expected_error.time)
+                < Duration::from_secs(1).as_nanos() as u64,
+            "Timestamp difference is bigger than 1 second! actual: {}, expected: {}",
+            actual_error.time,
+            expected_error.time
         );
         Ok(())
     }
