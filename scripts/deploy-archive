@@ -93,4 +93,4 @@ then
     network_arg+=( "--network" "$network")
 fi
 
-dfx canister "${network_arg[@]}" call "$canister_id" deploy_archive --argument-file <(echo "(blob \"$(hexdump -ve '1/1 "%.2x"' "$wasm")\")")
+dfx canister "${network_arg[@]}" call "$canister_id" deploy_archive --argument-file <(echo "(blob \"$(hexdump -ve '1/1 "%.2x"' "$wasm" | sed 's/../\\&/g')\")")
