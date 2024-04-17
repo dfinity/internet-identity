@@ -2,16 +2,13 @@ import {
   DeviceData,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
+import identityCardBackground from "$src/assets/identityCardBackground.png";
 import {
   AuthnTemplates,
   authenticateBox,
 } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
-import {
-  IdentityBackground,
-  identityCard,
-  loadIdentityBackground,
-} from "$src/components/identityCard";
+import { identityCard } from "$src/components/identityCard";
 import { withLoader } from "$src/components/loader";
 import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
@@ -31,6 +28,7 @@ import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
+import { PreLoadImage } from "$src/utils/preLoadImage";
 import {
   isProtected,
   isRecoveryDevice,
@@ -104,7 +102,7 @@ export const authFlowManage = async (connection: Connection) => {
   const i18n = new I18n();
   const dapps = shuffleArray(getDapps());
 
-  const identityBackground = loadIdentityBackground();
+  const identityBackground = new PreLoadImage(identityCardBackground);
   // Go through the login flow, potentially creating an anchor.
   const {
     userNumber,
@@ -164,7 +162,7 @@ const displayManageTemplate = ({
   addRecoveryKey: () => void;
   dapps: KnownDapp[];
   exploreDapps: () => void;
-  identityBackground: IdentityBackground;
+  identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
@@ -211,7 +209,7 @@ const anchorSection = ({
   identityBackground,
 }: {
   userNumber: bigint;
-  identityBackground: IdentityBackground;
+  identityBackground: PreLoadImage;
 }): TemplateResult => html`
   <aside class="l-stack">
     <div
@@ -229,7 +227,7 @@ export const renderManageWarmup = (): OmitParams<
   typeof renderManage,
   "identityBackground"
 > => {
-  const identityBackground = loadIdentityBackground();
+  const identityBackground = new PreLoadImage(identityCardBackground);
   return async (opts) => {
     return await renderManage({ ...opts, identityBackground });
   };
@@ -243,7 +241,7 @@ export const renderManage = async ({
 }: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
-  identityBackground: IdentityBackground;
+  identityBackground: PreLoadImage;
 }): Promise<never> => {
   let connection = origConnection;
 
@@ -298,7 +296,7 @@ export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceData[],
-  identityBackground: IdentityBackground
+  identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)

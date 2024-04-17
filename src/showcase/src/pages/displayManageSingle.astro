@@ -6,9 +6,12 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$src/components/toast";
     import { userNumber } from "../constants";
-    import { identityBackground } from "../backgrounds";
     import { dapps } from "../constants";
     import { displayManagePage } from "$src/flows/manage";
+    import identityCardBackground from "$src/assets/identityCardBackground.png";
+    import { PreLoadImage } from "$src/utils/preLoadImage";
+
+    const identityBackground = new PreLoadImage(identityCardBackground.src);
 
     displayManagePage({
       identityBackground,
