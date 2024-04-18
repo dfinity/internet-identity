@@ -347,6 +347,11 @@ mod pull_entries_tests {
         Ok(())
     }
 
+    /// Check that the archived entry is as expected with up to 1 second leniency in the timestamp.
+    /// The state machine increases the time every execution round, so the timestamp of the entry
+    /// is brittle to predict exactly.
+    /// For the functionality to be considered correct, the timestamp should be close to the expected
+    /// timestamp, but not to nanosecond precision.
     fn assert_eq_with_lenient_timestamp(actual: &Entry, expected: &Entry) {
         assert_eq!(actual.operation, expected.operation);
         assert_eq!(actual.anchor, expected.anchor);
