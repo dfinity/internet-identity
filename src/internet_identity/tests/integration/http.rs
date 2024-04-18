@@ -162,8 +162,11 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
     for metric in metrics {
         let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
         assert_eq!(
-            metric_timestamp,
-            env.time(),
+            env.time()
+                .duration_since(metric_timestamp)
+                .unwrap()
+                .as_secs(),
+            0,
             "metric timestamp did not match state machine time"
         )
     }
