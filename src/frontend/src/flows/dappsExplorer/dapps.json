@@ -516,5 +516,17 @@
     "oneLiner": "ICTO is a one-stop platform automating token operations on the Internet Computer.",
     "website": "https://icto.app",
     "logo": "icto_logo.png"
+  },
+  {
+    "name": "OptiGames",
+    "oneLiner": "Flexible framework for fully on-chain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
+    "website": "https://tpxio-7yaaa-aaaak-qdbaa-cai.icp0.io/",
+    "logo": "Optigames_logo.svg"
+  },
+  {
+    "name": "VFans",
+    "oneLiner": "A decentralized content platform for publishing video/articles and subscribing through mobile payments.",
+    "website": "https://www.vfans.org/",
+    "logo": "vfans_logo.png"
   }
 ]
