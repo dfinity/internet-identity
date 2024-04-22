@@ -83,6 +83,7 @@ function update() {
             | select(.usesInternetIdentity == true) # ensure the dapp actually uses II
             | select(.name != "Internet Identity") # skip II itself
             | select(.logo != null) # only use dapps with logo
+            | select(.website != null) # only use dapps with website
             | .logo |= sub("^/" + $portal_logo_prefix + "/"; "") # swap the logo for our prefix
             | with_entries( # drop entries we do not care about to reduce size
                 select(

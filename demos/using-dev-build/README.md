@@ -103,7 +103,7 @@ A detailed description of what happens behind the scenes is available in the [cl
 
 ### Getting the Canister IDs
 
-Let's now use those canisters. Don't care about details? Skip to the [helpers](#helpers).
+Let's now use those canisters.
 
 In order to talk to those canisters (for instance to view the webapp in your browser) you need to figure the ID of each canister and then use an URL of the form `https://localhost:4943/?canisterId=<canister ID>` (where `4943` is the port used by `dfx` to proxy calls to the replica; that port is usually specified in the `dfx.json`). You can find the canister IDs in the output of the `dfx command`, or by checking `dfx`'s "internal" (read: non-documented) state:
 
@@ -133,12 +133,14 @@ _If you actually use the webapp, make sure that the "Internet Identity URL" fiel
 - Chrome, Firefox: `http://<canister ID of the internet_identity canister>.localhost:4943/`.
 - Safari: `http://localhost:4943/?canisterId=<canister ID of the internet_identity canister>`.
 
-## Helpers
+## Local Development
 
-Figuring the canister IDs, and using the `canisterId=...` query parameter is all a bit cumbersome. Here are some commands you might like:
+Run `npm run dev` to build the app and serve it on `localhost:5173` with hot reload on code changes, ideal for hacking on the webapp.
 
-- `npm run dev`: Build the app and serve it on `localhost:5173` with hot reload on code changes, ideal for hacking on the webapp.
-- `npm run proxy`: Start a proxy that serves Internet Identity on `localhost:8086` and the webapp on `localhost:8087` for easy access.
-- `npm run test`: Start the proxy and run browser tests against the `internet_identity` canister.
+## Running Tests
 
-For more information, check the [`dfx.json`](./dfx.json) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [SDK documentation](https://smartcontracts.org/docs/quickstart/quickstart-intro.html). Not bored yet? Check out the [Internet Computer Specification](https://smartcontracts.org/docs/introduction/welcome.html) and the [Internet Identity Specification](../../docs/internet-identity-spec.adoc).
+Run `npm run test` to run browser tests against the `internet_identity` canister.
+
+## More Information
+
+For more information, check the [`dfx.json`](./dfx.json) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [Internet Computer documentation](https://internetcomputer.org/).

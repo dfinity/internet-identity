@@ -615,13 +615,16 @@ export class VcAllowView extends View {
     await this.browser.$('[data-action="allow"]').click();
   }
 
-  async getUserNumber(): Promise<string> {
-    return await this.browser.$('[data-role="anchor-input"]').getValue();
+  async hasUserNumberInput(): Promise<boolean> {
+    return await this.browser.$('[data-role="anchor-input"]').isExisting();
   }
 
-  async typeUserNumber(userNumber: string): Promise<void> {
-    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
-    await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
+  async getRelyingParty(): Promise<string> {
+    return await this.browser.$('[data-role="relying-party"]').getText();
+  }
+
+  async getIssuer(): Promise<string> {
+    return await this.browser.$('[data-role="issuer"]').getText();
   }
 }
 

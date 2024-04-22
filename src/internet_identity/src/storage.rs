@@ -231,7 +231,11 @@ impl<M: Memory + Clone> Storage<M> {
         // A single archive entry takes on average 476 bytes of space.
         // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
         // Since the memory manager allocates memory in buckets of 128 pages, we use a full bucket here.
-        let archive_buffer_memory = single_bucket_memory(&memory_manager, ARCHIVE_BUFFER_MEMORY_ID);
+        // XX: Clean-up after incident
+        let archive_buffer_memory = RestrictedMemory::new(
+            memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
+            0..(1_000 * BUCKET_SIZE_IN_PAGES as u64),
+        );
         let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
         Self {
             header,
@@ -492,17 +496,6 @@ impl<M: Memory + Clone> Storage<M> {
             ),
         ])
     }
-}
-
-/// Creates a new virtual memory corresponding to the given ID that is limited to a single bucket.
-fn single_bucket_memory<M: Memory>(
-    memory_manager: &MemoryManager<RestrictedMemory<M>>,
-    memory_id: MemoryId,
-) -> NestedRestrictedMemory<M> {
-    RestrictedMemory::new(
-        memory_manager.get(memory_id),
-        0..BUCKET_SIZE_IN_PAGES as u64,
-    )
 }
 
 #[derive(Debug)]

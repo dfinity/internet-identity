@@ -8,7 +8,9 @@ use identity_core::common::{Timestamp, Url};
 use identity_core::convert::FromJson;
 use identity_credential::credential::{Credential, CredentialBuilder, Jwt, Subject};
 use identity_credential::error::Error as JwtVcError;
-use identity_credential::presentation::{Presentation, PresentationJwtClaims};
+use identity_credential::presentation::{
+    JwtPresentationOptions, Presentation, PresentationBuilder, PresentationJwtClaims,
+};
 use identity_credential::validator::JwtValidationError;
 use identity_jose::jwk::{Jwk, JwkParams, JwkParamsOct, JwkType};
 use identity_jose::jws::{
@@ -243,7 +245,7 @@ fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, 
 }
 
 /// Verifies the specified JWT presentation cryptographically, which should contain exactly
-/// two verifiable credentials (in the order specifed):
+/// two verifiable credentials (in the order specified):
 ///   1. An "Id alias" credential which links the effective subject of the VP to a temporary id_alias.
 ///      This credential should be signed by canister vc_flow_parties.ii_canister_id.
 ///   2. An actual credential requested by a user.  The subject of this credential is id_alias,
@@ -367,6 +369,26 @@ pub fn build_credential_jwt(params: CredentialParams) -> String {
         .build()
         .unwrap();
     credential.serialize_jwt().unwrap()
+}
+
+/// Builds from the given parameters a Verifiable Presentation as returned by II
+/// to the relying party during a successful VC flow. Specifically, the returned JWT
+///  * contains the two given VCs (`id_alias_vc_jws` and `requested_vc_jws`, in that order),
+///  * contains the specified `holder`, which should match the subject of `id_alias_vc_jws`,
+///  * does not contain a signature,
+///
+/// This function is not used by II directly (as the returned presentation is built by II-frontend),
+/// but it is useful for testing RPs that should validate the presentations obtained from II.
+///
+/// NOTE: The given VCs are treated as opaque strings, and are NOT validated for syntax or contents,
+/// i.e. the returned JWT can contain invalid information (if the parameters are invalid or inconsistent).
+/// See also `verify_ii_presentation_jwt_with_canister_ids` for validation conditions.
+pub fn build_ii_verifiable_presentation_jwt(
+    holder: Principal,
+    id_alias_vc_jws: String,
+    requested_vc_jws: String,
+) -> Result<String, String> {
+    construct_verifiable_presentation_jwt(holder, vec![id_alias_vc_jws, requested_vc_jws])
 }
 
 fn credential_spec_args_to_json(spec: &CredentialSpec) -> serde_json::Value {
@@ -613,6 +635,36 @@ pub fn get_canister_sig_pk_raw(
     Ok(pk_raw)
 }
 
+fn construct_verifiable_presentation_jwt(
+    holder: Principal,
+    vcs_jws: Vec<String>,
+) -> Result<String, String> {
+    let holder_url = Url::parse(did_for_principal(holder)).map_err(|_| "Invalid holder")?;
+    let mut builder = PresentationBuilder::new(holder_url, Default::default());
+    for vc in vcs_jws {
+        builder = builder.credential(Jwt::from(vc));
+    }
+    let presentation: Presentation<Jwt> = builder
+        .build()
+        .map_err(|_| "failed building presentation")?;
+    presentation_to_compact_jwt(&presentation)
+}
+
+fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<String, String> {
+    let mut header: JwsHeader = JwsHeader::new();
+    header.set_typ("JWT");
+    header.set_alg(JwsAlgorithm::NONE);
+    let vp_jwt = presentation
+        .serialize_jwt(&JwtPresentationOptions {
+            expiration_date: None,
+            issuance_date: None,
+            audience: None,
+        })
+        .map_err(|_| "failed serializing presentation")?;
+    let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
+        .map_err(|_| "internal error: JWS encoder failed")?;
+    Ok(encoder.into_jws(&[]))
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -620,7 +672,6 @@ mod tests {
     use assert_matches::assert_matches;
     use canister_sig_util::{extract_raw_root_pk_from_der, IC_ROOT_PK_DER_PREFIX};
     use identity_core::common::Url;
-    use identity_credential::presentation::{JwtPresentationOptions, PresentationBuilder};
     use std::collections::HashMap;
 
     const TEST_IC_ROOT_PK_B64URL: &str = "MIGCMB0GDSsGAQQBgtx8BQMBAgEGDCsGAQQBgtx8BQMCAQNhAK32VjilMFayIiyRuyRXsCdLypUZilrL2t_n_XIXjwab3qjZnpR52Ah6Job8gb88SxH-J1Vw1IHxaY951Giv4OV6zB4pj4tpeY2nqJG77Blwk-xfR1kJkj1Iv-1oQ9vtHw";
@@ -687,37 +738,6 @@ mod tests {
         let claims: JwtClaims<Value> =
             serde_json::from_slice(jws.claims()).expect("failed parsing JSON JWT claims");
         claims
-    }
-
-    pub(crate) fn create_verifiable_presentation_jwt_for_test(
-        holder: Principal,
-        vcs_jws: Vec<String>,
-    ) -> Result<String, String> {
-        let holder_url = Url::parse(did_for_principal(holder)).map_err(|_| "Invalid holder")?;
-        let mut builder = PresentationBuilder::new(holder_url, Default::default());
-        for vc in vcs_jws {
-            builder = builder.credential(Jwt::from(vc));
-        }
-        let presentation: Presentation<Jwt> = builder
-            .build()
-            .map_err(|_| "failed building presentation")?;
-        presentation_to_compact_jwt(&presentation)
-    }
-
-    fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<String, String> {
-        let mut header: JwsHeader = JwsHeader::new();
-        header.set_typ("JWT");
-        header.set_alg(JwsAlgorithm::NONE);
-        let vp_jwt = presentation
-            .serialize_jwt(&JwtPresentationOptions {
-                expiration_date: None,
-                issuance_date: None,
-                audience: None,
-            })
-            .map_err(|_| "failed serializing presentation")?;
-        let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
-            .map_err(|_| "internal error: JWS encoder failed")?;
-        Ok(encoder.into_jws(&[]))
     }
 
     #[test]
@@ -889,9 +909,10 @@ mod tests {
         let id_alias_vc_jws = "a dummy id_alias_vc_jws".to_string();
         let requested_vc_jws = "a dummy requested_vc_jws".to_string();
         let holder = dapp_principal();
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             holder,
-            vec![id_alias_vc_jws.clone(), requested_vc_jws.clone()],
+            id_alias_vc_jws.clone(),
+            requested_vc_jws.clone(),
         )
         .expect("vp-creation failed");
         let presentation: Presentation<Jwt> =
@@ -922,12 +943,10 @@ mod tests {
     fn should_verify_ii_presentation() {
         let id_alias = Principal::from_text(ID_ALIAS_FOR_VP).expect("wrong principal");
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let (alias_tuple_from_jws, _claims) = verify_ii_presentation_jwt_with_canister_ids(
@@ -945,12 +964,10 @@ mod tests {
     #[test]
     fn should_fail_verify_ii_presentation_if_expired() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -966,7 +983,7 @@ mod tests {
     #[test]
     fn should_fail_verify_ii_presentation_with_extra_vc() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = construct_verifiable_presentation_jwt(
             id_dapp,
             vec![
                 ID_ALIAS_VC_FOR_VP_JWS.to_string(),
@@ -988,7 +1005,7 @@ mod tests {
     #[test]
     fn should_fail_verify_ii_presentation_with_missing_vc() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = construct_verifiable_presentation_jwt(
             id_dapp,
             vec![ID_ALIAS_VC_FOR_VP_JWS.to_string()],
         )
@@ -1006,12 +1023,10 @@ mod tests {
     #[test]
     fn should_fail_verify_ii_presentation_with_wrong_effective_subject() {
         let wrong_subject = dapp_principal(); // does not match ID_ALIAS_VC_FOR_VP_JWS
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             wrong_subject,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1029,12 +1044,10 @@ mod tests {
         let id_dapp = dapp_principal(); // does match ID_ALIAS_CREDENTIAL_JWS
 
         // ID_ALIAS_CREDENTIAL_JWS does not match REQUESTED_VC_FOR_VP_JWS
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_CREDENTIAL_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_CREDENTIAL_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1053,9 +1066,10 @@ mod tests {
 
         let mut bad_id_alias_vc = ID_ALIAS_VC_FOR_VP_JWS.to_string();
         bad_id_alias_vc.insert(42, 'a');
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![bad_id_alias_vc, VERIFIED_ADULT_VC_FOR_VP_JWS.to_string()],
+            bad_id_alias_vc,
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1074,9 +1088,10 @@ mod tests {
 
         let mut bad_requested_vc = VERIFIED_ADULT_VC_FOR_VP_JWS.to_string();
         bad_requested_vc.insert(42, 'a');
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![ID_ALIAS_VC_FOR_VP_JWS.to_string(), bad_requested_vc],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            bad_requested_vc,
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1093,12 +1108,10 @@ mod tests {
     fn should_fail_verify_ii_presentation_with_wrong_ii_canister_id() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
 
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1118,12 +1131,10 @@ mod tests {
     fn should_fail_verify_ii_presentation_with_wrong_issuer_canister_id() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
 
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1144,12 +1155,10 @@ mod tests {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
 
         // Swap the order of the VCs
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-            ],
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp creation failed");
         let result = verify_ii_presentation_jwt_with_canister_ids(
@@ -1340,12 +1349,10 @@ mod tests {
     #[test]
     fn should_validate_ii_presentation_and_claims() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp-creation failed");
         validate_ii_presentation_and_claims(
@@ -1362,12 +1369,10 @@ mod tests {
     #[test]
     fn should_fail_validate_ii_presentation_and_claims_if_wrong_vc_flow_signers() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp-creation failed");
 
@@ -1418,12 +1423,10 @@ mod tests {
     fn should_fail_validate_ii_presentation_and_claims_if_wrong_effective_subject() {
         let id_alias = Principal::from_text(ID_ALIAS_FOR_VP).expect("wrong principal");
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp-creation failed");
         let result = validate_ii_presentation_and_claims(
@@ -1440,12 +1443,10 @@ mod tests {
     #[test]
     fn should_fail_validate_ii_presentation_and_claims_if_expired() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_ADULT_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp-creation failed");
         let result = validate_ii_presentation_and_claims(
@@ -1462,12 +1463,10 @@ mod tests {
     #[test]
     fn should_fail_validate_ii_presentation_and_claims_if_wrong_vcs() {
         let id_dapp = Principal::from_text(ID_RP_FOR_VP).expect("wrong principal");
-        let vp_jwt = create_verifiable_presentation_jwt_for_test(
+        let vp_jwt = build_ii_verifiable_presentation_jwt(
             id_dapp,
-            vec![
-                ID_ALIAS_VC_FOR_VP_JWS.to_string(),
-                VERIFIED_EMPLOYEE_VC_FOR_VP_JWS.to_string(),
-            ],
+            ID_ALIAS_VC_FOR_VP_JWS.to_string(),
+            VERIFIED_EMPLOYEE_VC_FOR_VP_JWS.to_string(),
         )
         .expect("vp-creation failed");
         let result = validate_ii_presentation_and_claims(

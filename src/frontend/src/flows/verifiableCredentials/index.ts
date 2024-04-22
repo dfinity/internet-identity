@@ -5,7 +5,7 @@ import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
 import { getAnchorByPrincipal } from "$src/storage";
-import { resolveIssuerCanisterId } from "$src/utils/canisterIdResolution";
+import { resolveCanisterId } from "$src/utils/canisterIdResolution";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
 import {
@@ -18,6 +18,7 @@ import {
   CredentialSpec,
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
@@ -69,7 +70,7 @@ const verifyCredentials = async ({
   connection,
   request: {
     credentialSubject: givenP_RP,
-    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId_ },
+    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId },
     credentialSpec,
     derivationOrigin: rpDerivationOrigin,
   },
@@ -77,7 +78,7 @@ const verifyCredentials = async ({
 }: { connection: Connection } & VerifyCredentialsArgs) => {
   // Look up the canister ID from the origin
   const lookedUp = await withLoader(() =>
-    resolveIssuerCanisterId({ origin: issuerOrigin })
+    resolveCanisterId({ origin: issuerOrigin })
   );
   if (lookedUp === "not_found") {
     return abortedCredentials({ reason: "no_canister_id" });
@@ -85,9 +86,8 @@ const verifyCredentials = async ({
   const issuerCanisterId = lookedUp.ok;
 
   // If the RP provided a canister ID, check that it matches what we got
-  if (nonNullish(expectedIssuerCanisterId_)) {
-    const expectedCanisterId = expectedIssuerCanisterId_?.toText();
-    if (expectedCanisterId !== issuerCanisterId) {
+  if (nonNullish(expectedIssuerCanisterId)) {
+    if (expectedIssuerCanisterId.compareTo(issuerCanisterId) !== "eq") {
       return abortedCredentials({ reason: "bad_canister_id" });
     }
   }
@@ -95,7 +95,10 @@ const verifyCredentials = async ({
   // Verify that principals may be issued to RP using the specified
   // derivation origin
   const validRpDerivationOrigin = await withLoader(() =>
-    validateDerivationOrigin(rpOrigin_, rpDerivationOrigin)
+    validateDerivationOrigin({
+      requestOrigin: rpOrigin_,
+      derivationOrigin: rpDerivationOrigin,
+    })
   );
   if (validRpDerivationOrigin.result === "invalid") {
     return abortedCredentials({ reason: "bad_derivation_origin_rp" });
@@ -307,10 +310,10 @@ const getValidatedIssuerDerivationOrigin = async ({
   }
   derivationOriginResult.kind satisfies "origin";
 
-  const validationResult = await validateDerivationOrigin(
-    issuerOrigin,
-    derivationOriginResult.origin
-  );
+  const validationResult = await validateDerivationOrigin({
+    requestOrigin: issuerOrigin,
+    derivationOrigin: derivationOriginResult.origin,
+  });
   if (validationResult.result === "invalid") {
     console.error(
       `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`
@@ -435,7 +438,7 @@ const createPresentation = ({
   rpAliasCredential,
   issuedCredential,
 }: {
-  issuerCanisterId: string;
+  issuerCanisterId: Principal;
   rpAliasCredential: SignedIdAlias;
   issuedCredential: IssuedCredentialData;
 }): VcVerifiablePresentation => {
@@ -443,7 +446,7 @@ const createPresentation = ({
   const headerObj = { typ: "JWT", alg: "none" };
 
   const payloadObj = {
-    iss: `did:icp:${issuerCanisterId}` /* JWT Issuer is set to the issuer's canister ID as per spec */,
+    iss: `did:icp:${issuerCanisterId.toText()}` /* JWT Issuer is set to the issuer's canister ID as per spec */,
     vp: {
       "@context": "https://www.w3.org/2018/credentials/v1",
       type: "VerifiablePresentation",

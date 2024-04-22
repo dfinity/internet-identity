@@ -1,3 +1,4 @@
+import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 
 // XXX: this is not exactly a constant (since it might change on every node eval) but in
@@ -9,6 +10,11 @@ export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 export const TEST_APP_CANONICAL_URL_RAW = `https://${testAppCanisterId}.raw.icp0.io`;
 export const TEST_APP_CANONICAL_URL_LEGACY = `https://${testAppCanisterId}.ic0.app`;
 export const TEST_APP_NICE_URL = "https://nice-name.com";
+export const KNOWN_TEST_DAPP = new KnownDapp({
+  name: "Test Dapp",
+  website: "https://nice-name.com",
+  logo: "no-such-logo",
+});
 
 export const ISSUER_APP_URL = `https://${issuerAppCanisterId}.icp0.io`;
 export const ISSUER_APP_URL_LEGACY = `https://${issuerAppCanisterId}.ic0.app`;

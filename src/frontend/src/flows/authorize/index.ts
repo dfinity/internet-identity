@@ -167,10 +167,10 @@ const authenticate = async (
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
 
-  const validationResult = await validateDerivationOrigin(
-    authContext.requestOrigin,
-    authContext.authRequest.derivationOrigin
-  );
+  const validationResult = await validateDerivationOrigin({
+    requestOrigin: authContext.requestOrigin,
+    derivationOrigin: authContext.authRequest.derivationOrigin,
+  });
 
   if (validationResult.result === "invalid") {
     await displayError({
