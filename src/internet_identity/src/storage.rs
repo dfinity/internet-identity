@@ -95,6 +95,7 @@ use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
 use internet_identity_interface::archive::types::BufferedEntry;
 
+use crate::activity_stats::event_stats::EventData;
 use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
@@ -125,9 +126,13 @@ const GB: u64 = 1 << 30;
 const ANCHOR_MEMORY_INDEX: u8 = 0u8;
 const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
 const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2u8;
+const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
+const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
+const EVENT_DATA_MEMORY_ID: MemoryId = MemoryId::new(EVENT_DATA_MEMORY_INDEX);
+const STATS_AGGREGATIONS_MEMORY_ID: MemoryId = MemoryId::new(STATS_AGGREGATIONS_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -174,6 +179,12 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the persistent state memory.
     persistent_state_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
     persistent_state: StableCell<StorablePersistentState, VirtualMemory<RestrictedMemory<M>>>,
+    /// Memory wrapper used to report the size of the event data memory.
+    event_data_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
+    pub event_data: StableBTreeMap<Timestamp, EventData, VirtualMemory<RestrictedMemory<M>>>,
+    /// Memory wrapper used to report the size of the stats aggregation memory.
+    event_aggregations_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
+    pub event_aggregations: StableBTreeMap<String, u64, VirtualMemory<RestrictedMemory<M>>>,
 }
 
 #[repr(packed)]
@@ -237,6 +248,8 @@ impl<M: Memory + Clone> Storage<M> {
             0..(1_000 * BUCKET_SIZE_IN_PAGES as u64),
         );
         let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
+        let event_data_memory = memory_manager.get(EVENT_DATA_MEMORY_ID);
+        let stats_aggregations_memory = memory_manager.get(STATS_AGGREGATIONS_MEMORY_ID);
         Self {
             header,
             header_memory,
@@ -249,6 +262,12 @@ impl<M: Memory + Clone> Storage<M> {
                 StorablePersistentState::default(),
             )
             .expect("failed to initialize persistent state"),
+            event_data_memory_wrapper: MemoryWrapper::new(event_data_memory.clone()),
+            event_data: StableBTreeMap::init(event_data_memory),
+            event_aggregations_memory_wrapper: MemoryWrapper::new(
+                stats_aggregations_memory.clone(),
+            ),
+            event_aggregations: StableBTreeMap::init(stats_aggregations_memory),
         }
     }
 
@@ -493,6 +512,14 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "persistent_state".to_string(),
                 self.persistent_state_memory_wrapper.size(),
+            ),
+            (
+                "event_data".to_string(),
+                self.event_data_memory_wrapper.size(),
+            ),
+            (
+                "event_aggregations".to_string(),
+                self.event_aggregations_memory_wrapper.size(),
             ),
         ])
     }

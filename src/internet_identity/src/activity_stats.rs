@@ -6,6 +6,7 @@ use candid::{CandidType, Deserialize};
 use internet_identity_interface::internet_identity::types::Timestamp;
 
 pub mod activity_counter;
+pub mod event_stats;
 mod stats_maintenance;
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
