@@ -41,7 +41,7 @@
     "@types/ua-parser-js": "^0.7.36",
     "@typescript-eslint/eslint-plugin": "6.7.5",
     "@typescript-eslint/parser": "6.7.5",
-    "@vitejs/plugin-basic-ssl": "^1.0.1",
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@wdio/globals": "8.32.3",
     "astro": "4.5.0",
     "eslint": "8.51.0",
@@ -52,7 +52,7 @@
     "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
-    "vite": "^4.5.3",
+    "vite": "^5.2.10",
     "vitest": "^0.34.0",
     "webdriverio": "8.32.3"
   },
