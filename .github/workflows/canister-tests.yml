@@ -539,11 +539,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: |
-          sudo apt-get update
-          sudo apt-get --only-upgrade install google-chrome-stable
-          google-chrome --version
-
       - uses: ./.github/actions/setup-node
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
