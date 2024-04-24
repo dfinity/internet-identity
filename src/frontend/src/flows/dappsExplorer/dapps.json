@@ -528,5 +528,17 @@
     "oneLiner": "A decentralized content platform for publishing video/articles and subscribing through mobile payments.",
     "website": "https://www.vfans.org/",
     "logo": "vfans_logo.png"
+  },
+  {
+    "name": "ICPanda DAO",
+    "website": "https://panda.fans/",
+    "logo": "icpanda-dao_logo.webp",
+    "oneLiner": "A decentralized Panda meme brand built on the Internet Computer."
+  },
+  {
+    "name": "ICPEx",
+    "oneLiner": "Decentralized exchange built entirely on the chain based on the ICP.",
+    "website": "https://icpex.org/",
+    "logo": "icpex_logo.png"
   }
 ]
