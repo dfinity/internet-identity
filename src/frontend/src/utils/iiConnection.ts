@@ -379,6 +379,7 @@ export class Connection {
     const agent = new HttpAgent({
       identity: delegationIdentity,
       host: inferHost(),
+      retryTimes: 10,
     });
 
     // Only fetch the root key when we're not in prod
