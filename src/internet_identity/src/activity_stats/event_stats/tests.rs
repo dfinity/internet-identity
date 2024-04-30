@@ -28,10 +28,10 @@ fn should_store_event_and_add_to_aggregations() {
 
     assert_eq!(storage.event_aggregations.len(), 4);
     const EXPECTED_AGGREGATIONS: [&str; 4] = [
-        "PD_count_24h_ic0.app_https://example.com",
-        "PD_sess_sec_24h_ic0.app_https://example.com",
-        "PD_count_30d_ic0.app_https://example.com",
-        "PD_sess_sec_24h_ic0.app_https://example.com",
+        "PD_count>24h>ic0.app>https://example.com",
+        "PD_sess_sec>24h>ic0.app>https://example.com",
+        "PD_count>30d>ic0.app>https://example.com",
+        "PD_sess_sec>30d>ic0.app>https://example.com",
     ];
     for key in EXPECTED_AGGREGATIONS.iter() {
         assert!(storage.event_aggregations.contains_key(&key.to_string()));
@@ -72,9 +72,9 @@ fn should_track_ii_domains() {
 
     assert_eq!(storage.event_aggregations.len(), 12); // 4 per domain
     const EXPECTED_AGGREGATIONS: [&str; 3] = [
-        "PD_count_24h_ic0.app_https://example.com",
-        "PD_count_24h_internetcomputer.org_https://example.com",
-        "PD_count_24h_other_https://example.com",
+        "PD_count>24h>ic0.app>https://example.com",
+        "PD_count>24h>internetcomputer.org>https://example.com",
+        "PD_count>24h>other>https://example.com",
     ];
     for key in EXPECTED_AGGREGATIONS.iter() {
         assert!(storage.event_aggregations.contains_key(&key.to_string()));
@@ -104,8 +104,8 @@ fn should_track_multiple_frontends() {
 
     assert_eq!(storage.event_aggregations.len(), 8); // 4 per domain
     const EXPECTED_AGGREGATIONS: [&str; 2] = [
-        "PD_count_24h_ic0.app_https://example.com",
-        "PD_count_24h_ic0.app_https://other-example.com",
+        "PD_count>24h>ic0.app>https://example.com",
+        "PD_count>24h>ic0.app>https://other-example.com",
     ];
     for key in EXPECTED_AGGREGATIONS.iter() {
         assert!(storage.event_aggregations.contains_key(&key.to_string()));
@@ -132,28 +132,28 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         2
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs * 2
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         2
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs * 2
     );
@@ -179,28 +179,28 @@ fn should_store_prune_daily_events_after_24h() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         1
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         2
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs * 2
     );
@@ -226,28 +226,28 @@ fn should_store_prune_monthly_events_after_30d() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         1
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_count_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_count>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         1
     );
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_30d_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>30d>ic0.app>https://example.com".to_string())
             .unwrap(),
         sess_duration_secs
     );
@@ -268,7 +268,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         1800
     );
@@ -285,7 +285,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         2700
     );
@@ -302,7 +302,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
     assert_eq!(
         storage
             .event_aggregations
-            .get(&"PD_sess_sec_24h_ic0.app_https://example.com".to_string())
+            .get(&"PD_sess_sec>24h>ic0.app>https://example.com".to_string())
             .unwrap(),
         1
     );
@@ -323,10 +323,10 @@ fn should_remove_aggregations_without_events_when_pruning() {
 
     assert_eq!(storage.event_aggregations.len(), 4);
     const EXPECTED_AGGREGATIONS: [&str; 4] = [
-        "PD_count_24h_ic0.app_https://example.com",
-        "PD_sess_sec_24h_ic0.app_https://example.com",
-        "PD_count_30d_ic0.app_https://example.com",
-        "PD_sess_sec_24h_ic0.app_https://example.com",
+        "PD_count>24h>ic0.app>https://example.com",
+        "PD_sess_sec>24h>ic0.app>https://example.com",
+        "PD_count>30d>ic0.app>https://example.com",
+        "PD_sess_sec>24h>ic0.app>https://example.com",
     ];
     for key in EXPECTED_AGGREGATIONS.iter() {
         assert!(storage.event_aggregations.contains_key(&key.to_string()));
@@ -345,10 +345,10 @@ fn should_remove_aggregations_without_events_when_pruning() {
     update_events_internal(event2, TIMESTAMP + 30 * DAY_NS, &mut storage);
 
     const EXPECTED_AGGREGATIONS_2: [&str; 4] = [
-        "PD_count_24h_ic0.app_https://other-example.com",
-        "PD_sess_sec_24h_ic0.app_https://other-example.com",
-        "PD_count_30d_ic0.app_https://other-example.com",
-        "PD_sess_sec_24h_ic0.app_https://other-example.com",
+        "PD_count>24h>ic0.app>https://other-example.com",
+        "PD_sess_sec>24h>ic0.app>https://other-example.com",
+        "PD_count>30d>ic0.app>https://other-example.com",
+        "PD_sess_sec>24h>ic0.app>https://other-example.com",
     ];
     assert_eq!(storage.event_aggregations.len(), 4);
     for key in EXPECTED_AGGREGATIONS_2.iter() {

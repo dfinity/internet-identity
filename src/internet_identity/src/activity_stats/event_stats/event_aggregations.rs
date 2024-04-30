@@ -22,7 +22,7 @@ pub const AGGREGATIONS: [Aggregation; 2] =
 /// - over 24h and 30d buckets
 ///
 /// Results in labels like "PD_count_<bucket_length>_<ii_domain>_<frontend_hostname>"
-/// e.g "PD_count_24h_ic0.app_https://dapp.example.com"
+/// e.g "PD_count>24h>ic0.app>https://dapp.example.com"
 const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
     |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation("PD_count", key_duration, |_| 1, event)
@@ -34,7 +34,7 @@ const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<Aggregatio
 /// - over 24h and 30d buckets
 ///
 /// Results in labels like "PD_sess_sec_<bucket_length>_<ii_domain>_<frontend_hostname>"
-/// e.g "PD_sess_sec_24h_ic0.app_https://dapp.example.com"
+/// e.g "PD_sess_sec>24h>ic0.app>https://dapp.example.com"
 const PREPARE_DELEGATION_SESSION_SECONDS: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
     |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation(
@@ -54,7 +54,7 @@ fn prepare_delegation_aggregation(
     match &event.event {
         Event::PrepareDelegation(prepare_delegation_event) => {
             let key = format!(
-                "{}_{}_{}_{}",
+                "{}>{}>{}>{}", // '>' is chosen as delimiter because it is not allowed in URLs
                 key_prefix,
                 key_duration,
                 ii_domain_to_label(&prepare_delegation_event.ii_domain),

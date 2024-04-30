@@ -31,10 +31,11 @@
 //! Example of event_aggregations:
 //! ```
 //! event_aggregations: {
-//!   "PD_count_24h_ic0.app_https://dapp.example.com": 5,
-//!   "PD_sess_sec_24h_ic0.app_https://dapp.example.com": 15,
-//!   "PD_count_30d_internetcomputer.org_https://anotherapp.example.com": 20,
-//!   "PD_sess_sec_30d_internetcomputer.org_https://anotherapp.example.com": 60
+//!   "PD_count>24h>ic0.app>https://dapp.example.com": 5,
+//!   "PD_sess_sec>24h>ic0.app>https://dapp.example.com": 15,
+//!   "PD_count>30d>internetcomputer.org>https://anotherapp.example.com": 20,
+//!   "PD_sess_sec>30d>internetcomputer.org>https://anotherapp.example.com": 60
+//!   //...
 //! }
 //! ```
 
