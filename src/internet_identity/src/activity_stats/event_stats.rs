@@ -190,6 +190,11 @@ fn update_aggregation<M: Memory, F>(
                 current_weight,
                 key
             );
-            db.insert(key, current_weight - pruned_weight);
+            let new_weight = current_weight - pruned_weight;
+            if new_weight == 0 {
+                db.remove(&key);
+            } else {
+                db.insert(key, new_weight);
+            }
         });
 }

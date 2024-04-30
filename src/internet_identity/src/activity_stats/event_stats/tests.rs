@@ -308,6 +308,55 @@ fn should_account_for_dapps_changing_session_lifetime() {
     );
 }
 
+#[test]
+fn should_remove_zero_weighted_aggregations() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0AppDomain),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
+        }),
+    };
+
+    update_events_internal(event, TIMESTAMP, &mut storage);
+
+    assert_eq!(storage.event_aggregations.len(), 4);
+    const EXPECTED_AGGREGATIONS: [&str; 4] = [
+        "PD_count_24h_ic0.app_https://example.com",
+        "PD_sess_sec_24h_ic0.app_https://example.com",
+        "PD_count_30d_ic0.app_https://example.com",
+        "PD_sess_sec_24h_ic0.app_https://example.com",
+    ];
+    for key in EXPECTED_AGGREGATIONS.iter() {
+        assert!(storage.event_aggregations.contains_key(&key.to_string()));
+    }
+
+    let event2 = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0AppDomain),
+            frontend: EXAMPLE_URL_2.to_string(),
+            session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
+        }),
+    };
+
+    // after this update, the previous aggregations should be removed as their weight is 0
+    update_events_internal(event2, TIMESTAMP + 30 * DAY_NS, &mut storage);
+
+    const EXPECTED_AGGREGATIONS_2: [&str; 4] = [
+        "PD_count_24h_ic0.app_https://other-example.com",
+        "PD_sess_sec_24h_ic0.app_https://other-example.com",
+        "PD_count_30d_ic0.app_https://other-example.com",
+        "PD_sess_sec_24h_ic0.app_https://other-example.com",
+    ];
+    assert_eq!(storage.event_aggregations.len(), 4);
+    for key in EXPECTED_AGGREGATIONS_2.iter() {
+        assert!(storage.event_aggregations.contains_key(&key.to_string()));
+    }
+
+    assert_eq!(storage.event_data.len(), 1);
+}
+
 fn test_storage() -> Storage<Rc<RefCell<Vec<u8>>>> {
     const DEFAULT_ID_RANGE: (u64, u64) = (1, 100);
     let memory = VectorMemory::default();
