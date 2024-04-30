@@ -309,7 +309,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
 }
 
 #[test]
-fn should_remove_zero_weighted_aggregations() {
+fn should_remove_aggregations_without_events_when_pruning() {
     let mut storage = test_storage();
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
@@ -341,6 +341,7 @@ fn should_remove_zero_weighted_aggregations() {
     };
 
     // after this update, the previous aggregations should be removed as their weight is 0
+    // (this means that there is no event being counted for them)
     update_events_internal(event2, TIMESTAMP + 30 * DAY_NS, &mut storage);
 
     const EXPECTED_AGGREGATIONS_2: [&str; 4] = [

@@ -1,5 +1,5 @@
 use crate::activity_stats::event_stats::{
-    Event, EventData, PrepareDelegationEvent, WeightedAggregation,
+    AggregationEvent, Event, EventData, PrepareDelegationEvent,
 };
 use crate::ii_domain::IIDomain;
 use std::time::Duration;
@@ -7,10 +7,10 @@ use std::time::Duration;
 /// Type definition for an aggregation function.
 ///
 /// Each aggregation is defined as a function that takes a bucket size label (i.e. "24h" or "30d")
-/// and a tuple of `(timestamp, event_data)` and maps it to an optional [WeightedAggregation]
+/// and a tuple of `(timestamp, event_data)` and maps it to an optional [AggregationEvent]
 /// (i.e. a key for the aggregation and a weight for the event).
 /// If the event is not part of the aggregation, the function should return [None].
-type Aggregation = fn(&str, &(u64, EventData)) -> Option<WeightedAggregation>;
+type Aggregation = fn(&str, &(u64, EventData)) -> Option<AggregationEvent>;
 
 /// All aggregations currently maintained over event data.
 pub const AGGREGATIONS: [Aggregation; 2] =
@@ -23,8 +23,8 @@ pub const AGGREGATIONS: [Aggregation; 2] =
 ///
 /// Results in labels like "PD_count_<bucket_length>_<ii_domain>_<frontend_hostname>"
 /// e.g "PD_count_24h_ic0.app_https://dapp.example.com"
-const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<WeightedAggregation> =
-    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<WeightedAggregation> {
+const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
+    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation("PD_count", key_duration, |_| 1, event)
     };
 
@@ -35,11 +35,8 @@ const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<WeightedAg
 ///
 /// Results in labels like "PD_sess_sec_<bucket_length>_<ii_domain>_<frontend_hostname>"
 /// e.g "PD_sess_sec_24h_ic0.app_https://dapp.example.com"
-const PREPARE_DELEGATION_SESSION_SECONDS: fn(
-    &str,
-    &(u64, EventData),
-) -> Option<WeightedAggregation> =
-    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<WeightedAggregation> {
+const PREPARE_DELEGATION_SESSION_SECONDS: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
+    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation(
             "PD_sess_sec",
             key_duration,
@@ -53,7 +50,7 @@ fn prepare_delegation_aggregation(
     key_duration: &str,
     weight_func: fn(&PrepareDelegationEvent) -> u64,
     event: &EventData,
-) -> Option<WeightedAggregation> {
+) -> Option<AggregationEvent> {
     match &event.event {
         Event::PrepareDelegation(prepare_delegation_event) => {
             let key = format!(
@@ -63,7 +60,7 @@ fn prepare_delegation_aggregation(
                 ii_domain_to_label(&prepare_delegation_event.ii_domain),
                 prepare_delegation_event.frontend
             );
-            Some(WeightedAggregation {
+            Some(AggregationEvent {
                 key,
                 weight: weight_func(prepare_delegation_event),
             })

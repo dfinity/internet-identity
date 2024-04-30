@@ -1,3 +1,43 @@
+//! This module contains the event-based statistics for the Internet Identity.
+//! Two data structures are required to maintain the event-based statistics:
+//! - `event_data`: A map from timestamps to events.
+//! - `event_aggregations`: A map from aggregation keys to aggregated values (i.e. running totals).
+//!
+//! Example of event_data:
+//! ```
+//! event_data: {
+//!   "1640995200000": {
+//!     "event": {
+//!       "PrepareDelegation": {
+//!         "ii_domain": "Ic0AppDomain",
+//!         "frontend": "https://dapp.example.com",
+//!         "session_duration_ns": 3000000000
+//!       }
+//!     }
+//!   },
+//!   "1640998800000": {
+//!     "event": {
+//!       "PrepareDelegation": {
+//!         "ii_domain": "InternetComputerOrgDomain",
+//!         "frontend": "https://anotherapp.example.com",
+//!         "session_duration_ns": 4500000000
+//!       }
+//!     }
+//!   },
+//!   //...
+//! }
+//! ```
+//!
+//! Example of event_aggregations:
+//! ```
+//! event_aggregations: {
+//!   "PD_count_24h_ic0.app_https://dapp.example.com": 5,
+//!   "PD_sess_sec_24h_ic0.app_https://dapp.example.com": 15,
+//!   "PD_count_30d_internetcomputer.org_https://anotherapp.example.com": 20,
+//!   "PD_sess_sec_30d_internetcomputer.org_https://anotherapp.example.com": 60
+//! }
+//! ```
+
 use crate::activity_stats::event_stats::event_aggregations::AGGREGATIONS;
 use crate::ii_domain::IIDomain;
 use crate::state::storage_borrow_mut;
@@ -46,7 +86,11 @@ impl Storable for EventData {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-struct WeightedAggregation {
+/// Result of applying an aggregation function to an event.
+/// The key is the aggregation key in the event_aggregations map and the weight is the weight of
+/// the event (i.e. by how much the aggregation value is impacted by this event).
+/// For example, if the aggregation is a count the weight is 1.
+struct AggregationEvent {
     key: String,
     weight: u64,
 }
@@ -142,9 +186,10 @@ fn update_aggregation<M: Memory, F>(
     pruned_events: &[(Timestamp, EventData)],
     db: &mut StableBTreeMap<String, u64, M>,
 ) where
-    F: Fn(&(u64, EventData)) -> Option<WeightedAggregation>,
+    F: Fn(&(u64, EventData)) -> Option<AggregationEvent>,
 {
-    // Process the pruned events to calculate the pruned weight by aggregation key
+    // Process the pruned events to calculate the pruned weight by aggregation key.
+    // See PREPARE_DELEGATION_COUNT and PREPARE_DELEGATION_SESSION_SECONDS for examples of such keys.
     let mut pruned_weight_by_key = pruned_events
         .iter()
         .filter_map(&aggregation_filter_map)
@@ -156,8 +201,7 @@ fn update_aggregation<M: Memory, F>(
         });
 
     // Process the new event and merge it with the pruned events
-    if let Some(WeightedAggregation { key, mut weight }) = aggregation_filter_map(&(now, new_event))
-    {
+    if let Some(AggregationEvent { key, mut weight }) = aggregation_filter_map(&(now, new_event)) {
         if let Some(pruned_weight) = pruned_weight_by_key.get_mut(&key) {
             if *pruned_weight <= weight {
                 weight -= *pruned_weight;
