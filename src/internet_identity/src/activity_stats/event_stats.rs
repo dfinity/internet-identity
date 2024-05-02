@@ -5,41 +5,57 @@
 //!
 //! Example of event_data:
 //! ```
-//! event_data: {
-//!   "1640995200000": {
+//! event_data: [
+//!   {
+//!     time: 1640995200000,
+//!     counter: 0,
+//!   } ->  {
 //!     "event": {
 //!       "PrepareDelegation": {
-//!         "ii_domain": "Ic0AppDomain",
+//!         "ii_domain": "Ic0App",
 //!         "frontend": "https://dapp.example.com",
 //!         "session_duration_ns": 3000000000
 //!       }
 //!     }
 //!   },
-//!   "1640998800000": {
+//!   {
+//!     time: 1641095230000,
+//!     counter: 1,
+//!   } ->  {
 //!     "event": {
 //!       "PrepareDelegation": {
-//!         "ii_domain": "InternetComputerOrgDomain",
+//!         "ii_domain": "InternetComputerOrg",
 //!         "frontend": "https://anotherapp.example.com",
 //!         "session_duration_ns": 4500000000
 //!       }
 //!     }
 //!   },
-//!   //...
-//! }
+//!   ...
+//! ]
 //! ```
 //!
 //! Example of event_aggregations:
 //! ```
-//! event_aggregations: {
-//!   "PD_count>24h>ic0.app>https://dapp.example.com": 5,
-//!   "PD_sess_sec>24h>ic0.app>https://dapp.example.com": 15,
-//!   "PD_count>30d>internetcomputer.org>https://anotherapp.example.com": 20,
-//!   "PD_sess_sec>30d>internetcomputer.org>https://anotherapp.example.com": 60
-//!   //...
-//! }
+//! event_aggregations: [
+//!   {
+//!     kind: AggregationKind::PrepareDelegationCount,
+//!     window: AggregationWindow::Day,
+//!     ii_domain: Some(IIDomain::Ic0App),
+//!     data: "https://dapp.example.com".as_bytes(),
+//!   } ->  5,
+//!   {
+//!     kind: AggregationKind::PrepareDelegationSessionSeconds,
+//!     window: AggregationWindow::Day,
+//!     ii_domain: Some(IIDomain::Ic0App),
+//!     data: "https://dapp.example.com".as_bytes(),
+//!   } ->  2700,
+//!   ...
+//! ]
 //! ```
 
-use crate::activity_stats::event_stats::event_aggregations::AGGREGATIONS;
+use crate::activity_stats::event_stats::event_aggregations::{
+    AggregationKey, AggregationWindow, AGGREGATIONS,
+};
 use crate::ii_domain::IIDomain;
 use crate::state::storage_borrow_mut;
 use crate::storage::Storage;
@@ -53,7 +69,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// This module defines the aggregations over the events.
-mod event_aggregations;
+pub mod event_aggregations;
 
 #[cfg(test)]
 mod tests;
@@ -142,11 +158,11 @@ impl Storable for EventData {
 }
 
 /// Result of applying an aggregation function to an event.
-/// The key is the aggregation key in the event_aggregations map and the weight is the weight of
+/// The key is the [AggregationKey] in the event_aggregations map and the weight is the weight of
 /// the event (i.e. by how much the aggregation value is impacted by this event).
 /// For example, if the aggregation is a count the weight is 1.
-struct AggregationEvent {
-    key: String,
+pub struct AggregationEvent {
+    key: AggregationKey,
     weight: u64,
 }
 
@@ -197,9 +213,9 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
     };
 
     // Update 24h aggregations
-    AGGREGATIONS.iter().for_each(|aggregation_filter_map| {
+    AGGREGATIONS.iter().for_each(|aggregation| {
         update_aggregation(
-            |input| aggregation_filter_map("24h", input),
+            |(_, data)| aggregation.process_event(AggregationWindow::Day, data),
             current_key.clone(),
             event.clone(),
             &pruned_24h,
@@ -213,9 +229,9 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
     let pruned_30d = prune_events(&mut s.event_data, now);
 
     // Update 30d aggregations
-    AGGREGATIONS.iter().for_each(|aggregation_filter_map| {
+    AGGREGATIONS.iter().for_each(|aggregation| {
         update_aggregation(
-            |input| aggregation_filter_map("30d", input),
+            |(_, data)| aggregation.process_event(AggregationWindow::Month, data),
             current_key.clone(),
             event.clone(),
             &pruned_30d,
@@ -248,7 +264,7 @@ fn update_aggregation<M: Memory, F>(
     now: EventKey,
     new_event: EventData,
     pruned_events: &[(EventKey, EventData)],
-    db: &mut StableBTreeMap<String, u64, M>,
+    db: &mut StableBTreeMap<AggregationKey, u64, M>,
 ) where
     F: Fn(&(EventKey, EventData)) -> Option<AggregationEvent>,
 {
@@ -289,11 +305,11 @@ fn update_aggregation<M: Memory, F>(
         .into_iter()
         .for_each(|(key, pruned_weight)| {
             let current_weight = db.get(&key).unwrap_or_else(|| {
-                panic!("aggregation key \"{}\" not found in DB when pruning", key)
+                panic!("aggregation key \"{:?}\" not found in DB when pruning", key)
             });
             assert!(
                 current_weight >= pruned_weight,
-                "pruned weight {} exceeds current weight {} for key \"{}\"",
+                "pruned weight {} exceeds current weight {} for key \"{:?}\"",
                 pruned_weight,
                 current_weight,
                 key
