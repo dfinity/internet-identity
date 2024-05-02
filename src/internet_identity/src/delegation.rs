@@ -1,3 +1,6 @@
+use crate::activity_stats::event_stats::{
+    update_event_based_stats, Event, EventData, PrepareDelegationEvent,
+};
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
@@ -30,11 +33,11 @@ pub async fn prepare_delegation(
     state::ensure_salt_set().await;
     check_frontend_length(&frontend);
 
-    let delta = u64::min(
+    let session_duration_ns = u64::min(
         max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
         MAX_EXPIRATION_PERIOD_NS,
     );
-    let expiration = time().saturating_add(delta);
+    let expiration = time().saturating_add(session_duration_ns);
     let seed = calculate_seed(anchor_number, &frontend);
 
     state::signature_map_mut(|sigs| {
@@ -42,7 +45,7 @@ pub async fn prepare_delegation(
     });
     update_root_hash();
 
-    delegation_bookkeeping(frontend, ii_domain);
+    delegation_bookkeeping(frontend, ii_domain.clone(), session_duration_ns);
 
     (
         ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
@@ -51,12 +54,25 @@ pub async fn prepare_delegation(
 }
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(frontend: FrontendHostname, ii_domain: &Option<IIDomain>) {
+fn delegation_bookkeeping(
+    frontend: FrontendHostname,
+    ii_domain: Option<IIDomain>,
+    session_duration_ns: u64,
+) {
     state::usage_metrics_mut(|metrics| {
         metrics.delegation_counter += 1;
     });
-    if ii_domain.is_some() && !is_dev_frontend(&frontend) {
-        update_latest_delegation_origins(frontend);
+    if !is_dev_frontend(&frontend) {
+        update_event_based_stats(EventData {
+            event: Event::PrepareDelegation(PrepareDelegationEvent {
+                ii_domain: ii_domain.clone(),
+                frontend: frontend.clone(),
+                session_duration_ns,
+            }),
+        });
+        if ii_domain.is_some() {
+            update_latest_delegation_origins(frontend);
+        }
     }
 }
 

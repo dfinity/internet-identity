@@ -304,7 +304,9 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
     // - memory manager internal state in the second page
     // - one allocated bucket (i.e. 128 pages) for the archive entries buffer
     // - one allocated bucket (i.e. 128 pages) for the persistent state
-    assert_eq!(stable_memory_pages, 258f64);
+    // - one allocated bucket (i.e. 128 pages) for the event data
+    // - one allocated bucket (i.e. 128 pages) for the event aggregations
+    assert_eq!(stable_memory_pages, 514f64);
 
     // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage by
     // one bucket (ie. 128 pages) allocated by the memory manager.
@@ -312,7 +314,7 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
 
     let metrics = get_metrics(&env, canister_id);
     let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    assert_eq!(stable_memory_pages, 386f64);
+    assert_eq!(stable_memory_pages, 642f64);
     Ok(())
 }
 
@@ -513,6 +515,16 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
         "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
         1f64,
     );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"event_data\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"event_aggregations\"}",
+        1f64,
+    );
 
     let authn_method = test_authn_method();
     create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -528,15 +540,11 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
         "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
         1f64,
     );
-    // To test the archive buffer memory metric growing, we would need to spawn an archive and then
-    // create a large number of entries to be archived. Or load a prepared state with a large number
-    // of entries. This is not done here, as it would either require brittle setup or a long-running
-    // test.
-    assert_metric(
-        &metrics,
-        "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
-        1f64,
-    );
+
+    // To test the archive buffer and event data related memory metrics growing,
+    // we would have a very complex setup and require a large number of request.
+    // Or load a prepared state with a large number of entries.
+    // This is not done here, as it would either require brittle setup or a long-running test.
 
     Ok(())
 }

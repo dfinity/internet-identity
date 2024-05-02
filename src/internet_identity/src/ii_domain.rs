@@ -1,6 +1,7 @@
 use crate::storage::anchor::DomainActivity;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
-#[derive(Eq, PartialEq)]
+use serde::{Deserialize, Serialize};
+#[derive(Deserialize, Serialize, Eq, PartialEq, Clone, Debug, Ord, PartialOrd, Hash)]
 pub enum IIDomain {
     Ic0App,
     InternetComputerOrg,
