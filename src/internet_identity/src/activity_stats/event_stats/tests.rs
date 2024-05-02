@@ -22,7 +22,7 @@ const EXAMPLE_URL_2: &str = "https://other-example.com";
 #[test]
 fn should_store_event_and_add_to_aggregations() {
     let mut storage = test_storage();
-    let domain: Option<IIDomain> = Some(IIDomain::Ic0AppDomain);
+    let domain: Option<IIDomain> = Some(IIDomain::Ic0App);
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
             ii_domain: domain.clone(),
@@ -79,7 +79,7 @@ fn should_store_multiple_events_with_same_timestamp() {
     let mut storage = test_storage();
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -100,14 +100,14 @@ fn should_track_ii_domains() {
     let mut storage = test_storage();
     let event1 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
     };
     let event2 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::InternetComputerOrgDomain),
+            ii_domain: Some(IIDomain::InternetComputerOrg),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -129,13 +129,13 @@ fn should_track_ii_domains() {
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::InternetComputerOrgDomain),
+            Some(IIDomain::InternetComputerOrg),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(PrepareDelegationCount, Day, None, EXAMPLE_URL.to_string()),
@@ -150,14 +150,14 @@ fn should_track_multiple_frontends() {
     let mut storage = test_storage();
     let event1 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
     };
     let event2 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL_2.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -171,13 +171,13 @@ fn should_track_multiple_frontends() {
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL_2.to_string(),
         ),
     ];
@@ -192,7 +192,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
     let sess_duration_secs = 900;
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(sess_duration_secs).as_nanos() as u64,
         }),
@@ -209,7 +209,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -221,7 +221,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -233,7 +233,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -245,7 +245,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -259,7 +259,7 @@ fn should_prune_daily_events_after_24h() {
     let sess_duration_secs = 900;
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(sess_duration_secs).as_nanos() as u64,
         }),
@@ -276,7 +276,7 @@ fn should_prune_daily_events_after_24h() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -288,7 +288,7 @@ fn should_prune_daily_events_after_24h() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -300,7 +300,7 @@ fn should_prune_daily_events_after_24h() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -312,7 +312,7 @@ fn should_prune_daily_events_after_24h() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -326,7 +326,7 @@ fn should_prune_monthly_events_after_30d() {
     let sess_duration_secs = 900;
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(sess_duration_secs).as_nanos() as u64,
         }),
@@ -343,7 +343,7 @@ fn should_prune_monthly_events_after_30d() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -355,7 +355,7 @@ fn should_prune_monthly_events_after_30d() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -367,7 +367,7 @@ fn should_prune_monthly_events_after_30d() {
             .get(&AggregationKey::new(
                 PrepareDelegationCount,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -379,7 +379,7 @@ fn should_prune_monthly_events_after_30d() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Month,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -392,7 +392,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
     let mut storage = test_storage();
     let event1 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(1800).as_nanos() as u64,
         }),
@@ -405,7 +405,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -414,7 +414,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
 
     let event2 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -427,7 +427,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -436,7 +436,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
 
     let event3 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(1).as_nanos() as u64,
         }),
@@ -449,7 +449,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
             .get(&AggregationKey::new(
                 PrepareDelegationSessionSeconds,
                 Day,
-                Some(IIDomain::Ic0AppDomain),
+                Some(IIDomain::Ic0App),
                 EXAMPLE_URL.to_string()
             ))
             .unwrap(),
@@ -462,7 +462,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
     let mut storage = test_storage();
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -475,25 +475,25 @@ fn should_remove_aggregations_without_events_when_pruning() {
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationSessionSeconds,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationCount,
             Month,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationSessionSeconds,
             Month,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL.to_string(),
         ),
     ];
@@ -503,7 +503,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
 
     let event2 = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
-            ii_domain: Some(IIDomain::Ic0AppDomain),
+            ii_domain: Some(IIDomain::Ic0App),
             frontend: EXAMPLE_URL_2.to_string(),
             session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
         }),
@@ -517,25 +517,25 @@ fn should_remove_aggregations_without_events_when_pruning() {
         AggregationKey::new(
             PrepareDelegationCount,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL_2.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationSessionSeconds,
             Day,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL_2.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationCount,
             Month,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL_2.to_string(),
         ),
         AggregationKey::new(
             PrepareDelegationSessionSeconds,
             Month,
-            Some(IIDomain::Ic0AppDomain),
+            Some(IIDomain::Ic0App),
             EXAMPLE_URL_2.to_string(),
         ),
     ];
