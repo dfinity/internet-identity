@@ -229,12 +229,6 @@ fn persistent_state_metrics(
             .value(&[("type", "other")], counter.other_counter as f64)?;
         Ok(())
     })?;
-
-    w.encode_gauge(
-        "internet_identity_max_num_latest_delegation_origins",
-        persistent_state.max_num_latest_delegation_origins as f64,
-        "The maximum number of latest delegation origins that were used with II bound devices.",
-    )?;
     Ok(())
 }
 

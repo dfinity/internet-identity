@@ -1,0 +1,13 @@
+diff --git a/src/internet_identity/internet_identity.did b/src/internet_identity/internet_identity.did
+index 55cd4667..dd464712 100644
+--- a/src/internet_identity/internet_identity.did
++++ b/src/internet_identity/internet_identity.did
+@@ -171,6 +171,8 @@ type InternetIdentityStats = record {
+     };
+     archive_info: ArchiveInfo;
+     canister_creation_cycles_cost: nat64;
++    max_num_latest_delegation_origins: nat64;
++    latest_delegation_origins: vec FrontendHostname
+ };
+ 
+ // Configuration parameters related to the archive.

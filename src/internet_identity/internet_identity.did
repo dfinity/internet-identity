@@ -171,8 +171,6 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
-    max_num_latest_delegation_origins: nat64;
-    latest_delegation_origins: vec FrontendHostname
 };
 
 // Configuration parameters related to the archive.

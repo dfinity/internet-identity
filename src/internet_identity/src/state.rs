@@ -20,9 +20,6 @@ use std::time::Duration;
 
 mod temp_keys;
 
-/// Default value for max number of delegation origins to store in the list of latest used delegation origins
-pub const DEFAULT_MAX_DELEGATION_ORIGINS: u64 = 1000;
-
 /// Default value for max number of inflight captchas.
 pub const DEFAULT_MAX_INFLIGHT_CAPTCHAS: u64 = 500;
 
@@ -96,10 +93,6 @@ pub struct PersistentState {
     pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
     // Daily and monthly active authentication methods on the II domains.
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
-    // Hashmap of last used delegation origins
-    pub latest_delegation_origins: HashMap<FrontendHostname, Timestamp>,
-    // Maximum number of latest delegation origins to store
-    pub max_num_latest_delegation_origins: u64,
     // Maximum number of inflight captchas
     pub max_inflight_captchas: u64,
 }
@@ -114,8 +107,6 @@ impl Default for PersistentState {
             active_anchor_stats: ActivityStats::new(time),
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
-            latest_delegation_origins: HashMap::new(),
-            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
         }
     }

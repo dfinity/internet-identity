@@ -336,24 +336,12 @@ fn stats() -> InternetIdentityStats {
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
 
-    let (latest_delegation_origins, max_num_latest_delegation_origins) =
-        state::persistent_state(|persistent_state| {
-            let origins = persistent_state
-                .latest_delegation_origins
-                .keys()
-                .cloned()
-                .collect();
-            (origins, persistent_state.max_num_latest_delegation_origins)
-        });
-
     state::storage_borrow(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
         users_registered: storage.anchor_count() as u64,
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
-        max_num_latest_delegation_origins,
-        latest_delegation_origins,
     })
 }
 
@@ -424,11 +412,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(rate_limit) = arg.register_rate_limit {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.registration_rate_limit = rate_limit;
-            })
-        }
-        if let Some(limit) = arg.max_num_latest_delegation_origins {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_num_latest_delegation_origins = limit;
             })
         }
         if let Some(limit) = arg.max_inflight_captchas {

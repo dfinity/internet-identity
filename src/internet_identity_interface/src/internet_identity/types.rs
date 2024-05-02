@@ -207,8 +207,6 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
-    pub max_num_latest_delegation_origins: u64,
-    pub latest_delegation_origins: Vec<FrontendHostname>,
 }
 
 /// Information about the archive.

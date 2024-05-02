@@ -2,7 +2,6 @@ use crate::activity_stats::event_stats::{
     update_event_based_stats, Event, EventData, PrepareDelegationEvent,
 };
 use crate::ii_domain::IIDomain;
-use crate::state::persistent_state_mut;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::signature_map::SignatureMap;
@@ -70,21 +69,18 @@ fn delegation_bookkeeping(
                 session_duration_ns,
             }),
         });
-        if ii_domain.is_some() {
-            update_latest_delegation_origins(frontend);
-        }
     }
 }
 
 /// Filter out derivation origins that most likely point to development setups.
-/// This is not bullet proof but given the data we collected so far it should be good for now.
+/// This is not bulletproof but given the data we collected so far it should be good for now.
 fn is_dev_frontend(frontend: &FrontendHostname) -> bool {
     if frontend.starts_with("http://") || frontend.contains("localhost") {
         // we don't care about insecure origins or localhost
         return true;
     }
 
-    // lets check for local IP addresses
+    // let's check for local IP addresses
     if let Some(hostname) = frontend
         .strip_prefix("https://")
         .and_then(|s| s.split(':').next())
@@ -96,35 +92,6 @@ fn is_dev_frontend(frontend: &FrontendHostname) -> bool {
         };
     }
     false
-}
-
-/// Add the current front-end to the list of latest used front-end origins.
-fn update_latest_delegation_origins(frontend: FrontendHostname) {
-    let now_ns = time();
-
-    persistent_state_mut(|persistent_state| {
-        let latest_delegation_origins = &mut persistent_state.latest_delegation_origins;
-
-        if let Some(timestamp_ns) = latest_delegation_origins.get_mut(&frontend) {
-            *timestamp_ns = now_ns;
-        } else {
-            latest_delegation_origins.insert(frontend, now_ns);
-        };
-
-        // drop entries older than 30 days
-        latest_delegation_origins.retain(|_, timestamp_ns| now_ns - *timestamp_ns < 30 * DAY_NS);
-
-        // if we still have too many entries, drop the oldest
-        if latest_delegation_origins.len() as u64
-            > persistent_state.max_num_latest_delegation_origins
-        {
-            // if this case is hit often (i.e. we routinely have more than 1000 entries), we should
-            // consider using a more efficient data structure
-            let mut values: Vec<_> = latest_delegation_origins.clone().into_iter().collect();
-            values.sort_by(|(_, timestamp_1), (_, timestamp_2)| timestamp_1.cmp(timestamp_2));
-            latest_delegation_origins.remove(&values[0].0);
-        };
-    });
 }
 
 pub fn get_delegation(

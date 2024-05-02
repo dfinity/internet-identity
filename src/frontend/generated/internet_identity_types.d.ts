@@ -187,9 +187,7 @@ export interface InternetIdentityInit {
 export interface InternetIdentityStats {
   'storage_layout_version' : number,
   'users_registered' : bigint,
-  'max_num_latest_delegation_origins' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
-  'latest_delegation_origins' : Array<FrontendHostname>,
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,
 }
