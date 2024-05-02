@@ -43,7 +43,7 @@ use crate::activity_stats::event_stats::event_aggregations::AGGREGATIONS;
 use crate::ii_domain::IIDomain;
 use crate::state::storage_borrow_mut;
 use crate::storage::Storage;
-use crate::DAY_NS;
+use crate::{state, DAY_NS};
 use ic_cdk::api::time;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{Memory, StableBTreeMap, Storable};
@@ -57,6 +57,34 @@ mod event_aggregations;
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Deserialize, Serialize, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
+pub struct EventKey {
+    /// Timestamp of the event.
+    pub time: Timestamp,
+    /// A counter providing uniqueness for events with the same timestamp.
+    pub counter: u16,
+}
+
+impl EventKey {
+    pub fn new(time: Timestamp) -> Self {
+        Self {
+            time,
+            counter: state::get_and_inc_event_data_counter(),
+        }
+    }
+
+    pub fn min_key(time: Timestamp) -> Self {
+        Self { time, counter: 0 }
+    }
+
+    pub fn max_key(time: Timestamp) -> Self {
+        Self {
+            time,
+            counter: u16::MAX,
+        }
+    }
+}
 
 #[derive(Deserialize, Serialize, Clone, Eq, PartialEq, Debug)]
 pub struct EventData {
@@ -73,6 +101,32 @@ pub struct PrepareDelegationEvent {
     pub ii_domain: Option<IIDomain>,
     pub frontend: FrontendHostname,
     pub session_duration_ns: u64,
+}
+
+const EVENT_KEY_SIZE: usize = 10;
+impl Storable for EventKey {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut buf = Vec::with_capacity(EVENT_KEY_SIZE);
+        buf.extend(self.time.to_be_bytes());
+        buf.extend(self.counter.to_be_bytes());
+        Cow::Owned(buf)
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self {
+            time: u64::from_be_bytes(
+                TryFrom::try_from(&bytes[0..8]).expect("failed to read event key timestamp"),
+            ),
+            counter: u16::from_be_bytes(
+                TryFrom::try_from(&bytes[8..10]).expect("failed to read event key counter"),
+            ),
+        }
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        is_fixed_size: true,
+        max_size: EVENT_KEY_SIZE as u32,
+    };
 }
 
 impl Storable for EventData {
@@ -108,10 +162,17 @@ pub fn update_event_based_stats(event: EventData) {
 }
 
 /// Internal helper useful for testing.
-fn update_events_internal<M: Memory>(event: EventData, now: u64, s: &mut Storage<M>) {
-    s.event_data.insert(now, event.clone());
+fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut Storage<M>) {
+    let current_key = EventKey::new(now);
+    let option = s.event_data.insert(current_key.clone(), event.clone());
+    assert!(
+        option.is_none(),
+        "event already exists for key {:?}",
+        current_key
+    );
 
-    let pruned_24h = if let Some((timestamp, _)) = s.event_data.iter_upper_bound(&now).next() {
+    let pruned_24h = if let Some((prev_key, _)) = s.event_data.iter_upper_bound(&current_key).next()
+    {
         // `timestamp` denotes the time of the last event recorded just before `now`
         // The difference (now - timestamp) is the time that has passed since the last event
         // and hence the last time the daily stats were updated.
@@ -125,10 +186,10 @@ fn update_events_internal<M: Memory>(event: EventData, now: u64, s: &mut Storage
         // |  └ now - 24h (prune_window_end)                     └ timestamp
         // └ timestamp - 24h (prune_window_start)
 
-        let prune_window_start = timestamp - DAY_NS;
+        let prune_window_start = prev_key.time - DAY_NS;
         let prune_window_end = now - DAY_NS;
         s.event_data
-            .range(prune_window_start..=prune_window_end)
+            .range(EventKey::min_key(prune_window_start)..=EventKey::max_key(prune_window_end))
             .collect::<Vec<_>>()
     } else {
         // there is no event before `now` in the db, so the list of pruned events is empty
@@ -139,7 +200,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: u64, s: &mut Storage
     AGGREGATIONS.iter().for_each(|aggregation_filter_map| {
         update_aggregation(
             |input| aggregation_filter_map("24h", input),
-            now,
+            current_key.clone(),
             event.clone(),
             &pruned_24h,
             &mut s.event_aggregations,
@@ -155,7 +216,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: u64, s: &mut Storage
     AGGREGATIONS.iter().for_each(|aggregation_filter_map| {
         update_aggregation(
             |input| aggregation_filter_map("30d", input),
-            now,
+            current_key.clone(),
             event.clone(),
             &pruned_30d,
             &mut s.event_aggregations,
@@ -166,14 +227,16 @@ fn update_events_internal<M: Memory>(event: EventData, now: u64, s: &mut Storage
 /// Adds an event to the event_data map and simultaneously removes events older than the retention period (30d).
 /// Returns a vec of tuples of the pruned events and their timestamps.
 fn prune_events<M: Memory>(
-    db: &mut StableBTreeMap<Timestamp, EventData, M>,
+    db: &mut StableBTreeMap<EventKey, EventData, M>,
     now: Timestamp,
-) -> Vec<(Timestamp, EventData)> {
+) -> Vec<(EventKey, EventData)> {
     const RETENTION_PERIOD: u64 = 30 * DAY_NS;
 
-    let pruned_events = db.range(..=now - RETENTION_PERIOD).collect();
+    let pruned_events = db
+        .range(..=EventKey::max_key(now - RETENTION_PERIOD))
+        .collect();
     for entry in &pruned_events {
-        let entry: &(Timestamp, EventData) = entry;
+        let entry: &(EventKey, EventData) = entry;
         db.remove(&entry.0);
     }
 
@@ -182,12 +245,12 @@ fn prune_events<M: Memory>(
 
 fn update_aggregation<M: Memory, F>(
     aggregation_filter_map: F,
-    now: Timestamp,
+    now: EventKey,
     new_event: EventData,
-    pruned_events: &[(Timestamp, EventData)],
+    pruned_events: &[(EventKey, EventData)],
     db: &mut StableBTreeMap<String, u64, M>,
 ) where
-    F: Fn(&(u64, EventData)) -> Option<AggregationEvent>,
+    F: Fn(&(EventKey, EventData)) -> Option<AggregationEvent>,
 {
     // Process the pruned events to calculate the pruned weight by aggregation key.
     // See PREPARE_DELEGATION_COUNT and PREPARE_DELEGATION_SESSION_SECONDS for examples of such keys.

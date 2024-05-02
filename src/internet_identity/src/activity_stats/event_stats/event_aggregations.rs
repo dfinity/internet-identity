@@ -1,5 +1,5 @@
 use crate::activity_stats::event_stats::{
-    AggregationEvent, Event, EventData, PrepareDelegationEvent,
+    AggregationEvent, Event, EventData, EventKey, PrepareDelegationEvent,
 };
 use crate::ii_domain::IIDomain;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use std::time::Duration;
 /// and a tuple of `(timestamp, event_data)` and maps it to an optional [AggregationEvent]
 /// (i.e. a key for the aggregation and a weight for the event).
 /// If the event is not part of the aggregation, the function should return [None].
-type Aggregation = fn(&str, &(u64, EventData)) -> Option<AggregationEvent>;
+type Aggregation = fn(&str, &(EventKey, EventData)) -> Option<AggregationEvent>;
 
 /// All aggregations currently maintained over event data.
 pub const AGGREGATIONS: [Aggregation; 2] =
@@ -23,8 +23,8 @@ pub const AGGREGATIONS: [Aggregation; 2] =
 ///
 /// Results in labels like "PD_count_<bucket_length>_<ii_domain>_<frontend_hostname>"
 /// e.g "PD_count>24h>ic0.app>https://dapp.example.com"
-const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
-    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
+const PREPARE_DELEGATION_COUNT: fn(&str, &(EventKey, EventData)) -> Option<AggregationEvent> =
+    |key_duration: &str, (_, event): &(EventKey, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation("PD_count", key_duration, |_| 1, event)
     };
 
@@ -35,8 +35,11 @@ const PREPARE_DELEGATION_COUNT: fn(&str, &(u64, EventData)) -> Option<Aggregatio
 ///
 /// Results in labels like "PD_sess_sec_<bucket_length>_<ii_domain>_<frontend_hostname>"
 /// e.g "PD_sess_sec>24h>ic0.app>https://dapp.example.com"
-const PREPARE_DELEGATION_SESSION_SECONDS: fn(&str, &(u64, EventData)) -> Option<AggregationEvent> =
-    |key_duration: &str, (_timestamp, event): &(u64, EventData)| -> Option<AggregationEvent> {
+const PREPARE_DELEGATION_SESSION_SECONDS: fn(
+    &str,
+    &(EventKey, EventData),
+) -> Option<AggregationEvent> =
+    |key_duration: &str, (_, event): &(EventKey, EventData)| -> Option<AggregationEvent> {
         prepare_delegation_aggregation(
             "PD_sess_sec",
             key_duration,

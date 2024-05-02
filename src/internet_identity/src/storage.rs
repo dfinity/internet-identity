@@ -95,7 +95,7 @@ use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::activity_stats::event_stats::EventData;
+use crate::activity_stats::event_stats::{EventData, EventKey};
 use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;
@@ -181,7 +181,7 @@ pub struct Storage<M: Memory> {
     persistent_state: StableCell<StorablePersistentState, VirtualMemory<RestrictedMemory<M>>>,
     /// Memory wrapper used to report the size of the event data memory.
     event_data_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
-    pub event_data: StableBTreeMap<Timestamp, EventData, VirtualMemory<RestrictedMemory<M>>>,
+    pub event_data: StableBTreeMap<EventKey, EventData, VirtualMemory<RestrictedMemory<M>>>,
     /// Memory wrapper used to report the size of the stats aggregation memory.
     event_aggregations_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
     pub event_aggregations: StableBTreeMap<String, u64, VirtualMemory<RestrictedMemory<M>>>,

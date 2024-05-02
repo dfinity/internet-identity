@@ -1,5 +1,5 @@
 use crate::activity_stats::event_stats::{
-    update_events_internal, Event, EventData, PrepareDelegationEvent,
+    update_events_internal, Event, EventData, EventKey, PrepareDelegationEvent,
 };
 use crate::ii_domain::IIDomain;
 use crate::storage::Storage;
@@ -38,7 +38,34 @@ fn should_store_event_and_add_to_aggregations() {
     }
 
     assert_eq!(storage.event_data.len(), 1);
-    assert_eq!(storage.event_data.get(&TIMESTAMP).unwrap(), event);
+    assert_eq!(
+        storage
+            .event_data
+            .get(&EventKey::min_key(TIMESTAMP))
+            .unwrap(),
+        event
+    );
+}
+
+#[test]
+fn should_store_multiple_events_with_same_timestamp() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0AppDomain),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: Duration::from_secs(900).as_nanos() as u64,
+        }),
+    };
+
+    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+
+    assert_eq!(storage.event_data.len(), 2);
+    storage.event_data.iter().for_each(|(key, value)| {
+        assert_eq!(key.time, TIMESTAMP);
+        assert_eq!(value, event.clone());
+    });
 }
 
 #[test]

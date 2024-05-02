@@ -171,6 +171,8 @@ struct State {
     archive_status_cache: RefCell<Option<ArchiveStatusCache>>,
     // Tracking data for the registration rate limit, if any. Not persisted across upgrades.
     registration_rate_limit: RefCell<Option<RateLimitState>>,
+    // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
+    event_data_uniqueness_counter: Cell<u16>,
 }
 
 impl Default for State {
@@ -186,6 +188,7 @@ impl Default for State {
             persistent_state: RefCell::new(PersistentState::default()),
             archive_status_cache: RefCell::new(None),
             registration_rate_limit: RefCell::new(None),
+            event_data_uniqueness_counter: Cell::new(0),
         }
     }
 }
@@ -399,5 +402,13 @@ pub fn cache_archive_status(archive_status: ArchiveStatusCache) {
 pub fn invalidate_archive_status_cache() {
     STATE.with(|state| {
         *state.archive_status_cache.borrow_mut() = None;
+    })
+}
+
+pub fn get_and_inc_event_data_counter() -> u16 {
+    STATE.with(|s| {
+        let counter = s.event_data_uniqueness_counter.get();
+        s.event_data_uniqueness_counter.set(counter.wrapping_add(1));
+        counter
     })
 }
