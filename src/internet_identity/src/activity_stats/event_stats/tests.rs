@@ -61,7 +61,7 @@ fn should_store_event_and_add_to_aggregations() {
         ),
     ];
     for key in expected_aggregations.iter() {
-        assert!(storage.event_aggregations.contains_key(&key));
+        assert!(storage.event_aggregations.contains_key(key));
     }
 
     assert_eq!(storage.event_data.len(), 1);
@@ -141,7 +141,7 @@ fn should_track_ii_domains() {
         AggregationKey::new(PrepareDelegationCount, Day, None, EXAMPLE_URL.to_string()),
     ];
     for key in expected_aggregations.iter() {
-        assert!(storage.event_aggregations.contains_key(&key));
+        assert!(storage.event_aggregations.contains_key(key));
     }
 }
 
@@ -182,7 +182,7 @@ fn should_track_multiple_frontends() {
         ),
     ];
     for key in expected_aggregations.iter() {
-        assert!(storage.event_aggregations.contains_key(&key));
+        assert!(storage.event_aggregations.contains_key(key));
     }
 }
 
@@ -498,7 +498,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
         ),
     ];
     for key in expected_aggregations.iter() {
-        assert!(storage.event_aggregations.contains_key(&key));
+        assert!(storage.event_aggregations.contains_key(key));
     }
 
     let event2 = EventData {
@@ -541,7 +541,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
     ];
     assert_eq!(storage.event_aggregations.len(), 4);
     for key in expected_aggregations_2.iter() {
-        assert!(storage.event_aggregations.contains_key(&key));
+        assert!(storage.event_aggregations.contains_key(key));
     }
 
     assert_eq!(storage.event_data.len(), 1);
