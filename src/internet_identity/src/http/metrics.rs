@@ -1,12 +1,18 @@
 use crate::activity_stats::activity_counter::ActivityCounter;
+use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
+use crate::activity_stats::event_stats::event_aggregations::{
+    retrieve_aggregation, Aggregation, AggregationWindow, PD_SESS_SEC,
+};
 use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
+use crate::ii_domain::IIDomain;
 use crate::state::PersistentState;
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
 use std::time::Duration;
+use IIDomain::{Ic0App, InternetComputerOrg};
 
 /// Collects the various metrics exposed by the Internet Identity canister.
 /// Returns a ascii-encoded string of the metrics in the Prometheus exposition format.
@@ -131,6 +137,55 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         }
         Ok::<(), std::io::Error>(())
     })?;
+
+    event_metrics(w)?;
+    Ok(())
+}
+
+fn event_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> Result<(), std::io::Error> {
+    let sess_sec_builder = w.gauge_vec(
+        "internet_identity_prepare_delegation_session_seconds",
+        "Cumulative authenticated session duration in seconds for the given front-end origin.",
+    )?;
+    pd_aggregation_metrics(PD_SESS_SEC, sess_sec_builder)?;
+    Ok(())
+}
+
+fn pd_aggregation_metrics(
+    aggregation: &dyn Aggregation,
+    mut metrics_builder: LabeledMetricsBuilder<Vec<u8>>,
+) -> Result<(), std::io::Error> {
+    fn domain_to_label(domain: &Option<IIDomain>) -> &'static str {
+        match domain {
+            None => "other",
+            Some(Ic0App) => "ic0.app",
+            Some(InternetComputerOrg) => "internetcomputer.org",
+        }
+    }
+    fn window_to_label(window: &AggregationWindow) -> &'static str {
+        match window {
+            Day => "24h",
+            Month => "30d",
+        }
+    }
+    for window in &[Day, Month] {
+        for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
+            let data = retrieve_aggregation(aggregation, window.clone(), domain.clone());
+            let origin_label = domain_to_label(domain);
+            let window_label = window_to_label(window);
+
+            for (frontend_origin, sess_sec) in data.iter().take(10) {
+                metrics_builder = metrics_builder.value(
+                    &[
+                        ("dapp", frontend_origin),
+                        ("window", window_label),
+                        ("ii_origin", origin_label),
+                    ],
+                    *sess_sec as f64,
+                )?;
+            }
+        }
+    }
     Ok(())
 }
 
