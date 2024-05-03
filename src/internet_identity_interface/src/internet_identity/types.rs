@@ -196,7 +196,6 @@ pub struct InternetIdentityInit {
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
     pub register_rate_limit: Option<RateLimitConfig>,
-    pub max_num_latest_delegation_origins: Option<u64>,
     pub max_inflight_captchas: Option<u64>,
 }
 
