@@ -55,7 +55,9 @@ impl From<PersistentState> for StorablePersistentState {
             active_anchor_stats: s.active_anchor_stats,
             domain_active_anchor_stats: s.domain_active_anchor_stats,
             active_authn_method_stats: s.active_authn_method_stats,
+            // unused, kept for stable memory compatibility
             latest_delegation_origins: Default::default(),
+            // unused, kept for stable memory compatibility
             max_num_latest_delegation_origins: 0,
             max_inflight_captchas: s.max_inflight_captchas,
         }
