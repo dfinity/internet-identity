@@ -964,8 +964,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # we need the history for the tags, but we don't need the files (except for the GitHub workflows / actions)
+          # --> sparse checkout of only the needed things
+          fetch-depth: 0
+          sparse-checkout: |
+            src/internet_identity/internet_identity.did
+            .github
+            .didc-release
+            allowed_breaking_change.patch
+          sparse-checkout-cone-mode: false
       - uses: ./.github/actions/setup-didc
+      - name: 'Get latest release'
+        uses: actions/github-script@v7
+        id: latest-release-tag
+        with:
+          result-encoding: string
+          script: return (await github.rest.repos.getLatestRelease({owner:"dfinity", repo:"internet-identity"})).data.tag_name;
       - name: "Check canister interface compatibility"
         run: |
+          release="release-2024-04-26"
+          # undo the breaking changes that we _explicitly_ made
+          # remove after the next release
+          # if we accidentally introduced other breaking changes, the patch would no longer apply / fix them
+          # making this job fail.
+          if [ "${{ steps.latest-release-tag.outputs.result }}" == "$release" ]; then
+            echo "Rolling back intentionally made breaking changes $release"
+            git apply allowed_breaking_change.patch
+          fi
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
           didc check src/internet_identity/internet_identity.did internet_identity_previous.did
