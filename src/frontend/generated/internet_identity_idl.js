@@ -12,7 +12,6 @@ export const idlFactory = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
-    'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -493,7 +492,6 @@ export const init = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
-    'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
