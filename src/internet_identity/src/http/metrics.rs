@@ -204,6 +204,16 @@ fn persistent_state_metrics(
         Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
         "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
     )?;
+    w.encode_gauge(
+        "internet_identity_event_data_count",
+        persistent_state.event_data_count as f64,
+        "Number of events stored in event_data map.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_event_aggregations_count",
+        persistent_state.event_aggregations_count as f64,
+        "Number of entries in the event_aggregations map.",
+    )?;
 
     let stats = &persistent_state.active_anchor_stats;
     if let Some(ref daily_active_anchor_stats) = stats.completed.daily_events {

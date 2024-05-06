@@ -553,7 +553,7 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_list_aggregated_session_seconds() -> Result<(), CallError> {
+fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<(), CallError> {
     let pub_session_key = ByteBuf::from("session public key");
     let authn_method_ic0 = AuthnMethodData {
         metadata: HashMap::from([(
@@ -585,6 +585,16 @@ fn should_list_aggregated_session_seconds() -> Result<(), CallError> {
     let metrics = get_metrics(&env, canister_id);
     // make sure empty data is not listed on the metrics endpoint
     assert!(!metrics.contains("internet_identity_prepare_delegation_session_seconds{"));
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        0f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        0f64,
+    );
 
     api::prepare_delegation(
         &env,
@@ -654,9 +664,20 @@ fn should_list_aggregated_session_seconds() -> Result<(), CallError> {
         "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
         1800f64,
     );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        4f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        12f64,
+    );
 
-    env.advance_time(Duration::from_secs(60 * 60 * 24)); // advance time to see it reflected on the metrics endpoint
-                                                         // call prepare delegation again to trigger stats update
+    // advance time one day to see it reflected on the daily stats
+    env.advance_time(Duration::from_secs(60 * 60 * 24));
+    // call prepare delegation again to trigger stats update
     api::prepare_delegation(
         &env,
         canister_id,
@@ -694,6 +715,16 @@ fn should_list_aggregated_session_seconds() -> Result<(), CallError> {
         &metrics,
         "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
         1800f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        5f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        10f64,
     );
     Ok(())
 }

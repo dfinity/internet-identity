@@ -95,6 +95,14 @@ pub struct PersistentState {
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
     // Maximum number of inflight captchas
     pub max_inflight_captchas: u64,
+    // Count of entries in the event_data BTreeMap
+    // event_data is expected to have a lot of entries, thus counting by iterating over it is not
+    // an option.
+    pub event_data_count: u64,
+    // Count of entries in the event_aggregations BTreeMap
+    // event_aggregations is expected to have a lot of entries, thus counting by iterating over it is not
+    // an option.
+    pub event_aggregations_count: u64,
 }
 
 impl Default for PersistentState {
@@ -108,6 +116,8 @@ impl Default for PersistentState {
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+            event_data_count: 0,
+            event_aggregations_count: 0,
         }
     }
 }

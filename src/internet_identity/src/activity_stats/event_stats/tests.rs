@@ -6,6 +6,7 @@ use crate::activity_stats::event_stats::{
     update_events_internal, Event, EventData, EventKey, PrepareDelegationEvent,
 };
 use crate::ii_domain::IIDomain;
+use crate::state::persistent_state;
 use crate::storage::Storage;
 use crate::DAY_NS;
 use ic_stable_structures::VectorMemory;
@@ -72,6 +73,8 @@ fn should_store_event_and_add_to_aggregations() {
             .unwrap(),
         event
     );
+
+    assert_event_count_consistent(&mut storage);
 }
 
 #[test]
@@ -93,6 +96,7 @@ fn should_store_multiple_events_with_same_timestamp() {
         assert_eq!(key.time, TIMESTAMP);
         assert_eq!(value, event.clone());
     });
+    assert_event_count_consistent(&mut storage);
 }
 
 #[test]
@@ -143,6 +147,7 @@ fn should_track_ii_domains() {
     for key in expected_aggregations.iter() {
         assert!(storage.event_aggregations.contains_key(key));
     }
+    assert_event_count_consistent(&mut storage);
 }
 
 #[test]
@@ -184,6 +189,7 @@ fn should_track_multiple_frontends() {
     for key in expected_aggregations.iter() {
         assert!(storage.event_aggregations.contains_key(key));
     }
+    assert_event_count_consistent(&mut storage);
 }
 
 #[test]
@@ -251,6 +257,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
             .unwrap(),
         sess_duration_secs * 2
     );
+    assert_event_count_consistent(&mut storage);
 }
 
 #[test]
@@ -266,7 +273,9 @@ fn should_prune_daily_events_after_24h() {
     };
 
     update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    assert_event_count_consistent(&mut storage);
     update_events_internal(event.clone(), TIMESTAMP + DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(storage.event_data.len(), 2);
     assert_eq!(storage.event_aggregations.len(), 4);
@@ -333,7 +342,9 @@ fn should_prune_monthly_events_after_30d() {
     };
 
     update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    assert_event_count_consistent(&mut storage);
     update_events_internal(event.clone(), TIMESTAMP + DAY_NS * 30, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(storage.event_data.len(), 1);
     assert_eq!(storage.event_aggregations.len(), 4);
@@ -398,6 +409,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
         }),
     };
     update_events_internal(event1, TIMESTAMP, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(
         storage
@@ -420,6 +432,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
         }),
     };
     update_events_internal(event2, TIMESTAMP + 1, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(
         storage
@@ -442,6 +455,7 @@ fn should_account_for_dapps_changing_session_lifetime() {
         }),
     };
     update_events_internal(event3, TIMESTAMP + 1 + DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(
         storage
@@ -469,6 +483,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
     };
 
     update_events_internal(event, TIMESTAMP, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     assert_eq!(storage.event_aggregations.len(), 4);
     let expected_aggregations: [AggregationKey; 4] = [
@@ -512,6 +527,7 @@ fn should_remove_aggregations_without_events_when_pruning() {
     // after this update, the previous aggregations should be removed as their weight is 0
     // (this means that there is no event being counted for them)
     update_events_internal(event2, TIMESTAMP + 30 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
 
     let expected_aggregations_2: [AggregationKey; 4] = [
         AggregationKey::new(
@@ -545,6 +561,18 @@ fn should_remove_aggregations_without_events_when_pruning() {
     }
 
     assert_eq!(storage.event_data.len(), 1);
+}
+
+/// Make sure the cached count values are consistent with the actual data
+fn assert_event_count_consistent(storage: &mut Storage<Rc<RefCell<Vec<u8>>>>) {
+    assert_eq!(
+        storage.event_data.iter().count(),
+        persistent_state(|s| s.event_data_count) as usize
+    );
+    assert_eq!(
+        storage.event_aggregations.iter().count(),
+        persistent_state(|s| s.event_aggregations_count) as usize
+    );
 }
 
 fn test_storage() -> Storage<Rc<RefCell<Vec<u8>>>> {
