@@ -668,7 +668,7 @@ fn should_list_aggregated_session_seconds() -> Result<(), CallError> {
     )?;
 
     let metrics = get_metrics(&env, canister_id);
-    // make sure aggregations that hav no data anymore get removed from stats endpoint
+    // make sure aggregations that have no data anymore get removed from stats endpoint
     assert!(
         !metrics.contains(
         "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\""));
