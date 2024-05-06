@@ -36,14 +36,20 @@ fn should_retrieve_aggregations() {
     assert_eq!(results, vec![(EXAMPLE_URL.to_string(), 1)]);
 
     let results = retrieve_aggregation_internal(PD_SESS_SEC, Day, Some(IIDomain::Ic0App), &storage);
-    assert_eq!(results, vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]);
+    assert_eq!(
+        results,
+        vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]
+    );
 
     let results = retrieve_aggregation_internal(PD_COUNT, Month, Some(IIDomain::Ic0App), &storage);
     assert_eq!(results, vec![(EXAMPLE_URL.to_string(), 1)]);
 
     let results =
         retrieve_aggregation_internal(PD_SESS_SEC, Month, Some(IIDomain::Ic0App), &storage);
-    assert_eq!(results, vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]);
+    assert_eq!(
+        results,
+        vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]
+    );
 
     // expected non-existing
     let results = retrieve_aggregation_internal(
@@ -77,7 +83,8 @@ fn should_retrieve_aggregations_for_multiple_frontend_origins_sorted_by_weight()
             event: Event::PrepareDelegation(PrepareDelegationEvent {
                 ii_domain: Some(IIDomain::Ic0App),
                 frontend: format!("https://example{}.com", i),
-                session_duration_ns: Duration::from_secs(DUMMY_SESSION_LENGTH_SEC + i).as_nanos() as u64,
+                session_duration_ns: Duration::from_secs(DUMMY_SESSION_LENGTH_SEC + i).as_nanos()
+                    as u64,
             }),
         };
         update_events_internal(event.clone(), TIMESTAMP, &mut storage);
@@ -88,7 +95,12 @@ fn should_retrieve_aggregations_for_multiple_frontend_origins_sorted_by_weight()
         .collect::<Vec<_>>();
     let per_origin_sess_weight = (0..10)
         .rev() // aggregations are sorted by weight descending
-        .map(|i| (format!("https://example{}.com", i), DUMMY_SESSION_LENGTH_SEC + i))
+        .map(|i| {
+            (
+                format!("https://example{}.com", i),
+                DUMMY_SESSION_LENGTH_SEC + i,
+            )
+        })
         .collect::<Vec<_>>();
     let results = retrieve_aggregation_internal(PD_COUNT, Day, Some(IIDomain::Ic0App), &storage);
     assert_eq!(results, per_origin_weight_one);
@@ -184,7 +196,10 @@ fn should_retrieve_aggregation_by_time_window() {
     assert_eq!(results, vec![(EXAMPLE_URL.to_string(), 1)]);
 
     let results = retrieve_aggregation_internal(PD_SESS_SEC, Day, Some(IIDomain::Ic0App), &storage);
-    assert_eq!(results, vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]);
+    assert_eq!(
+        results,
+        vec![(EXAMPLE_URL.to_string(), DUMMY_SESSION_LENGTH_SEC)]
+    );
 
     let results = retrieve_aggregation_internal(PD_COUNT, Month, Some(IIDomain::Ic0App), &storage);
     assert_eq!(results, vec![(EXAMPLE_URL.to_string(), 2)]);
