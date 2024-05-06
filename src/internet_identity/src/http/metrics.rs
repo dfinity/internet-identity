@@ -1,11 +1,11 @@
 use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
 use crate::activity_stats::event_stats::event_aggregations::{
-    retrieve_aggregation, Aggregation, AggregationWindow, PD_SESS_SEC,
+    retrieve_aggregation, Aggregation, PD_SESS_SEC,
 };
 use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
-use crate::ii_domain::IIDomain;
+use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::PersistentState;
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::stable64_size;
@@ -155,31 +155,16 @@ fn pd_aggregation_metrics(
     aggregation: &dyn Aggregation,
     mut metrics_builder: LabeledMetricsBuilder<Vec<u8>>,
 ) -> Result<(), std::io::Error> {
-    fn domain_to_label(domain: &Option<IIDomain>) -> &'static str {
-        match domain {
-            None => "other",
-            Some(Ic0App) => "ic0.app",
-            Some(InternetComputerOrg) => "internetcomputer.org",
-        }
-    }
-    fn window_to_label(window: &AggregationWindow) -> &'static str {
-        match window {
-            Day => "24h",
-            Month => "30d",
-        }
-    }
     for window in &[Day, Month] {
         for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
             let data = retrieve_aggregation(aggregation, window.clone(), domain.clone());
-            let origin_label = domain_to_label(domain);
-            let window_label = window_to_label(window);
 
             for (frontend_origin, sess_sec) in data.iter().take(10) {
                 metrics_builder = metrics_builder.value(
                     &[
                         ("dapp", frontend_origin),
-                        ("window", window_label),
-                        ("ii_origin", origin_label),
+                        ("window", window.label()),
+                        ("ii_origin", maybe_domain_to_label(domain)),
                     ],
                     *sess_sec as f64,
                 )?;

@@ -309,6 +309,9 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
+    'event_aggregations' : IDL.Vec(
+      IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
+    ),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
