@@ -1,13 +1,13 @@
-use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::Month;
-use crate::activity_stats::event_stats::event_aggregations::{
-    AggregationKey, AggregationKind, AggregationWindow,
-};
-use crate::activity_stats::event_stats::Event::PruneEvent;
-use crate::activity_stats::event_stats::{
-    update_events_internal, Event, EventData, EventKey, PrepareDelegationEvent,
-};
 use crate::ii_domain::IIDomain;
 use crate::state::persistent_state;
+use crate::stats::event_stats::event_aggregations::AggregationWindow::Month;
+use crate::stats::event_stats::event_aggregations::{
+    AggregationKey, AggregationKind, AggregationWindow,
+};
+use crate::stats::event_stats::Event::PruneEvent;
+use crate::stats::event_stats::{
+    update_events_internal, Event, EventData, EventKey, PrepareDelegationEvent,
+};
 use crate::storage::Storage;
 use crate::DAY_NS;
 use ic_stable_structures::VectorMemory;

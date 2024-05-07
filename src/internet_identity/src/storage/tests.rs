@@ -1,7 +1,7 @@
-use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
-use crate::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::state::PersistentState;
+use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, StorageError, MAX_ENTRIES};
 use crate::Storage;

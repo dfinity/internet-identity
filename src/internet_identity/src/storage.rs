@@ -95,8 +95,8 @@ use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::activity_stats::event_stats::event_aggregations::AggregationKey;
-use crate::activity_stats::event_stats::{EventData, EventKey};
+use crate::stats::event_stats::AggregationKey;
+use crate::stats::event_stats::{EventData, EventKey};
 use internet_identity_interface::internet_identity::types::*;
 
 use crate::state::PersistentState;

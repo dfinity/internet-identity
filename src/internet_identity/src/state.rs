@@ -1,9 +1,9 @@
-use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
-use crate::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
-use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
-use crate::activity_stats::ActivityStats;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::temp_keys::TempKeys;
+use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
+use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
+use crate::stats::activity_stats::ActivityStats;
 use crate::storage::anchor::Anchor;
 use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};

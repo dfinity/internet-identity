@@ -1,11 +1,9 @@
-use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
-use crate::activity_stats::event_stats::event_aggregations::{
+use crate::ii_domain::IIDomain;
+use crate::stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
+use crate::stats::event_stats::event_aggregations::{
     retrieve_aggregation_internal, PD_COUNT, PD_SESS_SEC,
 };
-use crate::activity_stats::event_stats::{
-    update_events_internal, Event, EventData, PrepareDelegationEvent,
-};
-use crate::ii_domain::IIDomain;
+use crate::stats::event_stats::{update_events_internal, Event, EventData, PrepareDelegationEvent};
 use crate::storage::Storage;
 use crate::DAY_NS;
 use ic_stable_structures::VectorMemory;

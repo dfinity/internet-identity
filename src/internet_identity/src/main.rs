@@ -1,10 +1,10 @@
-use crate::activity_stats::event_stats::event_aggregations::all_aggregations_top_n;
 use crate::anchor_management::tentative_device_registration;
 use crate::anchor_management::tentative_device_registration::{
     TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::stats::event_stats::all_aggregations_top_n;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
@@ -26,7 +26,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 use storage::{Salt, Storage};
 
-mod activity_stats;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -39,6 +38,7 @@ mod hash;
 mod http;
 mod ii_domain;
 mod state;
+mod stats;
 mod storage;
 mod vc_mvp;
 
@@ -379,7 +379,7 @@ fn acknowledge_entries(sequence_number: u64) {
 #[update]
 #[candid_method]
 async fn prune_events_if_necessary() {
-    activity_stats::event_stats::prune_events_if_necessary().await
+    stats::event_stats::prune_events_if_necessary().await
 }
 
 /// Inject pruning event at the given timestamp.
@@ -387,7 +387,7 @@ async fn prune_events_if_necessary() {
 #[update]
 #[candid_method]
 fn inject_prune_event(timestamp: Timestamp) {
-    activity_stats::event_stats::inject_prune_event(timestamp);
+    stats::event_stats::inject_prune_event(timestamp);
 }
 
 #[init]

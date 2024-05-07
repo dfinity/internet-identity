@@ -1,10 +1,8 @@
-use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
-use crate::activity_stats::event_stats::{
-    AggregationEvent, Event, EventData, PrepareDelegationEvent,
-};
 use crate::ii_domain::IIDomain::{Ic0App, InternetComputerOrg};
 use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::storage_borrow;
+use crate::stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
+use crate::stats::event_stats::{AggregationEvent, Event, EventData, PrepareDelegationEvent};
 use crate::storage::Storage;
 use candid::Deserialize;
 use ic_stable_structures::{storable, Memory, Storable};

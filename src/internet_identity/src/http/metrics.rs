@@ -1,12 +1,10 @@
-use crate::activity_stats::activity_counter::ActivityCounter;
-use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
-use crate::activity_stats::event_stats::event_aggregations::{
-    retrieve_aggregation, Aggregation, PD_SESS_SEC,
-};
-use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
 use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::PersistentState;
+use crate::stats::activity_stats::activity_counter::ActivityCounter;
+use crate::stats::activity_stats::ActivityStats;
+use crate::stats::event_stats::AggregationWindow::{Day, Month};
+use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_SESS_SEC};
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
