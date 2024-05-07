@@ -243,9 +243,9 @@ impl AggregationKey {
     fn upper_bound(&self) -> Bound<Self> {
         let empty_data = ByteBuf::from(vec![]);
         let next_ii_domain = match self.ii_domain {
-            None => Some(IIDomain::Ic0App),
-            Some(IIDomain::Ic0App) => Some(IIDomain::InternetComputerOrg),
-            Some(IIDomain::InternetComputerOrg) => None,
+            None => Some(Ic0App),
+            Some(Ic0App) => Some(InternetComputerOrg),
+            Some(InternetComputerOrg) => None,
         };
         if next_ii_domain.is_some() {
             let end_bound = Bound::Excluded(AggregationKey {
@@ -272,7 +272,7 @@ impl AggregationKey {
         if let Some(kind) = next_kind {
             let end_bound = Bound::Excluded(AggregationKey {
                 kind,
-                window: AggregationWindow::Day,
+                window: Day,
                 ii_domain: None,
                 data: empty_data,
             });
