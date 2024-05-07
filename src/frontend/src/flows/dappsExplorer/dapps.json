@@ -540,5 +540,11 @@
     "oneLiner": "Decentralized exchange built entirely on the chain based on the ICP.",
     "website": "https://icpex.org/",
     "logo": "icpex_logo.png"
+  },
+  {
+    "name": "Personal DAO",
+    "oneLiner": "A web3 app that functions as a gated DAO, treasury, data storage solution, and more.",
+    "website": "https://fkkq7-siaaa-aaaap-qaaya-cai.ic0.app/",
+    "logo": "personal_dao_logo.png"
   }
 ]
