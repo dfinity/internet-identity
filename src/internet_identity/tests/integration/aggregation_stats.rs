@@ -2,7 +2,9 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, test_authn_method,
 };
 use canister_tests::api::internet_identity as api;
-use canister_tests::framework::{env, install_ii_canister, II_WASM};
+use canister_tests::framework::{
+    assert_metric, env, get_metrics, install_ii_canister, upgrade_ii_canister, II_WASM,
+};
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
@@ -135,6 +137,59 @@ fn assert_expected_aggregation(
         "Aggregation key \"{}\" does not match",
         key
     );
+}
+
+#[test]
+fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
+    const II_ORIGIN: &str = "ic0.app";
+    fn assert_expected_state(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {
+        let aggregations = api::stats(env, canister_id)?.event_aggregations;
+        assert_expected_aggregation(
+            &aggregations,
+            &aggregation_key(PD_COUNT, "24h", II_ORIGIN),
+            vec![("https://some-dapp.com".to_string(), 2u64)],
+        );
+        assert_expected_aggregation(
+            &aggregations,
+            &aggregation_key(PD_COUNT, "30d", II_ORIGIN),
+            vec![("https://some-dapp.com".to_string(), 2u64)],
+        );
+        assert_expected_aggregation(
+            &aggregations,
+            &aggregation_key(PD_SESS_SEC, "24h", II_ORIGIN),
+            vec![("https://some-dapp.com".to_string(), 2 * SESSION_LENGTH)],
+        );
+        assert_expected_aggregation(
+            &aggregations,
+            &aggregation_key(PD_SESS_SEC, "30d", II_ORIGIN),
+            vec![("https://some-dapp.com".to_string(), 2 * SESSION_LENGTH)],
+        );
+        assert_metric(
+            &get_metrics(env, canister_id),
+            "internet_identity_event_data_count",
+            2f64,
+        );
+        assert_metric(
+            &get_metrics(env, canister_id),
+            "internet_identity_event_aggregations_count",
+            4f64,
+        );
+        Ok(())
+    }
+
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_nr = create_identity(&env, canister_id, II_ORIGIN);
+
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    assert_expected_state(&env, canister_id)?;
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    assert_expected_state(&env, canister_id)?;
+    Ok(())
 }
 
 fn create_identity(env: &StateMachine, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {
