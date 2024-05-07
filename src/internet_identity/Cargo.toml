@@ -29,6 +29,7 @@ captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255
 # All IC deps
 candid.workspace = true
 ic-cdk.workspace = true
+ic-cdk-timers.workspace = true
 ic-cdk-macros.workspace = true
 ic-certification.workspace = true
 ic-metrics-encoder.workspace = true
