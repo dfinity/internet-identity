@@ -171,6 +171,9 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
+    // Map from event aggregation to a sorted list of top 100 sub-keys to their weights.
+    // Example: {"prepare_delegation_count 24h ic0.app": [{"https://dapp.com", 100}, {"https://dapp2.com", 50}]}
+    event_aggregations: vec record {text; vec record {text; nat64}};
 };
 
 // Configuration parameters related to the archive.

@@ -5,6 +5,7 @@
 //! See https://matklad.github.io/2021/02/27/delete-cargo-integration-tests.html#Implications for more details.
 
 mod activity_stats;
+mod aggregation_stats;
 mod anchor_management;
 mod archive_integration;
 mod delegation;

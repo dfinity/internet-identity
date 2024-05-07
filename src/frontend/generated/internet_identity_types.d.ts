@@ -189,6 +189,7 @@ export interface InternetIdentityStats {
   'assigned_user_number_range' : [bigint, bigint],
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,
+  'event_aggregations' : Array<[string, Array<[string, bigint]>]>,
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |

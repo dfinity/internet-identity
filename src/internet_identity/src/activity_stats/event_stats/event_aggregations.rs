@@ -1,7 +1,9 @@
+use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
 use crate::activity_stats::event_stats::{
     AggregationEvent, Event, EventData, PrepareDelegationEvent,
 };
-use crate::ii_domain::IIDomain;
+use crate::ii_domain::IIDomain::{Ic0App, InternetComputerOrg};
+use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::storage_borrow;
 use crate::storage::Storage;
 use candid::Deserialize;
@@ -9,6 +11,7 @@ use ic_stable_structures::{storable, Memory, Storable};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::ops::Bound;
 use std::time::Duration;
 
@@ -23,13 +26,46 @@ mod tests;
 pub trait Aggregation {
     fn kind(&self) -> AggregationKind;
 
-    fn label(&self, key: AggregationKey) -> String;
+    fn label(&self) -> &'static str;
+
+    fn key_label(&self, key: AggregationKey) -> String;
 
     fn process_event(
         &self,
         window: AggregationWindow,
         event: &EventData,
     ) -> Option<AggregationEvent>;
+}
+
+/// Returns a map of all aggregations, each with up to `limit` many data points.
+/// For each aggregation, the data points are sorted by weight in descending order.
+pub fn all_aggregations_top_n(limit: usize) -> HashMap<String, Vec<(String, u64)>> {
+    let mut aggregations = HashMap::new();
+    for aggregation in &AGGREGATIONS {
+        for window in &[Day, Month] {
+            for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
+                let tuples: Vec<_> =
+                    retrieve_aggregation(*aggregation, window.clone(), domain.clone())
+                        .into_iter()
+                        .take(limit)
+                        .collect();
+                if tuples.is_empty() {
+                    // don't add empty aggregations
+                    continue;
+                }
+                aggregations.insert(
+                    format!(
+                        "{} {} {}",
+                        aggregation.label(),
+                        window.label(),
+                        maybe_domain_to_label(domain)
+                    ),
+                    tuples,
+                );
+            }
+        }
+    }
+    aggregations
 }
 
 /// Retrieve the aggregation data for the given window and II domain.
@@ -58,7 +94,7 @@ fn retrieve_aggregation_internal<M: Memory>(
     let mut data: Vec<_> = s
         .event_aggregations
         .range((Bound::Included(range_start), range_end))
-        .map(|(key, weight)| (aggregation.label(key), weight))
+        .map(|(key, weight)| (aggregation.key_label(key), weight))
         .collect();
     data.sort_by(|(_, weight_a), (_, weight_b)| weight_b.cmp(weight_a));
     data
@@ -75,7 +111,11 @@ impl Aggregation for PrepareDelegationCount {
         AggregationKind::PrepareDelegationCount
     }
 
-    fn label(&self, key: AggregationKey) -> String {
+    fn label(&self) -> &'static str {
+        "prepare_delegation_count"
+    }
+
+    fn key_label(&self, key: AggregationKey) -> String {
         String::from_utf8(key.data.into_vec()).expect("Invalid UTF-8")
     }
 
@@ -99,7 +139,11 @@ impl Aggregation for PrepareDelegationSessionSeconds {
         AggregationKind::PrepareDelegationSessionSeconds
     }
 
-    fn label(&self, key: AggregationKey) -> String {
+    fn label(&self) -> &'static str {
+        "prepare_delegation_session_seconds"
+    }
+
+    fn key_label(&self, key: AggregationKey) -> String {
         String::from_utf8(key.data.into_vec()).expect("Invalid UTF-8")
     }
 
@@ -135,6 +179,13 @@ impl AggregationWindow {
         match &self {
             Day => Some(Month),
             Month => None,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Day => "24h",
+            Month => "30d",
         }
     }
 }

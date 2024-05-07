@@ -1,3 +1,4 @@
+use crate::activity_stats::event_stats::event_aggregations::all_aggregations_top_n;
 use crate::anchor_management::tentative_device_registration;
 use crate::anchor_management::tentative_device_registration::{
     TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
@@ -336,12 +337,15 @@ fn stats() -> InternetIdentityStats {
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
 
+    let event_aggregations = all_aggregations_top_n(100);
+
     state::storage_borrow(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
         users_registered: storage.anchor_count() as u64,
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
+        event_aggregations,
     })
 }
 

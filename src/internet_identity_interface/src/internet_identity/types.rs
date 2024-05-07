@@ -206,6 +206,10 @@ pub struct InternetIdentityStats {
     pub archive_info: ArchiveInfo,
     pub canister_creation_cycles_cost: u64,
     pub storage_layout_version: u8,
+    /// Aggregations of events that have been processed by the II.
+    /// The map contains a key for each aggregation type, and the value is a list of tuples
+    /// from aggregated sub-key (i.e. for prepare_delegation it's the frontend origin) to weight.
+    pub event_aggregations: HashMap<String, Vec<(String, u64)>>,
 }
 
 /// Information about the archive.
