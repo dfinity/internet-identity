@@ -25,7 +25,6 @@ export class VcIssuer {
     const agent = new HttpAgent({
       host: inferHost(),
       identity,
-      retryTimes: 10,
     });
 
     // Only fetch the root key when we're not in prod
