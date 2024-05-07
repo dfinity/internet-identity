@@ -15,6 +15,7 @@ use std::time::Duration;
 const SESSION_LENGTH: u64 = 900; // 900 seconds
 const PD_COUNT: &str = "prepare_delegation_count";
 const PD_SESS_SEC: &str = "prepare_delegation_session_seconds";
+const PRUNE_EVENT_COUNT: &str = "prune_event_count";
 
 #[test]
 fn should_report_expected_aggregations() -> Result<(), CallError> {
@@ -56,7 +57,6 @@ fn should_not_report_empty_aggregations() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
-    let ii_origin2 = "internetcomputer.org";
     let identity_nr = create_identity(&env, canister_id, ii_origin);
 
     delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
@@ -75,18 +75,14 @@ fn should_not_report_empty_aggregations() -> Result<(), CallError> {
     assert_eq!(keys, expected_keys);
 
     env.advance_time(Duration::from_secs(60 * 60 * 24 * 30)); // 30 days
-
-    let identity_nr2 = create_identity(&env, canister_id, ii_origin2);
-    delegation_for_origin(&env, canister_id, identity_nr2, "https://some-dapp.com")?;
+    env.tick(); // execute timers
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
 
-    // set of keys is now entirely different, because the other origin has been pruned after 30 days
+    // set of keys is now entirely different due to automatic pruning
     let mut expected_keys = vec![
-        aggregation_key(PD_COUNT, "24h", ii_origin2),
-        aggregation_key(PD_COUNT, "30d", ii_origin2),
-        aggregation_key(PD_SESS_SEC, "24h", ii_origin2),
-        aggregation_key(PD_SESS_SEC, "30d", ii_origin2),
+        aggregation_key(PRUNE_EVENT_COUNT, "24h", "other"),
+        aggregation_key(PRUNE_EVENT_COUNT, "30d", "other"),
     ];
     let mut keys = aggregations.into_keys().collect::<Vec<_>>();
     // sort for stable comparison

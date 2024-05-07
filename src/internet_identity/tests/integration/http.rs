@@ -677,16 +677,7 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
 
     // advance time one day to see it reflected on the daily stats
     env.advance_time(Duration::from_secs(60 * 60 * 24));
-    // call prepare delegation again to trigger stats update
-    api::prepare_delegation(
-        &env,
-        canister_id,
-        authn_method_internetcomputer.principal(),
-        user_number_1,
-        "https://some-dapp-4.com",
-        &pub_session_key,
-        None,
-    )?;
+    env.tick(); // trigger automatic pruning
 
     let metrics = get_metrics(&env, canister_id);
     // make sure aggregations that have no data anymore get removed from stats endpoint
@@ -724,7 +715,7 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_event_aggregations_count",
-        10f64,
+        8f64,
     );
     Ok(())
 }

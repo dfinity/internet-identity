@@ -2225,6 +2225,7 @@ dependencies = [
  "hex-literal",
  "ic-cdk",
  "ic-cdk-macros",
+ "ic-cdk-timers",
  "ic-certification 2.2.0",
  "ic-http-certification",
  "ic-metrics-encoder",

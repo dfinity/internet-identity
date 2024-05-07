@@ -161,11 +161,50 @@ impl Aggregation for PrepareDelegationSessionSeconds {
     }
 }
 
+/// Aggregates the number of injected [Event::PruneEvent] events
+/// - over 24h and 30d buckets
+struct PruneEventCount;
+
+impl Aggregation for PruneEventCount {
+    fn kind(&self) -> AggregationKind {
+        AggregationKind::PruneEventCount
+    }
+
+    fn label(&self) -> &'static str {
+        "prune_event_count"
+    }
+
+    fn key_label(&self, _key: AggregationKey) -> String {
+        // this aggregation only maintains a single count, so the key label is empty.
+        "".to_string()
+    }
+
+    fn process_event(
+        &self,
+        window: AggregationWindow,
+        event: &EventData,
+    ) -> Option<AggregationEvent> {
+        match &event.event {
+            Event::PruneEvent => {
+                let key = AggregationKey {
+                    kind: self.kind(),
+                    window,
+                    ii_domain: None,
+                    data: ByteBuf::from(vec![]),
+                };
+                Some(AggregationEvent { key, weight: 1 })
+            }
+            _ => None,
+        }
+    }
+}
+
 pub const PD_COUNT: &dyn Aggregation = &PrepareDelegationCount;
 pub const PD_SESS_SEC: &dyn Aggregation = &PrepareDelegationSessionSeconds;
+pub const PRUNE_COUNT: &dyn Aggregation = &PruneEventCount;
 
 /// List of aggregations currently maintained over events.
-pub const AGGREGATIONS: [&'static dyn Aggregation; 2] = [PD_COUNT, PD_SESS_SEC];
+pub const AGGREGATIONS: [&'static dyn Aggregation; 3] = [PD_COUNT, PD_SESS_SEC, PRUNE_COUNT];
 
 #[derive(Deserialize, Serialize, Clone, Eq, PartialEq, Debug, Ord, PartialOrd, Hash)]
 pub enum AggregationWindow {
@@ -195,6 +234,7 @@ impl AggregationWindow {
 pub enum AggregationKind {
     PrepareDelegationCount,
     PrepareDelegationSessionSeconds,
+    PruneEventCount,
 }
 
 impl AggregationKind {
@@ -202,7 +242,8 @@ impl AggregationKind {
         use AggregationKind::*;
         match &self {
             PrepareDelegationCount => Some(PrepareDelegationSessionSeconds),
-            PrepareDelegationSessionSeconds => None,
+            PrepareDelegationSessionSeconds => Some(PruneEventCount),
+            PruneEventCount => None,
         }
     }
 }
@@ -314,5 +355,6 @@ fn prepare_delegation_aggregation(
                 weight: weight_func(prepare_delegation_event),
             })
         }
+        _ => None,
     }
 }

@@ -363,6 +363,7 @@ export interface _SERVICE {
       { 'Err' : IdentityRegisterError }
   >,
   'init_salt' : ActorMethod<[], undefined>,
+  'inject_prune_event' : ActorMethod<[Timestamp], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
@@ -373,6 +374,7 @@ export interface _SERVICE {
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
   >,
+  'prune_events_if_necessary' : ActorMethod<[], undefined>,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
     RegisterResponse
