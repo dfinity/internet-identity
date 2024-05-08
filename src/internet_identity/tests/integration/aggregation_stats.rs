@@ -177,11 +177,25 @@ fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
 
 #[test]
 fn should_prune_automatically_after_upgrade() -> Result<(), CallError> {
+    const II_ORIGIN: &str = "ic0.app";
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let identity_nr = create_identity(&env, canister_id, "ic0.app");
+    let identity_nr = create_identity(&env, canister_id, II_ORIGIN);
 
     delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    let mut expected_keys = vec![
+        aggregation_key(PD_COUNT, "24h", II_ORIGIN),
+        aggregation_key(PD_COUNT, "30d", II_ORIGIN),
+        aggregation_key(PD_SESS_SEC, "24h", II_ORIGIN),
+        aggregation_key(PD_SESS_SEC, "30d", II_ORIGIN),
+    ];
+    let mut keys = aggregations.into_keys().collect::<Vec<_>>();
+    // sort for stable comparison
+    expected_keys.sort();
+    keys.sort();
+    assert_eq!(keys, expected_keys);
 
     // upgrade then advance time to trigger pruning
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
