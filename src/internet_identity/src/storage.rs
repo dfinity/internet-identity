@@ -149,7 +149,7 @@ pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u
 
 pub type Salt = [u8; 32];
 
-type NestedRestrictedMemory<M> = RestrictedMemory<VirtualMemory<RestrictedMemory<M>>>;
+type ManagedMemory<M> = VirtualMemory<RestrictedMemory<M>>;
 
 /// The [BufferedEntry] is wrapped to allow this crate to implement [Storable].
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -173,19 +173,19 @@ impl Storable for BufferedEntryWrapper {
 pub struct Storage<M: Memory> {
     header: Header,
     header_memory: RestrictedMemory<M>,
-    anchor_memory: VirtualMemory<RestrictedMemory<M>>,
+    anchor_memory: ManagedMemory<M>,
     /// Memory wrapper used to report the size of the archive buffer memory.
-    archive_buffer_memory_wrapper: MemoryWrapper<NestedRestrictedMemory<M>>,
-    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, NestedRestrictedMemory<M>>,
+    archive_buffer_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    archive_entries_buffer: StableBTreeMap<u64, BufferedEntryWrapper, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the persistent state memory.
-    persistent_state_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
-    persistent_state: StableCell<StorablePersistentState, VirtualMemory<RestrictedMemory<M>>>,
+    persistent_state_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    persistent_state: StableCell<StorablePersistentState, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the event data memory.
-    event_data_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
-    pub event_data: StableBTreeMap<EventKey, EventData, VirtualMemory<RestrictedMemory<M>>>,
+    event_data_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub event_data: StableBTreeMap<EventKey, EventData, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stats aggregation memory.
-    event_aggregations_memory_wrapper: MemoryWrapper<VirtualMemory<RestrictedMemory<M>>>,
-    pub event_aggregations: StableBTreeMap<AggregationKey, u64, VirtualMemory<RestrictedMemory<M>>>,
+    event_aggregations_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub event_aggregations: StableBTreeMap<AggregationKey, u64, ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -239,15 +239,7 @@ impl<M: Memory + Clone> Storage<M> {
             BUCKET_SIZE_IN_PAGES,
         );
         let anchor_memory = memory_manager.get(ANCHOR_MEMORY_ID);
-
-        // A single archive entry takes on average 476 bytes of space.
-        // To have space for 10_000 entries (accounting for ~10% overhead) we need 82 pages or ~5 MB.
-        // Since the memory manager allocates memory in buckets of 128 pages, we use a full bucket here.
-        // XX: Clean-up after incident
-        let archive_buffer_memory = RestrictedMemory::new(
-            memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID),
-            0..(1_000 * BUCKET_SIZE_IN_PAGES as u64),
-        );
+        let archive_buffer_memory = memory_manager.get(ARCHIVE_BUFFER_MEMORY_ID);
         let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
         let event_data_memory = memory_manager.get(EVENT_DATA_MEMORY_ID);
         let stats_aggregations_memory = memory_manager.get(STATS_AGGREGATIONS_MEMORY_ID);
