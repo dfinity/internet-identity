@@ -1,13 +1,12 @@
-use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActivityContext;
-use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::state;
+use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActivityContext;
+use crate::stats::activity_stats::activity_counter::ActivityCounter;
 use crate::storage::anchor::{Anchor, Device};
 use candid::{CandidType, Deserialize};
 use internet_identity_interface::internet_identity::types::Timestamp;
 
 pub mod activity_counter;
-pub mod event_stats;
-mod stats_maintenance;
+mod maintenance;
 
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct ActivityStats<T: ActivityCounter> {
@@ -34,7 +33,7 @@ impl<T: ActivityCounter> ActivityStats<T> {
     /// Updates all ongoing counters with the given context.
     /// Also performs maintenance on the stats, e.g. removing old monthly counters.
     fn update_counters(&mut self, context: &T::CountingContext<'_>) {
-        stats_maintenance::process_stats(self);
+        maintenance::process_stats(self);
         self.ongoing.daily_events.count_event(context);
         self.ongoing
             .monthly_events

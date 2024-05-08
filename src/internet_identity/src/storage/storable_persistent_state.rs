@@ -1,9 +1,9 @@
-use crate::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
-use crate::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
-use crate::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
-use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
 use crate::state::PersistentState;
+use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
+use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
+use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
+use crate::stats::activity_stats::ActivityStats;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;

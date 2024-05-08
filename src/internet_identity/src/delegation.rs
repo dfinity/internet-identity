@@ -1,7 +1,7 @@
-use crate::activity_stats::event_stats::{
+use crate::ii_domain::IIDomain;
+use crate::stats::event_stats::{
     update_event_based_stats, Event, EventData, PrepareDelegationEvent,
 };
-use crate::ii_domain::IIDomain;
 use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use canister_sig_util::signature_map::SignatureMap;

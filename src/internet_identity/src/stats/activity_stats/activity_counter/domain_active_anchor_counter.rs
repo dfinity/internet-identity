@@ -1,5 +1,5 @@
-use crate::activity_stats::activity_counter::ActivityCounter;
 use crate::ii_domain::IIDomain;
+use crate::stats::activity_stats::activity_counter::ActivityCounter;
 use crate::storage::anchor::{Anchor, DomainActivity};
 use candid::{CandidType, Deserialize};
 use internet_identity_interface::internet_identity::types::Timestamp;

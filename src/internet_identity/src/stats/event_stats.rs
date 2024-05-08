@@ -53,12 +53,10 @@
 //! ]
 //! ```
 
-use crate::activity_stats::event_stats::event_aggregations::{
-    AggregationKey, AggregationWindow, AGGREGATIONS,
-};
-use crate::activity_stats::event_stats::Event::PruneEvent;
 use crate::ii_domain::IIDomain;
 use crate::state::{storage_borrow, storage_borrow_mut};
+use crate::stats::event_stats::event_aggregations::AGGREGATIONS;
+use crate::stats::event_stats::Event::PruneEvent;
 use crate::storage::Storage;
 use crate::{state, DAY_NS, MINUTE_NS};
 use ic_cdk::api::call::CallResult;
@@ -72,7 +70,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// This module defines the aggregations over the events.
-pub mod event_aggregations;
+mod event_aggregations;
+pub use event_aggregations::*;
 
 #[cfg(test)]
 mod tests;

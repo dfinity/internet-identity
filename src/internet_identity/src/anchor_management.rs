@@ -2,7 +2,7 @@ use crate::archive::{archive_operation, device_diff};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
-use crate::{activity_stats, state};
+use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
