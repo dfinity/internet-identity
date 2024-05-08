@@ -61,6 +61,12 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         stable64_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "internet_identity_heap_pages",
+        core::arch::wasm32::memory_size::<0>() as f64,
+        "Number of heap memory pages used by this canister.",
+    )?;
     w.encode_gauge(
         "internet_identity_temp_keys_count",
         state::with_temp_keys(|temp_keys| temp_keys.num_temp_keys()) as f64,

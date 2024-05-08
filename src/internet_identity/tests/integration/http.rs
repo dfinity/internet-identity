@@ -145,6 +145,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_max_user_number",
         "internet_identity_signature_count",
         "internet_identity_stable_memory_pages",
+        "internet_identity_heap_pages",
         "internet_identity_last_upgrade_timestamp",
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
