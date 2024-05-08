@@ -122,19 +122,6 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
     Ok(())
 }
 
-fn assert_expected_aggregation(
-    aggregations: &HashMap<String, Vec<(String, u64)>>,
-    key: &str,
-    data: Vec<(String, u64)>,
-) {
-    assert_eq!(
-        aggregations.get(key).unwrap(),
-        &data,
-        "Aggregation key \"{}\" does not match",
-        key
-    );
-}
-
 #[test]
 fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
     const II_ORIGIN: &str = "ic0.app";
@@ -186,6 +173,62 @@ fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
 
     assert_expected_state(&env, canister_id)?;
     Ok(())
+}
+
+#[test]
+fn should_prune_automatically_after_upgrade() -> Result<(), CallError> {
+    const II_ORIGIN: &str = "ic0.app";
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_nr = create_identity(&env, canister_id, II_ORIGIN);
+
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    let mut expected_keys = vec![
+        aggregation_key(PD_COUNT, "24h", II_ORIGIN),
+        aggregation_key(PD_COUNT, "30d", II_ORIGIN),
+        aggregation_key(PD_SESS_SEC, "24h", II_ORIGIN),
+        aggregation_key(PD_SESS_SEC, "30d", II_ORIGIN),
+    ];
+    let mut keys = aggregations.into_keys().collect::<Vec<_>>();
+    // sort for stable comparison
+    expected_keys.sort();
+    keys.sort();
+    assert_eq!(keys, expected_keys);
+
+    // upgrade then advance time to trigger pruning
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    env.advance_time(Duration::from_secs(60 * 60 * 24 * 30)); // 30 days
+    env.tick(); // execute timers
+
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+
+    // set of keys only reflects pruning now
+    let mut expected_keys = vec![
+        aggregation_key(PRUNE_EVENT_COUNT, "24h", "other"),
+        aggregation_key(PRUNE_EVENT_COUNT, "30d", "other"),
+    ];
+    let mut keys = aggregations.into_keys().collect::<Vec<_>>();
+    // sort for stable comparison
+    expected_keys.sort();
+    keys.sort();
+    assert_eq!(keys, expected_keys);
+
+    Ok(())
+}
+
+fn assert_expected_aggregation(
+    aggregations: &HashMap<String, Vec<(String, u64)>>,
+    key: &str,
+    data: Vec<(String, u64)>,
+) {
+    assert_eq!(
+        aggregations.get(key).unwrap(),
+        &data,
+        "Aggregation key \"{}\" does not match",
+        key
+    );
 }
 
 fn create_identity(env: &StateMachine, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {

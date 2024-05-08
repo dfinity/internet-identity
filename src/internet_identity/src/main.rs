@@ -393,13 +393,22 @@ fn inject_prune_event(timestamp: Timestamp) {
 #[init]
 #[candid_method(init)]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
     state::init_new();
+    initialize(maybe_arg);
+}
 
+#[post_upgrade]
+fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
+    state::init_from_stable_memory();
+    // load the persistent state after initializing storage as it manages the respective stable cell
+    state::load_persistent_state();
+
+    initialize(maybe_arg);
+}
+
+fn initialize(maybe_arg: Option<InternetIdentityInit>) {
+    init_assets();
     apply_install_arg(maybe_arg);
-
-    // make sure the fully initialized storage configuration is written to stable memory
-    state::storage_borrow_mut(|storage| storage.flush());
     update_root_hash();
 
     // Immediately prune events if necessary and also set a timer to do so every 5 minutes.
@@ -410,19 +419,6 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     set_timer_interval(Duration::from_nanos(5 * MINUTE_NS), || {
         ic_cdk::spawn(prune_events_if_necessary());
     });
-}
-
-#[post_upgrade]
-fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
-    state::init_from_stable_memory();
-    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
-    state::load_persistent_state();
-
-    // We drop all the signatures on upgrade, users will
-    // re-request them if needed.
-    update_root_hash();
-    apply_install_arg(maybe_arg);
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
