@@ -53,8 +53,6 @@ const abortedCredentialsTemplate = ({
     </hgroup>
     <p class="t-paragraph">${copy[`aborted_${reason}`]}</p>
 
-    <p class="t-paragraph">${copy.notice}</p>
-
     <button
       data-action="cancel"
       ?disabled=${asyncReplace(didAck)}

@@ -2,7 +2,8 @@
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, create_identity_with_authn_methods,
+    sample_pubkey_authn_method, test_authn_method,
 };
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
@@ -12,8 +13,11 @@ use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::internet_identity::types::ChallengeAttempt;
+use internet_identity_interface::internet_identity::types::{
+    AuthnMethodData, ChallengeAttempt, MetadataEntryV2,
+};
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use std::time::{Duration, UNIX_EPOCH};
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -145,7 +149,6 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
-        "internet_identity_max_num_latest_delegation_origins",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
@@ -162,8 +165,11 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
     for metric in metrics {
         let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
         assert_eq!(
-            metric_timestamp,
-            env.time(),
+            env.time()
+                .duration_since(metric_timestamp)
+                .unwrap()
+                .as_secs(),
+            0,
             "metric timestamp did not match state machine time"
         )
     }
@@ -301,7 +307,9 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
     // - memory manager internal state in the second page
     // - one allocated bucket (i.e. 128 pages) for the archive entries buffer
     // - one allocated bucket (i.e. 128 pages) for the persistent state
-    assert_eq!(stable_memory_pages, 258f64);
+    // - one allocated bucket (i.e. 128 pages) for the event data
+    // - one allocated bucket (i.e. 128 pages) for the event aggregations
+    assert_eq!(stable_memory_pages, 514f64);
 
     // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage by
     // one bucket (ie. 128 pages) allocated by the memory manager.
@@ -309,7 +317,7 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
 
     let metrics = get_metrics(&env, canister_id);
     let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    assert_eq!(stable_memory_pages, 386f64);
+    assert_eq!(stable_memory_pages, 642f64);
     Ok(())
 }
 
@@ -510,6 +518,16 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
         "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
         1f64,
     );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"event_data\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"event_aggregations\"}",
+        1f64,
+    );
 
     let authn_method = test_authn_method();
     create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -525,16 +543,180 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
         "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
         1f64,
     );
-    // To test the archive buffer memory metric growing, we would need to spawn an archive and then
-    // create a large number of entries to be archived. Or load a prepared state with a large number
-    // of entries. This is not done here, as it would either require brittle setup or a long-running
-    // test.
-    assert_metric(
-        &metrics,
-        "internet_identity_virtual_memory_size_pages{memory=\"archive_buffer\"}",
-        1f64,
+
+    // To test the archive buffer and event data related memory metrics growing,
+    // we would have a very complex setup and require a large number of request.
+    // Or load a prepared state with a large number of entries.
+    // This is not done here, as it would either require brittle setup or a long-running test.
+
+    Ok(())
+}
+
+#[test]
+fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<(), CallError> {
+    let pub_session_key = ByteBuf::from("session public key");
+    let authn_method_ic0 = AuthnMethodData {
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+        )]),
+        ..sample_pubkey_authn_method(1)
+    };
+    let authn_method_internetcomputer = AuthnMethodData {
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntryV2::String("https://identity.internetcomputer.org".to_string()),
+        )]),
+        ..sample_pubkey_authn_method(2)
+    };
+
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number_1 = create_identity_with_authn_methods(
+        &env,
+        canister_id,
+        &[
+            test_authn_method(),
+            authn_method_ic0.clone(),
+            authn_method_internetcomputer.clone(),
+        ],
     );
 
+    let metrics = get_metrics(&env, canister_id);
+    // make sure empty data is not listed on the metrics endpoint
+    assert!(!metrics.contains("internet_identity_prepare_delegation_session_seconds{"));
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        0f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        0f64,
+    );
+
+    api::prepare_delegation(
+        &env,
+        canister_id,
+        test_authn_method().principal(),
+        user_number_1,
+        "https://some-dapp-1.com",
+        &pub_session_key,
+        None,
+    )?;
+    api::prepare_delegation(
+        &env,
+        canister_id,
+        test_authn_method().principal(),
+        user_number_1,
+        "https://some-dapp-1.com",
+        &pub_session_key,
+        Some(Duration::from_secs(3600).as_nanos() as u64),
+    )?;
+    api::prepare_delegation(
+        &env,
+        canister_id,
+        authn_method_ic0.principal(),
+        user_number_1,
+        "https://some-dapp-2.com",
+        &pub_session_key,
+        None,
+    )?;
+    api::prepare_delegation(
+        &env,
+        canister_id,
+        authn_method_internetcomputer.principal(),
+        user_number_1,
+        "https://some-dapp-3.com",
+        &pub_session_key,
+        None,
+    )?;
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\",ii_origin=\"other\"}",
+        5400f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"30d\",ii_origin=\"other\"}",
+        5400f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"24h\",ii_origin=\"ic0.app\"}",
+        1800f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
+        1800f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\",ii_origin=\"internetcomputer.org\"}",
+        1800f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
+        1800f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        4f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        12f64,
+    );
+
+    // advance time one day to see it reflected on the daily stats
+    env.advance_time(Duration::from_secs(60 * 60 * 24));
+    env.tick(); // trigger automatic pruning
+
+    let metrics = get_metrics(&env, canister_id);
+    // make sure aggregations that have no data anymore get removed from stats endpoint
+    assert!(
+        !metrics.contains(
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\""));
+    assert!(
+        !metrics.contains(
+            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"24h\""));
+    assert!(
+        !metrics.contains(
+            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\""));
+
+    // The 30d metrics should still be there
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"30d\",ii_origin=\"other\"}",
+        5400f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
+        1800f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
+        1800f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_data_count",
+        5f64,
+    );
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_event_aggregations_count",
+        8f64,
+    );
     Ok(())
 }
 

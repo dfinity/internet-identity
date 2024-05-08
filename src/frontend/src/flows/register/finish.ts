@@ -1,9 +1,6 @@
+import identityCardBackground from "$src/assets/identityCardBackground.png";
 import { checkmarkIcon, copyIcon } from "$src/components/icons";
-import {
-  IdentityBackground,
-  identityCard,
-  loadIdentityBackground,
-} from "$src/components/identityCard";
+import { identityCard } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import {
@@ -12,6 +9,7 @@ import {
   renderPage,
   withRef,
 } from "$src/utils/lit-html";
+import { PreLoadImage } from "$src/utils/preLoadImage";
 import { OmitParams } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
@@ -26,7 +24,7 @@ export const displayUserNumberTemplate = ({
 }: {
   onContinue: () => void;
   userNumber: bigint;
-  identityBackground: IdentityBackground;
+  identityBackground: PreLoadImage;
   stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
   /* put the page into view */
@@ -119,7 +117,7 @@ export const displayUserNumberWarmup = (): OmitParams<
   typeof displayUserNumber,
   "identityBackground"
 > => {
-  const identityBackground = loadIdentityBackground();
+  const identityBackground = new PreLoadImage(identityCardBackground);
   return async (opts) => {
     await displayUserNumber({ ...opts, identityBackground });
   };
@@ -132,7 +130,7 @@ export const displayUserNumber = ({
   marketingIntroSlot,
 }: {
   userNumber: bigint;
-  identityBackground: IdentityBackground;
+  identityBackground: PreLoadImage;
   stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
 }): Promise<void> => {

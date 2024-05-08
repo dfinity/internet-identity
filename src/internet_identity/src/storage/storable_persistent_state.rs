@@ -21,9 +21,15 @@ pub struct StorablePersistentState {
     active_anchor_stats: ActivityStats<ActiveAnchorCounter>,
     domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
     active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
+    // unused, kept for stable memory compatibility
     latest_delegation_origins: HashMap<FrontendHostname, Timestamp>,
+    // unused, kept for stable memory compatibility
     max_num_latest_delegation_origins: u64,
     max_inflight_captchas: u64,
+    // opt of backwards compatibility
+    event_data_count: Option<u64>,
+    // opt of backwards compatibility
+    event_aggregations_count: Option<u64>,
 }
 
 impl Storable for StorablePersistentState {
@@ -53,9 +59,13 @@ impl From<PersistentState> for StorablePersistentState {
             active_anchor_stats: s.active_anchor_stats,
             domain_active_anchor_stats: s.domain_active_anchor_stats,
             active_authn_method_stats: s.active_authn_method_stats,
-            latest_delegation_origins: s.latest_delegation_origins,
-            max_num_latest_delegation_origins: s.max_num_latest_delegation_origins,
+            // unused, kept for stable memory compatibility
+            latest_delegation_origins: Default::default(),
+            // unused, kept for stable memory compatibility
+            max_num_latest_delegation_origins: 0,
             max_inflight_captchas: s.max_inflight_captchas,
+            event_data_count: Some(s.event_data_count),
+            event_aggregations_count: Some(s.event_aggregations_count),
         }
     }
 }
@@ -69,9 +79,9 @@ impl From<StorablePersistentState> for PersistentState {
             active_anchor_stats: s.active_anchor_stats,
             domain_active_anchor_stats: s.domain_active_anchor_stats,
             active_authn_method_stats: s.active_authn_method_stats,
-            latest_delegation_origins: s.latest_delegation_origins,
-            max_num_latest_delegation_origins: s.max_num_latest_delegation_origins,
             max_inflight_captchas: s.max_inflight_captchas,
+            event_data_count: s.event_data_count.unwrap_or_default(),
+            event_aggregations_count: s.event_aggregations_count.unwrap_or_default(),
         }
     }
 }
@@ -79,7 +89,7 @@ impl From<StorablePersistentState> for PersistentState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{DEFAULT_MAX_DELEGATION_ORIGINS, DEFAULT_MAX_INFLIGHT_CAPTCHAS};
+    use crate::state::DEFAULT_MAX_INFLIGHT_CAPTCHAS;
     use std::time::Duration;
 
     #[test]
@@ -106,8 +116,10 @@ mod tests {
             domain_active_anchor_stats: ActivityStats::new(test_time),
             active_authn_method_stats: ActivityStats::new(test_time),
             latest_delegation_origins: HashMap::new(),
-            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
+            max_num_latest_delegation_origins: 0,
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+            event_data_count: Some(0),
+            event_aggregations_count: Some(0),
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -122,9 +134,9 @@ mod tests {
             active_anchor_stats: ActivityStats::new(test_time),
             domain_active_anchor_stats: ActivityStats::new(test_time),
             active_authn_method_stats: ActivityStats::new(test_time),
-            latest_delegation_origins: HashMap::new(),
-            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+            event_data_count: 0,
+            event_aggregations_count: 0,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

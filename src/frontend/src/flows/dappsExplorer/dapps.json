@@ -1,9 +1,9 @@
 [
   {
-    "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
-    "website": "https://dscvr.one/",
-    "logo": "dscvr_logo.webp"
+    "name": "Helix Markets",
+    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
+    "website": "https://www.helixmarkets.io/",
+    "logo": "helix_logo.webp"
   },
   {
     "name": "OpenChat",
@@ -35,21 +35,15 @@
     "logo": "trax_logo.webp"
   },
   {
-    "name": "Dmail",
-    "oneLiner": "Web3 Decentralized Email Client",
-    "website": "https://dmail.ai/",
-    "logo": "dmail_logo.webp"
-  },
-  {
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
     "logo": "icdex_logo.webp"
   },
   {
-    "name": "Helix Markets",
-    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
-    "website": "https://t.co/OcdISW1Xww",
-    "logo": "helix_logo.webp"
+    "name": "DSCVR",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
+    "website": "https://dscvr.one/",
+    "logo": "dscvr_logo.webp"
   },
   {
     "name": "distrikt",
@@ -492,5 +486,65 @@
     "oneLiner": "Decentralised Fantasy Football.",
     "website": "https://openfpl.xyz/",
     "logo": "openfpl_logo.png"
+  },
+  {
+    "name": "AllKinds",
+    "oneLiner": "A web3 social network where people find more meaningful connections.",
+    "website": "https://allkinds.xyz/",
+    "logo": "allkinds_logo.svg"
+  },
+  {
+    "name": "Dmail Network",
+    "oneLiner": "AI-powered decentralized messaging infrastructure.",
+    "website": "https://dmail.ai",
+    "logo": "dmail-network_logo.png"
+  },
+  {
+    "name": "Datapond",
+    "oneLiner": "A hub for exposing and tracing data used by AI to generate results.",
+    "website": "https://recheck.io/",
+    "logo": "ReCheck_logo.png"
+  },
+  {
+    "name": "Yuku",
+    "oneLiner": "An AI Web3 Platform featuring NFT Aggregator, 3D space, and AI Avatar integration.",
+    "website": "https://yuku.app/",
+    "logo": "yuku_logo.png"
+  },
+  {
+    "name": "ICTO",
+    "oneLiner": "ICTO is a one-stop platform automating token operations on the Internet Computer.",
+    "website": "https://icto.app",
+    "logo": "icto_logo.png"
+  },
+  {
+    "name": "OptiGames",
+    "oneLiner": "Flexible framework for fully on-chain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
+    "website": "https://tpxio-7yaaa-aaaak-qdbaa-cai.icp0.io/",
+    "logo": "Optigames_logo.svg"
+  },
+  {
+    "name": "VFans",
+    "oneLiner": "A decentralized content platform for publishing video/articles and subscribing through mobile payments.",
+    "website": "https://www.vfans.org/",
+    "logo": "vfans_logo.png"
+  },
+  {
+    "name": "ICPanda DAO",
+    "website": "https://panda.fans/",
+    "logo": "icpanda-dao_logo.webp",
+    "oneLiner": "A decentralized Panda meme brand built on the Internet Computer."
+  },
+  {
+    "name": "ICPEx",
+    "oneLiner": "Decentralized exchange built entirely on the chain based on the ICP.",
+    "website": "https://icpex.org/",
+    "logo": "icpex_logo.png"
+  },
+  {
+    "name": "Personal DAO",
+    "oneLiner": "A web3 app that functions as a gated DAO, treasury, data storage solution, and more.",
+    "website": "https://fkkq7-siaaa-aaaap-qaaya-cai.ic0.app/",
+    "logo": "personal_dao_logo.png"
   }
 ]

@@ -1,12 +1,18 @@
 use crate::activity_stats::activity_counter::ActivityCounter;
+use crate::activity_stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
+use crate::activity_stats::event_stats::event_aggregations::{
+    retrieve_aggregation, Aggregation, PD_SESS_SEC,
+};
 use crate::activity_stats::ActivityStats;
 use crate::archive::ArchiveState;
+use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::PersistentState;
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
 use std::time::Duration;
+use IIDomain::{Ic0App, InternetComputerOrg};
 
 /// Collects the various metrics exposed by the Internet Identity canister.
 /// Returns a ascii-encoded string of the metrics in the Prometheus exposition format.
@@ -131,6 +137,40 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         }
         Ok::<(), std::io::Error>(())
     })?;
+
+    event_metrics(w)?;
+    Ok(())
+}
+
+fn event_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> Result<(), std::io::Error> {
+    let sess_sec_builder = w.gauge_vec(
+        "internet_identity_prepare_delegation_session_seconds",
+        "Cumulative authenticated session duration in seconds for the given front-end origin.",
+    )?;
+    pd_aggregation_metrics(PD_SESS_SEC, sess_sec_builder)?;
+    Ok(())
+}
+
+fn pd_aggregation_metrics(
+    aggregation: &dyn Aggregation,
+    mut metrics_builder: LabeledMetricsBuilder<Vec<u8>>,
+) -> Result<(), std::io::Error> {
+    for window in &[Day, Month] {
+        for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
+            let data = retrieve_aggregation(aggregation, window.clone(), domain.clone());
+
+            for (frontend_origin, sess_sec) in data.iter().take(10) {
+                metrics_builder = metrics_builder.value(
+                    &[
+                        ("dapp", frontend_origin),
+                        ("window", window.label()),
+                        ("ii_origin", maybe_domain_to_label(domain)),
+                    ],
+                    *sess_sec as f64,
+                )?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -148,6 +188,16 @@ fn persistent_state_metrics(
         "internet_identity_register_rate_limit_time_per_tokens_seconds",
         Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
         "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
+    )?;
+    w.encode_gauge(
+        "internet_identity_event_data_count",
+        persistent_state.event_data_count as f64,
+        "Number of events stored in event_data map.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_event_aggregations_count",
+        persistent_state.event_aggregations_count as f64,
+        "Number of entries in the event_aggregations map.",
     )?;
 
     let stats = &persistent_state.active_anchor_stats;
@@ -229,12 +279,6 @@ fn persistent_state_metrics(
             .value(&[("type", "other")], counter.other_counter as f64)?;
         Ok(())
     })?;
-
-    w.encode_gauge(
-        "internet_identity_max_num_latest_delegation_origins",
-        persistent_state.max_num_latest_delegation_origins as f64,
-        "The maximum number of latest delegation origins that were used with II bound devices.",
-    )?;
     Ok(())
 }
 

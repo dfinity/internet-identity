@@ -12,7 +12,6 @@ export const idlFactory = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
-    'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -307,11 +306,12 @@ export const idlFactory = ({ IDL }) => {
   const InternetIdentityStats = IDL.Record({
     'storage_layout_version' : IDL.Nat8,
     'users_registered' : IDL.Nat64,
-    'max_num_latest_delegation_origins' : IDL.Nat64,
     'assigned_user_number_range' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
-    'latest_delegation_origins' : IDL.Vec(FrontendHostname),
     'archive_info' : ArchiveInfo,
     'canister_creation_cycles_cost' : IDL.Nat64,
+    'event_aggregations' : IDL.Vec(
+      IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
+    ),
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -456,6 +456,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'inject_prune_event' : IDL.Func([Timestamp], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
@@ -467,6 +468,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
         [],
       ),
+    'prune_events_if_necessary' : IDL.Func([], [], []),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
@@ -495,7 +497,6 @@ export const init = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
-    'max_num_latest_delegation_origins' : IDL.Opt(IDL.Nat64),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),

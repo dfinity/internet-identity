@@ -20,15 +20,15 @@ pub struct DomainActivityContext<'a> {
 impl DomainActiveAnchorCounter {
     fn increment_counter_for_domain(&mut self, domain: &IIDomain) {
         match domain {
-            IIDomain::Ic0AppDomain => self.ic0_app_counter += 1,
-            IIDomain::InternetComputerOrgDomain => self.internetcomputer_org_counter += 1,
+            IIDomain::Ic0App => self.ic0_app_counter += 1,
+            IIDomain::InternetComputerOrg => self.internetcomputer_org_counter += 1,
         }
     }
 
     fn decrement_counter_for_domain(&mut self, domain: &IIDomain) {
         match domain {
-            IIDomain::Ic0AppDomain => self.ic0_app_counter -= 1,
-            IIDomain::InternetComputerOrgDomain => self.internetcomputer_org_counter -= 1,
+            IIDomain::Ic0App => self.ic0_app_counter -= 1,
+            IIDomain::InternetComputerOrg => self.internetcomputer_org_counter -= 1,
         }
     }
 }

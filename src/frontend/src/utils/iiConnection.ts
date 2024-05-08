@@ -28,6 +28,7 @@ import {
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
+import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
   ActorSubclass,
@@ -235,7 +236,12 @@ export class Connection {
         return { kind: "webAuthnFailed" };
       }
 
-      throw e;
+      throw new Error(
+        `Failed to authenticate using passkey: ${unknownToString(
+          e,
+          "unknown error"
+        )}, ${await diagnosticInfo()}`
+      );
     }
 
     const actor = await this.createActor(delegationIdentity);

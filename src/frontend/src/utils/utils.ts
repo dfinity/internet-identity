@@ -20,6 +20,13 @@ export function unknownToString(obj: unknown, def: string): string {
   return def;
 }
 
+/** Collect information helpful to diagnose errors */
+export async function diagnosticInfo(): Promise<string> {
+  return `user-agent: "${
+    navigator.userAgent
+  }", is platform auth available: ${await window?.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable()}`;
+}
+
 // Helper to gain access to the event's target
 export const withInputElement = <E extends Event>(
   evnt: E,

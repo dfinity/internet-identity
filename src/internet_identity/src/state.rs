@@ -20,9 +20,6 @@ use std::time::Duration;
 
 mod temp_keys;
 
-/// Default value for max number of delegation origins to store in the list of latest used delegation origins
-pub const DEFAULT_MAX_DELEGATION_ORIGINS: u64 = 1000;
-
 /// Default value for max number of inflight captchas.
 pub const DEFAULT_MAX_INFLIGHT_CAPTCHAS: u64 = 500;
 
@@ -96,12 +93,16 @@ pub struct PersistentState {
     pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
     // Daily and monthly active authentication methods on the II domains.
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
-    // Hashmap of last used delegation origins
-    pub latest_delegation_origins: HashMap<FrontendHostname, Timestamp>,
-    // Maximum number of latest delegation origins to store
-    pub max_num_latest_delegation_origins: u64,
     // Maximum number of inflight captchas
     pub max_inflight_captchas: u64,
+    // Count of entries in the event_data BTreeMap
+    // event_data is expected to have a lot of entries, thus counting by iterating over it is not
+    // an option.
+    pub event_data_count: u64,
+    // Count of entries in the event_aggregations BTreeMap
+    // event_aggregations is expected to have a lot of entries, thus counting by iterating over it is not
+    // an option.
+    pub event_aggregations_count: u64,
 }
 
 impl Default for PersistentState {
@@ -114,9 +115,9 @@ impl Default for PersistentState {
             active_anchor_stats: ActivityStats::new(time),
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
-            latest_delegation_origins: HashMap::new(),
-            max_num_latest_delegation_origins: DEFAULT_MAX_DELEGATION_ORIGINS,
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+            event_data_count: 0,
+            event_aggregations_count: 0,
         }
     }
 }
@@ -171,6 +172,8 @@ struct State {
     archive_status_cache: RefCell<Option<ArchiveStatusCache>>,
     // Tracking data for the registration rate limit, if any. Not persisted across upgrades.
     registration_rate_limit: RefCell<Option<RateLimitState>>,
+    // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
+    event_data_uniqueness_counter: Cell<u16>,
 }
 
 impl Default for State {
@@ -186,6 +189,7 @@ impl Default for State {
             persistent_state: RefCell::new(PersistentState::default()),
             archive_status_cache: RefCell::new(None),
             registration_rate_limit: RefCell::new(None),
+            event_data_uniqueness_counter: Cell::new(0),
         }
     }
 }
@@ -399,5 +403,13 @@ pub fn cache_archive_status(archive_status: ArchiveStatusCache) {
 pub fn invalidate_archive_status_cache() {
     STATE.with(|state| {
         *state.archive_status_cache.borrow_mut() = None;
+    })
+}
+
+pub fn get_and_inc_event_data_counter() -> u16 {
+    STATE.with(|s| {
+        let counter = s.event_data_uniqueness_counter.get();
+        s.event_data_uniqueness_counter.set(counter.wrapping_add(1));
+        counter
     })
 }

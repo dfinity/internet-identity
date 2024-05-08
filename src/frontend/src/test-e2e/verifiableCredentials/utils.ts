@@ -18,6 +18,7 @@ import {
 
 import { II_URL } from "$src/test-e2e/constants";
 
+import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { nonNullish } from "@dfinity/utils";
 
 // Open the issuer demo, authenticate and register as an employee
@@ -113,6 +114,9 @@ export const getVCPresentation = async (args: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
+  relyingParty: string;
+  issuer: string;
+  knownDapps?: KnownDapp[];
 }): Promise<{ alias: string; credential: string }> => {
   const result = await getVCPresentation_(args);
   if (result.result === "aborted") {
@@ -128,11 +132,17 @@ export const getVCPresentation = async (args: {
 export const getVCPresentation_ = async ({
   vcTestApp,
   browser,
-  authConfig: { setupAuth, finalizeAuth, userNumber },
+  authConfig: { setupAuth, finalizeAuth },
+  relyingParty,
+  issuer,
+  knownDapps = [],
 }: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
+  relyingParty: string;
+  issuer: string;
+  knownDapps?: KnownDapp[];
 }): Promise<
   | { result: "ok"; alias: string; credential: string }
   | { result: "aborted"; reason: string }
@@ -147,8 +157,18 @@ export const getVCPresentation_ = async ({
     const reason = await vcAllow.getAbortReason();
     return { result: "aborted", reason };
   }
-  const userNumber_ = await vcAllow.getUserNumber();
-  expect(userNumber_).toBe(userNumber);
+
+  // II will show the issuer and relying party name if they are known dapps.
+  const issuerName: string =
+    knownDapps.find((dapp) => dapp.hasOrigin(issuer))?.name ?? issuer;
+  const rpName: string =
+    knownDapps.find((dapp) => dapp.hasOrigin(relyingParty))?.name ??
+    relyingParty;
+
+  expect(await vcAllow.getIssuer()).toBe(issuerName);
+  expect(await vcAllow.getRelyingParty()).toBe(rpName);
+  expect(await vcAllow.hasUserNumberInput()).toBe(false);
+
   await vcAllow.allow();
 
   await finalizeAuth(browser);
