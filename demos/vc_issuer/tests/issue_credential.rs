@@ -688,7 +688,15 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
         )
         .expect("credential verification failed");
-        let vc_claims = claims.vc().expect("missing VC claims");
+        let vc_claims = claims
+            .custom()
+            .expect("missing custom claims")
+            .as_object()
+            .expect("malformed custom claims")
+            .get("vc")
+            .expect("missing vc claims")
+            .as_object()
+            .expect("malformed vc claims");
         validate_claims_match_spec(vc_claims, &credential_spec).expect("Clam validation failed");
     }
 
