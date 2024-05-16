@@ -1,11 +1,13 @@
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
+import { getReplicaHost } from "../../../vite-plugins/dist/utils";
 
 // XXX: this is not exactly a constant (since it might change on every node eval) but in
 // practice is very stable, and is much easier to use as "constants" than as a lookup function.
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
-const issuerAppCanisterId = readCanisterId({ canisterName: "issuer" });
+export const ISSUER_CANISTER_ID = readCanisterId({ canisterName: "issuer" });
 
+export const REPLICA_URL = getReplicaHost();
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 export const TEST_APP_CANONICAL_URL_RAW = `https://${testAppCanisterId}.raw.icp0.io`;
 export const TEST_APP_CANONICAL_URL_LEGACY = `https://${testAppCanisterId}.ic0.app`;
@@ -16,8 +18,8 @@ export const KNOWN_TEST_DAPP = new KnownDapp({
   logo: "no-such-logo",
 });
 
-export const ISSUER_APP_URL = `https://${issuerAppCanisterId}.icp0.io`;
-export const ISSUER_APP_URL_LEGACY = `https://${issuerAppCanisterId}.ic0.app`;
+export const ISSUER_APP_URL = `https://${ISSUER_CANISTER_ID}.icp0.io`;
+export const ISSUER_APP_URL_LEGACY = `https://${ISSUER_CANISTER_ID}.ic0.app`;
 
 // Value needs to match how the canister was provisioned
 export const ISSUER_CUSTOM_ORIGIN_NICE_URL = `https://nice-issuer-custom-orig.com`;

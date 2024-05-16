@@ -1,6 +1,7 @@
 import { zip } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { assert } from "vitest";
 import { waitToClose } from "./util";
 
 class View {
@@ -648,6 +649,18 @@ export class IssuerAppView extends View {
     );
     await principalInput.clearValue();
     await principalInput.setValue(principal);
+  }
+
+  async setDerivationOrigin({
+    derivationOrigin,
+  }: {
+    derivationOrigin: string;
+  }): Promise<void> {
+    const derivationOriginInput = await this.browser.$(
+      '[data-role="derivation-origin"]'
+    );
+    await derivationOriginInput.clearValue();
+    await derivationOriginInput.setValue(derivationOrigin);
   }
 
   async waitForDisplay(): Promise<void> {
