@@ -4,7 +4,7 @@
       "type": "custom",
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm.gz",
-      "build": "bash -c 'II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build'",
+      "build": "bash -c 'II_DEV_CSP=1 II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build'",
       "shrink" : false
     },
     "test_app": {
