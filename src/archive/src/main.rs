@@ -36,7 +36,7 @@
 //! - prefix scan with anchor to retrieve entries by anchor
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
-use candid::{candid_method, CandidType, Deserialize, Nat, Principal};
+use candid::{candid_method, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable64_size;
