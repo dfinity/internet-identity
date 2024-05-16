@@ -1,7 +1,7 @@
 import { toast } from "$src/components/toast";
-import type {
+import {
   VcResponse,
-  VcVerifiablePresentation,
+  VcVerifiablePresentation
 } from "@dfinity/internet-identity-vc-api";
 import { VcFlowReady, VcFlowRequest } from "@dfinity/internet-identity-vc-api";
 

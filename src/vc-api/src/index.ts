@@ -67,10 +67,11 @@ export const VcFlowRequest = z.object({
   method: z.literal("request_credential"),
   params: z.object({
     issuer: z.object({
+      type: z.literal("IC"),
       origin: z
         .string()
         .url() /* XXX: we limit to URLs, but in practice should even be an origin */,
-      canisterId: z.optional(zodPrincipal),
+      canisterId: zodPrincipal,
     }),
     credentialSpec: zodCredentialSpec,
     credentialSubject: zodPrincipal,
