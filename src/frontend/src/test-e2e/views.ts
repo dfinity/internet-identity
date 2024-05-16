@@ -738,11 +738,17 @@ export class VcTestAppView extends View {
   async open(
     demoAppUrl: string,
     iiUrl: string,
-    issuerUrl: string
+    issuerUrl: string,
+    issuerCanisterId: string
   ): Promise<void> {
     await this.browser.url(demoAppUrl);
     await setInputValue(this.browser, '[data-role="ii-url"]', iiUrl);
     await setInputValue(this.browser, '[data-role="issuer-url"]', issuerUrl);
+    await setInputValue(
+      this.browser,
+      '[data-role="issuer-canister-id"]',
+      issuerCanisterId
+    );
   }
 
   async startSignIn(): Promise<void> {

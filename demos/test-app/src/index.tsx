@@ -397,6 +397,7 @@ let latestOpts:
   | undefined
   | {
       issuerOrigin: string;
+      issuerCanisterId: string;
       derivationOrigin?: string;
       credTy: CredType;
       flowId: number;
@@ -443,6 +444,7 @@ function handleFlowReady(evnt: MessageEvent) {
     params: {
       issuer: {
         origin: opts.issuerOrigin,
+        canisterId: opts.issuerCanisterId,
       },
       credentialSpec: credentialSpecs[opts.credTy],
       credentialSubject: principal,
@@ -450,7 +452,7 @@ function handleFlowReady(evnt: MessageEvent) {
     },
   };
 
-  // register a handler for the "done" message, kick start the flow and then
+  // register a handler for the "done" message, kickstart the flow and then
   // unregister ourselves
   try {
     window.addEventListener("message", handleFlowFinished);
@@ -497,6 +499,8 @@ const App = () => {
     "http://issuer.localhost:5173"
   );
 
+  const [issuerCanisterId, setIssuerCanisterId] = useState<string>("");
+
   // Alternative origin for the RP, if any
   const [derivationOrigin, setDerivationOrigin] = useState<string>("");
 
@@ -527,7 +531,8 @@ const App = () => {
     latestOpts = {
       flowId,
       credTy,
-      issuerOrigin: issuerUrl,
+      issuerOrigin: new URL(issuerUrl).origin,
+      issuerCanisterId,
       derivationOrigin: derivationOrigin !== "" ? derivationOrigin : undefined,
       win: iiWindow,
     };
@@ -545,6 +550,15 @@ const App = () => {
           type="text"
           value={issuerUrl}
           onChange={(evt) => setIssuerUrl(evt.target.value)}
+        />
+      </label>
+      <label>
+        Issuer canister Id:
+        <input
+          data-role="issuer-canister-id"
+          type="text"
+          value={issuerCanisterId}
+          onChange={(evt) => setIssuerCanisterId(evt.target.value)}
         />
       </label>
       <label>

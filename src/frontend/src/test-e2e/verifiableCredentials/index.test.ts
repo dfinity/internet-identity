@@ -9,9 +9,14 @@ import {
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
+  TEST_APP_NICE_URL,
 } from "$src/test-e2e/constants";
 
+import { DemoAppView } from "$src/test-e2e/views";
+import { beforeEach } from "vitest";
 import {
+  addEmployeeToIssuer,
+  authenticateOnII,
   authenticateToRelyingParty,
   getVCPresentation,
   register,
@@ -117,3 +122,51 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
     300_000
   );
 });
+
+test("Can issue credential with issuer front-end being hosted on a different canister", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const authConfig = await register["webauthn"](browser);
+    const relyingParty = TEST_APP_CANONICAL_URL;
+    // We pretend the issuer front-end is hosted on TEST_APP_NICE_URL
+    // while the relying party is TEST_APP_CANONICAL_URL.
+    // This is a setup where the issuer is split into two canisters, one hosting the front-end
+    // and one implementing the issuer canister API.
+    // This test demonstrates that this setup is possible _without_ configuring alternative origins,
+    // but simply configuring the derivation origin on the issuer canister and having the relying party specify
+    // the issuer canister id.
+    const issuer = TEST_APP_NICE_URL;
+    await setIssuerDerivationOrigin({
+      issuerCanisterId: ISSUER_CANISTER_ID,
+      derivationOrigin: issuer,
+      frontendHostname: issuer,
+    });
+
+    const issuerFrontEnd = new DemoAppView(browser);
+    await issuerFrontEnd.open(issuer, II_URL);
+    await issuerFrontEnd.waitForDisplay();
+    await issuerFrontEnd.signin();
+    await authenticateOnII({ authConfig, browser });
+    const issuerPrincipal = await issuerFrontEnd.getPrincipal();
+    await addEmployeeToIssuer({
+      issuerCanisterId: ISSUER_CANISTER_ID,
+      principal: issuerPrincipal,
+    });
+
+    // Go through the VC flow pretending the relying party URL to be the issuer front-end
+    const vcTestApp = await authenticateToRelyingParty({
+      browser,
+      issuer,
+      authConfig,
+      relyingParty,
+    });
+    await getVCPresentation({
+      vcTestApp,
+      browser,
+      authConfig,
+      relyingParty,
+      issuer,
+      knownDapps: [KNOWN_TEST_DAPP],
+    });
+  });
+}, 300_000);

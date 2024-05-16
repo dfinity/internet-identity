@@ -16,12 +16,18 @@ import {
   VcTestAppView,
 } from "$src/test-e2e/views";
 
-import { II_URL, ISSUER_APP_URL, REPLICA_URL } from "$src/test-e2e/constants";
+import {
+  II_URL,
+  ISSUER_APP_URL,
+  ISSUER_CANISTER_ID,
+  REPLICA_URL,
+} from "$src/test-e2e/constants";
 
 import { idlFactory as vc_issuer_idl } from "$generated/vc_issuer_idl";
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { _SERVICE } from "@dfinity/internet-identity-vc-api";
+import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 
 /**
@@ -93,7 +99,7 @@ const authenticateWithIssuer_ = async ({
   browser,
   issuerAppView,
   derivationOrigin,
-  authConfig: { setupAuth, finalizeAuth, userNumber },
+  authConfig,
 }: {
   browser: WebdriverIO.Browser;
   issuerAppView: IssuerAppView;
@@ -105,6 +111,17 @@ const authenticateWithIssuer_ = async ({
   }
   await issuerAppView.authenticate();
 
+  await authenticateOnII({ authConfig, browser });
+  return issuerAppView.waitForAuthenticated();
+};
+
+export const authenticateOnII = async ({
+  authConfig: { setupAuth, finalizeAuth, userNumber },
+  browser,
+}: {
+  authConfig: AuthConfig;
+  browser: WebdriverIO.Browser;
+}): Promise<void> => {
   await setupAuth(browser);
 
   const authenticateView = new AuthenticateView(browser);
@@ -113,13 +130,12 @@ const authenticateWithIssuer_ = async ({
 
   await finalizeAuth(browser);
   await waitToClose(browser);
-  return issuerAppView.waitForAuthenticated();
 };
 
 // Open the specified test app on the URL `relyingParty` and authenticate
 export const authenticateToRelyingParty = async ({
   browser,
-  authConfig: { setupAuth, finalizeAuth, userNumber },
+  authConfig,
   issuer,
   relyingParty,
   derivationOrigin,
@@ -131,7 +147,7 @@ export const authenticateToRelyingParty = async ({
   derivationOrigin?: string;
 }): Promise<VcTestAppView> => {
   const vcTestApp = new VcTestAppView(browser);
-  await vcTestApp.open(relyingParty, II_URL, issuer);
+  await vcTestApp.open(relyingParty, II_URL, issuer, ISSUER_CANISTER_ID);
 
   if (nonNullish(derivationOrigin)) {
     const demoView = new DemoAppView(browser);
@@ -145,16 +161,7 @@ export const authenticateToRelyingParty = async ({
     await vcTestApp.setAlternativeOrigin(derivationOrigin);
   }
   await vcTestApp.startSignIn();
-
-  await setupAuth(browser);
-
-  const authenticateView = new AuthenticateView(browser);
-  await authenticateView.waitForDisplay();
-  await authenticateView.pickAnchor(userNumber);
-
-  await finalizeAuth(browser);
-  await waitToClose(browser);
-
+  await authenticateOnII({ authConfig, browser });
   await vcTestApp.waitForAuthenticated();
 
   return vcTestApp;
@@ -316,6 +323,17 @@ export const resetIssuerOriginsConfig = async ({
   const actor = await createIssuerActor(issuerCanisterId);
   await actor.set_derivation_origin(ISSUER_APP_URL, ISSUER_APP_URL);
   await actor.set_alternative_origins('{"alternativeOrigins":[]}');
+};
+
+export const addEmployeeToIssuer = async ({
+  issuerCanisterId,
+  principal,
+}: {
+  issuerCanisterId: string;
+  principal: string;
+}): Promise<void> => {
+  const actor = await createIssuerActor(issuerCanisterId);
+  await actor.add_employee(Principal.from(principal));
 };
 
 const createIssuerActor = async (
