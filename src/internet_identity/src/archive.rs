@@ -120,7 +120,7 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
             let status = archive_status(data.archive_canister).await;
             match status.canister_status.module_hash {
                 None => (data.archive_canister, CanisterInstallMode::Install),
-                Some(_) => (data.archive_canister, CanisterInstallMode::Upgrade),
+                Some(_) => (data.archive_canister, CanisterInstallMode::Upgrade(None)),
             }
         }
     };
