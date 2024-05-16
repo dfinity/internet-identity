@@ -1,4 +1,4 @@
-use crate::activity_stats::activity_counter::ActivityCounter;
+use crate::stats::activity_stats::activity_counter::ActivityCounter;
 use crate::storage::anchor::Device;
 use candid::{CandidType, Deserialize};
 use internet_identity_interface::internet_identity::types::{KeyType, Purpose, Timestamp};

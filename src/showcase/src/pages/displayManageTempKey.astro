@@ -5,10 +5,13 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Display Manage Temp Key" pageName="displayManageTempKey">
   <script>
     import { toast } from "$src/components/toast";
-    import { identityBackground } from "../backgrounds";
     import { userNumber } from "../constants";
     import { dapps } from "../constants";
     import { displayManagePage } from "$src/flows/manage";
+    import identityCardBackground from "$src/assets/identityCardBackground.png";
+    import { PreLoadImage } from "$src/utils/preLoadImage";
+
+    const identityBackground = new PreLoadImage(identityCardBackground.src);
 
     displayManagePage({
       identityBackground,

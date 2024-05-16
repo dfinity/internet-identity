@@ -171,8 +171,9 @@ type InternetIdentityStats = record {
     };
     archive_info: ArchiveInfo;
     canister_creation_cycles_cost: nat64;
-    max_num_latest_delegation_origins: nat64;
-    latest_delegation_origins: vec FrontendHostname
+    // Map from event aggregation to a sorted list of top 100 sub-keys to their weights.
+    // Example: {"prepare_delegation_count 24h ic0.app": [{"https://dapp.com", 100}, {"https://dapp2.com", 50}]}
+    event_aggregations: vec record {text; vec record {text; nat64}};
 };
 
 // Configuration parameters related to the archive.
@@ -227,9 +228,6 @@ type InternetIdentityInit = record {
     canister_creation_cycles_cost : opt nat64;
     // Rate limit for the `register` call.
     register_rate_limit : opt RateLimitConfig;
-    // Maximum number of latest delegation origins to track.
-    // Default: 1000
-    max_num_latest_delegation_origins : opt nat64;
     // Maximum number of inflight captchas.
     // Default: 500
     max_inflight_captchas: opt nat64;
@@ -538,11 +536,16 @@ service : (opt InternetIdentityInit) -> {
     http_request_update: (request: HttpRequest) -> (HttpResponse);
 
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
-    /// Returns a batch of entries _sorted by sequence number_ to be archived.
-    /// This is an update call because the archive information _must_ be certified.
-    /// Only callable by this IIs archive canister.
+    // Returns a batch of entries _sorted by sequence number_ to be archived.
+    // This is an update call because the archive information _must_ be certified.
+    // Only callable by this IIs archive canister.
     fetch_entries: () -> (vec BufferedArchiveEntry);
     acknowledge_entries: (sequence_number: nat64) -> ();
+
+    // Calls used for event stats housekeeping.
+    // Only callable by the canister itself.
+    prune_events_if_necessary: () -> ();
+    inject_prune_event: (timestamp: Timestamp) -> ();
 
     // V2 API
     // WARNING: The following methods are experimental and may change in the future.

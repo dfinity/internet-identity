@@ -1903,6 +1903,7 @@ dependencies = [
 [[package]]
 name = "identity_core"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "cc",
  "ic-cdk 0.13.3",
@@ -1921,6 +1922,7 @@ dependencies = [
 [[package]]
 name = "identity_credential"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "identity_core 1.2.0",
  "identity_did",
@@ -1940,6 +1942,7 @@ dependencies = [
 [[package]]
 name = "identity_did"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "did_url_parser",
  "form_urlencoded",
@@ -1952,6 +1955,7 @@ dependencies = [
 [[package]]
 name = "identity_document"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "did_url_parser",
  "identity_core 1.2.0",
@@ -1984,6 +1988,7 @@ dependencies = [
 [[package]]
 name = "identity_jose"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "identity_core 1.2.0",
  "iota-crypto",
@@ -1997,6 +2002,7 @@ dependencies = [
 [[package]]
 name = "identity_verification"
 version = "1.2.0"
+source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "identity_core 1.2.0",
  "identity_did",

@@ -4,6 +4,7 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::stats::event_stats::all_aggregations_top_n;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
@@ -12,6 +13,7 @@ use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk_timers::{set_timer, set_timer_interval};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -21,9 +23,9 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::time::Duration;
 use storage::{Salt, Storage};
 
-mod activity_stats;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -36,6 +38,7 @@ mod hash;
 mod http;
 mod ii_domain;
 mod state;
+mod stats;
 mod storage;
 mod vc_mvp;
 
@@ -336,15 +339,7 @@ fn stats() -> InternetIdentityStats {
     let canister_creation_cycles_cost =
         state::persistent_state(|persistent_state| persistent_state.canister_creation_cycles_cost);
 
-    let (latest_delegation_origins, max_num_latest_delegation_origins) =
-        state::persistent_state(|persistent_state| {
-            let origins = persistent_state
-                .latest_delegation_origins
-                .keys()
-                .cloned()
-                .collect();
-            (origins, persistent_state.max_num_latest_delegation_origins)
-        });
+    let event_aggregations = all_aggregations_top_n(100);
 
     state::storage_borrow(|storage| InternetIdentityStats {
         assigned_user_number_range: storage.assigned_anchor_number_range(),
@@ -352,8 +347,7 @@ fn stats() -> InternetIdentityStats {
         archive_info,
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
-        max_num_latest_delegation_origins,
-        latest_delegation_origins,
+        event_aggregations,
     })
 }
 
@@ -380,30 +374,51 @@ fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
+/// Check for backlogged event data and prune if necessary.
+/// Only callable by this canister.
+#[update]
+#[candid_method]
+async fn prune_events_if_necessary() {
+    stats::event_stats::prune_events_if_necessary().await
+}
+
+/// Inject pruning event at the given timestamp.
+/// Only callable by this canister.
+#[update]
+#[candid_method]
+fn inject_prune_event(timestamp: Timestamp) {
+    stats::event_stats::inject_prune_event(timestamp);
+}
+
 #[init]
 #[candid_method(init)]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
     state::init_new();
-
-    apply_install_arg(maybe_arg);
-
-    // make sure the fully initialized storage configuration is written to stable memory
-    state::storage_borrow_mut(|storage| storage.flush());
-    update_root_hash();
+    initialize(maybe_arg);
 }
 
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
     state::init_from_stable_memory();
-    // load the persistent state after initializing storage, otherwise the memory address to load it from cannot be calculated
+    // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
 
-    // We drop all the signatures on upgrade, users will
-    // re-request them if needed.
-    update_root_hash();
+    initialize(maybe_arg);
+}
+
+fn initialize(maybe_arg: Option<InternetIdentityInit>) {
+    init_assets();
     apply_install_arg(maybe_arg);
+    update_root_hash();
+
+    // Immediately prune events if necessary and also set a timer to do so every 5 minutes.
+    // We need to use a timer here, because we cannot call canisters directly in init.
+    set_timer(Duration::from_nanos(0), || {
+        ic_cdk::spawn(prune_events_if_necessary());
+    });
+    set_timer_interval(Duration::from_nanos(5 * MINUTE_NS), || {
+        ic_cdk::spawn(prune_events_if_necessary());
+    });
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -424,11 +439,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(rate_limit) = arg.register_rate_limit {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.registration_rate_limit = rate_limit;
-            })
-        }
-        if let Some(limit) = arg.max_num_latest_delegation_origins {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_num_latest_delegation_origins = limit;
             })
         }
         if let Some(limit) = arg.max_inflight_captchas {

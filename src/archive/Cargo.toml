@@ -13,7 +13,7 @@ internet_identity_interface.workspace = true
 candid.workspace = true
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
-ic-cdk-timers = "0.6.0"
+ic-cdk-timers.workspace = true
 ic-metrics-encoder.workspace = true
 ic-stable-structures.workspace = true
 # other
