@@ -79,8 +79,8 @@ dependencies = [
  "candid_parser",
  "canister_tests",
  "hex",
- "ic-cdk 0.12.1",
- "ic-cdk-macros 0.8.4",
+ "ic-cdk",
+ "ic-cdk-macros",
  "ic-cdk-timers",
  "ic-metrics-encoder",
  "ic-stable-structures 0.6.4",
@@ -124,8 +124,8 @@ version = "0.1.0"
 dependencies = [
  "base64 0.21.7",
  "candid",
- "ic-cdk 0.12.1",
- "ic-cdk-macros 0.8.4",
+ "ic-cdk",
+ "ic-cdk-macros",
  "ic-certification 2.5.0",
  "ic-representation-independent-hash",
  "include_dir",
@@ -416,7 +416,7 @@ dependencies = [
  "assert_matches",
  "candid",
  "hex",
- "ic-cdk 0.12.1",
+ "ic-cdk",
  "ic-certification 2.5.0",
  "ic-representation-independent-hash",
  "lazy_static",
@@ -435,10 +435,10 @@ dependencies = [
  "candid",
  "flate2",
  "hex",
- "ic-cdk 0.12.1",
+ "ic-cdk",
  "ic-representation-independent-hash",
  "ic-test-state-machine-client",
- "identity_jose 0.7.0-alpha.6",
+ "identity_jose",
  "internet_identity_interface",
  "lazy_static",
  "regex",
@@ -1396,42 +1396,15 @@ dependencies = [
 
 [[package]]
 name = "ic-cdk"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f3d204af0b11c45715169c997858edb58fa8407d08f4fae78a6b415dd39a362"
-dependencies = [
- "candid",
- "ic-cdk-macros 0.8.4",
- "ic0 0.21.1",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "ic-cdk"
 version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6a471aa6c3bdcce8353c1c63ab2bc1de03b9f4901a3ed6b5d5bce23c92d028e"
 dependencies = [
  "candid",
- "ic-cdk-macros 0.13.3",
+ "ic-cdk-macros",
  "ic0 0.23.0",
  "serde",
  "serde_bytes",
-]
-
-[[package]]
-name = "ic-cdk-macros"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5a618e4020cea88e933d8d2f8c7f86d570ec06213506a80d4f2c520a9bba512"
-dependencies = [
- "candid",
- "proc-macro2",
- "quote",
- "serde",
- "serde_tokenstream 0.1.7",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -1444,18 +1417,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "serde_tokenstream 0.2.0",
+ "serde_tokenstream",
  "syn 2.0.63",
 ]
 
 [[package]]
 name = "ic-cdk-timers"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c43b9706fef3ad10c4192a14801d16bd9539068239f0f06f257857441364329"
+checksum = "054727a3a1c486528b96349817d54290ff70df6addf417def456ea708a16f7fb"
 dependencies = [
  "futures",
- "ic-cdk 0.12.1",
+ "ic-cdk",
  "ic0 0.21.1",
  "serde",
  "serde_bytes",
@@ -2088,28 +2061,11 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity_core"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#be73e6db80562e432e30dc8fcaba0c4f9561d4ed"
-dependencies = [
- "ic-cdk 0.12.1",
- "iota-crypto",
- "multibase",
- "serde",
- "serde_json",
- "strum",
- "thiserror",
- "time",
- "url",
- "zeroize",
-]
-
-[[package]]
-name = "identity_core"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "cc",
- "ic-cdk 0.13.3",
+ "ic-cdk",
  "iota-crypto",
  "js-sys",
  "multibase",
@@ -2127,7 +2083,7 @@ name = "identity_credential"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
  "identity_document",
  "identity_verification",
@@ -2149,7 +2105,7 @@ source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468
 dependencies = [
  "did_url_parser",
  "form_urlencoded",
- "identity_core 1.2.0",
+ "identity_core",
  "serde",
  "strum",
  "thiserror",
@@ -2161,7 +2117,7 @@ version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "did_url_parser",
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
  "identity_verification",
  "indexmap",
@@ -2172,28 +2128,10 @@ dependencies = [
 
 [[package]]
 name = "identity_jose"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#be73e6db80562e432e30dc8fcaba0c4f9561d4ed"
-dependencies = [
- "ic-crypto-standalone-sig-verifier",
- "ic-types",
- "identity_core 0.7.0-alpha.6",
- "iota-crypto",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "serde_json",
- "subtle",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "identity_jose"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "iota-crypto",
  "serde",
  "serde_json",
@@ -2207,9 +2145,9 @@ name = "identity_verification"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
- "identity_jose 1.2.0",
+ "identity_jose",
  "serde",
  "serde_json",
  "strum",
@@ -2292,8 +2230,8 @@ dependencies = [
  "getrandom 0.2.15",
  "hex",
  "hex-literal",
- "ic-cdk 0.12.1",
- "ic-cdk-macros 0.8.4",
+ "ic-cdk",
+ "ic-cdk-macros",
  "ic-cdk-timers",
  "ic-certification 2.5.0",
  "ic-http-certification",
@@ -2301,7 +2239,7 @@ dependencies = [
  "ic-response-verification",
  "ic-stable-structures 0.6.4",
  "ic-test-state-machine-client",
- "identity_jose 0.7.0-alpha.6",
+ "identity_jose",
  "include_dir",
  "internet_identity_interface",
  "lazy_static",
@@ -2323,7 +2261,7 @@ name = "internet_identity_interface"
 version = "0.1.0"
 dependencies = [
  "candid",
- "ic-cdk 0.12.1",
+ "ic-cdk",
  "serde",
  "serde_bytes",
 ]
@@ -3234,17 +3172,6 @@ dependencies = [
 
 [[package]]
 name = "serde_tokenstream"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "797ba1d80299b264f3aac68ab5d12e5825a561749db4df7cd7c8083900c5d4e9"
-dependencies = [
- "proc-macro2",
- "serde",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "serde_tokenstream"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a00ffd23fd882d096f09fcaae2a9de8329a328628e86027e049ee051dc1621f"
@@ -3732,9 +3659,9 @@ dependencies = [
  "ic-certification 2.5.0",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
- "identity_core 1.2.0",
+ "identity_core",
  "identity_credential",
- "identity_jose 1.2.0",
+ "identity_jose",
  "serde",
  "serde_bytes",
  "serde_cbor",

@@ -50,7 +50,7 @@ canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true
 ic-response-verification.workspace = true
-identity_jose = { git = "https://github.com/frederikrothenberger/identity.rs.git", branch = "frederik/wasm-test", default-features = false, features = ["iccs"]}
+identity_jose = { git = "https://github.com/przydatek/identity.rs.git", default-features = false}
 
 
 [features]
