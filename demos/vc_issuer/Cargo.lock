@@ -103,8 +103,8 @@ version = "0.1.0"
 dependencies = [
  "base64 0.21.4",
  "candid",
- "ic-cdk 0.12.0",
- "ic-cdk-macros 0.8.3",
+ "ic-cdk 0.13.3",
+ "ic-cdk-macros 0.13.3",
  "ic-certification 2.2.0",
  "ic-representation-independent-hash",
  "include_dir",
@@ -388,7 +388,7 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "hex",
- "ic-cdk 0.12.0",
+ "ic-cdk 0.13.3",
  "ic-certification 2.2.0",
  "ic-representation-independent-hash",
  "lazy_static",
@@ -406,10 +406,10 @@ dependencies = [
  "candid",
  "flate2",
  "hex",
- "ic-cdk 0.12.0",
+ "ic-cdk 0.13.3",
  "ic-representation-independent-hash",
  "ic-test-state-machine-client",
- "identity_jose 0.7.0-alpha.6",
+ "identity_jose",
  "internet_identity_interface",
  "lazy_static",
  "regex",
@@ -1885,23 +1885,6 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity_core"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#be73e6db80562e432e30dc8fcaba0c4f9561d4ed"
-dependencies = [
- "ic-cdk 0.12.0",
- "iota-crypto",
- "multibase",
- "serde",
- "serde_json",
- "strum",
- "thiserror",
- "time",
- "url",
- "zeroize",
-]
-
-[[package]]
-name = "identity_core"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
@@ -1924,7 +1907,7 @@ name = "identity_credential"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
  "identity_document",
  "identity_verification",
@@ -1946,7 +1929,7 @@ source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468
 dependencies = [
  "did_url_parser",
  "form_urlencoded",
- "identity_core 1.2.0",
+ "identity_core",
  "serde",
  "strum",
  "thiserror",
@@ -1958,7 +1941,7 @@ version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
  "did_url_parser",
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
  "identity_verification",
  "indexmap",
@@ -1969,28 +1952,10 @@ dependencies = [
 
 [[package]]
 name = "identity_jose"
-version = "0.7.0-alpha.6"
-source = "git+https://github.com/frederikrothenberger/identity.rs.git?branch=frederik/wasm-test#be73e6db80562e432e30dc8fcaba0c4f9561d4ed"
-dependencies = [
- "ic-crypto-standalone-sig-verifier",
- "ic-types",
- "identity_core 0.7.0-alpha.6",
- "iota-crypto",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "serde_json",
- "subtle",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "identity_jose"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "iota-crypto",
  "serde",
  "serde_json",
@@ -2004,9 +1969,9 @@ name = "identity_verification"
 version = "1.2.0"
 source = "git+https://github.com/przydatek/identity.rs.git#2e79cc4214a528035e468914733fb2e154824a62"
 dependencies = [
- "identity_core 1.2.0",
+ "identity_core",
  "identity_did",
- "identity_jose 1.2.0",
+ "identity_jose",
  "serde",
  "serde_json",
  "strum",
@@ -2067,7 +2032,7 @@ name = "internet_identity_interface"
 version = "0.1.0"
 dependencies = [
  "candid",
- "ic-cdk 0.12.0",
+ "ic-cdk 0.13.3",
  "serde",
  "serde_bytes",
 ]
@@ -3458,9 +3423,9 @@ dependencies = [
  "ic-certification 2.2.0",
  "ic-crypto-standalone-sig-verifier",
  "ic-types",
- "identity_core 1.2.0",
+ "identity_core",
  "identity_credential",
- "identity_jose 1.2.0",
+ "identity_jose",
  "serde",
  "serde_bytes",
  "serde_cbor",
