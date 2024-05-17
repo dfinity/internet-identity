@@ -112,7 +112,6 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             browser,
             authConfig,
             relyingParty,
-            issuerCanisterId: ISSUER_CANISTER_ID,
             issuerOrigin: issuer,
             knownDapps: [KNOWN_TEST_DAPP],
           });

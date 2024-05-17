@@ -116,7 +116,6 @@ export const getVCPresentation = async (args: {
   authConfig: AuthConfig;
   relyingParty: string;
   issuerOrigin: string;
-  issuerCanisterId: string;
   knownDapps?: KnownDapp[];
 }): Promise<{ alias: string; credential: string }> => {
   const result = await getVCPresentation_(args);
@@ -136,7 +135,6 @@ export const getVCPresentation_ = async ({
   authConfig: { setupAuth, finalizeAuth },
   relyingParty,
   issuerOrigin,
-  issuerCanisterId,
   knownDapps = [],
 }: {
   vcTestApp: VcTestAppView;
@@ -144,7 +142,6 @@ export const getVCPresentation_ = async ({
   authConfig: AuthConfig;
   relyingParty: string;
   issuerOrigin: string;
-  issuerCanisterId: string;
   knownDapps?: KnownDapp[];
 }): Promise<
   | { result: "ok"; alias: string; credential: string }
