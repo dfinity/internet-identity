@@ -442,7 +442,9 @@ function handleFlowReady(evnt: MessageEvent) {
     method: "request_credential",
     params: {
       issuer: {
+        type: "IC",
         origin: opts.issuerOrigin,
+        canisterId: principal,
       },
       credentialSpec: credentialSpecs[opts.credTy],
       credentialSubject: principal,
@@ -450,7 +452,7 @@ function handleFlowReady(evnt: MessageEvent) {
     },
   };
 
-  // register a handler for the "done" message, kick start the flow and then
+  // register a handler for the "done" message, kickstart the flow and then
   // unregister ourselves
   try {
     window.addEventListener("message", handleFlowFinished);
@@ -495,6 +497,10 @@ const App = () => {
   // The URL used for connecting to the issuer
   const [issuerUrl, setIssuerUrl] = useState<string>(
     "http://issuer.localhost:5173"
+  );
+
+  const [issuerCanisterId, setIssuerCanisterId] = useState<string>(
+    ""
   );
 
   // Alternative origin for the RP, if any
@@ -548,6 +554,15 @@ const App = () => {
         />
       </label>
       <label>
+        Issuer canister Id:
+        <input
+          data-role="issuer-canister-id"
+          type="text"
+          value={issuerCanisterId}
+          onChange={(evt) => setIssuerCanisterId(evt.target.value)}
+        />
+      </label>
+      <label>
         Alternative Derivation Origin:
         <input
           data-role="derivation-origin-rp"
@@ -584,6 +599,6 @@ const App = () => {
 
 ReactDOM.createRoot(document.getElementById("root-vc-flow")!).render(
   <React.StrictMode>
-    <App />
+    <App/>
   </React.StrictMode>
 );
