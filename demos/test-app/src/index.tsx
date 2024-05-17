@@ -499,9 +499,7 @@ const App = () => {
     "http://issuer.localhost:5173"
   );
 
-  const [issuerCanisterId, setIssuerCanisterId] = useState<string>(
-    ""
-  );
+  const [issuerCanisterId, setIssuerCanisterId] = useState<string>("");
 
   // Alternative origin for the RP, if any
   const [derivationOrigin, setDerivationOrigin] = useState<string>("");
@@ -599,6 +597,6 @@ const App = () => {
 
 ReactDOM.createRoot(document.getElementById("root-vc-flow")!).render(
   <React.StrictMode>
-    <App/>
+    <App />
   </React.StrictMode>
 );
