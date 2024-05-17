@@ -1,8 +1,9 @@
 use crate::internet_identity::types::{
     AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey, Purpose, Timestamp,
 };
-use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::management_canister::main::CanisterStatusResponse;
+use candid::{CandidType, Deserialize, Nat, Principal};
+use ic_cdk::api::management_canister::main::{CanisterStatusType, QueryStats};
+use serde::Serialize;
 use serde_bytes::ByteBuf;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -118,12 +119,48 @@ pub struct BufferedEntry {
     pub sequence_number: u64,
 }
 
+// Copies of `DefiniteCanisterSettings` resp. `CanisterStatusResponse` from ic-cdk v0.12, as v.0.13 has introduced
+// new fields (cf. https://github.com/dfinity/cdk-rs/blob/main/src/ic-cdk/CHANGELOG.md#changed-3),
+// and this leads to Candid incompatibility in `ArchiveStatus` returned by `status()-function.
+#[derive(
+    CandidType, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Default,
+)]
+pub struct DefiniteCanisterSettings {
+    /// Controllers of the canister.
+    pub controllers: Vec<Principal>,
+    /// Compute allocation.
+    pub compute_allocation: Nat,
+    /// Memory allocation.
+    pub memory_allocation: Nat,
+    /// Freezing threshold.
+    pub freezing_threshold: Nat,
+}
+#[derive(
+    CandidType, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone,
+)]
+pub struct CanisterStatus {
+    /// See [CanisterStatusType].
+    pub status: CanisterStatusType,
+    /// See [DefiniteCanisterSettings].
+    pub settings: DefiniteCanisterSettings,
+    /// A SHA256 hash of the module installed on the canister. This is null if the canister is empty.
+    pub module_hash: Option<Vec<u8>>,
+    /// The memory size taken by the canister.
+    pub memory_size: Nat,
+    /// The cycle balance of the canister.
+    pub cycles: Nat,
+    /// Amount of cycles burned per day.
+    pub idle_cycles_burned_per_day: Nat,
+    /// Query statistics
+    pub query_stats: QueryStats,
+}
+
 /// Information about the archive canister (i.e. useful for debugging).
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct ArchiveStatus {
     pub call_info: CallInfo,
     pub init: ArchiveInit,
-    pub canister_status: CanisterStatusResponse,
+    pub canister_status: CanisterStatus,
 }
 
 /// Information about the calls the archive is making to II.

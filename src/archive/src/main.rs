@@ -669,9 +669,24 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 #[candid_method]
 async fn status() -> ArchiveStatus {
     let canister_id = id();
-    let (canister_status,) = canister_status(CanisterIdRecord { canister_id })
+    let (ic_cdk_canister_status,) = canister_status(CanisterIdRecord { canister_id })
         .await
         .expect("failed to retrieve canister status");
+    let canister_settings = DefiniteCanisterSettings {
+        controllers: ic_cdk_canister_status.settings.controllers,
+        compute_allocation: ic_cdk_canister_status.settings.compute_allocation,
+        memory_allocation: ic_cdk_canister_status.settings.memory_allocation,
+        freezing_threshold: ic_cdk_canister_status.settings.freezing_threshold,
+    };
+    let canister_status = CanisterStatus {
+        status: ic_cdk_canister_status.status,
+        settings: canister_settings,
+        module_hash: ic_cdk_canister_status.module_hash,
+        memory_size: ic_cdk_canister_status.memory_size,
+        cycles: ic_cdk_canister_status.cycles,
+        idle_cycles_burned_per_day: ic_cdk_canister_status.idle_cycles_burned_per_day,
+        query_stats: ic_cdk_canister_status.query_stats,
+    };
     let config = with_config(|config| ArchiveInit {
         ii_canister: config.ii_canister,
         max_entries_per_call: config.max_entries_per_call,

@@ -29,9 +29,9 @@ vc_util = { path = "src/vc_util" }
 # ic dependencies
 candid = "0.10"
 candid_parser = "0.1.2"
-ic-cdk = "0.12"
-ic-cdk-macros = "0.8"
-ic-cdk-timers = "0.6"
+ic-cdk = "0.13"
+ic-cdk-macros = "0.13"
+ic-cdk-timers = "0.7"
 ic-certification = "2.2"
 ic-http-certification = "2.2"
 ic-metrics-encoder = "1"
