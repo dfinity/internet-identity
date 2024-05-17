@@ -7,7 +7,7 @@ import {
   ISSUER_APP_URL_LEGACY,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
-  TEST_APP_CANONICAL_URL_LEGACY
+  TEST_APP_CANONICAL_URL_LEGACY,
 } from "$src/test-e2e/constants";
 import { DemoAppView } from "$src/test-e2e/views";
 

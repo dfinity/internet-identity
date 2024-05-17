@@ -7,7 +7,7 @@ import {
   ISSUER_CUSTOM_ORIGIN_NICE_URL,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
-  TEST_APP_NICE_URL
+  TEST_APP_NICE_URL,
 } from "$src/test-e2e/constants";
 
 import {
