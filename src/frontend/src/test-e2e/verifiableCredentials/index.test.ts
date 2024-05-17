@@ -4,10 +4,10 @@ import {
   APPLE_USER_AGENT,
   II_URL,
   ISSUER_APP_URL,
-  ISSUER_APP_URL_LEGACY,
+  ISSUER_APP_URL_LEGACY, ISSUER_CANISTER_ID,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
-  TEST_APP_CANONICAL_URL_LEGACY,
+  TEST_APP_CANONICAL_URL_LEGACY
 } from "$src/test-e2e/constants";
 import { DemoAppView } from "$src/test-e2e/views";
 
@@ -112,6 +112,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             browser,
             authConfig,
             relyingParty,
+            issuerCanisterId: ISSUER_CANISTER_ID,
             issuerOrigin: issuer,
             knownDapps: [KNOWN_TEST_DAPP],
           });
