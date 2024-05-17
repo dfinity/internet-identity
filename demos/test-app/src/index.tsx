@@ -79,6 +79,7 @@ let delegationIdentity: DelegationIdentity | undefined = undefined;
 
 // The local, ephemeral key-pair
 let localIdentity_: SignIdentity | undefined = undefined;
+
 function getLocalIdentity(): SignIdentity {
   if (localIdentity_ === undefined) {
     localIdentity_ = Ed25519KeyIdentity.generate();
@@ -548,7 +549,7 @@ const App = () => {
           data-role="issuer-url"
           type="text"
           value={issuerUrl}
-          onChange={(evt) => setIssuerUrl(evt.target.value)}
+          onChange={(evt) => setIssuerUrl(new URL(evt.target.value).origin)}
         />
       </label>
       <label>

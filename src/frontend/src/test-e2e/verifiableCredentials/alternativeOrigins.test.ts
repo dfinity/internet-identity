@@ -64,7 +64,7 @@ test("Can issue credential with alternative RP derivation origin", async () => {
       browser,
       authConfig,
       relyingParty: TEST_APP_CANONICAL_URL,
-      issuer: ISSUER_APP_URL,
+      issuerOrigin: ISSUER_APP_URL,
     });
     const alias = JSON.parse(alias_);
 
@@ -90,7 +90,7 @@ test("Can issue credential with alternative RP derivation origin", async () => {
       browser,
       authConfig,
       relyingParty: TEST_APP_NICE_URL,
-      issuer: ISSUER_APP_URL,
+      issuerOrigin: ISSUER_APP_URL,
       knownDapps: [KNOWN_TEST_DAPP],
     });
 
@@ -198,7 +198,7 @@ test("Can issue credential with alternative issuer derivation origin", async () 
       browser,
       authConfig,
       relyingParty,
-      issuer,
+      issuerOrigin: issuer,
       knownDapps: [KNOWN_TEST_DAPP],
     });
   });

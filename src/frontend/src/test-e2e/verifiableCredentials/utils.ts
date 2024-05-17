@@ -16,7 +16,7 @@ import {
   VcTestAppView,
 } from "$src/test-e2e/views";
 
-import { II_URL } from "$src/test-e2e/constants";
+import { II_URL, ISSUER_CANISTER_ID } from "$src/test-e2e/constants";
 
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
 import { nonNullish } from "@dfinity/utils";
@@ -81,7 +81,7 @@ export const authenticateToRelyingParty = async ({
   derivationOrigin?: string;
 }): Promise<VcTestAppView> => {
   const vcTestApp = new VcTestAppView(browser);
-  await vcTestApp.open(relyingParty, II_URL, issuer);
+  await vcTestApp.open(relyingParty, II_URL, issuer, ISSUER_CANISTER_ID);
 
   if (nonNullish(derivationOrigin)) {
     const demoView = new DemoAppView(browser);
@@ -115,7 +115,8 @@ export const getVCPresentation = async (args: {
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
   relyingParty: string;
-  issuer: string;
+  issuerOrigin: string;
+  issuerCanisterId: string;
   knownDapps?: KnownDapp[];
 }): Promise<{ alias: string; credential: string }> => {
   const result = await getVCPresentation_(args);
@@ -134,14 +135,16 @@ export const getVCPresentation_ = async ({
   browser,
   authConfig: { setupAuth, finalizeAuth },
   relyingParty,
-  issuer,
+  issuerOrigin,
+  issuerCanisterId,
   knownDapps = [],
 }: {
   vcTestApp: VcTestAppView;
   browser: WebdriverIO.Browser;
   authConfig: AuthConfig;
   relyingParty: string;
-  issuer: string;
+  issuerOrigin: string;
+  issuerCanisterId: string;
   knownDapps?: KnownDapp[];
 }): Promise<
   | { result: "ok"; alias: string; credential: string }
@@ -160,7 +163,8 @@ export const getVCPresentation_ = async ({
 
   // II will show the issuer and relying party name if they are known dapps.
   const issuerName: string =
-    knownDapps.find((dapp) => dapp.hasOrigin(issuer))?.name ?? issuer;
+    knownDapps.find((dapp) => dapp.hasOrigin(issuerOrigin))?.name ??
+    issuerOrigin;
   const rpName: string =
     knownDapps.find((dapp) => dapp.hasOrigin(relyingParty))?.name ??
     relyingParty;

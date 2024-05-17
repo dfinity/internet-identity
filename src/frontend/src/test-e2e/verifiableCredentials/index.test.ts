@@ -112,7 +112,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             browser,
             authConfig,
             relyingParty,
-            issuer,
+            issuerOrigin: issuer,
             knownDapps: [KNOWN_TEST_DAPP],
           });
 
