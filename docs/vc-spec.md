@@ -259,9 +259,9 @@ After receiving the notification that II is ready, the relying party can request
 * Method: `request_credential`
 * Params:
   * `issuer`: An issuer that the relying party trusts. It has the following properties:
-    * `origin`: The origin of the issuer.
-    * `canisterId`: (optional) The canister id of the issuer, if applicable/known. If specified and not the same
-       as the one reported by a boundary node for `origin`, this is an error.
+    * `type`: The type of the issuer. Currently, only supported type is `IC`, meaning an IC canister will issue the credential. 
+    * `origin`: The front-end origin of the issuer. If this value is different from the value returned from the `derivation_origin` canister call, then the `origin` must be a valid alternative origin as per the [Alternative Frontend Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature.
+    * `canisterId`: The canister id of the issuer canister (i.e. the one, that implements the candid issuer API as defined above). 
   * `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
     * `credentialType`: The type of the requested credential.
     * `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
@@ -278,6 +278,7 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
+        "type": "IC",
         "origin": "https://employment-info.com",
         "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
     },
@@ -299,6 +300,7 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
+        "type": "IC",
         "origin": "https://kyc-star.com",
         "canisterId": "rdmx6-jaaaa-aaaaa-aaadq-cai"
     },
@@ -321,7 +323,9 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
-        "origin": "https://kyc-resident-info.org"
+        "type": "IC",
+        "origin": "https://kyc-resident-info.org",
+        "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
     },
     "credentialSpec": {
         "credentialType": "VerifiedResident",
