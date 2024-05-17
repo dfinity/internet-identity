@@ -3,7 +3,7 @@ import { DemoAppView } from "$src/test-e2e/views";
 
 import {
   II_URL,
-  ISSUER_APP_URL, ISSUER_CANISTER_ID,
+  ISSUER_APP_URL,
   ISSUER_CUSTOM_ORIGIN_NICE_URL,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
