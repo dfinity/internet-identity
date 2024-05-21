@@ -3032,9 +3032,9 @@ input[type="checkbox"] {
 .c-marquee__image-container {
   position: absolute;
   top: 50%;
-  left: 20%;
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   height: 65%;
+  aspect-ratio: 1;
 }
 
 .c-marquee__image {
