@@ -389,7 +389,9 @@ fn update_aggregation<M: Memory, F>(
     let mut pruned_weight_by_key = pruned_events
         .iter()
         .filter_map(&aggregation_filter_map)
-        // zero weighted events are ignored for pruning
+        // zero weighted events are ignored when adjusting aggregations during pruning because they
+        // don't contribute any change to the aggregations hence pruning them has no effect on
+        // aggregations
         .filter(|weighted_aggregation| weighted_aggregation.weight > 0)
         .fold(HashMap::<_, u64>::new(), |mut map, weighted_aggregation| {
             let value =
@@ -432,7 +434,7 @@ fn update_aggregation<M: Memory, F>(
                 }
             } else {
                 // This should not happen, but if it does, it's a bug.
-                // Print a message and so that we can investigate once canister logs are available.
+                // Print a message so that we can investigate once canister logs are available.
                 ic_cdk::println!("WARN: Aggregation key {:?} not found in db", key);
             }
         });
