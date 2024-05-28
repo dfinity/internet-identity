@@ -14,8 +14,8 @@ vc_util = { path = "../../src/vc_util" }
 asset_util = { path = "../../src/asset_util" }
 # ic dependencies
 candid = "0.10"
-ic-cdk = "0.12"
-ic-cdk-macros = "0.8"
+ic-cdk = "0.13"
+ic-cdk-macros = "0.13"
 ic-certification = "2.2"
 ic-stable-structures = "0.6.0"
 

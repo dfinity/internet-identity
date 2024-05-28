@@ -75,7 +75,9 @@ const marqueeList = (dapps: KnownDapp[]): TemplateResult => {
         // shows an empty space where the image suddenly pops seconds
         // later.
         ({ logoSrc, name }) => html`<div class="c-marquee__item">
-          <img src=${logoSrc} alt="${name}" class="c-marquee__image" />
+          <div class="c-marquee__image-container">
+            <img src=${logoSrc} alt="${name}" class="c-marquee__image" />
+          </div>
         </div>`
       );
 

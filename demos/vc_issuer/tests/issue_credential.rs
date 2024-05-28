@@ -731,6 +731,7 @@ fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
                 status_code: http_response.status_code,
                 headers: http_response.headers,
                 body: http_response.body.into_vec(),
+                upgrade: None,
             },
             canister_id.as_slice(),
             time(env) as u128,
