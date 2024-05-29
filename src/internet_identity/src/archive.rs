@@ -3,9 +3,8 @@ use crate::storage::anchor::Device;
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::main::{
-    canister_status, install_code, CanisterIdRecord, CanisterInstallMode,
-    CanisterInstallMode::Install, CanisterStatusResponse, CreateCanisterArgument,
-    InstallCodeArgument,
+    canister_status, install_code, CanisterIdRecord, CanisterInstallMode, CanisterStatusResponse,
+    CreateCanisterArgument, InstallCodeArgument,
 };
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, id, trap};
@@ -16,7 +15,6 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::time::Duration;
 use ArchiveState::{Configured, Created, CreationInProgress, NotConfigured};
-use CanisterInstallMode::Upgrade;
 
 /// State of the archive canister.
 #[derive(Eq, PartialEq, Clone, CandidType, Debug, Deserialize, Default)]
@@ -116,13 +114,13 @@ pub async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
                 Ok(archive) => archive,
                 Err(err) => return DeployArchiveResult::Failed(err),
             };
-            (archive, Install)
+            (archive, CanisterInstallMode::Install)
         }
         ReducedArchiveState::Created(data) => {
             let status = archive_status(data.archive_canister).await;
             match status.canister_status.module_hash {
-                None => (data.archive_canister, Install),
-                Some(_) => (data.archive_canister, Upgrade(None)),
+                None => (data.archive_canister, CanisterInstallMode::Install),
+                Some(_) => (data.archive_canister, CanisterInstallMode::Upgrade(None)),
             }
         }
     };

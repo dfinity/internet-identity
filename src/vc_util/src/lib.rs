@@ -313,6 +313,27 @@ pub fn verify_ii_presentation_jwt_with_canister_ids(
     Ok((alias_tuple, claims))
 }
 
+fn extract_vc_claims(claims: &JwtClaims<Value>) -> Result<Map<String, Value>, JwtValidationError> {
+    let vc_claims = claims
+        .custom()
+        .ok_or(inconsistent_jwt_claims(
+            "missing custom claims in JWT claims",
+        ))?
+        .as_object()
+        .ok_or(inconsistent_jwt_claims(
+            "malformed custom claims in JWT claims",
+        ))?
+        .get("vc")
+        .ok_or(inconsistent_jwt_claims(
+            "missing vc claims in JWT custom claims",
+        ))?
+        .as_object()
+        .ok_or(inconsistent_jwt_claims(
+            "malformed vc claims in JWT custom claims",
+        ))?;
+    Ok(vc_claims.clone())
+}
+
 /// Validates the provided presentation `vp_jwt`, both cryptographically and semantically:
 ///  - verifies the cryptographic consistency via `verify_ii_presentation_jwt_with_canister_ids(...)`.
 ///  - checks that the claims from the presentation match the credential spec `vc_spec`.
@@ -333,12 +354,8 @@ pub fn validate_ii_presentation_and_claims(
     )?;
     validate_claim("iss", &vc_flow_signers.issuer_origin, claims.iss())
         .map_err(invalid_requested_vc)?;
-    let vc_claims = claims
-        .vc()
-        .ok_or(invalid_requested_vc(inconsistent_jwt_claims(
-            "missing vc in id_alias JWT claims",
-        )))?;
-    validate_claims_match_spec(vc_claims, vc_spec).map_err(invalid_requested_vc)?;
+    let vc_claims = extract_vc_claims(&claims).map_err(invalid_requested_vc)?;
+    validate_claims_match_spec(&vc_claims, vc_spec).map_err(invalid_requested_vc)?;
     Ok(())
 }
 
@@ -368,7 +385,7 @@ pub fn build_credential_jwt(params: CredentialParams) -> String {
         .expiration_date(expiration_date)
         .build()
         .unwrap();
-    credential.serialize_jwt().unwrap()
+    credential.serialize_jwt(None).unwrap()
 }
 
 /// Builds from the given parameters a Verifiable Presentation as returned by II
@@ -429,9 +446,7 @@ fn extract_subject(claims: &JwtClaims<Value>) -> Result<Principal, JwtValidation
 
 fn extract_id_alias(claims: &JwtClaims<Value>) -> Result<AliasTuple, JwtValidationError> {
     let id_dapp = extract_subject(claims)?;
-    let vc = claims.vc().ok_or(inconsistent_jwt_claims(
-        "missing \"vc\" claim in id_alias JWT claims",
-    ))?;
+    let vc = extract_vc_claims(claims)?;
     let subject_value = vc.get("credentialSubject").ok_or(inconsistent_jwt_claims(
         "missing \"credentialSubject\" claim in id_alias JWT vc",
     ))?;
@@ -659,6 +674,7 @@ fn presentation_to_compact_jwt(presentation: &Presentation<Jwt>) -> Result<Strin
             expiration_date: None,
             issuance_date: None,
             audience: None,
+            custom_claims: None,
         })
         .map_err(|_| "failed serializing presentation")?;
     let encoder: CompactJwsEncoder = CompactJwsEncoder::new(vp_jwt.as_ref(), &header)
