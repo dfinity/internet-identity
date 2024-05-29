@@ -389,6 +389,10 @@ fn update_aggregation<M: Memory, F>(
     let mut pruned_weight_by_key = pruned_events
         .iter()
         .filter_map(&aggregation_filter_map)
+        // zero weighted events are ignored when adjusting aggregations during pruning because they
+        // don't contribute any change to the aggregations hence pruning them has no effect on
+        // aggregations
+        .filter(|weighted_aggregation| weighted_aggregation.weight > 0)
         .fold(HashMap::<_, u64>::new(), |mut map, weighted_aggregation| {
             let value =
                 map.get(&weighted_aggregation.key).unwrap_or(&0) + weighted_aggregation.weight;
@@ -420,21 +424,18 @@ fn update_aggregation<M: Memory, F>(
     pruned_weight_by_key
         .into_iter()
         .for_each(|(key, pruned_weight)| {
-            let current_weight = db.get(&key).unwrap_or_else(|| {
-                panic!("aggregation key \"{:?}\" not found in DB when pruning", key)
-            });
-            assert!(
-                current_weight >= pruned_weight,
-                "pruned weight {} exceeds current weight {} for key \"{:?}\"",
-                pruned_weight,
-                current_weight,
-                key
-            );
-            let new_weight = current_weight - pruned_weight;
-            if new_weight == 0 {
-                db.remove(&key);
+            // Adjust aggregation weight by subtracting the pruned weight
+            if let Some(current_weight) = db.get(&key) {
+                let new_weight = current_weight.saturating_sub(pruned_weight);
+                if new_weight == 0 {
+                    db.remove(&key);
+                } else {
+                    db.insert(key, new_weight);
+                }
             } else {
-                db.insert(key, new_weight);
+                // This should not happen, but if it does, it's a bug.
+                // Print a message so that we can investigate once canister logs are available.
+                ic_cdk::println!("WARN: Aggregation key {:?} not found in db", key);
             }
         });
 }

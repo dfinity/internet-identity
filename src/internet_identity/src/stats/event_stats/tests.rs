@@ -637,6 +637,70 @@ fn should_add_prune_events_to_prune_aggregations() {
     assert_event_count_consistent(&mut storage);
 }
 
+#[test]
+fn should_prune_zero_weighted_events() {
+    let mut storage = test_storage();
+    let ii_domain = Some(IIDomain::Ic0App);
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: ii_domain.clone(),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: to_ns(0),
+        }),
+    };
+
+    // no events initially
+    assert_eq!(storage.event_data.len(), 0);
+
+    // add multiple zero weighted event
+    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    update_events_internal(
+        EventData {
+            event: Event::PrepareDelegation(PrepareDelegationEvent {
+                ii_domain: ii_domain.clone(),
+                frontend: "https://example3.com".to_string(),
+                session_duration_ns: to_ns(0),
+            }),
+        },
+        TIMESTAMP,
+        &mut storage,
+    );
+
+    assert_eq!(storage.event_data.len(), 3);
+
+    // there should not be any aggregation for session seconds as the weight is 0
+    let sess_sec_aggregations: [AggregationKey; 2] = [
+        AggregationKey::new(
+            PrepareDelegationSessionSeconds,
+            Day,
+            ii_domain.clone(),
+            EXAMPLE_URL.to_string(),
+        ),
+        AggregationKey::new(
+            PrepareDelegationSessionSeconds,
+            Month,
+            ii_domain.clone(),
+            EXAMPLE_URL.to_string(),
+        ),
+    ];
+    for key in sess_sec_aggregations.iter() {
+        assert!(storage.event_aggregations.get(key).is_none());
+    }
+
+    let event2 = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0App),
+            frontend: EXAMPLE_URL_2.to_string(),
+            session_duration_ns: to_ns(SESS_DURATION_SEC),
+        }),
+    };
+    update_events_internal(event2.clone(), TIMESTAMP + DAY_NS * 30, &mut storage);
+
+    // zero weighted events should have been pruned
+    assert_eq!(storage.event_data.len(), 1);
+}
+
 /// Make sure the cached count values are consistent with the actual data
 fn assert_event_count_consistent(storage: &mut Storage<Rc<RefCell<Vec<u8>>>>) {
     assert_eq!(
