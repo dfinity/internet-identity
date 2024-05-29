@@ -62,12 +62,14 @@ use crate::{state, DAY_NS, MINUTE_NS};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::time;
 use ic_cdk::{caller, id, trap};
+use ic_cdk_timers::set_timer;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{Memory, StableBTreeMap, Storable};
 use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::time::Duration;
 
 /// This module defines the aggregations over the events.
 mod event_aggregations;
@@ -214,7 +216,11 @@ pub async fn prune_events_if_necessary() {
     // the last event is older than 5 minutes, which indicates that the event data is backlogged
     // and needs to be pruned
     let mut delta = now - key.time;
-    loop {
+
+    // The loop is explicitly bounded since it contains a self call.
+    // If the loop logic is accidentally changed in the future to not terminate, putting an explicit
+    // limit ensures termination
+    for _ in 0..64 {
         let injected_pruning_time = key.time + delta;
 
         // Use a self-call, so that we can retry in case of failure
@@ -239,10 +245,10 @@ pub async fn prune_events_if_necessary() {
 
     if delta < now - key.time {
         // we needed to back off at least once, so immediately try again to prune the rest
-        let result: CallResult<()> = ic_cdk::call(id(), "prune_events_if_necessary", ()).await;
-        if let Err(err) = result {
-            ic_cdk::println!("Chained 'prune_events_if_necessary' call failed: {:?}", err)
-        }
+        // use a timer instead of a self-call to avoid creating a call context
+        set_timer(Duration::from_nanos(0), || {
+            ic_cdk::spawn(crate::prune_events_if_necessary());
+        });
     }
 }
 
