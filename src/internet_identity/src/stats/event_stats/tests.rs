@@ -655,7 +655,17 @@ fn should_prune_zero_weighted_events() {
     // add multiple zero weighted event
     update_events_internal(event.clone(), TIMESTAMP, &mut storage);
     update_events_internal(event.clone(), TIMESTAMP, &mut storage);
-    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    update_events_internal(
+        EventData {
+            event: Event::PrepareDelegation(PrepareDelegationEvent {
+                ii_domain: ii_domain.clone(),
+                frontend: "https://example3.com".to_string(),
+                session_duration_ns: to_ns(0),
+            }),
+        },
+        TIMESTAMP,
+        &mut storage,
+    );
 
     assert_eq!(storage.event_data.len(), 3);
 
