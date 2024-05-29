@@ -3,7 +3,8 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
-    assert_metric, env, get_metrics, install_ii_canister, upgrade_ii_canister, II_WASM,
+    assert_metric, env, get_metrics, install_ii_canister, restore_compressed_stable_memory,
+    upgrade_ii_canister, EMPTY_WASM, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, StateMachine};
@@ -215,6 +216,24 @@ fn should_prune_automatically_after_upgrade() -> Result<(), CallError> {
     keys.sort();
     assert_eq!(keys, expected_keys);
 
+    Ok(())
+}
+
+#[test]
+fn crash_mem_backup() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+    restore_compressed_stable_memory(
+        &env,
+        canister_id,
+        "./stable_memory/stats_incident_v9.bin.gz",
+    );
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    env.advance_time(Duration::from_secs(60 * 60 * 24 + 1));
+
+    let identity_nr = create_identity(&env, canister_id, "ic0.app");
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
     Ok(())
 }
 

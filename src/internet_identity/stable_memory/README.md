@@ -14,6 +14,7 @@ The following stable memory backups are currently used:
 * `multiple-recovery-phrases-v9.bin.gz`: a backup with an identity that has multiple recovery phrases. The input validation does no longer allow to create such an identity (only one recovery phrase is allowed). However, legacy users that are in that state need a way to make their identity consistent again. This backup is used to test exactly that.
 * `persistent_state_archive_v9.bin.gz`: a backup to check that archive state and configuration are restored correctly.
 * `persistent_state_no_archive_v9.bin.gz`: a backup to check that persistent state without an archive is restored correctly. 
+* `stats_incident_v9.bin.gz`: a back-up of a state that caused the incident on May 23rd, 2024. It is used to make sure that newer versions of II can correctly recover from this state.
 
 ## Creating New Test Memory Backups
 
