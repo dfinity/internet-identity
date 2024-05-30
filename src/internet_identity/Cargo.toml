@@ -50,7 +50,7 @@ canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true
 ic-response-verification.workspace = true
-identity_jose = { git = "https://github.com/dfinity/identity.rs.git", default-features = false}
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "63d3683cf6b6e48136ffb6812125dd8addfbbe75", default-features = false}
 
 
 [features]
