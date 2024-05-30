@@ -564,5 +564,23 @@
     "oneLiner": "One-stop infrastructure, developer toolkit and middleware DevOps service platform",
     "website": "https://hamsternet.io/",
     "logo": "hamster_logo.png"
+  },
+  {
+    "name": "RIIDE",
+    "website": "https://riide.org/",
+    "logo": "riide_logo.png",
+    "oneLiner": "A community-owned Web3 application that primarily offers taxi, delivery, and courier services."
+  },
+  {
+    "name": "ChainkeyX",
+    "website": "https://www.chainkeyx.com",
+    "logo": "chainkeyx_logo.png",
+    "oneLiner": "A crypto neobank that offers fully on-chain bitcoin borrowing and lending on ICP."
+  },
+  {
+    "name": "EstateDAO",
+    "website": "https://wbdy5-yyaaa-aaaap-abysq-cai.icp0.io/",
+    "logo": "estatedao_logo.png",
+    "oneLiner": "A vacation real estate tokenization and rental platform on ICP, enabling users to invest in vacation real estate with investments as low as USD 100."
   }
 ]
