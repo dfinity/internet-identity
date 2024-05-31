@@ -112,9 +112,7 @@ export const authnTemplateAuthorize = ({
     const altOrigin = isAltOriginOf(action);
     return html`
       <div class="l-stack">
-        ${h1(
-          html`${copy[`${action}_title_1`]}<br />${copy[`${action}_title_2`]}`
-        )}
+        ${h1(html`${copy[`${action}_title_1`]}`)}
         <p class="t-lead l-stack">
           ${copy[`${action}_subtitle`]} ${copy[`${action}_subtitle_join`]}
           ${nonNullish(knownDapp)
