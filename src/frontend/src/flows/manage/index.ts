@@ -83,14 +83,14 @@ export const authnTemplateManage = ({
     },
     useExisting: {
       slot: wrap({
-        title: html`Enter your <br />Internet Identity`,
+        title: html`Enter Identity 🔑`,
         subtitle: "to continue",
       }),
     },
 
     pick: {
       slot: wrap({
-        title: html`Choose your <br />Internet Identity`,
+        title: html`Choose Identity 🔑`,
         subtitle: "to continue",
       }),
     },
