@@ -13,9 +13,9 @@ ic-types.workspace = true
 canister_sig_util.workspace = true
 
 # vc dependencies
-identity_core = { git = "https://github.com/dfinity/identity.rs.git", default-features = false, features = ["ic-wasm"] }
-identity_credential = { git = "https://github.com/dfinity/identity.rs.git", default-features = false , features = ["ic-wasm", "validator"] }
-identity_jose = { git = "https://github.com/dfinity/identity.rs.git", default-features = false}
+identity_core = { git = "https://github.com/dfinity/identity.rs.git", rev = "63d3683cf6b6e48136ffb6812125dd8addfbbe75", default-features = false, features = ["ic-wasm"] }
+identity_credential = { git = "https://github.com/dfinity/identity.rs.git", rev = "63d3683cf6b6e48136ffb6812125dd8addfbbe75", default-features = false , features = ["ic-wasm", "validator"] }
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "63d3683cf6b6e48136ffb6812125dd8addfbbe75", default-features = false}
 
 # other dependencies
 serde.workspace = true
