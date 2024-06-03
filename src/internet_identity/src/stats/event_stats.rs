@@ -269,11 +269,9 @@ pub fn inject_prune_event(timestamp: Timestamp) {
 fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut Storage<M>) {
     let current_key = EventKey::new(now);
     let option = s.event_data.insert(current_key.clone(), event.clone());
-    assert!(
-        option.is_none(),
-        "event already exists for key {:?}",
-        current_key
-    );
+    if option.is_some() {
+        ic_cdk::println!("WARN: Event already exists for key {:?}", current_key);
+    }
     state::persistent_state_mut(|s| {
         s.event_data_count += 1;
     });
