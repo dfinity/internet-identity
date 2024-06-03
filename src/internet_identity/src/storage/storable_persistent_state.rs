@@ -4,6 +4,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
 use crate::stats::activity_stats::ActivityStats;
+use crate::stats::event_stats::EventKey;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -30,6 +31,7 @@ pub struct StorablePersistentState {
     event_data_count: Option<u64>,
     // opt of backwards compatibility
     event_aggregations_count: Option<u64>,
+    event_stats_24h_pruning_start: Option<EventKey>,
 }
 
 impl Storable for StorablePersistentState {
@@ -66,6 +68,7 @@ impl From<PersistentState> for StorablePersistentState {
             max_inflight_captchas: s.max_inflight_captchas,
             event_data_count: Some(s.event_data_count),
             event_aggregations_count: Some(s.event_aggregations_count),
+            event_stats_24h_pruning_start: s.event_stats_24h_pruning_start,
         }
     }
 }
@@ -82,6 +85,7 @@ impl From<StorablePersistentState> for PersistentState {
             max_inflight_captchas: s.max_inflight_captchas,
             event_data_count: s.event_data_count.unwrap_or_default(),
             event_aggregations_count: s.event_aggregations_count.unwrap_or_default(),
+            event_stats_24h_pruning_start: s.event_stats_24h_pruning_start,
         }
     }
 }
@@ -120,6 +124,7 @@ mod tests {
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
             event_data_count: Some(0),
             event_aggregations_count: Some(0),
+            event_stats_24h_pruning_start: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -137,6 +142,7 @@ mod tests {
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
             event_data_count: 0,
             event_aggregations_count: 0,
+            event_stats_24h_pruning_start: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

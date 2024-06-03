@@ -398,6 +398,90 @@ fn should_prune_monthly_events_after_30d() {
 }
 
 #[test]
+fn should_prune_at_most_100_events_24h() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0App),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: to_ns(SESS_DURATION_SEC),
+        }),
+    };
+    let aggregation_key = AggregationKey::new(
+        PrepareDelegationCount,
+        Day,
+        Some(IIDomain::Ic0App),
+        EXAMPLE_URL.to_string(),
+    );
+
+    for _ in 0..107 {
+        update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    }
+
+    update_events_internal(event.clone(), TIMESTAMP + DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+
+    // Of the 107 initial events, 100 should be pruned, 1 was added to trigger the pruning
+    // --> 8 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 8);
+    assert_eq!(
+        persistent_state(|s| s.event_stats_24h_pruning_start.clone()).unwrap(),
+        EventKey {
+            time: TIMESTAMP,
+            counter: 100
+        }
+    );
+    update_events_internal(event.clone(), TIMESTAMP + 2 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+    // Prune again, after another 24h leaving only the event that triggered the pruning
+    // --> 1 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 1);
+    assert_eq!(
+        persistent_state(|s| s.event_stats_24h_pruning_start.clone()).unwrap(),
+        EventKey {
+            time: TIMESTAMP + DAY_NS,
+            counter: 108
+        }
+    );
+}
+
+#[test]
+fn should_prune_at_most_100_events_30d() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0App),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: to_ns(SESS_DURATION_SEC),
+        }),
+    };
+    let aggregation_key = AggregationKey::new(
+        PrepareDelegationCount,
+        Month,
+        Some(IIDomain::Ic0App),
+        EXAMPLE_URL.to_string(),
+    );
+
+    for _ in 0..107 {
+        update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    }
+
+    update_events_internal(event.clone(), TIMESTAMP + 30 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+
+    // Of the 107 initial events, 100 should be pruned, 1 was added to trigger the pruning
+    // --> 8 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 8);
+    assert_eq!(storage.event_data.len(), 8);
+    update_events_internal(event.clone(), TIMESTAMP + 60 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+    // Prune again, after another 30d leaving only the event that triggered the pruning
+    // --> 1 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 1);
+    assert_eq!(storage.event_data.len(), 1);
+}
+
+#[test]
 fn should_account_for_dapps_changing_session_lifetime() {
     let mut storage = test_storage();
     let event1 = EventData {

@@ -4,6 +4,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
 use crate::stats::activity_stats::ActivityStats;
+use crate::stats::event_stats::EventKey;
 use crate::storage::anchor::Anchor;
 use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};
@@ -103,6 +104,11 @@ pub struct PersistentState {
     // event_aggregations is expected to have a lot of entries, thus counting by iterating over it is not
     // an option.
     pub event_aggregations_count: u64,
+    // Key into the event_data BTreeMap where the 24h tracking window starts.
+    // This key is used to prune old entries from the 24h event aggregations.
+    // If it is `none`, then the 24h pruning window starts from the newest entry in the event_data
+    // BTreeMap minus 24h.
+    pub event_stats_24h_pruning_start: Option<EventKey>,
 }
 
 impl Default for PersistentState {
@@ -118,6 +124,7 @@ impl Default for PersistentState {
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
             event_data_count: 0,
             event_aggregations_count: 0,
+            event_stats_24h_pruning_start: None,
         }
     }
 }
