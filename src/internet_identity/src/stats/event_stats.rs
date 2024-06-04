@@ -77,7 +77,9 @@ mod event_aggregations;
 
 pub use event_aggregations::*;
 
-const MAX_EVENTS_TO_PRUNE: usize = 100;
+/// Number of past events to process per aggregation window in a single update call
+/// This limit will be applied twice, to the 24h and 30d aggregations.
+const MAX_EVENTS_TO_PROCESS: usize = 100;
 
 #[cfg(test)]
 mod tests;
@@ -294,11 +296,14 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
     });
 
     let mut aggregations_db_wrapper = CountingAggregationsWrapper(&mut s.event_aggregations);
+    // Collect events that should no longer be reflected in the 24h aggregations. Does _not_ delete
+    // the underlying events.
+    let removed_24h = events_to_remove_from_24h_aggregations(now, &current_key, &s.event_data);
     // Update 24h aggregations
     update_aggregations(
         &current_key,
         &event,
-        &prune_events_24h(now, &current_key, &s.event_data),
+        &removed_24h,
         AggregationWindow::Day,
         &mut aggregations_db_wrapper,
     );
@@ -306,7 +311,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
     // This pruning _deletes_ the data older than 30 days. Do this after the 24h aggregation
     // otherwise the daily stats become inaccurate on the unlikely event that there is no activity
     // for 30 days.
-    let pruned_30d = prune_events_30d(&mut s.event_data, now);
+    let pruned_30d = prune_events(&mut s.event_data, now);
     // Update 30d aggregations
     update_aggregations(
         &current_key,
@@ -338,11 +343,11 @@ fn update_aggregations<M: Memory>(
 
 /// Collects events older than 24h that need to be removed from the 24h aggregations.
 /// Given events are kept for 30 days, the events are not deleted from the supplied `db`.
-/// Instead, this function simply updates the `event_stats_24h_pruning_start` state variable
-/// that denotes the first event that should be pruned in the next call.
+/// Instead, this function simply updates the `event_stats_24h_start` state variable
+/// that denotes the first event that should be removed from the 24h window in the next call.
 ///
-/// Returns a vec of tuples of the pruned events and their timestamps, at most [MAX_EVENTS_TO_PRUNE].
-fn prune_events_24h<M: Memory>(
+/// Returns a vec of tuples of the pruned events and their timestamps, at most [MAX_EVENTS_TO_PROCESS].
+fn events_to_remove_from_24h_aggregations<M: Memory>(
     now: Timestamp,
     current_key: &EventKey,
     db: &StableBTreeMap<EventKey, EventData, M>,
@@ -359,10 +364,10 @@ fn prune_events_24h<M: Memory>(
     /// |--|--------------------------------------------------|--|   --> time
     /// ^  ^                                                  ^  ^
     /// |  |                                                  |  └ current_key
-    /// |  └ now - 24h (prune_window_end)                     └ previous event
-    /// └ previous event timestamp - 24h (prune_window_start)
+    /// |  └ now - 24h                                        └ previous event
+    /// └ previous event timestamp - 24h
     /// ```
-    fn prune_window_start_from_current_key<M: Memory>(
+    fn removal_start_from_current_key<M: Memory>(
         current_key: &EventKey,
         db: &StableBTreeMap<EventKey, EventData, M>,
     ) -> Option<EventKey> {
@@ -371,35 +376,35 @@ fn prune_events_24h<M: Memory>(
             .map(|(k, _)| EventKey::min_key(k.time - DAY_NS))
     }
 
-    let prune_window_start =
+    let window_start =
         // Continue pruning from the last key. This value will be set if the 24h window has been pruned
         // before.
-        state::persistent_state(|s| s.event_stats_24h_pruning_start.clone()).or_else(|| {
+        state::persistent_state(|s| s.event_stats_24h_start.clone()).or_else(|| {
             // Alternatively, calculate it from the current key. This is necessary in two cases:
             // - the events have never been pruned before because they are not yet 24h old.
             // - this is the first event after an II upgrade from a version that did not have this
             //   state variable to track the beginning of the 24h window.
-            prune_window_start_from_current_key(current_key, db)
+            removal_start_from_current_key(current_key, db)
         });
 
-    let Some(prune_start_key) = prune_window_start else {
-        // there is no key to start pruning from, so the list of pruned events is empty.
+    let Some(start_key) = window_start else {
+        // there is no key to start from, so the list of removed events is empty.
         return vec![];
     };
 
-    // Always aim to prune up to 24h ago, event if past attempts did not manage due to the
-    // MAX_EVENTS_TO_PRUNE limit.
-    let prune_window_end = now - DAY_NS;
+    // Always aim to collect events up to 24h ago, even if past update calls did not manage due to
+    // the MAX_EVENTS_TO_PROCESS limit.
+    let window_end_timestamp = now - DAY_NS;
     let events = db
-        .range(prune_start_key..=EventKey::max_key(prune_window_end))
-        .take(MAX_EVENTS_TO_PRUNE)
+        .range(start_key..=EventKey::max_key(window_end_timestamp))
+        .take(MAX_EVENTS_TO_PROCESS)
         .collect::<Vec<_>>();
 
     // update the persistent state with they key _after_ the one being pointed to by the last event
-    // so that the next amortized pruning can continue from there.
+    // so that the next amortized clean-up can continue from there.
     if let Some((k, _)) = events.last() {
         state::persistent_state_mut(|s| {
-            s.event_stats_24h_pruning_start = Some(k.next_key());
+            s.event_stats_24h_start = Some(k.next_key());
         });
     }
     events
@@ -407,8 +412,8 @@ fn prune_events_24h<M: Memory>(
 
 /// Removes events older than the retention period (30d).
 /// Returns a vec of tuples of the pruned events and their timestamps.
-/// Prunes at most [MAX_EVENTS_TO_PRUNE].
-fn prune_events_30d<M: Memory>(
+/// Prunes at most [MAX_EVENTS_TO_PROCESS].
+fn prune_events<M: Memory>(
     db: &mut StableBTreeMap<EventKey, EventData, M>,
     now: Timestamp,
 ) -> Vec<(EventKey, EventData)> {
@@ -416,7 +421,7 @@ fn prune_events_30d<M: Memory>(
 
     let pruned_events: Vec<_> = db
         .range(..=EventKey::max_key(now - RETENTION_PERIOD))
-        .take(MAX_EVENTS_TO_PRUNE)
+        .take(MAX_EVENTS_TO_PROCESS)
         .collect();
     for entry in &pruned_events {
         let entry: &(EventKey, EventData) = entry;

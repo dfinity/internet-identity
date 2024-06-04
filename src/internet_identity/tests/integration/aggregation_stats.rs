@@ -123,7 +123,7 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_prune_at_most_100_entries_24h() -> Result<(), CallError> {
+fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";

@@ -105,10 +105,10 @@ pub struct PersistentState {
     // an option.
     pub event_aggregations_count: u64,
     // Key into the event_data BTreeMap where the 24h tracking window starts.
-    // This key is used to prune old entries from the 24h event aggregations.
-    // If it is `none`, then the 24h pruning window starts from the newest entry in the event_data
+    // This key is used to remove old entries from the 24h event aggregations.
+    // If it is `none`, then the 24h window starts from the newest entry in the event_data
     // BTreeMap minus 24h.
-    pub event_stats_24h_pruning_start: Option<EventKey>,
+    pub event_stats_24h_start: Option<EventKey>,
 }
 
 impl Default for PersistentState {
@@ -124,7 +124,7 @@ impl Default for PersistentState {
             max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
             event_data_count: 0,
             event_aggregations_count: 0,
-            event_stats_24h_pruning_start: None,
+            event_stats_24h_start: None,
         }
     }
 }
