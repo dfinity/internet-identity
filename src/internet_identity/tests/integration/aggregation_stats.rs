@@ -124,6 +124,90 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
 }
 
 #[test]
+fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let ii_origin = "ic0.app";
+    let identity_nr = create_identity(&env, canister_id, ii_origin);
+
+    for i in 0..102 {
+        delegation_for_origin(
+            &env,
+            canister_id,
+            identity_nr,
+            &format!("https://some-dapp-{}", i),
+        )?;
+    }
+
+    env.advance_time(Duration::from_secs(60 * 60 * 24));
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    // 100 entries should have been pruned, leaving 3
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_eq!(
+        aggregations
+            .get(&aggregation_key(PD_COUNT, "24h", ii_origin))
+            .unwrap()
+            .len(),
+        3
+    );
+
+    // The rest should have been pruned, leaving 1
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_eq!(
+        aggregations
+            .get(&aggregation_key(PD_COUNT, "24h", ii_origin))
+            .unwrap()
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let ii_origin = "ic0.app";
+    let identity_nr = create_identity(&env, canister_id, ii_origin);
+
+    for i in 0..102 {
+        delegation_for_origin(
+            &env,
+            canister_id,
+            identity_nr,
+            &format!("https://some-dapp-{}", i),
+        )?;
+    }
+
+    env.advance_time(Duration::from_secs(60 * 60 * 24 * 30));
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    // 100 entries should have been pruned, leaving 3
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_eq!(
+        aggregations
+            .get(&aggregation_key(PD_COUNT, "30d", ii_origin))
+            .unwrap()
+            .len(),
+        3
+    );
+
+    // The rest should have been pruned, leaving 1
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_eq!(
+        aggregations
+            .get(&aggregation_key(PD_COUNT, "30d", ii_origin))
+            .unwrap()
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
 fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
     const II_ORIGIN: &str = "ic0.app";
     fn assert_expected_state(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {

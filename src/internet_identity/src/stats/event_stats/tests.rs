@@ -262,7 +262,7 @@ fn should_store_multiple_events_and_aggregate_expected_weight_count() {
 }
 
 #[test]
-fn should_prune_daily_events_after_24h() {
+fn should_remove_daily_events_after_24h() {
     let mut storage = test_storage();
     let event = EventData {
         event: Event::PrepareDelegation(PrepareDelegationEvent {
@@ -395,6 +395,96 @@ fn should_prune_monthly_events_after_30d() {
             .unwrap(),
         SESS_DURATION_SEC
     );
+}
+
+#[test]
+fn should_remove_at_most_100_events_24h() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0App),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: to_ns(SESS_DURATION_SEC),
+        }),
+    };
+    let aggregation_key = AggregationKey::new(
+        PrepareDelegationCount,
+        Day,
+        Some(IIDomain::Ic0App),
+        EXAMPLE_URL.to_string(),
+    );
+
+    for _ in 0..107 {
+        update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    }
+
+    update_events_internal(event.clone(), TIMESTAMP + DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+
+    // Of the 107 initial events, 100 should be removed, 1 was added to trigger the clean-up
+    // --> 8 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 8);
+
+    // Since the number of events exceeds the amortized clean-up limit of 100 events, the 24h window
+    // is expected to start at the time of the first event not cleaned-up, which is the event with
+    // counter 100 at time TIMESTAMP.
+    assert_eq!(
+        persistent_state(|s| s.event_stats_24h_start.clone()).unwrap(),
+        EventKey {
+            time: TIMESTAMP,
+            counter: 100
+        }
+    );
+    update_events_internal(event.clone(), TIMESTAMP + 2 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+    // Clean-up again, after another 24h leaving only the event that triggered the clean-up
+    // --> 1 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 1);
+
+    // the 24h window is now expected to be up-to-date starting 24h before the last event added
+    assert_eq!(
+        persistent_state(|s| s.event_stats_24h_start.clone()).unwrap(),
+        EventKey {
+            time: TIMESTAMP + DAY_NS,
+            counter: 108
+        }
+    );
+}
+
+#[test]
+fn should_prune_at_most_100_events_30d() {
+    let mut storage = test_storage();
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::Ic0App),
+            frontend: EXAMPLE_URL.to_string(),
+            session_duration_ns: to_ns(SESS_DURATION_SEC),
+        }),
+    };
+    let aggregation_key = AggregationKey::new(
+        PrepareDelegationCount,
+        Month,
+        Some(IIDomain::Ic0App),
+        EXAMPLE_URL.to_string(),
+    );
+
+    for _ in 0..107 {
+        update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+    }
+
+    update_events_internal(event.clone(), TIMESTAMP + 30 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+
+    // Of the 107 initial events, 100 should be pruned, 1 was added to trigger the pruning
+    // --> 8 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 8);
+    assert_eq!(storage.event_data.len(), 8);
+    update_events_internal(event.clone(), TIMESTAMP + 60 * DAY_NS, &mut storage);
+    assert_event_count_consistent(&mut storage);
+    // Prune again, after another 30d leaving only the event that triggered the pruning
+    // --> 1 expected events
+    assert_eq!(storage.event_aggregations.get(&aggregation_key).unwrap(), 1);
+    assert_eq!(storage.event_data.len(), 1);
 }
 
 #[test]
@@ -699,6 +789,16 @@ fn should_prune_zero_weighted_events() {
 
     // zero weighted events should have been pruned
     assert_eq!(storage.event_data.len(), 1);
+}
+
+#[test]
+fn should_wrap_event_key_counter_correctly() {
+    let key = EventKey {
+        time: TIMESTAMP,
+        counter: u16::MAX,
+    };
+    let next_key = key.next_key();
+    assert!(next_key > key);
 }
 
 /// Make sure the cached count values are consistent with the actual data
