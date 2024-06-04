@@ -367,7 +367,7 @@ fn events_to_remove_from_24h_aggregations<M: Memory>(
     /// |  └ now - 24h                                        └ previous event
     /// └ previous event timestamp - 24h
     /// ```
-    fn removal_start_from_current_key<M: Memory>(
+    fn window_start_from_current_key<M: Memory>(
         current_key: &EventKey,
         db: &StableBTreeMap<EventKey, EventData, M>,
     ) -> Option<EventKey> {
@@ -377,14 +377,14 @@ fn events_to_remove_from_24h_aggregations<M: Memory>(
     }
 
     let window_start =
-        // Continue pruning from the last key. This value will be set if the 24h window has been pruned
-        // before.
+        // Load the window start from persistent state. This value will be set if events have been
+        // removed from the 24h window before.
         state::persistent_state(|s| s.event_stats_24h_start.clone()).or_else(|| {
             // Alternatively, calculate it from the current key. This is necessary in two cases:
-            // - the events have never been pruned before because they are not yet 24h old.
+            // - the events have never been removed before because they are not yet 24h old.
             // - this is the first event after an II upgrade from a version that did not have this
             //   state variable to track the beginning of the 24h window.
-            removal_start_from_current_key(current_key, db)
+            window_start_from_current_key(current_key, db)
         });
 
     let Some(start_key) = window_start else {
