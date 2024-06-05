@@ -542,11 +542,6 @@ service : (opt InternetIdentityInit) -> {
     fetch_entries: () -> (vec BufferedArchiveEntry);
     acknowledge_entries: (sequence_number: nat64) -> ();
 
-    // Calls used for event stats housekeeping.
-    // Only callable by the canister itself.
-    prune_events_if_necessary: () -> ();
-    inject_prune_event: (timestamp: Timestamp) -> ();
-
     // V2 API
     // WARNING: The following methods are experimental and may change in the future.
 
