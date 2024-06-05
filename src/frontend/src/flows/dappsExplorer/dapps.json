@@ -1,5 +1,11 @@
 [
   {
+    "name": "Yuku",
+    "oneLiner": "Yuku, your gateway to NFTs, Metaverse, and GameFi!",
+    "website": "https://yuku.app/",
+    "logo": "yuku_logo.png"
+  },
+  {
     "name": "Helix Markets",
     "oneLiner": "Bringing true ownership and full transparency to crypto trading",
     "website": "https://www.helixmarkets.io/",
@@ -504,12 +510,6 @@
     "oneLiner": "A hub for exposing and tracing data used by AI to generate results.",
     "website": "https://recheck.io/",
     "logo": "ReCheck_logo.png"
-  },
-  {
-    "name": "Yuku",
-    "oneLiner": "An AI Web3 Platform featuring NFT Aggregator, 3D space, and AI Avatar integration.",
-    "website": "https://yuku.app/",
-    "logo": "yuku_logo.png"
   },
   {
     "name": "ICTO",
