@@ -109,4 +109,4 @@ echo "Using issuer derivation origin: $ISSUER_DERIVATION_ORIGIN" >&2
 echo "Using issuer frontend_hostname: $ISSUER_FRONTEND_HOSTNAME" >&2
 
 dfx canister call --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
-    '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'
+    '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = opt vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'
