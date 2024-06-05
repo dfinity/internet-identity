@@ -2,7 +2,7 @@ export const idlFactory = ({ IDL }) => {
   const IssuerConfig = IDL.Record({
     'derivation_origin' : IDL.Text,
     'idp_canister_ids' : IDL.Vec(IDL.Principal),
-    'ic_root_key_der' : IDL.Vec(IDL.Nat8),
+    'ic_root_key_der' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'frontend_hostname' : IDL.Text,
   });
   const DerivationOriginRequest = IDL.Record({
@@ -118,7 +118,7 @@ export const init = ({ IDL }) => {
   const IssuerConfig = IDL.Record({
     'derivation_origin' : IDL.Text,
     'idp_canister_ids' : IDL.Vec(IDL.Principal),
-    'ic_root_key_der' : IDL.Vec(IDL.Nat8),
+    'ic_root_key_der' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'frontend_hostname' : IDL.Text,
   });
   return [IDL.Opt(IssuerConfig)];
