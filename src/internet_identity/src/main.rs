@@ -13,7 +13,6 @@ use canister_sig_util::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::{set_timer, set_timer_interval};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -23,7 +22,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::time::Duration;
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -374,22 +372,6 @@ fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
-/// Check for backlogged event data and prune if necessary.
-/// Only callable by this canister.
-#[update]
-#[candid_method]
-async fn prune_events_if_necessary() {
-    stats::event_stats::prune_events_if_necessary().await
-}
-
-/// Inject pruning event at the given timestamp.
-/// Only callable by this canister.
-#[update]
-#[candid_method]
-fn inject_prune_event(timestamp: Timestamp) {
-    stats::event_stats::inject_prune_event(timestamp);
-}
-
 #[init]
 #[candid_method(init)]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
@@ -410,15 +392,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     init_assets();
     apply_install_arg(maybe_arg);
     update_root_hash();
-
-    // Immediately prune events if necessary and also set a timer to do so every 5 minutes.
-    // We need to use a timer here, because we cannot call canisters directly in init.
-    set_timer(Duration::from_nanos(0), || {
-        ic_cdk::spawn(prune_events_if_necessary());
-    });
-    set_timer_interval(Duration::from_nanos(5 * MINUTE_NS), || {
-        ic_cdk::spawn(prune_events_if_necessary());
-    });
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {

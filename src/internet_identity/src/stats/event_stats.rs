@@ -54,23 +54,18 @@
 //! ```
 
 use crate::ii_domain::IIDomain;
-use crate::state::{storage_borrow, storage_borrow_mut};
+use crate::state::storage_borrow_mut;
 use crate::stats::event_stats::event_aggregations::AGGREGATIONS;
-use crate::stats::event_stats::Event::PruneEvent;
 use crate::storage::Storage;
-use crate::{state, DAY_NS, MINUTE_NS};
+use crate::{state, DAY_NS};
 use candid::CandidType;
-use ic_cdk::api::call::CallResult;
 use ic_cdk::api::time;
-use ic_cdk::{caller, id, trap};
-use ic_cdk_timers::set_timer;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{Memory, StableBTreeMap, Storable};
 use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::time::Duration;
 
 /// This module defines the aggregations over the events.
 mod event_aggregations;
@@ -133,12 +128,9 @@ pub struct EventData {
 #[derive(Deserialize, Serialize, Clone, Eq, PartialEq, Debug)]
 pub enum Event {
     PrepareDelegation(PrepareDelegationEvent),
-    /// This event is injected when the backlog of events to be pruned gets too large to be handled
-    /// in an amortized fashion. This should not happen during regular operations, but might happen
-    /// as a second order effect to another incident causing II to stop processing `prepare_delegation`
-    /// calls.
-    /// By making it an event, we have control over the time window that should be pruned, and we
-    /// can have aggregations over it to know how often such an event was injected.
+    /// No longer used, but kept for backwards compatibility.
+    /// Used to be injected by a timer to artificially trigger regular pruning. No longer needed
+    /// due to the explicit [MAX_EVENTS_TO_PROCESS] limit.
     PruneEvent,
 }
 
@@ -205,82 +197,6 @@ pub fn update_event_based_stats(event: EventData) {
     let now = time();
     storage_borrow_mut(|s| {
         update_events_internal(event, now, s);
-    })
-}
-
-/// Checks if the event data has been pruned recently. If not, injects an artificial event to trigger
-/// the pruning.
-/// If the pruning fails, the timestamp delta is shrunk exponentially until the pruning succeeds.
-///
-/// This is useful to recover from a situation where II has not pruned events for a long time and
-/// would need to prune a large backlog of events immediately. Such a situation should not happen
-/// in regular operation, but might happen as a second order effect to another incident causing II
-/// to stop processing `prepare_delegation` calls.
-pub async fn prune_events_if_necessary() {
-    if caller() != id() {
-        // ignore if this is not a self-call
-        return;
-    }
-    let last = storage_borrow(|s| s.event_data.last_key_value());
-    let Some((key, _)) = last else {
-        return;
-    };
-
-    let now = time();
-    if now - key.time <= 5 * MINUTE_NS {
-        // the last event is recent, no need to prune
-        return;
-    }
-
-    // the last event is older than 5 minutes, which indicates that the event data is backlogged
-    // and needs to be pruned
-    let mut delta = now - key.time;
-
-    // The loop is explicitly bounded since it contains a self call.
-    // If the loop logic is accidentally changed in the future to not terminate, putting an explicit
-    // limit ensures termination
-    for _ in 0..64 {
-        let injected_pruning_time = key.time + delta;
-
-        // Use a self-call, so that we can retry in case of failure
-        let result: CallResult<()> =
-            ic_cdk::call(id(), "inject_prune_event", (injected_pruning_time,)).await;
-        match result {
-            Ok(()) => break, // success, we managed to prune once
-            Err(err) => {
-                // failure, try again with a smaller delta
-                delta /= 2;
-                if delta == 0 {
-                    trap("Prune event time delta reduced to 0, giving up!");
-                }
-                ic_cdk::println!(
-                    "Failed to inject prune event: {:?}, retrying with smaller delta {}",
-                    err,
-                    delta
-                );
-            }
-        }
-    }
-
-    if delta < now - key.time {
-        // we needed to back off at least once, so immediately try again to prune the rest
-        // use a timer instead of a self-call to avoid creating a call context
-        set_timer(Duration::from_nanos(0), || {
-            ic_cdk::spawn(crate::prune_events_if_necessary());
-        });
-    }
-}
-
-/// Retrieve the aggregation data for the given window and II domain.
-/// The data is returned as a map from a human-readable label to the aggregation weight.
-pub fn inject_prune_event(timestamp: Timestamp) {
-    if caller() != id() {
-        // ignore if this is not a self-call
-        return;
-    }
-    ic_cdk::println!("Injecting prune event at timestamp {}", timestamp);
-    storage_borrow_mut(|s| {
-        update_events_internal(EventData { event: PruneEvent }, timestamp, s);
     })
 }
 
