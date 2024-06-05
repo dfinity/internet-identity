@@ -6,7 +6,9 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
-use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
+use canister_tests::framework::{
+    env, get_wasm_path, principal_1, principal_2, test_principal, time, II_WASM,
+};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -60,7 +62,7 @@ lazy_static! {
     };
 
     pub static ref DUMMY_ISSUER_INIT: IssuerInit = IssuerInit {
-        ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
+        ic_root_key_der: Some(hex::decode(DUMMY_ROOT_KEY).unwrap()),
         idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
         derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
         frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
@@ -71,17 +73,25 @@ lazy_static! {
     };
 }
 
-pub fn install_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
-    let canister_id = env.create_canister(None);
+pub fn install_canister_as(
+    env: &StateMachine,
+    wasm: Vec<u8>,
+    controller: Option<Principal>,
+) -> CanisterId {
+    let canister_id = env.create_canister(controller);
     let arg = candid::encode_one("()").expect("error encoding II installation arg as candid");
-    env.install_canister(canister_id, wasm, arg, None);
+    env.install_canister(canister_id, wasm, arg, controller);
     canister_id
+}
+
+pub fn install_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
+    install_canister_as(env, wasm, None)
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct IssuerInit {
     /// Root of trust for checking canister signatures.
-    ic_root_key_der: Vec<u8>,
+    ic_root_key_der: Option<Vec<u8>>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
     /// The derivation origin to be used by the issuer.
@@ -103,9 +113,10 @@ mod api {
     pub fn configure(
         env: &StateMachine,
         canister_id: CanisterId,
+        sender: Principal,
         config: &IssuerInit,
     ) -> Result<(), CallError> {
-        call_candid(env, canister_id, "configure", (config,))
+        call_candid_as(env, canister_id, sender, "configure", (config,))
     }
 
     pub fn vc_consent_message(
@@ -352,7 +363,7 @@ fn should_return_derivation_origin() {
 fn should_return_derivation_origin_with_custom_init() {
     let env = env();
     let custom_init = IssuerInit {
-        ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
+        ic_root_key_der: Some(hex::decode(DUMMY_ROOT_KEY).unwrap()),
         idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
         derivation_origin: "https://derivation_origin".to_string(),
         frontend_hostname: "https://frontend.host.name".to_string(),
@@ -504,7 +515,7 @@ fn should_fail_prepare_credential_for_wrong_root_key() {
     let issuer_id = install_issuer(
         &env,
         &IssuerInit {
-            ic_root_key_der: canister_sig_util::IC_ROOT_PK_DER.to_vec(), // does not match the DUMMY_ROOT_KEY, which is used in DUMMY_ALIAS_JWS
+            ic_root_key_der: Some(canister_sig_util::IC_ROOT_PK_DER.to_vec()), // does not match the DUMMY_ROOT_KEY, which is used in DUMMY_ALIAS_JWS
             idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
             derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
             frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
@@ -529,7 +540,7 @@ fn should_fail_prepare_credential_for_wrong_idp_canister_id() {
     let issuer_id = install_issuer(
         &env,
         &IssuerInit {
-            ic_root_key_der: hex::decode(DUMMY_ROOT_KEY).unwrap(),
+            ic_root_key_der: Some(hex::decode(DUMMY_ROOT_KEY).unwrap()),
             idp_canister_ids: vec![Principal::from_text("rdmx6-jaaaa-aaaaa-aaadq-cai").unwrap()], // does not match the DUMMY_II_CANISTER_ID, which is used in DUMMY_ALIAS_JWS
             derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
             frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
@@ -594,7 +605,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
     let issuer_id = install_issuer(
         &env,
         &IssuerInit {
-            ic_root_key_der: env.root_key().to_vec(),
+            ic_root_key_der: Some(env.root_key().to_vec()),
             idp_canister_ids: vec![ii_id],
             derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
             frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
@@ -706,8 +717,19 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 #[test]
 fn should_configure() {
     let env = env();
-    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
-    api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
+    let controller = principal_1();
+    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
+    api::configure(&env, issuer_id, controller, &DUMMY_ISSUER_INIT).expect("API call failed");
+}
+
+#[test]
+fn should_fail_configure_if_not_controller() {
+    let env = env();
+    let controller = principal_1();
+    let not_controller = principal_2();
+    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
+    let result = api::configure(&env, issuer_id, not_controller, &DUMMY_ISSUER_INIT);
+    assert_matches!(result, Err(e) if format!("{:?}", e).contains("Only a controller can call configure"));
 }
 
 /// Verifies that the expected assets is delivered and certified.

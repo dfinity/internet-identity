@@ -1,7 +1,7 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER};
+use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY};
 use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
@@ -103,8 +103,7 @@ impl Default for IssuerConfig {
     fn default() -> Self {
         let derivation_origin = format!("https://{}.icp0.io", ic_cdk::id().to_text());
         Self {
-            ic_root_key_raw: extract_raw_root_pk_from_der(IC_ROOT_PK_DER)
-                .expect("failed to extract raw root pk from der"),
+            ic_root_key_raw: IC_ROOT_PUBLIC_KEY.clone(),
             idp_canister_ids: vec![Principal::from_text(PROD_II_CANISTER_ID).unwrap()],
             derivation_origin: derivation_origin.clone(),
             frontend_hostname: derivation_origin, // by default, use DERIVATION_ORIGIN as frontend-hostname
@@ -115,8 +114,12 @@ impl Default for IssuerConfig {
 impl From<IssuerInit> for IssuerConfig {
     fn from(init: IssuerInit) -> Self {
         Self {
-            ic_root_key_raw: extract_raw_root_pk_from_der(&init.ic_root_key_der)
-                .expect("failed to extract raw root pk from der"),
+            ic_root_key_raw: if let Some(custom_root_pk) = init.ic_root_key_der {
+                extract_raw_root_pk_from_der(&custom_root_pk)
+                    .expect("failed to extract raw root pk from der")
+            } else {
+                IC_ROOT_PUBLIC_KEY.clone()
+            },
             idp_canister_ids: init.idp_canister_ids,
             derivation_origin: init.derivation_origin,
             frontend_hostname: init.frontend_hostname,
@@ -127,7 +130,7 @@ impl From<IssuerInit> for IssuerConfig {
 #[derive(CandidType, Deserialize)]
 struct IssuerInit {
     /// Root of trust for checking canister signatures.
-    ic_root_key_der: Vec<u8>,
+    ic_root_key_der: Option<Vec<u8>>,
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids: Vec<Principal>,
     /// The derivation origin to be used by the issuer.
@@ -154,7 +157,11 @@ fn post_upgrade(init_arg: Option<IssuerInit>) {
 #[update]
 #[candid_method]
 fn configure(config: IssuerInit) {
-    apply_config(config);
+    if ic_cdk::api::is_controller(&caller()) {
+        apply_config(config);
+    } else {
+        panic!("Only a controller can call configure().");
+    }
 }
 
 fn apply_config(init: IssuerInit) {
@@ -623,8 +630,9 @@ mod test {
         )
         .unwrap_or_else(|e| {
             panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
+                "the canister interface is not equal to the did file: {:?} \n--- current interface:\n{}\n",
+                e,
+                canister_interface,
             )
         });
     }

@@ -81,7 +81,7 @@ type DerivationOriginError = variant {
 /// Configuration specific to this issuer.
 type IssuerConfig = record {
     /// Root of trust for checking canister signatures.
-    ic_root_key_der : blob;
+    ic_root_key_der : opt blob;
     /// List of canister ids that are allowed to provide id alias credentials.
     idp_canister_ids : vec principal;
     /// The derivation origin to be used by the issuer.
