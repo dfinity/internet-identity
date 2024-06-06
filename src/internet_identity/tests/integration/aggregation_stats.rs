@@ -4,7 +4,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     assert_metric, env, get_metrics, install_ii_canister, restore_compressed_stable_memory,
-    upgrade_ii_canister, EMPTY_WASM, II_WASM,
+    upgrade_ii_canister, EMPTY_WASM, II_WASM, II_WASM_PRE_STATS,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_test_state_machine_client::{CallError, StateMachine};
@@ -261,6 +261,56 @@ fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     assert_expected_state(&env, canister_id)?;
+    Ok(())
+}
+
+#[test]
+fn should_reset_stats_on_rollback_and_upgrade() -> Result<(), CallError> {
+    const II_ORIGIN: &str = "ic0.app";
+
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_nr = create_identity(&env, canister_id, II_ORIGIN);
+
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_expected_aggregation(
+        &aggregations,
+        &aggregation_key(PD_COUNT, "24h", II_ORIGIN),
+        vec![("https://some-dapp.com".to_string(), 2u64)],
+    );
+    assert_expected_aggregation(
+        &aggregations,
+        &aggregation_key(PD_COUNT, "30d", II_ORIGIN),
+        vec![("https://some-dapp.com".to_string(), 2u64)],
+    );
+    assert_expected_aggregation(
+        &aggregations,
+        &aggregation_key(PD_SESS_SEC, "24h", II_ORIGIN),
+        vec![("https://some-dapp.com".to_string(), 2 * SESSION_LENGTH)],
+    );
+    assert_expected_aggregation(
+        &aggregations,
+        &aggregation_key(PD_SESS_SEC, "30d", II_ORIGIN),
+        vec![("https://some-dapp.com".to_string(), 2 * SESSION_LENGTH)],
+    );
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_event_data_count", 2f64);
+    assert_metric(&metrics, "internet_identity_event_aggregations_count", 4f64);
+
+    // roll back to a version that does not know about event stats
+    upgrade_ii_canister(&env, canister_id, II_WASM_PRE_STATS.clone());
+    // upgrade to the latest version again --> stats should be reset
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    let aggregations = api::stats(&env, canister_id)?.event_aggregations;
+    assert_eq!(aggregations.len(), 0);
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_event_data_count", 0f64);
+    assert_metric(&metrics, "internet_identity_event_aggregations_count", 0f64);
     Ok(())
 }
 
