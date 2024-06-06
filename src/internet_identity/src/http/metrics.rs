@@ -4,13 +4,13 @@ use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::ActivityCounter;
 use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::AggregationWindow::{Day, Month};
-use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_SESS_SEC};
+use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_COUNT, PD_SESS_SEC};
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::stable64_size;
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
 use std::time::Duration;
-use IIDomain::{Ic0App, InternetComputerOrg};
+use IIDomain::Ic0App;
 
 /// Collects the various metrics exposed by the Internet Identity canister.
 /// Returns a ascii-encoded string of the metrics in the Prometheus exposition format.
@@ -152,6 +152,11 @@ fn event_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> Result<(), std::io::Error> 
         "Cumulative authenticated session duration in seconds for the given front-end origin.",
     )?;
     pd_aggregation_metrics(PD_SESS_SEC, sess_sec_builder)?;
+    let count_builder = w.gauge_vec(
+        "internet_identity_prepare_delegation_count",
+        "Number of authenticated sessions for the given front-end origin.",
+    )?;
+    pd_aggregation_metrics(PD_COUNT, count_builder)?;
     Ok(())
 }
 
@@ -160,19 +165,17 @@ fn pd_aggregation_metrics(
     mut metrics_builder: LabeledMetricsBuilder<Vec<u8>>,
 ) -> Result<(), std::io::Error> {
     for window in &[Day, Month] {
-        for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
-            let data = retrieve_aggregation(aggregation, window.clone(), domain.clone());
+        let data = retrieve_aggregation(aggregation, window.clone(), Some(Ic0App));
 
-            for (frontend_origin, sess_sec) in data.iter().take(10) {
-                metrics_builder = metrics_builder.value(
-                    &[
-                        ("dapp", frontend_origin),
-                        ("window", window.label()),
-                        ("ii_origin", maybe_domain_to_label(domain)),
-                    ],
-                    *sess_sec as f64,
-                )?;
-            }
+        for (frontend_origin, sess_sec) in data.iter().take(10) {
+            metrics_builder = metrics_builder.value(
+                &[
+                    ("dapp", frontend_origin),
+                    ("window", window.label()),
+                    ("ii_origin", maybe_domain_to_label(&Some(Ic0App))),
+                ],
+                *sess_sec as f64,
+            )?;
         }
     }
     Ok(())

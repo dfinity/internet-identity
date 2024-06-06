@@ -609,9 +609,9 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
     api::prepare_delegation(
         &env,
         canister_id,
-        test_authn_method().principal(),
+        authn_method_ic0.principal(),
         user_number_1,
-        "https://some-dapp-1.com",
+        "https://some-dapp-2.com",
         &pub_session_key,
         Some(Duration::from_secs(3600).as_nanos() as u64),
     )?;
@@ -637,33 +637,23 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
     let metrics = get_metrics(&env, canister_id);
     assert_metric(
         &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\",ii_origin=\"other\"}",
-        5400f64,
-    );
-    assert_metric(
-        &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"30d\",ii_origin=\"other\"}",
-        5400f64,
-    );
-    assert_metric(
-        &metrics,
         "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"24h\",ii_origin=\"ic0.app\"}",
-        1800f64,
+        5400f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_prepare_delegation_count{dapp=\"https://some-dapp-2.com\",window=\"24h\",ii_origin=\"ic0.app\"}",
+        2f64,
     );
     assert_metric(
         &metrics,
         "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
-        1800f64,
+        5400f64,
     );
     assert_metric(
         &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\",ii_origin=\"internetcomputer.org\"}",
-        1800f64,
-    );
-    assert_metric(
-        &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
-        1800f64,
+        "internet_identity_prepare_delegation_count{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
+        2f64,
     );
     assert_metric(
         &get_metrics(&env, canister_id),
@@ -675,6 +665,15 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
         "internet_identity_event_aggregations_count",
         12f64,
     );
+    // make sure aggregations for other II domains are not listed on the metrics endpoint
+    assert!(
+        !metrics.contains(
+            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\""));
+    assert!(
+        !metrics.contains(
+            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\""));
+    assert!(!metrics.contains("ii_origin=\"other\""));
+    assert!(!metrics.contains("ii_origin=\"internetcomputer.org\""));
 
     // advance time one day to see it reflected on the daily stats
     env.advance_time(Duration::from_secs(60 * 60 * 24));
@@ -690,32 +689,24 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
     )?;
 
     let metrics = get_metrics(&env, canister_id);
-    // make sure aggregations that have no data anymore get removed from stats endpoint
-    assert!(
-        !metrics.contains(
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\""));
+    // The 24h metrics should be gone now
     assert!(
         !metrics.contains(
             "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"24h\""));
     assert!(
         !metrics.contains(
-            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\""));
+            "internet_identity_prepare_delegation_count{dapp=\"https://some-dapp-2.com\",window=\"24h\""));
 
     // The 30d metrics should still be there
     assert_metric(
         &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"30d\",ii_origin=\"other\"}",
+        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
         5400f64,
     );
     assert_metric(
         &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
-        1800f64,
-    );
-    assert_metric(
-        &metrics,
-        "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"30d\",ii_origin=\"internetcomputer.org\"}",
-        1800f64,
+        "internet_identity_prepare_delegation_count{dapp=\"https://some-dapp-2.com\",window=\"30d\",ii_origin=\"ic0.app\"}",
+        2f64,
     );
     assert_metric(
         &get_metrics(&env, canister_id),
