@@ -358,7 +358,7 @@ impl<'a, M: Memory> CountingAggregationsWrapper<'a, M> {
         if prev_value.is_none() {
             // Increase count because we added a new value
             state::persistent_state_mut(|s| {
-                s.event_aggregations_count += 1;
+                s.event_aggregations_count = s.event_aggregations_count.saturating_add(1);
             })
         }
     }
@@ -372,7 +372,7 @@ impl<'a, M: Memory> CountingAggregationsWrapper<'a, M> {
         if prev_value.is_some() {
             // Decrease count because we removed a value
             state::persistent_state_mut(|s| {
-                s.event_aggregations_count -= 1;
+                s.event_aggregations_count = s.event_aggregations_count.saturating_sub(1);
             })
         }
     }
