@@ -1348,18 +1348,8 @@ by all browsers (FF is missing) */
 
 .c-logo svg {
   display: block;
-  width: 5.5rem;
-  flex: 0 0 5.5rem;
-}
-
-.c-logo__type {
-  text-align: center;
-  flex: 1 1 auto;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-weight: 600;
-  font-size: 1.1em;
+  width: 14.5rem;
+  flex: 0 0 14.5rem;
 }
 
 .t-title + .c-logo {
