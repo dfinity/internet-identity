@@ -656,7 +656,8 @@ jobs:
           ./demos/vc_issuer/provision \
             --ii-canister-id fgte5-ciaaa-aaaad-aaatq-cai \
             --dfx-network ic \
-            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai
+            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
+            --wallet "$wallet"
 
       - name: "Deploy archive"
         run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic

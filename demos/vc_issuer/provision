@@ -22,6 +22,7 @@ Options:
   --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
   --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.icp0.io
   --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
+  --wallet CANISTER_ID            Optional wallet canister ID to use to configure the issuer, if any.
 EOF
 }
 
@@ -35,6 +36,7 @@ EOF
 
 II_CANISTER_ID=
 DFX_NETWORK=
+WALLET=
 
 while [[ $# -gt 0  ]]
 do
@@ -68,6 +70,11 @@ do
         --issuer-frontend-hostname)
             ISSUER_FRONTEND_HOSTNAME="${2:?missing value for '--issuer-frontend-hostname'}"
             shift; # shift past --issuer-canister & value
+            shift;
+            ;;
+        --wallet)
+            WALLET="${2:?missing value for '--wallet'}"
+            shift; # shift past --wallet & value
             shift;
             ;;
         *)
@@ -108,5 +115,13 @@ echo "Using II canister: $II_CANISTER_ID" >&2
 echo "Using issuer derivation origin: $ISSUER_DERIVATION_ORIGIN" >&2
 echo "Using issuer frontend_hostname: $ISSUER_FRONTEND_HOSTNAME" >&2
 
-dfx canister call --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
+declare -a WALLET_ARG=( )
+
+if [ "$WALLET" ]
+then
+    echo "Using wallet: $WALLET" >&2
+    WALLET_ARG+=( "--wallet" "$WALLET")
+fi
+
+dfx canister call "${WALLET_ARG[@]}" --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
     '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = opt vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'
