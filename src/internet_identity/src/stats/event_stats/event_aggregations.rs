@@ -82,6 +82,11 @@ fn retrieve_aggregation_internal<M: Memory>(
     ii_domain: Option<IIDomain>,
     s: &Storage<M>,
 ) -> Vec<(String, u64)> {
+    // Limit the number of aggregations retrieved in one go to avoid hitting the cycles limit when
+    // retrieving stats or metrics. This limit is currently over-provisioned by ~10x.
+    // If the limit is reached, we should switch to a naturally ordered aggregation
+    // data structure such that we can retrieve the top-n elements directly.
+    const AGGREGATIONS_LIMIT: usize = 5_000;
     let range_start = AggregationKey {
         kind: aggregation.kind(),
         window,
@@ -92,6 +97,7 @@ fn retrieve_aggregation_internal<M: Memory>(
     let mut data: Vec<_> = s
         .event_aggregations
         .range((Bound::Included(range_start), range_end))
+        .take(AGGREGATIONS_LIMIT)
         .map(|(key, weight)| (aggregation.key_label(key), weight))
         .collect();
     data.sort_by(|(_, weight_a), (_, weight_b)| weight_b.cmp(weight_a));
