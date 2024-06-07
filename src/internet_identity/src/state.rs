@@ -264,7 +264,17 @@ pub fn save_persistent_state() {
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        storage_borrow(|storage| *s.persistent_state.borrow_mut() = storage.read_persistent_state())
+        let loaded_state = storage_borrow(|storage| storage.read_persistent_state());
+
+        // Reset the event_data and event_aggregations if they are reported as empty from the persistent state
+        // Necessary to handle rollback across the versions where the event_data and event_aggregations were introduced
+        if loaded_state.event_aggregations_count == 0 {
+            storage_borrow_mut(|storage| storage.event_aggregations.clear_new());
+        }
+        if loaded_state.event_data_count == 0 {
+            storage_borrow_mut(|storage| storage.event_data.clear_new());
+        }
+        *s.persistent_state.borrow_mut() = loaded_state;
     });
 }
 
