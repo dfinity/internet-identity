@@ -208,7 +208,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
         ic_cdk::println!("WARN: Event already exists for key {:?}", current_key);
     }
     state::persistent_state_mut(|s| {
-        s.event_data_count += 1;
+        s.event_data_count = s.event_data_count.saturating_add(1);
     });
 
     let mut aggregations_db_wrapper = CountingAggregationsWrapper(&mut s.event_aggregations);
@@ -344,7 +344,9 @@ fn prune_events<M: Memory>(
         db.remove(&entry.0);
     }
     state::persistent_state_mut(|s| {
-        s.event_data_count -= pruned_events.len() as u64;
+        s.event_data_count = s
+            .event_data_count
+            .saturating_sub(pruned_events.len() as u64);
     });
     pruned_events
 }
