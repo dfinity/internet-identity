@@ -1,11 +1,5 @@
 [
   {
-    "name": "Yuku",
-    "oneLiner": "Yuku, your gateway to NFTs, Metaverse, and GameFi!",
-    "website": "https://yuku.app/",
-    "logo": "yuku_logo.png"
-  },
-  {
     "name": "Helix Markets",
     "oneLiner": "Bringing true ownership and full transparency to crypto trading",
     "website": "https://www.helixmarkets.io/",
@@ -35,31 +29,15 @@
     "logo": "nfid_logo.webp"
   },
   {
-    "name": "Trax",
-    "oneLiner": "Trax is the world's first artist and fan-owned music platform.",
-    "website": "https://trax.so/",
-    "logo": "trax_logo.webp"
+    "name": "Yuku",
+    "oneLiner": "Yuku, your gateway to NFTs, Metaverse, and GameFi!",
+    "website": "https://yuku.app/",
+    "logo": "yuku_logo.png"
   },
   {
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
     "logo": "icdex_logo.webp"
-  },
-  {
-    "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
-    "website": "https://dscvr.one/",
-    "logo": "dscvr_logo.webp"
-  },
-  {
-    "name": "distrikt",
-    "oneLiner": "Censorship-resistant fully on-chain social media platform",
-    "website": "https://distrikt.app",
-    "authOrigins": [
-      "https://distrikt.app",
-      "https://az5sd-cqaaa-aaaae-aaarq-cai.ic0.app/"
-    ],
-    "logo": "distrikt_logo.webp"
   },
   {
     "name": "Hot or Not",
@@ -68,16 +46,33 @@
     "logo": "hot_or_not_logo.png"
   },
   {
-    "name": "Yumi",
-    "oneLiner": "NFT marketplace for digital and physical assets",
-    "website": "https://tppkg-ziaaa-aaaal-qatrq-cai.raw.ic0.app/",
-    "logo": "yumi_logo.webp"
-  },
-  {
     "name": "Sonic DEX",
     "oneLiner": "Sonic DEX is an AMM and Perpetual trading platform",
     "website": "https://sonic.ooo/",
     "logo": "sonic-dex_logo.webp"
+  },
+  {
+    "name": "Catalyze",
+    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
+    "oneLiner": "Manage your Web3 communities and events",
+    "logo": "catalyze_logo.webp"
+  },
+  {
+    "name": "Juno",
+    "oneLiner": "Build Web3 at Lightning Speed",
+    "website": "https://juno.build",
+    "authOrigins": ["https://console.juno.build"],
+    "logo": "juno_logo.svg"
+  },
+  {
+    "name": "TAGGR",
+    "website": "https://taggr.link",
+    "authOrigins": [
+      "https://taggr.link",
+      "https://6qfxa-ryaaa-aaaai-qbhsq-cai.ic0.app"
+    ],
+    "logo": "taggr_logo.webp",
+    "oneLiner": "Blending forums and blogs - controlled by a DAO"
   },
   {
     "name": "Stoic Wallet",
@@ -97,10 +92,9 @@
     "logo": "oisy_logo.svg"
   },
   {
-    "name": "Kinic",
-    "oneLiner": "The world's first Web3 search engine",
-    "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
-    "logo": "kinic_logo.webp"
+    "name": "Trax",
+    "website": "https://trax.so/",
+    "logo": "trax_logo.webp"
   },
   {
     "name": "DecideAI",
@@ -109,14 +103,9 @@
     "logo": "decideai_logo.png"
   },
   {
-    "name": "TAGGR",
-    "website": "https://taggr.link",
-    "authOrigins": [
-      "https://taggr.link",
-      "https://6qfxa-ryaaa-aaaai-qbhsq-cai.ic0.app"
-    ],
-    "logo": "taggr_logo.webp",
-    "oneLiner": "Blending forums and blogs - controlled by a DAO"
+    "name": "Arth",
+    "website": "https://play.google.com/store/apps/details?id=com.foo.arth&pli=1",
+    "logo": "arth_logo.png"
   },
   {
     "name": "AutoRoyale",
@@ -125,29 +114,16 @@
     "oneLiner": "A fast-paced 2D multiplayer shooter game"
   },
   {
-    "name": "Catalyze",
-    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
-    "oneLiner": "Manage your Web3 communities and events",
-    "logo": "catalyze_logo.webp"
-  },
-  {
-    "name": "Juno",
-    "oneLiner": "Build Web3 at Lightning Speed",
-    "website": "https://juno.build",
-    "authOrigins": ["https://console.juno.build"],
-    "logo": "juno_logo.svg"
-  },
-  {
-    "name": "Arth",
-    "oneLiner": "Arth ckBTC wallet and swap btc<>ckBtc",
-    "website": "https://play.google.com/store/apps/details?id=com.foo.arth&pli=1",
-    "logo": "arth_logo.png"
-  },
-  {
     "name": "Signals",
     "website": "https://signalsicp.com/",
     "logo": "signals_logo.webp",
     "oneLiner": "A location based app for empowering local communities"
+  },
+  {
+    "name": "DSCVR",
+    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
+    "website": "https://dscvr.one/",
+    "logo": "dscvr_logo.webp"
   },
   {
     "name": "Canistergeek",
@@ -440,6 +416,12 @@
     "oneLiner": "icRouter: A cross-chain network of assets"
   },
   {
+    "name": "Kinic",
+    "oneLiner": "The world's first Web3 search engine",
+    "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
+    "logo": "kinic_logo.webp"
+  },
+  {
     "name": "The Asset App",
     "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
     "logo": "asset-app_logo.png",
@@ -582,5 +564,15 @@
     "website": "https://wbdy5-yyaaa-aaaap-abysq-cai.icp0.io/",
     "logo": "estatedao_logo.png",
     "oneLiner": "A vacation real estate tokenization and rental platform on ICP, enabling users to invest in vacation real estate with investments as low as USD 100."
+  },
+  {
+    "name": "distrikt",
+    "oneLiner": "Censorship-resistant fully on-chain social media platform",
+    "website": "https://distrikt.app",
+    "authOrigins": [
+      "https://distrikt.app",
+      "https://az5sd-cqaaa-aaaae-aaarq-cai.ic0.app/"
+    ],
+    "logo": "distrikt_logo.webp"
   }
 ]
