@@ -17,7 +17,7 @@ sha2.workspace = true
 
 internet_identity_interface.workspace = true
 vc_util.workspace = true
-identity_jose = { git = "https://github.com/dfinity/identity.rs.git",  rev = "63d3683cf6b6e48136ffb6812125dd8addfbbe75", default-features = false}
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git",  rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false}
 
 # All IC deps
 candid.workspace = true
