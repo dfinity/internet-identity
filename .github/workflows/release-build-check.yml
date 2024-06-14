@@ -57,7 +57,7 @@ jobs:
     needs: latest-release
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, macos-11, macos-12 ]
+        os: [ ubuntu-22.04, ubuntu-20.04, macos-13, macos-14 ]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,7 +84,9 @@ jobs:
     needs: latest-release
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, macos-11, macos-12 ]
+        # macos-14 is itself virtualized and does not support nested virtualization which would be required for the docker build.
+        # -> just use macos-13
+        os: [ ubuntu-22.04, ubuntu-20.04, macos-13 ]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,11 +95,7 @@ jobs:
       - name: Setup docker (missing on MacOS)
         if: runner.os == 'macos'
         run: |
-          brew install docker
-          brew install docker-buildx
-          # The following 2 commands are taken from the post install instructions printed by `brew install docker-buildx` 
-          mkdir -p ~/.docker/cli-plugins
-          ln -sfn /usr/local/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+          brew install docker docker-buildx colima
           colima start
 
       - name: "Verify Hash"
