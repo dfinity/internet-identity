@@ -273,6 +273,12 @@
     "logo": "blocklist.png"
   },
   {
+    "name": "Vibeverse",
+    "oneLiner": "a learning mobile app that teaches ppl how to be creative with ai",
+    "logo": "vibeverse_logo.png",
+    "website": "https://www.vibeverse.ai/"
+  },
+  {
     "name": "DSign",
     "website": "https://dsign.ooo",
     "logo": "dsign_logo.webp",
