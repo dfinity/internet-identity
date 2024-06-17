@@ -120,7 +120,7 @@ function build_canister() {
     TARGET="wasm32-unknown-unknown"
     # standardize source references
     CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
-    RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo"
+    RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo -C link-args=-zstack-size=3000000"
 
     cargo_build_args=(
         --manifest-path "$SRC_DIR/Cargo.toml"
