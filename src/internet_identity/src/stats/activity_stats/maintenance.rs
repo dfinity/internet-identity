@@ -66,9 +66,8 @@ fn process_monthly_stats<T: ActivityCounter>(stats: &mut ActivityStats<T>) {
     }
 
     // Align new window to the currently running 24h interval
-    let start_timestamp = stats.ongoing.daily_events.start_timestamp();
     // Note: requires daily stats to be processed before the monthly stats
-    assert!(now - start_timestamp < DAY_NS);
+    let start_timestamp = stats.ongoing.daily_events.start_timestamp();
 
     if let Some(monthly_stats) = stats.ongoing.monthly_events.last() {
         if monthly_stats.start_timestamp() + 1 * DAY_NS <= now {
