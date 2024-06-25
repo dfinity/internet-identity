@@ -158,9 +158,23 @@ test(
   })
 );
 
-test("lastShownRecoveryTimestamp defaults to undefined", async () => {
-  expect(await getLastShownWarningPageTimestamp(BigInt(10000))).toBeUndefined();
-});
+test(
+  "lastShownRecoveryTimestamp defaults to undefined",
+  withStorage(async () => {
+    expect(
+      await getLastShownWarningPageTimestamp(BigInt(10000))
+    ).toBeUndefined();
+  })
+);
+
+test(
+  "lastShownRecoveryTimestamp isn't stored if anchor is not set",
+  withStorage(async () => {
+    const userNumber = BigInt(10000);
+    await setShownRecoveryWarningPage(userNumber);
+    expect(await getLastShownWarningPageTimestamp(userNumber)).toBeUndefined();
+  })
+);
 
 test(
   "multiple anchors can be stored",

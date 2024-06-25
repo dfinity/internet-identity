@@ -5,11 +5,6 @@ import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { z } from "zod";
-import {
-  ANCHORS_KEY_V2_AND_V1,
-  ANCHORS_KEY_V3,
-  USER_NUMBER_KEY_V0,
-} from "./keys";
 
 /** We keep as many anchors as possible for two reasons:
  *  - we should design the app to discourage having many many anchors, but shouldn't prevent it
@@ -392,7 +387,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 const migratedV0 = async (): Promise<Storage | undefined> => {
   // Nothing to do if no 'userNumber's are stored
-  const userNumberString = localStorage.getItem(USER_NUMBER_KEY_V0);
+  const userNumberString = localStorage.getItem("userNumber");
   if (userNumberString === null) {
     return;
   }
@@ -449,7 +444,7 @@ const migratedV1 = async (): Promise<Storage | undefined> => {
 
 // Read localstorage stored anchors
 const readLocalStorageV1 = (): AnchorsV1 | undefined => {
-  const raw = localStorage.getItem(ANCHORS_KEY_V2_AND_V1);
+  const raw = localStorage.getItem("anchors");
 
   // Abort
   if (raw === null) {
@@ -532,7 +527,7 @@ const readIndexedDBV2 = async (): Promise<AnchorsV2 | undefined> => {
 };
 
 const writeIndexedDBV2 = async (anchors: AnchorsV2) => {
-  await idbSet(ANCHORS_KEY_V2_AND_V1, anchors);
+  await idbSet("anchors", anchors);
 };
 
 /**
@@ -543,6 +538,8 @@ type StorageV3 = z.infer<typeof StorageV3>;
 type AnchorsV3 = z.infer<typeof AnchorsV3>;
 type AnchorV3 = z.infer<typeof AnchorV3>;
 type PrincipalDataV3 = z.infer<typeof PrincipalDataV3>;
+
+const IDB_KEY_V3 = "ii-storage-v3";
 
 const PrincipalDataV3 = z.object({
   /** The actual digest */
@@ -559,6 +556,7 @@ const AnchorV3 = z.object({
   knownPrincipals: z.array(PrincipalDataV3),
 
   /** Timestamp (millis since epoch) of when the recovery phrase warning page was last shown. */
+  /** Set as optional to keep backwards compatibility. */
   lastShownRecoveryTimestamp: z.number().optional(),
 });
 const AnchorsV3 = z.record(AnchorV3);
@@ -570,7 +568,7 @@ const StorageV3 = z.object({
 });
 
 const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
-  const item: unknown = await idbGet(ANCHORS_KEY_V3);
+  const item: unknown = await idbGet(IDB_KEY_V3);
 
   if (isNullish(item)) {
     return;
@@ -590,7 +588,7 @@ const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
 };
 
 const writeIndexedDBV3 = async (storage: Storage) => {
-  await idbSet(ANCHORS_KEY_V3, storage);
+  await idbSet(IDB_KEY_V3, storage);
 };
 
 /* Latest */
