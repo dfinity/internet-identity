@@ -15,7 +15,7 @@ import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
-import { setAnchorUsed } from "$src/storage";
+import { setAnchorUsed, setShownRecoveryWarningPage } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   ApiError,
@@ -194,6 +194,9 @@ export const registerFlow = async <T>({
   const userNumber = result.userNumber;
   await finalizeIdentity?.(userNumber);
   await setAnchorUsed(userNumber);
+  // We don't want to nudge the user with the recovery phrase warning page
+  // right after they've created their anchor.
+  await setShownRecoveryWarningPage(userNumber);
   await displayUserNumber({
     userNumber,
     stepper: finishStepper,

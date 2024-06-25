@@ -366,13 +366,6 @@ export const displayManage = (
         onAddDevice,
         addRecoveryPhrase,
         addRecoveryKey: async () => {
-          const confirmed = confirm(
-            "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
-          );
-          if (!confirmed) {
-            // No resolve here because we don't need to reload the screen
-            return;
-          }
           await setupKey({ connection });
           resolve();
         },

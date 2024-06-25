@@ -5,6 +5,11 @@ import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { z } from "zod";
+import {
+  ANCHORS_KEY_V2_AND_V1,
+  ANCHORS_KEY_V3,
+  USER_NUMBER_KEY_V0,
+} from "./keys";
 
 /** We keep as many anchors as possible for two reasons:
  *  - we should design the app to discourage having many many anchors, but shouldn't prevent it
@@ -31,6 +36,15 @@ export const getAnchors = async (): Promise<bigint[]> => {
   return anchors;
 };
 
+/** Find anchor by userNumber and return the last time the recovery page was shown */
+export const getLastShownWarningPageTimestamp = async (
+  userNumber: bigint
+): Promise<number | undefined> => {
+  const data = await readStorage();
+  const anchor = data.anchors[userNumber.toString()];
+  return anchor?.lastShownRecoveryTimestamp;
+};
+
 /** Set the specified anchor as used "just now" */
 export const setAnchorUsed = async (userNumber: bigint) => {
   await withStorage((storage) => {
@@ -45,6 +59,27 @@ export const setAnchorUsed = async (userNumber: bigint) => {
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
     storage.anchors[ix] = { ...oldAnchor, lastUsedTimestamp: nowMillis() };
+    return storage;
+  });
+};
+
+/** Set the specified anchor as used "just now" */
+export const setShownRecoveryWarningPage = async (userNumber: bigint) => {
+  await withStorage((storage) => {
+    const ix = userNumber.toString();
+
+    const anchors = storage.anchors;
+    const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
+      knownPrincipals: [],
+    };
+    const oldAnchor = anchors[ix] ?? defaultAnchor;
+
+    // Here we try to be as non-destructive as possible and we keep potentially unknown
+    // fields
+    storage.anchors[ix] = {
+      ...oldAnchor,
+      lastShownRecoveryTimestamp: nowMillis(),
+    };
     return storage;
   });
 };
@@ -357,7 +392,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 const migratedV0 = async (): Promise<Storage | undefined> => {
   // Nothing to do if no 'userNumber's are stored
-  const userNumberString = localStorage.getItem("userNumber");
+  const userNumberString = localStorage.getItem(USER_NUMBER_KEY_V0);
   if (userNumberString === null) {
     return;
   }
@@ -414,7 +449,7 @@ const migratedV1 = async (): Promise<Storage | undefined> => {
 
 // Read localstorage stored anchors
 const readLocalStorageV1 = (): AnchorsV1 | undefined => {
-  const raw = localStorage.getItem("anchors");
+  const raw = localStorage.getItem(ANCHORS_KEY_V2_AND_V1);
 
   // Abort
   if (raw === null) {
@@ -497,7 +532,7 @@ const readIndexedDBV2 = async (): Promise<AnchorsV2 | undefined> => {
 };
 
 const writeIndexedDBV2 = async (anchors: AnchorsV2) => {
-  await idbSet("anchors", anchors);
+  await idbSet(ANCHORS_KEY_V2_AND_V1, anchors);
 };
 
 /**
@@ -508,8 +543,6 @@ type StorageV3 = z.infer<typeof StorageV3>;
 type AnchorsV3 = z.infer<typeof AnchorsV3>;
 type AnchorV3 = z.infer<typeof AnchorV3>;
 type PrincipalDataV3 = z.infer<typeof PrincipalDataV3>;
-
-const IDB_KEY_V3 = "ii-storage-v3";
 
 const PrincipalDataV3 = z.object({
   /** The actual digest */
@@ -524,6 +557,9 @@ const AnchorV3 = z.object({
   lastUsedTimestamp: z.number(),
 
   knownPrincipals: z.array(PrincipalDataV3),
+
+  /** Timestamp (millis since epoch) of when the recovery phrase warning page was last shown. */
+  lastShownRecoveryTimestamp: z.number().optional(),
 });
 const AnchorsV3 = z.record(AnchorV3);
 
@@ -534,7 +570,7 @@ const StorageV3 = z.object({
 });
 
 const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
-  const item: unknown = await idbGet(IDB_KEY_V3);
+  const item: unknown = await idbGet(ANCHORS_KEY_V3);
 
   if (isNullish(item)) {
     return;
@@ -554,7 +590,7 @@ const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
 };
 
 const writeIndexedDBV3 = async (storage: Storage) => {
-  await idbSet(IDB_KEY_V3, storage);
+  await idbSet(ANCHORS_KEY_V3, storage);
 };
 
 /* Latest */
