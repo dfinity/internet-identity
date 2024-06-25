@@ -39,7 +39,9 @@ test("Register new identity and login without prefilled identity number", async 
 
     // load the II page again
     await browser.url(II_URL);
-    await FLOWS.loginWelcomeView(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginWelcomeView(userNumber, browser);
+    await FLOWS.skipRecoveryNag(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
 

@@ -61,7 +61,6 @@ export async function runInBrowser(
 
   const chromeOptions: ChromeOptions = {
     args: [
-      // "--headless",
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
       "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise

@@ -80,14 +80,11 @@ export const FLOWS = {
   },
   loginWelcomeView: async (
     userNumber: string,
-    deviceName: string,
     browser: WebdriverIO.Browser
   ): Promise<void> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
     await welcomeView.login(userNumber);
-    const mainView = new MainView(browser);
-    await mainView.waitForDeviceDisplay(deviceName);
   },
   loginAuthenticateView: async (
     userNumber: string,
@@ -169,6 +166,11 @@ export const FLOWS = {
     const addDeviceSuccessView = new AddDeviceSuccessView(browser);
     await addDeviceSuccessView.waitForDisplay();
     await addDeviceSuccessView.continue();
+  },
+  skipRecoveryNag: async (browser: WebdriverIO.Browser): Promise<void> => {
+    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
+    await recoveryMethodSelectorView.waitForDisplay();
+    await recoveryMethodSelectorView.skipRecovery();
   },
   recoverUsingSeedPhrase: async (
     browser: WebdriverIO.Browser,
