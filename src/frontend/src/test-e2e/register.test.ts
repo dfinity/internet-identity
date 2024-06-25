@@ -92,7 +92,6 @@ test("Register first then log into client application", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    await FLOWS.skipRecoveryNag(browser);
     const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami()).toBe(principal);
 
