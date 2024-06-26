@@ -16,13 +16,9 @@ import {
   setKnownPrincipal,
 } from ".";
 
-const now = 1719292831442;
-
 beforeAll(() => {
   // Initialize the IndexedDB global
   global.indexedDB = new IDBFactory();
-
-  vi.useFakeTimers().setSystemTime(now);
 });
 
 test("anchors default to nothing", async () => {
