@@ -158,7 +158,10 @@ const pinIdentityAuthenticatorValidity = async ({
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBoxFlow = async <T, I>({
+export const authenticateBoxFlow = async <
+  T extends AuthenticatedConnection,
+  I
+>({
   i18n,
   templates,
   addDevice,

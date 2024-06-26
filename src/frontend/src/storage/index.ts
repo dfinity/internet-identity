@@ -31,15 +31,6 @@ export const getAnchors = async (): Promise<bigint[]> => {
   return anchors;
 };
 
-/** Find anchor by userNumber and return the last time the recovery page was shown */
-export const getLastShownWarningPageTimestamp = async (
-  userNumber: bigint
-): Promise<number | undefined> => {
-  const data = await readStorage();
-  const anchor = data.anchors[userNumber.toString()];
-  return anchor?.lastShownRecoveryTimestamp;
-};
-
 /** Set the specified anchor as used "just now" */
 export const setAnchorUsed = async (userNumber: bigint) => {
   await withStorage((storage) => {
@@ -54,27 +45,6 @@ export const setAnchorUsed = async (userNumber: bigint) => {
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
     storage.anchors[ix] = { ...oldAnchor, lastUsedTimestamp: nowMillis() };
-    return storage;
-  });
-};
-
-/** Set the specified anchor as used "just now" */
-export const setShownRecoveryWarningPage = async (userNumber: bigint) => {
-  await withStorage((storage) => {
-    const ix = userNumber.toString();
-
-    const anchors = storage.anchors;
-    const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
-      knownPrincipals: [],
-    };
-    const oldAnchor = anchors[ix] ?? defaultAnchor;
-
-    // Here we try to be as non-destructive as possible and we keep potentially unknown
-    // fields
-    storage.anchors[ix] = {
-      ...oldAnchor,
-      lastShownRecoveryTimestamp: nowMillis(),
-    };
     return storage;
   });
 };
@@ -554,10 +524,6 @@ const AnchorV3 = z.object({
   lastUsedTimestamp: z.number(),
 
   knownPrincipals: z.array(PrincipalDataV3),
-
-  /** Timestamp (millis since epoch) of when the recovery phrase warning page was last shown. */
-  /** Set as optional to keep backwards compatibility. */
-  lastShownRecoveryTimestamp: z.number().optional(),
 });
 const AnchorsV3 = z.record(AnchorV3);
 

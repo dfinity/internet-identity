@@ -2,6 +2,9 @@ import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
 import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
+import { AuthenticatedConnection } from "$src/utils/iiConnection";
+import { MultiWebAuthnIdentity } from "$src/utils/multiWebAuthnIdentity";
+import { DelegationIdentity } from "@dfinity/identity";
 import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge } from "./constants";
 import { i18n } from "./i18n";
@@ -26,7 +29,25 @@ export const flowsPage = () => {
   render(pageContent, container);
 };
 
-const registerFlowOpts: RegisterFlowOpts<null> = {
+const mockDelegationIdentity = {} as DelegationIdentity;
+
+class MockAuthenticatedConnection extends AuthenticatedConnection {
+  constructor() {
+    super(
+      "12345",
+      MultiWebAuthnIdentity.fromCredentials([]),
+      mockDelegationIdentity,
+      BigInt(12345)
+    );
+  }
+  setShownRecoveryWarningPage = async (): Promise<void> => {
+    // Do nothing
+  };
+}
+
+const mockConnection = new MockAuthenticatedConnection();
+
+const registerFlowOpts: RegisterFlowOpts = {
   createChallenge: async () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     return dummyChallenge;
@@ -40,7 +61,7 @@ const registerFlowOpts: RegisterFlowOpts<null> = {
     return {
       kind: "loginSuccess",
       userNumber: BigInt(12356),
-      connection: null,
+      connection: mockConnection,
     };
   },
   registrationAllowed: true,
@@ -54,7 +75,10 @@ const registerFlowOpts: RegisterFlowOpts<null> = {
 
 export const iiFlows: Record<string, () => void> = {
   loginManage: async () => {
-    const result = await authenticateBoxFlow<null, "identity">({
+    const result = await authenticateBoxFlow<
+      AuthenticatedConnection,
+      "identity"
+    >({
       i18n,
       templates: manageTemplates,
       addDevice: () => {
@@ -70,7 +94,7 @@ export const iiFlows: Record<string, () => void> = {
         return Promise.resolve({
           kind: "loginSuccess",
           userNumber: BigInt(1234),
-          connection: null,
+          connection: mockConnection,
         });
       },
       allowPinAuthentication: true,
@@ -86,7 +110,7 @@ export const iiFlows: Record<string, () => void> = {
         return Promise.resolve({
           kind: "loginSuccess",
           userNumber: BigInt(1234),
-          connection: null,
+          connection: mockConnection,
         });
       },
       recover: () => {
@@ -94,7 +118,7 @@ export const iiFlows: Record<string, () => void> = {
         return Promise.resolve({
           kind: "loginSuccess",
           userNumber: BigInt(1234),
-          connection: null,
+          connection: mockConnection,
         });
       },
       retrievePinIdentityMaterial: ({ userNumber }) => {
@@ -129,11 +153,11 @@ export const iiFlows: Record<string, () => void> = {
     `);
   },
   register: async () => {
-    const result = await registerFlow<null>(registerFlowOpts);
+    const result = await registerFlow(registerFlowOpts);
     toast.success(registerSuccessToastTemplate(result));
   },
   registerWithPin: async () => {
-    const result = await registerFlow<null>({
+    const result = await registerFlow({
       ...registerFlowOpts,
       pinAllowed: () => Promise.resolve(true),
     });

@@ -15,7 +15,7 @@ import { pinStepper } from "$src/flows/pin/stepper";
 import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
-import { setAnchorUsed, setShownRecoveryWarningPage } from "$src/storage";
+import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import {
   ApiError,
@@ -37,7 +37,7 @@ import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
-export const registerFlow = async <T>({
+export const registerFlow = async <T extends AuthenticatedConnection>({
   createChallenge: createChallenge_,
   register,
   storePinIdentity,
@@ -192,11 +192,13 @@ export const registerFlow = async <T>({
   }
   result.kind satisfies "loginSuccess";
   const userNumber = result.userNumber;
-  await finalizeIdentity?.(userNumber);
-  await setAnchorUsed(userNumber);
-  // We don't want to nudge the user with the recovery phrase warning page
-  // right after they've created their anchor.
-  await setShownRecoveryWarningPage(userNumber);
+  await Promise.all([
+    finalizeIdentity?.(userNumber),
+    setAnchorUsed(userNumber),
+    // We don't want to nudge the user with the recovery phrase warning page
+    // right after they've created their anchor.
+    result.connection.setShownRecoveryWarningPage(),
+  ]);
   await displayUserNumber({
     userNumber,
     stepper: finishStepper,
@@ -205,9 +207,9 @@ export const registerFlow = async <T>({
   return { ...result, authnMethod };
 };
 
-export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
-  typeof registerFlow<T>
->[0];
+export type RegisterFlowOpts<
+  T extends AuthenticatedConnection = AuthenticatedConnection
+> = Parameters<typeof registerFlow<T>>[0];
 
 export const getRegisterFlowOpts = ({
   connection,

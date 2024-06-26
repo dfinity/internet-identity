@@ -7,10 +7,6 @@ import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { setupRecovery } from "./setupRecovery";
 
 import { infoScreenTemplate } from "$src/components/infoScreen";
-import {
-  getLastShownWarningPageTimestamp,
-  setShownRecoveryWarningPage,
-} from "$src/storage";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -93,7 +89,7 @@ export const recoveryWizard = async (
   const [recoveries, lastTimestampShown] = await withLoader(() =>
     Promise.all([
       connection.lookupRecovery(userNumber),
-      getLastShownWarningPageTimestamp(userNumber),
+      connection.getLastShownWarningPageTimestamp(),
     ])
   );
   const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
@@ -102,7 +98,8 @@ export const recoveryWizard = async (
   const hasNotSeenRecoveryPageLastWeek =
     (lastTimestampShown ?? 0) < oneWeekAgoTimestamp;
   if (recoveries.length === 0 && hasNotSeenRecoveryPageLastWeek) {
-    await setShownRecoveryWarningPage(userNumber);
+    // No need to await for this, we don't need the result.
+    void connection.setShownRecoveryWarningPage();
     const doAdd = await addPhrase({ intent: "securityReminder" });
     if (doAdd !== "cancel") {
       doAdd satisfies "ok";

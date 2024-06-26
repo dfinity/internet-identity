@@ -12,10 +12,8 @@ import {
   MAX_SAVED_PRINCIPALS,
   getAnchorByPrincipal,
   getAnchors,
-  getLastShownWarningPageTimestamp,
   setAnchorUsed,
   setKnownPrincipal,
-  setShownRecoveryWarningPage,
 } from ".";
 
 const now = 1719292831442;
@@ -36,19 +34,6 @@ test(
   withStorage(
     async () => {
       expect(await getAnchors()).toStrictEqual([BigInt(123456)]);
-    },
-    { localStorage: { before: { userNumber: "123456" } } }
-  )
-);
-
-test(
-  "old userNumber V0 doesn't store lastShownRecoveryTimestamp",
-  withStorage(
-    async () => {
-      expect(await getAnchors()).toStrictEqual([BigInt(123456)]);
-      expect(
-        await getLastShownWarningPageTimestamp(BigInt(123456))
-      ).toBeUndefined();
     },
     { localStorage: { before: { userNumber: "123456" } } }
   )
@@ -130,53 +115,6 @@ test(
 );
 
 test(
-  "one lastShownRecoveryTimestamp can be stored",
-  withStorage(async () => {
-    const userNumber = BigInt(10000);
-    await setAnchorUsed(userNumber);
-    await setShownRecoveryWarningPage(userNumber);
-    expect(await getLastShownWarningPageTimestamp(userNumber)).toBe(now);
-  })
-);
-
-test(
-  "multiple lastShownRecoveryTimestamp can be stored",
-  withStorage(async () => {
-    const userNumber = BigInt(10000);
-    const userNumber2 = BigInt(10001);
-    await setAnchorUsed(userNumber);
-    await setShownRecoveryWarningPage(userNumber);
-
-    const secondTimestamp = now + 1000;
-    vi.advanceTimersByTime(1000);
-    await setAnchorUsed(userNumber2);
-    await setShownRecoveryWarningPage(userNumber2);
-    expect(await getLastShownWarningPageTimestamp(userNumber)).toBe(now);
-    expect(await getLastShownWarningPageTimestamp(userNumber2)).toBe(
-      secondTimestamp
-    );
-  })
-);
-
-test(
-  "lastShownRecoveryTimestamp defaults to undefined",
-  withStorage(async () => {
-    expect(
-      await getLastShownWarningPageTimestamp(BigInt(10000))
-    ).toBeUndefined();
-  })
-);
-
-test(
-  "lastShownRecoveryTimestamp isn't stored if anchor is not set",
-  withStorage(async () => {
-    const userNumber = BigInt(10000);
-    await setShownRecoveryWarningPage(userNumber);
-    expect(await getLastShownWarningPageTimestamp(userNumber)).toBeUndefined();
-  })
-);
-
-test(
   "multiple anchors can be stored",
   withStorage(async () => {
     await setAnchorUsed(BigInt(10000));
@@ -204,30 +142,6 @@ test(
             "10000": { lastUsedTimestamp: 0 },
             "10001": { lastUsedTimestamp: 0 },
             "10003": { lastUsedTimestamp: 0 },
-          },
-        },
-      },
-    }
-  )
-);
-
-test(
-  "V2 anchors do not store lastShownRecoveryTimestamp",
-  withStorage(
-    async () => {
-      const userNumber = BigInt(10000);
-      expect(await getAnchors()).toContain(userNumber);
-      await setAnchorUsed(userNumber);
-      expect(
-        await getLastShownWarningPageTimestamp(userNumber)
-      ).toBeUndefined();
-    },
-    {
-      indexeddb: {
-        before: {
-          /* V2 layout */
-          anchors: {
-            "10000": { lastUsedTimestamp: 0 },
           },
         },
       },
