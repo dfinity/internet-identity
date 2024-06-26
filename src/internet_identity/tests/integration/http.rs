@@ -151,7 +151,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
-        "internet_identity_id_alias_counter",
+        "internet_identity_prepare_id_alias_counter",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
