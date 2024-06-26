@@ -167,11 +167,6 @@ export const FLOWS = {
     await addDeviceSuccessView.waitForDisplay();
     await addDeviceSuccessView.continue();
   },
-  skipRecoveryNag: async (browser: WebdriverIO.Browser): Promise<void> => {
-    const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
-    await recoveryMethodSelectorView.waitForDisplay();
-    await recoveryMethodSelectorView.skipRecovery();
-  },
   recoverUsingSeedPhrase: async (
     browser: WebdriverIO.Browser,
     recoveryPhrase: string

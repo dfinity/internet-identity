@@ -68,7 +68,6 @@ test("Register with PIN and login without prefilled identity number", async () =
     // load the II page again
     await browser.url(II_URL);
     await FLOWS.loginPinWelcomeView(userNumber, pin, browser);
-    await FLOWS.skipRecoveryNag(browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
 }, 300_000);
