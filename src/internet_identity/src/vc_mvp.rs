@@ -58,6 +58,11 @@ pub async fn prepare_id_alias(
         sigs.add_signature(seed.as_ref(), vc_signing_input_hash(&issuer_signing_input));
     });
     update_root_hash();
+
+    state::usage_metrics_mut(|metrics| {
+        metrics.prepare_id_alias_counter += 1;
+    });
+
     PreparedIdAlias {
         canister_sig_pk_der: ByteBuf::from(canister_sig_pk.to_der()),
         rp_id_alias_jwt: String::from_utf8(rp_signing_input).unwrap(),

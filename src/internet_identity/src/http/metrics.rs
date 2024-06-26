@@ -101,6 +101,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "internet_identity_anchor_operations_counter",
             usage_metrics.anchor_operation_counter as f64,
             "The number of anchor operations since last upgrade",
+        )?;
+        w.encode_gauge(
+            "internet_identity_prepare_id_alias_counter",
+            usage_metrics.prepare_id_alias_counter as f64,
+            "The number of successful prepare_id_alias calls handled since last upgrade. For each VC presentation flow, exactly one prepare_id_alias is made.",
         )
     })?;
     if let ArchiveState::Created { ref data, config } = state::archive_state() {
