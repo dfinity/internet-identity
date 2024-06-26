@@ -75,10 +75,7 @@ const registerFlowOpts: RegisterFlowOpts = {
 
 export const iiFlows: Record<string, () => void> = {
   loginManage: async () => {
-    const result = await authenticateBoxFlow<
-      AuthenticatedConnection,
-      "identity"
-    >({
+    const result = await authenticateBoxFlow<"identity">({
       i18n,
       templates: manageTemplates,
       addDevice: () => {
