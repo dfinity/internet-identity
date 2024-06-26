@@ -56,6 +56,8 @@ pub struct UsageMetrics {
     pub delegation_counter: u64,
     // number of anchor operations (register, add, remove, update) since last upgrade
     pub anchor_operation_counter: u64,
+    // number of prepare_id_alias calls since last upgrade
+    pub prepare_id_alias_counter: u64,
 }
 
 // The challenges we store and check against

@@ -13,8 +13,9 @@ use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
 use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, ChallengeAttempt, MetadataEntryV2,
+    AuthnMethodData, ChallengeAttempt, FrontendHostname, MetadataEntryV2,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -136,7 +137,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Verifies that all expected metrics are available via the HTTP endpoint.
+/// Verifies that expected metrics are available via the HTTP endpoint.
 #[test]
 fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
     let metrics = vec![
@@ -150,6 +151,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_inflight_challenges",
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
+        "internet_identity_prepare_id_alias_counter",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
@@ -717,6 +719,36 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
         &get_metrics(&env, canister_id),
         "internet_identity_event_aggregations_count",
         10f64,
+    );
+    Ok(())
+}
+
+#[test]
+fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let prepare_id_alias_req = PrepareIdAliasRequest {
+        identity_number,
+        relying_party: FrontendHostname::from("https://some-dapp.com"),
+        issuer: FrontendHostname::from("https://some-issuer-1.com"),
+    };
+
+    for _ in 0..3 {
+        api::vc_mvp::prepare_id_alias(
+            &env,
+            canister_id,
+            principal_1(),
+            prepare_id_alias_req.clone(),
+        )?
+        .expect("Got 'None' from prepare_id_alias");
+    }
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_prepare_id_alias_counter",
+        3f64,
     );
     Ok(())
 }
