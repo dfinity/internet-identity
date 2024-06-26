@@ -20,7 +20,6 @@ import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttach
 import {
   ApiError,
   AuthFail,
-  AuthenticatedConnection,
   BadChallenge,
   Connection,
   IIWebAuthnIdentity,
@@ -37,7 +36,7 @@ import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
-export const registerFlow = async <T extends AuthenticatedConnection>({
+export const registerFlow = async ({
   createChallenge: createChallenge_,
   register,
   storePinIdentity,
@@ -53,7 +52,7 @@ export const registerFlow = async <T extends AuthenticatedConnection>({
     credentialId?: CredentialId;
     challengeResult: { chars: string; challenge: Challenge };
   }) => Promise<
-    LoginSuccess<T> | BadChallenge | ApiError | AuthFail | RegisterNoSpace
+    LoginSuccess | BadChallenge | ApiError | AuthFail | RegisterNoSpace
   >;
   storePinIdentity: (opts: {
     userNumber: bigint;
@@ -63,7 +62,7 @@ export const registerFlow = async <T extends AuthenticatedConnection>({
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
 }): Promise<
-  | (LoginSuccess<T> & { authnMethod: "passkey" | "pin" })
+  | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | BadChallenge
   | ApiError
   | AuthFail
@@ -207,9 +206,7 @@ export const registerFlow = async <T extends AuthenticatedConnection>({
   return { ...result, authnMethod };
 };
 
-export type RegisterFlowOpts<
-  T extends AuthenticatedConnection = AuthenticatedConnection
-> = Parameters<typeof registerFlow<T>>[0];
+export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 
 export const getRegisterFlowOpts = ({
   connection,
