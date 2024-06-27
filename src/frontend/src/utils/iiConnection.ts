@@ -14,7 +14,11 @@ import {
   GetDelegationResponse,
   IdAliasCredentials,
   IdentityAnchorInfo,
+  IdentityInfo,
+  IdentityInfoError,
+  IdentityMetadataReplaceError,
   KeyType,
+  MetadataMapV2,
   PreparedIdAlias,
   PublicKey,
   Purpose,
@@ -28,6 +32,10 @@ import {
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
+import {
+  AnchorMetadata,
+  AnchorMetadataRepository,
+} from "$src/repositories/anchorMetadata";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
@@ -411,6 +419,7 @@ export class Connection {
 }
 
 export class AuthenticatedConnection extends Connection {
+  private metadataRepository: AnchorMetadataRepository;
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -419,6 +428,7 @@ export class AuthenticatedConnection extends Connection {
     public actor?: ActorSubclass<_SERVICE>
   ) {
     super(canisterId);
+    this.metadataRepository = new AnchorMetadataRepository(this);
   }
 
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
@@ -509,6 +519,34 @@ export class AuthenticatedConnection extends Connection {
   remove = async (publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
     await actor.remove(this.userNumber, publicKey);
+  };
+
+  getIdentityInfo = async (): Promise<
+    { Ok: IdentityInfo } | { Err: IdentityInfoError }
+  > => {
+    const actor = await this.getActor();
+    return await actor.identity_info(this.userNumber);
+  };
+
+  setIdentityMetadata = async (
+    metadata: MetadataMapV2
+  ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
+    const actor = await this.getActor();
+    return await actor.identity_metadata_replace(this.userNumber, metadata);
+  };
+
+  getAnchorMetadata = (): Promise<AnchorMetadata> => {
+    return this.metadataRepository.getMetadata();
+  };
+
+  setPartialMetadata = async (
+    partialMetadata: Partial<AnchorMetadata>
+  ): Promise<void> => {
+    await this.metadataRepository.setPartialMetadata(partialMetadata);
+  };
+
+  commitMetadata = async (): Promise<boolean> => {
+    return await this.metadataRepository.commitMetadata();
   };
 
   prepareDelegation = async (
