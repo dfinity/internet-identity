@@ -198,7 +198,6 @@ export const register: Record<
     const authenticatorId = await addVirtualAuthenticator(browser);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
     return {
       userNumber,
@@ -220,7 +219,6 @@ export const register: Record<
   pin: async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
 
     return {
       userNumber,

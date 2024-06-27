@@ -93,8 +93,6 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
     await pinAuthView.waitForError();
     await pinAuthView.enterPin(pin);
 
-    // NOTE: handle recovery nag because there is no recovery phrase
-    await FLOWS.skipRecoveryNag(browser);
     const mainView2 = new MainView(browser);
     await mainView2.waitForDisplay(); // we should be logged in
   }, APPLE_USER_AGENT);

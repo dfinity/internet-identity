@@ -21,7 +21,6 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 
@@ -59,7 +58,6 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 
@@ -97,7 +95,6 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 
@@ -142,7 +139,6 @@ test("Should allow arbitrary URL as derivation origin", async () => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 

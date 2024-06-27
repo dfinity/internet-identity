@@ -250,8 +250,10 @@ export const renderManage = async ({
   for (;;) {
     let anchorInfo: IdentityAnchorInfo;
     try {
-      // TODO: commit state
-      anchorInfo = await withLoader(() => connection.getAnchorInfo());
+      // Ignore the `commitMetadata` response, it's not critical for the application.
+      [anchorInfo] = await withLoader(() =>
+        Promise.all([connection.getAnchorInfo(), connection.commitMetadata()])
+      );
     } catch (error: unknown) {
       await displayFailedToListDevices(
         error instanceof Error ? error : unknownError()
@@ -367,13 +369,6 @@ export const displayManage = (
         onAddDevice,
         addRecoveryPhrase,
         addRecoveryKey: async () => {
-          const confirmed = confirm(
-            "Add a Recovery Device\n\nUse a FIDO Security Key, like a YubiKey, as an additional recovery method."
-          );
-          if (!confirmed) {
-            // No resolve here because we don't need to reload the screen
-            return;
-          }
           await setupKey({ connection });
           resolve();
         },

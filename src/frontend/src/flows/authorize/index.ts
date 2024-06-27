@@ -212,14 +212,17 @@ const authenticate = async (
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
-  // TODO: Commit state
-  const result = await withLoader(() =>
-    fetchDelegation({
-      connection: authSuccess.connection,
-      derivationOrigin,
-      publicKey: authContext.authRequest.sessionPublicKey,
-      maxTimeToLive: authContext.authRequest.maxTimeToLive,
-    })
+  // Ignore the response of committing the metadata because it's not crucial.
+  const [result] = await withLoader(() =>
+    Promise.all([
+      fetchDelegation({
+        connection: authSuccess.connection,
+        derivationOrigin,
+        publicKey: authContext.authRequest.sessionPublicKey,
+        maxTimeToLive: authContext.authRequest.maxTimeToLive,
+      }),
+      authSuccess.connection.commitMetadata(),
+    ])
   );
 
   if ("error" in result) {
