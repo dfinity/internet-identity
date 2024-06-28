@@ -21,7 +21,6 @@ test("Should issue the same principal to nice url and canonical url", async () =
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 
@@ -78,7 +77,6 @@ test("Should issue the same principal to dapps on legacy & official domains", as
     const registrationAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser); // avoids being prompted later during authz
     const credentials = await getWebAuthnCredentials(
       browser,
       registrationAuthenticator

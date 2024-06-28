@@ -14,7 +14,11 @@ import {
   GetDelegationResponse,
   IdAliasCredentials,
   IdentityAnchorInfo,
+  IdentityInfo,
+  IdentityInfoError,
+  IdentityMetadataReplaceError,
   KeyType,
+  MetadataMapV2,
   PreparedIdAlias,
   PublicKey,
   Purpose,
@@ -411,6 +415,8 @@ export class Connection {
 }
 
 export class AuthenticatedConnection extends Connection {
+  static SHOWN_RECOVERY_PAGE_TIMESTAMP_KEY = "showRecoveryPageTimestamp";
+
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -471,6 +477,60 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<VerifyTentativeDeviceResponse> => {
     const actor = await this.getActor();
     return await actor.verify_tentative_device(this.userNumber, pin);
+  };
+
+  getIdentityInfo = async (): Promise<
+    { Ok: IdentityInfo } | { Err: IdentityInfoError }
+  > => {
+    const actor = await this.getActor();
+    return await actor.identity_info(this.userNumber);
+  };
+
+  setIdentityMetadata = async (
+    metadata: MetadataMapV2
+  ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
+    const actor = await this.getActor();
+    return await actor.identity_metadata_replace(this.userNumber, metadata);
+  };
+
+  setShownRecoveryWarningPage = async (): Promise<void> => {
+    // We first get the current metadata, then add the timestamp to it, and then replace the metadata.
+    const infoResponse = await this.getIdentityInfo();
+    if ("Ok" in infoResponse) {
+      const { metadata } = infoResponse.Ok;
+      const newMetadata: MetadataMapV2 = [
+        ...metadata.filter(
+          ([key, _]) =>
+            key !== AuthenticatedConnection.SHOWN_RECOVERY_PAGE_TIMESTAMP_KEY
+        ),
+        [
+          AuthenticatedConnection.SHOWN_RECOVERY_PAGE_TIMESTAMP_KEY,
+          { String: BigInt(Date.now()).toString() },
+        ],
+      ];
+      await this.setIdentityMetadata(newMetadata);
+    }
+    // ignore error and return. This is not critical for the user.
+  };
+
+  getLastShownWarningPageTimestamp = async (): Promise<number | undefined> => {
+    const infoResponse = await this.getIdentityInfo();
+    if ("Ok" in infoResponse) {
+      const { metadata } = infoResponse.Ok;
+      const timestampEntry = metadata.find(
+        ([key, _]) =>
+          key === AuthenticatedConnection.SHOWN_RECOVERY_PAGE_TIMESTAMP_KEY
+      );
+      if (timestampEntry && "String" in timestampEntry[1]) {
+        const timestamp = Number(timestampEntry[1].String);
+        if (!isNaN(timestamp)) {
+          return timestamp;
+        }
+      }
+    }
+    // Return undefined if the timestamp is not found or not a number.
+    // This is not critical for the user.
+    return undefined;
   };
 
   add = async (
