@@ -250,6 +250,7 @@ export const renderManage = async ({
   for (;;) {
     let anchorInfo: IdentityAnchorInfo;
     try {
+      // TODO: commit state
       anchorInfo = await withLoader(() => connection.getAnchorInfo());
     } catch (error: unknown) {
       await displayFailedToListDevices(

@@ -1,13 +1,11 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
-import type { AuthenticatedConnection } from "$src/utils/iiConnection";
 
 export type AnchorMetadata = {
   recoveryPageShownTimestampMillis?: number;
 };
 
-const RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS = "recoveryPageShownTimestampMillis";
-const METADATA_FETCH_TIMEOUT = 1_000;
-const METADATA_FETCH_RETRIES = 10;
+export const RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS =
+  "recoveryPageShownTimestampMillis";
 
 const convertMetadata = (rawMetadata: MetadataMapV2): AnchorMetadata => {
   const recoveryPageEntry = rawMetadata.find(
@@ -17,30 +15,65 @@ const convertMetadata = (rawMetadata: MetadataMapV2): AnchorMetadata => {
     return {};
   }
   const stringValue = recoveryPageEntry[1];
-  const recoveryPageShownTimestampMillis = Number(stringValue);
-  if (isNaN(recoveryPageShownTimestampMillis)) {
-    return {};
+  if ("String" in stringValue) {
+    const recoveryPageShownTimestampMillis = Number(stringValue.String);
+    if (isNaN(recoveryPageShownTimestampMillis)) {
+      return {};
+    }
+    return {
+      recoveryPageShownTimestampMillis,
+    };
   }
-  return {
-    recoveryPageShownTimestampMillis,
-  };
+  return {};
 };
 
-export class MetadataNotLoadedError extends Error {}
-export class MetadataNotCommittedError extends Error {}
+type MetadataGetter = () => Promise<MetadataMapV2>;
+type MetadataSetter = (metadata: MetadataMapV2) => Promise<void>;
+type RawMetadataState = MetadataMapV2 | "loading" | "error" | "not-loaded";
 
+/**
+ * Class to manage the metadata of the anchor and interact with the canister.
+ *
+ * We decided to not throw any errors because this is non-critical for the application
+ * and we don't want to disrupt user flows if there is an error with the metadata.
+ *
+ * This class loads the metadata in the background when it's created.
+ * It can then be read and updated in memory.
+ * The metadata needs to be committed to the canister with the `commitMetadata` method to persist the changes.
+ */
 export class AnchorMetadataRepository {
   // The nice AnchorMetadata is exposed to the outside world, while the raw metadata is kept private.
   // We keep all the raw data to maintain other metadata fields.
-  private rawMetadata: MetadataMapV2 | "loading" | "error" | "not-loaded";
+  private rawMetadata: RawMetadataState;
   // Flag to keep track whether we need to commit the metadata to the canister.
   private updatedMetadata: boolean;
+  private getter: MetadataGetter;
+  private setter: MetadataSetter;
 
-  constructor(private connection: AuthenticatedConnection) {
+  static init = ({
+    getter,
+    setter,
+  }: {
+    getter: MetadataGetter;
+    setter: MetadataSetter;
+  }) => {
+    const instance = new AnchorMetadataRepository({ getter, setter });
+    // Load the metadata in the background.
+    void instance.loadMetadata();
+    return instance;
+  };
+
+  private constructor({
+    getter,
+    setter,
+  }: {
+    getter: MetadataGetter;
+    setter: MetadataSetter;
+  }) {
+    this.getter = getter;
+    this.setter = setter;
     this.rawMetadata = "not-loaded";
     this.updatedMetadata = false;
-    // Load the metadata in the background.
-    void this.loadMetadata();
   }
 
   /**
@@ -53,114 +86,107 @@ export class AnchorMetadataRepository {
    */
   loadMetadata = async (): Promise<void> => {
     this.rawMetadata = "loading";
-    const identityInfo = await this.connection.getIdentityInfo();
-    if ("Ok" in identityInfo) {
+    try {
       this.updatedMetadata = false;
-      this.rawMetadata = identityInfo.Ok.metadata;
-    } else {
+      this.rawMetadata = await this.getter();
+    } catch (error) {
+      // Do not throw the error becasue this is not critical for the application.
       this.rawMetadata = "error";
+      console.warn("Error loading metadata", error);
+      return;
     }
   };
 
+  private metadataIsLoaded = (
+    metadata: RawMetadataState
+  ): metadata is MetadataMapV2 => {
+    return (
+      this.rawMetadata !== "loading" &&
+      this.rawMetadata !== "error" &&
+      this.rawMetadata !== "not-loaded"
+    );
+  };
+
   /**
-   * It waits until the metadata is loaded and then converts it to a nice AnchorMetadata object.
+   * Returns the metadata transformed to `AnchorMetadata`.
    *
-   * @throws {MetadataNotLoadedError} If the metadata is not yet loaded after METADATA_FETCH_TIMEOUT * METADATA_FETCH_RETRIES milliseconds.
-   * or has failed after METADATA_FETCH_RETRIES.
-   * @returns {AnchorMetadata}
+   * It tries to load the metadata if it's not loaded yet.
+   *
+   * It returns `undefined` if the metadata is not loaded.
+   *
+   * @returns {AnchorMetadata | undefined}
    */
-  getMetadata = async (): Promise<AnchorMetadata> => {
-    // Wait for the metadata to load.
-    for (let i = 0; i < METADATA_FETCH_RETRIES; i++) {
-      if (this.rawMetadata === "loading") {
-        await new Promise((resolve) =>
-          setTimeout(resolve, METADATA_FETCH_TIMEOUT)
-        );
-      } else if (
-        this.rawMetadata === "error" ||
-        this.rawMetadata === "not-loaded"
-      ) {
-        // Retry in case of error or not loaded.
-        void this.loadMetadata();
-      } else {
-        break;
-      }
+  getMetadata = async (): Promise<AnchorMetadata | undefined> => {
+    if (!this.metadataIsLoaded(this.rawMetadata)) {
+      await this.loadMetadata();
     }
-    if (
-      this.rawMetadata === "loading" ||
-      this.rawMetadata === "error" ||
-      this.rawMetadata === "not-loaded"
-    ) {
-      throw new MetadataNotLoadedError("Metadata couldn't be loaded.");
+    if (this.metadataIsLoaded(this.rawMetadata)) {
+      return convertMetadata(this.rawMetadata);
     }
-    return convertMetadata(this.rawMetadata);
+    return undefined;
   };
 
   /**
    * Changes the metadata in memory but doesn't commit it to the canister.
    *
+   * At the moment, this functoin only supports changing the `recoveryPageShownTimestampMillis` field.
+   *
    * The metadata passed will be merged with the existing metadata. Same keys will be overwritten.
    *
-   * If the metadata is not loaded yet, it will try to load it
-   * If loading the metadata fails, it will throw an error.
+   * If the metadata is not loaded yet, it will try to load it.
+   * If loading the metadata fails, it will console a warning but won't throw an error.
+   *
+   * We consider the metadata to not be crucial for the application.
+   * Therefore, we don't want to disrupt user flows if there is an error with the metadata.
    *
    * @param {Partial<AnchorMetadata>} partialMetadata
-   * @throws {MetadataNotLoadedError} If the metadata can't be loaded.
    * @returns {Promise<void>} To indicate that the metadata has been set.
    */
   setPartialMetadata = async (
     partialMetadata: Partial<AnchorMetadata>
   ): Promise<void> => {
-    await this.getMetadata();
-    if (
-      this.rawMetadata === "loading" ||
-      this.rawMetadata === "error" ||
-      this.rawMetadata === "not-loaded"
-    ) {
-      throw new MetadataNotLoadedError("Metadata couldn't be loaded.");
+    if (!this.metadataIsLoaded(this.rawMetadata)) {
+      await this.getMetadata();
     }
-    let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
-    if (partialMetadata.recoveryPageShownTimestampMillis !== undefined) {
+    if (this.metadataIsLoaded(this.rawMetadata)) {
+      let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;
-      updatedMetadata = updatedMetadata
-        .filter(([key]) => key !== RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS)
-        .concat([
-          [
-            RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
+      updatedMetadata = updatedMetadata.map(([key, value]) => {
+        if (
+          key === RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS &&
+          partialMetadata.recoveryPageShownTimestampMillis !== undefined
+        ) {
+          return [
+            key,
             {
               String:
                 partialMetadata.recoveryPageShownTimestampMillis.toString(),
             },
-          ],
-        ]);
+          ];
+        }
+        return [key, value];
+      });
+      this.rawMetadata = updatedMetadata;
     }
-    this.rawMetadata = updatedMetadata;
+    // Do nothing if the metadata is not loaded.
   };
 
   /**
    * Commits the metadata to the canister if needed.
    *
-   * @throws {MetadataNotLoadedError} If the metadata can't be committed because it's not loaded yet or there was an error.
-   * @throws {MetadataNotCommittedError} If the metadata can't be committed because there was an error connecting with the canister.
-   * @returns {boolean} Whether the metadata was committed.
+   * @returns {boolean} Whether the metadata was committed or there was nothing to commit.
+   * `true` if the metadata was committed or there was nothing to commit.
+   * `false` if there was an error committing the metadata.
    */
   commitMetadata = async (): Promise<boolean> => {
-    if (
-      this.rawMetadata === "loading" ||
-      this.rawMetadata === "error" ||
-      this.rawMetadata === "not-loaded"
-    ) {
-      throw new MetadataNotLoadedError("Metadata couldn't be loaded.");
-    }
-    if (this.updatedMetadata) {
-      const response = await this.connection.setIdentityMetadata(
-        this.rawMetadata
-      );
-      if ("Ok" in response) {
-        this.updatedMetadata = false;
+    if (this.metadataIsLoaded(this.rawMetadata) && this.updatedMetadata) {
+      try {
+        await this.setter(this.rawMetadata);
         return true;
+      } catch (error) {
+        console.warn("Error committing metadata", error);
+        return false;
       }
-      throw new MetadataNotCommittedError(JSON.stringify(response.Err));
     }
     // If there was nothing to commit, we return true.
     return true;

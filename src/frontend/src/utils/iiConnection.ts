@@ -428,7 +428,24 @@ export class AuthenticatedConnection extends Connection {
     public actor?: ActorSubclass<_SERVICE>
   ) {
     super(canisterId);
-    this.metadataRepository = new AnchorMetadataRepository(this);
+    const metadataGetter = async () => {
+      const response = await this.getIdentityInfo();
+      if ("Ok" in response) {
+        return response.Ok.metadata;
+      }
+      throw new Error("Error fetching metadata");
+    };
+    const metadataSetter = async (metadata: MetadataMapV2) => {
+      const response = await this.setIdentityMetadata(metadata);
+      if ("Ok" in response) {
+        return;
+      }
+      throw new Error("Error updating metadata");
+    };
+    this.metadataRepository = AnchorMetadataRepository.init({
+      getter: metadataGetter,
+      setter: metadataSetter,
+    });
   }
 
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
@@ -521,21 +538,21 @@ export class AuthenticatedConnection extends Connection {
     await actor.remove(this.userNumber, publicKey);
   };
 
-  getIdentityInfo = async (): Promise<
+  private getIdentityInfo = async (): Promise<
     { Ok: IdentityInfo } | { Err: IdentityInfoError }
   > => {
     const actor = await this.getActor();
     return await actor.identity_info(this.userNumber);
   };
 
-  setIdentityMetadata = async (
+  private setIdentityMetadata = async (
     metadata: MetadataMapV2
   ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
     const actor = await this.getActor();
     return await actor.identity_metadata_replace(this.userNumber, metadata);
   };
 
-  getAnchorMetadata = (): Promise<AnchorMetadata> => {
+  getAnchorMetadata = (): Promise<AnchorMetadata | undefined> => {
     return this.metadataRepository.getMetadata();
   };
 
