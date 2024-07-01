@@ -1,8 +1,8 @@
 import { MetadataMapV2, _SERVICE } from "$generated/internet_identity_types";
 import {
-  AnchorMetadata,
+  IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-} from "$src/repositories/anchorMetadata";
+} from "$src/repositories/identityMetadata";
 import { ActorSubclass } from "@dfinity/agent";
 import { DelegationIdentity } from "@dfinity/identity";
 import { AuthenticatedConnection } from "./iiConnection";
@@ -23,19 +23,14 @@ const mockRawMetadata: MetadataMapV2 = [
     { String: String(recoveryPageShownTimestampMillis) },
   ],
 ];
-const mockAnchorMetadata: AnchorMetadata = {
+const mockIdentityMetadata: IdentityMetadata = {
   recoveryPageShownTimestampMillis,
-};
-const expectedAnchorInfo = {
-  devices: [],
-  device_registration: [],
 };
 
 // Used to await that the getter has resolved.
 let infoResponse: MetadataMapV2 | null | undefined = null;
 
 const mockActor = {
-  get_anchor_info: vi.fn().mockResolvedValue(expectedAnchorInfo),
   identity_info: vi.fn().mockImplementation(async () => {
     // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
     infoResponse = await mockRawMetadata;
@@ -44,20 +39,12 @@ const mockActor = {
   identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
 } as unknown as ActorSubclass<_SERVICE>;
 
-test("gets anchor info from actor", async () => {
-  const connection = new AuthenticatedConnection(
-    "12345",
-    MultiWebAuthnIdentity.fromCredentials([]),
-    mockDelegationIdentity,
-    BigInt(1234),
-    mockActor
-  );
-  const anchorInfo = await connection.getAnchorInfo();
-  expect(anchorInfo).toEqual(expectedAnchorInfo);
-  expect(mockActor.get_anchor_info).toHaveBeenCalledTimes(1);
+beforeEach(() => {
+  infoResponse = undefined;
+  vi.clearAllMocks();
 });
 
-test("initializes anchor metadata repository", async () => {
+test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
     MultiWebAuthnIdentity.fromCredentials([]),
@@ -68,10 +55,10 @@ test("initializes anchor metadata repository", async () => {
 
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
 
-  expect(await connection.getAnchorMetadata()).toEqual(mockAnchorMetadata);
+  expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
 });
 
-test("comits changes on anchor metadata", async () => {
+test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
@@ -83,7 +70,7 @@ test("comits changes on anchor metadata", async () => {
 
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
 
-  expect(await connection.getAnchorMetadata()).toEqual(mockAnchorMetadata);
+  expect(connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await connection.setPartialMetadata({

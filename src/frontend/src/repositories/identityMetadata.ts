@@ -1,13 +1,13 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
 
-export type AnchorMetadata = {
+export type IdentityMetadata = {
   recoveryPageShownTimestampMillis?: number;
 };
 
 export const RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS =
   "recoveryPageShownTimestampMillis";
 
-const convertMetadata = (rawMetadata: MetadataMapV2): AnchorMetadata => {
+const convertMetadata = (rawMetadata: MetadataMapV2): IdentityMetadata => {
   const recoveryPageEntry = rawMetadata.find(
     ([key]) => key === RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS
   );
@@ -32,7 +32,7 @@ type MetadataSetter = (metadata: MetadataMapV2) => Promise<void>;
 type RawMetadataState = MetadataMapV2 | "loading" | "error" | "not-loaded";
 
 /**
- * Class to manage the metadata of the anchor and interact with the canister.
+ * Class to manage the metadata of the identity and interact with the canister.
  *
  * We decided to not throw any errors because this is non-critical for the application
  * and we don't want to disrupt user flows if there is an error with the metadata.
@@ -41,14 +41,14 @@ type RawMetadataState = MetadataMapV2 | "loading" | "error" | "not-loaded";
  * It can then be read and updated in memory.
  * The metadata needs to be committed to the canister with the `commitMetadata` method to persist the changes.
  */
-export class AnchorMetadataRepository {
-  // The nice AnchorMetadata is exposed to the outside world, while the raw metadata is kept private.
+export class IdentityMetadataRepository {
+  // The nice IdentityMetadata is exposed to the outside world, while the raw metadata is kept private.
   // We keep all the raw data to maintain other metadata fields.
   private rawMetadata: RawMetadataState;
   // Flag to keep track whether we need to commit the metadata to the canister.
   private updatedMetadata: boolean;
-  private getter: MetadataGetter;
-  private setter: MetadataSetter;
+  private readonly getter: MetadataGetter;
+  private readonly setter: MetadataSetter;
 
   static init = ({
     getter,
@@ -57,7 +57,7 @@ export class AnchorMetadataRepository {
     getter: MetadataGetter;
     setter: MetadataSetter;
   }) => {
-    const instance = new AnchorMetadataRepository({ getter, setter });
+    const instance = new IdentityMetadataRepository({ getter, setter });
     // Load the metadata in the background.
     void instance.loadMetadata();
     return instance;
@@ -90,7 +90,7 @@ export class AnchorMetadataRepository {
       this.updatedMetadata = false;
       this.rawMetadata = await this.getter();
     } catch (error) {
-      // Do not throw the error becasue this is not critical for the application.
+      // Do not throw the error because this is not critical for the application.
       this.rawMetadata = "error";
       console.warn("Error loading metadata", error);
       return;
@@ -108,18 +108,13 @@ export class AnchorMetadataRepository {
   };
 
   /**
-   * Returns the metadata transformed to `AnchorMetadata`.
-   *
-   * It tries to load the metadata if it's not loaded yet.
+   * Returns the metadata transformed to `IdentityMetadata`.
    *
    * It returns `undefined` if the metadata is not loaded.
    *
-   * @returns {AnchorMetadata | undefined}
+   * @returns {IdentityMetadata | undefined}
    */
-  getMetadata = async (): Promise<AnchorMetadata | undefined> => {
-    if (!this.metadataIsLoaded(this.rawMetadata)) {
-      await this.loadMetadata();
-    }
+  getMetadata = (): IdentityMetadata | undefined => {
     if (this.metadataIsLoaded(this.rawMetadata)) {
       return convertMetadata(this.rawMetadata);
     }
@@ -129,25 +124,17 @@ export class AnchorMetadataRepository {
   /**
    * Changes the metadata in memory but doesn't commit it to the canister.
    *
-   * At the moment, this functoin only supports changing the `recoveryPageShownTimestampMillis` field.
+   * At the moment, this function only supports changing the `recoveryPageShownTimestampMillis` field.
    *
    * The metadata passed will be merged with the existing metadata. Same keys will be overwritten.
-   *
-   * If the metadata is not loaded yet, it will try to load it.
-   * If loading the metadata fails, it will console a warning but won't throw an error.
    *
    * We consider the metadata to not be crucial for the application.
    * Therefore, we don't want to disrupt user flows if there is an error with the metadata.
    *
-   * @param {Partial<AnchorMetadata>} partialMetadata
+   * @param {Partial<IdentityMetadata>} partialMetadata
    * @returns {Promise<void>} To indicate that the metadata has been set.
    */
-  setPartialMetadata = async (
-    partialMetadata: Partial<AnchorMetadata>
-  ): Promise<void> => {
-    if (!this.metadataIsLoaded(this.rawMetadata)) {
-      await this.getMetadata();
-    }
+  setPartialMetadata = (partialMetadata: Partial<IdentityMetadata>): void => {
     if (this.metadataIsLoaded(this.rawMetadata)) {
       let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;

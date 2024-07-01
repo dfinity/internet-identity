@@ -33,9 +33,9 @@ import {
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
 import {
-  AnchorMetadata,
-  AnchorMetadataRepository,
-} from "$src/repositories/anchorMetadata";
+  IdentityMetadata,
+  IdentityMetadataRepository,
+} from "$src/repositories/identityMetadata";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
@@ -419,7 +419,7 @@ export class Connection {
 }
 
 export class AuthenticatedConnection extends Connection {
-  private metadataRepository: AnchorMetadataRepository;
+  private metadataRepository: IdentityMetadataRepository;
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -442,7 +442,7 @@ export class AuthenticatedConnection extends Connection {
       }
       throw new Error("Error updating metadata");
     };
-    this.metadataRepository = AnchorMetadataRepository.init({
+    this.metadataRepository = IdentityMetadataRepository.init({
       getter: metadataGetter,
       setter: metadataSetter,
     });
@@ -552,12 +552,12 @@ export class AuthenticatedConnection extends Connection {
     return await actor.identity_metadata_replace(this.userNumber, metadata);
   };
 
-  getAnchorMetadata = (): Promise<AnchorMetadata | undefined> => {
+  getIdentityMetadata = (): IdentityMetadata | undefined => {
     return this.metadataRepository.getMetadata();
   };
 
   setPartialMetadata = async (
-    partialMetadata: Partial<AnchorMetadata>
+    partialMetadata: Partial<IdentityMetadata>
   ): Promise<void> => {
     await this.metadataRepository.setPartialMetadata(partialMetadata);
   };

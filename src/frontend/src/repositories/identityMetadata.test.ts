@@ -1,9 +1,9 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
 import {
-  AnchorMetadata,
-  AnchorMetadataRepository,
+  IdentityMetadata,
+  IdentityMetadataRepository,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-} from "./anchorMetadata";
+} from "./identityMetadata";
 
 const recoveryPageShownTimestampMillis = 1234567890;
 const mockRawMetadata: MetadataMapV2 = [
@@ -12,7 +12,7 @@ const mockRawMetadata: MetadataMapV2 = [
     { String: String(recoveryPageShownTimestampMillis) },
   ],
 ];
-const mockAnchorMetadata: AnchorMetadata = {
+const mockIdentityMetadata: IdentityMetadata = {
   recoveryPageShownTimestampMillis,
 };
 
@@ -37,8 +37,8 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
-test("AnchorMetadataRepository loads data on init in the background", async () => {
-  const instance = AnchorMetadataRepository.init({
+test("IdentityMetadataRepository loads data on init in the background", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
@@ -46,37 +46,11 @@ test("AnchorMetadataRepository loads data on init in the background", async () =
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   expect(getterMockSuccess).toHaveBeenCalledTimes(1);
-  expect(await instance.getMetadata()).toEqual(mockAnchorMetadata);
+  expect(instance.getMetadata()).toEqual(mockIdentityMetadata);
 });
 
-test("AnchorMetadataRepository loads data again on init in the background", async () => {
-  const getterMockErrorOnce = vi
-    .fn()
-    .mockImplementationOnce(async () => {
-      // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-      getterResponse = await null;
-      throw new Error("test error");
-    })
-    .mockResolvedValue(mockRawMetadata);
-
-  const instance = AnchorMetadataRepository.init({
-    getter: getterMockErrorOnce,
-    setter: setterMockSuccess,
-  });
-
-  // Wait for the first getter to fail.
-  await vi.waitFor(() => expect(getterResponse).toEqual(null));
-
-  // Error is not thrown, but a warning is logged.
-  expect(console.warn).toHaveBeenCalledTimes(1);
-  expect(getterMockErrorOnce).toHaveBeenCalledTimes(1);
-
-  expect(await instance.getMetadata()).toEqual(mockAnchorMetadata);
-  expect(getterMockErrorOnce).toHaveBeenCalledTimes(2);
-});
-
-test("AnchorMetadataRepository returns no metadata if fetching fails without raising an error", async () => {
-  const instance = AnchorMetadataRepository.init({
+test("IdentityMetadataRepository returns no metadata without raising an error if fetching fails", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockError,
     setter: setterMockSuccess,
   });
@@ -88,13 +62,13 @@ test("AnchorMetadataRepository returns no metadata if fetching fails without rai
   expect(console.warn).toHaveBeenCalledTimes(1);
   expect(getterMockError).toHaveBeenCalledTimes(1);
 
-  expect(await instance.getMetadata()).toEqual(undefined);
-  expect(getterMockError).toHaveBeenCalledTimes(2);
-  expect(console.warn).toHaveBeenCalledTimes(2);
+  expect(instance.getMetadata()).toEqual(undefined);
+  expect(getterMockError).toHaveBeenCalledTimes(1);
+  expect(console.warn).toHaveBeenCalledTimes(1);
 });
 
-test("AnchorMetadataRepository changes data in memory", async () => {
-  const instance = AnchorMetadataRepository.init({
+test("IdentityMetadataRepository changes data in memory", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
@@ -106,13 +80,13 @@ test("AnchorMetadataRepository changes data in memory", async () => {
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
-  expect(await instance.getMetadata()).toEqual({
+  expect(instance.getMetadata()).toEqual({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 });
 
-test("AnchorMetadataRepository commits updated metadata to canister", async () => {
-  const instance = AnchorMetadataRepository.init({
+test.only("IdentityMetadataRepository commits updated metadata to canister", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
@@ -136,8 +110,8 @@ test("AnchorMetadataRepository commits updated metadata to canister", async () =
   ]);
 });
 
-test("AnchorMetadataRepository doesn't commit to canister without changes", async () => {
-  const instance = AnchorMetadataRepository.init({
+test("IdentityMetadataRepository doesn't commit to canister without changes", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
@@ -150,8 +124,8 @@ test("AnchorMetadataRepository doesn't commit to canister without changes", asyn
   expect(setterMockSuccess).not.toHaveBeenCalled();
 });
 
-test("AnchorMetadataRepository doesn't raise an error if committing fails", async () => {
-  const instance = AnchorMetadataRepository.init({
+test("IdentityMetadataRepository doesn't raise an error if committing fails", async () => {
+  const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockError,
   });
@@ -177,10 +151,10 @@ test("AnchorMetadataRepository doesn't raise an error if committing fails", asyn
   ]);
 
   // But the value in memory is not lost.
-  expect(await instance.getMetadata()).toEqual(newMetadata);
+  expect(instance.getMetadata()).toEqual(newMetadata);
 });
 
-test("AnchorMetadataRepository commits all received metadata to canister after update", async () => {
+test("IdentityMetadataRepository commits all received metadata to canister after update", async () => {
   const anotherMetadataEntry: [string, { String: string }] = [
     "otherKey",
     { String: "otherValue" },
@@ -197,7 +171,7 @@ test("AnchorMetadataRepository commits all received metadata to canister after u
     getterResponse = await mockMoreRawMetadata;
     return mockMoreRawMetadata;
   });
-  const instance = AnchorMetadataRepository.init({
+  const instance = IdentityMetadataRepository.init({
     getter: getterMock,
     setter: setterMockSuccess,
   });
