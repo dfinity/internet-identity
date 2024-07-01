@@ -108,13 +108,11 @@ export class IdentityMetadataRepository {
   };
 
   /**
-   * Returns the metadata transformed to `IdentityMetadata`.
+   * Waits a maximum of 10 seconds for the metadata to be loaded.
    *
-   * It returns `undefined` if the metadata is not loaded.
-   *
-   * @returns {IdentityMetadata | undefined}
+   * It doesn't throw an error if the metadata is not loaded.
    */
-  getMetadata = async (): Promise<IdentityMetadata | undefined> => {
+  private waitUntilMetadataIsLoaded = async (): Promise<void> => {
     let currentWait = 0;
     const MAX_WAIT_MILLIS = 10_000;
     const ONE_WAIT_MILLIS = 1_000;
@@ -122,6 +120,17 @@ export class IdentityMetadataRepository {
       await new Promise((resolve) => setTimeout(resolve, 100));
       currentWait += ONE_WAIT_MILLIS;
     }
+  };
+
+  /**
+   * Returns the metadata transformed to `IdentityMetadata`.
+   *
+   * It returns `undefined` if the metadata is not loaded.
+   *
+   * @returns {IdentityMetadata | undefined}
+   */
+  getMetadata = async (): Promise<IdentityMetadata | undefined> => {
+    await this.waitUntilMetadataIsLoaded();
     if (this.metadataIsLoaded(this.rawMetadata)) {
       return convertMetadata(this.rawMetadata);
     }
@@ -141,7 +150,10 @@ export class IdentityMetadataRepository {
    * @param {Partial<IdentityMetadata>} partialMetadata
    * @returns {Promise<void>} To indicate that the metadata has been set.
    */
-  updateMetadata = (partialMetadata: Partial<IdentityMetadata>): void => {
+  updateMetadata = async (
+    partialMetadata: Partial<IdentityMetadata>
+  ): Promise<void> => {
+    await this.waitUntilMetadataIsLoaded();
     if (this.metadataIsLoaded(this.rawMetadata)) {
       let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;

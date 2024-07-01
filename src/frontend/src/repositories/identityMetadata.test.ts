@@ -16,21 +16,14 @@ const mockIdentityMetadata: IdentityMetadata = {
   recoveryPageShownTimestampMillis,
 };
 
-// Used to await that the getter has resolved.
-let getterResponse: MetadataMapV2 | null | undefined = null;
-const getterMockSuccess = vi.fn().mockImplementation(() => {
-  getterResponse = mockRawMetadata;
-  return mockRawMetadata;
-});
+const getterMockSuccess = vi.fn().mockResolvedValue(mockRawMetadata);
 const getterMockError = vi.fn().mockImplementation(() => {
-  getterResponse = null;
   throw new Error("test error");
 });
 const setterMockSuccess = vi.fn();
 const setterMockError = vi.fn().mockRejectedValue("test error");
 
 beforeEach(() => {
-  getterResponse = undefined;
   vi.clearAllMocks();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -40,8 +33,6 @@ test("IdentityMetadataRepository loads data on init in the background", async ()
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
-
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   expect(getterMockSuccess).toHaveBeenCalledTimes(1);
   expect(await instance.getMetadata()).toEqual(mockIdentityMetadata);
@@ -66,9 +57,6 @@ test("IdentityMetadataRepository returns undefined without raising an error if f
     setter: setterMockSuccess,
   });
 
-  // Wait for the first getter to fail.
-  await vi.waitFor(() => expect(getterResponse).toEqual(null));
-
   // Error is not thrown, but warnings is logged.
   expect(console.warn).toHaveBeenCalledTimes(1);
   expect(getterMockError).toHaveBeenCalledTimes(1);
@@ -84,8 +72,6 @@ test("IdentityMetadataRepository changes data in memory", async () => {
     setter: setterMockSuccess,
   });
 
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
-
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
@@ -99,14 +85,9 @@ test("IdentityMetadataRepository changes data in memory", async () => {
 test("IdentityMetadataRepository sets data in memory", async () => {
   const noMetadata: MetadataMapV2 = [];
   const instance = IdentityMetadataRepository.init({
-    getter: vi.fn().mockImplementation(() => {
-      getterResponse = noMetadata;
-      return noMetadata;
-    }),
+    getter: vi.fn().mockResolvedValue(noMetadata),
     setter: setterMockSuccess,
   });
-
-  await vi.waitFor(() => expect(getterResponse).toEqual(noMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await instance.updateMetadata({
@@ -123,8 +104,6 @@ test("IdentityMetadataRepository commits updated metadata to canister", async ()
     getter: getterMockSuccess,
     setter: setterMockSuccess,
   });
-
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await instance.updateMetadata({
@@ -149,8 +128,6 @@ test("IdentityMetadataRepository doesn't commit to canister without changes", as
     setter: setterMockSuccess,
   });
 
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
-
   expect(setterMockSuccess).not.toHaveBeenCalled();
   await instance.commitMetadata();
 
@@ -162,8 +139,6 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
     getter: getterMockSuccess,
     setter: setterMockError,
   });
-
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   const newMetadata = {
@@ -199,17 +174,11 @@ test("IdentityMetadataRepository commits additional metadata to canister after u
     ],
     anotherMetadataEntry,
   ];
-  const getterMock = vi.fn().mockImplementation(async () => {
-    // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-    getterResponse = await mockMoreRawMetadata;
-    return mockMoreRawMetadata;
-  });
+  const getterMock = vi.fn().mockResolvedValue(mockMoreRawMetadata);
   const instance = IdentityMetadataRepository.init({
     getter: getterMock,
     setter: setterMockSuccess,
   });
-
-  await vi.waitFor(() => expect(getterResponse).toEqual(mockMoreRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await instance.updateMetadata({
