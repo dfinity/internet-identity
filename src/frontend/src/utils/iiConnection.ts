@@ -556,10 +556,10 @@ export class AuthenticatedConnection extends Connection {
     return this.metadataRepository.getMetadata();
   };
 
-  updateIdentityMetadata = async (
+  updateIdentityMetadata = (
     partialMetadata: Partial<IdentityMetadata>
-  ): Promise<void> => {
-    await this.metadataRepository.updateMetadata(partialMetadata);
+  ): void => {
+    this.metadataRepository.updateMetadata(partialMetadata);
   };
 
   commitMetadata = async (): Promise<boolean> => {
