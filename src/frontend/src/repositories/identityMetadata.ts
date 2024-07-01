@@ -134,9 +134,7 @@ export class IdentityMetadataRepository {
    * @param {Partial<IdentityMetadata>} partialMetadata
    * @returns {Promise<void>} To indicate that the metadata has been set.
    */
-  updateIdentityMetadata = (
-    partialMetadata: Partial<IdentityMetadata>
-  ): void => {
+  updateMetadata = (partialMetadata: Partial<IdentityMetadata>): void => {
     if (this.metadataIsLoaded(this.rawMetadata)) {
       let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;

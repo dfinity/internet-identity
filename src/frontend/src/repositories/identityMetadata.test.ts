@@ -74,7 +74,7 @@ test("IdentityMetadataRepository changes data in memory", async () => {
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateIdentityMetadata({
+  await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -92,7 +92,7 @@ test("IdentityMetadataRepository commits updated metadata to canister", async ()
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateIdentityMetadata({
+  await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -134,7 +134,7 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
   const newMetadata = {
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   };
-  await instance.updateIdentityMetadata(newMetadata);
+  await instance.updateMetadata(newMetadata);
 
   expect(setterMockError).not.toHaveBeenCalled();
   const committed = await instance.commitMetadata();
@@ -177,7 +177,7 @@ test("IdentityMetadataRepository commits additional metadata to canister after u
   await vi.waitFor(() => expect(getterResponse).toEqual(mockMoreRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateIdentityMetadata({
+  await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
