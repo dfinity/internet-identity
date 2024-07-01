@@ -552,7 +552,7 @@ export class AuthenticatedConnection extends Connection {
     return await actor.identity_metadata_replace(this.userNumber, metadata);
   };
 
-  getIdentityMetadata = (): IdentityMetadata | undefined => {
+  getIdentityMetadata = (): Promise<IdentityMetadata | undefined> => {
     return this.metadataRepository.getMetadata();
   };
 

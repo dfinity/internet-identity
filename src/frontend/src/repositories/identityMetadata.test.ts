@@ -44,7 +44,20 @@ test("IdentityMetadataRepository loads data on init in the background", async ()
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   expect(getterMockSuccess).toHaveBeenCalledTimes(1);
-  expect(instance.getMetadata()).toEqual(mockIdentityMetadata);
+  expect(await instance.getMetadata()).toEqual(mockIdentityMetadata);
+});
+
+test("getMetadata waits until metadata is loaded", async () => {
+  const slowGetter = vi.fn().mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    return mockRawMetadata;
+  });
+  const instance = IdentityMetadataRepository.init({
+    getter: slowGetter,
+    setter: setterMockSuccess,
+  });
+
+  expect(await instance.getMetadata()).toEqual(mockIdentityMetadata);
 });
 
 test("IdentityMetadataRepository returns undefined without raising an error if fetching fails", async () => {
@@ -60,7 +73,7 @@ test("IdentityMetadataRepository returns undefined without raising an error if f
   expect(console.warn).toHaveBeenCalledTimes(1);
   expect(getterMockError).toHaveBeenCalledTimes(1);
 
-  expect(instance.getMetadata()).toEqual(undefined);
+  expect(await instance.getMetadata()).toEqual(undefined);
   expect(getterMockError).toHaveBeenCalledTimes(1);
   expect(console.warn).toHaveBeenCalledTimes(1);
 });
@@ -78,7 +91,7 @@ test("IdentityMetadataRepository changes data in memory", async () => {
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
-  expect(instance.getMetadata()).toEqual({
+  expect(await instance.getMetadata()).toEqual({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 });
@@ -149,7 +162,7 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
   ]);
 
   // But the value in memory is not lost.
-  expect(instance.getMetadata()).toEqual(newMetadata);
+  expect(await instance.getMetadata()).toEqual(newMetadata);
 });
 
 test("IdentityMetadataRepository commits additional metadata to canister after update", async () => {

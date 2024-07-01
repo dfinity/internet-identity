@@ -70,7 +70,7 @@ test("commits changes on identity metadata", async () => {
 
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
 
-  expect(connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
+  expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   await connection.updateIdentityMetadata({

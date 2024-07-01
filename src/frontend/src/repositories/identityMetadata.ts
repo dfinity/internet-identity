@@ -114,7 +114,14 @@ export class IdentityMetadataRepository {
    *
    * @returns {IdentityMetadata | undefined}
    */
-  getMetadata = (): IdentityMetadata | undefined => {
+  getMetadata = async (): Promise<IdentityMetadata | undefined> => {
+    let currentWait = 0;
+    const MAX_WAIT_MILLIS = 10_000;
+    const ONE_WAIT_MILLIS = 1_000;
+    while (this.rawMetadata === "loading" || currentWait < MAX_WAIT_MILLIS) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      currentWait += ONE_WAIT_MILLIS;
+    }
     if (this.metadataIsLoaded(this.rawMetadata)) {
       return convertMetadata(this.rawMetadata);
     }
