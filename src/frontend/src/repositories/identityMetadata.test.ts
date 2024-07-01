@@ -96,6 +96,28 @@ test("IdentityMetadataRepository changes data in memory", async () => {
   });
 });
 
+test("IdentityMetadataRepository sets data in memory", async () => {
+  const noMetadata: MetadataMapV2 = [];
+  const instance = IdentityMetadataRepository.init({
+    getter: vi.fn().mockImplementation(() => {
+      getterResponse = noMetadata;
+      return noMetadata;
+    }),
+    setter: setterMockSuccess,
+  });
+
+  await vi.waitFor(() => expect(getterResponse).toEqual(noMetadata));
+
+  const newRecoveryPageShownTimestampMillis = 9876543210;
+  await instance.updateMetadata({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+  });
+});
+
 test("IdentityMetadataRepository commits updated metadata to canister", async () => {
   const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
@@ -199,10 +221,10 @@ test("IdentityMetadataRepository commits additional metadata to canister after u
 
   expect(setterMockSuccess).toHaveBeenCalledTimes(1);
   expect(setterMockSuccess).toHaveBeenCalledWith([
+    anotherMetadataEntry,
     [
       RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
       { String: String(newRecoveryPageShownTimestampMillis) },
     ],
-    anotherMetadataEntry,
   ]);
 });

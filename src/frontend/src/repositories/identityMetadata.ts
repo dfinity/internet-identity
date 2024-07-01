@@ -145,21 +145,16 @@ export class IdentityMetadataRepository {
     if (this.metadataIsLoaded(this.rawMetadata)) {
       let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;
-      updatedMetadata = updatedMetadata.map(([key, value]) => {
-        if (
-          key === RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS &&
-          partialMetadata.recoveryPageShownTimestampMillis !== undefined
-        ) {
-          return [
-            key,
+      updatedMetadata = updatedMetadata
+        .filter(([key]) => key !== RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS)
+        .concat([
+          [
+            RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
             {
-              String:
-                partialMetadata.recoveryPageShownTimestampMillis.toString(),
+              String: String(partialMetadata.recoveryPageShownTimestampMillis),
             },
-          ];
-        }
-        return [key, value];
-      });
+          ],
+        ]);
       this.rawMetadata = updatedMetadata;
     }
     // Do nothing if the metadata is not loaded.
