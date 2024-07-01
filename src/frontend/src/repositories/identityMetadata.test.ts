@@ -18,14 +18,12 @@ const mockIdentityMetadata: IdentityMetadata = {
 
 // Used to await that the getter has resolved.
 let getterResponse: MetadataMapV2 | null | undefined = null;
-const getterMockSuccess = vi.fn().mockImplementation(async () => {
-  // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-  getterResponse = await mockRawMetadata;
+const getterMockSuccess = vi.fn().mockImplementation(() => {
+  getterResponse = mockRawMetadata;
   return mockRawMetadata;
 });
-const getterMockError = vi.fn().mockImplementation(async () => {
-  // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-  getterResponse = await null;
+const getterMockError = vi.fn().mockImplementation(() => {
+  getterResponse = null;
   throw new Error("test error");
 });
 const setterMockSuccess = vi.fn();
@@ -49,7 +47,7 @@ test("IdentityMetadataRepository loads data on init in the background", async ()
   expect(instance.getMetadata()).toEqual(mockIdentityMetadata);
 });
 
-test("IdentityMetadataRepository returns no metadata without raising an error if fetching fails", async () => {
+test("IdentityMetadataRepository returns undefined without raising an error if fetching fails", async () => {
   const instance = IdentityMetadataRepository.init({
     getter: getterMockError,
     setter: setterMockSuccess,
@@ -76,7 +74,7 @@ test("IdentityMetadataRepository changes data in memory", async () => {
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.setPartialMetadata({
+  await instance.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -85,7 +83,7 @@ test("IdentityMetadataRepository changes data in memory", async () => {
   });
 });
 
-test.only("IdentityMetadataRepository commits updated metadata to canister", async () => {
+test("IdentityMetadataRepository commits updated metadata to canister", async () => {
   const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
     setter: setterMockSuccess,
@@ -94,7 +92,7 @@ test.only("IdentityMetadataRepository commits updated metadata to canister", asy
   await vi.waitFor(() => expect(getterResponse).toEqual(mockRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.setPartialMetadata({
+  await instance.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -136,7 +134,7 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
   const newMetadata = {
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   };
-  await instance.setPartialMetadata(newMetadata);
+  await instance.updateIdentityMetadata(newMetadata);
 
   expect(setterMockError).not.toHaveBeenCalled();
   const committed = await instance.commitMetadata();
@@ -154,7 +152,7 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
   expect(instance.getMetadata()).toEqual(newMetadata);
 });
 
-test("IdentityMetadataRepository commits all received metadata to canister after update", async () => {
+test("IdentityMetadataRepository commits additional metadata to canister after update", async () => {
   const anotherMetadataEntry: [string, { String: string }] = [
     "otherKey",
     { String: "otherValue" },
@@ -179,7 +177,7 @@ test("IdentityMetadataRepository commits all received metadata to canister after
   await vi.waitFor(() => expect(getterResponse).toEqual(mockMoreRawMetadata));
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.setPartialMetadata({
+  await instance.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
