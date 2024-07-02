@@ -131,7 +131,11 @@
   --vc-brand-alt: rgba(215, 205, 235, 1);
   --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
-  --vc-brand-gradient: linear-gradient(90deg, #4b19d6 0%, #890eed 100%);
+  --vc-brand-gradient: linear-gradient(
+    90deg,
+    var(--vc-brand-purple),
+    var(--vc-brand-purple-light)
+  );
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -150,6 +154,8 @@
   --vs-line-height: 1.4;
 
   --vs-border-radius: 0.8rem;
+
+  --vs-screen-width: 40rem;
 
   /*
    * reference tokens
@@ -204,8 +210,8 @@
 
   --rc-button--disabled: var(--vc-shadow);
 
-  --rc-landing-page-background: var(--vc-brand-gradient);
-  --rc-landing-page-background-text: var(--vc-snow);
+  --rc-background--highlight: var(--vc-brand-gradient);
+  --rc-background--highlight-text: var(--vc-snow);
 
   /*
     color used to elevate something from its background
@@ -258,7 +264,7 @@
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
-  --rs-main-content-width: 40rem;
+  --rs-main-content-width: var(--vs-screen-width);
 
   --rs-inline-grid-gap: var(--vs-inline);
   --rs-inline-icon-gap: var(--vs-inline);
@@ -320,11 +326,14 @@
 
   --rs-footer-height: 4rem;
 
-  --rs-landing-page-padding--mobile: calc(var(--vs-stack) * 3);
-  --rs-landing-page-left-pane-padding: calc(var(--vs-gutter) * 8);
-  --rs-landing-page-right-pane-padding--desktop: 10vmax;
-  --rs-landing-page-right-pane-padding--mobile: calc(var(--vs-stack) * 2);
-  --rs-landing-page-stack: calc(var(--vs-stack) * 4);
+  --rs-split-page-padding--mobile: calc(var(--vs-stack) * 3);
+  --rs-split-page-left-pane-padding: calc(var(--vs-gutter) * 8);
+  --rs-split-page-right-pane-padding--desktop: 10vmax;
+  --rs-split-page-right-pane-padding--mobile: calc(var(--vs-stack) * 2);
+  --rs-split-page-stack: calc(var(--vs-stack) * 4);
+
+  /* This is not used in CSS, but it's used to compensate for the logo size. */
+  --rs-logo-height: 3rem;
 }
 
 /* II) Optional Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -970,15 +979,15 @@ a:hover,
   grid-template-columns: 1fr minmax(var(--rs-main-content-width), 1fr);
   grid-template-areas: "left right";
 
-  height: 100vh;
+  height: 100dvh;
 }
 
 .c-landingPage__logo {
   position: absolute;
-  left: var(--rs-landing-page-left-pane-padding);
-  top: var(--rs-landing-page-left-pane-padding);
+  left: var(--rs-split-page-left-pane-padding);
+  top: var(--rs-split-page-left-pane-padding);
 
-  color: var(--rc-landing-page-background-text);
+  color: var(--rc-background--highlight-text);
 }
 
 .c-landingPage__logo .c-logo {
@@ -986,8 +995,8 @@ a:hover,
 }
 
 .c-landingPage__left {
-  background: var(--rc-landing-page-background);
-  color: var(--rc-landing-page-background-text);
+  background: var(--rc-background--highlight);
+  color: var(--rc-background--highlight-text);
 
   grid-area: left;
 
@@ -995,7 +1004,7 @@ a:hover,
   flex-direction: column;
   align-items: flex-start;
 
-  padding: var(--rs-landing-page-left-pane-padding);
+  padding: var(--rs-split-page-left-pane-padding);
 }
 
 .c-landingPage__left__content {
@@ -1008,9 +1017,7 @@ a:hover,
 
   padding: 0 20%;
 
-  /* To compensate for the IC logo that is outisde the normal flow with position absolute */
-  --logo-height: 3rem;
-  margin-top: var(--logo-height);
+  margin-top: var(--rs-logo-height);
 }
 
 .c-landingPage__logo--mobile {
@@ -1061,9 +1068,9 @@ a:hover,
   .c-landingPage {
     display: block;
 
-    padding: 0 var(--rs-landing-page-padding--mobile);
+    padding: 0 var(--rs-split-page-padding--mobile);
 
-    background: var(--rc-landing-page-background);
+    background: var(--rc-background--highlight);
 
     height: auto;
     min-height: 100vh;
@@ -1072,12 +1079,14 @@ a:hover,
   .c-landingPage__logo {
     display: flex;
     position: static;
+    top: unset;
+    left: unset;
     justify-content: center;
 
     order: 1;
-    color: var(--rc-landing-page-background-text);
+    color: var(--rc-background--highlight-text);
 
-    padding: var(--rs-landing-page-stack) 0;
+    padding: var(--rs-split-page-stack) 0;
   }
 
   .c-landingPage__left {
@@ -1085,10 +1094,10 @@ a:hover,
     order: 2;
 
     padding: 0;
-    margin-top: var(--rs-landing-page-stack);
-    padding-bottom: var(--rs-landing-page-stack);
+    margin-top: var(--rs-split-page-stack);
+    padding-bottom: var(--rs-split-page-stack);
 
-    gap: var(--rs-landing-page-stack);
+    gap: var(--rs-split-page-stack);
   }
 
   .c-landingPage__left__content {
@@ -1102,7 +1111,7 @@ a:hover,
 
     background: var(--rc-light);
     border-radius: var(--rs-card-border-radius);
-    padding: var(--rs-landing-page-right-pane-padding--mobile);
+    padding: var(--rs-split-page-right-pane-padding--mobile);
 
     overflow: auto;
   }
