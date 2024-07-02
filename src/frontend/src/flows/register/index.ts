@@ -194,7 +194,7 @@ export const registerFlow = async ({
   await finalizeIdentity?.(userNumber);
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
-  // The metadata it started to fetch when the connection was created.
+  // The metadata starts to fetch when the connection is created.
   // But it might not have finished yet, so we `await` for `updateIdentityMetadata` to also wait for it.
   await result.connection.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: Date.now(),
