@@ -39,7 +39,8 @@ test("Register new identity and login without prefilled identity number", async 
 
     // load the II page again
     await browser.url(II_URL);
-    await FLOWS.loginWelcomeView(userNumber, DEVICE_NAME1, browser);
+    await FLOWS.loginWelcomeView(userNumber, browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
 
@@ -92,7 +93,6 @@ test("Register first then log into client application", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    await FLOWS.skipRecoveryNag(browser);
     const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami()).toBe(principal);
 

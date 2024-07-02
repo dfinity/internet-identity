@@ -20,7 +20,6 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const _userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
     expect(credentials).toHaveLength(1);
 

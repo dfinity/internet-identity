@@ -101,9 +101,9 @@ export class IdentityMetadataRepository {
     metadata: RawMetadataState
   ): metadata is MetadataMapV2 => {
     return (
-      this.rawMetadata !== "loading" &&
-      this.rawMetadata !== "error" &&
-      this.rawMetadata !== "not-loaded"
+      metadata !== "loading" &&
+      metadata !== "error" &&
+      metadata !== "not-loaded"
     );
   };
 
