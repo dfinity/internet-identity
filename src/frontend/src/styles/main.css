@@ -320,6 +320,7 @@
 
   --rs-footer-height: 4rem;
 
+  --rs-landing-page-padding--mobile: calc(var(--vs-stack) * 3);
   --rs-landing-page-left-pane-padding: calc(var(--vs-gutter) * 8);
   --rs-landing-page-right-pane-padding--desktop: 10vmax;
   --rs-landing-page-right-pane-padding--mobile: calc(var(--vs-stack) * 2);
@@ -1060,7 +1061,7 @@ a:hover,
   .c-landingPage {
     display: block;
 
-    padding: 0 5vmax;
+    padding: 0 var(--rs-landing-page-padding--mobile);
 
     background: var(--rc-landing-page-background);
 
