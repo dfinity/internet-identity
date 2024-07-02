@@ -698,7 +698,7 @@ const pinIdentityToDerPubkey = async (
 };
 
 // Find and use a passkey, whether PIN or webauthn
-const useIdentityFlow = async <T, I>({
+const useIdentityFlow = async <I>({
   userNumber,
   allowPinAuthentication,
   retrievePinIdentityMaterial,
