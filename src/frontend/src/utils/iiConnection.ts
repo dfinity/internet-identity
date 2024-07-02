@@ -14,7 +14,11 @@ import {
   GetDelegationResponse,
   IdAliasCredentials,
   IdentityAnchorInfo,
+  IdentityInfo,
+  IdentityInfoError,
+  IdentityMetadataReplaceError,
   KeyType,
+  MetadataMapV2,
   PreparedIdAlias,
   PublicKey,
   Purpose,
@@ -28,6 +32,10 @@ import {
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
+import {
+  IdentityMetadata,
+  IdentityMetadataRepository,
+} from "$src/repositories/identityMetadata";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
@@ -411,6 +419,7 @@ export class Connection {
 }
 
 export class AuthenticatedConnection extends Connection {
+  private metadataRepository: IdentityMetadataRepository;
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -419,6 +428,24 @@ export class AuthenticatedConnection extends Connection {
     public actor?: ActorSubclass<_SERVICE>
   ) {
     super(canisterId);
+    const metadataGetter = async () => {
+      const response = await this.getIdentityInfo();
+      if ("Ok" in response) {
+        return response.Ok.metadata;
+      }
+      throw new Error("Error fetching metadata");
+    };
+    const metadataSetter = async (metadata: MetadataMapV2) => {
+      const response = await this.setIdentityMetadata(metadata);
+      if ("Ok" in response) {
+        return;
+      }
+      throw new Error("Error updating metadata");
+    };
+    this.metadataRepository = IdentityMetadataRepository.init({
+      getter: metadataGetter,
+      setter: metadataSetter,
+    });
   }
 
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
@@ -509,6 +536,34 @@ export class AuthenticatedConnection extends Connection {
   remove = async (publicKey: PublicKey): Promise<void> => {
     const actor = await this.getActor();
     await actor.remove(this.userNumber, publicKey);
+  };
+
+  private getIdentityInfo = async (): Promise<
+    { Ok: IdentityInfo } | { Err: IdentityInfoError }
+  > => {
+    const actor = await this.getActor();
+    return await actor.identity_info(this.userNumber);
+  };
+
+  private setIdentityMetadata = async (
+    metadata: MetadataMapV2
+  ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
+    const actor = await this.getActor();
+    return await actor.identity_metadata_replace(this.userNumber, metadata);
+  };
+
+  getIdentityMetadata = (): Promise<IdentityMetadata | undefined> => {
+    return this.metadataRepository.getMetadata();
+  };
+
+  updateIdentityMetadata = (
+    partialMetadata: Partial<IdentityMetadata>
+  ): Promise<void> => {
+    return this.metadataRepository.updateMetadata(partialMetadata);
+  };
+
+  commitMetadata = async (): Promise<boolean> => {
+    return await this.metadataRepository.commitMetadata();
   };
 
   prepareDelegation = async (

@@ -212,6 +212,7 @@ const authenticate = async (
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
+  // TODO: Commit state
   const result = await withLoader(() =>
     fetchDelegation({
       connection: authSuccess.connection,
