@@ -131,6 +131,11 @@
   --vc-brand-alt: rgba(215, 205, 235, 1);
   --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
+  --vc-brand-gradient: linear-gradient(
+    90deg,
+    var(--vc-brand-purple),
+    var(--vc-brand-purple-light)
+  );
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -149,6 +154,8 @@
   --vs-line-height: 1.4;
 
   --vs-border-radius: 0.8rem;
+
+  --vs-screen-width: 40rem;
 
   /*
    * reference tokens
@@ -203,6 +210,9 @@
 
   --rc-button--disabled: var(--vc-shadow);
 
+  --rc-background--highlight: var(--vc-brand-gradient);
+  --rc-background--highlight-text: var(--vc-snow);
+
   /*
     color used to elevate something from its background
     secondary button, card, icon button
@@ -254,6 +264,8 @@
   --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
 
   /* reference tokens: sizes */
+  --rs-main-content-width: var(--vs-screen-width);
+
   --rs-inline-grid-gap: var(--vs-inline);
   --rs-inline-icon-gap: var(--vs-inline);
 
@@ -313,6 +325,15 @@
   --rs-line--thick: calc(var(--rs-line) * 4);
 
   --rs-footer-height: 4rem;
+
+  --rs-split-page-padding--mobile: calc(var(--vs-stack) * 3);
+  --rs-split-page-left-pane-padding: calc(var(--vs-gutter) * 8);
+  --rs-split-page-right-pane-padding--desktop: 10vmax;
+  --rs-split-page-right-pane-padding--mobile: calc(var(--vs-stack) * 2);
+  --rs-split-page-stack: calc(var(--vs-stack) * 4);
+
+  /* This is not used in CSS, but it's used to compensate for the logo size. */
+  --rs-logo-height: 3rem;
 }
 
 /* II) Optional Theme Settings: DarkMode, LightMode, Product Specific stuff */
@@ -755,8 +776,8 @@ a:hover,
 .l-container {
   position: relative;
   font-size: 1.6rem;
-  min-width: 40rem;
-  max-width: 40rem;
+  min-width: var(--rs-main-content-width);
+  max-width: var(--rs-main-content-width);
   /* centers the container and adds a bit of space to make sure the footer does not stick to it */
   margin: 0 auto 2rem;
 }
@@ -947,6 +968,159 @@ a:hover,
   left: 50%;
   transform: translate(-50%, -50%) scale(0.6);
   color: rgba(0, 0, 0, 0.5);
+}
+
+/**
+ * LandingPage component
+ */
+
+.c-landingPage {
+  display: grid;
+  grid-template-columns: 1fr minmax(var(--rs-main-content-width), 1fr);
+  grid-template-areas: "left right";
+
+  height: 100dvh;
+}
+
+.c-landingPage__logo {
+  position: absolute;
+  left: var(--rs-split-page-left-pane-padding);
+  top: var(--rs-split-page-left-pane-padding);
+
+  color: var(--rc-background--highlight-text);
+}
+
+.c-landingPage__logo .c-logo {
+  padding: 0;
+}
+
+.c-landingPage__left {
+  background: var(--rc-background--highlight);
+  color: var(--rc-background--highlight-text);
+
+  grid-area: left;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  padding: var(--rs-split-page-left-pane-padding);
+}
+
+.c-landingPage__left__content {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 20%;
+
+  margin-top: var(--rs-logo-height);
+}
+
+.c-landingPage__logo--mobile {
+  display: none;
+}
+
+.c-landingPage__logo--desktop {
+  display: block;
+}
+
+.c-landingPage__right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  grid-area: right;
+
+  overflow-y: scroll;
+}
+
+.c-landingPage__right__content {
+  min-width: var(--rs-main-content-width);
+  max-width: var(--rs-main-content-width);
+  /* This is necessary in case the content is bigger than the parent. */
+  /* It keeps the start of the box at the top of the container. */
+  max-height: 90%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.c-landingPage__right__content--full-width {
+  width: 100%;
+}
+
+.c-landingPage .c-footer__link {
+  padding: 0;
+}
+
+.c-landingPage__left__footer {
+  display: flex;
+  gap: var(--rs-inline-grid-gap);
+}
+
+@media (max-width: 512px) {
+  .c-landingPage {
+    display: block;
+
+    padding: 0 var(--rs-split-page-padding--mobile);
+
+    background: var(--rc-background--highlight);
+
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .c-landingPage__logo {
+    display: flex;
+    position: static;
+    top: unset;
+    left: unset;
+    justify-content: center;
+
+    order: 1;
+    color: var(--rc-background--highlight-text);
+
+    padding: var(--rs-split-page-stack) 0;
+  }
+
+  .c-landingPage__left {
+    background: none;
+    order: 2;
+
+    padding: 0;
+    margin-top: var(--rs-split-page-stack);
+    padding-bottom: var(--rs-split-page-stack);
+
+    gap: var(--rs-split-page-stack);
+  }
+
+  .c-landingPage__left__content {
+    padding: 0;
+    /* We don't need to account for the logo with absolute position */
+    margin-top: 0;
+  }
+
+  .c-landingPage__right {
+    order: 1;
+
+    background: var(--rc-light);
+    border-radius: var(--rs-card-border-radius);
+    padding: var(--rs-split-page-right-pane-padding--mobile);
+
+    overflow: auto;
+  }
+
+  .c-landingPage__right__content {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+  }
 }
 
 /**

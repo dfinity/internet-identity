@@ -48,6 +48,7 @@ import { promptUserNumber } from "./promptUserNumber";
 
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import copyJson from "./authenticateBox.json";
+import { landingPage } from "./landingPage";
 
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -562,12 +563,22 @@ export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
   const templates = authnTemplates(i18n, props);
 
   return {
-    firstTime: (opts: Parameters<typeof templates.firstTime>[0]) =>
-      page(templates.firstTime(opts)),
+    firstTime: (
+      opts: Parameters<typeof templates.firstTime>[0],
+      // TODO: remove this parameter once the landing page is ready.
+      landingPageTemplate: boolean = false
+    ) =>
+      // TODO: Use the landing page template always when ready.
+      page(templates.firstTime(opts), landingPageTemplate),
     useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
       page(templates.useExisting(opts)),
-    pick: (opts: Parameters<typeof templates.pick>[0]) =>
-      page(templates.pick(opts)),
+    pick: (
+      opts: Parameters<typeof templates.pick>[0],
+      // TODO: remove this parameter once the landing page is ready.
+      landingPageTemplate: boolean = false
+    ) =>
+      // TODO: Use the landing page template always when ready.
+      page(templates.pick(opts), landingPageTemplate),
   };
 };
 
@@ -615,12 +626,16 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
 };
 
 // Wrap the template with header & footer and render the page
-const page = (slot: TemplateResult) => {
-  const template = mainWindow({
-    slot: html` <!-- The title is hidden but used for accessibility -->
-      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-      ${slot}`,
-  });
+const page = (slot: TemplateResult, landingPageTemplate: boolean = false) => {
+  const template = landingPageTemplate
+    ? landingPage({
+        slot,
+      })
+    : mainWindow({
+        slot: html` <!-- The title is hidden but used for accessibility -->
+          <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+          ${slot}`,
+      });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
 };
