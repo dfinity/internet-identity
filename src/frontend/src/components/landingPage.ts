@@ -1,6 +1,8 @@
+import { I18n } from "$src/i18n";
 import { html, TemplateResult } from "lit-html";
 import { navigationLink } from "./footer";
 import { githubIcon, icLogo, questionIcon } from "./icons";
+import copyJson from "./landingPage.json";
 
 /**
  * Landing page template
@@ -16,6 +18,9 @@ export const landingPage = ({
 }: {
   slot: TemplateResult;
 }): TemplateResult => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
+
   return html` <main class="c-landingPage">
     <div class="c-landingPage__logo">
       <div class="c-logo">${icLogo}</div>
@@ -27,13 +32,8 @@ export const landingPage = ({
     </section>
     <section class="c-landingPage__left">
       <div class="c-landingPage__left__content">
-        <h1 class="t-title t-title--main">
-          Secure, seamless & privacy-preserving digital identity
-        </h1>
-        <p class="t-paragraph">
-          Internet Identity is a decentralized identity solution running
-          end-to-end on the Internet Computer blockchain.
-        </p>
+        <h1 class="t-title t-title--main">${copy.title}</h1>
+        <p class="t-paragraph">{${copy.subtitle}}</p>
       </div>
       <div class="c-landingPage__left__footer">
         ${navigationLink({
