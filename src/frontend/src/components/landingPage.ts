@@ -30,7 +30,7 @@ export const landingPage = ({
         <div class="c-landingPage__right__content--full-width">${slot}</div>
       </div>
     </section>
-    <section class="c-landingPage__left">
+    <section class="c-landingPage__left" aria-label="Action Pane">
       <div class="c-landingPage__left__content">
         <h1 class="t-title t-title--main">${copy.title}</h1>
         <p class="t-paragraph">{${copy.subtitle}}</p>
