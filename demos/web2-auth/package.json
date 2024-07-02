@@ -1,0 +1,18 @@
+{
+  "name": "web2-auth",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "@dfinity/sig-verifier-js": "*"
+  },
+  "devDependencies": {
+    "vite": "*"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "vite": "NODE_OPTIONS='--experimental-wasm-modules' vite --config ./vite.config.ts"
+  },
+  "author": "",
+  "license": "ISC"
+}
