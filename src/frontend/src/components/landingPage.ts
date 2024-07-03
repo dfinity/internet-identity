@@ -15,8 +15,10 @@ import copyJson from "./landingPage.json";
  */
 export const landingPage = ({
   slot,
+  dataPage,
 }: {
   slot: TemplateResult;
+  dataPage: string;
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);

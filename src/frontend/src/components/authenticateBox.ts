@@ -580,6 +580,7 @@ const page = (slot: TemplateResult, landingPageTemplate: boolean = false) => {
   const template = landingPageTemplate
     ? landingPage({
         slot,
+        dataPage: "authenticate",
       })
     : mainWindow({
         slot: html` <!-- The title is hidden but used for accessibility -->
