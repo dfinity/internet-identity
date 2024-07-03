@@ -8,7 +8,11 @@ import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/regist
 import { idbRetrievePinIdentityMaterial } from "$src/flows/pin/idb";
 import { usePin } from "$src/flows/pin/usePin";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
-import { getRegisterFlowOpts, registerFlow } from "$src/flows/register";
+import {
+  RegisterFlowOpts,
+  getRegisterFlowOpts,
+  registerFlow,
+} from "$src/flows/register";
 import { I18n } from "$src/i18n";
 import { getAnchors, setAnchorUsed } from "$src/storage";
 import {
@@ -83,7 +87,7 @@ export const authenticateBox = async ({
   authnMethod: "pin" | "passkey" | "recovery";
 }> => {
   const promptAuth = () =>
-    authenticateBoxFlow<AuthenticatedConnection, PinIdentityMaterial>({
+    authenticateBoxFlow<PinIdentityMaterial>({
       i18n,
       templates,
       addDevice: (userNumber) => asNewDevice(connection, userNumber),
@@ -159,7 +163,7 @@ const pinIdentityAuthenticatorValidity = async ({
 
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
-export const authenticateBoxFlow = async <T, I>({
+export const authenticateBoxFlow = async <I>({
   i18n,
   templates,
   addDevice,
@@ -179,7 +183,7 @@ export const authenticateBoxFlow = async <T, I>({
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
-    LoginSuccess<T> | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
   >;
   loginPinIdentityMaterial: ({
     userNumber,
@@ -189,8 +193,8 @@ export const authenticateBoxFlow = async <T, I>({
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
-  }) => Promise<LoginSuccess<T> | BadPin>;
-  recover: () => Promise<LoginSuccess<T> | { tag: "canceled" }>;
+  }) => Promise<LoginSuccess | BadPin>;
+  recover: () => Promise<LoginSuccess | { tag: "canceled" }>;
   retrievePinIdentityMaterial: ({
     userNumber,
   }: {
@@ -201,9 +205,9 @@ export const authenticateBoxFlow = async <T, I>({
     userNumber: bigint;
     pinIdentityMaterial: I;
   }) => Promise<"valid" | "expired">;
-  registerFlowOpts: Parameters<typeof registerFlow<T>>[0];
+  registerFlowOpts: RegisterFlowOpts;
 }): Promise<
-  | (LoginSuccess<T> & {
+  | (LoginSuccess & {
       newAnchor: boolean;
       authnMethod: "pin" | "passkey" | "recovery";
     })
@@ -215,7 +219,7 @@ export const authenticateBoxFlow = async <T, I>({
 
   // The registration flow for a new identity
   const doRegister = async (): Promise<
-    | (LoginSuccess<T> & {
+    | (LoginSuccess & {
         newAnchor: true;
         authnMethod: "pin" | "passkey" | "recovery";
       })
@@ -225,7 +229,7 @@ export const authenticateBoxFlow = async <T, I>({
     | RegisterNoSpace
     | { tag: "canceled" }
   > => {
-    const result2 = await registerFlow<T>(registerFlowOpts);
+    const result2 = await registerFlow(registerFlowOpts);
 
     if (result2 === "canceled") {
       return { tag: "canceled" } as const;
@@ -235,7 +239,7 @@ export const authenticateBoxFlow = async <T, I>({
       return result2;
     }
 
-    result2 satisfies LoginSuccess<T>;
+    result2 satisfies LoginSuccess;
     return {
       newAnchor: true,
       ...result2,
@@ -255,7 +259,7 @@ export const authenticateBoxFlow = async <T, I>({
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
-    | (LoginSuccess<T> & {
+    | (LoginSuccess & {
         newAnchor: boolean;
         authnMethod: "pin" | "passkey" | "recovery";
       })
@@ -284,7 +288,7 @@ export const authenticateBoxFlow = async <T, I>({
       return { tag: "canceled" } as const;
     }
 
-    recoverResult satisfies LoginSuccess<T>;
+    recoverResult satisfies LoginSuccess;
     return {
       newAnchor:
         false /* If an anchor was recovered, then it's _not_ a new anchor */,
@@ -389,9 +393,11 @@ const clarifyError_ = <K extends FlowError["kind"]>(
 ): Omit<ErrorOptions, "primaryButton"> =>
   clarifyError[flowError.kind](flowError);
 
-export const handleLoginFlowResult = async <T, E>(
-  result: (LoginSuccess<T> & E) | FlowError
-): Promise<({ userNumber: bigint; connection: T } & E) | undefined> => {
+export const handleLoginFlowResult = async <E>(
+  result: (LoginSuccess & E) | FlowError
+): Promise<
+  ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
+> => {
   if (result.kind === "loginSuccess") {
     await setAnchorUsed(result.userNumber);
     return result;
@@ -707,7 +713,7 @@ const pinIdentityToDerPubkey = async (
 };
 
 // Find and use a passkey, whether PIN or webauthn
-const useIdentityFlow = async <T, I>({
+const useIdentityFlow = async <I>({
   userNumber,
   allowPinAuthentication,
   retrievePinIdentityMaterial,
@@ -724,7 +730,7 @@ const useIdentityFlow = async <T, I>({
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
-    LoginSuccess<T> | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
   >;
   allowPinAuthentication: boolean;
   verifyPinValidity: (opts: {
@@ -739,9 +745,9 @@ const useIdentityFlow = async <T, I>({
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
-  }) => Promise<LoginSuccess<T> | BadPin>;
+  }) => Promise<LoginSuccess | BadPin>;
 }): Promise<
-  | (LoginSuccess<T> & {
+  | (LoginSuccess & {
       newAnchor: boolean;
       authnMethod: "pin" | "passkey" | "recovery";
     })
@@ -792,7 +798,7 @@ const useIdentityFlow = async <T, I>({
   }
 
   // Otherwise, attempt login with PIN
-  const result = await usePin<LoginSuccess<T> | BadPin>({
+  const result = await usePin<LoginSuccess | BadPin>({
     verifyPin: async (pin) => {
       const result = await loginPinIdentityMaterial({
         userNumber,
@@ -804,7 +810,7 @@ const useIdentityFlow = async <T, I>({
         return { ok: false, error: "Invalid PIN" };
       }
 
-      result satisfies LoginSuccess<T>;
+      result satisfies LoginSuccess;
       return { ok: true, value: result };
     },
   });
@@ -826,7 +832,7 @@ const useIdentityFlow = async <T, I>({
     return { ...pinResult };
   }
 
-  pinResult satisfies LoginSuccess<T>;
+  pinResult satisfies LoginSuccess;
 
   // We log in with an existing PIN anchor, meaning it is _not_ a new anchor
   return { newAnchor: false, authnMethod: "pin", ...pinResult };

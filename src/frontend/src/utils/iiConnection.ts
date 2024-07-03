@@ -84,9 +84,9 @@ export class DummyIdentity
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
-export type LoginSuccess<T = AuthenticatedConnection> = {
+export type LoginSuccess = {
   kind: "loginSuccess";
-  connection: T;
+  connection: AuthenticatedConnection;
   userNumber: bigint;
 };
 

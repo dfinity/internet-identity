@@ -80,16 +80,31 @@ export const addPhrase = ({
   );
 };
 
+// TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  const recoveries = await withLoader(() =>
-    connection.lookupRecovery(userNumber)
+  const [recoveries, identityMetadata] = await withLoader(() =>
+    Promise.all([
+      connection.lookupRecovery(userNumber),
+      connection.getIdentityMetadata(),
+    ])
   );
-  if (recoveries.length === 0) {
+
+  const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
+  const nowInMillis = Date.now();
+  const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
+  const hasNotSeenRecoveryPageLastWeek =
+    (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
+    oneWeekAgoTimestamp;
+  if (recoveries.length === 0 && hasNotSeenRecoveryPageLastWeek) {
+    // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
+    await connection.updateIdentityMetadata({
+      recoveryPageShownTimestampMillis: nowInMillis,
+    });
     const doAdd = await addPhrase({ intent: "securityReminder" });
     if (doAdd !== "cancel") {
       doAdd satisfies "ok";

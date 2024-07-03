@@ -20,7 +20,6 @@ import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttach
 import {
   ApiError,
   AuthFail,
-  AuthenticatedConnection,
   BadChallenge,
   Connection,
   IIWebAuthnIdentity,
@@ -37,7 +36,7 @@ import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
 
 /** Registration (anchor creation) flow for new users */
-export const registerFlow = async <T>({
+export const registerFlow = async ({
   createChallenge: createChallenge_,
   register,
   storePinIdentity,
@@ -53,7 +52,7 @@ export const registerFlow = async <T>({
     credentialId?: CredentialId;
     challengeResult: { chars: string; challenge: Challenge };
   }) => Promise<
-    LoginSuccess<T> | BadChallenge | ApiError | AuthFail | RegisterNoSpace
+    LoginSuccess | BadChallenge | ApiError | AuthFail | RegisterNoSpace
   >;
   storePinIdentity: (opts: {
     userNumber: bigint;
@@ -63,7 +62,7 @@ export const registerFlow = async <T>({
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
 }): Promise<
-  | (LoginSuccess<T> & { authnMethod: "passkey" | "pin" })
+  | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | BadChallenge
   | ApiError
   | AuthFail
@@ -193,6 +192,13 @@ export const registerFlow = async <T>({
   result.kind satisfies "loginSuccess";
   const userNumber = result.userNumber;
   await finalizeIdentity?.(userNumber);
+  // We don't want to nudge the user with the recovery phrase warning page
+  // right after they've created their anchor.
+  // The metadata starts to fetch when the connection is created.
+  // But it might not have finished yet, so we `await` for `updateIdentityMetadata` to also wait for it.
+  await result.connection.updateIdentityMetadata({
+    recoveryPageShownTimestampMillis: Date.now(),
+  });
   await setAnchorUsed(userNumber);
   await displayUserNumber({
     userNumber,
@@ -202,9 +208,7 @@ export const registerFlow = async <T>({
   return { ...result, authnMethod };
 };
 
-export type RegisterFlowOpts<T = AuthenticatedConnection> = Parameters<
-  typeof registerFlow<T>
->[0];
+export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 
 export const getRegisterFlowOpts = ({
   connection,
