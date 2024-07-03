@@ -80,6 +80,7 @@ export const addPhrase = ({
   );
 };
 
+// TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
