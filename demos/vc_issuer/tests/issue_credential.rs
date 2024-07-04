@@ -380,7 +380,8 @@ fn should_set_derivation_origin() {
         canister_id,
         frontend_hostname.as_str(),
         derivation_origin,
-    ).expect("failed to set derivation_origin");
+    )
+    .expect("failed to set derivation_origin");
 
     let req = DerivationOriginRequest { frontend_hostname };
     let response = api::derivation_origin(&env, canister_id, &req)
