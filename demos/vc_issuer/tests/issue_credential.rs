@@ -6,9 +6,7 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
-use canister_tests::framework::{
-    env, get_wasm_path, principal_1, principal_2, test_principal, time, II_WASM,
-};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -113,10 +111,9 @@ mod api {
     pub fn configure(
         env: &StateMachine,
         canister_id: CanisterId,
-        sender: Principal,
         config: &IssuerInit,
     ) -> Result<(), CallError> {
-        call_candid_as(env, canister_id, sender, "configure", (config,))
+        call_candid(env, canister_id, "configure", (config,))
     }
 
     pub fn vc_consent_message(
@@ -138,17 +135,29 @@ mod api {
     pub fn derivation_origin(
         env: &StateMachine,
         canister_id: CanisterId,
-        sender: Principal,
         derivation_origin_req: &DerivationOriginRequest,
     ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
-        call_candid_as(
+        call_candid(
             env,
             canister_id,
-            sender,
             "derivation_origin",
             (derivation_origin_req,),
         )
         .map(|(x,)| x)
+    }
+
+    pub fn set_derivation_origin(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        frontend_hostname: &str,
+        derivation_origin: &str,
+    ) -> Result<(), CallError> {
+        call_candid(
+            env,
+            canister_id,
+            "set_derivation_origin",
+            (frontend_hostname, derivation_origin),
+        )
     }
 
     pub fn set_alternative_origins(
@@ -366,10 +375,39 @@ fn should_return_derivation_origin() {
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let frontend_hostname = format!("https://{}.icp0.io", canister_id.to_text());
     let req = DerivationOriginRequest { frontend_hostname };
-    let response = api::derivation_origin(&env, canister_id, principal_1(), &req)
+    let response = api::derivation_origin(&env, canister_id, &req)
         .expect("API call failed")
         .expect("derivation_origin error");
     assert_eq!(response.origin, req.frontend_hostname);
+}
+
+#[test]
+fn should_set_derivation_origin() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let req = DerivationOriginRequest {
+        frontend_hostname: "frontend_hostname.com".to_string(),
+    };
+
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    let default_derivation_origin = format!("https://{}.icp0.io", canister_id.to_text());
+    assert_eq!(response.origin, default_derivation_origin);
+
+    let derivation_origin = "https://derivation.origin";
+    api::set_derivation_origin(
+        &env,
+        canister_id,
+        "frontend_hostname.com".to_string().as_str(),
+        derivation_origin,
+    )
+    .expect("failed to set derivation_origin");
+
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    assert_eq!(response.origin, derivation_origin);
 }
 
 #[test]
@@ -385,7 +423,6 @@ fn should_return_derivation_origin_with_custom_init() {
     let response = api::derivation_origin(
         &env,
         issuer_id,
-        principal_1(),
         &DerivationOriginRequest {
             frontend_hostname: custom_init.frontend_hostname.clone(),
         },
@@ -730,19 +767,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 #[test]
 fn should_configure() {
     let env = env();
-    let controller = principal_1();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    api::configure(&env, issuer_id, controller, &DUMMY_ISSUER_INIT).expect("API call failed");
-}
-
-#[test]
-fn should_fail_configure_if_not_controller() {
-    let env = env();
-    let controller = principal_1();
-    let not_controller = principal_2();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    let result = api::configure(&env, issuer_id, not_controller, &DUMMY_ISSUER_INIT);
-    assert_matches!(result, Err(e) if format!("{:?}", e).contains("Only a controller can call configure"));
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
 }
 
 #[test]

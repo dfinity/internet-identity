@@ -77,7 +77,7 @@ fn config_memory() -> Memory {
 #[cfg(target_arch = "wasm32")]
 use ic_cdk::println;
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Deserialize, Clone)]
 struct IssuerConfig {
     /// Root of trust for checking canister signatures.
     ic_root_key_raw: Vec<u8>,
@@ -143,7 +143,7 @@ struct IssuerInit {
 #[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
     if let Some(init) = init_arg {
-        apply_config(init);
+        apply_config(IssuerConfig::from(init));
     };
 
     init_assets();
@@ -156,17 +156,21 @@ fn post_upgrade(init_arg: Option<IssuerInit>) {
 
 #[update]
 #[candid_method]
-fn configure(config: IssuerInit) {
-    if ic_cdk::api::is_controller(&caller()) {
-        apply_config(config);
-    } else {
-        panic!("Only a controller can call configure().");
-    }
+fn configure(init: IssuerInit) {
+    apply_config(IssuerConfig::from(init));
 }
 
-fn apply_config(init: IssuerInit) {
+#[update]
+fn set_derivation_origin(frontend_hostname: String, derivation_origin: String) {
+    let mut config: IssuerConfig = CONFIG.with_borrow(|config| config.get().clone());
+    config.derivation_origin = derivation_origin;
+    config.frontend_hostname = frontend_hostname;
+    apply_config(config);
+}
+
+fn apply_config(config: IssuerConfig) {
     CONFIG
-        .with_borrow_mut(|config_cell| config_cell.set(IssuerConfig::from(init)))
+        .with_borrow_mut(|config_cell| config_cell.set(config))
         .expect("failed to apply issuer config");
 }
 
