@@ -120,6 +120,8 @@ service: (opt IssuerConfig) -> {
 
     /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();
+    // Sets the content of the alternative origins file.
+    set_alternative_origins: (alternative_origins: text) -> ();
 
     /// API for obtaining information about users, for testing only.
     /// In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.

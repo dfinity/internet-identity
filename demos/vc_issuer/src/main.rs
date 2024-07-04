@@ -25,7 +25,7 @@ use vc_util::{
 };
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
-use asset_util::{collect_assets, CertifiedAssets};
+use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use ic_cdk::api;
 use ic_cdk_macros::post_upgrade;
 use lazy_static::lazy_static;
@@ -449,6 +449,21 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 
 fn static_headers() -> Vec<HeaderField> {
     vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
+}
+
+#[update]
+fn set_alternative_origins(alternative_origins: String) {
+    const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
+    ASSETS.with_borrow_mut(|assets| {
+        let asset = Asset {
+            url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
+            content: alternative_origins.as_bytes().to_vec(),
+            encoding: ContentEncoding::Identity,
+            content_type: ContentType::JSON,
+        };
+        assets.certify_asset(asset, &static_headers())
+    });
+    update_root_hash()
 }
 
 fn main() {}
