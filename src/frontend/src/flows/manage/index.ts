@@ -55,44 +55,37 @@ export const authnTemplateManage = ({
 }: {
   dapps: KnownDapp[];
 }): AuthnTemplates => {
-  const wrap = ({
-    title,
-    subtitle,
-    showDapps = false,
-  }: {
-    title: TemplateElement;
-    subtitle?: string;
-    showDapps?: boolean;
-  }): TemplateResult => html`
-    ${showDapps ? dappsHeader({ dapps, clickable: false }) : undefined}
-    <header class="l-stack">
-      <h1 class="t-title t-title--main">${title}</h1>
-      ${nonNullish(subtitle)
-        ? html` <p class="t-lead l-stack">${subtitle}</p>`
-        : undefined}
-    </header>
-  `;
+  const title = (title: string) =>
+    html`<h1 class="t-title t-title--main">${title}</h1>`;
+
+  const subtitle = (subtitle: string) =>
+    `<p class="t-lead l-stack">${subtitle}</p>`;
+
   return {
     firstTime: {
-      slot: wrap({
-        title: "Securely connect to dapps on the Internet Computer",
-        showDapps: true,
-      }),
+      slot: html`
+        ${dappsHeader({ dapps, clickable: false })}
+        <header>
+          ${title("Securely connect to dapps on the Internet Computer")}
+        </header>
+      `,
       useExistingText: "Use existing",
       createAnchorText: "Create Internet Identity",
     },
     useExisting: {
-      slot: wrap({
-        title: html`Enter Identity 🔑`,
-        subtitle: "to continue",
-      }),
+      slot: html`
+        <header class="l-stack">
+          ${title("Enter Identity 🔑")} ${subtitle("to continue")}
+        </header>
+      `,
     },
 
     pick: {
-      slot: wrap({
-        title: html`Choose Identity 🔑`,
-        subtitle: "to continue",
-      }),
+      slot: html`
+        <header>
+          ${title("Choose Identity 🔑")} ${subtitle("to continue")}
+        </header>
+      `,
     },
   };
 };

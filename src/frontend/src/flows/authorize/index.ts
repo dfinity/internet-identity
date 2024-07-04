@@ -97,7 +97,7 @@ export const authnTemplateAuthorize = ({
   const firstTimeUnknown = (action: "pick" | "use_existing" | "first_time") => {
     const altOrigin = isAltOriginOf(action);
     return html`
-      <div class="l-stack">
+      <div>
         ${h1(copy.first_time_create)}
         <p class="t-lead l-stack">${copy.first_time_unknown_subtitle}</p>
         ${nonNullish(altOrigin)
@@ -110,8 +110,11 @@ export const authnTemplateAuthorize = ({
   // Variation: the user has used II before
   const returning = (action: "pick" | "use_existing") => {
     const altOrigin = isAltOriginOf(action);
+    // The "use_existing" screen has a different layout (mainWindow) than the "pick" screen (landingPage).
+    // Ideally the outer space would be handled by the parent.
+    const className = action === "use_existing" ? "l-stack" : undefined;
     return html`
-      <div class="l-stack">
+      <div class="${className}">
         ${h1(html`${copy[`${action}_title_1`]}`)}
         <p class="t-lead l-stack">
           ${copy[`${action}_subtitle`]} ${copy[`${action}_subtitle_join`]}
