@@ -198,15 +198,15 @@
   --rc-line-interaction: var(--vc-brand-purple);
   --rc-line-inverted: var(--rc-dark);
 
+  --rc-button: var(--vc-brand-purple);
+  --rc-button-pair: var(--vc-brand-purple-light);
+
   --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--vc-brand-purple-light);
+  --rc-interaction-text: var(--rc-button);
   --rc-interactionHighlight-text: var(--vc-brand-purple-light);
   --rc-loading: var(--vc-brand-purple);
 
   --rc-marketing-icon: var(--vc-brand-purple);
-
-  --rc-button: var(--vc-brand-purple);
-  --rc-button-pair: var(--vc-brand-purple-light);
 
   --rc-button--disabled: var(--vc-shadow);
 
