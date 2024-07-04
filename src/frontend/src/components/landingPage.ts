@@ -33,7 +33,7 @@ export const landingPage = ({
     <section class="c-landingPage__left" aria-label="Action Pane">
       <div class="c-landingPage__left__content">
         <h1 class="t-title t-title--main">${copy.title}</h1>
-        <p class="t-paragraph">{${copy.subtitle}}</p>
+        <p class="t-paragraph">${copy.subtitle}</p>
       </div>
       <div class="c-landingPage__left__footer">
         ${navigationLink({

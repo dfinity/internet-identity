@@ -1064,7 +1064,7 @@ a:hover,
   gap: var(--rs-inline-grid-gap);
 }
 
-@media (max-width: 512px) {
+@media (max-width: 1024px) {
   .c-landingPage {
     display: block;
 
