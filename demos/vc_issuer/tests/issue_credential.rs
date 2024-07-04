@@ -750,8 +750,6 @@ fn should_set_alternative_origins() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let alternative_origins = r#"{"alternativeOrigins":["https://test.issuer"]}"#;
-    api::set_alternative_origins(&env, issuer_id, alternative_origins).expect("API call failed");
-
     let request = HttpRequest {
         method: "GET".to_string(),
         url: "/.well-known/ii-alternative-origins".to_string(),
@@ -759,6 +757,12 @@ fn should_set_alternative_origins() {
         body: ByteBuf::new(),
         certificate_version: Some(2),
     };
+
+    let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
+    assert_eq!(http_response.status_code, 404);
+
+    api::set_alternative_origins(&env, issuer_id, alternative_origins).expect("API call failed");
+
     let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
     assert_eq!(http_response.status_code, 200);
     assert_eq!(&http_response.body, alternative_origins.as_bytes())
