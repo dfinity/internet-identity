@@ -329,7 +329,12 @@
   --rs-split-page-padding--mobile: calc(var(--vs-stack) * 3);
   --rs-split-page-left-pane-padding: calc(var(--vs-gutter) * 8);
   --rs-split-page-right-pane-padding--desktop: 10vmax;
-  --rs-split-page-right-pane-padding--mobile: calc(var(--vs-stack) * 2);
+  --rs-split-page-right-pane-padding--mobile--vertical: calc(
+    var(--vs-stack) * 3
+  );
+  --rs-split-page-right-pane-padding--mobile--horizontal: calc(
+    var(--vs-stack) * 2
+  );
   --rs-split-page-stack: calc(var(--vs-stack) * 4);
 
   /* This is not used in CSS, but it's used to compensate for the logo size. */
@@ -975,11 +980,21 @@ a:hover,
  */
 
 .c-landingPage {
+  height: 100dvh;
+}
+
+.c-landingPage__container {
   display: grid;
   grid-template-columns: 1fr minmax(var(--rs-main-content-width), 1fr);
   grid-template-areas: "left right";
 
-  height: 100dvh;
+  height: 100%;
+}
+
+.c-landingPage__title {
+  font-size: calc(2.8rem + 1vw);
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .c-landingPage__logo {
@@ -1061,19 +1076,31 @@ a:hover,
 
 .c-landingPage__left__footer {
   display: flex;
-  gap: var(--rs-inline-grid-gap);
+  gap: var(--rs-list-bullet-space);
+}
+
+.c-landingPage__left__footer > a:hover {
+  color: var(--rc-light-transparent);
 }
 
 @media (max-width: 1024px) {
   .c-landingPage {
-    display: block;
-
-    padding: 0 var(--rs-split-page-padding--mobile);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 
     background: var(--rc-background--highlight);
 
     height: auto;
     min-height: 100vh;
+  }
+
+  .c-landingPage__container {
+    display: block;
+
+    padding: 0 var(--rs-split-page-padding--mobile);
+
+    max-width: var(--rs-main-content-width);
   }
 
   .c-landingPage__logo {
@@ -1111,7 +1138,8 @@ a:hover,
 
     background: var(--rc-light);
     border-radius: var(--rs-card-border-radius);
-    padding: var(--rs-split-page-right-pane-padding--mobile);
+    padding: var(--rs-split-page-right-pane-padding--mobile--vertical)
+      var(--rs-split-page-right-pane-padding--mobile--horizontal);
 
     overflow: auto;
   }
