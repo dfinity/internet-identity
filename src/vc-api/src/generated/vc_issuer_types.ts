@@ -88,6 +88,7 @@ export interface _SERVICE {
       { 'Err' : IssueCredentialError }
   >,
   'set_derivation_origin' : ActorMethod<[string, string], undefined>,
+  'set_alternative_origins' : ActorMethod<[string], undefined>,
   'vc_consent_message' : ActorMethod<
     [Icrc21VcConsentMessageRequest],
     { 'Ok' : Icrc21ConsentInfo } |

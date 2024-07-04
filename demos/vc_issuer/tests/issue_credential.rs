@@ -160,6 +160,19 @@ mod api {
         )
     }
 
+    pub fn set_alternative_origins(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        alternative_origins: &str,
+    ) -> Result<(), CallError> {
+        call_candid(
+            env,
+            canister_id,
+            "set_alternative_origins",
+            (alternative_origins,),
+        )
+    }
+
     pub fn add_employee(
         env: &StateMachine,
         canister_id: CanisterId,
@@ -756,6 +769,29 @@ fn should_configure() {
     let env = env();
     let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
     api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
+}
+
+#[test]
+fn should_set_alternative_origins() {
+    let env = env();
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let alternative_origins = r#"{"alternativeOrigins":["https://test.issuer"]}"#;
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/ii-alternative-origins".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+
+    let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
+    assert_eq!(http_response.status_code, 404);
+
+    api::set_alternative_origins(&env, issuer_id, alternative_origins).expect("API call failed");
+
+    let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
+    assert_eq!(http_response.status_code, 200);
+    assert_eq!(&http_response.body, alternative_origins.as_bytes())
 }
 
 /// Verifies that the expected assets is delivered and certified.
