@@ -107,8 +107,8 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'set_derivation_origin' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'set_alternative_origins' : IDL.Func([IDL.Text], [], []),
+    'set_derivation_origin' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'vc_consent_message' : IDL.Func(
         [Icrc21VcConsentMessageRequest],
         [IDL.Variant({ 'Ok' : Icrc21ConsentInfo, 'Err' : Icrc21Error })],

@@ -87,8 +87,8 @@ export interface _SERVICE {
     { 'Ok' : PreparedCredentialData } |
       { 'Err' : IssueCredentialError }
   >,
-  'set_derivation_origin' : ActorMethod<[string, string], undefined>,
   'set_alternative_origins' : ActorMethod<[string], undefined>,
+  'set_derivation_origin' : ActorMethod<[string, string], undefined>,
   'vc_consent_message' : ActorMethod<
     [Icrc21VcConsentMessageRequest],
     { 'Ok' : Icrc21ConsentInfo } |
