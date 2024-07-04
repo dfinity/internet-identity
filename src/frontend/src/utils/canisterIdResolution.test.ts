@@ -79,6 +79,25 @@ test("should not resolve canister id from malformed header", async () => {
   ).toEqual("not_found");
 });
 
+test("should resolve canister id from a custom domain that returns a response with status 500", async () => {
+  const fetchMock = vi.fn();
+  const canisterId = "bkyz2-fmaaa-aaaaa-qaaaq-cai";
+  fetchMock.mockReturnValueOnce(
+    new Response(null, {
+      status: 500,
+      // Boundary Node sets the header even on error
+      headers: [[HEADER_NAME, canisterId]],
+    })
+  );
+  global.fetch = fetchMock;
+
+  expect(
+    await resolveCanisterId({
+      origin: "https://example.com",
+    })
+  ).toEqual({ ok: Principal.fromText(canisterId) });
+});
+
 test("should not resolve canister id from malformed origin", async () => {
   expect(
     await resolveCanisterId({
