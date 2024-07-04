@@ -112,9 +112,9 @@ export const authnTemplateAuthorize = ({
     const altOrigin = isAltOriginOf(action);
     // The "use_existing" screen has a different layout (mainWindow) than the "pick" screen (landingPage).
     // Ideally the outer space would be handled by the parent.
-    const className = action === "use_existing" ? "l-stack" : undefined;
+    const classAttribute = action === "use_existing" ? 'class="l-stack"' : "";
     return html`
-      <div class="${className}">
+      <div ${classAttribute}>
         ${h1(html`${copy[`${action}_title_1`]}`)}
         <p class="t-lead l-stack">
           ${copy[`${action}_subtitle`]} ${copy[`${action}_subtitle_join`]}
