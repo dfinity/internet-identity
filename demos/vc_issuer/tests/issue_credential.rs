@@ -6,9 +6,7 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
-use canister_tests::framework::{
-    env, get_wasm_path, principal_1, principal_2, test_principal, time, II_WASM,
-};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -137,17 +135,29 @@ mod api {
     pub fn derivation_origin(
         env: &StateMachine,
         canister_id: CanisterId,
-        sender: Principal,
         derivation_origin_req: &DerivationOriginRequest,
     ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
-        call_candid_as(
+        call_candid(
             env,
             canister_id,
-            sender,
             "derivation_origin",
             (derivation_origin_req,),
         )
         .map(|(x,)| x)
+    }
+
+    pub fn set_derivation_origin(
+        env: &StateMachine,
+        canister_id: CanisterId,
+        frontend_hostname: &str,
+        derivation_origin: &str,
+    ) -> Result<(), CallError> {
+        call_candid(
+            env,
+            canister_id,
+            "set_derivation_origin",
+            (frontend_hostname, derivation_origin),
+        )
     }
 
     pub fn add_employee(
@@ -352,10 +362,31 @@ fn should_return_derivation_origin() {
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let frontend_hostname = format!("https://{}.icp0.io", canister_id.to_text());
     let req = DerivationOriginRequest { frontend_hostname };
-    let response = api::derivation_origin(&env, canister_id, principal_1(), &req)
+    let response = api::derivation_origin(&env, canister_id, &req)
         .expect("API call failed")
         .expect("derivation_origin error");
     assert_eq!(response.origin, req.frontend_hostname);
+}
+
+#[test]
+fn should_set_derivation_origin() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let frontend_hostname = "frontend_hostname.com".to_string();
+    let derivation_origin = "https://derivation.origin";
+
+    api::set_derivation_origin(
+        &env,
+        canister_id,
+        frontend_hostname.as_str(),
+        derivation_origin,
+    ).expect("failed to set derivation_origin");
+
+    let req = DerivationOriginRequest { frontend_hostname };
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    assert_eq!(response.origin, derivation_origin);
 }
 
 #[test]
@@ -371,7 +402,6 @@ fn should_return_derivation_origin_with_custom_init() {
     let response = api::derivation_origin(
         &env,
         issuer_id,
-        principal_1(),
         &DerivationOriginRequest {
             frontend_hostname: custom_init.frontend_hostname.clone(),
         },
