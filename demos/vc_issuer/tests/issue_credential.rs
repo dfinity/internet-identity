@@ -372,17 +372,25 @@ fn should_return_derivation_origin() {
 fn should_set_derivation_origin() {
     let env = env();
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
-    let frontend_hostname = "frontend_hostname.com".to_string();
-    let derivation_origin = "https://derivation.origin";
+    let req = DerivationOriginRequest {
+        frontend_hostname: "frontend_hostname.com".to_string(),
+    };
 
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    let default_derivation_origin = format!("https://{}.icp0.io", canister_id.to_text());
+    assert_eq!(response.origin, default_derivation_origin);
+
+    let derivation_origin = "https://derivation.origin";
     api::set_derivation_origin(
         &env,
         canister_id,
-        frontend_hostname.as_str(),
+        "frontend_hostname.com".to_string().as_str(),
         derivation_origin,
-    ).expect("failed to set derivation_origin");
+    )
+    .expect("failed to set derivation_origin");
 
-    let req = DerivationOriginRequest { frontend_hostname };
     let response = api::derivation_origin(&env, canister_id, &req)
         .expect("API call failed")
         .expect("derivation_origin error");
