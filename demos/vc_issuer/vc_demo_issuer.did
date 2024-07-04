@@ -120,6 +120,7 @@ service: (opt IssuerConfig) -> {
 
     /// Configure the issuer (e.g. set the root key), used for deployment/testing.
     configure: (IssuerConfig) -> ();
+    set_derivation_origin: (frontend_hostname: text, derivation_origin: text) -> ();
 
     /// API for obtaining information about users, for testing only.
     /// In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.

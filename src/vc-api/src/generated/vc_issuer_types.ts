@@ -55,7 +55,7 @@ export interface IssuedCredentialData { 'vc_jws' : string }
 export interface IssuerConfig {
   'derivation_origin' : string,
   'idp_canister_ids' : Array<Principal>,
-  'ic_root_key_der' : Uint8Array | number[],
+  'ic_root_key_der' : [] | [Uint8Array | number[]],
   'frontend_hostname' : string,
 }
 export interface PrepareCredentialRequest {
@@ -87,6 +87,7 @@ export interface _SERVICE {
     { 'Ok' : PreparedCredentialData } |
       { 'Err' : IssueCredentialError }
   >,
+  'set_derivation_origin' : ActorMethod<[string, string], undefined>,
   'vc_consent_message' : ActorMethod<
     [Icrc21VcConsentMessageRequest],
     { 'Ok' : Icrc21ConsentInfo } |
