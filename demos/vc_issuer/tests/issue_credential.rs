@@ -113,10 +113,9 @@ mod api {
     pub fn configure(
         env: &StateMachine,
         canister_id: CanisterId,
-        sender: Principal,
         config: &IssuerInit,
     ) -> Result<(), CallError> {
-        call_candid_as(env, canister_id, sender, "configure", (config,))
+        call_candid(env, canister_id, "configure", (config,))
     }
 
     pub fn vc_consent_message(
@@ -717,19 +716,8 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 #[test]
 fn should_configure() {
     let env = env();
-    let controller = principal_1();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    api::configure(&env, issuer_id, controller, &DUMMY_ISSUER_INIT).expect("API call failed");
-}
-
-#[test]
-fn should_fail_configure_if_not_controller() {
-    let env = env();
-    let controller = principal_1();
-    let not_controller = principal_2();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    let result = api::configure(&env, issuer_id, not_controller, &DUMMY_ISSUER_INIT);
-    assert_matches!(result, Err(e) if format!("{:?}", e).contains("Only a controller can call configure"));
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
 }
 
 /// Verifies that the expected assets is delivered and certified.
