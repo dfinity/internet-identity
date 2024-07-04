@@ -336,6 +336,7 @@
     var(--vs-stack) * 2
   );
   --rs-split-page-stack: calc(var(--vs-stack) * 4);
+  --rs-split-page-stack--large: calc(var(--vs-stack) * 6);
 
   /* This is not used in CSS, but it's used to compensate for the logo size. */
   --rs-logo-height: 3rem;
@@ -1124,7 +1125,7 @@ a:hover,
     margin-top: var(--rs-split-page-stack);
     padding-bottom: var(--rs-split-page-stack);
 
-    gap: var(--rs-split-page-stack);
+    gap: var(--rs-split-page-stack--large);
   }
 
   .c-landingPage__left__content {
