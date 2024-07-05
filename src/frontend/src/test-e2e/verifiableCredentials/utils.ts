@@ -20,7 +20,7 @@ import { II_URL, ISSUER_APP_URL, REPLICA_URL } from "$src/test-e2e/constants";
 
 import { idlFactory as vc_issuer_idl } from "$generated/vc_issuer_idl";
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { _SERVICE } from "@dfinity/internet-identity-vc-api";
 import { nonNullish } from "@dfinity/utils";
 
@@ -64,13 +64,11 @@ export const registerWithIssuer = async ({
   browser,
   issuer,
   derivationOrigin,
-  principal: principal_,
   authConfig,
 }: {
   browser: WebdriverIO.Browser;
   issuer: string;
   derivationOrigin?: string;
-  principal?: string;
   authConfig: AuthConfig;
 }): Promise<{ msg: string; principal: string }> => {
   const issuerAppView = new IssuerAppView(browser);
@@ -79,14 +77,6 @@ export const registerWithIssuer = async ({
     iiUrl: II_URL,
   });
   await issuerAppView.waitForDisplay();
-
-  if (nonNullish(principal_)) {
-    const principal = principal_;
-    await issuerAppView.setPrincipal({ principal });
-    const msg = await issuerAppView.addEmployee();
-    return { principal, msg };
-  }
-
   expect(await issuerAppView.isAuthenticated()).toBe(false);
 
   const principal = await authenticateWithIssuer_({
@@ -303,12 +293,7 @@ export const setIssuerDerivationOrigin = async ({
   frontendHostname: string;
   derivationOrigin: string;
 }): Promise<void> => {
-  const agent = new HttpAgent({ host: REPLICA_URL });
-  await agent.fetchRootKey();
-  const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
-    agent: agent,
-    canisterId: issuerCanisterId,
-  });
+  const actor = await createIssuerActor(issuerCanisterId);
   await actor.set_derivation_origin(frontendHostname, derivationOrigin);
 };
 
@@ -319,12 +304,7 @@ export const setIssuerAlternativeOrigins = async ({
   issuerCanisterId: string;
   alternativeOrigins: string;
 }): Promise<void> => {
-  const agent = new HttpAgent({ host: REPLICA_URL });
-  await agent.fetchRootKey();
-  const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
-    agent: agent,
-    canisterId: issuerCanisterId,
-  });
+  const actor = await createIssuerActor(issuerCanisterId);
   await actor.set_alternative_origins(alternativeOrigins);
 };
 
@@ -333,12 +313,18 @@ export const resetIssuerOriginsConfig = async ({
 }: {
   issuerCanisterId: string;
 }): Promise<void> => {
+  const actor = await createIssuerActor(issuerCanisterId);
+  await actor.set_derivation_origin(ISSUER_APP_URL, ISSUER_APP_URL);
+  await actor.set_alternative_origins('{"alternativeOrigins":[]}');
+};
+
+const createIssuerActor = async (
+  issuerCanisterId: string
+): Promise<ActorSubclass<_SERVICE>> => {
   const agent = new HttpAgent({ host: REPLICA_URL });
   await agent.fetchRootKey();
-  const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
+  return Actor.createActor<_SERVICE>(vc_issuer_idl, {
     agent: agent,
     canisterId: issuerCanisterId,
   });
-  await actor.set_derivation_origin(ISSUER_APP_URL, ISSUER_APP_URL);
-  await actor.set_alternative_origins('{"alternativeOrigins":[]}');
 };
