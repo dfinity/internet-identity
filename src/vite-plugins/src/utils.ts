@@ -94,7 +94,7 @@ export const forwardToReplica = async ({
   }
 
   // Add a 'x-ic-canister-id' header like the BNs do
-  res.setHeader("x-ic-canister-id", canisterId);
+  // res.setHeader("x-ic-canister-id", canisterId);
 
   // Ensure the browser accepts the response
   res.setHeader("access-control-allow-origin", "*");
