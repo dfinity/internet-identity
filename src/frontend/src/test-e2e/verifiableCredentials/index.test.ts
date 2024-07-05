@@ -16,8 +16,13 @@ import {
   getVCPresentation,
   register,
   registerWithIssuer,
+  resetIssuerOriginsConfig,
   setIssuerDerivationOrigin,
 } from "./utils";
+
+beforeEach(async () => {
+  await resetIssuerOriginsConfig({ issuerCanisterId: ISSUER_CANISTER_ID });
+});
 
 test("Can add employee on issuer app", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
