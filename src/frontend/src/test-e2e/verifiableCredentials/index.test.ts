@@ -4,10 +4,10 @@ import {
   APPLE_USER_AGENT,
   II_URL,
   ISSUER_APP_URL,
-  ISSUER_APP_URL_LEGACY,
+  ISSUER_APP_URL_LEGACY, ISSUER_CUSTOM_ORIGIN_NICE_URL,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
-  TEST_APP_CANONICAL_URL_LEGACY,
+  TEST_APP_CANONICAL_URL_LEGACY
 } from "$src/test-e2e/constants";
 import { DemoAppView } from "$src/test-e2e/views";
 
@@ -49,6 +49,11 @@ const testConfigs: Array<{
   {
     relyingParty: TEST_APP_CANONICAL_URL,
     issuer: ISSUER_APP_URL_LEGACY,
+    authType: "webauthn",
+  },
+  {
+    relyingParty: TEST_APP_CANONICAL_URL,
+    issuer: ISSUER_CUSTOM_ORIGIN_NICE_URL,
     authType: "webauthn",
   },
   {
