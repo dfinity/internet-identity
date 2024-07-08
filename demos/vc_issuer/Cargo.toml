@@ -30,10 +30,11 @@ strfmt = "0.2"
 lazy_static = "1.4"
 include_dir = "0.7"
 
+
 [dev-dependencies]
 assert_matches = "1.5.0"
 candid_parser = "0.1"
 ic-http-certification = "2.2"
-ic-test-state-machine-client = "3"
+pocket-ic = "4.0"
 ic-response-verification = "2.2"
 canister_tests = { path = "../../src/canister_tests" }

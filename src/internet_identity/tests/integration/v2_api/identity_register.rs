@@ -7,10 +7,10 @@ use canister_tests::framework::{
     arg_with_anchor_range, env, expect_user_error_with_message, install_ii_canister,
     install_ii_canister_with_arg, II_WASM,
 };
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
     ChallengeAttempt, IdentityRegisterError, MetadataEntryV2,
 };
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::Duration;

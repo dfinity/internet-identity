@@ -1,12 +1,12 @@
 use canister_tests::api::archive as api;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 /// Verifies that the canister can be installed successfully.
 #[test]
@@ -469,7 +469,7 @@ mod read_tests {
             error_buffer_limit: 1,
         })
         .unwrap();
-        let canister_id = env.create_canister(None);
+        let canister_id = env.create_canister();
         env.install_canister(canister_id, ARCHIVE_WASM.clone(), config, None);
 
         // 257 entries because we need the index to not fit in a single byte
@@ -536,11 +536,8 @@ mod metrics_tests {
         for metric in metrics {
             let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
             assert_eq!(
-                env.time()
-                    .duration_since(metric_timestamp)
-                    .unwrap()
-                    .as_secs(),
-                0,
+                metric_timestamp,
+                Duration::from_nanos(time(&env)).as_millis() as u64,
                 "metric timestamp did not match state machine time"
             )
         }
@@ -556,24 +553,16 @@ mod metrics_tests {
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_last_upgrade_timestamp_seconds",
-            env.time()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs_f64(),
+            Duration::from_nanos(time(&env)).as_secs() as f64,
         );
-        println!("{}", get_metrics(&env, canister_id));
 
         env.advance_time(Duration::from_secs(300));
         upgrade_archive_canister(&env, canister_id, ARCHIVE_WASM.clone());
 
-        println!("{}", get_metrics(&env, canister_id));
         assert_metric(
             &get_metrics(&env, canister_id),
             "ii_archive_last_upgrade_timestamp_seconds",
-            env.time()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs_f64(),
+            Duration::from_nanos(time(&env)).as_secs() as f64,
         );
         Ok(())
     }

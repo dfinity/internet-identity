@@ -7,10 +7,10 @@ use canister_tests::framework::{
     upgrade_ii_canister, EMPTY_WASM, II_WASM, II_WASM_PRE_STATS,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, IdentityNumber, MetadataEntryV2,
 };
+use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -214,7 +214,7 @@ fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
 #[test]
 fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
     const II_ORIGIN: &str = "ic0.app";
-    fn assert_expected_state(env: &StateMachine, canister_id: CanisterId) -> Result<(), CallError> {
+    fn assert_expected_state(env: &PocketIc, canister_id: CanisterId) -> Result<(), CallError> {
         let aggregations = api::stats(env, canister_id)?.event_aggregations;
         assert_expected_aggregation(
             &aggregations,
@@ -345,7 +345,7 @@ fn assert_expected_aggregation(
     );
 }
 
-fn create_identity(env: &StateMachine, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {
+fn create_identity(env: &PocketIc, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
@@ -361,7 +361,7 @@ fn aggregation_key(aggregation: &str, window: &str, ii_domain: &str) -> String {
 }
 
 fn delegation_for_origin(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     identity_nr: IdentityNumber,
     frontend_hostname: &str,
