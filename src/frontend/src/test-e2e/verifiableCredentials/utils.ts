@@ -16,21 +16,59 @@ import {
   VcTestAppView,
 } from "$src/test-e2e/views";
 
-import { II_URL } from "$src/test-e2e/constants";
+import { II_URL, ISSUER_APP_URL, REPLICA_URL } from "$src/test-e2e/constants";
 
+import { idlFactory as vc_issuer_idl } from "$generated/vc_issuer_idl";
 import { KnownDapp } from "$src/flows/dappsExplorer/dapps";
+import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
+import { _SERVICE } from "@dfinity/internet-identity-vc-api";
 import { nonNullish } from "@dfinity/utils";
+
+/**
+ * Authenticate with the issuer app and return the principal. Do _not_ register as an employee.
+ * @param browser The browser to use
+ * @param issuer The issuer app URL
+ * @param derivationOrigin The derivation origin to be used for the authentication process, if any.
+ * @param authConfig The authentication configuration for II (i.e. how to complete the auth process on II)
+ */
+export const authenticateWithIssuer = async ({
+  browser,
+  issuer,
+  derivationOrigin,
+  authConfig,
+}: {
+  browser: WebdriverIO.Browser;
+  issuer: string;
+  derivationOrigin?: string;
+  authConfig: AuthConfig;
+}): Promise<{ principal: string }> => {
+  const issuerAppView = new IssuerAppView(browser);
+  await issuerAppView.open({
+    issuerAppUrl: issuer,
+    iiUrl: II_URL,
+  });
+  await issuerAppView.waitForDisplay();
+  expect(await issuerAppView.isAuthenticated()).toBe(false);
+  const principal = await authenticateWithIssuer_({
+    browser,
+    issuerAppView,
+    derivationOrigin,
+    authConfig,
+  });
+
+  return { principal };
+};
 
 // Open the issuer demo, authenticate and register as an employee
 export const registerWithIssuer = async ({
   browser,
   issuer,
-  principal: principal_,
-  authConfig: { setupAuth, finalizeAuth, userNumber },
+  derivationOrigin,
+  authConfig,
 }: {
   browser: WebdriverIO.Browser;
   issuer: string;
-  principal?: string;
+  derivationOrigin?: string;
   authConfig: AuthConfig;
 }): Promise<{ msg: string; principal: string }> => {
   const issuerAppView = new IssuerAppView(browser);
@@ -39,16 +77,32 @@ export const registerWithIssuer = async ({
     iiUrl: II_URL,
   });
   await issuerAppView.waitForDisplay();
-
-  if (nonNullish(principal_)) {
-    const principal = principal_;
-    await issuerAppView.setPrincipal({ principal });
-    const msg = await issuerAppView.addEmployee();
-    return { principal, msg };
-  }
-
   expect(await issuerAppView.isAuthenticated()).toBe(false);
 
+  const principal = await authenticateWithIssuer_({
+    browser,
+    issuerAppView,
+    derivationOrigin,
+    authConfig,
+  });
+  const msg = await issuerAppView.addEmployee();
+  return { principal, msg };
+};
+
+const authenticateWithIssuer_ = async ({
+  browser,
+  issuerAppView,
+  derivationOrigin,
+  authConfig: { setupAuth, finalizeAuth, userNumber },
+}: {
+  browser: WebdriverIO.Browser;
+  issuerAppView: IssuerAppView;
+  derivationOrigin?: string;
+  authConfig: AuthConfig;
+}): Promise<string> => {
+  if (nonNullish(derivationOrigin)) {
+    await issuerAppView.setDerivationOrigin({ derivationOrigin });
+  }
   await issuerAppView.authenticate();
 
   await setupAuth(browser);
@@ -59,11 +113,7 @@ export const registerWithIssuer = async ({
 
   await finalizeAuth(browser);
   await waitToClose(browser);
-
-  const principal = await issuerAppView.waitForAuthenticated();
-  const msg = await issuerAppView.addEmployee();
-
-  return { principal, msg };
+  return issuerAppView.waitForAuthenticated();
 };
 
 // Open the specified test app on the URL `relyingParty` and authenticate
@@ -232,4 +282,49 @@ export const register: Record<
       },
     };
   },
+};
+
+export const setIssuerDerivationOrigin = async ({
+  issuerCanisterId,
+  frontendHostname,
+  derivationOrigin,
+}: {
+  issuerCanisterId: string;
+  frontendHostname: string;
+  derivationOrigin: string;
+}): Promise<void> => {
+  const actor = await createIssuerActor(issuerCanisterId);
+  await actor.set_derivation_origin(frontendHostname, derivationOrigin);
+};
+
+export const setIssuerAlternativeOrigins = async ({
+  issuerCanisterId,
+  alternativeOrigins,
+}: {
+  issuerCanisterId: string;
+  alternativeOrigins: string;
+}): Promise<void> => {
+  const actor = await createIssuerActor(issuerCanisterId);
+  await actor.set_alternative_origins(alternativeOrigins);
+};
+
+export const resetIssuerOriginsConfig = async ({
+  issuerCanisterId,
+}: {
+  issuerCanisterId: string;
+}): Promise<void> => {
+  const actor = await createIssuerActor(issuerCanisterId);
+  await actor.set_derivation_origin(ISSUER_APP_URL, ISSUER_APP_URL);
+  await actor.set_alternative_origins('{"alternativeOrigins":[]}');
+};
+
+const createIssuerActor = async (
+  issuerCanisterId: string
+): Promise<ActorSubclass<_SERVICE>> => {
+  const agent = new HttpAgent({ host: REPLICA_URL });
+  await agent.fetchRootKey();
+  return Actor.createActor<_SERVICE>(vc_issuer_idl, {
+    agent: agent,
+    canisterId: issuerCanisterId,
+  });
 };

@@ -5,18 +5,24 @@ import {
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
+  ISSUER_CANISTER_ID,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
 } from "$src/test-e2e/constants";
-import { DemoAppView } from "$src/test-e2e/views";
 
 import {
   authenticateToRelyingParty,
   getVCPresentation,
   register,
   registerWithIssuer,
+  resetIssuerOriginsConfig,
+  setIssuerDerivationOrigin,
 } from "./utils";
+
+beforeEach(async () => {
+  await resetIssuerOriginsConfig({ issuerCanisterId: ISSUER_CANISTER_ID });
+});
 
 test("Can add employee on issuer app", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -35,7 +41,7 @@ test("Can add employee on issuer app", async () => {
 
 const getDomain = (url: string) => url.split(".").slice(1).join(".");
 
-// The different test configs (different URLs, differnet auth methods)
+// The different test configs (different URLs, different auth methods)
 const testConfigs: Array<{
   relyingParty: string;
   issuer: string;
@@ -68,45 +74,29 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
     async () => {
       await runInBrowser(
         async (browser: WebdriverIO.Browser) => {
-          await browser.url(II_URL);
+          await setIssuerDerivationOrigin({
+            issuerCanisterId: ISSUER_CANISTER_ID,
+            derivationOrigin: issuer,
+            frontendHostname: issuer,
+          });
 
+          await browser.url(II_URL);
           const authConfig = await register[authType](browser);
 
-          // Auth to RP
-
-          let vcTestApp = await authenticateToRelyingParty({
-            browser,
-            issuer,
-            authConfig,
-            relyingParty,
-          });
-          const principalRP = await vcTestApp.getPrincipal();
-
           // Add employee
+          await registerWithIssuer({
+            browser,
+            issuer: ISSUER_APP_URL,
+            authConfig,
+          });
 
-          const { msg: _msg, principal: _principal } = await registerWithIssuer(
-            {
-              browser,
-              issuer,
-              authConfig,
-              principal: principalRP /* issuer uses test app as origin */,
-            }
-          );
-
-          // Get VC presentation
-
-          vcTestApp = await authenticateToRelyingParty({
+          const vcTestApp = await authenticateToRelyingParty({
             browser,
             issuer,
             authConfig,
             relyingParty,
           });
 
-          const demoAppView = new DemoAppView(browser);
-          await demoAppView.updateAlternativeOrigins(
-            `{"alternativeOrigins":["${issuer}"]}`,
-            "certified"
-          );
           const { alias } = await getVCPresentation({
             vcTestApp,
             browser,
@@ -117,6 +107,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
           });
 
           // Perform a basic check on the alias
+          const principalRP = await vcTestApp.getPrincipal();
           const aliasObj = JSON.parse(alias);
           expect(aliasObj.sub).toBe(`did:icp:${principalRP}`);
         },
