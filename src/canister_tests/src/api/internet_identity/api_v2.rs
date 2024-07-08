@@ -1,20 +1,26 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{
-    call_candid, call_candid_as, query_candid, CallError, StateMachine,
-};
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::common::rest::RawEffectivePrincipal;
+use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
 use std::collections::HashMap;
 
 pub fn captcha_create(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
 ) -> Result<Result<Challenge, ()>, CallError> {
-    call_candid(env, canister_id, "captcha_create", ()).map(|(x,)| x)
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "captcha_create",
+        (),
+    )
+    .map(|(x,)| x)
 }
 
 pub fn identity_register(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     authn_method: &AuthnMethodData,
@@ -24,6 +30,7 @@ pub fn identity_register(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "identity_register",
         (authn_method, challenge_attempt, temp_key),
@@ -32,7 +39,7 @@ pub fn identity_register(
 }
 
 pub fn identity_authn_info(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     identity_number: IdentityNumber,
 ) -> Result<Result<IdentityAuthnInfo, ()>, CallError> {
@@ -40,7 +47,7 @@ pub fn identity_authn_info(
 }
 
 pub fn identity_info(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -48,6 +55,7 @@ pub fn identity_info(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "identity_info",
         (identity_number,),
@@ -56,7 +64,7 @@ pub fn identity_info(
 }
 
 pub fn identity_metadata_replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -65,6 +73,7 @@ pub fn identity_metadata_replace(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "identity_metadata_replace",
         (identity_number, metadata),
@@ -73,7 +82,7 @@ pub fn identity_metadata_replace(
 }
 
 pub fn authn_method_add(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -82,6 +91,7 @@ pub fn authn_method_add(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_add",
         (identity_number, authn_method),
@@ -90,7 +100,7 @@ pub fn authn_method_add(
 }
 
 pub fn authn_method_replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -100,6 +110,7 @@ pub fn authn_method_replace(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_replace",
         (identity_number, public_key, authn_method),
@@ -108,7 +119,7 @@ pub fn authn_method_replace(
 }
 
 pub fn authn_method_metadata_replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -118,6 +129,7 @@ pub fn authn_method_metadata_replace(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_metadata_replace",
         (identity_number, public_key, metadata),
@@ -126,7 +138,7 @@ pub fn authn_method_metadata_replace(
 }
 
 pub fn authn_method_security_settings_replace(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -136,6 +148,7 @@ pub fn authn_method_security_settings_replace(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_security_settings_replace",
         (identity_number, public_key, security_settings),
@@ -144,7 +157,7 @@ pub fn authn_method_security_settings_replace(
 }
 
 pub fn authn_method_remove(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -153,6 +166,7 @@ pub fn authn_method_remove(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_remove",
         (identity_number, public_key),
@@ -161,7 +175,7 @@ pub fn authn_method_remove(
 }
 
 pub fn authn_method_registration_mode_enter(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -169,6 +183,7 @@ pub fn authn_method_registration_mode_enter(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_registration_mode_enter",
         (identity_number,),
@@ -177,7 +192,7 @@ pub fn authn_method_registration_mode_enter(
 }
 
 pub fn authn_method_registration_mode_exit(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -185,6 +200,7 @@ pub fn authn_method_registration_mode_exit(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_registration_mode_exit",
         (identity_number,),
@@ -193,7 +209,7 @@ pub fn authn_method_registration_mode_exit(
 }
 
 pub fn authn_method_register(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     identity_number: IdentityNumber,
     authn_method: &AuthnMethodData,
@@ -201,6 +217,7 @@ pub fn authn_method_register(
     call_candid(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         "authn_method_register",
         (identity_number, authn_method),
     )
@@ -208,7 +225,7 @@ pub fn authn_method_register(
 }
 
 pub fn authn_method_confirm(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
@@ -217,6 +234,7 @@ pub fn authn_method_confirm(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "authn_method_confirm",
         (identity_number, confirmation_code),

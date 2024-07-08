@@ -7,7 +7,6 @@ edition = "2021"
 base64.workspace = true
 flate2 = "1.0"
 hex.workspace = true
-ic-test-state-machine-client.workspace = true
 lazy_static.workspace = true
 regex.workspace = true
 serde.workspace = true
@@ -23,3 +22,5 @@ identity_jose = { git = "https://github.com/dfinity/identity.rs.git",  rev = "aa
 candid.workspace = true
 ic-cdk.workspace = true
 ic-representation-independent-hash.workspace = true
+pocket-ic.workspace = true
+url = "2.5.0"

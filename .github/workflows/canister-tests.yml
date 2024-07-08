@@ -246,16 +246,8 @@ jobs:
           name: internet_identity_test.wasm.gz
           path: .
       - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
-      - name: Download ic-test-state-machine binary
-        run: |
-          uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
-          echo "uname_sys: $uname_sys"
-          commit_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
-          echo "commit sha: $commit_sha"
-          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
-          gzip -d ic-test-state-machine.gz
-          chmod a+x ic-test-state-machine
-          ./ic-test-state-machine --version
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+      - run: dfx start --background --pocketic --clean
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
         run: |
@@ -264,6 +256,7 @@ jobs:
           touch dist/index.{html,css,js}
           touch dist/index2.js
           cargo test
+      - run: dfx stop
 
   ###########################
   # The Rust canister tests #
@@ -359,16 +352,8 @@ jobs:
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
-      - name: Download ic-test-state-machine binary
-        run: |
-          uname_sys=$(uname -s | tr '[:upper:]' '[:lower:]')
-          echo "uname_sys: $uname_sys"
-          commit_sha=$(sed <.ic-commit 's/#.*$//' | sed '/^$/d')
-          echo "commit sha: $commit_sha"
-          curl -sLO "https://download.dfinity.systems/ic/$commit_sha/binaries/x86_64-$uname_sys/ic-test-state-machine.gz"
-          gzip -d ic-test-state-machine.gz
-          chmod a+x ic-test-state-machine
-          ./ic-test-state-machine --version
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+      - run: dfx start --background --pocketic --clean
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v4
@@ -398,6 +383,8 @@ jobs:
           ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
+
+      - run: dfx stop
 
   ######################
   # The end-to-end tests #

@@ -4,17 +4,16 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
+    env, expect_user_error_with_message, install_ii_canister, time, II_WASM,
 };
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
     AuthnMethodRegistration,
 };
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
-use std::ops::Add;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 #[test]
 fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
@@ -33,11 +32,7 @@ fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
 
     assert_eq!(
         result.expiration,
-        env.time()
-            .add(Duration::from_secs(900)) // 900 seconds -> 15 min
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        time(&env) + Duration::from_secs(900).as_nanos() as u64 // 900 seconds -> 15 min
     );
     Ok(())
 }

@@ -4,13 +4,12 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::GetDelegationResponse;
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
-use std::ops::Add;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 /// Verifies that valid delegations are issued.
 #[test]
@@ -32,11 +31,7 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
     )?;
     assert_eq!(
         expiration,
-        env.time()
-            .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
     let signed_delegation = match api::get_delegation(
@@ -52,7 +47,12 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(
+        &env,
+        canister_sig_key,
+        &signed_delegation,
+        &env.root_key().unwrap(),
+    );
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -78,11 +78,7 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
     )?;
     assert_eq!(
         expiration,
-        env.time()
-            .add(Duration::from_secs(60 * 60)) // 1 hour
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        time(&env) + Duration::from_secs(60 * 60).as_nanos() as u64
     );
 
     let signed_delegation = match api::get_delegation(
@@ -98,7 +94,12 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(
+        &env,
+        canister_sig_key,
+        &signed_delegation,
+        &env.root_key().unwrap(),
+    );
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -122,13 +123,10 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         &pub_session_key,
         Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64), // 31 days
     )?;
+    let month_seconds = 30 * 24 * 60 * 60; // 30 days
     assert_eq!(
         expiration,
-        env.time()
-            .add(Duration::from_secs(30 * 24 * 60 * 60)) // 30 days
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        time(&env) + Duration::from_secs(month_seconds).as_nanos() as u64
     );
 
     let signed_delegation = match api::get_delegation(
@@ -144,7 +142,12 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(
+        &env,
+        canister_sig_key,
+        &signed_delegation,
+        &env.root_key().unwrap(),
+    );
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())
@@ -154,7 +157,7 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
 #[test]
 fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
     let env = env();
-    let root_key = env.root_key();
+    let root_key = env.root_key().unwrap();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com";
@@ -203,11 +206,7 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 
                 assert_eq!(
                     expiration,
-                    env.time()
-                        .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_nanos() as u64
+                    time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
                 );
                 (session_key, frontend_hostname, canister_sig_key, expiration)
             });
@@ -256,11 +255,7 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
     )?;
     assert_eq!(
         expiration,
-        env.time()
-            .add(Duration::from_secs(30 * 60)) // default expiration: 30 minutes
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
     let signed_delegation = match api::get_delegation(
@@ -276,7 +271,12 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
         GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
     };
 
-    verify_delegation(&env, canister_sig_key, &signed_delegation, &env.root_key());
+    verify_delegation(
+        &env,
+        canister_sig_key,
+        &signed_delegation,
+        &env.root_key().unwrap(),
+    );
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
     Ok(())

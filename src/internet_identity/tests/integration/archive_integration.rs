@@ -1,23 +1,23 @@
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
+use candid::Principal;
 use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::{CallError, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
-use std::time::SystemTime;
 
-fn setup_ii(env: &StateMachine, arg: Option<InternetIdentityInit>) -> CanisterId {
+fn setup_ii(env: &PocketIc, arg: Option<InternetIdentityInit>) -> CanisterId {
     let ii_canister = install_ii_canister_with_arg(env, II_WASM.clone(), arg);
     assert_eq!(
         ii_api::stats(env, ii_canister)
@@ -218,8 +218,13 @@ mod pull_entries_tests {
     fn should_restore_archive_buffer_from_stable_memory_backup() -> Result<(), CallError> {
         let env = env();
         let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
-        // re-create the archive canister with the new II to match the restored backup
-        env.create_canister(Some(ii_canister));
+        // re-create the archive canister with II as the controller and the canister id matching the restored backup
+        env.create_canister_with_id(
+            Some(ii_canister),
+            None,
+            Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap(),
+        )
+        .expect("failed to create archive canister");
 
         // restore stable memory backup with buffered entries in persistent state
         restore_compressed_stable_memory(
@@ -248,6 +253,8 @@ mod pull_entries_tests {
         // have the archive fetch the (restored) buffered entries
         env.advance_time(Duration::from_secs(2));
         // execute the timer
+        env.tick();
+        // progress after the inter-canister call
         env.tick();
 
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
@@ -371,11 +378,7 @@ mod pull_entries_tests {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "key";
-        let timestamp = env
-            .time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let timestamp = time(&env);
 
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
         assert!(env.canister_exists(archive_canister));
@@ -476,11 +479,7 @@ mod pull_entries_tests {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "some-metadata-key";
-        let timestamp = env
-            .time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let timestamp = time(&env);
 
         let device = DeviceData::auth_test_device();
         let anchor = flows::register_anchor_with_device(&env, ii_canister, &device);
@@ -596,6 +595,8 @@ mod pull_entries_tests {
         env.advance_time(Duration::from_secs(2));
         // execute the timer
         env.tick();
+        // resume after inter-canister call
+        env.tick();
 
         let status = archive_api::status(&env, archive_canister)?;
         assert!(status.call_info.call_errors.is_empty());
@@ -611,10 +612,7 @@ mod pull_entries_tests {
         assert_metric(
             &get_metrics(&env, archive_canister),
             "ii_archive_last_successful_fetch_timestamp_seconds",
-            env.time()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs_f64(),
+            Duration::from_nanos(time(&env)).as_secs() as f64,
         );
         assert_metric(
             &get_metrics(&env, archive_canister),

@@ -4,9 +4,10 @@
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::common::rest::BlobCompression::NoCompression;
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
@@ -70,7 +71,12 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
     let principal = Principal::self_authenticating(hex::decode(PUBLIC_KEY).unwrap());
 
     let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
+    // the principal is dependent on the canister id, hence we need to create the canister with a
+    // specific one.
+    let canister_id = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
+    env.create_canister_with_id(None, None, canister_id)
+        .expect("failed to create canister");
+    env.install_canister(canister_id, EMPTY_WASM.clone(), vec![], None);
 
     restore_compressed_stable_memory(
         &env,
@@ -287,7 +293,7 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
 
     let stable_memory_backup =
         std::fs::read(PathBuf::from("stable_memory/genesis-memory-layout.bin")).unwrap();
-    env.set_stable_memory(canister_id, ByteBuf::from(stable_memory_backup));
+    env.set_stable_memory(canister_id, stable_memory_backup, NoCompression);
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
     assert!(result.is_err());
     let err = result.err().unwrap();

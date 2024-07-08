@@ -4,10 +4,10 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_canister, II_WASM};
-use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
     IdentityMetadataReplaceError, MetadataEntryV2,
 };
+use pocket_ic::CallError;
 use std::collections::HashMap;
 
 #[test]

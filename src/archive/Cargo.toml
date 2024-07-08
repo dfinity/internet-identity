@@ -24,5 +24,5 @@ serde_bytes.workspace = true
 candid_parser.workspace = true
 canister_tests.workspace = true
 hex.workspace = true
-ic-test-state-machine-client.workspace = true
+pocket-ic.workspace = true
 regex.workspace = true

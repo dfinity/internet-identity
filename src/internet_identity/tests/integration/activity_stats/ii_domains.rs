@@ -2,7 +2,7 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
+use pocket_ic::CallError;
 use std::time::Duration;
 
 const DAY_SECONDS: u64 = 24 * 60 * 60;
