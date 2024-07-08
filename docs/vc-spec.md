@@ -320,7 +320,6 @@ After receiving the notification that II is ready, the relying party can request
   "method": "request_credential",
   "params": {
     "issuer": {
-        "type": "IC",
         "origin": "https://kyc-resident-info.org",
         "canisterId": "rwlgt-iiaaa-aaaaa-aaaaa-cai"
     },
