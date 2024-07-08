@@ -34,6 +34,6 @@ include_dir = "0.7"
 assert_matches = "1.5.0"
 candid_parser = "0.1"
 ic-http-certification = "2.2"
-pocket-ic = "3.1"
+pocket-ic = { git = "https://github.com/dfinity/ic", rev="2e7cce7dcb91dd33aac6f66090c9d4f2a79e795f" }
 ic-response-verification = "2.2"
 canister_tests = { path = "../../src/canister_tests" }

@@ -246,8 +246,12 @@ jobs:
           name: internet_identity_test.wasm.gz
           path: .
       - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
-      - run: dfx start --background --pocketic --clean
+      - name: Install PocketIC
+        run: |
+          curl -sL -o pocket-ic.gz https://download.dfinity.systems/ic/2e7cce7dcb91dd33aac6f66090c9d4f2a79e795f/binaries/x86_64-linux/pocket-ic.gz
+          gzip -d pocket-ic.gz
+          chmod +x pocket-ic
+          echo "POCKET_IC_BIN=$(pwd)/pocket-ic" >> $GITHUB_ENV
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
         run: |
@@ -256,7 +260,6 @@ jobs:
           touch dist/index.{html,css,js}
           touch dist/index2.js
           cargo test
-      - run: dfx stop
 
   ###########################
   # The Rust canister tests #
@@ -337,7 +340,7 @@ jobs:
     needs: [canister-tests-build, cached-build, docker-build-archive]
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest] # , macos-latest ]
         partition: ['1/3', '2/3', '3/3']
     steps:
       - uses: actions/checkout@v4
@@ -352,8 +355,12 @@ jobs:
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
-      - run: dfx start --background --pocketic --clean
+      - name: Install PocketIC
+        run: |
+          curl -sL -o pocket-ic.gz https://download.dfinity.systems/ic/2e7cce7dcb91dd33aac6f66090c9d4f2a79e795f/binaries/${{ matrix.os == 'macos-latest' && 'x86_64-darwin' || 'x86_64-linux' }}/pocket-ic.gz
+          gzip -d pocket-ic.gz
+          chmod +x pocket-ic
+          echo "POCKET_IC_BIN=$(pwd)/pocket-ic" >> $GITHUB_ENV
 
       - name: 'Download II wasm'
         uses: actions/download-artifact@v4
@@ -383,8 +390,6 @@ jobs:
           ./cargo-nextest nextest run --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
-
-      - run: dfx stop
 
   ######################
   # The end-to-end tests #

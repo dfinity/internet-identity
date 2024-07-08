@@ -21,9 +21,7 @@ use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path;
-use std::process::Command;
 use std::time::{Duration, SystemTime};
-use url::Url;
 /* The first few lines deal with actually getting the Wasm module(s) to test */
 
 lazy_static! {
@@ -136,28 +134,13 @@ pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Ve
 
 /// The path to the state machine binary to run the tests with
 pub fn env() -> PocketIc {
-    let dfx_output = Command::new("dfx")
-        .arg("ping")
-        .output()
-        .expect("failed to execute dfx");
-    if !dfx_output.status.success() {
-        panic!("dfx is not running, please start dfx with `dfx start --pocketic --clean`");
-    }
-    let dfx_output = Command::new("dfx")
-        .arg("info")
-        .arg("replica-port")
-        .output()
-        .expect("failed to execute dfx");
-    let port = String::from_utf8(dfx_output.stdout).expect("failed to get port");
-
     let config = ExtendedSubnetConfigSet {
         ii: Some(SubnetSpec::default()),
         nns: Some(SubnetSpec::default()),
         ..ExtendedSubnetConfigSet::default()
     };
 
-    let pocket_ic_url = Url::parse(&format!("http://127.0.0.1:{}", port)).unwrap();
-    PocketIc::from_config_and_server_url(config, pocket_ic_url)
+    PocketIc::from_config(config)
 }
 
 pub fn install_ii_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
