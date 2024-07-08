@@ -5,7 +5,6 @@ import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
 import { getAnchorByPrincipal } from "$src/storage";
-import { resolveCanisterId } from "$src/utils/canisterIdResolution";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
 import {
@@ -19,7 +18,6 @@ import {
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
 import { Principal } from "@dfinity/principal";
-import { nonNullish } from "@dfinity/utils";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
 import { VcVerifiablePresentation, vcProtocol } from "./postMessageInterface";
@@ -70,28 +68,12 @@ const verifyCredentials = async ({
   connection,
   request: {
     credentialSubject: givenP_RP,
-    issuer: { origin: issuerOrigin, canisterId: expectedIssuerCanisterId },
+    issuer: { origin: issuerOrigin, canisterId: issuerCanisterId },
     credentialSpec,
     derivationOrigin: rpDerivationOrigin,
   },
   rpOrigin: rpOrigin_,
 }: { connection: Connection } & VerifyCredentialsArgs) => {
-  // Look up the canister ID from the origin
-  const lookedUp = await withLoader(() =>
-    resolveCanisterId({ origin: issuerOrigin })
-  );
-  if (lookedUp === "not_found") {
-    return abortedCredentials({ reason: "no_canister_id" });
-  }
-  const issuerCanisterId = lookedUp.ok;
-
-  // If the RP provided a canister ID, check that it matches what we got
-  if (nonNullish(expectedIssuerCanisterId)) {
-    if (expectedIssuerCanisterId.compareTo(issuerCanisterId) !== "eq") {
-      return abortedCredentials({ reason: "bad_canister_id" });
-    }
-  }
-
   // Verify that principals may be issued to RP using the specified
   // derivation origin
   const validRpDerivationOrigin = await withLoader(() =>
