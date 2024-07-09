@@ -59,7 +59,7 @@ export const authnTemplateManage = ({
     html`<h1 class="t-title t-title--main">${title}</h1>`;
 
   const subtitle = (subtitle: string) =>
-    `<p class="t-lead l-stack">${subtitle}</p>`;
+    html`<p class="t-lead l-stack">${subtitle}</p>`;
 
   return {
     firstTime: {
