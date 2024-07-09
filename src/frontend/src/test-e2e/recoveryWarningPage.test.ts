@@ -131,37 +131,7 @@ test("User sees the recovery phrase warning page if one week has passed since la
     const publicKeyBuffer = response[0].pubkey;
     console.log(response);
 
-    // Get the x and y coordinates of the public key
-    // const x = publicKey.getX().toString("hex");
-    // const y = publicKey.getY().toString("hex");
-    // function hexToBase64Url(hexString: string) {
-    //   // Step 1: Convert hex string to a buffer
-    //   const buffer = Buffer.from(hexString, "hex");
-
-    //   // Step 2: Convert buffer to a base64 string
-    //   const base64String = buffer.toString("base64");
-
-    //   // Step 3: Convert base64 string to a base64url string
-    //   const base64UrlString = base64String
-    //     .replace(/\+/g, "-") // Replace '+' with '-'
-    //     .replace(/\//g, "_") // Replace '/' with '_'
-    //     .replace(/=+$/, ""); // Remove trailing '='
-
-    //   return base64UrlString;
-    // }
-    // const jwkPublicKey = {
-    //   kty: "EC",
-    //   crv: "P-256",
-    //   // d: credentials[0].privateKey, // Example private key
-    //   x: hexToBase64Url(x),
-    //   y: hexToBase64Url(y),
-    // };
-    // const jwkKey = {
-    //   ...jwkPublicKey,
-    //   d: credentials[0].privateKey, // Example private key
-    // };
-    // console.log("privateKeyBuffer", privateKeyBuffer);
-
+    // This is not working. Error: "Unsupported key usage for a ECDSA key"
     const cryptoPrivateKey = await subtle.importKey(
       "raw",
       privateKeyBuffer,
@@ -172,8 +142,6 @@ test("User sees the recovery phrase warning page if one week has passed since la
       false,
       ["sign", "verify"]
     );
-    // const publicKey = createPublicKey(credentials[0].privateKey);
-    // const publicKeyDer = publicKey.export({ format: "der", type: "pkcs8" });
     const cryptoPublicKey = await subtle.importKey(
       "raw",
       new Uint8Array(publicKeyBuffer),
