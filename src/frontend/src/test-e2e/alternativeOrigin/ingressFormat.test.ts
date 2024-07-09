@@ -1,9 +1,7 @@
 import { FLOWS } from "../flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
 } from "../util";
@@ -31,13 +29,13 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId3 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId3,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId3,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(

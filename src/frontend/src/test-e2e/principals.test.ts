@@ -1,9 +1,7 @@
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
 } from "./util";
@@ -31,13 +29,13 @@ test("Should issue the same principal to nice url and canonical url", async () =
     expect(await canonicalDemoAppView.getPrincipal()).toBe("");
     await canonicalDemoAppView.signin();
 
-    const authenticatorId2 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId2,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId2,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     let authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
@@ -55,13 +53,13 @@ test("Should issue the same principal to nice url and canonical url", async () =
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId3 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId3,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId3,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
@@ -90,13 +88,13 @@ test("Should issue the same principal to dapps on legacy & official domains", as
       await canonicalDemoAppView.waitForDisplay();
       await canonicalDemoAppView.signin();
 
-      const authzAuthenticator = await switchToPopup(browser);
-      await addWebAuthnCredential(
-        browser,
-        authzAuthenticator,
-        credentials[0],
-        originToRelyingPartyId(II_URL)
-      );
+      await switchToPopup(browser);
+      // await addWebAuthnCredential(
+      //   browser,
+      //   authzAuthenticator,
+      //   credentials[0],
+      //   originToRelyingPartyId(II_URL)
+      // );
       const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();
       await authenticateView.pickAnchor(userNumber);

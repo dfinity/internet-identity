@@ -1,9 +1,7 @@
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
   wipeStorage,
@@ -82,13 +80,13 @@ test("Register first then log into client application", async () => {
     expect(await demoAppView.getPrincipal()).toBe("");
     await demoAppView.signin();
 
-    const authenticatorId2 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId2,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId2,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
 
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();

@@ -1,9 +1,7 @@
 import { FLOWS } from "../flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRelyingPartyId,
   runInBrowser,
   switchToPopup,
 } from "../util";
@@ -35,13 +33,13 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId3 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId3,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId3,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
@@ -72,13 +70,13 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId3 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId3,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId3,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
@@ -109,13 +107,13 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId2 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId2,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId2,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
 
     // Selenium has _no_ connectivity to the raw url
     // We want accessing raw urls to fail because it would be a security issue on mainnet
@@ -153,13 +151,13 @@ test("Should allow arbitrary URL as derivation origin", async () => {
     expect(await niceDemoAppView.getPrincipal()).toBe("");
     await niceDemoAppView.signin();
 
-    const authenticatorId3 = await switchToPopup(browser);
-    await addWebAuthnCredential(
-      browser,
-      authenticatorId3,
-      credentials[0],
-      originToRelyingPartyId(II_URL)
-    );
+    await switchToPopup(browser);
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authenticatorId3,
+    //   credentials[0],
+    //   originToRelyingPartyId(II_URL)
+    // );
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
