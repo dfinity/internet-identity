@@ -6,6 +6,9 @@ import { getReplicaHost } from "../../../vite-plugins/dist/utils";
 // practice is very stable, and is much easier to use as "constants" than as a lookup function.
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const ISSUER_CANISTER_ID = readCanisterId({ canisterName: "issuer" });
+export const II_CANISTER_ID = readCanisterId({
+  canisterName: "internet_identity",
+});
 
 export const REPLICA_URL = getReplicaHost();
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;

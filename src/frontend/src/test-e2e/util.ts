@@ -63,6 +63,7 @@ export async function runInBrowser(
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
+      "--headless",
       "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
       // Map all hosts to localhost:5173 (which is the vite dev server) in the context of DNS resolution.
       // The dev server will then terminate TLS and either forward the request to the local replica or serve
@@ -220,6 +221,11 @@ export async function addCustomCommands(
           required: true,
         },
       ],
+      returns: {
+        type: "string",
+        name: "authenticatorId",
+        description: "Returns the string ID of the authenticator.",
+      },
     })
   );
 
@@ -264,6 +270,11 @@ export async function addCustomCommands(
           },
         ],
         parameters: [],
+        returns: {
+          type: "object[]",
+          name: "credentials",
+          description: "Returns an array of credentials.",
+        },
       }
     )
   );
@@ -281,22 +292,14 @@ export async function addCustomCommands(
         variables: [
           {
             name: "authenticatorId",
-            type: "string",
             description: "The id of the authenticator to remove",
-            required: true,
           },
         ],
         parameters: [
           {
-            name: "rpId",
-            type: "string",
-            description: "The relying party ID the credential is scoped to.",
-            required: true,
-          },
-          {
             name: "credentialId",
             type: "string",
-            description: "The credential ID encoded using Base64url encoding",
+            description: "The Credential ID encoded using Base64url Encoding.",
             required: true,
           },
           {
@@ -307,10 +310,23 @@ export async function addCustomCommands(
             required: true,
           },
           {
+            name: "rpId",
+            type: "string",
+            description: "The Relying Party ID the credential is scoped to.",
+            required: true,
+          },
+          {
             name: "privateKey",
             type: "string",
             description:
-              "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url encoding.",
+              "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url Encoding.",
+            required: true,
+          },
+          {
+            name: "userHandle",
+            type: "string",
+            description:
+              "The userHandle associated to the credential encoded using Base64url Encoding. This property may not be defined.",
             required: true,
           },
           {
@@ -321,17 +337,10 @@ export async function addCustomCommands(
             required: true,
           },
           {
-            name: "userHandle",
-            type: "string",
-            description:
-              "The userHandle associated to the credential encoded using Base64url encoding.",
-            required: false,
-          },
-          {
             name: "largeBlob",
             type: "string",
             description:
-              "The large, per-credential blob associated to the public key credential source, encoded using Base64url encoding.",
+              "The large, per-credential blob associated to the public key credential source, encoded using Base64url Encoding. This property may not be defined.",
             required: false,
           },
         ],
@@ -363,15 +372,15 @@ export async function getWebAuthnCredentials(
 export async function addWebAuthnCredential(
   browser: WebdriverIO.Browser,
   authId: string,
-  credential: WebAuthnCredential,
-  rpId: string
+  credential: WebAuthnCredential
 ): Promise<void> {
   return await browser.addWebauthnCredential(
     authId,
-    rpId,
     credential.credentialId,
     credential.isResidentCredential,
+    credential.rpId,
     credential.privateKey,
+    credential.userHandle,
     credential.signCount
   );
 }
