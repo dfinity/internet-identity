@@ -63,7 +63,7 @@ export async function runInBrowser(
     args: [
       "--ignore-certificate-errors", // allow self-signed certificates
       "--disable-gpu",
-      "--headless",
+      // "--headless",
       "--disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
       // Map all hosts to localhost:5173 (which is the vite dev server) in the context of DNS resolution.
       // The dev server will then terminate TLS and either forward the request to the local replica or serve
@@ -323,17 +323,17 @@ export async function addCustomCommands(
             required: true,
           },
           {
-            name: "userHandle",
-            type: "string",
-            description:
-              "The userHandle associated to the credential encoded using Base64url Encoding. This property may not be defined.",
-            required: true,
-          },
-          {
             name: "signCount",
             type: "number",
             description:
               "The initial value for a signature counter associated to the public key credential source.",
+            required: true,
+          },
+          {
+            name: "userHandle",
+            type: "string",
+            description:
+              "The userHandle associated to the credential encoded using Base64url Encoding. This property may not be defined.",
             required: true,
           },
           {
@@ -372,16 +372,17 @@ export async function getWebAuthnCredentials(
 export async function addWebAuthnCredential(
   browser: WebdriverIO.Browser,
   authId: string,
-  credential: WebAuthnCredential
+  credential: WebAuthnCredential,
+  rpId: string
 ): Promise<void> {
   return await browser.addWebauthnCredential(
     authId,
     credential.credentialId,
     credential.isResidentCredential,
-    credential.rpId,
+    rpId,
     credential.privateKey,
-    credential.userHandle,
-    credential.signCount
+    credential.signCount,
+    credential.userHandle
   );
 }
 

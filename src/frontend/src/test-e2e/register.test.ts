@@ -66,11 +66,12 @@ test("Log into client application, after registration", async () => {
   });
 }, 300_000);
 
-test("Register first then log into client application", async () => {
+test.only("Register first then log into client application", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
 
     await browser.url(II_URL);
+    // await new Promise((r) => setTimeout(r, 20_000));
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
 
     const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
@@ -90,9 +91,18 @@ test("Register first then log into client application", async () => {
       originToRelyingPartyId(II_URL)
     );
 
+    const credentials2 = await getWebAuthnCredentials(
+      browser,
+      authenticatorId2
+    );
+
+    console.log("da num credentials", credentials2.length);
+
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
+    await new Promise((r) => setTimeout(r, 20_000));
     await authenticateView.pickAnchor(userNumber);
+
     const principal = await demoAppView.waitForAuthenticated();
     expect(await demoAppView.whoami()).toBe(principal);
 

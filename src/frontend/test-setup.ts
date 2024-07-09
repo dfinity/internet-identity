@@ -14,8 +14,8 @@ export type WebAuthnCredential = {
   isResidentCredential: boolean;
   privateKey: string;
   signCount: number;
-  rpId: string;
-  userHandle: string;
+  rpId?: string;
+  userHandle?: string;
 };
 
 declare global {
@@ -38,8 +38,8 @@ declare global {
         isResidentCredential: boolean,
         rpId: string,
         privateKey: string,
-        userHandle: string,
         signCount: number,
+        userHandle?: string,
         largeBlob?: string
       ) => Promise<void>;
     }

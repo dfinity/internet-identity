@@ -5,16 +5,18 @@ import { idlFactory as internet_identity_idl } from "$generated/internet_identit
 import { _SERVICE } from "$generated/internet_identity_types";
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
-import { subtle } from "crypto";
-import { ec as EC } from "elliptic";
+import { randomUUID } from "crypto";
+import { WebAuthnCredential } from "../../test-setup";
 import { DEVICE_NAME1, II_CANISTER_ID, II_URL, REPLICA_URL } from "./constants";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
+  addWebAuthnCredential,
   getWebAuthnCredentials,
+  originToRelyingPartyId,
   runInBrowser,
 } from "./util";
-import { MainView } from "./views";
+import { MainView, WelcomeView } from "./views";
 
 // Function to convert ArrayBuffer to base64
 function uint8ArrayToBase64Url(uint8Array: Uint8Array) {
@@ -68,29 +70,36 @@ function convertECDSAPrivateKeyToBase64Url(jwk: JsonWebKey): string {
 
 test("User sees the recovery phrase warning page if one week has passed since last time", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await browser.url(II_URL);
-    // const authId = randomUUID();
     const authId = await addVirtualAuthenticator(browser);
-    // const initialCredentials = await getWebAuthnCredentials(browser, authId);
-    // console.log("da initialCredentials", initialCredentials.length);
+    await browser.url(II_URL);
+
+    const welcomeView = new WelcomeView(browser);
+    await welcomeView.waitForDisplay();
+    await new Promise((r) => setTimeout(r, 20_000));
+
+    // const authId = randomUUID();
+    const initialCredentials = await getWebAuthnCredentials(browser, authId);
+    console.log("da initialCredentials", initialCredentials.length);
     // Clean all credentials so that the one we add is the only one
-    // await removeCredential(browser, authId, initialCredentials[0].credentialId);
-    // const identity = await ECDSAKeyIdentity.generate({ extractable: true });
-    // const keyPair = identity.getKeyPair();
-    // const privateKey = await global["crypto"]["subtle"].exportKey(
-    //   "pkcs8",
-    //   keyPair.privateKey
-    // );
-    // const credential: WebAuthnCredential = {
-    //   credentialId: randomUUID(),
-    //   isResidentCredential: false,
-    //   privateKey: uint8ArrayToBase64Url(new Uint8Array(privateKey)),
-    //   signCount: 0,
-    //   rpId: originToRelyingPartyId(II_URL),
-    //   userHandle: "test",
-    // };
-    // console.log("RP ID");
-    // await addWebAuthnCredential(browser, authId, credential);
+    const identity = await ECDSAKeyIdentity.generate({ extractable: true });
+    const keyPair = identity.getKeyPair();
+    const privateKey = await global["crypto"]["subtle"].exportKey(
+      "pkcs8",
+      keyPair.privateKey
+    );
+    const credential: WebAuthnCredential = {
+      credentialId: randomUUID(),
+      isResidentCredential: false,
+      privateKey: uint8ArrayToBase64Url(new Uint8Array(privateKey)),
+      signCount: 0,
+      userHandle: "test",
+    };
+    await addWebAuthnCredential(
+      browser,
+      authId,
+      credential,
+      originToRelyingPartyId(II_URL)
+    );
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
@@ -103,68 +112,71 @@ test("User sees the recovery phrase warning page if one week has passed since la
     console.log("da authId", authId);
     console.log("credentials", credentials.length);
     console.log("credentials", credentials[0]);
-    const privateKeyBuffer = base64ToArrayBuffer(credentials[0].privateKey);
-    const ec = new EC("p256");
-    const keyPair = ec.keyFromPrivate(credentials[0].privateKey);
-    const publicKey = keyPair.getPublic();
+    console.log("credentials", credentials[1]);
 
-    // Get the x and y coordinates of the public key
-    const x = publicKey.getX().toString("hex");
-    const y = publicKey.getY().toString("hex");
-    function hexToBase64Url(hexString: string) {
-      // Step 1: Convert hex string to a buffer
-      const buffer = Buffer.from(hexString, "hex");
+    await new Promise((r) => setTimeout(r, 20_000));
+    // const privateKeyBuffer = base64ToArrayBuffer(credentials[0].privateKey);
+    // const ec = new EC("p256");
+    // const keyPair = ec.keyFromPrivate(credentials[0].privateKey);
+    // const publicKey = keyPair.getPublic();
 
-      // Step 2: Convert buffer to a base64 string
-      const base64String = buffer.toString("base64");
+    // // Get the x and y coordinates of the public key
+    // const x = publicKey.getX().toString("hex");
+    // const y = publicKey.getY().toString("hex");
+    // function hexToBase64Url(hexString: string) {
+    //   // Step 1: Convert hex string to a buffer
+    //   const buffer = Buffer.from(hexString, "hex");
 
-      // Step 3: Convert base64 string to a base64url string
-      const base64UrlString = base64String
-        .replace(/\+/g, "-") // Replace '+' with '-'
-        .replace(/\//g, "_") // Replace '/' with '_'
-        .replace(/=+$/, ""); // Remove trailing '='
+    //   // Step 2: Convert buffer to a base64 string
+    //   const base64String = buffer.toString("base64");
 
-      return base64UrlString;
-    }
-    const jwkPublicKey = {
-      kty: "EC",
-      crv: "P-256",
-      // d: credentials[0].privateKey, // Example private key
-      x: hexToBase64Url(x),
-      y: hexToBase64Url(y),
-    };
-    const jwkKey = {
-      ...jwkPublicKey,
-      d: credentials[0].privateKey, // Example private key
-    };
-    console.log("privateKeyBuffer", privateKeyBuffer);
+    //   // Step 3: Convert base64 string to a base64url string
+    //   const base64UrlString = base64String
+    //     .replace(/\+/g, "-") // Replace '+' with '-'
+    //     .replace(/\//g, "_") // Replace '/' with '_'
+    //     .replace(/=+$/, ""); // Remove trailing '='
 
-    const cryptoPrivateKey = await subtle.importKey(
-      "jwk",
-      jwkKey,
-      {
-        name: "ECDSA",
-        namedCurve: "P-256",
-      },
-      false,
-      ["sign"]
-    );
-    // const publicKey = createPublicKey(credentials[0].privateKey);
-    // const publicKeyDer = publicKey.export({ format: "der", type: "pkcs8" });
-    const cryptoPublicKey = await subtle.importKey(
-      "jwk",
-      jwkPublicKey,
-      {
-        name: "ECDSA",
-        namedCurve: "P-256",
-      },
-      true,
-      ["verify"]
-    );
-    const identity = ECDSAKeyIdentity.fromKeyPair({
-      privateKey: cryptoPrivateKey,
-      publicKey: cryptoPublicKey,
-    });
+    //   return base64UrlString;
+    // }
+    // const jwkPublicKey = {
+    //   kty: "EC",
+    //   crv: "P-256",
+    //   // d: credentials[0].privateKey, // Example private key
+    //   x: hexToBase64Url(x),
+    //   y: hexToBase64Url(y),
+    // };
+    // const jwkKey = {
+    //   ...jwkPublicKey,
+    //   d: credentials[0].privateKey, // Example private key
+    // };
+    // console.log("privateKeyBuffer", privateKeyBuffer);
+
+    // const cryptoPrivateKey = await subtle.importKey(
+    //   "jwk",
+    //   jwkKey,
+    //   {
+    //     name: "ECDSA",
+    //     namedCurve: "P-256",
+    //   },
+    //   false,
+    //   ["sign"]
+    // );
+    // // const publicKey = createPublicKey(credentials[0].privateKey);
+    // // const publicKeyDer = publicKey.export({ format: "der", type: "pkcs8" });
+    // const cryptoPublicKey = await subtle.importKey(
+    //   "jwk",
+    //   jwkPublicKey,
+    //   {
+    //     name: "ECDSA",
+    //     namedCurve: "P-256",
+    //   },
+    //   true,
+    //   ["verify"]
+    // );
+    // const identity = ECDSAKeyIdentity.fromKeyPair({
+    //   privateKey: cryptoPrivateKey,
+    //   publicKey: cryptoPublicKey,
+    // });
 
     const agent = new HttpAgent({
       identity,
