@@ -23,7 +23,7 @@ export const landingPage = ({
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
 
-  return html` <main class="c-landingPage">
+  return html` <main class="c-landingPage" data-page="${dataPage}">
     <div class="c-landingPage__container">
       <div class="c-landingPage__logo">
         <div class="c-logo">${icLogo}</div>
