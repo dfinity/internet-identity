@@ -3,17 +3,14 @@
 // Reference: https://github.com/vitest-dev/vitest/issues/4043#issuecomment-1713026327
 import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import { _SERVICE } from "$generated/internet_identity_types";
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { Actor, AnonymousIdentity, HttpAgent } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
-import { randomUUID } from "crypto";
-import { WebAuthnCredential } from "../../test-setup";
+import { subtle } from "crypto";
 import { DEVICE_NAME1, II_CANISTER_ID, II_URL, REPLICA_URL } from "./constants";
 import { FLOWS } from "./flows";
 import {
   addVirtualAuthenticator,
-  addWebAuthnCredential,
   getWebAuthnCredentials,
-  originToRelyingPartyId,
   runInBrowser,
 } from "./util";
 import { MainView, WelcomeView } from "./views";
@@ -75,31 +72,31 @@ test("User sees the recovery phrase warning page if one week has passed since la
 
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
-    await new Promise((r) => setTimeout(r, 20_000));
+    // await new Promise((r) => setTimeout(r, 20_000));
 
     // const authId = randomUUID();
     const initialCredentials = await getWebAuthnCredentials(browser, authId);
     console.log("da initialCredentials", initialCredentials.length);
     // Clean all credentials so that the one we add is the only one
-    const identity = await ECDSAKeyIdentity.generate({ extractable: true });
-    const keyPair = identity.getKeyPair();
-    const privateKey = await global["crypto"]["subtle"].exportKey(
-      "pkcs8",
-      keyPair.privateKey
-    );
-    const credential: WebAuthnCredential = {
-      credentialId: randomUUID(),
-      isResidentCredential: false,
-      privateKey: uint8ArrayToBase64Url(new Uint8Array(privateKey)),
-      signCount: 0,
-      userHandle: "test",
-    };
-    await addWebAuthnCredential(
-      browser,
-      authId,
-      credential,
-      originToRelyingPartyId(II_URL)
-    );
+    // const identity = await ECDSAKeyIdentity.generate({ extractable: true });
+    // const keyPair = identity.getKeyPair();
+    // const privateKey = await global["crypto"]["subtle"].exportKey(
+    //   "pkcs8",
+    //   keyPair.privateKey
+    // );
+    // const credential: WebAuthnCredential = {
+    //   credentialId: randomUUID(),
+    //   isResidentCredential: false,
+    //   privateKey: uint8ArrayToBase64Url(new Uint8Array(privateKey)),
+    //   signCount: 0,
+    //   userHandle: "test",
+    // };
+    // await addWebAuthnCredential(
+    //   browser,
+    //   authId,
+    //   credential,
+    //   originToRelyingPartyId(II_URL)
+    // );
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
@@ -114,13 +111,27 @@ test("User sees the recovery phrase warning page if one week has passed since la
     console.log("credentials", credentials[0]);
     console.log("credentials", credentials[1]);
 
-    await new Promise((r) => setTimeout(r, 20_000));
-    // const privateKeyBuffer = base64ToArrayBuffer(credentials[0].privateKey);
-    // const ec = new EC("p256");
-    // const keyPair = ec.keyFromPrivate(credentials[0].privateKey);
-    // const publicKey = keyPair.getPublic();
+    const privateKeyBuffer = base64ToArrayBuffer(credentials[0].privateKey);
 
-    // // Get the x and y coordinates of the public key
+    const anonymousAgent = new HttpAgent({
+      identity: new AnonymousIdentity(),
+      host: REPLICA_URL,
+    });
+    await anonymousAgent.fetchRootKey();
+    const iiAnonymousActor = Actor.createActor<_SERVICE>(
+      internet_identity_idl,
+      {
+        agent: anonymousAgent,
+        canisterId: II_CANISTER_ID,
+      }
+    );
+
+    const response = await iiAnonymousActor.lookup(BigInt(userNumber));
+
+    const publicKeyBuffer = response[0].pubkey;
+    console.log(response);
+
+    // Get the x and y coordinates of the public key
     // const x = publicKey.getX().toString("hex");
     // const y = publicKey.getY().toString("hex");
     // function hexToBase64Url(hexString: string) {
@@ -151,32 +162,32 @@ test("User sees the recovery phrase warning page if one week has passed since la
     // };
     // console.log("privateKeyBuffer", privateKeyBuffer);
 
-    // const cryptoPrivateKey = await subtle.importKey(
-    //   "jwk",
-    //   jwkKey,
-    //   {
-    //     name: "ECDSA",
-    //     namedCurve: "P-256",
-    //   },
-    //   false,
-    //   ["sign"]
-    // );
-    // // const publicKey = createPublicKey(credentials[0].privateKey);
-    // // const publicKeyDer = publicKey.export({ format: "der", type: "pkcs8" });
-    // const cryptoPublicKey = await subtle.importKey(
-    //   "jwk",
-    //   jwkPublicKey,
-    //   {
-    //     name: "ECDSA",
-    //     namedCurve: "P-256",
-    //   },
-    //   true,
-    //   ["verify"]
-    // );
-    // const identity = ECDSAKeyIdentity.fromKeyPair({
-    //   privateKey: cryptoPrivateKey,
-    //   publicKey: cryptoPublicKey,
-    // });
+    const cryptoPrivateKey = await subtle.importKey(
+      "raw",
+      privateKeyBuffer,
+      {
+        name: "ECDSA",
+        namedCurve: "P-256",
+      },
+      false,
+      ["sign", "verify"]
+    );
+    // const publicKey = createPublicKey(credentials[0].privateKey);
+    // const publicKeyDer = publicKey.export({ format: "der", type: "pkcs8" });
+    const cryptoPublicKey = await subtle.importKey(
+      "raw",
+      new Uint8Array(publicKeyBuffer),
+      {
+        name: "ECDSA",
+        namedCurve: "P-256",
+      },
+      false,
+      ["verify"]
+    );
+    const identity = ECDSAKeyIdentity.fromKeyPair({
+      privateKey: cryptoPrivateKey,
+      publicKey: cryptoPublicKey,
+    });
 
     const agent = new HttpAgent({
       identity,
