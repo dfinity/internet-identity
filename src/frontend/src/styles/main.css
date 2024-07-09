@@ -326,17 +326,14 @@
 
   --rs-footer-height: 4rem;
 
-  --rs-split-page-padding--mobile: calc(var(--vs-stack) * 3);
-  --rs-split-page-left-pane-padding: calc(var(--vs-gutter) * 8);
-  --rs-split-page-right-pane-padding--desktop: 10vmax;
-  --rs-split-page-right-pane-padding--mobile--vertical: calc(
-    var(--vs-stack) * 3
-  );
-  --rs-split-page-right-pane-padding--mobile--horizontal: calc(
-    var(--vs-stack) * 2
-  );
+  --rs-split-page-bezzel--mobile: calc(var(--vs-stack) * 3);
+  --rs-split-page-left-pane-bezzel: calc(var(--vs-gutter) * 8);
+  --rs-split-page-right-pane-bezzel--desktop: 10vmax;
+  --rs-split-page-right-pane-bezzel-y--mobile: calc(var(--vs-stack) * 3);
+  --rs-split-page-right-pane-bezzel-x--mobile: calc(var(--vs-stack) * 2);
   --rs-split-page-stack: calc(var(--vs-stack) * 4);
   --rs-split-page-stack--large: calc(var(--vs-stack) * 6);
+  --rs-split-page-title: calc(2.8rem + 1vw);
 
   /* This is not used in CSS, but it's used to compensate for the logo size. */
   --rs-logo-height: 3rem;
@@ -993,15 +990,15 @@ a:hover,
 }
 
 .c-landingPage__title {
-  font-size: calc(2.8rem + 1vw);
+  font-size: var(--rs-split-page-title);
   font-weight: 600;
   line-height: 1.1;
 }
 
 .c-landingPage__logo {
   position: absolute;
-  left: var(--rs-split-page-left-pane-padding);
-  top: var(--rs-split-page-left-pane-padding);
+  left: var(--rs-split-page-left-pane-bezzel);
+  top: var(--rs-split-page-left-pane-bezzel);
 
   color: var(--rc-background--highlight-text);
 }
@@ -1020,7 +1017,7 @@ a:hover,
   flex-direction: column;
   align-items: flex-start;
 
-  padding: var(--rs-split-page-left-pane-padding);
+  padding: var(--rs-split-page-left-pane-bezzel);
 }
 
 .c-landingPage__left__content {
@@ -1099,7 +1096,7 @@ a:hover,
   .c-landingPage__container {
     display: block;
 
-    padding: 0 var(--rs-split-page-padding--mobile);
+    padding: 0 var(--rs-split-page-bezzel--mobile);
 
     max-width: var(--rs-main-content-width);
   }
@@ -1139,8 +1136,8 @@ a:hover,
 
     background: var(--rc-light);
     border-radius: var(--rs-card-border-radius);
-    padding: var(--rs-split-page-right-pane-padding--mobile--vertical)
-      var(--rs-split-page-right-pane-padding--mobile--horizontal);
+    padding: var(--rs-split-page-right-pane-bezzel-y--mobile)
+      var(--rs-split-page-right-pane-bezzel-x--mobile);
 
     overflow: auto;
   }
