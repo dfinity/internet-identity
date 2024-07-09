@@ -4362,6 +4362,7 @@ dependencies = [
  "candid_parser",
  "canister_sig_util",
  "canister_tests",
+ "getrandom",
  "hex",
  "ic-cdk",
  "ic-cdk-macros",

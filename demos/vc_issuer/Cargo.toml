@@ -30,6 +30,9 @@ strfmt = "0.2"
 lazy_static = "1.4"
 include_dir = "0.7"
 
+[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
 [dev-dependencies]
 assert_matches = "1.5.0"
 candid_parser = "0.1"
