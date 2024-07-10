@@ -65,7 +65,7 @@ export const authnTemplateManage = ({
     firstTime: {
       slot: html`
         ${dappsHeader({ dapps, clickable: false })}
-        <header>
+        <header class="l-stack">
           ${title("Securely connect to dapps on the Internet Computer")}
         </header>
       `,

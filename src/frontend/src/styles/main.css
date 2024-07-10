@@ -131,11 +131,13 @@
   --vc-brand-alt: rgba(215, 205, 235, 1);
   --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
-  --vc-brand-gradient: linear-gradient(
-    90deg,
-    var(--vc-brand-purple),
-    var(--vc-brand-purple-light)
-  );
+  --vc-brand-gradient: radial-gradient(
+      at 100% 100%,
+      hsla(265, 80%, 75%, 1) 0px,
+      transparent 50%
+    ),
+    radial-gradient(at 100% 0%, hsla(272, 86%, 55%, 1) 0px, transparent 50%),
+    radial-gradient(at 0% 18%, hsla(223, 79%, 66%, 1) 0px, transparent 50%);
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -210,7 +212,8 @@
 
   --rc-button--disabled: var(--vc-shadow);
 
-  --rc-background--highlight: var(--vc-brand-gradient);
+  --rc-background-image--highlight: var(--vc-brand-gradient);
+  --rc-background--highlight: var(--vc-brand-purple);
   --rc-background--highlight-text: var(--vc-snow);
 
   /*
@@ -1008,7 +1011,8 @@ a:hover,
 }
 
 .c-landingPage__left {
-  background: var(--rc-background--highlight);
+  background-image: var(--rc-background-image--highlight);
+  background-color: var(--rc-background--highlight);
   color: var(--rc-background--highlight-text);
 
   grid-area: left;
@@ -1077,7 +1081,10 @@ a:hover,
   gap: var(--rs-list-bullet-space);
 }
 
-.c-landingPage__left__footer > a:hover {
+.c-landingPage__left__footer > a:hover,
+a:active,
+a:focus,
+a:visited {
   color: var(--rc-light-transparent);
 }
 
@@ -1087,7 +1094,8 @@ a:hover,
     flex-direction: column;
     align-items: center;
 
-    background: var(--rc-background--highlight);
+    background-image: var(--rc-background-image--highlight);
+    background-color: var(--rc-background--highlight);
 
     height: auto;
     min-height: 100vh;
@@ -1146,6 +1154,12 @@ a:hover,
     min-width: auto;
     max-width: none;
     width: 100%;
+  }
+}
+
+@media (max-width: 512px) {
+  .c-landingPage__container {
+    max-width: none;
   }
 }
 
