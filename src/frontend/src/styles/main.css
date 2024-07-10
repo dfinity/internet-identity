@@ -1082,9 +1082,9 @@ a:hover,
 }
 
 .c-landingPage__left__footer > a:hover,
-a:active,
-a:focus,
-a:visited {
+.c-landingPage__left__footer > a:active,
+.c-landingPage__left__footer > a:focus,
+.c-landingPage__left__footer > a:visited {
   color: var(--rc-light-transparent);
 }
 
