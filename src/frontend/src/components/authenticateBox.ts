@@ -39,19 +39,10 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { mkAnchorInput } from "./anchorInput";
 import { mkAnchorPicker } from "./anchorPicker";
-import {
-  controlIcon,
-  githubBigIcon,
-  participateIcon,
-  privacyIcon,
-  secureIcon,
-  signInIcon,
-} from "./icons";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
 
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import copyJson from "./authenticateBox.json";
 import { landingPage } from "./landingPage";
 
 /** Template used for rendering specific authentication screens. See `authnScreens` below
@@ -413,43 +404,18 @@ export const handleLoginFlowResult = async <E>(
   return undefined;
 };
 
+const learnMoreBlock = html`<p class="l-stack t-centered">
+  <a
+    href="https://internetcomputer.org/internet-identity"
+    target="_blank"
+    rel="noopener noreferrer"
+    >Learn more</a
+  >
+  about Internet Identity
+</p>`;
+
 /** The templates for the authentication pages */
 export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
-  const copy = i18n.i18n(copyJson);
-
-  const marketingBlocks = [
-    {
-      icon: secureIcon,
-      title: copy.secure_and_convenient,
-      body: copy.instead_of_passwords,
-    },
-    {
-      icon: privacyIcon,
-      title: copy.no_tracking,
-      body: copy.get_privacy,
-    },
-    {
-      icon: controlIcon,
-      title: copy.control_your_identity,
-      body: copy.securely_access,
-    },
-    {
-      icon: participateIcon,
-      title: copy.own_and_participate,
-      body: copy.share_and_vote,
-    },
-    {
-      icon: signInIcon,
-      title: copy.sign_in_to_web3,
-      body: copy.manages_keys,
-    },
-    {
-      icon: githubBigIcon,
-      title: copy.opensource_and_transparent,
-      body: copy.internet_identity_codebase,
-    },
-  ];
-
   return {
     firstTime: (firstTimeProps: {
       useExisting: () => void;
@@ -474,20 +440,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
             ${props.firstTime.useExistingText}
           </button>
         </div>
-        <div class="c-marketing-section">
-          ${marketingBlocks.map(
-            ({ title, body, icon }) =>
-              html`
-                <article class="c-marketing-block">
-                  ${icon !== undefined
-                    ? html`<i class="c-icon c-icon--marketing">${icon}</i>`
-                    : undefined}
-                  <h2 class="t-title t-title--main">${title}</h2>
-                  <p class="t-paragraph t-paragraph--weak">${body}</p>
-                </article>
-              `
-          )}
-        </div> `;
+        ${learnMoreBlock}`;
     },
     useExisting: (useExistingProps: {
       register: () => void;
@@ -560,6 +513,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
           pick: pickProps.onSubmit,
           moreOptions: pickProps.moreOptions,
         }).template}
+        ${learnMoreBlock}
       `;
     },
   };
@@ -569,22 +523,12 @@ export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
   const templates = authnTemplates(i18n, props);
 
   return {
-    firstTime: (
-      opts: Parameters<typeof templates.firstTime>[0],
-      // TODO: remove this parameter once the landing page is ready.
-      landingPageTemplate: boolean = false
-    ) =>
-      // TODO: Use the landing page template always when ready.
-      page(templates.firstTime(opts), landingPageTemplate),
+    firstTime: (opts: Parameters<typeof templates.firstTime>[0]) =>
+      page(templates.firstTime(opts), true),
     useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
-      page(templates.useExisting(opts)),
-    pick: (
-      opts: Parameters<typeof templates.pick>[0],
-      // TODO: remove this parameter once the landing page is ready.
-      landingPageTemplate: boolean = false
-    ) =>
-      // TODO: Use the landing page template always when ready.
-      page(templates.pick(opts), landingPageTemplate),
+      page(templates.useExisting(opts), false),
+    pick: (opts: Parameters<typeof templates.pick>[0]) =>
+      page(templates.pick(opts), true),
   };
 };
 
@@ -636,6 +580,7 @@ const page = (slot: TemplateResult, landingPageTemplate: boolean = false) => {
   const template = landingPageTemplate
     ? landingPage({
         slot,
+        dataPage: "authenticate",
       })
     : mainWindow({
         slot: html` <!-- The title is hidden but used for accessibility -->
