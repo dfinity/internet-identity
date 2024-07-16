@@ -524,11 +524,14 @@ export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
 
   return {
     firstTime: (opts: Parameters<typeof templates.firstTime>[0]) =>
-      page(templates.firstTime(opts), true),
+      page({ slot: templates.firstTime(opts), useLandingPageTemplate: true }),
     useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
-      page(templates.useExisting(opts), false),
+      page({
+        slot: templates.useExisting(opts),
+        useLandingPageTemplate: false,
+      }),
     pick: (opts: Parameters<typeof templates.pick>[0]) =>
-      page(templates.pick(opts), true),
+      page({ slot: templates.pick(opts), useLandingPageTemplate: true }),
   };
 };
 
@@ -576,8 +579,14 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
 };
 
 // Wrap the template with header & footer and render the page
-const page = (slot: TemplateResult, landingPageTemplate: boolean = false) => {
-  const template = landingPageTemplate
+const page = ({
+  slot,
+  useLandingPageTemplate,
+}: {
+  slot: TemplateResult;
+  useLandingPageTemplate: boolean;
+}) => {
+  const template = useLandingPageTemplate
     ? landingPage({
         slot,
         dataPage: "authenticate",
