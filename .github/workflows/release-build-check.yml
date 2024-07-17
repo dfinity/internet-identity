@@ -84,19 +84,13 @@ jobs:
     needs: latest-release
     strategy:
       matrix:
-        # macos-14 is itself virtualized and does not support nested virtualization which would be required for the docker build.
-        # -> just use macos-13
-        os: [ ubuntu-22.04, ubuntu-20.04, macos-13 ]
+        # docker builds on macos are flaky or not supported at all (in case of ARM based runners). The signal they gave
+        # was minimal, so we will skip them for now until there is a reliable way to run docker images on macos runners.
+        os: [ ubuntu-22.04, ubuntu-20.04 ]
     steps:
       - uses: actions/checkout@v4
         with:
           ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
-
-      - name: Setup docker (missing on MacOS)
-        if: runner.os == 'macos'
-        run: |
-          brew install docker docker-buildx colima
-          colima start
 
       - name: "Verify Hash"
         run: |
