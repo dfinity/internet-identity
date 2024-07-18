@@ -1,3 +1,6 @@
+import CodeBlock from "@theme/CodeBlock";
+import IICandidInterface from "!!raw-loader!../src/internet_identity/internet_identity.did";
+
 # The Internet Identity Specification
 
 ## Introduction
@@ -291,11 +294,7 @@ This interface is currently only used by its own frontend. This tight coupling m
 
 The summary is given by the Candid interface:
 
-<!-- The '_attachments/` bit is an implementation detail of the docusaurus deploy -->
-
-``` candid name=https://raw.githubusercontent.com/dfinity/internet-identity/main/src/internet_identity/internet_identity.did
-```
-
+<CodeBlock language="candid">{IICandidInterface}</CodeBlock>
 
 The `init_salt` method is mostly internal, see [Salt](#salt).
 
