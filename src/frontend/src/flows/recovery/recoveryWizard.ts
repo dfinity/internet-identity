@@ -80,6 +80,53 @@ export const addPhrase = ({
   );
 };
 
+type DeviceStatus = "pin-only" | "one-passkey";
+
+const addDeviceWarningTemplate = ({
+  ok,
+  remindLater,
+  doNotRemindAgain,
+  i18n,
+  status,
+}: {
+  ok: () => void;
+  remindLater: () => void;
+  doNotRemindAgain: () => void;
+  i18n: I18n;
+  status: DeviceStatus;
+}): TemplateResult => {
+  const copy = i18n.i18n(copyJson);
+
+  const [paragraph, title] = {
+    "pin-only": [
+      copy.paragraph_add_device_pin_only,
+      copy.add_device_title_pin_only,
+    ],
+    "one-passkey": [
+      copy.paragraph_add_device_one_passkey,
+      copy.add_device_title_one_passkey,
+    ],
+  }[status];
+
+  return infoScreenTemplate({
+    cancel: remindLater,
+    cancelText: copy.remind_later,
+    next: ok,
+    nextText: copy.add_device,
+    additionalAction: doNotRemindAgain,
+    additionalActionText: copy.do_not_remind,
+    title,
+    paragraph,
+    scrollToTop: true,
+    icon: "warning",
+    pageId: "add-another-device-warning",
+    label: copy.label_warning,
+  });
+};
+
+// TODO: Create the `addDeviceWarning` page and use it in `recoveryWizard` function.
+export const addDeviceWarningPage = renderPage(addDeviceWarningTemplate);
+
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,

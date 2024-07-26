@@ -24,6 +24,8 @@ export const infoScreenTemplate = ({
   nextText,
   cancel,
   cancelText,
+  additionalAction,
+  additionalActionText,
   title,
   paragraph,
   entries,
@@ -36,6 +38,8 @@ export const infoScreenTemplate = ({
   nextText: DynamicKey | string;
   cancel: () => void;
   cancelText: DynamicKey | string;
+  additionalAction?: () => void;
+  additionalActionText?: DynamicKey | string;
   title: DynamicKey | string;
   paragraph: TemplateElement;
   entries?: {
@@ -71,6 +75,15 @@ export const infoScreenTemplate = ({
       >
         ${cancelText}
       </button>
+      ${nonNullish(additionalAction)
+        ? html`<button
+            @click=${() => additionalAction()}
+            data-action="additional"
+            class="c-button c-button--textOnly"
+          >
+            ${additionalActionText}
+          </button>`
+        : undefined}
     </div>
     ${nonNullish(entries) && entries.length > 0
       ? html`<section class="c-marketing-block">
