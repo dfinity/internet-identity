@@ -9,6 +9,14 @@
     "skip": "Remind me later",
     "cancel": "Cancel",
 
+    "add_device_title_pin_only": "Add a device",
+    "add_device_title_one_passkey": "Add another device",
+    "add_device": "Add device",
+    "remind_later": "Remind me later",
+    "do_not_remind": "Do not remind me again",
+    "paragraph_add_device_one_passkey": "You only have one passkey attached to this identity. If you lose access to this device, you will lose access to your identity. Add another device to protect your identity.",
+    "paragraph_add_device_pin_only": "You are using a temporary key. If you lose access to this device or clear the storage of the browser, you will lose access to your identity. Add another device to protect your identity.",
+
     "what_is_phrase_q": "What is a recovery phrase?",
     "what_is_phrase_a": "A secret phrase that includes your Internet Identity number and a unique combination of 24 words that represent your private key",
 
