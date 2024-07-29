@@ -5,7 +5,9 @@ import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 
+import { AnchorCredentials } from "$generated/internet_identity_types";
 import { infoScreenTemplate } from "$src/components/infoScreen";
+import { IdentityMetadata } from "$src/repositories/identityMetadata";
 import { isNullish } from "@dfinity/utils";
 import { addDevice } from "../addDevice/manage/addDevice";
 import copyJson from "./recoveryWizard.json";
@@ -145,6 +147,52 @@ export const addDeviceWarning = ({
   );
 };
 
+/**
+ * Helper to encapsulate the logic of when to show the recovery warning page.
+ *
+ * Three conditions must be met for the warning page to be shown:
+ * * Not having seen the recovery page in the last week
+ *    (on registration, the user is not shown the page, but set it as seen to not bother during the onboarding)
+ * * The user has less than one device.
+ *    (a phrase is not considered a device, only normal devices or recovery devices)
+ *    (the pin is not considered a device)
+ * * The user has not disabled the warning.
+ *    (users can choose to not see the warning again by clicking "do not remind" button)
+ *
+ * @param params {Object}
+ * @param params.credentials {AnchorCredentials}
+ * @param params.identityMetadata {IdentityMetadata | undefined}
+ * @param params.nowInMillis {number}
+ * @returns {boolean}
+ */
+// Exported for testing
+export const shouldShowRecoveryWarning = ({
+  credentials,
+  identityMetadata,
+  nowInMillis,
+}: {
+  credentials: AnchorCredentials;
+  identityMetadata: IdentityMetadata | undefined;
+  nowInMillis: number;
+}): boolean => {
+  const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
+  const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
+  const hasNotSeenRecoveryPageLastWeek =
+    (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
+    oneWeekAgoTimestamp;
+  const showWarningPageEnabled = isNullish(
+    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
+  );
+  const hasLessThanOneDevice =
+    credentials.credentials.length + credentials.recovery_credentials.length <=
+    1;
+  return (
+    hasLessThanOneDevice &&
+    hasNotSeenRecoveryPageLastWeek &&
+    showWarningPageEnabled
+  );
+};
+
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
@@ -158,23 +206,9 @@ export const recoveryWizard = async (
       connection.getIdentityMetadata(),
     ])
   );
-
-  const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
   const nowInMillis = Date.now();
-  const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
-  const hasNotSeenRecoveryPageLastWeek =
-    (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
-    oneWeekAgoTimestamp;
-  const showWarningPageEnabled = isNullish(
-    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
-  );
-  const hasLessThanOneDevice =
-    credentials.credentials.length + credentials.recovery_credentials.length <=
-    1;
   if (
-    hasLessThanOneDevice &&
-    hasNotSeenRecoveryPageLastWeek &&
-    showWarningPageEnabled
+    shouldShowRecoveryWarning({ credentials, identityMetadata, nowInMillis })
   ) {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
