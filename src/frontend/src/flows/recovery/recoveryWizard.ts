@@ -4,9 +4,10 @@ import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import { setupRecovery } from "./setupRecovery";
 
 import { infoScreenTemplate } from "$src/components/infoScreen";
+import { isNullish } from "@dfinity/utils";
+import { addDevice } from "../addDevice/manage/addDevice";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -127,6 +128,23 @@ const addDeviceWarningTemplate = ({
 // TODO: Create the `addDeviceWarning` page and use it in `recoveryWizard` function.
 export const addDeviceWarningPage = renderPage(addDeviceWarningTemplate);
 
+// Prompt the user to create a recovery phrase
+export const addDeviceWarning = ({
+  status,
+}: {
+  status: DeviceStatus;
+}): Promise<{ action: "remind-later" | "do-not-remind" | "add-device" }> => {
+  return new Promise((resolve) =>
+    addDeviceWarningPage({
+      i18n: new I18n(),
+      ok: () => resolve({ action: "add-device" }),
+      remindLater: () => resolve({ action: "remind-later" }),
+      doNotRemindAgain: () => resolve({ action: "do-not-remind" }),
+      status,
+    })
+  );
+};
+
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
@@ -134,9 +152,9 @@ export const recoveryWizard = async (
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  const [recoveries, identityMetadata] = await withLoader(() =>
+  const [credentials, identityMetadata] = await withLoader(() =>
     Promise.all([
-      connection.lookupRecovery(userNumber),
+      connection.lookupCredentials(userNumber),
       connection.getIdentityMetadata(),
     ])
   );
@@ -147,16 +165,31 @@ export const recoveryWizard = async (
   const hasNotSeenRecoveryPageLastWeek =
     (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
     oneWeekAgoTimestamp;
-  if (recoveries.length === 0 && hasNotSeenRecoveryPageLastWeek) {
+  const showWarningPageEnabled = isNullish(
+    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
+  );
+  const hasLessThanOneDevice =
+    credentials.credentials.length + credentials.recovery_credentials.length <=
+    1;
+  if (
+    hasLessThanOneDevice &&
+    hasNotSeenRecoveryPageLastWeek &&
+    showWarningPageEnabled
+  ) {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
     });
-    const doAdd = await addPhrase({ intent: "securityReminder" });
-    if (doAdd !== "cancel") {
-      doAdd satisfies "ok";
-
-      await setupRecovery({ userNumber, connection });
+    const userChoice = await addDeviceWarning({ status: "one-passkey" });
+    if (userChoice.action === "add-device") {
+      await addDevice({ userNumber, connection });
     }
+    if (userChoice.action === "do-not-remind") {
+      // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
+      await connection.updateIdentityMetadata({
+        doNotShowRecoveryPageRequestTimestampMillis: nowInMillis,
+      });
+    }
+    // Do nothing if `"remind-later"`.
   }
 };

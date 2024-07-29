@@ -353,3 +353,10 @@ export type OmitParams<T extends (arg: any) => any, A extends string> = (
 // Zip two arrays together
 export const zip = <A, B>(a: A[], b: B[]): [A, B][] =>
   Array.from(Array(Math.min(b.length, a.length)), (_, i) => [a[i], b[i]]);
+
+export const isValidKey = <T>(
+  key: string | number | symbol,
+  keys: Array<keyof T>
+): key is keyof T => {
+  return keys.includes(key as keyof T);
+};
