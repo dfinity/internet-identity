@@ -9,6 +9,7 @@ import { shouldShowRecoveryWarning } from "./recoveryWizard";
 const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
 const nowInMillis = 1722259851155;
 const moreThanAWeekAgo = nowInMillis - ONE_WEEK_MILLIS - 1;
+const lessThanAWeekAgo = nowInMillis - 1;
 
 const noCredentials: AnchorCredentials = {
   credentials: [],
@@ -41,6 +42,12 @@ const oneDeviceAndPhrase: AnchorCredentials = {
 
 const twoDevices: AnchorCredentials = {
   credentials: [device, { ...device }],
+  recovery_credentials: [],
+  recovery_phrases: [[] as PublicKey],
+};
+
+const threeDevices: AnchorCredentials = {
+  credentials: [device, { ...device }, { ...device }],
   recovery_credentials: [],
   recovery_phrases: [[] as PublicKey],
 };
@@ -122,6 +129,19 @@ test("shouldShowRecoveryWarning returns false for user with pin that has disable
   ).toBe(false);
 });
 
+test("shouldShowRecoveryWarning returns false for user with one device that has disabled the warning", () => {
+  expect(
+    shouldShowRecoveryWarning({
+      credentials: oneDeviceOnly,
+      identityMetadata: {
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
+        doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo,
+      },
+      nowInMillis,
+    })
+  ).toBe(false);
+});
+
 test("shouldShowRecoveryWarning returns false for user with two devices", () => {
   expect(
     shouldShowRecoveryWarning({
@@ -140,6 +160,28 @@ test("shouldShowRecoveryWarning returns false for user with one normal device an
       credentials: oneNormalOneRecovery,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
+      },
+      nowInMillis,
+    })
+  ).toBe(false);
+});
+
+test("shouldShowRecoveryWarning returns false for user with more than two devices and empty identity metadata", () => {
+  expect(
+    shouldShowRecoveryWarning({
+      credentials: threeDevices,
+      identityMetadata: {},
+      nowInMillis,
+    })
+  ).toBe(false);
+});
+
+test("shouldShowRecoveryWarning returns false for user with pin and has seen recovery less than a week ago", () => {
+  expect(
+    shouldShowRecoveryWarning({
+      credentials: noCredentials,
+      identityMetadata: {
+        recoveryPageShownTimestampMillis: lessThanAWeekAgo,
       },
       nowInMillis,
     })
