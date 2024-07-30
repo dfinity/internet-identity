@@ -154,8 +154,7 @@ export const addDeviceWarning = ({
  * * Not having seen the recovery page in the last week
  *    (on registration, the user is not shown the page, but set it as seen to not bother during the onboarding)
  * * The user has less than one device.
- *    (a phrase is not considered a device, only normal devices or recovery devices)
- *    (the pin is not considered a device)
+ *    (a phrase and pin are not considered a device, only normal devices or recovery devices)
  * * The user has not disabled the warning.
  *    (users can choose to not see the warning again by clicking "do not remind" button)
  *
