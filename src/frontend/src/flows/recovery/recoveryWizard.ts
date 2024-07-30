@@ -152,7 +152,7 @@ export const addDeviceWarning = ({
 };
 
 /**
- * Helper to encapsulate the logic of when to show the recovery warning page.
+ * Helper to encapsulate the logic of when and which recovery warning page to show.
  *
  * Three conditions must be met for the warning page to be shown:
  * * Not having seen the recovery page in the last week
@@ -162,9 +162,14 @@ export const addDeviceWarning = ({
  * * The user has not disabled the warning.
  *    (users can choose to not see the warning again by clicking "do not remind" button)
  *
+ * If the page is shown, there are two options:
+ * * User has only the pin authentication method.
+ * * User has only one device.
+ *
  * @param params {Object}
  * @param params.credentials {AnchorCredentials}
  * @param params.identityMetadata {IdentityMetadata | undefined}
+ * @param params.pinIdentityMaterial {PinIdentityMaterial | undefined}
  * @param params.nowInMillis {number}
  * @returns {DeviceStatus | "no-warning"}
  */
