@@ -10,6 +10,10 @@ import { infoScreenTemplate } from "$src/components/infoScreen";
 import { IdentityMetadata } from "$src/repositories/identityMetadata";
 import { isNullish } from "@dfinity/utils";
 import { addDevice } from "../addDevice/manage/addDevice";
+import {
+  PinIdentityMaterial,
+  idbRetrievePinIdentityMaterial,
+} from "../pin/idb";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -83,7 +87,7 @@ export const addPhrase = ({
   );
 };
 
-type DeviceStatus = "pin-only" | "one-passkey";
+type DeviceStatus = "pin-only" | "one-device";
 
 const addDeviceWarningTemplate = ({
   ok,
@@ -105,7 +109,7 @@ const addDeviceWarningTemplate = ({
       copy.paragraph_add_device_pin_only,
       copy.add_device_title_pin_only,
     ],
-    "one-passkey": [
+    "one-device": [
       copy.paragraph_add_device_one_passkey,
       copy.add_device_title_one_passkey,
     ],
@@ -162,18 +166,20 @@ export const addDeviceWarning = ({
  * @param params.credentials {AnchorCredentials}
  * @param params.identityMetadata {IdentityMetadata | undefined}
  * @param params.nowInMillis {number}
- * @returns {boolean}
+ * @returns {DeviceStatus | "no-warning"}
  */
 // Exported for testing
-export const shouldShowRecoveryWarning = ({
+export const getDevicesStatus = ({
   credentials,
   identityMetadata,
+  pinIdentityMaterial,
   nowInMillis,
 }: {
   credentials: AnchorCredentials;
   identityMetadata: IdentityMetadata | undefined;
+  pinIdentityMaterial: PinIdentityMaterial | undefined;
   nowInMillis: number;
-}): boolean => {
+}): DeviceStatus | "no-warning" => {
   const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
   const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
   const hasNotSeenRecoveryPageLastWeek =
@@ -182,14 +188,21 @@ export const shouldShowRecoveryWarning = ({
   const showWarningPageEnabled = isNullish(
     identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
   );
-  const hasLessThanOneDevice =
-    credentials.credentials.length + credentials.recovery_credentials.length <=
-    1;
-  return (
-    hasLessThanOneDevice &&
+  const totalDevicesCount =
+    credentials.credentials.length + credentials.recovery_credentials.length;
+  if (
+    totalDevicesCount <= 1 &&
     hasNotSeenRecoveryPageLastWeek &&
     showWarningPageEnabled
-  );
+  ) {
+    if (totalDevicesCount === 0 && !pinIdentityMaterial) {
+      // This should never happen because it means that the user has no devices and no pin.
+      // But we still handle it to avoid a crash assuming there was an error retrieving the pin material.
+      return "pin-only";
+    }
+    return totalDevicesCount === 0 ? "pin-only" : "one-device";
+  }
+  return "no-warning";
 };
 
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
@@ -199,21 +212,33 @@ export const recoveryWizard = async (
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  const [credentials, identityMetadata] = await withLoader(() =>
-    Promise.all([
-      connection.lookupCredentials(userNumber),
-      connection.getIdentityMetadata(),
-    ])
+  const [credentials, identityMetadata, pinIdentityMaterial] = await withLoader(
+    () =>
+      Promise.all([
+        connection.lookupCredentials(userNumber),
+        connection.getIdentityMetadata(),
+        idbRetrievePinIdentityMaterial({
+          userNumber,
+        }),
+      ])
   );
   const nowInMillis = Date.now();
-  if (
-    shouldShowRecoveryWarning({ credentials, identityMetadata, nowInMillis })
-  ) {
+
+  const devivesStatus = getDevicesStatus({
+    credentials,
+    identityMetadata,
+    pinIdentityMaterial,
+    nowInMillis,
+  });
+
+  if (devivesStatus !== "no-warning") {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
     });
-    const userChoice = await addDeviceWarning({ status: "one-passkey" });
+    const userChoice = await addDeviceWarning({
+      status: devivesStatus,
+    });
     if (userChoice.action === "add-device") {
       await addDevice({ userNumber, connection });
     }

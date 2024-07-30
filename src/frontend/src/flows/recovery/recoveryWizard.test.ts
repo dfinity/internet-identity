@@ -4,12 +4,16 @@ import {
   PublicKey,
   WebAuthnCredential,
 } from "$generated/internet_identity_types";
-import { shouldShowRecoveryWarning } from "./recoveryWizard";
+import { PinIdentityMaterial } from "../pin/idb";
+import { getDevicesStatus } from "./recoveryWizard";
 
 const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
 const nowInMillis = 1722259851155;
 const moreThanAWeekAgo = nowInMillis - ONE_WEEK_MILLIS - 1;
 const lessThanAWeekAgo = nowInMillis - 1;
+
+const pinIdentityMaterial: PinIdentityMaterial =
+  {} as unknown as PinIdentityMaterial;
 
 const noCredentials: AnchorCredentials = {
   credentials: [],
@@ -58,132 +62,143 @@ const oneNormalOneRecovery: AnchorCredentials = {
   recovery_phrases: [[] as PublicKey],
 };
 
-test("shouldShowRecoveryWarning returns true for user with pin and has seen recovery longer than a week ago", () => {
+test("getDevicesStatus returns 'pin-only' for user with pin and has seen recovery longer than a week ago", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: noCredentials,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial,
       nowInMillis,
     })
-  ).toBe(true);
+  ).toBe("pin-only");
 });
 
-test("shouldShowRecoveryWarning returns true for user with one passkey and has seen recovery longer than a week ago", () => {
+test("getDevicesStatus returns 'one-device' for user with one passkey and has seen recovery longer than a week ago", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneDeviceOnly,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(true);
+  ).toBe("one-device");
 });
 
-test("shouldShowRecoveryWarning returns true for user with one passkey and empty identity metadata", () => {
+test("getDevicesStatus returns true for user with one passkey and empty identity metadata", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneDeviceOnly,
       identityMetadata: {},
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(true);
+  ).toBe("one-device");
 });
 
-test("shouldShowRecoveryWarning returns true for user with one recovery device and has seen recovery longer than a week ago", () => {
+test("getDevicesStatus returns 'one-device' for user with one recovery device and has seen recovery longer than a week ago", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneRecoveryDeviceOnly,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(true);
+  ).toBe("one-device");
 });
 
-test("shouldShowRecoveryWarning returns true for user with one device and a recovery phrase", () => {
+test("getDevicesStatus returns 'one-device' for user with one device and a recovery phrase", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneDeviceAndPhrase,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(true);
+  ).toBe("one-device");
 });
 
-test("shouldShowRecoveryWarning returns false for user with pin that has disabled the warning", () => {
+test("getDevicesStatus returns 'no-warning' for user with pin that has disabled the warning", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: noCredentials,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
         doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
 
-test("shouldShowRecoveryWarning returns false for user with one device that has disabled the warning", () => {
+test("getDevicesStatus returns 'no-warning' for user with one device that has disabled the warning", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneDeviceOnly,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
         doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
 
-test("shouldShowRecoveryWarning returns false for user with two devices", () => {
+test("getDevicesStatus returns 'no-warning' for user with two devices", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: twoDevices,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
 
-test("shouldShowRecoveryWarning returns false for user with one normal device and a recovery device", () => {
+test("getDevicesStatus returns 'no-warning' for user with one normal device and a recovery device", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: oneNormalOneRecovery,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
 
-test("shouldShowRecoveryWarning returns false for user with more than two devices and empty identity metadata", () => {
+test("getDevicesStatus returns 'no-warning' for user with more than two devices and empty identity metadata", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: threeDevices,
       identityMetadata: {},
+      pinIdentityMaterial: undefined,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
 
-test("shouldShowRecoveryWarning returns false for user with pin and has seen recovery less than a week ago", () => {
+test("getDevicesStatus returns 'no-warning' for user with pin and has seen recovery less than a week ago", () => {
   expect(
-    shouldShowRecoveryWarning({
+    getDevicesStatus({
       credentials: noCredentials,
       identityMetadata: {
         recoveryPageShownTimestampMillis: lessThanAWeekAgo,
       },
+      pinIdentityMaterial,
       nowInMillis,
     })
-  ).toBe(false);
+  ).toBe("no-warning");
 });
