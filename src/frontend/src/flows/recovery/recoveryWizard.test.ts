@@ -104,7 +104,7 @@ test("shouldShowRecoveryWarning returns true for user with one recovery device a
   ).toBe(true);
 });
 
-test("shouldShowRecoveryWarning doesn't count phrase as one device", () => {
+test("shouldShowRecoveryWarning returns true for user with one device and a recovery phrase", () => {
   expect(
     shouldShowRecoveryWarning({
       credentials: oneDeviceAndPhrase,
