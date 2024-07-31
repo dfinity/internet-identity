@@ -229,20 +229,20 @@ export const recoveryWizard = async (
   );
   const nowInMillis = Date.now();
 
-  const devivesStatus = getDevicesStatus({
+  const devicesStatus = getDevicesStatus({
     credentials,
     identityMetadata,
     pinIdentityMaterial,
     nowInMillis,
   });
 
-  if (devivesStatus !== "no-warning") {
+  if (devicesStatus !== "no-warning") {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
     });
     const userChoice = await addDeviceWarning({
-      status: devivesStatus,
+      status: devicesStatus,
     });
     if (userChoice.action === "add-device") {
       await addDevice({ userNumber, connection });
