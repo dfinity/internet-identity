@@ -157,12 +157,12 @@ export const addDeviceWarning = ({
  * Three conditions must be met for the warning page to be shown:
  * * Not having seen the recovery page in the last week
  *    (on registration, the user is not shown the page, but set it as seen to not bother during the onboarding)
- * * The user has less than one device.
+ * * The user has at most one device.
  *    (a phrase and pin are not considered a device, only normal devices or recovery devices)
  * * The user has not disabled the warning.
  *    (users can choose to not see the warning again by clicking "do not remind" button)
  *
- * If the page is shown, there are two options:
+ * When the warning page is shown, two different messages could be displayed:
  * * User has only the pin authentication method.
  * * User has only one device.
  *
