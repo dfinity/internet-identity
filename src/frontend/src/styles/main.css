@@ -1126,7 +1126,7 @@ a:hover,
     order: 2;
 
     padding: 0;
-    margin-top: var(--rs-split-page-stack);
+    margin-top: var(--rs-split-page-stack--large);
     padding-bottom: var(--rs-split-page-stack);
 
     gap: var(--rs-split-page-stack--large);
