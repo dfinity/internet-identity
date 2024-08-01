@@ -400,10 +400,10 @@
     "logo": "kinic_logo.webp"
   },
   {
-    "name": "The Asset App",
+    "name": "ubin",
     "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
     "logo": "asset-app_logo.png",
-    "oneLiner": "Allows any user to generate their own file canister smart contract and visually manage their files on the Internet Computer without requiring any code"
+    "oneLiner": "Allows you to seamlessly launch your file storage smart contracts on ICP and interact with them via a file explorer in the browser."
   },
   {
     "name": "icgpt",
@@ -552,5 +552,36 @@
       "https://az5sd-cqaaa-aaaae-aaarq-cai.ic0.app/"
     ],
     "logo": "distrikt_logo.webp"
+  },
+  {
+    "name": "CLP Finance",
+    "oneLiner": "A decentralized financial protocol with low-cost, efficient, and secure digital asset lending services to borrow CUSD using ICP, ckETH, or ckBTC.",
+    "website": "https://www.clp.finance/",
+    "logo": "clpfinance_logo.png"
+  },
+  {
+    "name": "Dotmeet",
+    "oneLiner": "A city-based events calendar app helping web3 communities and companies in effectively reaching their target audience within cities.",
+    "website": "https://dotmeet.app/",
+    "logo": "dotmeet_logo.webp"
+  },
+  {
+    "name": "Doxa",
+    "oneLiner": "A multi-stablecoin plartform with the doxa dollar.",
+    "website": "https://i7m4z-gqaaa-aaaak-qddtq-cai.icp0.io/",
+    "logo": "doxa_logo.webp"
+  },
+  {
+    "name": "Staex VTS",
+    "oneLiner": "A vehicle tracking system that serves as an infrastructure to track and invoice vehicles.",
+    "website": "https://staex.io",
+    "logo": "staex_logo.png"
+  },
+  {
+    "name": "Zon Social Media",
+    "oneLiner": "A fusion of social network, marketplace, and Web directory.",
+    "website": "https://zoncircle.com",
+    "logo": "zon_logo.webp",
+    "authOrigins": "https://zoncircle.com"
   }
 ]
