@@ -1,19 +1,26 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
 import {
+  DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
   IdentityMetadata,
   IdentityMetadataRepository,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "./identityMetadata";
 
 const recoveryPageShownTimestampMillis = 1234567890;
+const doNotShowRecoveryPageRequestTimestampMillis = 3456789012;
 const mockRawMetadata: MetadataMapV2 = [
   [
     RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
     { String: String(recoveryPageShownTimestampMillis) },
   ],
+  [
+    DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
+    { String: String(doNotShowRecoveryPageRequestTimestampMillis) },
+  ],
 ];
 const mockIdentityMetadata: IdentityMetadata = {
   recoveryPageShownTimestampMillis,
+  doNotShowRecoveryPageRequestTimestampMillis,
 };
 
 const getterMockSuccess = vi.fn().mockResolvedValue(mockRawMetadata);
@@ -66,9 +73,78 @@ test("IdentityMetadataRepository returns undefined without raising an error if f
   expect(console.warn).toHaveBeenCalledTimes(1);
 });
 
+test("IdentityMetadataRepository changes partial data in memory", async () => {
+  const instance = IdentityMetadataRepository.init({
+    getter: getterMockSuccess,
+    setter: setterMockSuccess,
+  });
+
+  const newRecoveryPageShownTimestampMillis = 9876543210;
+  await instance.updateMetadata({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      doNotShowRecoveryPageRequestTimestampMillis,
+  });
+});
+
 test("IdentityMetadataRepository changes data in memory", async () => {
   const instance = IdentityMetadataRepository.init({
     getter: getterMockSuccess,
+    setter: setterMockSuccess,
+  });
+
+  const newRecoveryPageShownTimestampMillis = 9876543210;
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
+  await instance.updateMetadata({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+});
+
+test("IdentityMetadataRepository sets data from partial data in memory", async () => {
+  const partialMetadata: MetadataMapV2 = [
+    [
+      RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
+      { String: String(recoveryPageShownTimestampMillis) },
+    ],
+  ];
+  const instance = IdentityMetadataRepository.init({
+    getter: vi.fn().mockResolvedValue(partialMetadata),
+    setter: setterMockSuccess,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: recoveryPageShownTimestampMillis,
+  });
+
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
+  await instance.updateMetadata({
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: recoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+});
+
+test("IdentityMetadataRepository sets partial data in memory", async () => {
+  const noMetadata: MetadataMapV2 = [];
+  const instance = IdentityMetadataRepository.init({
+    getter: vi.fn().mockResolvedValue(noMetadata),
     setter: setterMockSuccess,
   });
 
@@ -90,12 +166,17 @@ test("IdentityMetadataRepository sets data in memory", async () => {
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
   await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
   });
 
   expect(await instance.getMetadata()).toEqual({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
   });
 });
 
@@ -106,8 +187,11 @@ test("IdentityMetadataRepository commits updated metadata to canister", async ()
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
   await instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
   });
 
   expect(setterMockSuccess).not.toHaveBeenCalled();
@@ -118,6 +202,10 @@ test("IdentityMetadataRepository commits updated metadata to canister", async ()
     [
       RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
       { String: String(newRecoveryPageShownTimestampMillis) },
+    ],
+    [
+      DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
+      { String: String(newDoNotShowRecoveryPageRequestTimestampMillis) },
     ],
   ]);
 });
@@ -141,8 +229,11 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
   const newMetadata = {
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
   };
   await instance.updateMetadata(newMetadata);
 
@@ -155,6 +246,10 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
     [
       RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
       { String: String(newRecoveryPageShownTimestampMillis) },
+    ],
+    [
+      DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
+      { String: String(newDoNotShowRecoveryPageRequestTimestampMillis) },
     ],
   ]);
 
@@ -190,10 +285,54 @@ test("IdentityMetadataRepository commits additional metadata to canister after u
 
   expect(setterMockSuccess).toHaveBeenCalledTimes(1);
   expect(setterMockSuccess).toHaveBeenCalledWith([
-    anotherMetadataEntry,
     [
       RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
       { String: String(newRecoveryPageShownTimestampMillis) },
+    ],
+    anotherMetadataEntry,
+  ]);
+});
+
+test("IdentityMetadataRepository commits from initial partial data after adding more partial data", async () => {
+  const partialMetadata: MetadataMapV2 = [
+    [
+      RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
+      { String: String(recoveryPageShownTimestampMillis) },
+    ],
+  ];
+  const instance = IdentityMetadataRepository.init({
+    getter: vi.fn().mockResolvedValue(partialMetadata),
+    setter: setterMockSuccess,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: recoveryPageShownTimestampMillis,
+  });
+
+  const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
+  await instance.updateMetadata({
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+
+  expect(await instance.getMetadata()).toEqual({
+    recoveryPageShownTimestampMillis: recoveryPageShownTimestampMillis,
+    doNotShowRecoveryPageRequestTimestampMillis:
+      newDoNotShowRecoveryPageRequestTimestampMillis,
+  });
+
+  expect(setterMockSuccess).not.toHaveBeenCalled();
+  await instance.commitMetadata();
+
+  expect(setterMockSuccess).toHaveBeenCalledTimes(1);
+  expect(setterMockSuccess).toHaveBeenCalledWith([
+    [
+      RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
+      { String: String(recoveryPageShownTimestampMillis) },
+    ],
+    [
+      DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
+      { String: String(newDoNotShowRecoveryPageRequestTimestampMillis) },
     ],
   ]);
 });

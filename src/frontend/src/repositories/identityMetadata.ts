@@ -1,30 +1,73 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
+import { isValidKey } from "$src/utils/utils";
 
 export type IdentityMetadata = {
   recoveryPageShownTimestampMillis?: number;
+  doNotShowRecoveryPageRequestTimestampMillis?: number;
 };
 
 export const RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS =
   "recoveryPageShownTimestampMillis";
+export const DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS =
+  "doNotShowRecoveryPageRequestTimestampMillis";
+const NUMBER_KEYS: Array<keyof IdentityMetadata> = [
+  RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
+  DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
+];
 
 const convertMetadata = (rawMetadata: MetadataMapV2): IdentityMetadata => {
-  const recoveryPageEntry = rawMetadata.find(
-    ([key]) => key === RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS
-  );
-  if (recoveryPageEntry === undefined) {
-    return {};
-  }
-  const stringValue = recoveryPageEntry[1];
-  if ("String" in stringValue) {
-    const recoveryPageShownTimestampMillis = Number(stringValue.String);
-    if (isNaN(recoveryPageShownTimestampMillis)) {
-      return {};
+  return rawMetadata.reduce((acc, [key, value]) => {
+    if (isValidKey(key, NUMBER_KEYS)) {
+      if (!("String" in value)) {
+        return acc;
+      }
+      const stringValue = value.String;
+      const numberValue = Number(stringValue);
+      if (!isNaN(numberValue)) {
+        // We need to cast the key because TS is not smart enough to
+        acc[key] = numberValue;
+      }
     }
-    return {
-      recoveryPageShownTimestampMillis,
-    };
-  }
-  return {};
+    return acc;
+  }, {} as IdentityMetadata);
+};
+
+const updateMetadataMapV2 = ({
+  metadataMap,
+  partialIdentityMetadata,
+}: {
+  metadataMap: MetadataMapV2;
+  partialIdentityMetadata: Partial<IdentityMetadata>;
+}): MetadataMapV2 => {
+  // Convert the partialIdentityMetadata into the format of MetadataMapV2
+  const identityMetadataEntries: MetadataMapV2 = Object.entries(
+    partialIdentityMetadata
+  ).map(([key, value]) => {
+    if (typeof value === "number") {
+      return [key, { String: value.toString() }] as [
+        string,
+        { String: string }
+      ];
+    }
+    return [key, { String: value as string }] as [string, { String: string }];
+  });
+
+  // Update or add entries in metadataMap
+  const updatedMetadataMap: MetadataMapV2 = metadataMap.map(([key, value]) => {
+    const updatedEntry = identityMetadataEntries.find(
+      ([identityKey]) => identityKey === key
+    );
+    return updatedEntry ? updatedEntry : [key, value];
+  });
+
+  // Add new entries that were not in the original metadataMap
+  identityMetadataEntries.forEach(([identityKey, identityValue]) => {
+    if (!metadataMap.some(([key]) => key === identityKey)) {
+      updatedMetadataMap.push([identityKey, identityValue]);
+    }
+  });
+
+  return updatedMetadataMap;
 };
 
 type MetadataGetter = () => Promise<MetadataMapV2>;
@@ -116,8 +159,8 @@ export class IdentityMetadataRepository {
     let currentWait = 0;
     const MAX_WAIT_MILLIS = 10_000;
     const ONE_WAIT_MILLIS = 1_000;
-    while (this.rawMetadata === "loading" || currentWait < MAX_WAIT_MILLIS) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    while (this.rawMetadata === "loading" && currentWait < MAX_WAIT_MILLIS) {
+      await new Promise((resolve) => setTimeout(resolve, ONE_WAIT_MILLIS));
       currentWait += ONE_WAIT_MILLIS;
     }
   };
@@ -155,19 +198,11 @@ export class IdentityMetadataRepository {
   ): Promise<void> => {
     await this.waitUntilMetadataIsLoaded();
     if (this.metadataIsLoaded(this.rawMetadata)) {
-      let updatedMetadata: MetadataMapV2 = [...this.rawMetadata];
       this.updatedMetadata = true;
-      updatedMetadata = updatedMetadata
-        .filter(([key]) => key !== RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS)
-        .concat([
-          [
-            RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-            {
-              String: String(partialMetadata.recoveryPageShownTimestampMillis),
-            },
-          ],
-        ]);
-      this.rawMetadata = updatedMetadata;
+      this.rawMetadata = updateMetadataMapV2({
+        metadataMap: this.rawMetadata,
+        partialIdentityMetadata: partialMetadata,
+      });
     }
     // Do nothing if the metadata is not loaded.
   };
