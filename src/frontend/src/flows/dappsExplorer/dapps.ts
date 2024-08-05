@@ -22,12 +22,19 @@ export class KnownDapp {
   // * the website
   // * any (some) of the authOrigins
   hasOrigin(orig: string): boolean {
-    return (
-      orig === new URL(this.descr.website).origin ||
-      (this.descr.authOrigins ?? []).some(
+    if (orig === this.descr.website) {
+      return true;
+    }
+    if (typeof this.descr.authOrigins === "string") {
+      return (
+        // If authOrigins is a string, it's a single origin
+        orig === new URL(this.descr.authOrigins).origin
+      );
+    } else {
+      return (this.descr.authOrigins ?? []).some(
         (authOrigin) => orig === new URL(authOrigin).origin
-      )
-    );
+      );
+    }
   }
 
   // Path to use for logo files
