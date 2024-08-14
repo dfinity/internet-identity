@@ -601,5 +601,11 @@
     "oneLiner": "BIT10 is the S&P500 of Bitcoin DeFi Assets",
     "website": "https://www.bit10.app",
     "logo": "bit10_logo.webp"
+  },
+  {
+    "name": "Aegis Finance",
+    "website": "https://aegis-finance.vercel.app/",
+    "logo": "aegis-finance_logo.webp",
+    "oneLiner": "Unlocking financial freedom, block by block."
   }
 ]
