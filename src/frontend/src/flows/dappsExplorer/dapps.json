@@ -603,6 +603,24 @@
     "logo": "bit10_logo.webp"
   },
   {
+    "name": "Bridge 23",
+    "oneLiner": "Bridge 23 is a fully featured data marketplace running on ICP where everyone can sell their data directly to merchants, companies and institutions.",
+    "website": "https://alpha.bridge23.app/login",
+    "logo": "bridge23_logo.png"
+  },
+  {
+    "name": "Event Hub",
+    "oneLiner": "Event Hub Broadcaster is an event-driven system managed by Attention DAO for connecting ecosystem projects on ICP.",
+    "website": "https://attentiondao.app/dao",
+    "logo": "eventhub_logo.png"
+  },
+  {
+    "name": "Gate23",
+    "oneLiner": "Gate23 is an advanced point-of-sale (POS) and business software designed specifically for the food and beverage, e-commerce, and retail industries.",
+    "website": "https://alpha-gate23.bridge23.app/",
+    "logo": "Gate23_logo.png"
+  },
+  {
     "name": "Aegis Finance",
     "website": "https://aegis-finance.vercel.app/",
     "logo": "aegis-finance_logo.webp",
