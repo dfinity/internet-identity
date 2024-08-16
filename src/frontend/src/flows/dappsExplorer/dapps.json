@@ -430,8 +430,8 @@
     "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
   },
   {
-    "name": "UncensoredGreats",
-    "website": "https://www.uncensoredgreats.com/",
+    "name": "Alexandria",
+    "website": "https://lbry.app/",
     "logo": "UncensoredGreatsLogo.png",
     "oneLiner": "Migrating all the World's Books to NFT-form for use in domain-specific AI"
   },
@@ -555,7 +555,7 @@
   },
   {
     "name": "CLP Finance",
-    "oneLiner": "A decentralized financial protocol with low-cost, efficient, and secure digital asset lending services to borrow CUSD using ICP, ckETH, or ckBTC.",
+    "oneLiner": "A liquidity protocol and native stablecoin that allows users to deposit assets, borrow stablecoins at zero interest.",
     "website": "https://www.clp.finance/",
     "logo": "clpfinance_logo.png"
   },
@@ -572,6 +572,18 @@
     "logo": "doxa_logo.webp"
   },
   {
+    "name": "Fomowell",
+    "oneLiner": "The fairest Web3 project launch platform.",
+    "website": "https://fomowell.com/",
+    "logo": "fomowell_logo.png"
+  },
+  {
+    "name": "Metaviz",
+    "oneLiner": "A visual project collaboration workspace.",
+    "website": "https://www.metaviz.net/",
+    "logo": "metaviz_logo.png"
+  },
+  {
     "name": "Staex VTS",
     "oneLiner": "A vehicle tracking system that serves as an infrastructure to track and invoice vehicles.",
     "website": "https://staex.io",
@@ -583,5 +595,35 @@
     "website": "https://zoncircle.com",
     "logo": "zon_logo.webp",
     "authOrigins": "https://zoncircle.com"
+  },
+  {
+    "name": "BIT10",
+    "oneLiner": "BIT10 is the S&P500 of Bitcoin DeFi Assets",
+    "website": "https://www.bit10.app",
+    "logo": "bit10_logo.webp"
+  },
+  {
+    "name": "Bridge 23",
+    "oneLiner": "Bridge 23 is a fully featured data marketplace running on ICP where everyone can sell their data directly to merchants, companies and institutions.",
+    "website": "https://alpha.bridge23.app/login",
+    "logo": "bridge23_logo.png"
+  },
+  {
+    "name": "Event Hub",
+    "oneLiner": "Event Hub Broadcaster is an event-driven system managed by Attention DAO for connecting ecosystem projects on ICP.",
+    "website": "https://attentiondao.app/dao",
+    "logo": "eventhub_logo.png"
+  },
+  {
+    "name": "Gate23",
+    "oneLiner": "Gate23 is an advanced point-of-sale (POS) and business software designed specifically for the food and beverage, e-commerce, and retail industries.",
+    "website": "https://alpha-gate23.bridge23.app/",
+    "logo": "Gate23_logo.png"
+  },
+  {
+    "name": "Aegis Finance",
+    "website": "https://aegis-finance.vercel.app/",
+    "logo": "aegis-finance_logo.webp",
+    "oneLiner": "Unlocking financial freedom, block by block."
   }
 ]
