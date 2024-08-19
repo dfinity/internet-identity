@@ -10,7 +10,7 @@ import { showSpinner } from "$src/components/spinner";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
-import { setKnownPrincipal } from "$src/storage";
+import { getAnchorByPrincipal, setKnownPrincipal } from "$src/storage";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
@@ -188,6 +188,14 @@ const authenticate = async (
     };
   }
 
+  let autoSelectIdentity = undefined;
+  if (nonNullish(authContext.authRequest.autoSelectMatchingIdentity)) {
+    autoSelectIdentity = await getAnchorByPrincipal({
+      origin: authContext.requestOrigin,
+      principal: authContext.authRequest.autoSelectMatchingIdentity,
+    });
+  }
+
   const authSuccess = await authenticateBox({
     connection,
     i18n,
@@ -201,6 +209,7 @@ const authenticate = async (
     }),
     allowPinAuthentication:
       authContext.authRequest.allowPinAuthentication ?? true,
+    autoSelectIdentity,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add

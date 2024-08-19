@@ -1,5 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { zodPrincipal } from "@dfinity/internet-identity-vc-api";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";
 
@@ -41,6 +42,7 @@ export const AuthRequest = z.object({
     }),
   derivationOrigin: z.optional(z.string()),
   allowPinAuthentication: z.optional(z.boolean()),
+  autoSelectMatchingIdentity: z.optional(zodPrincipal),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;
