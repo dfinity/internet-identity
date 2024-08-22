@@ -11,15 +11,15 @@ use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
-use ic_test_state_machine_client::{CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, ChallengeAttempt, FrontendHostname, MetadataEntryV2,
 };
+use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
 #[test]
@@ -168,11 +168,8 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
     for metric in metrics {
         let (_, metric_timestamp) = parse_metric(&metrics_body, metric);
         assert_eq!(
-            env.time()
-                .duration_since(metric_timestamp)
-                .unwrap()
-                .as_secs(),
-            0,
+            metric_timestamp,
+            Duration::from_nanos(time(&env)).as_millis() as u64,
             "metric timestamp did not match state machine time"
         )
     }
@@ -335,7 +332,7 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_last_upgrade_timestamp",
-        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos() as f64,
+        time(&env) as f64,
     );
 
     env.advance_time(Duration::from_secs(300)); // the state machine does not advance time on its own
@@ -344,7 +341,7 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_last_upgrade_timestamp",
-        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos() as f64,
+        time(&env) as f64,
     );
     Ok(())
 }
@@ -754,7 +751,7 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
 }
 
 fn verify_response_certification(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     request: HttpRequest,
     http_response: HttpResponse,
@@ -776,7 +773,7 @@ fn verify_response_certification(
         canister_id.as_slice(),
         time(env) as u128,
         Duration::from_secs(300).as_nanos(),
-        &env.root_key(),
+        &env.root_key().unwrap(),
         min_certification_version as u8,
     )
     .unwrap_or_else(|e| panic!("validation failed: {e}"))

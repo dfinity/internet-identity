@@ -8,10 +8,10 @@ use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_canister, time, II_WASM};
-use ic_test_state_machine_client::CallError;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, DeviceData, DeviceWithUsage, IdentityInfoError, MetadataEntry,
 };
+use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;

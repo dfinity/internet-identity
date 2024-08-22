@@ -3,7 +3,6 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use ic_test_state_machine_client::CallError;
 use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
 use identity_jose::jwu::encode_b64;
@@ -11,6 +10,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, PrepareIdAliasError, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
+use pocket_ic::CallError;
 use std::ops::Deref;
 use vc_util::verify_credential_jws_with_canister_id;
 
@@ -77,13 +77,14 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
     let canister_sig_pk =
         CanisterSigPublicKey::try_from(prepared_id_alias.canister_sig_pk_der.as_ref())
             .expect("failed parsing canister sig pk");
+    let root_key = env.root_key().unwrap();
     let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&root_key).expect("Failed decoding IC root key.");
     verify_id_alias_credential_via_env(
         &env,
         prepared_id_alias.canister_sig_pk_der.clone(),
         &id_alias_credentials.rp_id_alias_credential,
-        &env.root_key(),
+        &root_key,
     );
     verify_credential_jws_with_canister_id(
         &id_alias_credentials.rp_id_alias_credential.credential_jws,
@@ -96,7 +97,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
         &env,
         prepared_id_alias.canister_sig_pk_der.clone(),
         &id_alias_credentials.issuer_id_alias_credential,
-        &env.root_key(),
+        &root_key,
     );
     verify_credential_jws_with_canister_id(
         &id_alias_credentials
@@ -196,8 +197,8 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    let root_pk_raw = extract_raw_root_pk_from_der(&env.root_key().unwrap())
+        .expect("Failed decoding IC root key.");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
@@ -322,8 +323,8 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    let root_pk_raw = extract_raw_root_pk_from_der(&env.root_key().unwrap())
+        .expect("Failed decoding IC root key.");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
@@ -449,8 +450,8 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    let root_pk_raw = extract_raw_root_pk_from_der(&env.root_key().unwrap())
+        .expect("Failed decoding IC root key.");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
@@ -566,8 +567,8 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
         id_alias_credentials_2.issuer_id_alias_credential.id_alias
     );
 
-    let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+    let root_pk_raw = extract_raw_root_pk_from_der(&env.root_key().unwrap())
+        .expect("Failed decoding IC root key.");
     verify_credential_jws_with_canister_id(
         &id_alias_credentials_1.rp_id_alias_credential.credential_jws,
         &canister_sig_pk_1.canister_id,
@@ -774,17 +775,18 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
         id_alias_credentials.issuer_id_alias_credential.id_alias
     );
 
+    let root_key = env.root_key().unwrap();
     verify_id_alias_credential_via_env(
         &env,
         prepared_id_alias.canister_sig_pk_der.clone(),
         &id_alias_credentials.rp_id_alias_credential,
-        &env.root_key(),
+        &root_key,
     );
     verify_id_alias_credential_via_env(
         &env,
         prepared_id_alias.canister_sig_pk_der.clone(),
         &id_alias_credentials.issuer_id_alias_credential,
-        &env.root_key(),
+        &root_key,
     );
 
     let mut bad_canister_sig_key = prepared_id_alias.canister_sig_pk_der.clone();
@@ -797,6 +799,6 @@ fn should_not_validate_id_alias_with_wrong_canister_key() {
         &env,
         bad_canister_sig_key,
         &id_alias_credentials.rp_id_alias_credential,
-        &env.root_key(),
+        &root_key,
     );
 }

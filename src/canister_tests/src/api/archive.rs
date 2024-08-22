@@ -1,13 +1,12 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::{
-    call_candid, call_candid_as, query_candid, CallError, StateMachine,
-};
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::common::rest::RawEffectivePrincipal;
+use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
 
 pub fn add_entry(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor: AnchorNumber,
@@ -17,6 +16,7 @@ pub fn add_entry(
     call_candid_as(
         env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "write_entry",
         (anchor, timestamp, entry),
@@ -24,7 +24,7 @@ pub fn add_entry(
 }
 
 pub fn get_entries(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     idx: Option<u64>,
     limit: Option<u16>,
@@ -33,7 +33,7 @@ pub fn get_entries(
 }
 
 pub fn get_anchor_entries(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     anchor: AnchorNumber,
     cursor: Option<Cursor>,
@@ -48,8 +48,8 @@ pub fn get_anchor_entries(
     .map(|(x,)| x)
 }
 
-pub fn status(env: &StateMachine, canister_id: CanisterId) -> Result<ArchiveStatus, CallError> {
-    call_candid(env, canister_id, "status", ()).map(|(x,)| x)
+pub fn status(env: &PocketIc, canister_id: CanisterId) -> Result<ArchiveStatus, CallError> {
+    call_candid(env, canister_id, RawEffectivePrincipal::None, "status", ()).map(|(x,)| x)
 }
 
 /// A "compatibility" module for the previous version of the archive to handle API changes.

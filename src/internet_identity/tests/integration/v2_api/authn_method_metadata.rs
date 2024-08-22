@@ -6,12 +6,12 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     env, expect_user_error_with_message, install_ii_canister, II_WASM,
 };
-use ic_test_state_machine_client::CallError;
-use ic_test_state_machine_client::ErrorCode::CanisterCalledTrap;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodMetadataReplaceError, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, MetadataEntryV2,
 };
+use pocket_ic::CallError;
+use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
