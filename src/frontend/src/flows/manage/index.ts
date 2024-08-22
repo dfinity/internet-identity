@@ -244,9 +244,8 @@ export const renderManage = async ({
     let anchorInfo: IdentityAnchorInfo;
     try {
       // Ignore the `commitMetadata` response, it's not critical for the application.
-      [anchorInfo] = await withLoader(() =>
-        Promise.all([connection.getAnchorInfo(), connection.commitMetadata()])
-      );
+      void connection.commitMetadata();
+      anchorInfo = await withLoader(() => connection.getAnchorInfo());
     } catch (error: unknown) {
       await displayFailedToListDevices(
         error instanceof Error ? error : unknownError()
