@@ -25,7 +25,7 @@ const mockIdentityMetadata: IdentityMetadata = {
 
 const getterMockSuccess = vi.fn().mockResolvedValue(mockRawMetadata);
 const getterMockError = vi.fn().mockImplementation(() => {
-  throw new Error("test error");
+  return Promise.reject(Error("test error"));
 });
 const setterMockSuccess = vi.fn();
 const setterMockError = vi.fn().mockRejectedValue("test error");
@@ -64,12 +64,11 @@ test("IdentityMetadataRepository returns undefined without raising an error if f
     setter: setterMockSuccess,
   });
 
-  // Error is not thrown, but warnings is logged.
-  expect(console.warn).toHaveBeenCalledTimes(1);
   expect(getterMockError).toHaveBeenCalledTimes(1);
 
   expect(await instance.getMetadata()).toEqual(undefined);
   expect(getterMockError).toHaveBeenCalledTimes(1);
+  // Error is not thrown, but warnings is logged.
   expect(console.warn).toHaveBeenCalledTimes(1);
 });
 
