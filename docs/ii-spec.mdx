@@ -234,7 +234,7 @@ This feature is intended to allow more flexibility with respect to the origins o
 `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 :::
 
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://internetcomputer.org/docs/current/references/http-gateway-protocol-spec)).
 
 
 ### JSON Schema {#alternative-frontend-origins-schema}
