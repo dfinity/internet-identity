@@ -11,7 +11,7 @@ export const VcFlowReady = {
   method: "vc-flow-ready",
 };
 
-export const zodPrincipal = z.string().transform((val, ctx) => {
+const zodPrincipal = z.string().transform((val, ctx) => {
   let principal;
   try {
     principal = Principal.fromText(val);
