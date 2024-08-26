@@ -66,13 +66,13 @@ export const authenticateBox = async ({
   i18n,
   templates,
   allowPinAuthentication,
-  autoSelectIdentity,
+  autoSelectionIdentity,
 }: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
   allowPinAuthentication: boolean;
-  autoSelectIdentity?: bigint;
+  autoSelectionIdentity?: bigint;
 }): Promise<{
   userNumber: bigint;
   connection: AuthenticatedConnection;
@@ -107,7 +107,7 @@ export const authenticateBox = async ({
   // Retry until user has successfully authenticated
   for (;;) {
     try {
-      const result = await promptAuth(autoSelectIdentity);
+      const result = await promptAuth(autoSelectionIdentity);
 
       // If the user canceled or just added a device, we retry
       if ("tag" in result) {
@@ -131,7 +131,7 @@ export const authenticateBox = async ({
     }
     // clear out the auto-select so that after the first error / cancel
     // the identity number picker actually waits for input
-    autoSelectIdentity = undefined;
+    autoSelectionIdentity = undefined;
   }
 };
 

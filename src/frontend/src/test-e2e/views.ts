@@ -874,8 +874,8 @@ export class DemoAppView extends View {
     await fillText(this.browser, "derivationOrigin", derivationOrigin);
   }
 
-  async setKnownAutoSelectPrincipal(principal: string): Promise<void> {
-    await fillText(this.browser, "bypassKnownPrincipal", principal);
+  async setAutoSelectionPrincipal(principal: string): Promise<void> {
+    await fillText(this.browser, "autoSelectionPrincipal", principal);
   }
 
   async whoami(): Promise<string> {

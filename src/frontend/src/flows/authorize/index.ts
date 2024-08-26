@@ -188,11 +188,11 @@ const authenticate = async (
     };
   }
 
-  let autoSelectIdentity = undefined;
-  if (nonNullish(authContext.authRequest.autoSelectMatchingIdentity)) {
-    autoSelectIdentity = await getAnchorByPrincipal({
+  let autoSelectionIdentity = undefined;
+  if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
+    autoSelectionIdentity = await getAnchorByPrincipal({
       origin: authContext.requestOrigin,
-      principal: authContext.authRequest.autoSelectMatchingIdentity,
+      principal: authContext.authRequest.autoSelectionPrincipal,
     });
   }
 
@@ -209,7 +209,7 @@ const authenticate = async (
     }),
     allowPinAuthentication:
       authContext.authRequest.allowPinAuthentication ?? true,
-    autoSelectIdentity,
+    autoSelectionIdentity: autoSelectionIdentity,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add

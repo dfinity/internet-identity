@@ -68,8 +68,8 @@ const maxTimeToLiveEl = document.getElementById(
 const derivationOriginEl = document.getElementById(
   "derivationOrigin"
 ) as HTMLInputElement;
-const bypassKnownPrincipalEl = document.getElementById(
-  "bypassKnownPrincipal"
+const autoSelectionPrincipalEl = document.getElementById(
+  "autoSelectionPrincipal"
 ) as HTMLInputElement;
 const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication"
@@ -225,9 +225,9 @@ const init = async () => {
       maxTimeToLive_ > BigInt(0) ? maxTimeToLive_ : authClientDefaultMaxTTL;
     const derivationOrigin =
       derivationOriginEl.value !== "" ? derivationOriginEl.value : undefined;
-    const autoSelectMatchingIdentity =
-      bypassKnownPrincipalEl.value !== ""
-        ? bypassKnownPrincipalEl.value
+    const autoSelectionPrincipal =
+      autoSelectionPrincipalEl.value !== ""
+        ? autoSelectionPrincipalEl.value
         : undefined;
 
     const allowPinAuthentication = allowPinAuthenticationEl.checked
@@ -241,7 +241,7 @@ const init = async () => {
         derivationOrigin,
         allowPinAuthentication,
         sessionIdentity: getLocalIdentity(),
-        autoSelectMatchingIdentity,
+        autoSelectionPrincipal,
       });
       delegationIdentity = result.identity;
       updateDelegationView({

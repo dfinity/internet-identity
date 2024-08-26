@@ -17,7 +17,7 @@ test("Should prompt for passkey auth immediately when supplying known auto-selec
 
     // authenticate again, but this time _with_ a known principal
     const knownPrincipal = await demoAppView.getPrincipal();
-    await demoAppView.setKnownAutoSelectPrincipal(knownPrincipal);
+    await demoAppView.setAutoSelectionPrincipal(knownPrincipal);
     await demoAppView.signin();
 
     // add credential previously registered to the new tab again
@@ -48,7 +48,7 @@ test("Should require user interaction when supplying unknown auto-select princip
 
     // authenticate again, but this time with an unknown principal
     // we use a canister id here, because II will never issue a canister id to users, but it is a valid principal
-    await demoAppView.setKnownAutoSelectPrincipal(
+    await demoAppView.setAutoSelectionPrincipal(
       "rdmx6-jaaaa-aaaaa-aaadq-cai"
     );
     await demoAppView.signin();

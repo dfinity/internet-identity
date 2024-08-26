@@ -42,7 +42,7 @@ export const AuthRequest = z.object({
     }),
   derivationOrigin: z.optional(z.string()),
   allowPinAuthentication: z.optional(z.boolean()),
-  autoSelectMatchingIdentity: z.optional(zodPrincipal),
+  autoSelectionPrincipal: z.optional(zodPrincipal),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;

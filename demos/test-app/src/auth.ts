@@ -29,13 +29,13 @@ export const authWithII = async ({
   allowPinAuthentication,
   derivationOrigin,
   sessionIdentity,
-  autoSelectMatchingIdentity,
+  autoSelectionPrincipal,
 }: {
   url: string;
   maxTimeToLive?: bigint;
   allowPinAuthentication?: boolean;
   derivationOrigin?: string;
-  autoSelectMatchingIdentity?: string;
+  autoSelectionPrincipal?: string;
   sessionIdentity: SignIdentity;
 }): Promise<{ identity: DelegationIdentity; authnMethod: string }> => {
   // Figure out the II URL to use
@@ -76,7 +76,7 @@ export const authWithII = async ({
     maxTimeToLive,
     derivationOrigin,
     allowPinAuthentication,
-    autoSelectMatchingIdentity,
+    autoSelectionPrincipal,
   };
 
   win.postMessage(request, iiUrl.origin);
