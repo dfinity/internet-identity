@@ -159,6 +159,7 @@ This section describes the Internet Identity Service from the point of view of a
       maxTimeToLive?: bigint;
       allowPinAuthentication?: boolean;
       derivationOrigin?: string;
+      autoSelectionPrincipal?: string
     }
     ```
 
@@ -171,6 +172,8 @@ This section describes the Internet Identity Service from the point of view of a
     -   the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
 
     -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will only accept values that are also listed in the HTTP resource `/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+
+    -   the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
 
 
 6.  Now the client application window expects a message back, with data `event`.

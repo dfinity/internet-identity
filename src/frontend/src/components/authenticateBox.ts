@@ -66,18 +66,20 @@ export const authenticateBox = async ({
   i18n,
   templates,
   allowPinAuthentication,
+  autoSelectionIdentity,
 }: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
   allowPinAuthentication: boolean;
+  autoSelectionIdentity?: bigint;
 }): Promise<{
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
   authnMethod: "pin" | "passkey" | "recovery";
 }> => {
-  const promptAuth = () =>
+  const promptAuth = (autoSelectIdentity?: bigint) =>
     authenticateBoxFlow<PinIdentityMaterial>({
       i18n,
       templates,
@@ -99,12 +101,13 @@ export const authenticateBox = async ({
       retrievePinIdentityMaterial: ({ userNumber }) =>
         idbRetrievePinIdentityMaterial({ userNumber }),
       allowPinAuthentication,
+      autoSelectIdentity,
     });
 
   // Retry until user has successfully authenticated
   for (;;) {
     try {
-      const result = await promptAuth();
+      const result = await promptAuth(autoSelectionIdentity);
 
       // If the user canceled or just added a device, we retry
       if ("tag" in result) {
@@ -126,6 +129,9 @@ export const authenticateBox = async ({
         primaryButton: "Try again",
       });
     }
+    // clear out the auto-select so that after the first error / cancel
+    // the identity number picker actually waits for input
+    autoSelectionIdentity = undefined;
   }
 };
 
@@ -165,6 +171,7 @@ export const authenticateBoxFlow = async <I>({
   verifyPinValidity,
   retrievePinIdentityMaterial,
   allowPinAuthentication,
+  autoSelectIdentity,
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
@@ -192,6 +199,7 @@ export const authenticateBoxFlow = async <I>({
     userNumber: bigint;
   }) => Promise<I | undefined>;
   allowPinAuthentication: boolean;
+  autoSelectIdentity?: bigint;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -292,7 +300,10 @@ export const authenticateBoxFlow = async <I>({
   // we assume a new user and show the "firstTime" screen.
   const anchors = await getAnchors();
   if (isNonEmptyArray(anchors)) {
-    const result = await pages.pick({ anchors });
+    const result = await pages.pick({
+      anchors,
+      autoSelect: autoSelectIdentity,
+    });
 
     if (result.tag === "pick") {
       return doLogin({ userNumber: result.userNumber });
@@ -565,16 +576,29 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "recover", userNumber }),
         })
       ),
-    pick: (pickProps: { anchors: NonEmptyArray<bigint> }) =>
+    pick: (pickProps: {
+      anchors: NonEmptyArray<bigint>;
+      autoSelect?: bigint;
+    }) =>
       new Promise<
         { tag: "more_options" } | { tag: "pick"; userNumber: bigint }
-      >((resolve) =>
+      >((resolve) => {
+        // render page first so that when the identity is picked and the passkey
+        // dialog pops up, the II page is not just blank.
         pages.pick({
           ...pickProps,
           onSubmit: (userNumber) => resolve({ tag: "pick", userNumber }),
           moreOptions: () => resolve({ tag: "more_options" }),
-        })
-      ),
+        });
+        // If an existing autoSelect value is supplied immediately
+        // resolve with the auto-selected identity number
+        if (
+          nonNullish(pickProps.autoSelect) &&
+          pickProps.anchors.includes(pickProps.autoSelect)
+        ) {
+          resolve({ tag: "pick", userNumber: pickProps.autoSelect });
+        }
+      }),
   };
 };
 

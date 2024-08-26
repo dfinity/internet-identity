@@ -874,6 +874,10 @@ export class DemoAppView extends View {
     await fillText(this.browser, "derivationOrigin", derivationOrigin);
   }
 
+  async setAutoSelectionPrincipal(principal: string): Promise<void> {
+    await fillText(this.browser, "autoSelectionPrincipal", principal);
+  }
+
   async whoami(): Promise<string> {
     await fillText(this.browser, "hostUrl", this.replicaUrl);
     await this.browser.$("#whoamiBtn").click();
