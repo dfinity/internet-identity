@@ -299,7 +299,7 @@ jobs:
 
         # Use the GitHub API to post links to screenshots if necessary
       - name: Notify PR of screen changes
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         env:
           FILES_ADDED: ${{ steps.diff.outputs.FILES_ADDED }}
           FILES_CHANGED: ${{ steps.diff.outputs.FILES_CHANGED }}
