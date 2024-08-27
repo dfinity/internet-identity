@@ -542,14 +542,23 @@ export class AuthenticatedConnection extends Connection {
     { Ok: IdentityInfo } | { Err: IdentityInfoError }
   > => {
     const actor = await this.getActor();
-    return await actor.identity_info(this.userNumber);
+    console.log("in da getIdentityInfo");
+    const response = await actor.identity_info(this.userNumber);
+    console.log("response", response);
+    return response;
   };
 
   private setIdentityMetadata = async (
     metadata: MetadataMapV2
   ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
     const actor = await this.getActor();
-    return await actor.identity_metadata_replace(this.userNumber, metadata);
+    console.log("in da setIdentityMetadata");
+    const response = await actor.identity_metadata_replace(
+      this.userNumber,
+      metadata
+    );
+    console.log("response", response);
+    return response;
   };
 
   getIdentityMetadata = (): Promise<IdentityMetadata | undefined> => {
