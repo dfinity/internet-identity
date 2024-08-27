@@ -226,8 +226,8 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 
 ## Alternative Frontend Origins
 
-To allow flexibility regarding the canister frontend URL, the client may choose to provide another frontend URL as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using the `derivationOrigin` directly.
-This feature works for `canisterId` based URLs and [ICP custom domains](https://internetcomputer.org/docs/current/developer-docs/web-apps/custom-domains/using-custom-domains) backed by canisters.
+To allow flexibility regarding the canister frontend URL, the client may choose to provide another URL as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using the `derivationOrigin` directly.
+This feature works for `canisterId` based URLs and [ICP custom domains](https://internetcomputer.org/docs/current/developer-docs/web-apps/custom-domains/using-custom-domains) (backed by canisters) as `derivationOrigin`.
 
 :::caution
 This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
