@@ -1,8 +1,8 @@
+import { authnTemplates } from "$src/components/authenticateBox";
 import { I18n } from "$src/utils/i18n";
 import { IDBFactory } from "fake-indexeddb";
 import { html, render } from "lit-html";
 import { vi } from "vitest";
-import { authnTemplates } from "./authenticateBox";
 
 beforeEach(() => {
   // Create a fresh IDB before each test

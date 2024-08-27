@@ -1,6 +1,6 @@
 import {
-  authenticateBox,
   AuthnTemplates,
+  authenticateBox,
 } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon } from "$src/components/icons";
@@ -15,14 +15,13 @@ import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
-import { html, TemplateResult } from "lit-html";
+import { nonNullish } from "@dfinity/utils";
+import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 import { Delegation, fetchDelegation } from "./fetchDelegation";
-import { AuthContext, authenticationProtocol } from "./postMessageInterface";
-
-import { nonNullish } from "@dfinity/utils";
 import copyJson from "./index.json";
+import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 
 /* Template for the authbox when authenticating to a dapp */
 export const authnTemplateAuthorize = ({
