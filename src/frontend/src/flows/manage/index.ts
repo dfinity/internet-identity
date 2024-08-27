@@ -170,16 +170,6 @@ const displayManageTemplate = ({
     ${nonNullish(tempKeysWarning)
       ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
       : ""}
-    <p class="t-paragraph">
-      ${dappsTeaser({
-        dapps,
-        click: () => exploreDapps(),
-        copy: {
-          dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Connect to these dapps",
-        },
-      })}
-    </p>
     ${pinAuthenticators.length > 0
       ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
       : ""}
@@ -189,6 +179,16 @@ const displayManageTemplate = ({
       warnNoPasskeys,
     })}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    <aside class="l-stack">
+      ${dappsTeaser({
+        dapps,
+        click: () => exploreDapps(),
+        copy: {
+          dapps_explorer: "Dapps explorer",
+          sign_into_dapps: "Connect to these dapps",
+        },
+      })}
+    </aside>
     ${logoutSection()}
   </section>`;
 
