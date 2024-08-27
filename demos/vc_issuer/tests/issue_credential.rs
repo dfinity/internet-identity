@@ -6,24 +6,22 @@ use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
-use canister_tests::framework::{
-    env, get_wasm_path, principal_1, principal_2, test_principal, time, II_WASM,
-};
+use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
-use ic_test_state_machine_client::{call_candid, call_candid_as};
-use ic_test_state_machine_client::{query_candid_as, CallError, StateMachine};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
+use pocket_ic::{call_candid, call_candid_as};
+use pocket_ic::{query_candid_as, CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 use vc_util::issuer_api::{
     ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
     DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences,
@@ -74,17 +72,17 @@ lazy_static! {
 }
 
 pub fn install_canister_as(
-    env: &StateMachine,
+    env: &PocketIc,
     wasm: Vec<u8>,
     controller: Option<Principal>,
 ) -> CanisterId {
-    let canister_id = env.create_canister(controller);
+    let canister_id = env.create_canister_with_settings(controller, None);
     let arg = candid::encode_one("()").expect("error encoding II installation arg as candid");
     env.install_canister(canister_id, wasm, arg, controller);
     canister_id
 }
 
-pub fn install_canister(env: &StateMachine, wasm: Vec<u8>) -> CanisterId {
+pub fn install_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
     install_canister_as(env, wasm, None)
 }
 
@@ -100,8 +98,8 @@ pub struct IssuerInit {
     frontend_hostname: String,
 }
 
-pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
-    let canister_id = env.create_canister(None);
+pub fn install_issuer(env: &PocketIc, init: &IssuerInit) -> CanisterId {
+    let canister_id = env.create_canister();
     let arg = candid::encode_one(Some(init)).expect("error encoding II installation arg as candid");
     env.install_canister(canister_id, VC_ISSUER_WASM.clone(), arg, None);
     canister_id
@@ -109,18 +107,24 @@ pub fn install_issuer(env: &StateMachine, init: &IssuerInit) -> CanisterId {
 
 mod api {
     use super::*;
+    use pocket_ic::common::rest::RawEffectivePrincipal;
 
     pub fn configure(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
-        sender: Principal,
         config: &IssuerInit,
     ) -> Result<(), CallError> {
-        call_candid_as(env, canister_id, sender, "configure", (config,))
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "configure",
+            (config,),
+        )
     }
 
     pub fn vc_consent_message(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         sender: Principal,
         consent_message_request: &Icrc21VcConsentMessageRequest,
@@ -128,6 +132,7 @@ mod api {
         call_candid_as(
             env,
             canister_id,
+            RawEffectivePrincipal::None,
             sender,
             "vc_consent_message",
             (consent_message_request,),
@@ -136,47 +141,96 @@ mod api {
     }
 
     pub fn derivation_origin(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
-        sender: Principal,
         derivation_origin_req: &DerivationOriginRequest,
     ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
-        call_candid_as(
+        call_candid(
             env,
             canister_id,
-            sender,
+            RawEffectivePrincipal::None,
             "derivation_origin",
             (derivation_origin_req,),
         )
         .map(|(x,)| x)
     }
 
+    pub fn set_derivation_origin(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        frontend_hostname: &str,
+        derivation_origin: &str,
+    ) -> Result<(), CallError> {
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "set_derivation_origin",
+            (frontend_hostname, derivation_origin),
+        )
+    }
+
+    pub fn set_alternative_origins(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        alternative_origins: &str,
+    ) -> Result<(), CallError> {
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "set_alternative_origins",
+            (alternative_origins,),
+        )
+    }
+
     pub fn add_employee(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         employee_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id, "add_employee", (employee_id,)).map(|(x,)| x)
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "add_employee",
+            (employee_id,),
+        )
+        .map(|(x,)| x)
     }
 
     pub fn add_graduate(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         graduate_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id, "add_graduate", (graduate_id,)).map(|(x,)| x)
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "add_graduate",
+            (graduate_id,),
+        )
+        .map(|(x,)| x)
     }
 
     pub fn add_adult(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         adult_id: Principal,
     ) -> Result<String, CallError> {
-        call_candid(env, canister_id, "add_adult", (adult_id,)).map(|(x,)| x)
+        call_candid(
+            env,
+            canister_id,
+            RawEffectivePrincipal::None,
+            "add_adult",
+            (adult_id,),
+        )
+        .map(|(x,)| x)
     }
 
     pub fn prepare_credential(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         sender: Principal,
         prepare_credential_request: &PrepareCredentialRequest,
@@ -184,6 +238,7 @@ mod api {
         call_candid_as(
             env,
             canister_id,
+            RawEffectivePrincipal::None,
             sender,
             "prepare_credential",
             (prepare_credential_request,),
@@ -192,7 +247,7 @@ mod api {
     }
 
     pub fn get_credential(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         sender: Principal,
         get_credential_request: &GetCredentialRequest,
@@ -353,10 +408,39 @@ fn should_return_derivation_origin() {
     let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
     let frontend_hostname = format!("https://{}.icp0.io", canister_id.to_text());
     let req = DerivationOriginRequest { frontend_hostname };
-    let response = api::derivation_origin(&env, canister_id, principal_1(), &req)
+    let response = api::derivation_origin(&env, canister_id, &req)
         .expect("API call failed")
         .expect("derivation_origin error");
     assert_eq!(response.origin, req.frontend_hostname);
+}
+
+#[test]
+fn should_set_derivation_origin() {
+    let env = env();
+    let canister_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let req = DerivationOriginRequest {
+        frontend_hostname: "frontend_hostname.com".to_string(),
+    };
+
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    let default_derivation_origin = format!("https://{}.icp0.io", canister_id.to_text());
+    assert_eq!(response.origin, default_derivation_origin);
+
+    let derivation_origin = "https://derivation.origin";
+    api::set_derivation_origin(
+        &env,
+        canister_id,
+        "frontend_hostname.com".to_string().as_str(),
+        derivation_origin,
+    )
+    .expect("failed to set derivation_origin");
+
+    let response = api::derivation_origin(&env, canister_id, &req)
+        .expect("API call failed")
+        .expect("derivation_origin error");
+    assert_eq!(response.origin, derivation_origin);
 }
 
 #[test]
@@ -372,7 +456,6 @@ fn should_return_derivation_origin_with_custom_init() {
     let response = api::derivation_origin(
         &env,
         issuer_id,
-        principal_1(),
         &DerivationOriginRequest {
             frontend_hostname: custom_init.frontend_hostname.clone(),
         },
@@ -602,10 +685,11 @@ fn should_prepare_degree_credential_for_authorized_principal() {
 fn should_issue_credential_e2e() -> Result<(), CallError> {
     let env = env();
     let ii_id = install_canister(&env, II_WASM.clone());
+    let root_key = env.root_key().unwrap();
     let issuer_id = install_issuer(
         &env,
         &IssuerInit {
-            ic_root_key_der: Some(env.root_key().to_vec()),
+            ic_root_key_der: Some(root_key.to_vec()),
             idp_canister_ids: vec![ii_id],
             derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
             frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),
@@ -640,7 +724,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         .expect("get id_alias failed");
 
     let root_pk_raw =
-        extract_raw_root_pk_from_der(&env.root_key()).expect("Failed decoding IC root key.");
+        extract_raw_root_pk_from_der(&root_key).expect("Failed decoding IC root key.");
     let alias_tuple = get_verified_id_alias_from_jws(
         &id_alias_credentials
             .issuer_id_alias_credential
@@ -648,7 +732,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
         &id_alias_credentials.issuer_id_alias_credential.id_dapp,
         &canister_sig_pk.canister_id,
         &root_pk_raw,
-        env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
+        time(&env) as u128,
     )
     .expect("Invalid ID alias");
 
@@ -696,7 +780,7 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
             &get_credential_response.unwrap().vc_jws,
             &issuer_id,
             &root_pk_raw,
-            env.time().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
+            time(&env) as u128,
         )
         .expect("credential verification failed");
         let vc_claims = claims
@@ -717,26 +801,38 @@ fn should_issue_credential_e2e() -> Result<(), CallError> {
 #[test]
 fn should_configure() {
     let env = env();
-    let controller = principal_1();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    api::configure(&env, issuer_id, controller, &DUMMY_ISSUER_INIT).expect("API call failed");
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    api::configure(&env, issuer_id, &DUMMY_ISSUER_INIT).expect("API call failed");
 }
 
 #[test]
-fn should_fail_configure_if_not_controller() {
+fn should_set_alternative_origins() {
     let env = env();
-    let controller = principal_1();
-    let not_controller = principal_2();
-    let issuer_id = install_canister_as(&env, VC_ISSUER_WASM.clone(), Some(controller));
-    let result = api::configure(&env, issuer_id, not_controller, &DUMMY_ISSUER_INIT);
-    assert_matches!(result, Err(e) if format!("{:?}", e).contains("Only a controller can call configure"));
+    let issuer_id = install_canister(&env, VC_ISSUER_WASM.clone());
+    let alternative_origins = r#"{"alternativeOrigins":["https://test.issuer"]}"#;
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/ii-alternative-origins".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+
+    let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
+    assert_eq!(http_response.status_code, 404);
+
+    api::set_alternative_origins(&env, issuer_id, alternative_origins).expect("API call failed");
+
+    let http_response = http_request(&env, issuer_id, &request).expect("HTTP request failed");
+    assert_eq!(http_response.status_code, 200);
+    assert_eq!(&http_response.body, alternative_origins.as_bytes())
 }
 
 /// Verifies that the expected assets is delivered and certified.
 #[test]
 fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
     fn verify_response_certification(
-        env: &StateMachine,
+        env: &PocketIc,
         canister_id: CanisterId,
         request: HttpRequest,
         http_response: HttpResponse,
@@ -758,7 +854,7 @@ fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
             canister_id.as_slice(),
             time(env) as u128,
             Duration::from_secs(300).as_nanos(),
-            &env.root_key(),
+            &env.root_key().unwrap(),
             min_certification_version as u8,
         )
         .unwrap_or_else(|e| panic!("validation failed: {e}"))

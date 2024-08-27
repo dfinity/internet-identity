@@ -237,6 +237,7 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
     ///  - origin
     ///  - authenticator_attachment
     ///  - usage
+    ///
     /// This restriction may be lifted in the future.
     fn try_from(mut data: AuthnMethodData) -> Result<Self, Self::Error> {
         fn remove_metadata_string(

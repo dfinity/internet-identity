@@ -70,7 +70,7 @@ export const VcFlowRequest = z.object({
       origin: z
         .string()
         .url() /* XXX: we limit to URLs, but in practice should even be an origin */,
-      canisterId: z.optional(zodPrincipal),
+      canisterId: zodPrincipal,
     }),
     credentialSpec: zodCredentialSpec,
     credentialSubject: zodPrincipal,

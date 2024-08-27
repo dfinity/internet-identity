@@ -762,7 +762,7 @@ export const creationOptions = (
             type: "public-key",
           }
     ),
-    challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+    challenge: window.crypto.getRandomValues(new Uint8Array(16)),
     pubKeyCredParams: [
       {
         type: "public-key",

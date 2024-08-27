@@ -1,11 +1,11 @@
 use canister_tests::api::internet_identity::api_v2;
 use ic_cdk::api::management_canister::main::CanisterId;
-use ic_test_state_machine_client::StateMachine;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, ChallengeAttempt, IdentityNumber, MetadataEntryV2, PublicKeyAuthn,
     WebAuthn,
 };
+use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
@@ -53,7 +53,7 @@ pub fn test_authn_method() -> AuthnMethodData {
 }
 
 pub fn create_identity_with_authn_method(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
@@ -78,7 +78,7 @@ pub fn create_identity_with_authn_method(
 }
 
 pub fn create_identity_with_authn_methods(
-    env: &StateMachine,
+    env: &PocketIc,
     canister_id: CanisterId,
     authn_methods: &[AuthnMethodData],
 ) -> IdentityNumber {

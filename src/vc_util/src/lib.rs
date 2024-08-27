@@ -250,6 +250,7 @@ fn parse_verifiable_presentation_jwt(vp_jwt: &str) -> Result<Presentation<Jwt>, 
 ///      This credential should be signed by canister vc_flow_parties.ii_canister_id.
 ///   2. An actual credential requested by a user.  The subject of this credential is id_alias,
 ///      and it should be signed by canister vc_flow_parties.issuer_canister_id
+///
 /// Verifies that the subject of the first credential matches `effective_vc_subject`.
 /// Returns the verified `effective_vc_subject` with id_alias, and the claims from the requested credential.
 /// DOES NOT perform semantic validation of the returned claims.

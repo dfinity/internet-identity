@@ -15,44 +15,48 @@ import copyJson from "./landingPage.json";
  */
 export const landingPage = ({
   slot,
+  dataPage,
 }: {
   slot: TemplateResult;
+  dataPage: string;
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
 
-  return html` <main class="c-landingPage">
-    <div class="c-landingPage__logo">
-      <div class="c-logo">${icLogo}</div>
+  return html` <main class="c-landingPage" data-page="${dataPage}">
+    <div class="c-landingPage__container">
+      <div class="c-landingPage__logo">
+        <div class="c-logo">${icLogo}</div>
+      </div>
+      <section class="c-landingPage__right" aria-label="Marketing Copy">
+        <div class="c-landingPage__right__content">
+          <div class="c-landingPage__right__content--full-width">${slot}</div>
+        </div>
+      </section>
+      <section class="c-landingPage__left" aria-label="Action Pane">
+        <div class="c-landingPage__left__content">
+          <h1 class="c-landingPage__title">${copy.title}</h1>
+          <p class="t-paragraph">${copy.subtitle}</p>
+        </div>
+        <div class="c-landingPage__left__footer">
+          ${navigationLink({
+            icon: questionIcon,
+            labelText: "Support",
+            id: "support-link",
+            url: "https://internetidentity.zendesk.com/hc/en-us",
+            rel: "noopener noreferrer",
+            classes: "t-link--discreet c-footer__link",
+          })}
+          ${navigationLink({
+            icon: githubIcon,
+            labelText: "Source code",
+            id: "source-link",
+            url: "https://github.com/dfinity/internet-identity",
+            rel: "noopener noreferrer",
+            classes: "t-link--discreet c-footer__link",
+          })}
+        </div>
+      </section>
     </div>
-    <section class="c-landingPage__right">
-      <div class="c-landingPage__right__content">
-        <div class="c-landingPage__right__content--full-width">${slot}</div>
-      </div>
-    </section>
-    <section class="c-landingPage__left" aria-label="Action Pane">
-      <div class="c-landingPage__left__content">
-        <h1 class="t-title t-title--main">${copy.title}</h1>
-        <p class="t-paragraph">{${copy.subtitle}}</p>
-      </div>
-      <div class="c-landingPage__left__footer">
-        ${navigationLink({
-          icon: questionIcon,
-          labelText: "Support",
-          id: "support-link",
-          url: "https://internetidentity.zendesk.com/hc/en-us",
-          rel: "noopener noreferrer",
-          classes: "t-link--discreet c-footer__link",
-        })}
-        ${navigationLink({
-          icon: githubIcon,
-          labelText: "Source code",
-          id: "source-link",
-          url: "https://github.com/dfinity/internet-identity",
-          rel: "noopener noreferrer",
-          classes: "t-link--discreet c-footer__link",
-        })}
-      </div>
-    </section>
   </main>`;
 };

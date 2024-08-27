@@ -4,9 +4,16 @@ import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import { setupRecovery } from "./setupRecovery";
 
+import { AnchorCredentials } from "$generated/internet_identity_types";
 import { infoScreenTemplate } from "$src/components/infoScreen";
+import { IdentityMetadata } from "$src/repositories/identityMetadata";
+import { isNullish } from "@dfinity/utils";
+import { addDevice } from "../addDevice/manage/addDevice";
+import {
+  PinIdentityMaterial,
+  idbRetrievePinIdentityMaterial,
+} from "../pin/idb";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
@@ -80,6 +87,129 @@ export const addPhrase = ({
   );
 };
 
+type DeviceStatus = "pin-only" | "one-device";
+
+const addDeviceWarningTemplate = ({
+  ok,
+  remindLater,
+  doNotRemindAgain,
+  i18n,
+  status,
+}: {
+  ok: () => void;
+  remindLater: () => void;
+  doNotRemindAgain: () => void;
+  i18n: I18n;
+  status: DeviceStatus;
+}): TemplateResult => {
+  const copy = i18n.i18n(copyJson);
+
+  const [paragraph, title] = {
+    "pin-only": [
+      copy.paragraph_add_device_pin_only,
+      copy.add_device_title_pin_only,
+    ],
+    "one-device": [
+      copy.paragraph_add_device_one_passkey,
+      copy.add_device_title_one_passkey,
+    ],
+  }[status];
+
+  return infoScreenTemplate({
+    cancel: remindLater,
+    cancelText: copy.remind_later,
+    next: ok,
+    nextText: copy.add_device,
+    additionalAction: doNotRemindAgain,
+    additionalActionText: copy.do_not_remind,
+    title,
+    paragraph,
+    scrollToTop: true,
+    icon: "warning",
+    pageId: "add-another-device-warning",
+    label: copy.label_warning,
+  });
+};
+
+// TODO: Create the `addDeviceWarning` page and use it in `recoveryWizard` function.
+export const addDeviceWarningPage = renderPage(addDeviceWarningTemplate);
+
+// Prompt the user to create a recovery phrase
+export const addDeviceWarning = ({
+  status,
+}: {
+  status: DeviceStatus;
+}): Promise<{ action: "remind-later" | "do-not-remind" | "add-device" }> => {
+  return new Promise((resolve) =>
+    addDeviceWarningPage({
+      i18n: new I18n(),
+      ok: () => resolve({ action: "add-device" }),
+      remindLater: () => resolve({ action: "remind-later" }),
+      doNotRemindAgain: () => resolve({ action: "do-not-remind" }),
+      status,
+    })
+  );
+};
+
+/**
+ * Helper to encapsulate the logic of when and which recovery warning page to show.
+ *
+ * Three conditions must be met for the warning page to be shown:
+ * * Not having seen the recovery page in the last week
+ *    (on registration, the user is not shown the page, but set it as seen to not bother during the onboarding)
+ * * The user has at most one device.
+ *    (a phrase and pin are not considered a device, only normal devices or recovery devices)
+ * * The user has not disabled the warning.
+ *    (users can choose to not see the warning again by clicking "do not remind" button)
+ *
+ * When the warning page is shown, two different messages could be displayed:
+ * * User has only the pin authentication method.
+ * * User has only one device.
+ *
+ * @param params {Object}
+ * @param params.credentials {AnchorCredentials}
+ * @param params.identityMetadata {IdentityMetadata | undefined}
+ * @param params.pinIdentityMaterial {PinIdentityMaterial | undefined}
+ * @param params.nowInMillis {number}
+ * @returns {DeviceStatus | "no-warning"}
+ */
+// Exported for testing
+export const getDevicesStatus = ({
+  credentials,
+  identityMetadata,
+  pinIdentityMaterial,
+  nowInMillis,
+}: {
+  credentials: AnchorCredentials;
+  identityMetadata: IdentityMetadata | undefined;
+  pinIdentityMaterial: PinIdentityMaterial | undefined;
+  nowInMillis: number;
+}): DeviceStatus | "no-warning" => {
+  const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
+  const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
+  const hasNotSeenRecoveryPageLastWeek =
+    (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
+    oneWeekAgoTimestamp;
+  const showWarningPageEnabled = isNullish(
+    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
+  );
+  const totalDevicesCount =
+    credentials.credentials.length + credentials.recovery_credentials.length;
+  if (
+    totalDevicesCount <= 1 &&
+    hasNotSeenRecoveryPageLastWeek &&
+    showWarningPageEnabled
+  ) {
+    if (totalDevicesCount === 0 && !pinIdentityMaterial) {
+      // This should never happen because it means that the user has no devices and no pin.
+      // But we still handle it to avoid a crash assuming there was an error retrieving the pin material.
+      return "pin-only";
+    }
+    return totalDevicesCount === 0 ? "pin-only" : "one-device";
+  }
+  return "no-warning";
+};
+
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
@@ -87,29 +217,42 @@ export const recoveryWizard = async (
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  const [recoveries, identityMetadata] = await withLoader(() =>
-    Promise.all([
-      connection.lookupRecovery(userNumber),
-      connection.getIdentityMetadata(),
-    ])
+  const [credentials, identityMetadata, pinIdentityMaterial] = await withLoader(
+    () =>
+      Promise.all([
+        connection.lookupCredentials(userNumber),
+        connection.getIdentityMetadata(),
+        idbRetrievePinIdentityMaterial({
+          userNumber,
+        }),
+      ])
   );
-
-  const ONE_WEEK_MILLIS = 7 * 24 * 60 * 60 * 1000;
   const nowInMillis = Date.now();
-  const oneWeekAgoTimestamp = nowInMillis - ONE_WEEK_MILLIS;
-  const hasNotSeenRecoveryPageLastWeek =
-    (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
-    oneWeekAgoTimestamp;
-  if (recoveries.length === 0 && hasNotSeenRecoveryPageLastWeek) {
+
+  const devicesStatus = getDevicesStatus({
+    credentials,
+    identityMetadata,
+    pinIdentityMaterial,
+    nowInMillis,
+  });
+
+  if (devicesStatus !== "no-warning") {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
     });
-    const doAdd = await addPhrase({ intent: "securityReminder" });
-    if (doAdd !== "cancel") {
-      doAdd satisfies "ok";
-
-      await setupRecovery({ userNumber, connection });
+    const userChoice = await addDeviceWarning({
+      status: devicesStatus,
+    });
+    if (userChoice.action === "add-device") {
+      await addDevice({ userNumber, connection });
     }
+    if (userChoice.action === "do-not-remind") {
+      // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
+      await connection.updateIdentityMetadata({
+        doNotShowRecoveryPageRequestTimestampMillis: nowInMillis,
+      });
+    }
+    // Do nothing if `"remind-later"`.
   }
 };

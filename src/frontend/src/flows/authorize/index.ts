@@ -10,7 +10,7 @@ import { showSpinner } from "$src/components/spinner";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
-import { setKnownPrincipal } from "$src/storage";
+import { getAnchorByPrincipal, setKnownPrincipal } from "$src/storage";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
@@ -97,7 +97,7 @@ export const authnTemplateAuthorize = ({
   const firstTimeUnknown = (action: "pick" | "use_existing" | "first_time") => {
     const altOrigin = isAltOriginOf(action);
     return html`
-      <div class="l-stack">
+      <div>
         ${h1(copy.first_time_create)}
         <p class="t-lead l-stack">${copy.first_time_unknown_subtitle}</p>
         ${nonNullish(altOrigin)
@@ -110,8 +110,11 @@ export const authnTemplateAuthorize = ({
   // Variation: the user has used II before
   const returning = (action: "pick" | "use_existing") => {
     const altOrigin = isAltOriginOf(action);
+    // The "use_existing" screen has a different layout (mainWindow) than the "pick" screen (landingPage).
+    // Ideally the outer space would be handled by the parent.
+    const classAttribute = action === "use_existing" ? 'class="l-stack"' : "";
     return html`
-      <div class="l-stack">
+      <div ${classAttribute}>
         ${h1(html`${copy[`${action}_title_1`]}`)}
         <p class="t-lead l-stack">
           ${copy[`${action}_subtitle`]} ${copy[`${action}_subtitle_join`]}
@@ -185,6 +188,14 @@ const authenticate = async (
     };
   }
 
+  let autoSelectionIdentity = undefined;
+  if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
+    autoSelectionIdentity = await getAnchorByPrincipal({
+      origin: authContext.requestOrigin,
+      principal: authContext.authRequest.autoSelectionPrincipal,
+    });
+  }
+
   const authSuccess = await authenticateBox({
     connection,
     i18n,
@@ -198,6 +209,7 @@ const authenticate = async (
     }),
     allowPinAuthentication:
       authContext.authRequest.allowPinAuthentication ?? true,
+    autoSelectionIdentity: autoSelectionIdentity,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
@@ -213,16 +225,14 @@ const authenticate = async (
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
   // Ignore the response of committing the metadata because it's not crucial.
-  const [result] = await withLoader(() =>
-    Promise.all([
-      fetchDelegation({
-        connection: authSuccess.connection,
-        derivationOrigin,
-        publicKey: authContext.authRequest.sessionPublicKey,
-        maxTimeToLive: authContext.authRequest.maxTimeToLive,
-      }),
-      authSuccess.connection.commitMetadata(),
-    ])
+  void authSuccess.connection.commitMetadata();
+  const result = await withLoader(() =>
+    fetchDelegation({
+      connection: authSuccess.connection,
+      derivationOrigin,
+      publicKey: authContext.authRequest.sessionPublicKey,
+      maxTimeToLive: authContext.authRequest.maxTimeToLive,
+    })
   );
 
   if ("error" in result) {

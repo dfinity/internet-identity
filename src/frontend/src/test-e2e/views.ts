@@ -1,6 +1,7 @@
 import { zip } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { assert } from "vitest";
 import { waitToClose } from "./util";
 
 class View {
@@ -650,6 +651,18 @@ export class IssuerAppView extends View {
     await principalInput.setValue(principal);
   }
 
+  async setDerivationOrigin({
+    derivationOrigin,
+  }: {
+    derivationOrigin: string;
+  }): Promise<void> {
+    const derivationOriginInput = await this.browser.$(
+      '[data-role="derivation-origin"]'
+    );
+    await derivationOriginInput.clearValue();
+    await derivationOriginInput.setValue(derivationOrigin);
+  }
+
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-page="add-employee"]')
@@ -725,11 +738,17 @@ export class VcTestAppView extends View {
   async open(
     demoAppUrl: string,
     iiUrl: string,
-    issuerUrl: string
+    issuerUrl: string,
+    issuerCanisterId: string
   ): Promise<void> {
     await this.browser.url(demoAppUrl);
     await setInputValue(this.browser, '[data-role="ii-url"]', iiUrl);
     await setInputValue(this.browser, '[data-role="issuer-url"]', issuerUrl);
+    await setInputValue(
+      this.browser,
+      '[data-role="issuer-canister-id"]',
+      issuerCanisterId
+    );
   }
 
   async startSignIn(): Promise<void> {
@@ -853,6 +872,10 @@ export class DemoAppView extends View {
 
   async setDerivationOrigin(derivationOrigin: string): Promise<void> {
     await fillText(this.browser, "derivationOrigin", derivationOrigin);
+  }
+
+  async setAutoSelectionPrincipal(principal: string): Promise<void> {
+    await fillText(this.browser, "autoSelectionPrincipal", principal);
   }
 
   async whoami(): Promise<string> {

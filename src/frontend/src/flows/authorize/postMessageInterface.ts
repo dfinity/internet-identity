@@ -1,5 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";
 
@@ -23,6 +24,17 @@ export interface AuthContext {
   requestOrigin: string;
 }
 
+const zodPrincipal = z.string().transform((val, ctx) => {
+  let principal;
+  try {
+    principal = Principal.fromText(val);
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Not a principal " });
+    return z.NEVER;
+  }
+  return principal;
+});
+
 export const AuthRequest = z.object({
   kind: z.literal("authorize-client"),
   sessionPublicKey: z.instanceof(Uint8Array),
@@ -41,6 +53,7 @@ export const AuthRequest = z.object({
     }),
   derivationOrigin: z.optional(z.string()),
   allowPinAuthentication: z.optional(z.boolean()),
+  autoSelectionPrincipal: z.optional(zodPrincipal),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;

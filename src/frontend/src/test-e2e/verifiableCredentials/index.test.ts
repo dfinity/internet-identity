@@ -5,18 +5,29 @@ import {
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
+  ISSUER_CANISTER_ID,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
   TEST_APP_CANONICAL_URL_LEGACY,
+  TEST_APP_NICE_URL,
 } from "$src/test-e2e/constants";
-import { DemoAppView } from "$src/test-e2e/views";
 
+import { DemoAppView } from "$src/test-e2e/views";
+import { beforeEach } from "vitest";
 import {
+  addEmployeeToIssuer,
+  authenticateOnII,
   authenticateToRelyingParty,
   getVCPresentation,
   register,
   registerWithIssuer,
+  resetIssuerOriginsConfig,
+  setIssuerDerivationOrigin,
 } from "./utils";
+
+beforeEach(async () => {
+  await resetIssuerOriginsConfig({ issuerCanisterId: ISSUER_CANISTER_ID });
+});
 
 test("Can add employee on issuer app", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -35,7 +46,7 @@ test("Can add employee on issuer app", async () => {
 
 const getDomain = (url: string) => url.split(".").slice(1).join(".");
 
-// The different test configs (different URLs, differnet auth methods)
+// The different test configs (different URLs, different auth methods)
 const testConfigs: Array<{
   relyingParty: string;
   issuer: string;
@@ -68,45 +79,29 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
     async () => {
       await runInBrowser(
         async (browser: WebdriverIO.Browser) => {
-          await browser.url(II_URL);
+          await setIssuerDerivationOrigin({
+            issuerCanisterId: ISSUER_CANISTER_ID,
+            derivationOrigin: issuer,
+            frontendHostname: issuer,
+          });
 
+          await browser.url(II_URL);
           const authConfig = await register[authType](browser);
 
-          // Auth to RP
-
-          let vcTestApp = await authenticateToRelyingParty({
-            browser,
-            issuer,
-            authConfig,
-            relyingParty,
-          });
-          const principalRP = await vcTestApp.getPrincipal();
-
           // Add employee
+          await registerWithIssuer({
+            browser,
+            issuer: ISSUER_APP_URL,
+            authConfig,
+          });
 
-          const { msg: _msg, principal: _principal } = await registerWithIssuer(
-            {
-              browser,
-              issuer,
-              authConfig,
-              principal: principalRP /* issuer uses test app as origin */,
-            }
-          );
-
-          // Get VC presentation
-
-          vcTestApp = await authenticateToRelyingParty({
+          const vcTestApp = await authenticateToRelyingParty({
             browser,
             issuer,
             authConfig,
             relyingParty,
           });
 
-          const demoAppView = new DemoAppView(browser);
-          await demoAppView.updateAlternativeOrigins(
-            `{"alternativeOrigins":["${issuer}"]}`,
-            "certified"
-          );
           const { alias } = await getVCPresentation({
             vcTestApp,
             browser,
@@ -117,6 +112,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
           });
 
           // Perform a basic check on the alias
+          const principalRP = await vcTestApp.getPrincipal();
           const aliasObj = JSON.parse(alias);
           expect(aliasObj.sub).toBe(`did:icp:${principalRP}`);
         },
@@ -126,3 +122,51 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
     300_000
   );
 });
+
+test("Can issue credential with issuer front-end being hosted on a different canister", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const authConfig = await register["webauthn"](browser);
+    const relyingParty = TEST_APP_CANONICAL_URL;
+    // We pretend the issuer front-end is hosted on TEST_APP_NICE_URL
+    // while the relying party is TEST_APP_CANONICAL_URL.
+    // This is a setup where the issuer is split into two canisters, one hosting the front-end
+    // and one implementing the issuer canister API.
+    // This test demonstrates that this setup is possible _without_ configuring alternative origins,
+    // but simply configuring the derivation origin on the issuer canister and having the relying party specify
+    // the issuer canister id.
+    const issuer = TEST_APP_NICE_URL;
+    await setIssuerDerivationOrigin({
+      issuerCanisterId: ISSUER_CANISTER_ID,
+      derivationOrigin: issuer,
+      frontendHostname: issuer,
+    });
+
+    const issuerFrontEnd = new DemoAppView(browser);
+    await issuerFrontEnd.open(issuer, II_URL);
+    await issuerFrontEnd.waitForDisplay();
+    await issuerFrontEnd.signin();
+    await authenticateOnII({ authConfig, browser });
+    const issuerPrincipal = await issuerFrontEnd.getPrincipal();
+    await addEmployeeToIssuer({
+      issuerCanisterId: ISSUER_CANISTER_ID,
+      principal: issuerPrincipal,
+    });
+
+    // Go through the VC flow pretending the relying party URL to be the issuer front-end
+    const vcTestApp = await authenticateToRelyingParty({
+      browser,
+      issuer,
+      authConfig,
+      relyingParty,
+    });
+    await getVCPresentation({
+      vcTestApp,
+      browser,
+      authConfig,
+      relyingParty,
+      issuer,
+      knownDapps: [KNOWN_TEST_DAPP],
+    });
+  });
+}, 300_000);

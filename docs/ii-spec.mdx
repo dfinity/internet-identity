@@ -1,3 +1,6 @@
+import CodeBlock from "@theme/CodeBlock";
+import IICandidInterface from "!!raw-loader!./internet_identity.did";
+
 # The Internet Identity Specification
 
 ## Introduction
@@ -156,6 +159,7 @@ This section describes the Internet Identity Service from the point of view of a
       maxTimeToLive?: bigint;
       allowPinAuthentication?: boolean;
       derivationOrigin?: string;
+      autoSelectionPrincipal?: string
     }
     ```
 
@@ -168,6 +172,8 @@ This section describes the Internet Identity Service from the point of view of a
     -   the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
 
     -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will only accept values that are also listed in the HTTP resource `/.well-known/ii-alternative-origins` of the corresponding canister (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+
+    -   the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
 
 
 6.  Now the client application window expects a message back, with data `event`.
@@ -231,7 +237,7 @@ This feature is intended to allow more flexibility with respect to the origins o
 `https://<canister_id>.ic0.app` and `https://<canister_id>.raw.ic0.app` do _not_ issue the same principals by default . However, this feature can also be used to map `https://<canister_id>.raw.ic0.app` to `https://<canister_id>.ic0.app` principals or vice versa.
 :::
 
-In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://github.com/dfinity/interface-spec/blob/master/spec/index.adoc#the-http-gateway-protocol)).
+In order for Internet Identity to accept the `derivationOrigin` the corresponding canister must list the frontend origin in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the canister _must_ implement the `http_request` query call as specified [here](https://internetcomputer.org/docs/current/references/http-gateway-protocol-spec)).
 
 
 ### JSON Schema {#alternative-frontend-origins-schema}
@@ -291,11 +297,7 @@ This interface is currently only used by its own frontend. This tight coupling m
 
 The summary is given by the Candid interface:
 
-<!-- The '_attachments/` bit is an implementation detail of the docusaurus deploy -->
-
-``` candid name=https://raw.githubusercontent.com/dfinity/internet-identity/main/src/internet_identity/internet_identity.did
-```
-
+<CodeBlock language="candid">{IICandidInterface}</CodeBlock>
 
 The `init_salt` method is mostly internal, see [Salt](#salt).
 
