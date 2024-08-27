@@ -1,4 +1,3 @@
-import { ErrorOptions, displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import {
   PinIdentityMaterial,
@@ -42,6 +41,8 @@ import { mkAnchorPicker } from "./anchorPicker";
 import { mainWindow } from "./mainWindow";
 import { promptUserNumber } from "./promptUserNumber";
 
+import { displayError } from "$src/components/displayError";
+import { toast } from "$src/components/toast";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { landingPage } from "./landingPage";
 
@@ -390,10 +391,24 @@ const clarifyError: {
   }),
 };
 
-const clarifyError_ = <K extends FlowError["kind"]>(
+const flowErrorToastTemplate = <K extends FlowError["kind"]>(
   flowError: KindToError<K> & { kind: K }
-): Omit<ErrorOptions, "primaryButton"> =>
-  clarifyError[flowError.kind](flowError);
+): TemplateResult => {
+  const props = clarifyError[flowError.kind](flowError);
+  const detailSlot = nonNullish(props.detail)
+    ? html`<div class="l-stack">
+        <h4>Error details:</h4>
+        <pre data-role="error-detail" class="t-paragraph">${props.detail}</pre>
+      </div>`
+    : undefined;
+  return html`
+    <h3 data-error-code=${flowError.kind} class="t-title c-card__title">
+      ${props.title}
+    </h3>
+    <div data-role="warning-message" class="t-paragraph">${props.message}</div>
+    ${detailSlot}
+  `;
+};
 
 export const handleLoginFlowResult = async <E>(
   result: (LoginSuccess & E) | FlowError
@@ -407,11 +422,7 @@ export const handleLoginFlowResult = async <E>(
 
   result satisfies FlowError;
 
-  await displayError({
-    ...clarifyError_(result),
-    errorCode: result.kind,
-    primaryButton: "Try again",
-  });
+  toast.error(flowErrorToastTemplate(result));
   return undefined;
 };
 
