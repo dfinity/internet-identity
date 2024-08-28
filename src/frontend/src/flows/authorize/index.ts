@@ -190,7 +190,6 @@ const authenticate = async (
   let autoSelectionIdentity = undefined;
   if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
     autoSelectionIdentity = await getAnchorByPrincipal({
-      origin: authContext.requestOrigin,
       principal: authContext.authRequest.autoSelectionPrincipal,
     });
   }
