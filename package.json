@@ -49,7 +49,6 @@
     "lit-analyzer": "^2.0.2",
     "prettier": "2.8.0",
     "prettier-plugin-organize-imports": "^3.2.2",
-    "ts-loader": "9.4.1",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
     "vite": "^5.2.10",
