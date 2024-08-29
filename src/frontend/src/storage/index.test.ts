@@ -94,7 +94,7 @@ test(
           expect(storageV4).toBeTypeOf("object");
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchorsV4: any = storage["anchors"];
+          const anchorsV4: any = storageV4["anchors"];
           expect(anchorsV4).toBeTypeOf("object");
           expect(anchorsV4["123456"]).toBeDefined();
         },
