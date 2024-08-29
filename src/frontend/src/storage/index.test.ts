@@ -7,6 +7,7 @@ import {
   keys as idbKeys,
   set as idbSet,
 } from "idb-keyval";
+import { expect } from "vitest";
 import {
   MAX_SAVED_ANCHORS,
   MAX_SAVED_PRINCIPALS,
@@ -15,7 +16,6 @@ import {
   setAnchorUsed,
   setKnownPrincipal,
 } from ".";
-import { expect } from "vitest";
 
 beforeAll(() => {
   // Initialize the IndexedDB global
