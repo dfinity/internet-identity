@@ -75,6 +75,43 @@ test("Should require user interaction when supplying unknown auto-select princip
   });
 }, 300_000);
 
+test("Should require user interaction when supplying not most recent auto-select principal", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const { demoAppView, credentials, userNumber } = await registerAndSignIn(
+      browser
+    );
+    const principal = await demoAppView.waitForAuthenticated();
+
+    // register a second identity
+    await registerAndSignIn(browser);
+    const principal2 = await demoAppView.waitForAuthenticated();
+    expect(principal).not.toBe(principal2);
+
+    // authenticate again, but supply the first (older) known principal
+    await demoAppView.setAutoSelectionPrincipal(principal);
+    await demoAppView.signin();
+
+    // add credential previously registered to the new tab again
+    const authenticatorId2 = await switchToPopup(browser);
+    await addWebAuthnCredential(
+      browser,
+      authenticatorId2,
+      credentials[0],
+      originToRelyingPartyId(II_URL)
+    );
+
+    const authView = new AuthenticateView(browser);
+    await authView.waitForDisplay();
+    // needs explicit identity selection
+    await authView.pickAnchor(userNumber);
+
+    // Passkey interaction completes automatically with virtual authenticator
+    const principal3 = await demoAppView.waitForAuthenticated();
+    // We are signed in as the first user again.
+    expect(principal3).toBe(principal);
+  });
+}, 300_000);
+
 /**
  * Registers a user and signs in with the demo app.
  * @param browser browser to use.
