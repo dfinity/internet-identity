@@ -15,6 +15,7 @@ import {
   setAnchorUsed,
   setKnownPrincipal,
 } from ".";
+import { expect } from "vitest";
 
 beforeAll(() => {
   // Initialize the IndexedDB global
@@ -87,15 +88,15 @@ test(
       },
       indexeddb: {
         after: (storage) => {
-          // Written to V3
+          // Written to V4
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const storageV3: any = storage["ii-storage-v4"];
-          expect(storageV3).toBeTypeOf("object");
+          const storageV4: any = storage["ii-storage-v4"];
+          expect(storageV4).toBeTypeOf("object");
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchorsV3: any = storageV3["anchors"];
-          expect(anchorsV3).toBeTypeOf("object");
-          expect(anchorsV3["123456"]).toBeDefined();
+          const anchorsV4: any = storage["anchors"];
+          expect(anchorsV4).toBeTypeOf("object");
+          expect(anchorsV4["123456"]).toBeDefined();
         },
       },
     }
@@ -171,7 +172,7 @@ test(
           },
         },
         after: (storage) => {
-          // Written to V3
+          // Written to V4
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const storageV4: any = storage["ii-storage-v4"];
           expect(storageV4).toBeTypeOf("object");
