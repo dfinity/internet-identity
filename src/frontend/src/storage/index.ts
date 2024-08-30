@@ -81,6 +81,60 @@ export const getAnchorByPrincipal = async ({
   return;
 };
 
+/** Look up an anchor by principal, if it is the last used for the given origin.
+ */
+export const getAnchorIfLastUsed = async ({
+  principal,
+  origin,
+}: {
+  principal: Principal;
+  origin: string;
+}): Promise<bigint | undefined> => {
+  const storage = await readStorage();
+  const anchors = storage.anchors;
+
+  const principalDigest = await computePrincipalDigest({
+    principal,
+    hasher: storage.hasher,
+  });
+
+  const originDigest = await computeOriginDigest({
+    origin,
+    hasher: storage.hasher,
+  });
+
+  // candidate anchors with their timestamp, principal digest -> identity number
+  const candidates = [];
+  for (const ix in anchors) {
+    const anchor: Anchor = anchors[ix];
+
+    // there is at most one principal known per anchor and origin.
+    const lastUsed = anchor.knownPrincipals.filter(
+      (knownPrincipal) => knownPrincipal.originDigest === originDigest
+    )[0];
+    if (isNullish(lastUsed)) {
+      continue;
+    }
+    candidates.push({
+      lastUsedTimestamp: lastUsed.lastUsedTimestamp,
+      principalDigest: lastUsed.principalDigest,
+      identityNumber: ix,
+    });
+  }
+
+  candidates.sort((a, b) => b.lastUsedTimestamp - a.lastUsedTimestamp);
+  const mostRecent = candidates[0];
+  if (isNullish(mostRecent)) {
+    return;
+  }
+
+  if (mostRecent.principalDigest === principalDigest) {
+    return BigInt(mostRecent.identityNumber);
+  }
+
+  return;
+};
+
 /** Set the principal as "known"; i.e. from which the anchor can be "looked up" */
 export const setKnownPrincipal = async ({
   userNumber,

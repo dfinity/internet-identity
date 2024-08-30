@@ -173,7 +173,7 @@ This section describes the Internet Identity Service from the point of view of a
 
     -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will validate the `derivationOrigin` by checking that it lists the client application origin in the `/.well-known/ii-alternative-origins` file (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 
-    -   the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
+    -   the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity and the corresponding identity has been the most recently used for the client application origin, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
 
 
 6.  Now the client application window expects a message back, with data `event`.
