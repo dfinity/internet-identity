@@ -334,13 +334,51 @@ test(
   "should not retrieve anchor if not most recent",
   withStorage(async () => {
     const origin = "https://example.com";
+    const oldPrincipal = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+    vi.useFakeTimers().setSystemTime(new Date(0));
+    const oldIdentity = BigInt(10000);
+    await setKnownPrincipal({
+      userNumber: oldIdentity,
+      origin,
+      principal: oldPrincipal,
+    });
+
+    vi.useFakeTimers().setSystemTime(new Date(1));
+    const mostRecentPrincipal = Principal.fromText(
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+    );
+    const mostRecentIdentity = BigInt(10001);
+    await setKnownPrincipal({
+      userNumber: mostRecentIdentity,
+      origin,
+      principal: mostRecentPrincipal,
+    });
+
+    expect(
+      await getAnchorIfLastUsed({ principal: oldPrincipal, origin })
+    ).not.toBeDefined();
+    // most recent principal still works
+    expect(
+      await getAnchorIfLastUsed({ principal: mostRecentPrincipal, origin })
+    ).toBe(mostRecentIdentity);
+  })
+);
+
+test(
+  "latest principals on different origins can be retrieved",
+  withStorage(async () => {
+    const origin1 = "https://example1.com";
+    const origin2 = "https://example2.com";
     const principal1 = Principal.fromText(
       "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
     );
     vi.useFakeTimers().setSystemTime(new Date(0));
+    const identity1 = BigInt(10000);
     await setKnownPrincipal({
-      userNumber: BigInt(10000),
-      origin,
+      userNumber: identity1,
+      origin: origin1,
       principal: principal1,
     });
 
@@ -348,19 +386,19 @@ test(
     const principal2 = Principal.fromText(
       "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
     );
+    const identity2 = BigInt(10001);
     await setKnownPrincipal({
-      userNumber: BigInt(10001),
-      origin,
+      userNumber: identity2,
+      origin: origin2,
       principal: principal2,
     });
 
     expect(
-      await getAnchorIfLastUsed({ principal: principal1, origin })
-    ).not.toBeDefined();
-    // most recent principal still works
-    expect(await getAnchorIfLastUsed({ principal: principal2, origin })).toBe(
-      BigInt(10001)
-    );
+      await getAnchorIfLastUsed({ principal: principal1, origin: origin1 })
+    ).toBe(identity1);
+    expect(
+      await getAnchorIfLastUsed({ principal: principal2, origin: origin2 })
+    ).toBe(identity2);
   })
 );
 
