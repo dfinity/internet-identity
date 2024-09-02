@@ -351,7 +351,7 @@ const computePrincipalDigest = async ({
   const principal = enc.encode(principal_);
   const principalLen = Uint8Array.from([principal_.length]);
 
-  // Create a buffer with all four elements
+  // Create a buffer with all elements
   const buff = concatUint8Arrays([principal, principalLen]);
 
   // Create the digest
@@ -391,7 +391,7 @@ const computeOriginDigest = async ({
   const origin = enc.encode(origin_);
   const originLen = Uint8Array.from([origin_.length]);
 
-  // Create a buffer with all four elements
+  // Create a buffer with all elements
   const buff = concatUint8Arrays([origin, originLen]);
 
   // Create the digest
