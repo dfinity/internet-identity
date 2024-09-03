@@ -83,6 +83,7 @@
   },
   "workspaces": [
     "src/vc-api",
+    "demos/web2-auth",
     "demos/test-app",
     "demos/vc_issuer",
     "src/vite-plugins",
