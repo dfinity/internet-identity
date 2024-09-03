@@ -4654,16 +4654,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vc_util_js"
-version = "1.0.0"
-dependencies = [
- "candid",
- "canister_sig_util",
- "vc_util",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
