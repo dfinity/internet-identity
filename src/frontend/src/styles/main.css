@@ -1187,6 +1187,10 @@ a:hover,
   max-width: 100%;
 }
 
+.c-card--hide-overflow {
+  overflow: hidden;
+}
+
 /* c-cards pretty much fill up the screen on small devices so we disable rounding */
 @media (max-width: 512px) {
   .c-card {

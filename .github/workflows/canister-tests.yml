@@ -475,11 +475,6 @@ jobs:
           until [ -f ~/npm-ci-status ]; do sleep 1; done
           exit $(cat ~/npm-ci-status)
 
-      - name: Build sig-verifier
-        run: npm run --workspace ./src/sig-verifier-js build
-      - name: Run sig-verifier tests
-        run: npm run --workspace ./src/sig-verifier-js test
-
       - name: Run dev server
         id: dev-server-start
         run: |
@@ -964,3 +959,14 @@ jobs:
         run: |
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
           didc check src/internet_identity/internet_identity.did internet_identity_previous.did
+
+  sig-verifier-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+      - name: Build sig-verifier
+        run: npm run --workspace ./src/sig-verifier-js build
+      - name: Run sig-verifier tests
+        run: npm run --workspace ./src/sig-verifier-js test

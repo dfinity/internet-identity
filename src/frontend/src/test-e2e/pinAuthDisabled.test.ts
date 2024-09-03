@@ -40,8 +40,6 @@ test("Cannot auth with PIN if dapp disallows PIN", async () => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
     await authenticateView.pickAnchor(userNumber);
-    await browser
-      .$('#errorContainer [data-error-code="pinNotAllowed"]')
-      .waitForDisplayed();
+    await browser.$('[data-error-code="pinNotAllowed"]').waitForDisplayed();
   }, APPLE_USER_AGENT);
 }, 300_000);

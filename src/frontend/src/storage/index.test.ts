@@ -7,10 +7,12 @@ import {
   keys as idbKeys,
   set as idbSet,
 } from "idb-keyval";
+import { expect } from "vitest";
 import {
   MAX_SAVED_ANCHORS,
   MAX_SAVED_PRINCIPALS,
   getAnchorByPrincipal,
+  getAnchorIfLastUsed,
   getAnchors,
   setAnchorUsed,
   setKnownPrincipal,
@@ -87,15 +89,15 @@ test(
       },
       indexeddb: {
         after: (storage) => {
-          // Written to V3
+          // Written to V4
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const storageV3: any = storage["ii-storage-v3"];
-          expect(storageV3).toBeTypeOf("object");
+          const storageV4: any = storage["ii-storage-v4"];
+          expect(storageV4).toBeTypeOf("object");
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchorsV3: any = storageV3["anchors"];
-          expect(anchorsV3).toBeTypeOf("object");
-          expect(anchorsV3["123456"]).toBeDefined();
+          const anchorsV4: any = storageV4["anchors"];
+          expect(anchorsV4).toBeTypeOf("object");
+          expect(anchorsV4["123456"]).toBeDefined();
         },
       },
     }
@@ -146,7 +148,46 @@ test(
 );
 
 test(
-  "anchors are also written to V2",
+  "V3 anchors are migrated",
+  withStorage(
+    async () => {
+      expect(await getAnchors()).toContain(BigInt(10000));
+      expect(await getAnchors()).toContain(BigInt(10001));
+      expect(await getAnchors()).toContain(BigInt(10003));
+    },
+    {
+      indexeddb: {
+        before: {
+          /* V3 layout */
+          "ii-storage-v3": {
+            anchors: {
+              "10000": { lastUsedTimestamp: 0, knownPrincipals: [] },
+              "10001": { lastUsedTimestamp: 0, knownPrincipals: [] },
+              "10003": { lastUsedTimestamp: 0, knownPrincipals: [] },
+            },
+            hasher: await crypto.subtle.generateKey(
+              { name: "HMAC", hash: "SHA-512" },
+              false /* not extractable */,
+              ["sign"] /* only used to "sign" (e.g. produce a digest ) */
+            ),
+          },
+        },
+        after: (storage) => {
+          // Written to V4
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const storageV4: any = storage["ii-storage-v4"];
+          expect(storageV4).toBeTypeOf("object");
+          expect(storageV4.anchors["10000"]).toBeDefined();
+          expect(storageV4.anchors["10001"]).toBeDefined();
+          expect(storageV4.anchors["10003"]).toBeDefined();
+        },
+      },
+    }
+  )
+);
+
+test(
+  "anchors are also written to V3",
   withStorage(
     async () => {
       await setAnchorUsed(BigInt(10000));
@@ -156,13 +197,13 @@ test(
     {
       indexeddb: {
         after: (storage) => {
-          // Written to V2
+          // Written to V3
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anchorsV2: any = storage["anchors"];
-          expect(anchorsV2).toBeTypeOf("object");
-          expect(anchorsV2["10000"]).toBeDefined();
-          expect(anchorsV2["10001"]).toBeDefined();
-          expect(anchorsV2["10003"]).toBeDefined();
+          const storageV3: any = storage["ii-storage-v3"];
+          expect(storageV3).toBeTypeOf("object");
+          expect(storageV3.anchors["10000"]).toBeDefined();
+          expect(storageV3.anchors["10001"]).toBeDefined();
+          expect(storageV3.anchors["10003"]).toBeDefined();
         },
       },
     }
@@ -202,14 +243,7 @@ test(
       principal,
     });
 
-    const otherOrigin = "https://other.com";
-    expect(
-      await getAnchorByPrincipal({ origin: otherOrigin, principal })
-    ).not.toBeDefined();
-
-    expect(await getAnchorByPrincipal({ origin, principal })).toBe(
-      BigInt(10000)
-    );
+    expect(await getAnchorByPrincipal({ principal })).toBe(BigInt(10000));
   })
 );
 
@@ -234,13 +268,24 @@ test(
   "old principals are dropped",
   withStorage(async () => {
     const userNumber = BigInt(10000);
-    const principal = Principal.fromText("2vxsx-fae");
-    const oldOrigin = "https://old.com";
-    const veryOldOrigin = "https://very.old.com";
+    const principal = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+    const oldPrincipal = Principal.fromText(
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+    );
+    const veryOldPrincipal = Principal.fromText(
+      "t6s4t-dzahw-w2cqi-csimw-vn4xf-fjte4-doj3g-gyjxt-6v2uk-cjeft-eae"
+    );
+    const origin = "https://origin.com";
     vi.useFakeTimers().setSystemTime(new Date(0));
-    await setKnownPrincipal({ userNumber, principal, origin: veryOldOrigin });
+    await setKnownPrincipal({
+      userNumber,
+      principal: veryOldPrincipal,
+      origin,
+    });
     vi.useFakeTimers().setSystemTime(new Date(1));
-    await setKnownPrincipal({ userNumber, principal, origin: oldOrigin });
+    await setKnownPrincipal({ userNumber, principal: oldPrincipal, origin });
     let date = 2;
     vi.useFakeTimers().setSystemTime(new Date(date));
     for (let i = 0; i < MAX_SAVED_PRINCIPALS; i++) {
@@ -248,26 +293,127 @@ test(
       vi.useFakeTimers().setSystemTime(new Date(date));
       await setKnownPrincipal({
         userNumber,
-        principal,
+        principal: Principal.fromUint8Array(
+          window.crypto.getRandomValues(new Uint8Array(29))
+        ),
         origin: `https://new${i}.com`,
       });
     }
     date++;
     vi.useFakeTimers().setSystemTime(new Date(date));
-    const newOrigin = "https://new.com";
-    await setKnownPrincipal({ userNumber, principal, origin: newOrigin });
+    await setKnownPrincipal({ userNumber, principal, origin });
     expect(
-      await getAnchorByPrincipal({ principal, origin: veryOldOrigin })
+      await getAnchorByPrincipal({ principal: veryOldPrincipal })
     ).not.toBeDefined();
     expect(
-      await getAnchorByPrincipal({ principal, origin: oldOrigin })
+      await getAnchorByPrincipal({ principal: oldPrincipal })
     ).not.toBeDefined();
-    expect(
-      await getAnchorByPrincipal({ principal, origin: newOrigin })
-    ).toBeDefined();
+    expect(await getAnchorByPrincipal({ principal })).toBeDefined();
     vi.useRealTimers();
   })
 );
+
+test(
+  "should retrieve last anchor",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const principal = Principal.fromText("2vxsx-fae");
+    await setKnownPrincipal({
+      userNumber: BigInt(10000),
+      origin,
+      principal,
+    });
+
+    expect(await getAnchorIfLastUsed({ principal, origin })).toBe(
+      BigInt(10000)
+    );
+  })
+);
+
+test(
+  "should not retrieve anchor if not most recent",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const oldPrincipal = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+    vi.useFakeTimers().setSystemTime(new Date(0));
+    const oldIdentity = BigInt(10000);
+    await setKnownPrincipal({
+      userNumber: oldIdentity,
+      origin,
+      principal: oldPrincipal,
+    });
+
+    vi.useFakeTimers().setSystemTime(new Date(1));
+    const mostRecentPrincipal = Principal.fromText(
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+    );
+    const mostRecentIdentity = BigInt(10001);
+    await setKnownPrincipal({
+      userNumber: mostRecentIdentity,
+      origin,
+      principal: mostRecentPrincipal,
+    });
+
+    expect(
+      await getAnchorIfLastUsed({ principal: oldPrincipal, origin })
+    ).not.toBeDefined();
+    // most recent principal still works
+    expect(
+      await getAnchorIfLastUsed({ principal: mostRecentPrincipal, origin })
+    ).toBe(mostRecentIdentity);
+  })
+);
+
+test(
+  "latest principals on different origins can be retrieved",
+  withStorage(async () => {
+    const origin1 = "https://example1.com";
+    const origin2 = "https://example2.com";
+    const principal1 = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+    vi.useFakeTimers().setSystemTime(new Date(0));
+    const identity1 = BigInt(10000);
+    await setKnownPrincipal({
+      userNumber: identity1,
+      origin: origin1,
+      principal: principal1,
+    });
+
+    vi.useFakeTimers().setSystemTime(new Date(1));
+    const principal2 = Principal.fromText(
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+    );
+    const identity2 = BigInt(10001);
+    await setKnownPrincipal({
+      userNumber: identity2,
+      origin: origin2,
+      principal: principal2,
+    });
+
+    expect(
+      await getAnchorIfLastUsed({ principal: principal1, origin: origin1 })
+    ).toBe(identity1);
+    expect(
+      await getAnchorIfLastUsed({ principal: principal2, origin: origin2 })
+    ).toBe(identity2);
+  })
+);
+
+test(
+  "should not retrieve unknown principal",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const principal = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+
+    expect(await getAnchorIfLastUsed({ principal, origin })).not.toBeDefined();
+  })
+);
+
 /** Test storage usage. Storage is cleared after the callback has returned.
  * If `before` is specified, storage is populated with its content before the test is run.
  * If `after` is specified, the content of storage are checked against `after` after the

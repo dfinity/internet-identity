@@ -111,11 +111,7 @@ const verifyCredentials = async ({
     return abortedCredentials({ reason: "auth_failed_issuer" });
   }
 
-  const userNumber_ = await getAnchorByPrincipal({
-    origin:
-      rpOrigin_ /* NOTE: the storage uses the request origin, not the derivation origin */,
-    principal: givenP_RP,
-  });
+  const userNumber_ = await getAnchorByPrincipal({ principal: givenP_RP });
 
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({

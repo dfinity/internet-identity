@@ -527,6 +527,10 @@ export class AuthenticateView extends View {
   }
 
   async register(): Promise<void> {
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
+    if (await moreOptions.isExisting()) {
+      await moreOptions.click();
+    }
     await this.browser.$("#registerButton").click();
   }
 
