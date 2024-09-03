@@ -2,16 +2,18 @@ use crate::ii_domain::IIDomain;
 use crate::stats::event_stats::{
     update_event_based_stats, Event, EventData, PrepareDelegationEvent,
 };
-use crate::{hash, state, update_root_hash, DAY_NS, MINUTE_NS};
+use crate::{state, update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
-use canister_sig_util::signature_map::SignatureMap;
-use canister_sig_util::CanisterSigPublicKey;
+use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
+use ic_canister_sig_creation::{
+    delegation_signature_msg, CanisterSigPublicKey, DELEGATION_SIG_DOMAIN,
+};
 use ic_cdk::api::time;
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::collections::HashMap;
+use sha2::{Digest, Sha256};
 use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
@@ -103,16 +105,12 @@ pub fn get_delegation(
     check_frontend_length(&frontend);
 
     state::assets_and_signatures(|certified_assets, sigs| {
-        let message_hash = delegation_signature_msg_hash(&Delegation {
-            pubkey: session_key.clone(),
-            expiration,
-            targets: None,
-        });
-        match sigs.get_signature_as_cbor(
-            &calculate_seed(anchor_number, &frontend),
-            message_hash,
-            Some(certified_assets.root_hash()),
-        ) {
+        let inputs = CanisterSigInputs {
+            domain: DELEGATION_SIG_DOMAIN,
+            seed: &calculate_seed(anchor_number, &frontend),
+            message: &delegation_signature_msg(&session_key, expiration, None),
+        };
+        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
             Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                 delegation: Delegation {
                     pubkey: session_key,
@@ -149,29 +147,18 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
     blob.push(frontend.bytes().len() as u8);
     blob.extend(frontend.bytes());
 
-    hash::hash_bytes(blob)
+    hash_bytes(blob)
+}
+
+fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_ref());
+    hasher.finalize().into()
 }
 
 pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     let my_canister_id = id();
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()
-}
-
-fn delegation_signature_msg_hash(d: &Delegation) -> Hash {
-    use hash::Value;
-
-    let mut m = HashMap::new();
-    m.insert("pubkey", Value::Bytes(d.pubkey.as_slice()));
-    m.insert("expiration", Value::U64(d.expiration));
-    if let Some(targets) = d.targets.as_ref() {
-        let mut arr = Vec::with_capacity(targets.len());
-        for t in targets.iter() {
-            arr.push(Value::Bytes(t.as_ref()));
-        }
-        m.insert("targets", Value::Array(arr));
-    }
-    let map_hash = hash::hash_of_map(m);
-    hash::hash_with_domain(b"ic-request-auth-delegation", &map_hash)
 }
 
 fn add_delegation_signature(
@@ -180,12 +167,12 @@ fn add_delegation_signature(
     seed: &[u8],
     expiration: Timestamp,
 ) {
-    let msg_hash = delegation_signature_msg_hash(&Delegation {
-        pubkey: pk,
-        expiration,
-        targets: None,
-    });
-    sigs.add_signature(seed, msg_hash);
+    let inputs = CanisterSigInputs {
+        domain: DELEGATION_SIG_DOMAIN,
+        seed,
+        message: &delegation_signature_msg(&pk, expiration, None),
+    };
+    sigs.add_signature(&inputs);
 }
 
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {

@@ -2,14 +2,26 @@
 
 use assert_matches::assert_matches;
 use candid::{CandidType, Deserialize, Principal};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::http_request;
 use canister_tests::api::internet_identity::vc_mvp as ii_api;
 use canister_tests::flows;
 use canister_tests::framework::{env, get_wasm_path, principal_1, test_principal, time, II_WASM};
+use ic_canister_sig_creation::{
+    extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PK_DER,
+};
 use ic_cdk::api::management_canister::provisional::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
+use ic_verifiable_credentials::issuer_api::{
+    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences,
+    Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias as SignedIssuerIdAlias,
+};
+use ic_verifiable_credentials::{
+    get_verified_id_alias_from_jws, validate_claims_match_spec,
+    verify_credential_jws_with_canister_id,
+};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasRequest, PrepareIdAliasRequest,
@@ -22,16 +34,6 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
-use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21ConsentPreferences,
-    Icrc21Error, Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
-    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias as SignedIssuerIdAlias,
-};
-use vc_util::{
-    get_verified_id_alias_from_jws, validate_claims_match_spec,
-    verify_credential_jws_with_canister_id,
-};
 
 const DUMMY_ROOT_KEY: &str ="308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c05030201036100adf65638a53056b2222c91bb2457b0274bca95198a5acbdadfe7fd72178f069bdea8d99e9479d8087a2686fc81bf3c4b11fe275570d481f1698f79d468afe0e57acc1e298f8b69798da7a891bbec197093ec5f475909923d48bfed6843dbed1f";
 const DUMMY_II_CANISTER_ID: &str = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
@@ -598,7 +600,7 @@ fn should_fail_prepare_credential_for_wrong_root_key() {
     let issuer_id = install_issuer(
         &env,
         &IssuerInit {
-            ic_root_key_der: Some(canister_sig_util::IC_ROOT_PK_DER.to_vec()), // does not match the DUMMY_ROOT_KEY, which is used in DUMMY_ALIAS_JWS
+            ic_root_key_der: Some(IC_ROOT_PK_DER.to_vec()), // does not match the DUMMY_ROOT_KEY, which is used in DUMMY_ALIAS_JWS
             idp_canister_ids: vec![Principal::from_text(DUMMY_II_CANISTER_ID).unwrap()],
             derivation_origin: DUMMY_DERIVATION_ORIGIN.to_string(),
             frontend_hostname: DUMMY_FRONTEND_HOSTNAME.to_string(),

@@ -1,6 +1,6 @@
 use crate::http::metrics::metrics;
 use crate::state;
-use canister_sig_util::signature_map::LABEL_SIG;
+use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde_bytes::ByteBuf;
