@@ -2,11 +2,9 @@
 members = [
     "src/asset_util",
     "src/internet_identity",
-    "src/canister_sig_util",
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",
-    "src/vc_util",
     "src/sig-verifier-js"
 ]
 resolver = "2"
@@ -20,10 +18,8 @@ opt-level = 'z'
 [workspace.dependencies]
 # local dependencies
 asset_util = { path = "src/asset_util" }
-canister_sig_util = { path = "src/canister_sig_util" }
 canister_tests = { path = "src/canister_tests" }
 internet_identity_interface = { path = "src/internet_identity_interface" }
-vc_util = { path = "src/vc_util" }
 
 # ic dependencies
 candid = "0.10"
@@ -37,7 +33,9 @@ ic-metrics-encoder = "1"
 ic-representation-independent-hash = "2.2"
 ic-response-verification = "2.2"
 ic-stable-structures = "0.6"
+ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "2bc90b2ce7355ba68001fcc484bdc31f2fe8e820"}
 ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
+ic-canister-sig-creation = "1.1"
 ic-types = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
 pocket-ic = "4.0"
 

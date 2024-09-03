@@ -1,5 +1,7 @@
 use candid::Principal;
-use canister_sig_util::{delegation_signature_msg, hash_bytes, CanisterSigPublicKey};
+use ic_canister_sig_creation::{
+    delegation_signature_msg, hash_bytes, CanisterSigPublicKey, DELEGATION_SIG_DOMAIN,
+};
 use ic_crypto_standalone_sig_verifier as ic_sig_ver;
 use ic_crypto_standalone_sig_verifier::KeyBytesContentType;
 use ic_types::crypto::threshold_sig::IcRootOfTrust;
@@ -136,10 +138,13 @@ pub fn validate_delegation_and_get_principal(
     // `delegations[0].signature` is a valid canister signature on a representation-independent hash of `delegations[0]`,
     //  wrt. `signed_delegation_chain.publicKey` and `ic_root_public_key_raw`.
     let root_of_trust = root_public_key_from_bytes(ic_root_public_key_raw)?;
-    let message = delegation_signature_msg(
-        delegation.pubkey.as_slice(),
-        delegation.expiration(),
-        delegation.targets.as_ref(),
+    let message = msg_with_domain(
+        DELEGATION_SIG_DOMAIN,
+        &delegation_signature_msg(
+            delegation.pubkey.as_slice(),
+            delegation.expiration(),
+            delegation.targets.as_ref(),
+        ),
     );
     println!("signed bytes: {}", hex::encode(message.as_slice()));
     println!(
@@ -155,6 +160,13 @@ pub fn validate_delegation_and_get_principal(
     .map_err(|e| format!("Invalid canister signature: {}", e))?;
 
     Ok(Principal::self_authenticating(signed_delegation_chain.publicKey.as_slice()).to_text())
+}
+
+fn msg_with_domain(sep: &[u8], bytes: &[u8]) -> Vec<u8> {
+    let mut msg = vec![sep.len() as u8];
+    msg.append(&mut sep.to_vec());
+    msg.append(&mut bytes.to_vec());
+    msg
 }
 
 // A custom definition of Delegation, as we need to parse from hex-values provided  in JSON from JS.
@@ -203,7 +215,7 @@ fn root_public_key_from_bytes(ic_root_public_key: &[u8]) -> Result<IcRootOfTrust
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use canister_sig_util::IC_ROOT_PUBLIC_KEY;
+    use ic_canister_sig_creation::IC_ROOT_PUBLIC_KEY;
     const CHALLENGE_HEX: &str =
         "e7875e69ce7beda6fc7b6dfbd9b75be1c6f6d5debae3ae1ed7c7f873de1b6f9f75e9e7dcddcf37efaddcdf6f7b69a7b57377b5ddaef87dee386ddd75e39e9cd39d7d77debc79df1b7b469df36eb8e7cef47b4d5cefa7f5df67dbefc73debdf5c";
     const DELEGATION_CHAIN_JSON: &str = r#"{

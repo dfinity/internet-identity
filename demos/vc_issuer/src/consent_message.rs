@@ -2,13 +2,13 @@
 
 use crate::verify_credential_spec;
 use crate::SupportedCredentialType;
+use ic_verifiable_credentials::issuer_api::{
+    CredentialSpec, Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo,
+};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use strfmt::strfmt;
-use vc_util::issuer_api::{
-    CredentialSpec, Icrc21ConsentInfo, Icrc21ConsentPreferences, Icrc21Error, Icrc21ErrorInfo,
-};
 use SupportedLanguage::{English, German};
 
 const EMPLOYMENT_VC_DESCRIPTION_EN: &str = r###"# {employer} Employment Credential
