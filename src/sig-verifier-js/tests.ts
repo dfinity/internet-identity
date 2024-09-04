@@ -130,6 +130,6 @@ test("Should fail validateDelegationAndGetPrincipal with wrong IC root public ke
       BAD_ROOT_PK
     );
   expect(call).toThrow(
-    expect.stringContaining("signature could not be verified")
+    expect.stringContaining("Invalid canister signature: invalid BLS signature")
   );
 });

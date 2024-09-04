@@ -9,8 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ic-canister-sig-creation.workspace = true
-ic-crypto-standalone-sig-verifier.workspace = true
-ic-types.workspace = true
+ic-signature-verification = "0.2"
 candid = "0.10"
 hex = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
