@@ -359,6 +359,8 @@ pub enum ContentType {
     PNG,
     SVG,
     WOFF2,
+    WASM,
+    JPG,
 }
 
 impl ContentType {
@@ -374,6 +376,8 @@ impl ContentType {
             ContentType::PNG => "image/png".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
             ContentType::WOFF2 => "application/font-woff2".to_string(),
+            ContentType::WASM => "application/wasm".to_string(),
+            ContentType::JPG => "image/jpeg".to_string(),
         }
     }
 }
@@ -503,6 +507,8 @@ fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding
         "svg" => ContentType::SVG,
         "webp" => ContentType::WEBP,
         "woff2" => ContentType::WOFF2,
+        "wasm" => ContentType::WASM,
+        "jpg" | "jpeg" => ContentType::JPG,
         ext => panic!(
             "Unknown asset type '{}' for asset '{}'",
             ext,
@@ -728,6 +734,21 @@ fn should_return_correct_extension() {
             "path16.dot/gz_json_file.json.gz",
             ContentType::JSON,
             ContentEncoding::GZip,
+        ),
+        (
+            "path17.dot/wasm_file.wasm",
+            ContentType::WASM,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path18.dot/jpg_file.jpg",
+            ContentType::JPG,
+            ContentEncoding::Identity,
+        ),
+        (
+            "path19.dot/jpg_file.jpeg",
+            ContentType::JPG,
+            ContentEncoding::Identity,
         ),
     ];
     for (path, expected_extension, expected_encoding) in path_extension_encoding {
