@@ -13,12 +13,13 @@ asset_util = { path = "../../src/asset_util" }
 # ic dependencies
 candid = "0.10"
 ic-canister-sig-creation = "1.1"
-ic-cdk = "0.13"
-ic-cdk-macros = "0.13"
-ic-certification = "2.2"
-ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
-ic-stable-structures = "0.6.0"
-ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "2bc90b2ce7355ba68001fcc484bdc31f2fe8e820"}
+ic-cdk = "0.16"
+ic-cdk-macros = "0.16"
+ic-certification = "2.6"
+ic-stable-structures = "0.6"
+ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "b74c746ea5361af3da207a2c957be4a951f7a72c"}
+# unfortunately required because we have a transitive dependency on getrandom
+ic-crypto-getrandom-for-wasm = { git="https://github.com/dfinity/ic", rev="faacac31032a9b98020475eb608fd63455603556" }
 
 # other dependencies
 hex = "0.4"
@@ -26,16 +27,16 @@ serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
 serde_cbor = "0.11"
 serde_json = "1"
-sha2 = "^0.10" # set bound to match ic-certified-map bound
+sha2 = "0.10"
 strfmt = "0.2"
-lazy_static = "1.4"
+lazy_static = "1.5"
 include_dir = "0.7"
 
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 candid_parser = "0.1"
-ic-http-certification = "2.2"
+ic-http-certification = "2.6"
 pocket-ic = "4.0"
-ic-response-verification = "2.2"
+ic-response-verification = "2.6"
 canister_tests = { path = "../../src/canister_tests" }
