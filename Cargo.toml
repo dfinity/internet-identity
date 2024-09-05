@@ -34,9 +34,7 @@ ic-representation-independent-hash = "2.2"
 ic-response-verification = "2.2"
 ic-stable-structures = "0.6"
 ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "2bc90b2ce7355ba68001fcc484bdc31f2fe8e820"}
-ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
 ic-canister-sig-creation = "1.1"
-ic-types = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
 pocket-ic = "4.0"
 
 # other dependencies
