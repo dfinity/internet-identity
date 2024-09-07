@@ -578,6 +578,12 @@
     "logo": "metaviz_logo.png"
   },
   {
+    "name": "CYCLES-TRANSFER-STATION",
+    "oneLiner": "An on-chain order-book market, where the market tokens trade against the stable CYCLES. Mint, hold, transfer, and trade the CYCLES at the CTS market.",
+    "website": "https://cycles-transfer-station.com",
+    "logo": "cyclestransferstation_logo.png"
+  },
+  {
     "name": "Staex VTS",
     "oneLiner": "A vehicle tracking system that serves as an infrastructure to track and invoice vehicles.",
     "website": "https://staex.io",
