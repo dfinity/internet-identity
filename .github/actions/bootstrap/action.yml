@@ -37,7 +37,7 @@ runs:
         path: |
           ~/.cargo/bin/ic-wasm
           ~/.rustup
-        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}-4
+        key: cargo-bin-${{ steps.platform.outputs.platform-id }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'scripts/bootstrap') }}-4
 
     - name: Bootstrap
       shell: bash
