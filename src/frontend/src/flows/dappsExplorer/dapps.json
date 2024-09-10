@@ -625,5 +625,11 @@
     "website": "https://aegis-finance.vercel.app/",
     "logo": "aegis-finance_logo.webp",
     "oneLiner": "Unlocking financial freedom, block by block."
+  },
+  {
+    "name": "PlexiMail",
+    "logo": "pleximail_logo.png",
+    "oneLiner": "The end-to-end encrypted, ICP canister-based, trustless secure email service.",
+    "website": "https://ai-fi.cc"
   }
 ]
