@@ -10,11 +10,11 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 ic-canister-sig-creation.workspace = true
 ic-signature-verification = "0.2"
-candid = "0.10"
+candid.workspace = true
 hex = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.107", features = ["std"] }
+serde_json = { version = "1.0", features = ["std"] }
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
-assert_matches = "1.5.0"
+assert_matches = "1.5"

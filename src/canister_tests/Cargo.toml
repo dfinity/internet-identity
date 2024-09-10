@@ -23,4 +23,4 @@ ic-cdk.workspace = true
 ic-representation-independent-hash.workspace = true
 ic-verifiable-credentials.workspace = true
 pocket-ic.workspace = true
-url = "2.5.0"
+url = "2.5"

@@ -14,8 +14,8 @@ crate-type = ["cdylib"]
 [dependencies]
 asset_util = { path = "../../src/asset_util" }
 candid = "0.10"
-ic-cdk = "0.13"
-ic-cdk-macros = "0.13"
+ic-cdk = "0.16"
+ic-cdk-macros = "0.16"
 serde = "1"
 serde_bytes = "0.11"
 include_dir = "0.7"
