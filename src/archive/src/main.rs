@@ -39,7 +39,7 @@
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
-use ic_cdk::api::stable::stable64_size;
+use ic_cdk::api::stable::stable_size;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -642,7 +642,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     })?;
     w.encode_gauge(
         "ii_archive_stable_memory_pages",
-        stable64_size() as f64,
+        stable_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
     with_call_info(|call_info| {

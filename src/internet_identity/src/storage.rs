@@ -140,11 +140,11 @@ const STATS_AGGREGATIONS_MEMORY_ID: MemoryId = MemoryId::new(STATS_AGGREGATIONS_
 // for the foreseeable future.
 const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
-const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES as u64;
+const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
 /// The maximum number of anchors this canister can store.
 pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u64) // deduct one bucket for the archive entries buffer
-    * WASM_PAGE_SIZE_IN_BYTES as u64
+    * WASM_PAGE_SIZE_IN_BYTES
     / DEFAULT_ENTRY_SIZE as u64;
 
 pub type Salt = [u8; 32];
