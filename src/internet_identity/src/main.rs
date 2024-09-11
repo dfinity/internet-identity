@@ -9,7 +9,7 @@ use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
 use candid::{candid_method, Principal};
-use canister_sig_util::signature_map::LABEL_SIG;
+use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -32,7 +32,6 @@ mod authz_utils;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
-mod hash;
 mod http;
 mod ii_domain;
 mod state;

@@ -39,7 +39,7 @@
 use candid::{candid_method, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
-use ic_cdk::api::stable::stable64_size;
+use ic_cdk::api::stable::stable_size;
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -49,7 +49,7 @@ use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemor
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{
     cell::Cell as StableCell, log::Log, DefaultMemoryImpl, Memory as StableMemory,
-    RestrictedMemory, StableBTreeMap, Storable,
+    RestrictedMemory, StableBTreeMap, Storable, MAX_PAGES,
 };
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -70,12 +70,6 @@ type ConfigCell = StableCell<ConfigState, Memory>;
 /// Type of the index to efficiently retrieve entries by anchor.
 type LogIndex = u64;
 type AnchorIndex = StableBTreeMap<AnchorIndexKey, (), VirtualMemory<Memory>>;
-
-const GIB: u64 = 1 << 30;
-const WASM_PAGE_SIZE: u64 = 65536;
-const MAX_STABLE_MEMORY_SIZE: u64 = 32 * GIB;
-/// The maximum number of Wasm pages that we allow to use for the stable storage.
-const MAX_WASM_PAGES: u64 = MAX_STABLE_MEMORY_SIZE / WASM_PAGE_SIZE;
 
 /// Memory ids of memory managed by the memory manager.
 const LOG_INDEX_MEMORY_ID: MemoryId = MemoryId::new(0);
@@ -111,7 +105,7 @@ fn config_memory() -> Memory {
 
 /// All the memory after the initial config page is managed by the [MemoryManager].
 fn managed_memory() -> Memory {
-    RestrictedMemory::new(DefaultMemoryImpl::default(), 1..MAX_WASM_PAGES)
+    RestrictedMemory::new(DefaultMemoryImpl::default(), 1..MAX_PAGES)
 }
 
 /// A helper function to access the configuration.
@@ -642,7 +636,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     })?;
     w.encode_gauge(
         "ii_archive_stable_memory_pages",
-        stable64_size() as f64,
+        stable_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
     with_call_info(|call_info| {

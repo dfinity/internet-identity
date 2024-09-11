@@ -82,14 +82,6 @@ const lookupCanister = async ({
       }
     );
 
-    if (response.status !== 200) {
-      console.error(
-        "Bad response when looking for canister ID",
-        response.status
-      );
-      return "not_found";
-    }
-
     const headerValue = response.headers.get(HEADER_NAME);
     if (isNullish(headerValue)) {
       console.error(

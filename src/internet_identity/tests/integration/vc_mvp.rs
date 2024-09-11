@@ -1,8 +1,9 @@
 //! Tests related to prepare_id_alias and get_id_alias canister calls.
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use ic_canister_sig_creation::{extract_raw_root_pk_from_der, CanisterSigPublicKey};
+use ic_verifiable_credentials::verify_credential_jws_with_canister_id;
 use identity_jose::jwk::JwkType;
 use identity_jose::jws::Decoder;
 use identity_jose::jwu::encode_b64;
@@ -12,7 +13,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use pocket_ic::CallError;
 use std::ops::Deref;
-use vc_util::verify_credential_jws_with_canister_id;
 
 fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
     let decoder: Decoder = Decoder::new();

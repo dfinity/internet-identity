@@ -2,12 +2,9 @@
 members = [
     "src/asset_util",
     "src/internet_identity",
-    "src/canister_sig_util",
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",
-    "src/vc_util",
-    "src/vc_util_js",
     "src/sig-verifier-js"
 ]
 resolver = "2"
@@ -21,34 +18,32 @@ opt-level = 'z'
 [workspace.dependencies]
 # local dependencies
 asset_util = { path = "src/asset_util" }
-canister_sig_util = { path = "src/canister_sig_util" }
 canister_tests = { path = "src/canister_tests" }
 internet_identity_interface = { path = "src/internet_identity_interface" }
-vc_util = { path = "src/vc_util" }
 
 # ic dependencies
 candid = "0.10"
 candid_parser = "0.1.2"
-ic-cdk = "0.13"
-ic-cdk-macros = "0.13"
-ic-cdk-timers = "0.7"
-ic-certification = "2.2"
-ic-http-certification = "2.2"
+ic-cdk = "0.16"
+ic-cdk-macros = "0.16"
+ic-cdk-timers = "0.10"
+ic-certification = "2.6"
+ic-http-certification = "2.6"
 ic-metrics-encoder = "1"
-ic-representation-independent-hash = "2.2"
-ic-response-verification = "2.2"
+ic-representation-independent-hash = "2.6"
+ic-response-verification = "2.6"
 ic-stable-structures = "0.6"
-ic-crypto-standalone-sig-verifier = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
-ic-types = { git = "https://github.com/dfinity/ic", rev = "e69bcc7b319cbb3ebc22ec55af35287741244db6" }
+ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "b74c746ea5361af3da207a2c957be4a951f7a72c"}
+ic-canister-sig-creation = "1.1"
 pocket-ic = "4.0"
 
 # other dependencies
-assert_matches = "1.5.0"
-base64 = "0.21"
+assert_matches = "1.5"
+base64 = "0.22"
 hex = "0.4"
 include_dir = "0.7"
-lazy_static = "1.4"
-regex = "1.9"
+lazy_static = "1.5"
+regex = "1.10"
 serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"

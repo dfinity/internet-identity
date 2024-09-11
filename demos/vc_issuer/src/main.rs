@@ -1,28 +1,30 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
 use candid::{candid_method, CandidType, Deserialize, Principal};
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY};
+use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap, LABEL_SIG};
+use ic_canister_sig_creation::{
+    extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY,
+};
 use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
+use ic_verifiable_credentials::issuer_api::{
+    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
+};
+use ic_verifiable_credentials::{
+    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
+    vc_signing_input, AliasTuple, CredentialParams, VC_SIGNING_INPUT_DOMAIN,
+};
 use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
-    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
-};
-use vc_util::{
-    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
-    vc_signing_input, vc_signing_input_hash, AliasTuple, CredentialParams,
-};
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
@@ -215,11 +217,14 @@ async fn prepare_credential(
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
-    let msg_hash = vc_signing_input_hash(&signing_input);
 
     SIGNATURES.with(|sigs| {
         let mut sigs = sigs.borrow_mut();
-        sigs.add_signature(&CANISTER_SIG_SEED, msg_hash);
+        sigs.add_signature(&CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed: &CANISTER_SIG_SEED,
+            message: &signing_input,
+        });
     });
     update_root_hash();
     Ok(PreparedCredentialData {
@@ -270,13 +275,15 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
-    let message_hash = vc_signing_input_hash(&signing_input);
     let sig_result = SIGNATURES.with(|sigs| {
         let sig_map = sigs.borrow();
         let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
         sig_map.get_signature_as_cbor(
-            &CANISTER_SIG_SEED,
-            message_hash,
+            &CanisterSigInputs {
+                domain: VC_SIGNING_INPUT_DOMAIN,
+                seed: &CANISTER_SIG_SEED,
+                message: &signing_input,
+            },
             Some(certified_assets_root_hash),
         )
     });

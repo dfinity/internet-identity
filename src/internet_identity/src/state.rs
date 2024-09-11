@@ -10,7 +10,7 @@ use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize};
-use canister_sig_util::signature_map::SignatureMap;
+use ic_canister_sig_creation::signature_map::SignatureMap;
 use ic_cdk::trap;
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::*;
