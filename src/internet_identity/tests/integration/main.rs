@@ -8,6 +8,7 @@ mod activity_stats;
 mod aggregation_stats;
 mod anchor_management;
 mod archive_integration;
+mod conifg;
 mod delegation;
 mod http;
 mod rollback;

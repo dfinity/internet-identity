@@ -4,6 +4,7 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -325,6 +326,25 @@ fn stats() -> InternetIdentityStats {
         canister_creation_cycles_cost,
         storage_layout_version: storage.version(),
         event_aggregations,
+    })
+}
+
+#[query]
+fn config() -> InternetIdentityInit {
+    let archive_config = match state::archive_state() {
+        ArchiveState::NotConfigured => None,
+        ArchiveState::Configured { config } | ArchiveState::CreationInProgress { config, .. } => {
+            Some(config)
+        }
+        ArchiveState::Created { config, .. } => Some(config),
+    };
+    let user_range = state::storage_borrow(|s| s.assigned_anchor_number_range());
+    persistent_state(|persistent_state| InternetIdentityInit {
+        assigned_user_number_range: Some(user_range),
+        archive_config,
+        canister_creation_cycles_cost: Some(persistent_state.canister_creation_cycles_cost),
+        register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
+        max_inflight_captchas: Some(persistent_state.max_inflight_captchas),
     })
 }
 

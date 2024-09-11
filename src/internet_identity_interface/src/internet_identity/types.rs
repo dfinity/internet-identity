@@ -190,7 +190,7 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Default)]
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
     pub archive_config: Option<ArchiveConfig>,

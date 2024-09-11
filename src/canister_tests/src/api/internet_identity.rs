@@ -355,5 +355,12 @@ pub fn acknowledge_entries(
     )
 }
 
+pub fn config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+) -> Result<types::InternetIdentityInit, CallError> {
+    call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
+}
+
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}
