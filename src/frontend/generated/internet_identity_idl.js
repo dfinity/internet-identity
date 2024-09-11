@@ -402,6 +402,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : Challenge, 'Err' : IDL.Null })],
         [],
       ),
+    'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),

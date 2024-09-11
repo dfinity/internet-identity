@@ -323,6 +323,7 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
   'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
+  'config' : ActorMethod<[], InternetIdentityInit>,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
