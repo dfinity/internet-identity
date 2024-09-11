@@ -36,7 +36,7 @@
 //! - prefix scan with anchor to retrieve entries by anchor
 //! - prefix scan with (anchor, timestamp) to narrow down on the time period for a specific anchor
 //! - prefix scan with (anchor, timestamp, log index) to do pagination (with the key of the first entry not included in the previous set)
-use candid::{candid_method, CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use ic_cdk::api::stable::stable_size;
@@ -239,7 +239,6 @@ impl Storable for AnchorIndexKey {
 /// I.e. this allows rolling back Internet Identity from pull to push without rolling back the
 /// archive.
 #[update]
-#[candid_method]
 fn write_entry(anchor_number: AnchorNumber, timestamp: Timestamp, entry: ByteBuf) {
     with_config(|config| {
         if config.ii_canister != caller() {
@@ -378,7 +377,6 @@ fn store_call_error(call_error: CallErrorInfo) {
 }
 
 #[query]
-#[candid_method(query)]
 fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
     let limit = limit_or_default(limit);
 
@@ -404,7 +402,6 @@ fn get_entries(index: Option<u64>, limit: Option<u16>) -> Entries {
 }
 
 #[query]
-#[candid_method(query)]
 fn get_anchor_entries(
     anchor: AnchorNumber,
     cursor: Option<Cursor>,
@@ -509,7 +506,6 @@ fn set_highest_archived_sequence_number(sequence_number: u64) {
 }
 
 #[init]
-#[candid_method(init)]
 fn initialize(arg: ArchiveInit) {
     write_config(ArchiveConfig {
         ii_canister: arg.ii_canister,
@@ -539,7 +535,6 @@ fn write_config(config: ArchiveConfig) {
 }
 
 #[query]
-#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     match parts[0] {
@@ -660,7 +655,6 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
 /// Publicly exposes the status of the archive canister.
 /// This is useful to check operations or for debugging purposes.
 #[update]
-#[candid_method]
 async fn status() -> ArchiveStatus {
     let canister_id = id();
     let (ic_cdk_canister_status,) = canister_status(CanisterIdRecord { canister_id })
@@ -700,7 +694,7 @@ async fn status() -> ArchiveStatus {
 
 fn main() {}
 
-// Order dependent: do not move above any function annotated with #[candid_method]!
+// Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
 #[cfg(test)]

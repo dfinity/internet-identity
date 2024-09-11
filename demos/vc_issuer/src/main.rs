@@ -1,5 +1,5 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
-use candid::{candid_method, CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize, Principal};
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap, LABEL_SIG};
 use ic_canister_sig_creation::{
     extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY,
@@ -142,7 +142,6 @@ struct IssuerInit {
 }
 
 #[init]
-#[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
     if let Some(init) = init_arg {
         apply_config(IssuerConfig::from(init));
@@ -157,7 +156,6 @@ fn post_upgrade(init_arg: Option<IssuerInit>) {
 }
 
 #[update]
-#[candid_method]
 fn configure(init: IssuerInit) {
     apply_config(IssuerConfig::from(init));
 }
@@ -202,7 +200,6 @@ fn authorize_vc_request(
 }
 
 #[update]
-#[candid_method]
 async fn prepare_credential(
     req: PrepareCredentialRequest,
 ) -> Result<PreparedCredentialData, IssueCredentialError> {
@@ -247,7 +244,6 @@ fn update_root_hash() {
 }
 
 #[query]
-#[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
     if let Err(err) = authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         return Result::<IssuedCredentialData, IssueCredentialError>::Err(err);
@@ -304,7 +300,6 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
 }
 
 #[update]
-#[candid_method]
 async fn vc_consent_message(
     req: Icrc21VcConsentMessageRequest,
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
@@ -315,7 +310,6 @@ async fn vc_consent_message(
 }
 
 #[update]
-#[candid_method]
 async fn derivation_origin(
     req: DerivationOriginRequest,
 ) -> Result<DerivationOriginData, DerivationOriginError> {
@@ -409,28 +403,24 @@ fn verify_single_argument(
 }
 
 #[update]
-#[candid_method]
 fn add_employee(employee_id: Principal) -> String {
     EMPLOYEES.with_borrow_mut(|employees| employees.insert(employee_id));
     format!("Added employee {}", employee_id)
 }
 
 #[update]
-#[candid_method]
 fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
     format!("Added graduate {}", graduate_id)
 }
 
 #[update]
-#[candid_method]
 fn add_adult(adult_id: Principal) -> String {
     ADULTS.with_borrow_mut(|adults| adults.insert(adult_id));
     format!("Added adult {}", adult_id)
 }
 
 #[query]
-#[candid_method(query)]
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
@@ -596,7 +586,7 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     hasher.finalize().into()
 }
 
-// Order dependent: do not move above any function annotated with #[candid_method]!
+// Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
 // Assets
