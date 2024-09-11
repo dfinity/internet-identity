@@ -17,9 +17,9 @@ This document describes and specifies Internet Identity from various angles and 
 
 -   Important implementation notes about the Internet Identity Service backend
 
-The Internet Identity Service consists of
+The Internet Identity service consists of:
 
--   its backend, a canister on the IC. More precisely, a canister on a dedicated subnet with a *well-known* canister id, and
+-   Its backend, a canister on ICP. More precisely, a canister on a dedicated subnet with a *well-known* canister id, and
 
 -   its frontend, a web application served by the backend canister.
 
@@ -81,7 +81,7 @@ The canister maintains a salt (in the following the `salt`), a 32 byte long blob
 Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
 :::
 
-A user account is identified by a unique *Identity Anchor*, a smallish natural number chosen by the canister.
+A user account is identified by a unique *Identity Anchor*, a natural number chosen by the canister.
 
 A client application frontend is identified by its origin (e.g., `https://abcde-efg.ic0.app`, `https://nice-name.com`). Frontend applications can be served by canisters or by websites that are not hosted on the Internet Computer.
 
@@ -110,11 +110,11 @@ When a client application frontend wants to authenticate as a user, it uses a *s
 
 The delegation chain consists of one delegation, called the *client delegation*. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a [canister signature](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures). This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 30 days, with a default of 30 minutes.
 
-The Internet Identity Service Frontend also manages an *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
+The Internet Identity service frontend also manages an *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
 ## Client authentication protocol
 
-This section describes the Internet Identity Service from the point of view of a client application frontend.
+This section describes the Internet Identity service from the point of view of a client application frontend.
 
 ```mermaid
 sequenceDiagram
@@ -226,7 +226,7 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 -   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that origin. Be careful when implementing a JavaScript playground on the Internet Computer.
 :::
 
-## Alternative Frontend Origins
+## Alternative frontend origins
 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide another URL as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using the `derivationOrigin` directly.
 This feature works for `canisterId` based URLs and [ICP custom domains](https://internetcomputer.org/docs/current/developer-docs/web-apps/custom-domains/using-custom-domains) (backed by canisters) as `derivationOrigin`.
@@ -296,23 +296,23 @@ In order to allow Internet Identity to read the path `/.well-known/ii-alternativ
 This section describes the interface that the backend canister provides.
 
 Note that the interface is split into 4 categories:
-* Identity management API, i.e. APIs for end-users to manage their identity
-  * Legacy API
-  * API v2 (experimental, incomplete)
+* Identity management API, i.e. APIs for end-users to manage their identity.
+  * Legacy API.
+  * API v2 (experimental, incomplete).
     * The aim of the API v2 is to introduce changes that cannot be made without breaking existing clients of the legacy API. While the API v2 has feature parity with the legacy API, the desired changes are not fully implemented yet:
-      * Methods should return proper results with meaningful errors
-      * Adding explicit WebAuthn signatures to security critical operations
-* HTTP gateway protocol, required to serve https://identity.ic0.app
-* Auth protocol, for creating signed delegations
-* Verifiable Credentials protocol, for creating id alias credentials
-* internal methods, not intended to be called by external clients
-    * these are methods related to initialisation of II itself and integration with its archive
+      * Methods should return proper results with meaningful errors.
+      * Adding explicit WebAuthn signatures to security critical operations.
+* HTTP gateway protocol, required to serve `https://identity.ic0.app`.
+* Auth protocol, for creating signed delegations.
+* Verifiable credentials protocol, for creating id alias credentials.
+* Internal methods, not intended to be called by external clients.
+    * These are methods related to initialization of II itself and integration with its archive.
 
 The summary is given by the Candid interface:
 
 <CodeBlock language="candid">{IICandidInterface}</CodeBlock>
 
-### Identity Management (legacy API)
+### Identity management (legacy API)
 #### The `create_challenge` and `register`  methods
 :::note API V2: `captcha_create` and `identity_register` :::
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
@@ -406,7 +406,7 @@ Fetches all data associated with an anchor including registration mode and tenta
 
 Fetches the principal for a given user and front end.
 
-### Identity Management (API V2 only)
+### Identity management (API V2 only)
 #### The `authn_method_metadata_replace` query method
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
@@ -447,7 +447,7 @@ Together with the `UserKey` returned by `prepare_delegation`, the result of this
 
 See here for the specification of the verifiable credentials protocol.
 
-### HTTP Gateway Protocol
+### HTTP gateway protocol
 
 The methods `http_request` and `http_request_update` serve the front-end assets to browesers. See [here](https://internetcomputer.org/docs/current/references/http-gateway-protocol-spec) for additional details.
 
@@ -473,7 +473,7 @@ The `deploy_archive` method deploys the supplied wasm to the archive canister, g
 
 API for the archive canister to fetch archive entries from the Internet Identity canister and to trigger pruning of archived entries within Internet Identity.
 
-## The Internet Identity Service backend internals
+## The Internet Identity service backend internals
 
 This section, which is to be expanded, describes interesting design choices about the internals of the Internet Identity Service Canister. In particular
 
