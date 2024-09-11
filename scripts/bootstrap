@@ -26,7 +26,7 @@ echo "looking for ic-wasm 0.8.5"
 if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
 then
     echo "installing ic-wasm 0.8.5"
-    run cargo install ic-wasm --version 0.8.5
+    run cargo install ic-wasm --version 0.8.5 --force
 fi
 
 # make sure the packages are actually installed (rustup waits for the first invoke to lazyload)
