@@ -6,7 +6,7 @@ use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::AggregationWindow::{Day, Month};
 use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_COUNT, PD_SESS_SEC};
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
-use ic_cdk::api::stable::stable64_size;
+use ic_cdk::api::stable::stable_size;
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
 use std::time::Duration;
@@ -58,7 +58,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     })?;
     w.encode_gauge(
         "internet_identity_stable_memory_pages",
-        stable64_size() as f64,
+        stable_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
     #[cfg(target_arch = "wasm32")]

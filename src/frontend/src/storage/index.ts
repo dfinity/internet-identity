@@ -4,7 +4,7 @@ import { parseUserNumber } from "$src/utils/userNumber";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { get as idbGet, set as idbSet } from "idb-keyval";
-import { z } from "zod";
+import { ZodType, z } from "zod";
 
 /** We keep as many anchors as possible for two reasons:
  *  - we should design the app to discourage having many many anchors, but shouldn't prevent it
@@ -54,17 +54,14 @@ export const setAnchorUsed = async (userNumber: bigint) => {
  * more information.
  */
 export const getAnchorByPrincipal = async ({
-  origin,
   principal,
 }: {
-  origin: string;
   principal: Principal;
 }): Promise<bigint | undefined> => {
   const storage = await readStorage();
   const anchors = storage.anchors;
 
-  const digest = await computePrincipalDigest({
-    origin,
+  const principalDigest = await computePrincipalDigest({
     principal,
     hasher: storage.hasher,
   });
@@ -72,9 +69,67 @@ export const getAnchorByPrincipal = async ({
   for (const ix in anchors) {
     const anchor: Anchor = anchors[ix];
 
-    if (anchor.knownPrincipals.some((digest_) => digest_.digest === digest)) {
+    if (
+      anchor.knownPrincipals.some(
+        (digest_) => digest_.principalDigest === principalDigest
+      )
+    ) {
       return BigInt(ix);
     }
+  }
+
+  return;
+};
+
+/** Look up an anchor by principal, if it is the last used for the given origin.
+ */
+export const getAnchorIfLastUsed = async ({
+  principal,
+  origin,
+}: {
+  principal: Principal;
+  origin: string;
+}): Promise<bigint | undefined> => {
+  const storage = await readStorage();
+  const anchors = storage.anchors;
+
+  const principalDigest = await computePrincipalDigest({
+    principal,
+    hasher: storage.hasher,
+  });
+
+  const originDigest = await computeOriginDigest({
+    origin,
+    hasher: storage.hasher,
+  });
+
+  // candidate anchors with their timestamp, principal digest -> identity number
+  const candidates = [];
+  for (const ix in anchors) {
+    const anchor: Anchor = anchors[ix];
+
+    // there is at most one principal known per anchor and origin.
+    const lastUsed = anchor.knownPrincipals.filter(
+      (knownPrincipal) => knownPrincipal.originDigest === originDigest
+    )[0];
+    if (isNullish(lastUsed)) {
+      continue;
+    }
+    candidates.push({
+      lastUsedTimestamp: lastUsed.lastUsedTimestamp,
+      principalDigest: lastUsed.principalDigest,
+      identityNumber: ix,
+    });
+  }
+
+  candidates.sort((a, b) => b.lastUsedTimestamp - a.lastUsedTimestamp);
+  const mostRecent = candidates[0];
+  if (isNullish(mostRecent)) {
+    return;
+  }
+
+  if (mostRecent.principalDigest === principalDigest) {
+    return BigInt(mostRecent.identityNumber);
   }
 
   return;
@@ -100,20 +155,24 @@ export const setKnownPrincipal = async ({
     const anchors = storage.anchors;
     const oldAnchor = anchors[ix] ?? defaultAnchor;
 
-    const digest = await computePrincipalDigest({
-      origin,
+    const principalDigest = await computePrincipalDigest({
       principal,
       hasher: storage.hasher,
     });
 
     const principalData = {
-      digest,
+      principalDigest,
+      originDigest: await computeOriginDigest({
+        origin,
+        hasher: storage.hasher,
+      }),
       lastUsedTimestamp: nowMillis(),
     };
 
     // Remove the principal, if we've encountered it already
     const dedupedPrincipals = oldAnchor.knownPrincipals.filter(
-      (principalData_) => principalData_.digest !== principalData.digest
+      (principalData_) =>
+        principalData_.principalDigest !== principalData.principalDigest
     );
 
     // Add the new principal and sort (most recently used is first)
@@ -180,9 +239,9 @@ const updateStorage = async (
 
   if (doWrite) {
     await writeIndexedDB(prunedStorage);
-
-    // NOTE: we keep V2 up to date in case of rollback
-    await writeIndexedDBV2(prunedStorage.anchors);
+    // NOTE: we keep V3 up to date in case of rollback
+    // (only for known identity numbers, _not_ known anchors)
+    await writeIndexedDBV3(toV3(prunedStorage));
   }
 
   return prunedStorage;
@@ -232,6 +291,12 @@ const mostUnused = (anchors: Anchors): string | undefined => {
 /** Best effort to migrate potentially old localStorage data to
  * the latest format */
 const migrated = async (): Promise<Storage | undefined> => {
+  // Try to read the "v3" (idb.anchors) storage and return that if found
+  const v3 = await migratedV3();
+  if (nonNullish(v3)) {
+    return v3;
+  }
+
   // Try to read the "v2" (idb.anchors) storage and return that if found
   const v2 = await migratedV2();
   if (nonNullish(v2)) {
@@ -269,17 +334,45 @@ const nowMillis = (): number => {
  * user's browser is compromised: the principals associated with and origin of the visited dapps
  * should in principle not be leaked.
  *
- * The digest is a sha hash of the origin, principal and some secret, i.e. a HMAC digest (with
- * non-extractable HMAC key). The origin is hashed in to further reduce the already unlikely
- * possibility of collisions.
+ * The digest is a sha hash of the principal and some secret, i.e. a HMAC digest (with
+ * non-extractable HMAC key).
  */
 const computePrincipalDigest = async ({
-  origin: origin_,
   principal: principalObj,
   hasher,
 }: {
-  origin: string;
   principal: Principal;
+  hasher: CryptoKey;
+}): Promise<string> => {
+  // Encode each element & size
+  const enc = new TextEncoder();
+  const principal_ = principalObj.toText();
+
+  const principal = enc.encode(principal_);
+  const principalLen = Uint8Array.from([principal_.length]);
+
+  // Create a buffer with all elements
+  const buff = concatUint8Arrays([principal, principalLen]);
+
+  // Create the digest
+  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
+  return arrayBufferToBase64(digestBytes);
+};
+
+/**
+ * This computes a digest for an origin.
+ *
+ * Anchors store digests for every origin on which II generates principals for them. This information is required to
+ * figure out if a specific principal was derived last for a specific origin.
+ *
+ * The digest is a sha hash of the origin and some secret, i.e. a HMAC digest (with
+ * non-extractable HMAC key).
+ */
+const computeOriginDigest = async ({
+  origin: origin_,
+  hasher,
+}: {
+  origin: string;
   hasher: CryptoKey;
 }): Promise<string> => {
   if (origin_.length > 255) {
@@ -294,21 +387,16 @@ const computePrincipalDigest = async ({
   }
   // Encode each element & size
   const enc = new TextEncoder();
-  const principal_ = principalObj.toText();
 
   const origin = enc.encode(origin_);
   const originLen = Uint8Array.from([origin_.length]);
 
-  const principal = enc.encode(principal_);
-  const principalLen = Uint8Array.from([principal_.length]);
-
-  // Create a buffer with all four elements
-  const buff = concatUint8Arrays([origin, originLen, principal, principalLen]);
+  // Create a buffer with all elements
+  const buff = concatUint8Arrays([origin, originLen]);
 
   // Create the digest
   const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
-  const digest = arrayBufferToBase64(digestBytes);
-  return digest;
+  return arrayBufferToBase64(digestBytes);
 };
 
 // Concat some byte arrays
@@ -402,7 +490,7 @@ const migratedV1 = async (): Promise<Storage | undefined> => {
     return undefined;
   }
 
-  const migratedAnchors: AnchorsV3 = {};
+  const migratedAnchors: Anchors = {};
   for (const userNumber in anchors) {
     const oldAnchor = anchors[userNumber];
     migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipals: [] };
@@ -464,7 +552,7 @@ const migratedV2 = async (): Promise<Storage | undefined> => {
   }
 
   // No known principals
-  const migratedAnchors: AnchorsV3 = {};
+  const migratedAnchors: Anchors = {};
 
   for (const userNumber in readAnchors) {
     const oldAnchor = readAnchors[userNumber];
@@ -476,28 +564,8 @@ const migratedV2 = async (): Promise<Storage | undefined> => {
   return { anchors: migratedAnchors, hasher };
 };
 
-const readIndexedDBV2 = async (): Promise<AnchorsV2 | undefined> => {
-  const item: unknown = await idbGet("anchors");
-
-  if (item === undefined) {
-    return;
-  }
-
-  // Read the object
-  const parsed = AnchorsV2.safeParse(item);
-  if (parsed.success !== true) {
-    const message =
-      `could not read saved identities: ignoring malformed IndexedDB data: ` +
-      parsed.error;
-    console.warn(message);
-    return {};
-  }
-
-  return parsed.data;
-};
-
-const writeIndexedDBV2 = async (anchors: AnchorsV2) => {
-  await idbSet("anchors", anchors);
+const readIndexedDBV2 = (): Promise<AnchorsV2 | undefined> => {
+  return readGeneric({ idbKey: "anchors", storageType: AnchorsV2 });
 };
 
 /**
@@ -533,18 +601,97 @@ const StorageV3 = z.object({
   hasher: z.instanceof(CryptoKey),
 });
 
-const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
-  const item: unknown = await idbGet(IDB_KEY_V3);
+const readIndexedDBV3 = (): Promise<StorageV3 | undefined> => {
+  return readGeneric({ idbKey: IDB_KEY_V3, storageType: StorageV3 });
+};
+
+const writeIndexedDBV3 = async (storage: StorageV3) => {
+  await idbSet(IDB_KEY_V3, storage);
+};
+
+const migratedV3 = async (): Promise<Storage | undefined> => {
+  const readStorage = await readIndexedDBV3();
+
+  if (isNullish(readStorage)) {
+    return undefined;
+  }
+
+  // No known principals
+  const migratedAnchors: Anchors = {};
+
+  for (const userNumber in readStorage.anchors) {
+    const oldAnchor = readStorage.anchors[userNumber];
+    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipals: [] };
+  }
+
+  return { anchors: migratedAnchors, hasher: readStorage.hasher };
+};
+
+const toV3 = (storage: Storage): StorageV3 => {
+  const migratedAnchors: AnchorsV3 = {};
+  for (const userNumber in storage.anchors) {
+    const oldAnchor = storage.anchors[userNumber];
+    migratedAnchors[userNumber] = { ...oldAnchor, knownPrincipals: [] };
+  }
+
+  return { anchors: migratedAnchors, hasher: storage.hasher };
+};
+
+/**
+ * V4, indexeddb["ii-storage-v4"] = { anchors: { 20000: ... } }
+ * */
+type StorageV4 = z.infer<typeof StorageV4>;
+type AnchorsV4 = z.infer<typeof AnchorsV4>;
+type AnchorV4 = z.infer<typeof AnchorV4>;
+const IDB_KEY_V4 = "ii-storage-v4";
+
+const PrincipalDataV4 = z.object({
+  principalDigest: z.string(),
+  originDigest: z.string(),
+
+  /** The last time the user authenticated with the principal */
+  lastUsedTimestamp: z.number(),
+});
+
+const AnchorV4 = z.object({
+  /** Timestamp (mills since epoch) of when anchor was last used */
+  lastUsedTimestamp: z.number(),
+
+  knownPrincipals: z.array(PrincipalDataV4),
+});
+const AnchorsV4 = z.record(AnchorV4);
+
+/** The type of all anchors in storage. */
+const StorageV4 = z.object({
+  anchors: AnchorsV4,
+  hasher: z.instanceof(CryptoKey),
+});
+const readIndexedDBV4 = (): Promise<StorageV4 | undefined> => {
+  return readGeneric({ idbKey: IDB_KEY_V4, storageType: StorageV4 });
+};
+
+const writeIndexedDBV4 = async (storage: StorageV4) => {
+  await idbSet(IDB_KEY_V4, storage);
+};
+
+const readGeneric = async <T extends ZodType>({
+  idbKey,
+  storageType,
+}: {
+  idbKey: IDBValidKey;
+  storageType: T;
+}): Promise<T["_output"] | undefined> => {
+  const item: unknown = await idbGet(idbKey);
 
   if (isNullish(item)) {
     return;
   }
 
   // Read the object
-  const parsed = StorageV3.safeParse(item);
-  if (parsed.success !== true) {
+  const parsed = storageType.safeParse(item);
+  if (!parsed.success) {
     const message =
-      `could not read saved identities: ignoring malformed IndexedDB data: ` +
+      `could not read saved identities: ignoring malformed IndexedDB data (key: "${idbKey}"): ` +
       parsed.error;
     console.warn(message);
     return { anchors: {}, hasher: await newHMACKey() };
@@ -553,15 +700,11 @@ const readIndexedDBV3 = async (): Promise<Storage | undefined> => {
   return parsed.data;
 };
 
-const writeIndexedDBV3 = async (storage: Storage) => {
-  await idbSet(IDB_KEY_V3, storage);
-};
-
 /* Latest */
 
 /* Always points to the latest storage & anchor types */
-type Storage = StorageV3;
-type Anchor = AnchorV3;
+type Storage = StorageV4;
+type Anchor = AnchorV4;
 type Anchors = Storage["anchors"];
-const readIndexedDB = readIndexedDBV3;
-const writeIndexedDB = writeIndexedDBV3;
+const readIndexedDB = readIndexedDBV4;
+const writeIndexedDB = writeIndexedDBV4;

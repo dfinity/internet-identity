@@ -8,8 +8,8 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
-use candid::{candid_method, Principal};
-use canister_sig_util::signature_map::LABEL_SIG;
+use candid::Principal;
+use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -32,7 +32,6 @@ mod authz_utils;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
-mod hash;
 mod http;
 mod ii_domain;
 mod state;
@@ -55,27 +54,23 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 
 #[update]
-#[candid_method]
 async fn init_salt() {
     state::init_salt().await;
 }
 
 #[update]
-#[candid_method]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::enter_device_registration_mode(anchor_number)
 }
 
 #[update]
-#[candid_method]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     tentative_device_registration::exit_device_registration_mode(anchor_number)
 }
 
 #[update]
-#[candid_method]
 async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
@@ -106,7 +101,6 @@ async fn add_tentative_device(
 }
 
 #[update]
-#[candid_method]
 fn verify_tentative_device(
     anchor_number: AnchorNumber,
     user_verification_code: DeviceVerificationCode,
@@ -139,13 +133,11 @@ fn verify_tentative_device(
 }
 
 #[update]
-#[candid_method]
 async fn create_challenge() -> Challenge {
     anchor_management::registration::create_challenge().await
 }
 
 #[update]
-#[candid_method]
 fn register(
     device_data: DeviceData,
     challenge_result: ChallengeAttempt,
@@ -155,7 +147,6 @@ fn register(
 }
 
 #[update]
-#[candid_method]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
@@ -164,7 +155,6 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 }
 
 #[update]
-#[candid_method]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
@@ -176,7 +166,6 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 }
 
 #[update]
-#[candid_method]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
@@ -188,7 +177,6 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 }
 
 #[update]
-#[candid_method]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
@@ -202,7 +190,6 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
 /// Deprecated: use [get_anchor_credentials] instead
 #[query]
-#[candid_method(query)]
 fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
         return vec![];
@@ -221,7 +208,6 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
 }
 
 #[query]
-#[candid_method(query)]
 fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
         return AnchorCredentials::default();
@@ -253,14 +239,12 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 }
 
 #[update] // this is an update call because queries are not (yet) certified
-#[candid_method]
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
 
 #[query]
-#[candid_method(query)]
 fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
@@ -269,7 +253,6 @@ fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Pri
 }
 
 #[update]
-#[candid_method]
 async fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -289,7 +272,6 @@ async fn prepare_delegation(
 }
 
 #[query]
-#[candid_method(query)]
 fn get_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
@@ -303,19 +285,16 @@ fn get_delegation(
 }
 
 #[query]
-#[candid_method(query)]
 fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[update]
-#[candid_method]
 fn http_request_update(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
 
 #[query]
-#[candid_method(query)]
 fn stats() -> InternetIdentityStats {
     let archive_info = match state::archive_state() {
         ArchiveState::NotConfigured => ArchiveInfo {
@@ -350,7 +329,6 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[update]
-#[candid_method]
 async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
     archive::deploy_archive(wasm).await
 }
@@ -359,7 +337,6 @@ async fn deploy_archive(wasm: ByteBuf) -> DeployArchiveResult {
 /// This is an update call because the archive information _must_ be certified.
 /// Only callable by this IIs archive canister.
 #[update]
-#[candid_method]
 fn fetch_entries() -> Vec<BufferedEntry> {
     archive::fetch_entries()
 }
@@ -367,13 +344,11 @@ fn fetch_entries() -> Vec<BufferedEntry> {
 /// Removes all buffered archive entries up to sequence number.
 /// Only callable by this IIs archive canister.
 #[update]
-#[candid_method]
 fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
 #[init]
-#[candid_method(init)]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     state::init_new();
     initialize(maybe_arg);
@@ -482,7 +457,6 @@ mod v2_api {
     use super::*;
 
     #[query]
-    #[candid_method(query)]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
         let Ok(anchor) = state::storage_borrow(|storage| storage.read(identity_number)) else {
             return Ok(IdentityAuthnInfo {
@@ -520,14 +494,12 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     async fn captcha_create() -> Result<Challenge, ()> {
         let challenge = anchor_management::registration::create_challenge().await;
         Ok(challenge)
     }
 
     #[update]
-    #[candid_method]
     fn identity_register(
         authn_method: AuthnMethodData,
         challenge_result: ChallengeAttempt,
@@ -544,7 +516,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
         check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
         let anchor_info = anchor_management::get_anchor_info(identity_number);
@@ -572,7 +543,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_add(
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
@@ -583,7 +553,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_remove(
         identity_number: IdentityNumber,
         public_key: PublicKey,
@@ -593,7 +562,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_replace(
         identity_number: IdentityNumber,
         authn_method_pk: PublicKey,
@@ -607,7 +575,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_metadata_replace(
         identity_number: IdentityNumber,
         authn_method_pk: PublicKey,
@@ -634,7 +601,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_security_settings_replace(
         identity_number: IdentityNumber,
         authn_method_pk: PublicKey,
@@ -656,7 +622,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn identity_metadata_replace(
         identity_number: IdentityNumber,
         metadata: HashMap<String, MetadataEntryV2>,
@@ -675,7 +640,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
     ) -> Result<RegistrationModeInfo, ()> {
@@ -686,14 +650,12 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
         exit_device_registration_mode(identity_number);
         Ok(())
     }
 
     #[update]
-    #[candid_method]
     async fn authn_method_register(
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
@@ -719,7 +681,6 @@ mod v2_api {
     }
 
     #[update]
-    #[candid_method]
     fn authn_method_confirm(
         identity_number: IdentityNumber,
         confirmation_code: String,
@@ -745,7 +706,6 @@ mod attribute_sharing_mvp {
     use super::*;
 
     #[update]
-    #[candid_method]
     async fn prepare_id_alias(
         req: PrepareIdAliasRequest,
     ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
@@ -762,7 +722,6 @@ mod attribute_sharing_mvp {
     }
 
     #[query]
-    #[candid_method(query)]
     fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
         check_authorization(req.identity_number).map_err(GetIdAliasError::from)?;
         vc_mvp::get_id_alias(
@@ -779,7 +738,7 @@ mod attribute_sharing_mvp {
 
 fn main() {}
 
-// Order dependent: do not move above any function annotated with #[candid_method]!
+// Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
 #[cfg(test)]

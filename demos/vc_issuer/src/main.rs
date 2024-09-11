@@ -1,28 +1,30 @@
 use crate::consent_message::{get_vc_consent_message, SupportedLanguage};
-use candid::{candid_method, CandidType, Deserialize, Principal};
-use canister_sig_util::signature_map::{SignatureMap, LABEL_SIG};
-use canister_sig_util::{extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY};
+use candid::{CandidType, Deserialize, Principal};
+use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap, LABEL_SIG};
+use ic_canister_sig_creation::{
+    extract_raw_root_pk_from_der, CanisterSigPublicKey, IC_ROOT_PUBLIC_KEY,
+};
 use ic_cdk::api::{caller, set_certified_data, time};
 use ic_cdk_macros::{init, query, update};
 use ic_certification::{fork_hash, labeled_hash, pruned, Hash};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::{DefaultMemoryImpl, RestrictedMemory, StableCell, Storable};
+use ic_verifiable_credentials::issuer_api::{
+    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
+    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
+    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
+    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
+};
+use ic_verifiable_credentials::{
+    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
+    vc_signing_input, AliasTuple, CredentialParams, VC_SIGNING_INPUT_DOMAIN,
+};
 use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use vc_util::issuer_api::{
-    ArgumentValue, CredentialSpec, DerivationOriginData, DerivationOriginError,
-    DerivationOriginRequest, GetCredentialRequest, Icrc21ConsentInfo, Icrc21Error,
-    Icrc21VcConsentMessageRequest, IssueCredentialError, IssuedCredentialData,
-    PrepareCredentialRequest, PreparedCredentialData, SignedIdAlias,
-};
-use vc_util::{
-    build_credential_jwt, did_for_principal, get_verified_id_alias_from_jws, vc_jwt_to_jws,
-    vc_signing_input, vc_signing_input_hash, AliasTuple, CredentialParams,
-};
 use SupportedCredentialType::{UniversityDegree, VerifiedAdult, VerifiedEmployee};
 
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
@@ -140,7 +142,6 @@ struct IssuerInit {
 }
 
 #[init]
-#[candid_method(init)]
 fn init(init_arg: Option<IssuerInit>) {
     if let Some(init) = init_arg {
         apply_config(IssuerConfig::from(init));
@@ -155,7 +156,6 @@ fn post_upgrade(init_arg: Option<IssuerInit>) {
 }
 
 #[update]
-#[candid_method]
 fn configure(init: IssuerInit) {
     apply_config(IssuerConfig::from(init));
 }
@@ -200,7 +200,6 @@ fn authorize_vc_request(
 }
 
 #[update]
-#[candid_method]
 async fn prepare_credential(
     req: PrepareCredentialRequest,
 ) -> Result<PreparedCredentialData, IssueCredentialError> {
@@ -215,11 +214,14 @@ async fn prepare_credential(
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
-    let msg_hash = vc_signing_input_hash(&signing_input);
 
     SIGNATURES.with(|sigs| {
         let mut sigs = sigs.borrow_mut();
-        sigs.add_signature(&CANISTER_SIG_SEED, msg_hash);
+        sigs.add_signature(&CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed: &CANISTER_SIG_SEED,
+            message: &signing_input,
+        });
     });
     update_root_hash();
     Ok(PreparedCredentialData {
@@ -242,7 +244,6 @@ fn update_root_hash() {
 }
 
 #[query]
-#[candid_method(query)]
 fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, IssueCredentialError> {
     if let Err(err) = authorize_vc_request(&req.signed_id_alias, &caller(), time().into()) {
         return Result::<IssuedCredentialData, IssueCredentialError>::Err(err);
@@ -270,13 +271,15 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
     };
     let signing_input =
         vc_signing_input(&credential_jwt, &CANISTER_SIG_PK).expect("failed getting signing_input");
-    let message_hash = vc_signing_input_hash(&signing_input);
     let sig_result = SIGNATURES.with(|sigs| {
         let sig_map = sigs.borrow();
         let certified_assets_root_hash = ASSETS.with_borrow(|assets| assets.root_hash());
         sig_map.get_signature_as_cbor(
-            &CANISTER_SIG_SEED,
-            message_hash,
+            &CanisterSigInputs {
+                domain: VC_SIGNING_INPUT_DOMAIN,
+                seed: &CANISTER_SIG_SEED,
+                message: &signing_input,
+            },
             Some(certified_assets_root_hash),
         )
     });
@@ -297,7 +300,6 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
 }
 
 #[update]
-#[candid_method]
 async fn vc_consent_message(
     req: Icrc21VcConsentMessageRequest,
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
@@ -308,7 +310,6 @@ async fn vc_consent_message(
 }
 
 #[update]
-#[candid_method]
 async fn derivation_origin(
     req: DerivationOriginRequest,
 ) -> Result<DerivationOriginData, DerivationOriginError> {
@@ -402,28 +403,24 @@ fn verify_single_argument(
 }
 
 #[update]
-#[candid_method]
 fn add_employee(employee_id: Principal) -> String {
     EMPLOYEES.with_borrow_mut(|employees| employees.insert(employee_id));
     format!("Added employee {}", employee_id)
 }
 
 #[update]
-#[candid_method]
 fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
     format!("Added graduate {}", graduate_id)
 }
 
 #[update]
-#[candid_method]
 fn add_adult(adult_id: Principal) -> String {
     ADULTS.with_borrow_mut(|adults| adults.insert(adult_id));
     format!("Added adult {}", adult_id)
 }
 
 #[query]
-#[candid_method(query)]
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     let parts: Vec<&str> = req.url.split('?').collect();
     let path = parts[0];
@@ -589,7 +586,7 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     hasher.finalize().into()
 }
 
-// Order dependent: do not move above any function annotated with #[candid_method]!
+// Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
 // Assets

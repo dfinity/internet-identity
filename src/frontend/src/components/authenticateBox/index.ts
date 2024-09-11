@@ -431,7 +431,11 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
 
         <ul class="c-link-group">
           <li>
-            <button @click=${() => useExistingProps.register()} class="t-link">
+            <button
+              @click=${() => useExistingProps.register()}
+              id="registerButton"
+              class="t-link"
+            >
               Create New
             </button>
           </li>

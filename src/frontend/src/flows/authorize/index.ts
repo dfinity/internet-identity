@@ -10,7 +10,7 @@ import { showSpinner } from "$src/components/spinner";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
-import { getAnchorByPrincipal, setKnownPrincipal } from "$src/storage";
+import { getAnchorIfLastUsed, setKnownPrincipal } from "$src/storage";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
@@ -189,9 +189,9 @@ const authenticate = async (
 
   let autoSelectionIdentity = undefined;
   if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
-    autoSelectionIdentity = await getAnchorByPrincipal({
-      origin: authContext.requestOrigin,
+    autoSelectionIdentity = await getAnchorIfLastUsed({
       principal: authContext.authRequest.autoSelectionPrincipal,
+      origin: authContext.requestOrigin,
     });
   }
 

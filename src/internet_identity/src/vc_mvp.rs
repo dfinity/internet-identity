@@ -1,23 +1,23 @@
 use crate::delegation::check_frontend_length;
 use crate::{delegation, random_salt, state, update_root_hash, MINUTE_NS};
-use std::collections::HashMap;
-
 use candid::Principal;
-use canister_sig_util::CanisterSigPublicKey;
+use ic_canister_sig_creation::signature_map::CanisterSigInputs;
+use ic_canister_sig_creation::CanisterSigPublicKey;
 use ic_cdk::api::time;
 use ic_certification::Hash;
+use ic_verifiable_credentials::issuer_api::{ArgumentValue, CredentialSpec};
+use ic_verifiable_credentials::{
+    build_credential_jwt, canister_sig_pk_from_vc_signing_input, did_for_principal,
+    vc_signing_input, vc_signing_input_to_jws, AliasTuple, CredentialParams,
+    II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL, VC_SIGNING_INPUT_DOMAIN,
+};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::{FrontendHostname, IdentityNumber};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use vc_util::issuer_api::{ArgumentValue, CredentialSpec};
-use vc_util::{
-    build_credential_jwt, canister_sig_pk_from_vc_signing_input, did_for_principal,
-    vc_signing_input, vc_signing_input_hash, vc_signing_input_to_jws, AliasTuple, CredentialParams,
-    II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL,
-};
+use std::collections::HashMap;
 
 // The expiration of id_alias verifiable credentials.
 const ID_ALIAS_VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
@@ -54,8 +54,16 @@ pub async fn prepare_id_alias(
         vc_signing_input(&id_alias_credential_jwt(&issuer_tuple), &canister_sig_pk)
             .expect("failed getting signing_input");
     state::signature_map_mut(|sigs| {
-        sigs.add_signature(seed.as_ref(), vc_signing_input_hash(&rp_signing_input));
-        sigs.add_signature(seed.as_ref(), vc_signing_input_hash(&issuer_signing_input));
+        sigs.add_signature(&CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed: &seed,
+            message: &rp_signing_input,
+        });
+        sigs.add_signature(&CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed: &seed,
+            message: &issuer_signing_input,
+        });
     });
     update_root_hash();
 
@@ -88,22 +96,26 @@ pub fn get_id_alias(
         let id_rp = delegation::get_principal(identity_number, dapps.relying_party.clone());
         let id_issuer = delegation::get_principal(identity_number, dapps.issuer.clone());
 
-        let rp_alias_msg_hash = vc_signing_input_hash(rp_id_alias_jwt.as_bytes());
+        let rp_sig_inputs = CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed,
+            message: rp_id_alias_jwt.as_bytes(),
+        };
         let rp_sig = sigs
-            .get_signature_as_cbor(seed, rp_alias_msg_hash, Some(cert_assets.root_hash()))
+            .get_signature_as_cbor(&rp_sig_inputs, Some(cert_assets.root_hash()))
             .map_err(|err| {
                 GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
             })?;
         let rp_jws = vc_signing_input_to_jws(rp_id_alias_jwt.as_bytes(), &rp_sig)
             .expect("failed constructing rp JWS");
 
-        let issuer_id_alias_msg_hash = vc_signing_input_hash(issuer_id_alias_jwt.as_bytes());
+        let issuer_sig_inputs = CanisterSigInputs {
+            domain: VC_SIGNING_INPUT_DOMAIN,
+            seed,
+            message: issuer_id_alias_jwt.as_bytes(),
+        };
         let issuer_sig = sigs
-            .get_signature_as_cbor(
-                seed,
-                issuer_id_alias_msg_hash,
-                Some(cert_assets.root_hash()),
-            )
+            .get_signature_as_cbor(&issuer_sig_inputs, Some(cert_assets.root_hash()))
             .map_err(|err| {
                 GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
             })?;
