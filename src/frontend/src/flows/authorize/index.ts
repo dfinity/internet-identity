@@ -216,7 +216,7 @@ const authenticate = async (
   // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
   // may have already closed the II window
   if (!authSuccess.newAnchor) {
-    console.log("authz: calling into recovery wizard")
+    console.log("authz: calling into recovery wizard");
     await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
   }
 
