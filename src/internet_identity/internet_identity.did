@@ -620,6 +620,7 @@ service : (opt InternetIdentityInit) -> {
     // ================
     init_salt: () -> ();
     stats : () -> (InternetIdentityStats) query;
+    config : () -> (InternetIdentityInit) query;
 
     deploy_archive: (wasm: blob) -> (DeployArchiveResult);
     // Returns a batch of entries _sorted by sequence number_ to be archived.
