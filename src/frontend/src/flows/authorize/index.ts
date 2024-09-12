@@ -210,6 +210,7 @@ const authenticate = async (
       authContext.authRequest.allowPinAuthentication ?? true,
     autoSelectionIdentity: autoSelectionIdentity,
   });
+  console.log("authz success: " + authSuccess.userNumber.toString(10));
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
