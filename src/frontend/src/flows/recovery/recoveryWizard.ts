@@ -227,6 +227,7 @@ export const recoveryWizard = async (
         }),
       ])
   );
+  console.log("identity metadata: " + JSON.stringify(identityMetadata));
   const nowInMillis = Date.now();
 
   const devicesStatus = getDevicesStatus({
@@ -235,7 +236,7 @@ export const recoveryWizard = async (
     pinIdentityMaterial,
     nowInMillis,
   });
-  console.log("identity metadata: " + JSON.stringify(identityMetadata));
+  console.log("device status: " + JSON.stringify(devicesStatus));
   if (devicesStatus !== "no-warning") {
     // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
     await connection.updateIdentityMetadata({
