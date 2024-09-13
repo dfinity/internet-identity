@@ -248,7 +248,7 @@ jobs:
       - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
       - name: Install PocketIC
         run: |
-          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/5.0.0/pocket-ic-x86_64-linux.gz
+          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/6.0.0/pocket-ic-x86_64-linux.gz
           gzip -d pocket-ic.gz
           chmod +x pocket-ic
       - name: "Run VC issuer canister tests"
@@ -356,7 +356,7 @@ jobs:
           path: .
       - name: Install PocketIC
         run: |
-          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/5.0.0/pocket-ic-x86_64-${{ matrix.os == 'macos-latest' && 'darwin' || 'linux' }}.gz
+          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/6.0.0/pocket-ic-x86_64-${{ matrix.os == 'macos-latest' && 'darwin' || 'linux' }}.gz
           gzip -d pocket-ic.gz
           chmod +x pocket-ic
 
