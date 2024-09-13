@@ -21,8 +21,11 @@ use std::time::Duration;
 
 mod temp_keys;
 
-/// Default value for max number of inflight captchas.
-pub const DEFAULT_MAX_INFLIGHT_CAPTCHAS: u64 = 500;
+/// Default captcha config
+pub const DEFAULT_CAPTCHA_CONFIG: CaptchaConfig = CaptchaConfig {
+    max_unsolved_captchas: 500,
+    captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+};
 
 /// Default registration rate limit config.
 pub const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = RateLimitConfig {
@@ -96,8 +99,8 @@ pub struct PersistentState {
     pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
     // Daily and monthly active authentication methods on the II domains.
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
-    // Maximum number of inflight captchas
-    pub max_inflight_captchas: u64,
+    // Configuration of the captcha challenge during registration flow
+    pub captcha_config: CaptchaConfig,
     // Count of entries in the event_data BTreeMap
     // event_data is expected to have a lot of entries, thus counting by iterating over it is not
     // an option.
@@ -123,7 +126,7 @@ impl Default for PersistentState {
             active_anchor_stats: ActivityStats::new(time),
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
-            max_inflight_captchas: DEFAULT_MAX_INFLIGHT_CAPTCHAS,
+            captcha_config: DEFAULT_CAPTCHA_CONFIG,
             event_data_count: 0,
             event_aggregations_count: 0,
             event_stats_24h_start: None,

@@ -344,7 +344,7 @@ fn config() -> InternetIdentityInit {
         archive_config,
         canister_creation_cycles_cost: Some(persistent_state.canister_creation_cycles_cost),
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
-        max_inflight_captchas: Some(persistent_state.max_inflight_captchas),
+        captcha_config: Some(persistent_state.captcha_config.clone()),
     })
 }
 
@@ -409,9 +409,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.registration_rate_limit = rate_limit;
             })
         }
-        if let Some(limit) = arg.max_inflight_captchas {
+        if let Some(captcha_config) = arg.captcha_config {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.max_inflight_captchas = limit;
+                persistent_state.captcha_config = captcha_config;
             })
         }
     }

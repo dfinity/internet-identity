@@ -1,7 +1,7 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{env, install_ii_canister_with_arg, II_WASM};
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, InternetIdentityInit, RateLimitConfig,
+    ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, RateLimitConfig,
 };
 use pocket_ic::CallError;
 
@@ -21,7 +21,14 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
             time_per_token_ns: 99,
             max_tokens: 874,
         }),
-        max_inflight_captchas: Some(456),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 788,
+            captcha_trigger: CaptchaTrigger::Dynamic {
+                threshold_pct: 12,
+                current_rate_sampling_interval_s: 456,
+                reference_rate_sampling_interval_s: 9999,
+            },
+        }),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
