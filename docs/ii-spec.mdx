@@ -314,7 +314,11 @@ The summary is given by the Candid interface:
 
 ### Identity management (legacy API)
 #### The `create_challenge` and `register`  methods
-:::note API V2: `captcha_create` and `identity_register` :::
+
+:::note
+API V2: `captcha_create` and `identity_register`
+:::
+
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
 The `register` method is used to create a new user. The Internet Identity Service backend creates a *fresh* Identity Anchor, creates the account record, and adds the given device as the first device.
@@ -322,7 +326,11 @@ The `register` method is used to create a new user. The Internet Identity Servic
 In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes *and* if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 
 #### The `add` method
-:::note API V2: `authn_method_add` :::
+
+:::note
+API V2: `authn_method_add`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `add` method appends a new device to the given user's record.
@@ -332,7 +340,11 @@ The Internet Identity Service backend rejects the call if the user already has a
 This may also fail (with a *reject*) if the user is registering too many devices.
 
 #### The `remove` method
-:::note API V2: `authn_method_remove` :::
+
+:::note
+API V2: `authn_method_remove`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `remove` method removes a device, identified by its public key, from the list of devices a user has.
@@ -348,7 +360,11 @@ If the device has the `protected` flag, then the request must be sent to the can
 :::
 
 #### The `replace` method
-:::note API V2: `authn_method_replace` :::
+
+:::note
+API V2: `authn_method_replace`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `replace` method atomically replaces a device, identified by its public key from the list of devices a user has with another one supplied as an argument.
@@ -362,19 +378,31 @@ If the device has the `protected` flag, then the request must be sent to the can
 :::
 
 #### The `enter_device_registration_mode` method
-:::note API V2: `authn_method_registration_mode_enter` :::
+
+:::note
+API V2: `authn_method_registration_mode_enter`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Enables device registration mode for the given identity anchor. When device registration mode is active, new devices can be added using `add_tentative_device` and `verify_tentative_device`. Device registration mode stays active for at most 15 minutes or until the flow is either completed or aborted.
 
 #### The `exit_device_registration_mode` method
-:::note API V2: `authn_method_registration_mode_exit` :::
+
+:::note
+API V2: `authn_method_registration_mode_exit`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Exits device registration mode immediately. Any non verified tentative devices are discarded.
 
 #### The `add_tentative_device` method
-:::note API V2: `authn_method_register` :::
+
+:::note
+API V2: `authn_method_register`
+:::
+
 **Authorization**: Anyone can call this
 
 Tentatively adds a new device to the supplied identity anchor and returns a verification code. This code has to be used with the `verify_tentative_device` method to verify this device. If the flow is aborted or not completed within 15 minutes, the tentative device is discarded.
@@ -382,7 +410,11 @@ Tentatively adds a new device to the supplied identity anchor and returns a veri
 Tentatively added devices cannot be used to login into the management view or authorize authentications for other dApps.
 
 #### The `verify_tentative_device` method
-:::note API V2: `authn_method_confirm` :::
+
+:::note
+API V2: `authn_method_confirm`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 For an anchor in device registration mode: if called with a valid verification code, adds the tentative device as a regular device to the anchor and exits registration mode. The registration flow is aborted if this method is called five times with invalid verification codes.
@@ -390,13 +422,21 @@ For an anchor in device registration mode: if called with a valid verification c
 Returns an error if called for a device not in registration mode.
 
 #### The `lookup` query method
-:::note API V2: `identity_authn_info` :::
+
+:::note
+API V2: `identity_authn_info`
+:::
+
 **Authorization**: Anyone can call this
 
 Fetches all device data associated with a user. Since this method can be called by anyone, the information returned is limited. In particular, any fields containing potentially personal information are stripped away (such as the metadata or alias fields).
 
 #### The `get_anchor_info` method
-:::note API V2: `identity_info` :::
+
+:::note
+API V2: `identity_info`
+:::
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Fetches all data associated with an anchor including registration mode and tentatively registered devices.
