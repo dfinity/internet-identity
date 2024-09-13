@@ -192,7 +192,10 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
 fn should_limit_captcha_creation() -> Result<(), CallError> {
     let env = env();
     let init_arg = InternetIdentityInit {
-        max_inflight_captchas: Some(3),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 3,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+        }),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(init_arg));

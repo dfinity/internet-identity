@@ -209,6 +209,31 @@ type RateLimitConfig = record {
     max_tokens: nat64;
 };
 
+// Captcha configuration
+type CaptchaConfig = record {
+    // Maximum number of unsolved captchas.
+    // Default: 500
+    max_unsolved_captchas : nat64;
+    // Configuration for when captcha protection should kick in.
+    captcha_trigger: variant {
+      // Based on the rate of registrations compared to some reference time frame and allowing some leeway.
+      Dynamic: record {
+        // Percentage of increased registration rate observed in the current rate sampling interval (compared to
+        // reference rate) at which II will enable captcha for new registrations.
+        threshold_pct: nat16;
+        // Length of the interval in seconds used to sample the current rate of registrations.
+        current_rate_sampling_interval_s: nat64;
+        // Length of the interval in seconds used to sample the reference rate of registrations.
+        reference_rate_sampling_interval_s: nat64;
+      };
+      // Statically enable / disable captcha
+      Static: variant {
+        CaptchaEnabled;
+        CaptchaDisabled;
+      }
+    };
+};
+
 // Init arguments of II which can be supplied on install and upgrade.
 // Setting a value to null keeps the previous value.
 type InternetIdentityInit = record {
@@ -228,9 +253,8 @@ type InternetIdentityInit = record {
     canister_creation_cycles_cost : opt nat64;
     // Rate limit for the `register` call.
     register_rate_limit : opt RateLimitConfig;
-    // Maximum number of inflight captchas.
-    // Default: 500
-    max_inflight_captchas: opt nat64;
+    // Configuration of the captcha in the registration flow.
+    captcha_config: opt CaptchaConfig;
 };
 
 type ChallengeKey = text;

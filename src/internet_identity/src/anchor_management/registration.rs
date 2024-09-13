@@ -26,7 +26,7 @@ pub async fn create_challenge() -> Challenge {
 
         // Error out if there are too many inflight challenges
         if inflight_challenges.len()
-            >= state::persistent_state(|s| s.max_inflight_captchas) as usize
+            >= state::persistent_state(|s| s.captcha_config.max_unsolved_captchas) as usize
         {
             trap("too many inflight captchas");
         }

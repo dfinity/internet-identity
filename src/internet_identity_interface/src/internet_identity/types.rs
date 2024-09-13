@@ -196,7 +196,7 @@ pub struct InternetIdentityInit {
     pub archive_config: Option<ArchiveConfig>,
     pub canister_creation_cycles_cost: Option<u64>,
     pub register_rate_limit: Option<RateLimitConfig>,
-    pub max_inflight_captchas: Option<u64>,
+    pub captcha_config: Option<CaptchaConfig>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -227,6 +227,28 @@ pub struct RateLimitConfig {
     pub time_per_token_ns: u64,
     // How many tokens are at most generated (to accommodate peaks).
     pub max_tokens: u64,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct CaptchaConfig {
+    pub max_unsolved_captchas: u64,
+    pub captcha_trigger: CaptchaTrigger,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum CaptchaTrigger {
+    Dynamic {
+        threshold_pct: u16,
+        current_rate_sampling_interval_s: u64,
+        reference_rate_sampling_interval_s: u64,
+    },
+    Static(StaticCaptchaTrigger),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum StaticCaptchaTrigger {
+    CaptchaEnabled,
+    CaptchaDisabled,
 }
 
 /// Configuration parameters of the archive to be used on the next deployment.
