@@ -7,15 +7,29 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const CaptchaConfig = IDL.Record({
+    'max_unsolved_captchas' : IDL.Nat64,
+    'captcha_trigger' : IDL.Variant({
+      'Dynamic' : IDL.Record({
+        'reference_rate_sampling_interval_s' : IDL.Nat64,
+        'threshold_pct' : IDL.Nat16,
+        'current_rate_sampling_interval_s' : IDL.Nat64,
+      }),
+      'Static' : IDL.Variant({
+        'CaptchaDisabled' : IDL.Null,
+        'CaptchaEnabled' : IDL.Null,
+      }),
+    }),
+  });
   const RateLimitConfig = IDL.Record({
     'max_tokens' : IDL.Nat64,
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
-    'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -491,15 +505,29 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const CaptchaConfig = IDL.Record({
+    'max_unsolved_captchas' : IDL.Nat64,
+    'captcha_trigger' : IDL.Variant({
+      'Dynamic' : IDL.Record({
+        'reference_rate_sampling_interval_s' : IDL.Nat64,
+        'threshold_pct' : IDL.Nat16,
+        'current_rate_sampling_interval_s' : IDL.Nat64,
+      }),
+      'Static' : IDL.Variant({
+        'CaptchaDisabled' : IDL.Null,
+        'CaptchaEnabled' : IDL.Null,
+      }),
+    }),
+  });
   const RateLimitConfig = IDL.Record({
     'max_tokens' : IDL.Nat64,
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
-    'max_inflight_captchas' : IDL.Opt(IDL.Nat64),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];
