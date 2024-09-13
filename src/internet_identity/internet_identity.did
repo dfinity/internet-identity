@@ -210,9 +210,11 @@ type RateLimitConfig = record {
 };
 
 // Captcha configuration
+// Default:
+// - max_unsolved_captchas: 500
+// - captcha_trigger: Static, CaptchaEnabled
 type CaptchaConfig = record {
     // Maximum number of unsolved captchas.
-    // Default: 500
     max_unsolved_captchas : nat64;
     // Configuration for when captcha protection should kick in.
     captcha_trigger: variant {
