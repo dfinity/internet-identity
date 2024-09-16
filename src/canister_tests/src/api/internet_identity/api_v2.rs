@@ -5,35 +5,54 @@ use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
 use std::collections::HashMap;
 
-pub fn captcha_create(
-    env: &PocketIc,
-    canister_id: CanisterId,
-) -> Result<Result<Challenge, ()>, CallError> {
-    call_candid(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        "captcha_create",
-        (),
-    )
-    .map(|(x,)| x)
-}
-
-pub fn identity_register(
+pub fn identity_registration_start(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    authn_method: &AuthnMethodData,
-    challenge_attempt: &ChallengeAttempt,
-    temp_key: Option<Principal>,
-) -> Result<Result<IdentityNumber, IdentityRegisterError>, CallError> {
+) -> Result<Result<IdRegNextStepResult, IdRegStartError>, CallError> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "identity_register",
-        (authn_method, challenge_attempt, temp_key),
+        "identity_registration_start",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn check_captcha(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    solution: String,
+) -> Result<Result<IdRegNextStepResult, CheckCaptchaError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "check_captcha",
+        (CheckCaptchaArg { solution },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn identity_registration_finish(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    authn_method: &AuthnMethodData,
+) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "identity_registration_finish",
+        (IdRegFinishArg {
+            authn_method: authn_method.clone(),
+        },),
     )
     .map(|(x,)| x)
 }

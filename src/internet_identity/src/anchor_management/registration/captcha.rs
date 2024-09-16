@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use rand_core::{RngCore, SeedableRng};
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone, Debug)]
 pub struct Base64(pub String);
 
 lazy_static! {
@@ -143,7 +144,7 @@ pub fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
 
 /// Check whether the supplied CAPTCHA solution attempt matches the expected solution (after
 /// normalizing ambiguous characters).
-fn check_captcha_solution(solution_attempt: String, solution: String) -> Result<(), ()> {
+pub fn check_captcha_solution(solution_attempt: String, solution: String) -> Result<(), ()> {
     // avoid processing too many characters
     if solution_attempt.len() > CAPTCHA_LENGTH {
         return Err(());

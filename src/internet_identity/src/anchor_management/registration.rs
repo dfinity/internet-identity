@@ -1,4 +1,3 @@
-use crate::anchor_management::registration::captcha::Base64;
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state;
 use crate::state::temp_keys::TempKeyId;
@@ -12,6 +11,9 @@ use internet_identity_interface::internet_identity::types::*;
 
 mod captcha;
 mod rate_limit;
+pub mod registration_flow_v2;
+
+pub use captcha::Base64;
 
 pub async fn create_challenge() -> Challenge {
     let mut rng = captcha::make_rng().await;
@@ -65,7 +67,8 @@ pub fn register(
     // The key is optional for backwards compatibility
     temp_key: Option<Principal>,
 ) -> RegisterResponse {
-    rate_limit::process_rate_limit();
+    rate_limit::process_rate_limit()
+        .unwrap_or_else(|_| trap("rate limit reached, try again later"));
     if let Err(()) = captcha::check_challenge(challenge_result) {
         return RegisterResponse::BadChallenge;
     }

@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
@@ -19,6 +20,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
+pub mod flow_states;
 pub mod temp_keys;
 
 /// Default captcha config
@@ -169,6 +171,7 @@ struct State {
     sigs: RefCell<SignatureMap>,
     // Temporary keys that can be used in lieu of a particular device
     temp_keys: RefCell<TempKeys>,
+    flow_states: RefCell<FlowStates>,
     last_upgrade_timestamp: Cell<Timestamp>,
     // note: we COULD persist this through upgrades, although this is currently NOT persisted
     // through upgrades
@@ -348,6 +351,14 @@ pub fn with_temp_keys_mut<R>(f: impl FnOnce(&mut TempKeys) -> R) -> R {
 
 pub fn with_temp_keys<R>(f: impl FnOnce(&TempKeys) -> R) -> R {
     STATE.with(|s| f(&mut s.temp_keys.borrow()))
+}
+
+pub fn with_flow_states_mut<R>(f: impl FnOnce(&mut FlowStates) -> R) -> R {
+    STATE.with(|s| f(&mut s.flow_states.borrow_mut()))
+}
+
+pub fn with_flow_states<R>(f: impl FnOnce(&FlowStates) -> R) -> R {
+    STATE.with(|s| f(&mut s.flow_states.borrow()))
 }
 
 pub fn usage_metrics<R>(f: impl FnOnce(&UsageMetrics) -> R) -> R {
