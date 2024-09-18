@@ -156,11 +156,14 @@ pub struct RateLimitState {
     pub token_timestamp: Timestamp,
 }
 
+#[derive(Default)]
 enum StorageState {
+    #[default]
     Uninitialised,
     Initialised(Storage<DefaultMemoryImpl>),
 }
 
+#[derive(Default)]
 struct State {
     storage_state: RefCell<StorageState>,
     sigs: RefCell<SignatureMap>,
@@ -186,24 +189,6 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            storage_state: RefCell::new(StorageState::Uninitialised),
-            sigs: RefCell::new(SignatureMap::default()),
-            temp_keys: RefCell::new(TempKeys::default()),
-            last_upgrade_timestamp: Cell::new(0),
-            inflight_challenges: RefCell::new(HashMap::new()),
-            tentative_device_registrations: RefCell::new(HashMap::new()),
-            usage_metrics: RefCell::new(UsageMetrics::default()),
-            persistent_state: RefCell::new(PersistentState::default()),
-            archive_status_cache: RefCell::new(None),
-            registration_rate_limit: RefCell::new(None),
-            event_data_uniqueness_counter: Cell::new(0),
-        }
-    }
 }
 
 // Checks if salt is empty and calls `init_salt` to set it.
