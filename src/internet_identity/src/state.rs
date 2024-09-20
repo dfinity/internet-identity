@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
-mod temp_keys;
+pub mod temp_keys;
 
 /// Default captcha config
 pub const DEFAULT_CAPTCHA_CONFIG: CaptchaConfig = CaptchaConfig {

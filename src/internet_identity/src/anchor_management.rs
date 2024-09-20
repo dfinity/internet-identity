@@ -1,4 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
+use crate::state::temp_keys::TempKeyId;
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
@@ -133,7 +134,10 @@ pub fn replace(
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
 
-    state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &old_device));
+    state::with_temp_keys_mut(|temp_keys| {
+        let temp_key_id = TempKeyId::from_identity_authn_method(anchor_number, old_device.clone());
+        temp_keys.remove_temp_key(&temp_key_id)
+    });
     Operation::ReplaceDevice {
         old_device,
         new_device: DeviceDataWithoutAlias::from(new_device),
@@ -151,7 +155,10 @@ pub fn remove(
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
-    state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &device_key));
+    state::with_temp_keys_mut(|temp_keys| {
+        let temp_key_id = TempKeyId::from_identity_authn_method(anchor_number, device_key.clone());
+        temp_keys.remove_temp_key(&temp_key_id)
+    });
     Operation::RemoveDevice { device: device_key }
 }
 
