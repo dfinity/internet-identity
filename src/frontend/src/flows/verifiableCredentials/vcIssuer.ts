@@ -22,20 +22,17 @@ export class VcIssuer {
   createActor = async (
     identity?: Identity
   ): Promise<ActorSubclass<_SERVICE>> => {
-    const agent = new HttpAgent({
+    const agent = await HttpAgent.create({
       host: inferHost(),
       identity,
+      // Only fetch the root key when we're not in prod
+      shouldFetchRootKey: features.FETCH_ROOT_KEY,
     });
 
-    // Only fetch the root key when we're not in prod
-    if (features.FETCH_ROOT_KEY) {
-      await agent.fetchRootKey();
-    }
-    const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
+    return Actor.createActor<_SERVICE>(vc_issuer_idl, {
       agent,
       canisterId: this.canisterId,
     });
-    return actor;
   };
 
   prepareCredential = async ({

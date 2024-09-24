@@ -339,8 +339,10 @@ export const addEmployeeToIssuer = async ({
 const createIssuerActor = async (
   issuerCanisterId: string
 ): Promise<ActorSubclass<_SERVICE>> => {
-  const agent = new HttpAgent({ host: REPLICA_URL });
-  await agent.fetchRootKey();
+  const agent = await HttpAgent.create({
+    host: REPLICA_URL,
+    shouldFetchRootKey: true,
+  });
   return Actor.createActor<_SERVICE>(vc_issuer_idl, {
     agent: agent,
     canisterId: issuerCanisterId,

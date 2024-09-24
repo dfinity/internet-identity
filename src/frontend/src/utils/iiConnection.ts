@@ -3,6 +3,7 @@
  */
 import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
 import {
+  _SERVICE,
   AddTentativeDeviceResponse,
   AnchorCredentials,
   Challenge,
@@ -28,7 +29,6 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
   WebAuthnCredential,
-  _SERVICE,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
@@ -53,7 +53,7 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { RecoveryDevice, isRecoveryDevice } from "./recoveryDevice";
+import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 
 /*
@@ -384,20 +384,17 @@ export class Connection {
   createActor = async (
     delegationIdentity?: DelegationIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
-    const agent = new HttpAgent({
+    const agent = await HttpAgent.create({
       identity: delegationIdentity,
       host: inferHost(),
+      // Only fetch the root key when we're not in prod
+      shouldFetchRootKey: features.FETCH_ROOT_KEY,
     });
 
-    // Only fetch the root key when we're not in prod
-    if (features.FETCH_ROOT_KEY) {
-      await agent.fetchRootKey();
-    }
-    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    return Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId: this.canisterId,
     });
-    return actor;
   };
 
   requestFEDelegation = async (

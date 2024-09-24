@@ -9,18 +9,17 @@ export class VcIssuer {
   public constructor(readonly canisterId: string) {}
 
   createActor = async (): Promise<ActorSubclass<_SERVICE>> => {
-    const agent = new HttpAgent();
+    const agent = await HttpAgent.create({
+      // XXX: we always fetch the rootkey.
+      // Although this isn't necessary/recommended on mainnet,
+      // we do this for simplicity.
+      shouldFetchRootKey: true,
+    });
 
-    // XXX: we always fetch the rootkey.
-    // Although this isn't necessary/recommended on mainnet,
-    // we do this for simplicity.
-    await agent.fetchRootKey();
-
-    const actor = Actor.createActor<_SERVICE>(vc_issuer_idl, {
+    return Actor.createActor<_SERVICE>(vc_issuer_idl, {
       agent,
       canisterId: this.canisterId,
     });
-    return actor;
   };
 
   addEmployee = async ({
