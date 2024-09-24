@@ -1,3 +1,4 @@
+use crate::anchor_management::registration::captcha::Base64;
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state;
 use crate::state::temp_keys::TempKeyId;

@@ -4,12 +4,12 @@ use captcha::fonts::Default as DefaultFont;
 use captcha::fonts::Font;
 use ic_cdk::api::time;
 use ic_cdk::trap;
-use internet_identity_interface::internet_identity::types::{
-    Base64, ChallengeAttempt, ChallengeKey,
-};
+use internet_identity_interface::internet_identity::types::{ChallengeAttempt, ChallengeKey};
 use lazy_static::lazy_static;
 use rand_core::{RngCore, SeedableRng};
 use std::collections::{HashMap, HashSet};
+
+pub struct Base64(pub String);
 
 lazy_static! {
     /// Problematic characters that are easily mixed up by humans to "normalized" replacement.
@@ -150,7 +150,7 @@ fn check_captcha_solution(solution_attempt: String, solution: String) -> Result<
     }
     // Normalize challenge attempts by replacing characters that are not in the captcha character set
     // with the respective replacement from CHAR_REPLACEMENTS.
-    let normalized_challenge_res: String = solution_attempt
+    let normalized_solution_attempt: String = solution_attempt
         .chars()
         .map(|c| {
             // Apply all replacements
@@ -163,7 +163,7 @@ fn check_captcha_solution(solution_attempt: String, solution: String) -> Result<
         })
         .collect();
 
-    if normalized_challenge_res != solution {
+    if normalized_solution_attempt != solution {
         return Err(());
     }
     Ok(())
