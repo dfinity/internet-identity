@@ -4,12 +4,12 @@ use captcha::fonts::Default as DefaultFont;
 use captcha::fonts::Font;
 use ic_cdk::api::time;
 use ic_cdk::trap;
-use internet_identity_interface::internet_identity::types::{
-    Base64, ChallengeAttempt, ChallengeKey,
-};
+use internet_identity_interface::internet_identity::types::{ChallengeAttempt, ChallengeKey};
 use lazy_static::lazy_static;
 use rand_core::{RngCore, SeedableRng};
 use std::collections::{HashMap, HashSet};
+
+pub struct Base64(pub String);
 
 lazy_static! {
     /// Problematic characters that are easily mixed up by humans to "normalized" replacement.
@@ -131,14 +131,26 @@ pub fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
 
 // Check whether the CAPTCHA challenge was solved
 pub fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
+    let Some(challenge) = state::inflight_challenges_mut(|inflight_challenges| {
+        prune_expired_challenges(inflight_challenges);
+        inflight_challenges.remove(&res.key)
+    }) else {
+        return Err(());
+    };
+
+    check_captcha_solution(res.chars, challenge.chars)
+}
+
+/// Check whether the supplied CAPTCHA solution attempt matches the expected solution (after
+/// normalizing ambiguous characters).
+fn check_captcha_solution(solution_attempt: String, solution: String) -> Result<(), ()> {
     // avoid processing too many characters
-    if res.chars.len() > CAPTCHA_LENGTH {
+    if solution_attempt.len() > CAPTCHA_LENGTH {
         return Err(());
     }
     // Normalize challenge attempts by replacing characters that are not in the captcha character set
     // with the respective replacement from CHAR_REPLACEMENTS.
-    let normalized_challenge_res: String = res
-        .chars
+    let normalized_solution_attempt: String = solution_attempt
         .chars()
         .map(|c| {
             // Apply all replacements
@@ -151,17 +163,8 @@ pub fn check_challenge(res: ChallengeAttempt) -> Result<(), ()> {
         })
         .collect();
 
-    state::inflight_challenges_mut(|inflight_challenges| {
-        prune_expired_challenges(inflight_challenges);
-
-        match inflight_challenges.remove(&res.key) {
-            Some(challenge) => {
-                if normalized_challenge_res != challenge.chars {
-                    return Err(());
-                }
-                Ok(())
-            }
-            None => Err(()),
-        }
-    })
+    if normalized_solution_attempt != solution {
+        return Err(());
+    }
+    Ok(())
 }

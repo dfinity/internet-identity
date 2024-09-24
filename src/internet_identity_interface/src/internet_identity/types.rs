@@ -22,8 +22,6 @@ pub mod vc_mvp;
 // without breaking clients
 pub use api_v2::*;
 
-pub struct Base64(pub String);
-
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceData {
     pub pubkey: DeviceKey,
