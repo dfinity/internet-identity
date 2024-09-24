@@ -75,7 +75,7 @@
   },
   {
     "name": "NNS Dapp",
-    "oneLiner": "Dapp for Staking Neurons + Voting On-Chain",
+    "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
     "website": "https://nns.ic0.app",
     "logo": "nnsfront-enddapp_logo-dark.webp"
   },
@@ -115,7 +115,7 @@
   },
   {
     "name": "DSCVR",
-    "oneLiner": "Social portals, community airdrops, crypto tipping on-chain",
+    "oneLiner": "Social portals, community airdrops, crypto tipping onchain",
     "website": "https://dscvr.one/",
     "logo": "dscvr_logo.webp"
   },
@@ -199,7 +199,7 @@
   {
     "name": "Uniswap Frontend on ICP",
     "website": "https://yrog5-xqaaa-aaaap-qa5za-cai.ic0.app/#/swap",
-    "oneLiner": "Front-End On-Chain",
+    "oneLiner": "Front-End Onchain",
     "logo": "uniswapfrontendontheic_logo.webp"
   },
   {
@@ -401,7 +401,7 @@
   },
   {
     "name": "icgpt",
-    "oneLiner": "A fun dApp to demonstrate on-chain LLMs",
+    "oneLiner": "A fun dApp to demonstrate onchain LLMs",
     "website": "https://icgpt.icpp.world/",
     "logo": "icpp-logo.dracula-cyan.112x112.png"
   },
@@ -437,7 +437,7 @@
   },
   {
     "name": "Formyfi",
-    "oneLiner": "Decentralized & fully on-chain forms.",
+    "oneLiner": "Decentralized & fully onchain forms.",
     "website": "https://formyfi.io",
     "logo": "formify_logo.webp"
   },
@@ -473,7 +473,7 @@
   },
   {
     "name": "OptiGames",
-    "oneLiner": "Flexible framework for fully on-chain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
+    "oneLiner": "Flexible framework for fully onchain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
     "website": "https://tpxio-7yaaa-aaaak-qdbaa-cai.icp0.io/",
     "logo": "Optigames_logo.svg"
   },
@@ -529,7 +529,7 @@
     "name": "ChainkeyX",
     "website": "https://www.chainkeyx.com",
     "logo": "chainkeyx_logo.png",
-    "oneLiner": "A crypto neobank that offers fully on-chain bitcoin borrowing and lending on ICP."
+    "oneLiner": "A crypto neobank that offers fully onchain bitcoin borrowing and lending on ICP."
   },
   {
     "name": "EstateDAO",
@@ -539,7 +539,7 @@
   },
   {
     "name": "distrikt",
-    "oneLiner": "Censorship-resistant fully on-chain social media platform",
+    "oneLiner": "Censorship-resistant fully onchain social media platform",
     "website": "https://distrikt.app",
     "authOrigins": [
       "https://distrikt.app",
@@ -579,7 +579,7 @@
   },
   {
     "name": "CYCLES-TRANSFER-STATION",
-    "oneLiner": "An on-chain order-book market, where the market tokens trade against the stable CYCLES. Mint, hold, transfer, and trade the CYCLES at the CTS market.",
+    "oneLiner": "An onchain order-book market, where the market tokens trade against the stable CYCLES. Mint, hold, transfer, and trade the CYCLES at the CTS market.",
     "website": "https://cycles-transfer-station.com",
     "logo": "cyclestransferstation_logo.png"
   },
