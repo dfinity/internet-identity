@@ -51,7 +51,7 @@
     "prettier-plugin-organize-imports": "^3.2.2",
     "ts-node": "^10.8.1",
     "typescript": "5.2.2",
-    "vite": "^4.5.5",
+    "vite": "^5.4.6",
     "vitest": "^1.6.0",
     "webdriverio": "^8.39.0"
   },
