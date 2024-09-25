@@ -429,9 +429,9 @@ type IdentityInfo = record {
 };
 
 type IdentityInfoError = variant {
-    /// The principal is not authorized to call this method with the given arguments.
+    // The principal is not authorized to call this method with the given arguments.
     Unauthorized: principal;
-    /// Internal canister error. See the error message for details.
+    // Internal canister error. See the error message for details.
     InternalCanisterError: text;
 };
 
@@ -458,51 +458,51 @@ type AuthnMethodReplaceError = variant {
 
 type AuthnMethodMetadataReplaceError = variant {
     InvalidMetadata: text;
-    /// No authentication method found with the given public key.
+    // No authentication method found with the given public key.
     AuthnMethodNotFound;
 };
 
 type AuthnMethodSecuritySettingsReplaceError = variant {
-    /// No authentication method found with the given public key.
+    // No authentication method found with the given public key.
     AuthnMethodNotFound;
 };
 
 type IdentityMetadataReplaceError = variant {
-    /// The principal is not authorized to call this method with the given arguments.
+    // The principal is not authorized to call this method with the given arguments.
     Unauthorized: principal;
-    /// The identity including the new metadata exceeds the maximum allowed size.
+    // The identity including the new metadata exceeds the maximum allowed size.
     StorageSpaceExceeded: record {space_available: nat64; space_required: nat64};
-    /// Internal canister error. See the error message for details.
+    // Internal canister error. See the error message for details.
     InternalCanisterError: text;
 };
 
 type PrepareIdAliasRequest = record {
-    /// Origin of the issuer in the attribute sharing flow.
+    // Origin of the issuer in the attribute sharing flow.
     issuer : FrontendHostname;
-    /// Origin of the relying party in the attribute sharing flow.
+    // Origin of the relying party in the attribute sharing flow.
     relying_party : FrontendHostname;
-    /// Identity for which the IdAlias should be generated.
+    // Identity for which the IdAlias should be generated.
     identity_number : IdentityNumber;
 };
 
 type PrepareIdAliasError = variant {
-    /// The principal is not authorized to call this method with the given arguments.
+    // The principal is not authorized to call this method with the given arguments.
     Unauthorized: principal;
-    /// Internal canister error. See the error message for details.
+    // Internal canister error. See the error message for details.
     InternalCanisterError: text;
 };
 
-/// The prepared id alias contains two (still unsigned) credentials in JWT format,
-/// certifying the id alias for the issuer resp. the relying party.
+// The prepared id alias contains two (still unsigned) credentials in JWT format,
+// certifying the id alias for the issuer resp. the relying party.
 type PreparedIdAlias = record {
     rp_id_alias_jwt : text;
     issuer_id_alias_jwt : text;
     canister_sig_pk_der : PublicKey;
 };
 
-/// The request to retrieve the actual signed id alias credentials.
-/// The field values should be equal to the values of corresponding
-/// fields from the preceding `PrepareIdAliasRequest` and `PrepareIdAliasResponse`.
+// The request to retrieve the actual signed id alias credentials.
+// The field values should be equal to the values of corresponding
+// fields from the preceding `PrepareIdAliasRequest` and `PrepareIdAliasResponse`.
 type GetIdAliasRequest = record {
     rp_id_alias_jwt : text;
     issuer : FrontendHostname;
@@ -512,15 +512,15 @@ type GetIdAliasRequest = record {
 };
 
 type GetIdAliasError = variant {
-    /// The principal is not authorized to call this method with the given arguments.
+    // The principal is not authorized to call this method with the given arguments.
     Unauthorized: principal;
-    /// The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
+    // The credential(s) are not available: may be expired or not prepared yet (call prepare_id_alias to prepare).
     NoSuchCredentials : text;
-    /// Internal canister error. See the error message for details.
+    // Internal canister error. See the error message for details.
     InternalCanisterError: text;
 };
 
-/// The signed id alias credentials for each involved party.
+// The signed id alias credentials for each involved party.
 type IdAliasCredentials = record {
     rp_id_alias_credential : SignedIdAlias;
     issuer_id_alias_credential : SignedIdAlias;
