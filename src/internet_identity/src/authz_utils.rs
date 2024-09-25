@@ -19,17 +19,19 @@ pub enum IdentityUpdateError {
 }
 
 #[derive(Debug)]
-pub enum AuthorizationError {
-    Unauthorized(Principal),
+pub struct AuthorizationError {
+    pub principal: Principal,
+}
+
+impl From<Principal> for AuthorizationError {
+    fn from(principal: Principal) -> Self {
+        Self { principal }
+    }
 }
 
 impl From<AuthorizationError> for IdentityUpdateError {
     fn from(err: AuthorizationError) -> Self {
-        match err {
-            AuthorizationError::Unauthorized(principal) => {
-                IdentityUpdateError::Unauthorized(principal)
-            }
-        }
+        IdentityUpdateError::Unauthorized(err.principal)
     }
 }
 
@@ -110,7 +112,7 @@ pub fn check_authorization(
             return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
-    Err(AuthorizationError::Unauthorized(caller))
+    Err(AuthorizationError::from(caller))
 }
 
 /// Checks that the caller is authorized to operate on the given anchor_number and updates the device used to
