@@ -68,8 +68,6 @@ impl From<IdentityUpdateError> for IdentityInfoError {
 
 impl From<AuthorizationError> for GetIdAliasError {
     fn from(value: AuthorizationError) -> Self {
-        match value {
-            AuthorizationError::Unauthorized(principal) => GetIdAliasError::Unauthorized(principal),
-        }
+        Self::Unauthorized(value.principal)
     }
 }
