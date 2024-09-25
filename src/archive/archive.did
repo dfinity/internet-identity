@@ -135,9 +135,9 @@ type CallInfo = record {
 };
 
 type FetchInfo = record {
-    /// Timestamp when the last execution of the archive `fetch_entries` method finished.
+    // Timestamp when the last execution of the archive `fetch_entries` method finished.
     timestamp: Timestamp;
-    /// The number of entries fetched (regardless of how many of those were actually archived).
+    // The number of entries fetched (regardless of how many of those were actually archived).
     number_of_entries: nat16;
 };
 
