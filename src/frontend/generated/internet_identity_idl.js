@@ -148,6 +148,19 @@ export const idlFactory = ({ IDL }) => {
   const AuthnMethodSecuritySettingsReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
   });
+  const CheckCaptchaArg = IDL.Record({ 'solution' : IDL.Text });
+  const RegistrationFlowNextStep = IDL.Variant({
+    'CheckCaptcha' : IDL.Record({ 'captcha_png_base64' : IDL.Text }),
+    'Finish' : IDL.Null,
+  });
+  const IdRegNextStepResult = IDL.Record({
+    'next_step' : RegistrationFlowNextStep,
+  });
+  const CheckCaptchaError = IDL.Variant({
+    'NoRegistrationFlow' : IDL.Null,
+    'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
+    'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -283,15 +296,19 @@ export const idlFactory = ({ IDL }) => {
       'space_available' : IDL.Nat64,
     }),
   });
-  const ChallengeResult = IDL.Record({
-    'key' : ChallengeKey,
-    'chars' : IDL.Text,
+  const IdRegFinishArg = IDL.Record({ 'authn_method' : AuthnMethodData });
+  const IdRegFinishResult = IDL.Record({ 'identity_number' : IDL.Nat64 });
+  const IdRegFinishError = IDL.Variant({
+    'NoRegistrationFlow' : IDL.Null,
+    'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
+    'InvalidAuthnMethod' : IDL.Text,
+    'IdentityLimitReached' : IDL.Null,
+    'StorageError' : IDL.Text,
   });
-  const CaptchaResult = ChallengeResult;
-  const IdentityRegisterError = IDL.Variant({
-    'BadCaptcha' : IDL.Null,
-    'CanisterFull' : IDL.Null,
-    'InvalidMetadata' : IDL.Text,
+  const IdRegStartError = IDL.Variant({
+    'InvalidCaller' : IDL.Null,
+    'AlreadyInProgress' : IDL.Null,
+    'RateLimitExceeded' : IDL.Null,
   });
   const UserKey = PublicKey;
   const PrepareIdAliasRequest = IDL.Record({
@@ -307,6 +324,10 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const ChallengeResult = IDL.Record({
+    'key' : ChallengeKey,
+    'chars' : IDL.Text,
   });
   const RegisterResponse = IDL.Variant({
     'bad_challenge' : IDL.Null,
@@ -411,9 +432,14 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'captcha_create' : IDL.Func(
-        [],
-        [IDL.Variant({ 'Ok' : Challenge, 'Err' : IDL.Null })],
+    'check_captcha' : IDL.Func(
+        [CheckCaptchaArg],
+        [
+          IDL.Variant({
+            'Ok' : IdRegNextStepResult,
+            'Err' : CheckCaptchaError,
+          }),
+        ],
         [],
       ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
@@ -465,9 +491,14 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'identity_register' : IDL.Func(
-        [AuthnMethodData, CaptchaResult, IDL.Opt(IDL.Principal)],
-        [IDL.Variant({ 'Ok' : IdentityNumber, 'Err' : IdentityRegisterError })],
+    'identity_registration_finish' : IDL.Func(
+        [IdRegFinishArg],
+        [IDL.Variant({ 'Ok' : IdRegFinishResult, 'Err' : IdRegFinishError })],
+        [],
+      ),
+    'identity_registration_start' : IDL.Func(
+        [],
+        [IDL.Variant({ 'Ok' : IdRegNextStepResult, 'Err' : IdRegStartError })],
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
