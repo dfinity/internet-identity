@@ -106,6 +106,7 @@ pub fn register(
                 anchor_number
             ))
         });
+        storage.registration_rates.new_registration()
     });
 
     // Save the 'temp_key' as a mean of authenticating for a short period of time, see

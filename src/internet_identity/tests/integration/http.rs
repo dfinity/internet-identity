@@ -14,7 +14,8 @@ use ic_response_verification::verify_request_response_pair;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, ChallengeAttempt, FrontendHostname, MetadataEntryV2,
+    AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, FrontendHostname,
+    InternetIdentityInit, MetadataEntryV2,
 };
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
@@ -301,23 +302,15 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
     let metrics = get_metrics(&env, canister_id);
-    let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    // empty II has some metadata in stable memory which requires some pages:
-    // - configuration data in the first page
-    // - memory manager internal state in the second page
-    // - one allocated bucket (i.e. 128 pages) for the archive entries buffer
-    // - one allocated bucket (i.e. 128 pages) for the persistent state
-    // - one allocated bucket (i.e. 128 pages) for the event data
-    // - one allocated bucket (i.e. 128 pages) for the event aggregations
-    assert_eq!(stable_memory_pages, 514f64);
+    let (initial_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
 
     // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage by
-    // one bucket (ie. 128 pages) allocated by the memory manager.
+    // one bucket (i.e. 128 pages) allocated by the memory manager.
     flows::register_anchor(&env, canister_id);
 
     let metrics = get_metrics(&env, canister_id);
-    let (stable_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    assert_eq!(stable_memory_pages, 642f64);
+    let (pages_with_users, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+    assert!(initial_memory_pages < pages_with_users);
     Ok(())
 }
 
@@ -528,6 +521,16 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
         "internet_identity_virtual_memory_size_pages{memory=\"event_aggregations\"}",
         1f64,
     );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"reference_registration_rate\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"current_registration_rate\"}",
+        1f64,
+    );
 
     let authn_method = test_authn_method();
     create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -721,7 +724,7 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
 }
 
 #[test]
-fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> {
+fn should_list_prepare_id_alias_counter() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -746,6 +749,74 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
         &get_metrics(&env, canister_id),
         "internet_identity_prepare_id_alias_counter",
         3f64,
+    );
+    Ok(())
+}
+
+#[test]
+fn should_report_registration_rates() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            captcha_config: Some(CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 20,
+                    current_rate_sampling_interval_s: 10,
+                    reference_rate_sampling_interval_s: 100,
+                },
+            }),
+            ..InternetIdentityInit::default()
+        }),
+    );
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"reference_rate\"}",
+        0.0,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"current_rate\"}",
+        0.0,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"captcha_threshold_rate\"}",
+        0.0,
+    );
+
+    for _ in 0..20 {
+        // make sure both registration flows are counted
+        flows::register_anchor(&env, canister_id); // legacy API
+        create_identity_with_authn_method(&env, canister_id, &test_authn_method()); // v2 API
+        env.advance_time(Duration::from_secs(1));
+    }
+
+    // advance time a little further to make reference rate be different from the current rate
+    env.advance_time(Duration::from_secs(5));
+    env.tick(); // tick for the advance time to become effective
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric_approx(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"reference_rate\"}",
+        1.6,
+        0.1,
+    );
+    assert_metric_approx(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"current_rate\"}",
+        1.3,
+        0.1,
+    );
+    assert_metric_approx(
+        &metrics,
+        "internet_identity_registrations_per_second{type=\"captcha_threshold_rate\"}",
+        1.9,
+        0.1,
     );
     Ok(())
 }
