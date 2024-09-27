@@ -64,7 +64,8 @@ async fn captcha_flow_state(flow_created_timestamp_ns: u64) -> (Base64, Registra
 }
 
 pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, CheckCaptchaError> {
-    let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller()))
+    let caller = caller();
+    let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
     else {
         return Err(CheckCaptchaError::NoRegistrationFlow);
     };
@@ -80,7 +81,6 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
         });
     };
 
-    let caller = caller();
     if check_captcha_solution(arg.solution, captcha_solution).is_err() {
         let (captcha_png_base64, flow_state) = captcha_flow_state(flow_created_timestamp_ns).await;
         state::with_flow_states_mut(|flow_states| {
@@ -114,7 +114,8 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
 pub fn identity_registration_finish(
     arg: IdRegFinishArg,
 ) -> Result<IdRegFinishResult, IdRegFinishError> {
-    let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller()))
+    let caller = caller();
+    let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
     else {
         return Err(IdRegFinishError::NoRegistrationFlow);
     };
@@ -127,7 +128,6 @@ pub fn identity_registration_finish(
 
     let identity_number = create_identity(&arg)?;
 
-    let caller = caller();
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
 

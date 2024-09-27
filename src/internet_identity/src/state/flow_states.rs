@@ -42,7 +42,7 @@ pub enum RegistrationFlowState {
 }
 
 impl RegistrationFlowState {
-    pub fn create_at_timestamp_ns(&self) -> u64 {
+    pub fn created_at_timestamp_ns(&self) -> u64 {
         match self {
             RegistrationFlowState::CheckCaptcha {
                 flow_created_timestamp_ns,
@@ -68,7 +68,7 @@ impl FlowStates {
 
         self.expirations.push_back(FlowExpiration {
             principal,
-            expiration: flow_state.create_at_timestamp_ns() + FLOW_EXPIRATION_NS,
+            expiration: flow_state.created_at_timestamp_ns() + FLOW_EXPIRATION_NS,
         });
 
         self.registration_flows.insert(principal, flow_state);
@@ -97,7 +97,7 @@ impl FlowStates {
         self.registration_flows
             .get(principal)
             // filter out expired flow
-            .filter(|flow_state| flow_state.create_at_timestamp_ns() + FLOW_EXPIRATION_NS > time())
+            .filter(|flow_state| flow_state.created_at_timestamp_ns() + FLOW_EXPIRATION_NS > time())
             .cloned()
     }
 
@@ -106,13 +106,13 @@ impl FlowStates {
 
         let now = time();
         for _ in 0..MAX_TO_PRUNE {
+            // The expirations are sorted by expiration time because the expiration is constant
+            // and time() is monotonic
+            // -> we can stop pruning once we reach a flow that is not expired
             let Some(expiration) = self.expirations.front() else {
                 break;
             };
 
-            // The expirations are sorted by expiration time because the expiration is constant
-            // and time() is monotonic
-            // -> we can stop pruning once we reach a flow that is not expired
             if expiration.expiration > now {
                 break;
             }
