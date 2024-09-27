@@ -107,7 +107,7 @@ impl TempKeys {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TempKey {
+struct TempKey {
     /// The temp key principal
     principal: Principal,
     /// The expiration timestamp of the temp key
@@ -115,9 +115,9 @@ pub struct TempKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TempKeyExpiration {
+struct TempKeyExpiration {
     /// Key with which to find the temp key in the `temp_keys` map
-    pub key: (AnchorNumber, DeviceKey),
+    key: (AnchorNumber, DeviceKey),
     /// The expiration timestamp of the temp key
-    pub expiration: Timestamp,
+    expiration: Timestamp,
 }
