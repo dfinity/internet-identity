@@ -1,6 +1,5 @@
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state;
-use crate::state::temp_keys::TempKeyId;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
 use candid::Principal;
@@ -113,10 +112,7 @@ pub fn register(
     // `TempKeys`
     if let Some(temp_key) = temp_key {
         state::with_temp_keys_mut(|temp_keys| {
-            temp_keys.add_temp_key(
-                TempKeyId::from_identity_authn_method(anchor_number, device.pubkey.clone()),
-                temp_key,
-            )
+            temp_keys.add_temp_key(&device.pubkey, anchor_number, temp_key)
         });
     }
 

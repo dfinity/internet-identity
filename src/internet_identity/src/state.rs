@@ -21,7 +21,7 @@ use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 pub mod flow_states;
-pub mod temp_keys;
+mod temp_keys;
 
 /// Default captcha config
 pub const DEFAULT_CAPTCHA_CONFIG: CaptchaConfig = CaptchaConfig {

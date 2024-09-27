@@ -1,6 +1,5 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
-use crate::state::temp_keys::TempKeyId;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
@@ -104,9 +103,9 @@ pub fn check_authorization(
     for device in anchor.devices() {
         if caller == Principal::self_authenticating(&device.pubkey)
             || state::with_temp_keys_mut(|temp_keys| {
-                let temp_key_id =
-                    TempKeyId::from_identity_authn_method(anchor_number, device.pubkey.clone());
-                temp_keys.check_temp_key(&caller, &temp_key_id).is_ok()
+                temp_keys
+                    .check_temp_key(&caller, &device.pubkey, anchor_number)
+                    .is_ok()
             })
         {
             return Ok((anchor.clone(), device.pubkey.clone()));
