@@ -6,6 +6,7 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
+use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
@@ -135,7 +136,7 @@ fn verify_tentative_device(
 
 #[update]
 async fn create_challenge() -> Challenge {
-    anchor_management::registration::create_challenge().await
+    registration::create_challenge().await
 }
 
 #[update]
@@ -514,25 +515,20 @@ mod v2_api {
     }
 
     #[update]
-    async fn captcha_create() -> Result<Challenge, ()> {
-        let challenge = anchor_management::registration::create_challenge().await;
-        Ok(challenge)
+    async fn identity_registration_start() -> Result<IdRegNextStepResult, IdRegStartError> {
+        registration::registration_flow_v2::identity_registration_start().await
     }
 
     #[update]
-    fn identity_register(
-        authn_method: AuthnMethodData,
-        challenge_result: ChallengeAttempt,
-        temp_key: Option<Principal>,
-    ) -> Result<IdentityNumber, IdentityRegisterError> {
-        let device = DeviceWithUsage::try_from(authn_method)
-            .map_err(|err| IdentityRegisterError::InvalidMetadata(err.to_string()))?;
+    async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, CheckCaptchaError> {
+        registration::registration_flow_v2::check_captcha(arg).await
+    }
 
-        match register(DeviceData::from(device), challenge_result, temp_key) {
-            RegisterResponse::Registered { user_number } => Ok(user_number),
-            RegisterResponse::CanisterFull => Err(IdentityRegisterError::CanisterFull),
-            RegisterResponse::BadChallenge => Err(IdentityRegisterError::BadCaptcha),
-        }
+    #[update]
+    fn identity_registration_finish(
+        arg: IdRegFinishArg,
+    ) -> Result<IdRegFinishResult, IdRegFinishError> {
+        registration::registration_flow_v2::identity_registration_finish(arg)
     }
 
     #[update]

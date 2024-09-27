@@ -1,9 +1,9 @@
 use canister_tests::api::internet_identity::api_v2;
+use canister_tests::framework::{test_principal, time};
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, ChallengeAttempt, IdentityNumber, MetadataEntryV2, PublicKeyAuthn,
-    WebAuthn,
+    AuthnMethodSecuritySettings, IdentityNumber, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
 };
 use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
@@ -57,24 +57,20 @@ pub fn create_identity_with_authn_method(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
-    let challenge = api_v2::captcha_create(env, canister_id)
+    // unique flow principal as the time changes every round
+    let flow_principal = test_principal(time(env));
+    api_v2::identity_registration_start(env, canister_id, flow_principal)
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("registration start failed");
 
-    let challenge_attempt = ChallengeAttempt {
-        chars: "a".to_string(),
-        key: challenge.challenge_key,
-    };
-    api_v2::identity_register(
-        env,
-        canister_id,
-        authn_method.principal(),
-        authn_method,
-        &challenge_attempt,
-        None,
-    )
-    .expect("API call failed")
-    .expect("identity_register failed")
+    api_v2::check_captcha(env, canister_id, flow_principal, "a".to_string())
+        .expect("API call failed")
+        .expect("check_captcha failed");
+
+    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method)
+        .expect("API call failed")
+        .expect("registration finish failed")
+        .identity_number
 }
 
 pub fn create_identity_with_authn_methods(

@@ -1,7 +1,6 @@
 use crate::state;
 use crate::state::RateLimitState;
 use ic_cdk::api::time;
-use ic_cdk::trap;
 use internet_identity_interface::internet_identity::types::RateLimitConfig;
 use std::cmp::min;
 
@@ -15,7 +14,7 @@ use std::cmp::min;
 /// tokens have replenished.
 /// There is a maximum of `max_tokens` tokens, when reached the tokens not increase any further.
 /// This is the maximum number of calls that can be handled in a burst.
-pub fn process_rate_limit() {
+pub fn process_rate_limit() -> Result<(), ()> {
     let config = state::persistent_state(|ps| ps.registration_rate_limit.clone());
 
     state::registration_rate_limit_mut(|state_opt| {
@@ -35,8 +34,9 @@ pub fn process_rate_limit() {
         if state.tokens > 0 {
             state.tokens -= 1;
         } else {
-            trap("rate limit reached, try again later");
+            return Err(());
         }
+        Ok(())
     })
 }
 

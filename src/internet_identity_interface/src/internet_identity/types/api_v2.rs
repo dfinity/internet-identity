@@ -149,3 +149,54 @@ pub enum IdentityMetadataReplaceError {
     },
     InternalCanisterError(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdRegNextStepResult {
+    pub next_step: RegistrationFlowNextStep,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdRegStartError {
+    RateLimitExceeded,
+    InvalidCaller,
+    AlreadyInProgress,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RegistrationFlowNextStep {
+    /// Supply the captcha solution using check_captcha
+    CheckCaptcha { captcha_png_base64: String },
+    /// Finish the registration using identity_registration_finish
+    Finish,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct CheckCaptchaArg {
+    pub solution: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum CheckCaptchaError {
+    WrongSolution { new_captcha_png_base64: String },
+    UnexpectedCall { next_step: RegistrationFlowNextStep },
+    NoRegistrationFlow,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdRegFinishArg {
+    pub authn_method: AuthnMethodData,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdRegFinishResult {
+    pub identity_number: IdentityNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdRegFinishError {
+    IdentityLimitReached,
+    UnexpectedCall { next_step: RegistrationFlowNextStep },
+    NoRegistrationFlow,
+    InvalidAuthnMethod(String),
+    StorageError(String),
+}

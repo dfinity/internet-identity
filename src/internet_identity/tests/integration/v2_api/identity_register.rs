@@ -4,14 +4,15 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
-    arg_with_anchor_range, env, expect_user_error_with_message, install_ii_canister,
-    install_ii_canister_with_arg, II_WASM,
+    arg_with_anchor_range, arg_with_rate_limit, assert_metric, env, get_metrics,
+    install_ii_canister, install_ii_canister_with_arg, test_principal, time, II_WASM,
 };
+use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
-    ChallengeAttempt, IdentityRegisterError, MetadataEntryV2,
+    CheckCaptchaError, IdRegFinishError, IdRegStartError, MetadataEntryV2, RateLimitConfig,
+    RegistrationFlowNextStep,
 };
-use pocket_ic::ErrorCode::CanisterCalledTrap;
-use regex::Regex;
+use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -38,6 +39,40 @@ fn should_register_multiple_identities() {
 }
 
 #[test]
+fn should_transition_flow_principal_to_temp_key() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let authn_method = test_authn_method();
+    let flow_principal = test_principal(time(&env));
+
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed")
+        .expect("registration start failed");
+
+    api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
+        .expect("API call failed")
+        .expect("check_captcha failed");
+
+    let identity_nr =
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+            .expect("API call failed")
+            .expect("registration finish failed")
+            .identity_number;
+
+    // authenticated call
+    let result = api_v2::identity_info(&env, canister_id, flow_principal, identity_nr)
+        .expect("API call failed");
+    assert!(result.is_ok());
+
+    env.advance_time(Duration::from_secs(601));
+
+    // temp_key is expired now
+    let result = api_v2::identity_info(&env, canister_id, flow_principal, identity_nr)
+        .expect("API call failed");
+    assert!(matches!(result, Err(Unauthorized(_))));
+}
+
+#[test]
 fn should_not_exceed_configured_identity_range() {
     let env = env();
     let canister_id =
@@ -47,102 +82,122 @@ fn should_not_exceed_configured_identity_range() {
     create_identity_with_authn_method(&env, canister_id, &authn_method);
     create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let challenge = api_v2::captcha_create(&env, canister_id)
+    let flow_principal = test_principal(0);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("registration start failed");
 
-    let result = api_v2::identity_register(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        &authn_method,
-        &ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
-    )
-    .expect("API call failed");
-    assert!(matches!(result, Err(IdentityRegisterError::CanisterFull)));
-}
-
-#[test]
-fn should_verify_sender_matches_authn_method() {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-
-    let challenge = api_v2::captcha_create(&env, canister_id)
+    api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("check_captcha failed");
 
-    let result = api_v2::identity_register(
-        &env,
-        canister_id,
-        Principal::anonymous(),
-        &test_authn_method(),
-        &ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
-    );
-    expect_user_error_with_message(
+    let result =
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+            .expect("API call failed");
+    assert!(matches!(
         result,
-        CanisterCalledTrap,
-        Regex::new("[a-z\\d-]+ could not be authenticated against").unwrap(),
-    );
+        Err(IdRegFinishError::IdentityLimitReached)
+    ));
 }
 
 #[test]
 fn should_not_allow_wrong_captcha() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let authn_method = test_authn_method();
 
-    let challenge = api_v2::captcha_create(&env, canister_id)
+    let flow_principal = test_principal(0);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("registration start failed");
 
-    let result = api_v2::identity_register(
+    let result = api_v2::check_captcha(
         &env,
         canister_id,
-        authn_method.principal(),
-        &authn_method,
-        &ChallengeAttempt {
-            chars: "wrong solution".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
+        flow_principal,
+        "wrong solution".to_string(),
     )
     .expect("API call failed");
-    assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
+
+    assert!(matches!(
+        result,
+        Err(CheckCaptchaError::WrongSolution { .. })
+    ));
 }
 
 #[test]
-fn should_not_allow_expired_captcha() {
+fn should_not_allow_anonymous_principal_to_start_registration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let authn_method = test_authn_method();
 
-    let challenge = api_v2::captcha_create(&env, canister_id)
+    let result = api_v2::identity_registration_start(&env, canister_id, Principal::anonymous())
+        .expect("API call failed");
+
+    assert!(matches!(result, Err(IdRegStartError::InvalidCaller)));
+}
+
+#[test]
+fn should_not_allow_different_principal() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let flow_principal1 = test_principal(1);
+    let flow_principal2 = test_principal(2);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal1)
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("registration start failed");
 
-    env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
+    let result = api_v2::check_captcha(&env, canister_id, flow_principal2, "a".to_string())
+        .expect("API call failed");
 
-    let result = api_v2::identity_register(
+    assert!(matches!(result, Err(CheckCaptchaError::NoRegistrationFlow)));
+}
+
+#[test]
+fn should_allow_captcha_retries() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let flow_principal = test_principal(0);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed")
+        .expect("registration start failed");
+
+    let result = api_v2::check_captcha(
         &env,
         canister_id,
-        authn_method.principal(),
-        &authn_method,
-        &ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
+        flow_principal,
+        "wrong solution".to_string(),
     )
     .expect("API call failed");
-    assert!(matches!(result, Err(IdentityRegisterError::BadCaptcha)));
+
+    assert!(matches!(
+        result,
+        Err(CheckCaptchaError::WrongSolution { .. })
+    ));
+
+    let result = api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
+        .expect("API call failed")
+        .expect("check_captcha failed");
+    assert!(matches!(result.next_step, RegistrationFlowNextStep::Finish))
+}
+
+#[test]
+fn should_not_allow_to_continue_expired_flow() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let flow_principal = test_principal(0);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed")
+        .expect("registration start failed");
+
+    env.advance_time(Duration::from_secs(301)); // one second longer than the flow validity
+
+    let result = api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
+        .expect("API call failed");
+
+    // flow is not known anymore, as it has been pruned
+    assert!(matches!(result, Err(CheckCaptchaError::NoRegistrationFlow)));
 }
 
 #[test]
@@ -155,24 +210,64 @@ fn should_fail_on_invalid_metadata() {
         MetadataEntryV2::Bytes(ByteBuf::from("invalid")),
     );
 
-    let challenge = api_v2::captcha_create(&env, canister_id)
+    let flow_principal = test_principal(0);
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
         .expect("API call failed")
-        .expect("captcha_create failed");
+        .expect("registration start failed");
 
-    let result = api_v2::identity_register(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        &authn_method,
-        &ChallengeAttempt {
-            chars: "a".to_string(),
-            key: challenge.challenge_key,
-        },
-        None,
-    )
-    .expect("API call failed");
+    api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
+        .expect("API call failed")
+        .expect("check_captcha failed");
+
+    let result =
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+            .expect("API call failed");
     assert!(matches!(
         result,
-        Err(IdentityRegisterError::InvalidMetadata(_))
+        Err(IdRegFinishError::InvalidAuthnMethod(_))
     ));
+}
+
+#[test]
+fn should_trigger_rate_limit_on_too_many_flows() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        arg_with_rate_limit(RateLimitConfig {
+            time_per_token_ns: Duration::from_secs(1).as_nanos() as u64,
+            max_tokens: 3,
+        }),
+    );
+
+    // the canister starts out with max_tokens, so use some to make the replenish actually do something
+    for i in 0..3 {
+        api_v2::identity_registration_start(&env, canister_id, test_principal(i))
+            .expect("API call failed")
+            .expect("registration start failed");
+    }
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_register_rate_limit_current_tokens",
+        0f64,
+    );
+
+    let flow_principal = test_principal(3);
+    let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed");
+    assert!(matches!(result, Err(IdRegStartError::RateLimitExceeded)));
+
+    env.advance_time(Duration::from_secs(100));
+
+    let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed");
+    assert!(result.is_ok());
+
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_register_rate_limit_current_tokens",
+        2f64,
+    );
+    Ok(())
 }
