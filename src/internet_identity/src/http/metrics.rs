@@ -38,6 +38,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             (hi - 1) as f64,
             "The highest Identity Anchor that can be served by this canister.",
         )?;
+        w.encode_gauge(
+            "internet_identity_event_data_count",
+            storage.event_data.len() as f64,
+            "Number of events stored in event_data map.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_event_aggregations_count",
+            storage.event_aggregations.len() as f64,
+            "Number of entries in the event_aggregations map.",
+        )?;
 
         let mut virtual_memory_stats_builder = w.gauge_vec(
             "internet_identity_virtual_memory_size_pages",
@@ -200,16 +210,6 @@ fn persistent_state_metrics(
         "internet_identity_register_rate_limit_time_per_tokens_seconds",
         Duration::from_nanos(register_rate_limit_config.time_per_token_ns).as_secs() as f64,
         "Min number of seconds between two register calls to not exceed the rate limit (sustained).",
-    )?;
-    w.encode_gauge(
-        "internet_identity_event_data_count",
-        persistent_state.event_data_count as f64,
-        "Number of events stored in event_data map.",
-    )?;
-    w.encode_gauge(
-        "internet_identity_event_aggregations_count",
-        persistent_state.event_aggregations_count as f64,
-        "Number of entries in the event_aggregations map.",
     )?;
 
     let stats = &persistent_state.active_anchor_stats;
