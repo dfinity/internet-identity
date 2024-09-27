@@ -5,7 +5,6 @@ use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state;
 use crate::state::flow_states::RegistrationFlowState;
-use crate::state::temp_keys::TempKeyId;
 use crate::storage::anchor::Device;
 use candid::Principal;
 use ic_cdk::api::time;
@@ -133,13 +132,7 @@ pub fn identity_registration_finish(
 
     // add temp key so the user can keep using the identity used for the registration flow
     state::with_temp_keys_mut(|temp_keys| {
-        temp_keys.add_temp_key(
-            TempKeyId::IdentityAuthnMethod {
-                identity_number,
-                authn_method_pubkey: arg.authn_method.public_key(),
-            },
-            caller,
-        )
+        temp_keys.add_temp_key(&arg.authn_method.public_key(), identity_number, caller)
     });
 
     Ok(IdRegFinishResult { identity_number })

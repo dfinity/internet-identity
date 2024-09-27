@@ -1,35 +1,11 @@
 use crate::MINUTE_NS;
 use candid::Principal;
 use ic_cdk::api::time;
-use internet_identity_interface::internet_identity::types::{IdentityNumber, PublicKey, Timestamp};
+use internet_identity_interface::internet_identity::types::{AnchorNumber, DeviceKey, Timestamp};
 use std::collections::{HashMap, VecDeque};
 
 // Expiration for temp keys, the same as the front-end delegation expiry
 const TEMP_KEY_EXPIRATION_NS: u64 = 10 * MINUTE_NS;
-
-/// A temp key identifier
-#[derive(Debug, Clone, Eq, PartialOrd, PartialEq, Hash)]
-pub enum TempKeyId {
-    /// A temp key that is tied to an existing identity and authn_method.
-    /// We need to track the authn_method because the associated temp_key
-    /// must become invalid if the authn_method is removed from the identity.
-    IdentityAuthnMethod {
-        identity_number: IdentityNumber,
-        authn_method_pubkey: PublicKey,
-    },
-}
-
-impl TempKeyId {
-    pub fn from_identity_authn_method(
-        identity_number: IdentityNumber,
-        authn_method_pubkey: PublicKey,
-    ) -> Self {
-        TempKeyId::IdentityAuthnMethod {
-            identity_number,
-            authn_method_pubkey,
-        }
-    }
-}
 
 #[derive(Default, Debug)]
 pub struct TempKeys {
@@ -50,40 +26,50 @@ pub struct TempKeys {
     ///
     /// Since temp keys can only be added during registration, the max number of temp keys is
     /// bounded by the registration rate limit.
-    temp_keys: HashMap<TempKeyId, TempKey>,
+    temp_keys: HashMap<(AnchorNumber, DeviceKey), TempKey>,
 
     /// Deque to efficiently prune expired temp keys
     expirations: VecDeque<TempKeyExpiration>,
 }
 
 impl TempKeys {
-    pub fn add_temp_key(&mut self, key_id: TempKeyId, temp_key: Principal) {
+    pub fn add_temp_key(
+        &mut self,
+        device_key: &DeviceKey,
+        anchor: AnchorNumber,
+        temp_key: Principal,
+    ) {
         let tmp_key = TempKey {
             principal: temp_key,
             expiration: time() + TEMP_KEY_EXPIRATION_NS,
         };
 
         self.expirations.push_back(TempKeyExpiration {
-            key_id: key_id.clone(),
+            key: (anchor, device_key.clone()),
             expiration: tmp_key.expiration,
         });
-        self.temp_keys.insert(key_id, tmp_key);
+        self.temp_keys.insert((anchor, device_key.clone()), tmp_key);
     }
 
     /// Removes the temporary key for the given device if it exists and is linked to the provided anchor.
-    pub fn remove_temp_key(&mut self, key_id: &TempKeyId) {
+    pub fn remove_temp_key(&mut self, anchor: AnchorNumber, device_key: &DeviceKey) {
         // we can skip the removal from expirations because there it will be removed
         // during amortized clean-up operations
-        self.temp_keys.remove(key_id);
+        self.temp_keys.remove(&(anchor, device_key.clone()));
     }
 
     /// Checks that the temporary key is valid for the given device and anchor.
     ///
     /// Requires a mutable reference because it does amortized clean-up of expired temp keys.
-    pub fn check_temp_key(&mut self, caller: &Principal, key_id: &TempKeyId) -> Result<(), ()> {
+    pub fn check_temp_key(
+        &mut self,
+        caller: &Principal,
+        device_key: &DeviceKey,
+        anchor: AnchorNumber,
+    ) -> Result<(), ()> {
         self.prune_expired_keys();
 
-        let Some(temp_key) = self.temp_keys.get(key_id) else {
+        let Some(temp_key) = self.temp_keys.get(&(anchor, device_key.clone())) else {
             return Err(());
         };
         if temp_key.expiration < time() {
@@ -110,7 +96,7 @@ impl TempKeys {
             if expiration.expiration > now {
                 break;
             }
-            self.temp_keys.remove(&expiration.key_id);
+            self.temp_keys.remove(&expiration.key);
             self.expirations.pop_front();
         }
     }
@@ -131,7 +117,7 @@ struct TempKey {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TempKeyExpiration {
     /// Key with which to find the temp key in the `temp_keys` map
-    pub key_id: TempKeyId,
+    key: (AnchorNumber, DeviceKey),
     /// The expiration timestamp of the temp key
-    pub expiration: Timestamp,
+    expiration: Timestamp,
 }
