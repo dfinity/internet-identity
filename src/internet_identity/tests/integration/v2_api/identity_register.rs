@@ -1,3 +1,5 @@
+mod dynamic_captcha;
+
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, test_authn_method,
 };
@@ -9,8 +11,9 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
-    CheckCaptchaError, IdRegFinishError, IdRegStartError, MetadataEntryV2, RateLimitConfig,
-    RegistrationFlowNextStep,
+    CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegFinishError, IdRegStartError,
+    InternetIdentityInit, MetadataEntryV2, RateLimitConfig, RegistrationFlowNextStep,
+    StaticCaptchaTrigger,
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
@@ -270,4 +273,26 @@ fn should_trigger_rate_limit_on_too_many_flows() -> Result<(), CallError> {
         2f64,
     );
     Ok(())
+}
+
+#[test]
+fn should_not_require_captcha_when_disabled() {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            captcha_config: Some(CaptchaConfig {
+                max_unsolved_captchas: 50,
+                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+            }),
+            ..InternetIdentityInit::default()
+        }),
+    );
+
+    let result = api_v2::identity_registration_start(&env, canister_id, test_principal(0))
+        .expect("API call failed")
+        .expect("registration start failed");
+
+    assert!(matches!(result.next_step, RegistrationFlowNextStep::Finish));
 }

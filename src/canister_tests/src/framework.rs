@@ -209,6 +209,20 @@ pub fn arg_with_anchor_range(
     })
 }
 
+pub fn arg_with_dynamic_captcha() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 50,
+            captcha_trigger: CaptchaTrigger::Dynamic {
+                threshold_pct: 20,
+                current_rate_sampling_interval_s: 10,
+                reference_rate_sampling_interval_s: 100,
+            },
+        }),
+        ..InternetIdentityInit::default()
+    })
+}
+
 pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(wasm);

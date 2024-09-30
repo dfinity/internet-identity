@@ -23,6 +23,12 @@ pub struct NormalizedRegistrationRates {
     pub captcha_threshold_rate: f64,
 }
 
+impl NormalizedRegistrationRates {
+    pub fn captcha_required(&self) -> bool {
+        self.current_rate_per_second > self.captcha_threshold_rate
+    }
+}
+
 struct DynamicCaptchaConfig {
     reference_rate_retention_ns: u64,
     current_rate_retention_ns: u64,

@@ -1,7 +1,8 @@
 use crate::anchor_management::registration::captcha::{
-    check_captcha_solution, create_captcha, make_rng, Base64,
+    check_captcha_solution, create_captcha, make_rng,
 };
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
+use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
 use crate::state;
 use crate::state::flow_states::RegistrationFlowState;
@@ -12,10 +13,23 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage, IdRegFinishArg,
-    IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber,
-    RegistrationFlowNextStep,
+    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage,
+    IdRegFinishArg, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError,
+    IdentityNumber, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
+
+impl RegistrationFlowState {
+    pub fn to_flow_next_step(&self) -> RegistrationFlowNextStep {
+        match self {
+            RegistrationFlowState::CheckCaptcha {
+                captcha_png_base64, ..
+            } => RegistrationFlowNextStep::CheckCaptcha {
+                captcha_png_base64: captcha_png_base64.0.clone(),
+            },
+            RegistrationFlowState::FinishRegistration { .. } => RegistrationFlowNextStep::Finish,
+        }
+    }
+}
 
 impl From<RegistrationFlowState> for RegistrationFlowNextStep {
     fn from(value: RegistrationFlowState) -> Self {
@@ -38,17 +52,40 @@ pub async fn identity_registration_start() -> Result<IdRegNextStepResult, IdRegS
         return Err(IdRegStartError::InvalidCaller);
     }
 
-    let (captcha_png_base64, flow_state) = captcha_flow_state(time()).await;
+    let flow_state = match captcha_required() {
+        true => captcha_flow_state(time()).await.1,
+        false => RegistrationFlowState::FinishRegistration {
+            flow_created_timestamp_ns: time(),
+        },
+    };
+
+    let next_step_result = IdRegNextStepResult {
+        next_step: flow_state.to_flow_next_step(),
+    };
+
     state::with_flow_states_mut(|flow_states| {
         flow_states.new_registration_flow(caller, flow_state)
     })
     .map_err(|_| IdRegStartError::AlreadyInProgress)?;
 
-    Ok(IdRegNextStepResult {
-        next_step: RegistrationFlowNextStep::CheckCaptcha {
-            captcha_png_base64: captcha_png_base64.0,
+    Ok(next_step_result)
+}
+
+fn captcha_required() -> bool {
+    let captcha_config = state::persistent_state(|ps| ps.captcha_config.clone());
+    match captcha_config.captcha_trigger {
+        CaptchaTrigger::Static(static_trigger) => match static_trigger {
+            StaticCaptchaTrigger::CaptchaEnabled => true,
+            StaticCaptchaTrigger::CaptchaDisabled => false,
         },
-    })
+        CaptchaTrigger::Dynamic { .. } => {
+            state::storage_borrow(|storage| storage.registration_rates.registration_rates())
+                .map(|rates| rates.captcha_required())
+                // unreachable because it is only `None` on static captcha
+                // default to true nonetheless because requiring a captcha is better than panicking
+                .unwrap_or(true)
+        }
+    }
 }
 
 async fn captcha_flow_state(flow_created_timestamp_ns: u64) -> (Base64, RegistrationFlowState) {
