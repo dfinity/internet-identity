@@ -469,7 +469,7 @@ pub fn get_metrics(env: &PocketIc, canister_id: CanisterId) -> String {
 
 pub fn parse_metric(body: &str, metric: &str) -> (f64, u64) {
     let metric = metric.replace('{', "\\{").replace('}', "\\}");
-    let metric_capture = Regex::new(&format!("(?m)^{metric} (\\d+) (\\d+)$"))
+    let metric_capture = Regex::new(&format!("(?m)^{metric} ([\\d\\.]+) ([\\d\\.]+)$"))
         .unwrap()
         .captures(body)
         .unwrap_or_else(|| panic!("metric {metric} not found"));
