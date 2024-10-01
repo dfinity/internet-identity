@@ -92,7 +92,9 @@ use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemor
 use ic_stable_structures::reader::Reader;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::writer::Writer;
-use ic_stable_structures::{Memory, RestrictedMemory, StableBTreeMap, StableCell, Storable};
+use ic_stable_structures::{
+    Memory, MinHeap, RestrictedMemory, StableBTreeMap, StableCell, Storable,
+};
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::stats::event_stats::AggregationKey;
@@ -102,10 +104,12 @@ use internet_identity_interface::internet_identity::types::*;
 use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
+use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::storage::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
+pub mod registration_rates;
 
 /// module for the internal serialization format of anchors
 mod storable_anchor;
@@ -129,11 +133,17 @@ const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
 const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2u8;
 const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
 const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
+const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
+const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
 const EVENT_DATA_MEMORY_ID: MemoryId = MemoryId::new(EVENT_DATA_MEMORY_INDEX);
 const STATS_AGGREGATIONS_MEMORY_ID: MemoryId = MemoryId::new(STATS_AGGREGATIONS_MEMORY_INDEX);
+const REGISTRATION_REFERENCE_RATE_MEMORY_ID: MemoryId =
+    MemoryId::new(REGISTRATION_REFERENCE_RATE_MEMORY_INDEX);
+const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
+    MemoryId::new(REGISTRATION_CURRENT_RATE_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -186,6 +196,13 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the stats aggregation memory.
     event_aggregations_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub event_aggregations: StableBTreeMap<AggregationKey, u64, ManagedMemory<M>>,
+    /// Registration rates tracked for the purpose of toggling the dynamic captcha (if configured)
+    /// This data is persisted as it potentially contains data collected over longer periods of time.
+    pub registration_rates: RegistrationRates<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the current registration rate memory.
+    current_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the reference registration rate memory.
+    reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -243,10 +260,28 @@ impl<M: Memory + Clone> Storage<M> {
         let persistent_state_memory = memory_manager.get(PERSISTENT_STATE_MEMORY_ID);
         let event_data_memory = memory_manager.get(EVENT_DATA_MEMORY_ID);
         let stats_aggregations_memory = memory_manager.get(STATS_AGGREGATIONS_MEMORY_ID);
+        let registration_ref_rate_memory =
+            memory_manager.get(REGISTRATION_REFERENCE_RATE_MEMORY_ID);
+        let registration_current_rate_memory =
+            memory_manager.get(REGISTRATION_CURRENT_RATE_MEMORY_ID);
+
+        let registration_rates = RegistrationRates::new(
+            MinHeap::init(registration_ref_rate_memory.clone())
+                .expect("failed to initialize registration reference rate min heap"),
+            MinHeap::init(registration_current_rate_memory.clone())
+                .expect("failed to initialize registration current rate min heap"),
+        );
         Self {
             header,
             header_memory,
             anchor_memory,
+            registration_rates,
+            reference_registration_rate_memory_wrapper: MemoryWrapper::new(
+                registration_ref_rate_memory,
+            ),
+            current_registration_rate_memory_wrapper: MemoryWrapper::new(
+                registration_current_rate_memory,
+            ),
             archive_buffer_memory_wrapper: MemoryWrapper::new(archive_buffer_memory.clone()),
             archive_entries_buffer: StableBTreeMap::init(archive_buffer_memory),
             persistent_state_memory_wrapper: MemoryWrapper::new(persistent_state_memory.clone()),
@@ -513,6 +548,14 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "event_aggregations".to_string(),
                 self.event_aggregations_memory_wrapper.size(),
+            ),
+            (
+                "reference_registration_rate".to_string(),
+                self.reference_registration_rate_memory_wrapper.size(),
+            ),
+            (
+                "current_registration_rate".to_string(),
+                self.current_registration_rate_memory_wrapper.size(),
             ),
         ])
     }

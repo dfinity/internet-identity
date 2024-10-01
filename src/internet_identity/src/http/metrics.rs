@@ -48,6 +48,24 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.event_aggregations.len() as f64,
             "Number of entries in the event_aggregations map.",
         )?;
+        if let Some(registration_rates) = storage.registration_rates.registration_rates() {
+            w.gauge_vec(
+                "internet_identity_registrations_per_second",
+                "Rate of new identity registrations on Internet Identity",
+            )?
+            .value(
+                &[("type", "reference_rate")],
+                registration_rates.reference_rate_per_second,
+            )?
+            .value(
+                &[("type", "current_rate")],
+                registration_rates.current_rate_per_second,
+            )?
+            .value(
+                &[("type", "captcha_threshold_rate")],
+                registration_rates.captcha_threshold_rate,
+            )?;
+        }
 
         let mut virtual_memory_stats_builder = w.gauge_vec(
             "internet_identity_virtual_memory_size_pages",

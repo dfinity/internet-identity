@@ -153,8 +153,11 @@ fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishEr
 
     let identity_number = identity.anchor_number();
 
-    state::storage_borrow_mut(|s| s.write(identity))
-        .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
+    state::storage_borrow_mut(|s| {
+        s.registration_rates.new_registration();
+        s.write(identity)
+    })
+    .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
 
     let operation = Operation::RegisterAnchor {
         device: DeviceDataWithoutAlias::from(device),
