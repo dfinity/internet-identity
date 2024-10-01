@@ -87,6 +87,7 @@ impl<M: Memory> RegistrationRates<M> {
 /// already been collected. Adjusting the window to the actual data collected is important because
 /// * rates are underestimated by fixed window calculations
 /// * the reference registration rate window is generally longer than the current rate window
+/// 
 /// => this means that the captcha would be triggered prematurely during the period where data has
 /// not been collected for the full reference registration rate data retention window.
 ///
