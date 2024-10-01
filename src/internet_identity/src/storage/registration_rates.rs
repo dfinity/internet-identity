@@ -8,7 +8,11 @@ use internet_identity_interface::internet_identity::types::{CaptchaTrigger, Time
 use std::time::Duration;
 
 pub struct RegistrationRates<M: Memory> {
+    /// Min heap of registration timestamps to calculate the reference registration rate.
+    /// [prune_data] removes values that  are in the past whenever new data is added.
     reference_rate_data: MinHeap<Timestamp, M>,
+    /// Min heap of registration timestamps to calculate the current registration rate.
+    /// [prune_data] removes values that  are in the past whenever new data is added.
     current_rate_data: MinHeap<Timestamp, M>,
 }
 
@@ -54,12 +58,12 @@ impl<M: Memory> RegistrationRates<M> {
         let config = dynamic_captcha_config()?;
         let now = time();
 
-        let reference_rate_per_second = calculate_rate(
+        let reference_rate_per_second = calculate_registration_rate(
             now,
             &self.reference_rate_data,
             config.reference_rate_retention_ns,
         );
-        let current_rate_per_second = calculate_rate(
+        let current_rate_per_second = calculate_registration_rate(
             now,
             &self.current_rate_data,
             config.current_rate_retention_ns,
@@ -80,13 +84,24 @@ impl<M: Memory> RegistrationRates<M> {
 }
 
 /// Calculates the rate per second of registrations taking into account for how long data has
-/// already been collected.
+/// already been collected. Adjusting the window to the actual data collected is important because
+/// * rates are underestimated by fixed window calculations
+/// * the reference registration rate window is generally longer than the current rate window
+/// => this means that the captcha would be triggered prematurely during the period where data has
+/// not been collected for the full reference registration rate data retention window.
 ///
-/// E.g. if `data_retention_ns` is 3 weeks, the rate cannot just be calculated over a 3-week time
-/// window because until 3 weeks of data has been collected the rate would be inaccurate.
-/// In particular, it would underestimate the actual rate leading to the captcha threshold being
-/// reached more easily thus potentially triggering the captcha prematurely.
-fn calculate_rate<M: Memory>(
+/// Example:
+/// * `data_retention_ns` is 3 weeks
+/// * there are currently 3 data points: `[1727768623000000000, 1727855023000000000, 1727941423000000000]`
+///   (these are 24h apart each)
+///
+/// If the rate was calculated over a 3-week time window, this would be
+/// 3 registrations / 1814400 seconds = 0.000001653439153 registrations / second
+///
+/// However, because the data is not actually spanning 3 weeks, this underestimates the actual rate.
+/// Taking into account that the data is only spanning 3 days we get the following:
+/// 3 registrations / 259200 seconds = 0.00001157407407 registrations / second
+fn calculate_registration_rate<M: Memory>(
     now: u64,
     data: &MinHeap<Timestamp, M>,
     data_retention_ns: u64,
@@ -189,6 +204,17 @@ mod test {
         );
 
         registration_rates.new_registration();
+
+        // 1 data point -> still 0 rates
+        assert_eq!(
+            registration_rates.registration_rates().unwrap(),
+            NormalizedRegistrationRates {
+                reference_rate_per_second: 0.0,
+                current_rate_per_second: 0.0,
+                captcha_threshold_rate: 0.0,
+            }
+        );
+
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
         registration_rates.new_registration();
 
@@ -198,7 +224,7 @@ mod test {
             NormalizedRegistrationRates {
                 reference_rate_per_second: 2.0,
                 current_rate_per_second: 2.0,
-                captcha_threshold_rate: 2.4,
+                captcha_threshold_rate: 2.4, // 20% more than the reference rate, as per config
             }
         );
     }
@@ -216,7 +242,7 @@ mod test {
             NormalizedRegistrationRates {
                 reference_rate_per_second: 1.0,
                 current_rate_per_second: 1.0,
-                captcha_threshold_rate: 1.2,
+                captcha_threshold_rate: 1.2, // 20% more than the reference rate, as per config
             }
         );
     }
@@ -224,7 +250,7 @@ mod test {
     #[test]
     fn should_only_use_recent_data_for_current_rate() {
         let mut registration_rates = setup();
-        // hone in reference rate with 1 registration / second
+        // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
             registration_rates.new_registration();
             TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
@@ -243,7 +269,7 @@ mod test {
             NormalizedRegistrationRates {
                 current_rate_per_second: 3.0,
                 reference_rate_per_second: 1.2, // increases too, but more slowly
-                captcha_threshold_rate: 1.44,   // reference rate * 1.2
+                captcha_threshold_rate: 1.44,   // reference rate * 1.2 (as per config)
             }
         );
     }

@@ -199,7 +199,9 @@ pub struct Storage<M: Memory> {
     /// Registration rates tracked for the purpose of toggling the dynamic captcha (if configured)
     /// This data is persisted as it potentially contains data collected over longer periods of time.
     pub registration_rates: RegistrationRates<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the current registration rate memory.
     current_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the reference registration rate memory.
     reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
 }
 
