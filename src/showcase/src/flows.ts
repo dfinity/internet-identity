@@ -62,16 +62,32 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
 const mockConnection = new MockAuthenticatedConnection();
 
 const registerFlowOpts: RegisterFlowOpts = {
-  createChallenge: async () => {
+  identityRegistrationStart: async () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    return dummyChallenge;
+    return {
+      kind: "registrationFlowStepSuccess",
+      nextStep: {
+        step: "checkCaptcha",
+        captcha_png_base64: dummyChallenge.png_base64,
+      },
+    };
   },
-  register: async ({ challengeResult: { chars } }) => {
+  checkCaptcha: async (solution: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (solution !== "8wJ6Q") {
+      return {
+        kind: "wrongCaptchaSolution",
+        new_captcha_png_base64: dummyChallenge.png_base64,
+      };
+    }
+    return {
+      kind: "registrationFlowStepSuccess",
+      nextStep: { step: "finish" },
+    };
+  },
+  identityRegistrationFinish: async () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    if (chars !== "8wJ6Q") {
-      return { kind: "badChallenge" };
-    }
     return {
       kind: "loginSuccess",
       userNumber: BigInt(12356),

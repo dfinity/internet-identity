@@ -6,9 +6,7 @@ import {
   _SERVICE,
   AddTentativeDeviceResponse,
   AnchorCredentials,
-  Challenge,
-  ChallengeResult,
-  CredentialId,
+  AuthnMethodData,
   DeviceData,
   DeviceKey,
   FrontendHostname,
@@ -23,7 +21,7 @@ import {
   PreparedIdAlias,
   PublicKey,
   Purpose,
-  RegisterResponse,
+  RegistrationFlowNextStep,
   SessionKey,
   Timestamp,
   UserNumber,
@@ -90,15 +88,38 @@ export type LoginSuccess = {
   userNumber: bigint;
 };
 
-export type BadChallenge = { kind: "badChallenge" };
+export type RegFlowNextStep =
+  | { step: "checkCaptcha"; captcha_png_base64: string }
+  | { step: "finish" };
+export type RegistrationFlowStepSuccess = {
+  kind: "registrationFlowStepSuccess";
+  nextStep: RegFlowNextStep;
+};
+
 export type BadPin = { kind: "badPin" };
 export type UnknownUser = { kind: "unknownUser"; userNumber: bigint };
+export type UnexpectedCall = {
+  kind: "unexpectedCall";
+  nextStep: RegFlowNextStep;
+};
+export type NoRegistrationFlow = { kind: "noRegistrationFlow" };
+export type WrongCaptchaSolution = {
+  kind: "wrongCaptchaSolution";
+  new_captcha_png_base64: string;
+};
 export type AuthFail = { kind: "authFail"; error: Error };
+export type InvalidCaller = { kind: "invalidCaller" };
+export type RateLimitExceeded = { kind: "rateLimitExceeded" };
+export type AlreadyInProgress = { kind: "alreadyInProgress" };
 export type ApiError = { kind: "apiError"; error: Error };
 export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
+export type InvalidAuthnMethod = {
+  kind: "invalidAuthnMethod";
+  message: string;
+};
 
 export type { ChallengeResult } from "$generated/internet_identity_types";
 
@@ -115,43 +136,22 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 export class Connection {
   public constructor(readonly canisterId: string) {}
 
-  register = async ({
-    identity,
+  identity_registration_start = async ({
     tempIdentity,
-    credentialId,
-    keyType,
-    alias,
-    challengeResult,
   }: {
-    identity: SignIdentity;
     tempIdentity: SignIdentity;
-    credentialId?: CredentialId;
-    keyType: KeyType;
-    alias: string;
-    challengeResult: ChallengeResult;
   }): Promise<
-    LoginSuccess | ApiError | AuthFail | RegisterNoSpace | BadChallenge
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | InvalidCaller
+    | AlreadyInProgress
+    | RateLimitExceeded
   > => {
-    const delegationIdentity = await this.requestFEDelegation(tempIdentity);
-    const actor = await this.createActor(delegationIdentity);
-    const pubkey = Array.from(new Uint8Array(identity.getPublicKey().toDer()));
+    const actor = await this.createActor(tempIdentity);
 
-    let registerResponse: RegisterResponse;
+    let startResponse;
     try {
-      registerResponse = await actor.register(
-        {
-          alias,
-          pubkey,
-          credential_id: credentialId ? [credentialId] : [],
-          key_type: keyType,
-          purpose: { authentication: null },
-          protection: { unprotected: null },
-          origin: readDeviceOrigin(),
-          metadata: [],
-        },
-        challengeResult,
-        [tempIdentity.getPrincipal()]
-      );
+      startResponse = await actor.identity_registration_start();
     } catch (error: unknown) {
       if (error instanceof Error) {
         return { kind: "apiError", error };
@@ -163,11 +163,137 @@ export class Connection {
       }
     }
 
-    if ("canister_full" in registerResponse) {
-      return { kind: "registerNoSpace" };
-    } else if ("registered" in registerResponse) {
-      const userNumber = registerResponse.registered.user_number;
-      console.log(`registered Internet Identity ${userNumber}`);
+    if ("Ok" in startResponse) {
+      return {
+        kind: "registrationFlowStepSuccess",
+        nextStep: mapRegFlowNextStep(startResponse.Ok.next_step),
+      };
+    }
+
+    if ("Err" in startResponse) {
+      const err = startResponse.Err;
+      if ("InvalidCaller" in err) {
+        return { kind: "invalidCaller" };
+      }
+      if ("AlreadyInProgress" in err) {
+        return { kind: "alreadyInProgress" };
+      }
+      if ("RateLimitExceeded" in err) {
+        return { kind: "rateLimitExceeded" };
+      }
+    }
+    console.error(
+      "unexpected identity_registration_start response",
+      startResponse
+    );
+    throw Error("unexpected identity_registration_start response");
+  };
+
+  check_captcha = async ({
+    tempIdentity,
+    captchaSolution,
+  }: {
+    tempIdentity: SignIdentity;
+    captchaSolution: string;
+  }): Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | WrongCaptchaSolution
+  > => {
+    const actor = await this.createActor(tempIdentity);
+
+    let captchaResponse;
+    try {
+      captchaResponse = await actor.check_captcha({
+        solution: captchaSolution,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
+    }
+
+    if ("Ok" in captchaResponse) {
+      const nextStep = captchaResponse.Ok.next_step;
+      if ("Finish" in nextStep) {
+        return {
+          kind: "registrationFlowStepSuccess",
+          nextStep: { step: "finish" },
+        };
+      }
+      console.error(
+        "unexpected next step in check_captcha response",
+        captchaResponse
+      );
+      throw Error("unexpected next step in check_captcha response");
+    }
+
+    if ("Err" in captchaResponse) {
+      const err = captchaResponse.Err;
+      if ("WrongSolution" in err) {
+        return {
+          kind: "wrongCaptchaSolution",
+          new_captcha_png_base64: err.WrongSolution.new_captcha_png_base64,
+        };
+      }
+      if ("UnexpectedCall" in err) {
+        return {
+          kind: "unexpectedCall",
+          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
+        };
+      }
+      if ("NoRegistrationFlow" in err) {
+        return { kind: "noRegistrationFlow" };
+      }
+    }
+    console.error("unexpected check_captcha response", captchaResponse);
+    throw Error("unexpected check_captcha response");
+  };
+
+  identity_registration_finish = async ({
+    tempIdentity,
+    identity,
+    authnMethod,
+  }: {
+    tempIdentity: SignIdentity;
+    identity: SignIdentity;
+    authnMethod: AuthnMethodData;
+  }): Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+  > => {
+    const delegationIdentity = await this.requestFEDelegation(tempIdentity);
+    const actor = await this.createActor(delegationIdentity);
+
+    let finishResponse;
+    try {
+      finishResponse = await actor.identity_registration_finish({
+        authn_method: authnMethod,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
+    }
+
+    if ("Ok" in finishResponse) {
+      const userNumber = finishResponse.Ok.identity_number;
       return {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
@@ -179,12 +305,38 @@ export class Connection {
         ),
         userNumber,
       };
-    } else if ("bad_challenge" in registerResponse) {
-      return { kind: "badChallenge" };
-    } else {
-      console.error("unexpected register response", registerResponse);
-      throw Error("unexpected register response");
     }
+
+    if ("Err" in finishResponse) {
+      const err = finishResponse.Err;
+      if ("InvalidAuthnMethod" in err) {
+        return {
+          kind: "invalidAuthnMethod",
+          message: err.InvalidAuthnMethod,
+        };
+      }
+      if ("UnexpectedCall" in err) {
+        return {
+          kind: "unexpectedCall",
+          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
+        };
+      }
+      if ("NoRegistrationFlow" in err) {
+        return { kind: "noRegistrationFlow" };
+      }
+      if ("IdentityLimitReached" in err) {
+        return { kind: "registerNoSpace" };
+      }
+      if ("StorageError" in err) {
+        // this is unrecoverable, so we can just map it to a generic API error
+        return {
+          kind: "apiError",
+          error: new Error("StorageError: " + err.StorageError),
+        };
+      }
+    }
+    console.error("unexpected check_captcha response", finishResponse);
+    throw Error("unexpected check_captcha response");
   };
 
   login = async (
@@ -343,13 +495,6 @@ export class Connection {
     return await actor.lookup(userNumber);
   };
 
-  createChallenge = async (): Promise<Challenge> => {
-    const actor = await this.createActor();
-    const challenge = await actor.create_challenge();
-    console.log("Challenge Created");
-    return challenge;
-  };
-
   lookupAuthenticators = async (
     userNumber: UserNumber
   ): Promise<Omit<DeviceData, "alias">[]> => {
@@ -382,10 +527,10 @@ export class Connection {
 
   // Create an actor representing the backend
   createActor = async (
-    delegationIdentity?: DelegationIdentity
+    identity?: SignIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
     const agent = await HttpAgent.create({
-      identity: delegationIdentity,
+      identity,
       host: inferHost(),
       // Only fetch the root key when we're not in prod
       shouldFetchRootKey: features.FETCH_ROOT_KEY,
@@ -847,4 +992,17 @@ export const inferHost = (): string => {
 
   // Otherwise assume it's a custom setup and use the host itself as API.
   return location.protocol + "//" + location.host;
+};
+
+const mapRegFlowNextStep = (
+  step: RegistrationFlowNextStep
+): RegFlowNextStep => {
+  if ("Finish" in step) {
+    return { step: "finish" };
+  }
+  step satisfies { CheckCaptcha: { captcha_png_base64: string } };
+  return {
+    step: "checkCaptcha",
+    captcha_png_base64: step.CheckCaptcha.captcha_png_base64,
+  };
 };

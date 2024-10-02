@@ -4,7 +4,6 @@
     "retry": "retry",
     "instructions": "Type the characters you see",
     "cancel": "Cancel",
-    "generating": "Generating...",
     "verifying": "Verifying...",
     "next": "Next",
     "incorrect": "Try one more time."
