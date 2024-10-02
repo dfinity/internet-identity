@@ -30,10 +30,7 @@ pub struct StorablePersistentState {
     max_inflight_captchas: u64,
 
     // opt fields because of backwards compatibility
-    event_data_count: Option<u64>,
-    event_aggregations_count: Option<u64>,
     event_stats_24h_start: Option<EventKey>,
-
     captcha_config: Option<CaptchaConfig>,
 }
 
@@ -70,8 +67,6 @@ impl From<PersistentState> for StorablePersistentState {
             max_num_latest_delegation_origins: 0,
             // unused, kept for stable memory compatibility
             max_inflight_captchas: 0,
-            event_data_count: Some(s.event_data_count),
-            event_aggregations_count: Some(s.event_aggregations_count),
             event_stats_24h_start: s.event_stats_24h_start,
             captcha_config: Some(s.captcha_config),
         }
@@ -88,8 +83,6 @@ impl From<StorablePersistentState> for PersistentState {
             domain_active_anchor_stats: s.domain_active_anchor_stats,
             active_authn_method_stats: s.active_authn_method_stats,
             captcha_config: s.captcha_config.unwrap_or(DEFAULT_CAPTCHA_CONFIG),
-            event_data_count: s.event_data_count.unwrap_or_default(),
-            event_aggregations_count: s.event_aggregations_count.unwrap_or_default(),
             event_stats_24h_start: s.event_stats_24h_start,
         }
     }
@@ -129,8 +122,6 @@ mod tests {
             latest_delegation_origins: HashMap::new(),
             max_num_latest_delegation_origins: 0,
             max_inflight_captchas: 0,
-            event_data_count: Some(0),
-            event_aggregations_count: Some(0),
             event_stats_24h_start: None,
             captcha_config: Some(CaptchaConfig {
                 max_unsolved_captchas: 500,
@@ -154,8 +145,6 @@ mod tests {
                 max_unsolved_captchas: 500,
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             },
-            event_data_count: 0,
-            event_aggregations_count: 0,
             event_stats_24h_start: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
