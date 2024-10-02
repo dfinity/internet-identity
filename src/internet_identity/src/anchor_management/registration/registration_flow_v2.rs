@@ -52,10 +52,11 @@ pub async fn identity_registration_start() -> Result<IdRegNextStepResult, IdRegS
         return Err(IdRegStartError::InvalidCaller);
     }
 
+    let now = time();
     let flow_state = match captcha_required() {
-        true => captcha_flow_state(time()).await.1,
+        true => captcha_flow_state(now).await.1,
         false => RegistrationFlowState::FinishRegistration {
-            flow_created_timestamp_ns: time(),
+            flow_created_timestamp_ns: now,
         },
     };
 

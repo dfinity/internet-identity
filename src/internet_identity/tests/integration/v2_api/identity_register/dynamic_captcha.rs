@@ -42,8 +42,8 @@ fn should_require_captcha_above_threshold_rate() {
 
     // Double the rate of registrations to one per second
     // The 20% threshold rate should allow 5 registrations before the captcha kicks in
-    let flow_principal = test_principal(0);
-    for _ in 0..5 {
+    for i in 0..5 {
+        let flow_principal = test_principal(i);
         let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
             .expect("API call failed")
             .expect("registration start failed");
@@ -56,7 +56,7 @@ fn should_require_captcha_above_threshold_rate() {
         env.advance_time(Duration::from_secs(1));
     }
 
-    let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
+    let result = api_v2::identity_registration_start(&env, canister_id, test_principal(99))
         .expect("API call failed")
         .expect("registration start failed");
 
