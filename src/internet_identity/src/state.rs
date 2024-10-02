@@ -103,14 +103,6 @@ pub struct PersistentState {
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
     // Configuration of the captcha challenge during registration flow
     pub captcha_config: CaptchaConfig,
-    // Count of entries in the event_data BTreeMap
-    // event_data is expected to have a lot of entries, thus counting by iterating over it is not
-    // an option.
-    pub event_data_count: u64,
-    // Count of entries in the event_aggregations BTreeMap
-    // event_aggregations is expected to have a lot of entries, thus counting by iterating over it is not
-    // an option.
-    pub event_aggregations_count: u64,
     // Key into the event_data BTreeMap where the 24h tracking window starts.
     // This key is used to remove old entries from the 24h event aggregations.
     // If it is `none`, then the 24h window starts from the newest entry in the event_data
@@ -129,8 +121,6 @@ impl Default for PersistentState {
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
-            event_data_count: 0,
-            event_aggregations_count: 0,
             event_stats_24h_start: None,
         }
     }
@@ -257,17 +247,8 @@ pub fn save_persistent_state() {
 
 pub fn load_persistent_state() {
     STATE.with(|s| {
-        let loaded_state = storage_borrow(|storage| storage.read_persistent_state());
-
-        // Reset the event_data and event_aggregations if they are reported as empty from the persistent state
-        // Necessary to handle rollback across the versions where the event_data and event_aggregations were introduced
-        if loaded_state.event_aggregations_count == 0 {
-            storage_borrow_mut(|storage| storage.event_aggregations.clear_new());
-        }
-        if loaded_state.event_data_count == 0 {
-            storage_borrow_mut(|storage| storage.event_data.clear_new());
-        }
-        *s.persistent_state.borrow_mut() = loaded_state;
+        *s.persistent_state.borrow_mut() =
+            storage_borrow(|storage| storage.read_persistent_state());
     });
 }
 

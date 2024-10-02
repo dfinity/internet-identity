@@ -207,11 +207,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
     if option.is_some() {
         ic_cdk::println!("WARN: Event already exists for key {:?}", current_key);
     }
-    state::persistent_state_mut(|s| {
-        s.event_data_count = s.event_data_count.saturating_add(1);
-    });
 
-    let mut aggregations_db_wrapper = CountingAggregationsWrapper(&mut s.event_aggregations);
     // Collect events that should no longer be reflected in the 24h aggregations. Does _not_ delete
     // the underlying events.
     let removed_24h = events_to_remove_from_24h_aggregations(now, &current_key, &s.event_data);
@@ -221,7 +217,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
         &event,
         &removed_24h,
         AggregationWindow::Day,
-        &mut aggregations_db_wrapper,
+        &mut s.event_aggregations,
     );
 
     // This pruning _deletes_ the data older than 30 days. Do this after the 24h aggregation
@@ -234,7 +230,7 @@ fn update_events_internal<M: Memory>(event: EventData, now: Timestamp, s: &mut S
         &event,
         &pruned_30d,
         AggregationWindow::Month,
-        &mut aggregations_db_wrapper,
+        &mut s.event_aggregations,
     );
 }
 
@@ -244,7 +240,7 @@ fn update_aggregations<M: Memory>(
     event_data: &EventData,
     pruned_events: &[(EventKey, EventData)],
     window: AggregationWindow,
-    aggregations_db: &mut CountingAggregationsWrapper<M>,
+    aggregations_db: &mut StableBTreeMap<AggregationKey, u64, M>,
 ) {
     AGGREGATIONS.iter().for_each(|aggregation| {
         update_aggregation(
@@ -343,49 +339,14 @@ fn prune_events<M: Memory>(
         let entry: &(EventKey, EventData) = entry;
         db.remove(&entry.0);
     }
-    state::persistent_state_mut(|s| {
-        s.event_data_count = s
-            .event_data_count
-            .saturating_sub(pruned_events.len() as u64);
-    });
     pruned_events
 }
-
-/// Helper struct for updating the count of event aggregations.
-struct CountingAggregationsWrapper<'a, M: Memory>(&'a mut StableBTreeMap<AggregationKey, u64, M>);
-
-impl<'a, M: Memory> CountingAggregationsWrapper<'a, M> {
-    fn insert(&mut self, key: AggregationKey, value: u64) {
-        let prev_value = self.0.insert(key, value);
-        if prev_value.is_none() {
-            // Increase count because we added a new value
-            state::persistent_state_mut(|s| {
-                s.event_aggregations_count = s.event_aggregations_count.saturating_add(1);
-            })
-        }
-    }
-
-    fn get(&self, key: &AggregationKey) -> Option<u64> {
-        self.0.get(key)
-    }
-
-    fn remove(&mut self, key: &AggregationKey) {
-        let prev_value = self.0.remove(key);
-        if prev_value.is_some() {
-            // Decrease count because we removed a value
-            state::persistent_state_mut(|s| {
-                s.event_aggregations_count = s.event_aggregations_count.saturating_sub(1);
-            })
-        }
-    }
-}
-
 fn update_aggregation<M: Memory, F>(
     aggregation_filter_map: F,
     now: EventKey,
     new_event: EventData,
     pruned_events: &[(EventKey, EventData)],
-    db: &mut CountingAggregationsWrapper<M>,
+    db: &mut StableBTreeMap<AggregationKey, u64, M>,
 ) where
     F: Fn(&(EventKey, EventData)) -> Option<AggregationEvent>,
 {
