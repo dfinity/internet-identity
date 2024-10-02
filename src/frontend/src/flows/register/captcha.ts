@@ -1,23 +1,18 @@
-import { Challenge } from "$generated/internet_identity_types";
 import { mainWindow } from "$src/components/mainWindow";
 import { DynamicKey, I18n } from "$src/i18n";
+import { WrongCaptchaSolution } from "$src/utils/iiConnection";
 import { mount, renderPage, withRef } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-
-import { isNullish, nonNullish } from "@dfinity/utils";
 import copyJson from "./captcha.json";
-
-// A symbol that we can differentiate from generic `T` types
-// when verifying the challenge
-export const badChallenge: unique symbol = Symbol("ii.bad_challenge");
 
 export const promptCaptchaTemplate = <T>({
   cancel,
-  requestChallenge,
-  verifyChallengeChars,
+  captcha_png_base64,
+  checkCaptcha,
   onContinue,
   i18n,
   stepper,
@@ -25,12 +20,11 @@ export const promptCaptchaTemplate = <T>({
   scrollToTop = false,
 }: {
   cancel: () => void;
-  requestChallenge: () => Promise<Challenge>;
-  verifyChallengeChars: (cr: {
-    chars: string;
-    challenge: Challenge;
-  }) => Promise<T | typeof badChallenge>;
-  onContinue: (result: T) => void;
+  captcha_png_base64: string;
+  checkCaptcha: (
+    solution: string
+  ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
+  onContinue: (result: Exclude<T, WrongCaptchaSolution>) => void;
   i18n: I18n;
   stepper: TemplateResult;
   focus?: boolean;
@@ -62,7 +56,7 @@ export const promptCaptchaTemplate = <T>({
   // The various states the component can inhabit
   type State =
     | { status: "requesting" }
-    | { status: "prompting"; challenge: Challenge }
+    | { status: "prompting"; captcha_png_base64: string }
     | { status: "verifying" }
     | { status: "bad" };
 
@@ -76,7 +70,7 @@ export const promptCaptchaTemplate = <T>({
       state.status === "requesting"
         ? spinnerImg
         : state.status === "prompting"
-        ? captchaImg(state.challenge.png_base64)
+        ? captchaImg(state.captcha_png_base64)
         : Chan.unchanged,
     def: spinnerImg,
   });
@@ -110,57 +104,55 @@ export const promptCaptchaTemplate = <T>({
         ? (e) => {
             e.preventDefault();
             e.stopPropagation();
-            doVerify(state.challenge);
+            doVerify();
           }
         : undefined
   );
 
   const nextDisabled: Chan<boolean> = next.map(isNullish);
-  const nextCaption: Chan<DynamicKey> = state.map(({ status }) =>
-    status === "requesting"
-      ? copy.generating
-      : status === "verifying"
-      ? copy.verifying
-      : copy.next
-  );
+  const nextCaption: Chan<DynamicKey> = state.map(({ status }) => {
+    console.log("next caption", status);
+    if (status === "requesting") {
+      return copy.generating;
+    }
+    if (status === "verifying") {
+      return copy.verifying;
+    }
+    console.log("copy next", copy.next);
+    return copy.next;
+  });
 
-  // The "retry" button behavior
-  const retry: Chan<(() => Promise<void>) | undefined> = state.map((state) =>
-    state.status === "prompting" || state.status === "bad" ? doRetry : undefined
-  );
-  const retryDisabled: Chan<boolean> = retry.map(isNullish);
-
-  // On retry, request a new challenge
-  const doRetry = async () => {
-    state.send({ status: "requesting" });
-    const challenge = await requestChallenge();
-    state.send({ status: "prompting", challenge });
-  };
-
+  // On retry, prompt with a new challenge
   // On verification, check the chars and either continue (on good challenge)
   // or go to "bad" state
-  const doVerify = (challenge: Challenge) => {
+  const doVerify = () => {
     state.send({ status: "verifying" });
     void withRef(input, async (input) => {
-      const res = await verifyChallengeChars({
-        chars: input.value,
-        challenge,
-      });
-      if (res === badChallenge) {
+      const res = await checkCaptcha(input.value);
+      if (isBadCaptchaResult(res)) {
+        console.log("bad captcha");
         // on a bad challenge, show some error, clear the input & focus
         // and retry
         state.send({ status: "bad" });
         input.value = "";
         input.focus();
-        void doRetry();
-      } else {
-        onContinue(res);
+        console.log("sending prompting");
+        state.send({ status: "requesting" });
+        state.send({
+          status: "prompting",
+          captcha_png_base64: res.new_captcha_png_base64,
+        });
+        return;
       }
+      onContinue(res);
     });
   };
 
   // Kickstart everything
-  void doRetry();
+  void state.send({
+    status: "prompting",
+    captcha_png_base64: captcha_png_base64,
+  });
 
   // A "resize" handler than ensures that the captcha is centered when after
   // the page is resized. This is particularly useful on mobile devices, where
@@ -192,15 +184,6 @@ export const promptCaptchaTemplate = <T>({
           class="c-input c-input--icon"
         >
           ${asyncReplace(img)}
-          <i
-            tabindex="0"
-            id="seedCopy"
-            class="c-button__icon"
-            @click=${asyncReplace(retry)}
-            ?disabled=${asyncReplace(retryDisabled)}
-          >
-            <span>${copy.retry}</span>
-          </i>
         </div>
         <label>
           <strong class="t-strong">${copy.instructions}</strong>
@@ -257,23 +240,22 @@ export function promptCaptchaPage<T>(
 }
 
 export const promptCaptcha = <T>({
-  createChallenge,
+  captcha_png_base64,
   stepper,
-  register,
+  checkCaptcha,
 }: {
-  createChallenge: () => Promise<Challenge>;
+  captcha_png_base64: string;
   stepper: TemplateResult;
-  register: (cr: {
-    chars: string;
-    challenge: Challenge;
-  }) => Promise<T | typeof badChallenge>;
-}): Promise<T | { tag: "canceled" }> => {
+  checkCaptcha: (
+    solution: string
+  ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
+}): Promise<Exclude<T, WrongCaptchaSolution> | "canceled"> => {
   return new Promise((resolve) => {
     const i18n = new I18n();
-    promptCaptchaPage({
-      verifyChallengeChars: register,
-      requestChallenge: () => createChallenge(),
-      cancel: () => resolve({ tag: "canceled" }),
+    promptCaptchaPage<T>({
+      cancel: () => resolve("canceled"),
+      captcha_png_base64,
+      checkCaptcha,
       onContinue: resolve,
       i18n,
       stepper,
@@ -281,6 +263,17 @@ export const promptCaptcha = <T>({
       focus: true,
     });
   });
+};
+
+const isBadCaptchaResult = <T>(
+  res: Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution
+): res is WrongCaptchaSolution => {
+  return (
+    nonNullish(res) &&
+    typeof res === "object" &&
+    "kind" in res &&
+    res.kind === "wrongCaptchaSolution"
+  );
 };
 
 // Returns a function that returns `first` on the first call,

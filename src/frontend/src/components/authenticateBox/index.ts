@@ -23,14 +23,19 @@ import {
 import { I18n } from "$src/i18n";
 import { getAnchors, setAnchorUsed } from "$src/storage";
 import {
+  AlreadyInProgress,
   ApiError,
   AuthFail,
   AuthenticatedConnection,
-  BadChallenge,
   BadPin,
   Connection,
+  InvalidAuthnMethod,
+  InvalidCaller,
   LoginSuccess,
+  NoRegistrationFlow,
+  RateLimitExceeded,
   RegisterNoSpace,
+  UnexpectedCall,
   UnknownUser,
   WebAuthnFailed,
   bufferEqual,
@@ -80,7 +85,7 @@ export const authenticateBox = async ({
   newAnchor: boolean;
   authnMethod: "pin" | "passkey" | "recovery";
 }> => {
-  const promptAuth = (autoSelectIdentity?: bigint) =>
+  const promptAuth = async (autoSelectIdentity?: bigint) =>
     authenticateBoxFlow<PinIdentityMaterial>({
       i18n,
       templates,
@@ -89,7 +94,7 @@ export const authenticateBox = async ({
       loginPinIdentityMaterial: (opts) =>
         loginPinIdentityMaterial({ ...opts, connection }),
       recover: () => useRecovery(connection),
-      registerFlowOpts: getRegisterFlowOpts({
+      registerFlowOpts: await getRegisterFlowOpts({
         connection,
         allowPinAuthentication,
       }),
@@ -223,10 +228,7 @@ export const authenticateBoxFlow = async <I>({
         newAnchor: true;
         authnMethod: "pin" | "passkey" | "recovery";
       })
-    | BadChallenge
-    | ApiError
-    | AuthFail
-    | RegisterNoSpace
+    | FlowError
     | { tag: "canceled" }
   > => {
     const result2 = await registerFlow(registerFlowOpts);
@@ -329,10 +331,15 @@ export type FlowError =
   | AuthFail
   | BadPin
   | { kind: "pinNotAllowed" }
-  | BadChallenge
   | WebAuthnFailed
   | UnknownUser
   | ApiError
+  | InvalidCaller
+  | AlreadyInProgress
+  | RateLimitExceeded
+  | NoRegistrationFlow
+  | UnexpectedCall
+  | InvalidAuthnMethod
   | RegisterNoSpace;
 
 export const handleLoginFlowResult = async <E>(

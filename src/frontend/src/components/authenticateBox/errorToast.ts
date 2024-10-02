@@ -11,7 +11,7 @@ type KindToError<K extends FlowError["kind"]> = Omit<
   "kind"
 >;
 
-// Makes the error human readable
+// Makes the error human-readable
 const clarifyError: {
   [K in FlowError["kind"]]: (err: KindToError<K>) => {
     title: string;
@@ -41,11 +41,6 @@ const clarifyError: {
     detail: err.error.message,
   }),
   badPin: () => ({ title: "Could not authenticate", message: "Invalid PIN" }),
-  badChallenge: () => ({
-    title: "Failed to register",
-    message:
-      "Failed to register with Internet Identity, because the CAPTCHA challenge wasn't successful",
-  }),
   registerNoSpace: () => ({
     title: "Failed to register",
     message:
@@ -55,6 +50,32 @@ const clarifyError: {
     title: "PIN method not allowed",
     message:
       "The Dapp you are authenticating to does not allow PIN identities and you only have a PIN identity. Please retry using a Passkey: open a new Internet Identity page, add a passkey and retry.",
+  }),
+  alreadyInProgress: () => ({
+    title: "Registration is already in progress",
+    message: "Registration has already been started on this session.",
+  }),
+  rateLimitExceeded: () => ({
+    title: "Registration rate limit exceeded",
+    message:
+      "Internet Identity is under heavy load. Too many registrations. Please try again later.",
+  }),
+  invalidCaller: () => ({
+    title: "Registration is not allowed using the anonymous identity",
+    message:
+      "Registration was attempted using the anonymous identity which is not allowed.",
+  }),
+  invalidAuthnMethod: (err) => ({
+    title: "Invalid authentication method",
+    message: `Invalid authentication method: ${err.message}.`,
+  }),
+  noRegistrationFlow: () => ({
+    title: "Registration flow timed out",
+    message: "Registration flow timed out. Please restart.",
+  }),
+  unexpectedCall: (err) => ({
+    title: "Unexpected call",
+    message: `Unexpected call: expected next step "${err.nextStep.step}"`,
   }),
 };
 

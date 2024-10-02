@@ -8,18 +8,22 @@ import Screen from "../layouts/Screen.astro";
     import { i18n } from "../i18n";
     import { registerStepper } from "$src/flows/register/stepper";
     import { promptCaptchaPage } from "$src/flows/register/captcha";
+    import { dummyChallenge } from "../constants";
 
     promptCaptchaPage({
       cancel: () => toast.info("canceled"),
       focus: true,
-      requestChallenge: () =>
-        new Promise(() => {
-          /* noop */
-        }),
-      verifyChallengeChars: () =>
-        new Promise(() => {
-          /* noop */
-        }),
+      captcha_png_base64: dummyChallenge.png_base64,
+      checkCaptcha: async (solution) => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (solution !== "8wJ6Q") {
+          return {
+            kind: "wrongCaptchaSolution",
+            new_captcha_png_base64: dummyChallenge.png_base64,
+          };
+        }
+        return undefined;
+      },
       stepper: registerStepper({ current: "captcha" }),
       onContinue: () => toast.info("Done"),
       i18n,
