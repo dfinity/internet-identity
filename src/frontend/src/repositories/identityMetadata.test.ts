@@ -79,7 +79,7 @@ test("IdentityMetadataRepository changes partial data in memory", async () => {
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -98,7 +98,7 @@ test("IdentityMetadataRepository changes data in memory", async () => {
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
@@ -128,7 +128,7 @@ test("IdentityMetadataRepository sets data from partial data in memory", async (
   });
 
   const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
   });
@@ -148,7 +148,7 @@ test("IdentityMetadataRepository sets partial data in memory", async () => {
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -166,7 +166,7 @@ test("IdentityMetadataRepository sets data in memory", async () => {
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
@@ -187,7 +187,7 @@ test("IdentityMetadataRepository commits updated metadata to canister", async ()
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
@@ -234,7 +234,7 @@ test("IdentityMetadataRepository doesn't raise an error if committing fails", as
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
   };
-  await instance.updateMetadata(newMetadata);
+  instance.updateMetadata(newMetadata);
 
   expect(setterMockError).not.toHaveBeenCalled();
   const committed = await instance.commitMetadata();
@@ -275,7 +275,7 @@ test("IdentityMetadataRepository commits additional metadata to canister after u
   });
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
@@ -309,7 +309,7 @@ test("IdentityMetadataRepository commits from initial partial data after adding 
   });
 
   const newDoNotShowRecoveryPageRequestTimestampMillis = 1234567890;
-  await instance.updateMetadata({
+  instance.updateMetadata({
     doNotShowRecoveryPageRequestTimestampMillis:
       newDoNotShowRecoveryPageRequestTimestampMillis,
   });
