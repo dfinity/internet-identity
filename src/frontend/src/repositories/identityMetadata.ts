@@ -143,8 +143,6 @@ export class IdentityMetadataRepository {
    * We consider the metadata to not be crucial for the application.
    * Therefore, we don't want to disrupt user flows if there is an error with the metadata.
    *
-   * @param {Partial<IdentityMetadata>} partialMetadata
-   * @returns {Promise<void>} To indicate that the metadata has been set.
    */
   updateMetadata = (partialMetadata: Partial<IdentityMetadata>) => {
     try {
