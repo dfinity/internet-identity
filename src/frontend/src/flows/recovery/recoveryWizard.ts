@@ -237,8 +237,7 @@ export const recoveryWizard = async (
   });
 
   if (devicesStatus !== "no-warning") {
-    // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
-    await connection.updateIdentityMetadata({
+    connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
     });
     const userChoice = await addDeviceWarning({
@@ -248,8 +247,7 @@ export const recoveryWizard = async (
       await addDevice({ userNumber, connection });
     }
     if (userChoice.action === "do-not-remind") {
-      // `await` here doesn't add any waiting time beacause we already got the metadata earlier.
-      await connection.updateIdentityMetadata({
+      connection.updateIdentityMetadata({
         doNotShowRecoveryPageRequestTimestampMillis: nowInMillis,
       });
     }

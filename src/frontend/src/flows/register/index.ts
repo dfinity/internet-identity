@@ -194,12 +194,16 @@ export const registerFlow = async ({
   await finalizeIdentity?.(userNumber);
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
-  // The metadata starts to fetch when the connection is created.
-  // But it might not have finished yet, so we `await` for `updateIdentityMetadata` to also wait for it.
-  await result.connection.updateIdentityMetadata({
+  result.connection.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: Date.now(),
   });
-  await setAnchorUsed(userNumber);
+  // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
+  // This way, dropping of at that point does not negatively impact UX with additional nagging
+  // To the user this just looks like the captcha takes a bit longer to verify.
+  await Promise.all([
+    result.connection.commitMetadata(),
+    setAnchorUsed(userNumber),
+  ]);
   await displayUserNumber({
     userNumber,
     stepper: finishStepper,
