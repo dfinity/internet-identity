@@ -229,7 +229,7 @@ export const registerFlow = async ({
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
   // This operation can complete asynchronously -> no need to await
-  void result.connection.updateIdentityMetadata({
+  await result.connection.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: Date.now(),
   });
   await setAnchorUsed(userNumber);

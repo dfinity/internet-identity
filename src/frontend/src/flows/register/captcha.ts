@@ -161,7 +161,7 @@ export const promptCaptchaTemplate = <T>({
   // The handler automatically deregisters itself the first time it is called when
   // the captcha doesn't exist anymore.
   //
-  // Should not be registerd before the template is rendered.
+  // Should not be registered before the template is rendered.
   const setResizeHandler = () => {
     const value = captchaContainer.value;
     if (isNullish(value)) {
