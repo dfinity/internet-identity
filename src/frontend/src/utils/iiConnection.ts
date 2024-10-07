@@ -553,9 +553,7 @@ export class AuthenticatedConnection extends Connection {
     return this.metadataRepository.getMetadata();
   };
 
-  updateIdentityMetadata = (
-    partialMetadata: Partial<IdentityMetadata>
-  ): Promise<void> => {
+  updateIdentityMetadata = (partialMetadata: Partial<IdentityMetadata>) => {
     return this.metadataRepository.updateMetadata(partialMetadata);
   };
 

@@ -73,7 +73,7 @@ test("commits changes on identity metadata", async () => {
   expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
-  await connection.updateIdentityMetadata({
+  connection.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
