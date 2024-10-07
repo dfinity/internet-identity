@@ -146,13 +146,11 @@ export class IdentityMetadataRepository {
    * @param {Partial<IdentityMetadata>} partialMetadata
    * @returns {Promise<void>} To indicate that the metadata has been set.
    */
-  updateMetadata = async (
-    partialMetadata: Partial<IdentityMetadata>
-  ): Promise<void> => {
+  updateMetadata = (partialMetadata: Partial<IdentityMetadata>) => {
     try {
-      this.metadata = Promise.resolve(
+      this.metadata = this.metadata.then((metadataMap) =>
         updateMetadataMapV2({
-          metadataMap: await this.metadata,
+          metadataMap: metadataMap,
           partialIdentityMetadata: partialMetadata,
         })
       );

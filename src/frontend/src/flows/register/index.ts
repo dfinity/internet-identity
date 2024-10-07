@@ -228,7 +228,7 @@ export const registerFlow = async ({
   await finalizeIdentity?.(userNumber);
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
-  await result.connection.updateIdentityMetadata({
+  result.connection.updateIdentityMetadata({
     recoveryPageShownTimestampMillis: Date.now(),
   });
   await setAnchorUsed(userNumber);
