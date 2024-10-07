@@ -111,14 +111,12 @@ export const promptCaptchaTemplate = <T>({
 
   const nextDisabled: Chan<boolean> = next.map(isNullish);
   const nextCaption: Chan<DynamicKey> = state.map(({ status }) => {
-    console.log("next caption", status);
     if (status === "requesting") {
       return copy.generating;
     }
     if (status === "verifying") {
       return copy.verifying;
     }
-    console.log("copy next", copy.next);
     return copy.next;
   });
 
@@ -130,13 +128,12 @@ export const promptCaptchaTemplate = <T>({
     void withRef(input, async (input) => {
       const res = await checkCaptcha(input.value);
       if (isBadCaptchaResult(res)) {
-        console.log("bad captcha");
         // on a bad challenge, show some error, clear the input & focus
         // and retry
         state.send({ status: "bad" });
         input.value = "";
         input.focus();
-        console.log("sending prompting");
+        // first send requesting because otherwise the button text won't update correctly
         state.send({ status: "requesting" });
         state.send({
           status: "prompting",

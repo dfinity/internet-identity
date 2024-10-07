@@ -163,7 +163,6 @@ export class IdentityMetadataRepository {
         unknownToString(e, "unknown error")
       );
     }
-    // Do nothing if the metadata is not loaded.
   };
 
   /**
