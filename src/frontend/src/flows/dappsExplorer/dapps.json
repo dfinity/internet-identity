@@ -30,7 +30,7 @@
   },
   {
     "name": "Yuku",
-    "oneLiner": "Yuku, your gateway to NFTs, Metaverse, and GameFi!",
+    "oneLiner": "Your Gateway to NFTs, Metaverse, and an AI Agent.",
     "website": "https://yuku.app/",
     "logo": "yuku_logo.png"
   },
@@ -631,5 +631,11 @@
     "logo": "pleximail_logo.png",
     "oneLiner": "The end-to-end encrypted, ICP canister-based, trustless secure email service.",
     "website": "https://ai-fi.cc"
+  },
+  {
+    "name": "Cipher AI Vault",
+    "logo": "cipherAI_logo.webp",
+    "oneLiner": "Azle-based proof-of-concept designed integrating in-memory VectorDB and LLM.",
+    "website": "https://qehbq-rqaaa-aaaan-ql2iq-cai.icp0.io/"
   }
 ]
