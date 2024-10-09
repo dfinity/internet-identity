@@ -159,16 +159,6 @@
     "logo": "kontribute_logo.webp"
   },
   {
-    "name": "IC Drive",
-    "website": "https://rglue-kyaaa-aaaah-qakca-cai.ic0.app/",
-    "logo": "icdrive_logo.webp"
-  },
-  {
-    "name": "Content Fly",
-    "website": "https://contentfly.app/",
-    "logo": "contentfly_logo.webp"
-  },
-  {
     "name": "Saga Tarot",
     "website": "https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app/",
     "logo": "sagatarot_logo.webp"
@@ -242,11 +232,6 @@
     "logo": "dbox_logo.webp"
   },
   {
-    "name": "ICNaming",
-    "website": "https://app-testnet.icnaming.com/",
-    "logo": "icnaming_logo.webp"
-  },
-  {
     "name": "Tipjar",
     "website": "https://tipjar.rocks",
     "logo": "tipjar_logo.webp"
@@ -289,13 +274,6 @@
     "website": "https://rakeoff.io/",
     "logo": "rakeoff_logo.webp",
     "oneLiner": "Rakeoff is a cryptocurrency staking rewards application built on the ICP blockchain."
-  },
-  {
-    "name": "Tswaanda",
-    "oneLiner": "Bridging farmers to profitable markets, empowering growth through trade and financing",
-    "website": "https://tswaanda.com",
-    "logo": "tswaanda_logo.webp",
-    "authOrigins": ["https://4qia7-eaaaa-aaaal-qb34a-cai.icp0.io"]
   },
   {
     "name": "D-VOTE",
@@ -344,12 +322,6 @@
     "oneLiner": "An infrastructure that brings Web 2.0 user experience to Web 3.0",
     "logo": "faceless_logo.png",
     "website": "https://faceless.live/"
-  },
-  {
-    "name": "FishVerse",
-    "website": "https://thefishverse.com/",
-    "logo": "fishverse_logo.webp",
-    "oneLiner": "FishVerse is a W2E fishing game that is built on ICP technology"
   },
   {
     "name": "dFlow",
@@ -412,22 +384,10 @@
     "oneLiner": "Stay updated on ICP dapps with Ping!"
   },
   {
-    "name": "EA Kazi",
-    "website": "https://eakazi.africa",
-    "logo": "ea-kazi_logo.webp",
-    "oneLiner": "Elevating freelancing with trust and verifiability"
-  },
-  {
     "name": "Virtuaseal",
     "website": "https://p3cwv-2aaaa-aaaap-abwba-cai.icp0.io/",
     "logo": "virtuaseal.png",
     "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
-  },
-  {
-    "name": "Alexandria",
-    "website": "https://lbry.app/",
-    "logo": "UncensoredGreatsLogo.png",
-    "oneLiner": "Migrating all the World's Books to NFT-form for use in domain-specific AI"
   },
   {
     "name": "ICP Governor",
@@ -476,12 +436,6 @@
     "oneLiner": "Flexible framework for fully onchain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
     "website": "https://tpxio-7yaaa-aaaak-qdbaa-cai.icp0.io/",
     "logo": "Optigames_logo.svg"
-  },
-  {
-    "name": "VFans",
-    "oneLiner": "A decentralized content platform for publishing video/articles and subscribing through mobile payments.",
-    "website": "https://www.vfans.org/",
-    "logo": "vfans_logo.png"
   },
   {
     "name": "ICPanda DAO",
