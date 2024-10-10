@@ -591,5 +591,17 @@
     "logo": "cipherAI_logo.webp",
     "oneLiner": "Azle-based proof-of-concept designed integrating in-memory VectorDB and LLM.",
     "website": "https://qehbq-rqaaa-aaaan-ql2iq-cai.icp0.io/"
+  },
+  {
+    "name": "User Public Achievement Standard (UPAS)",
+    "logo": "upas_logo.png",
+    "oneLiner": "A decentralized open-source reputation standard that utilizes ICP securely and autonomously verify user achievements and issue credentials.",
+    "website": "https://5j4ti-jqaaa-aaaaj-qncma-cai.icp0.io/"
+  },
+  {
+    "name": "Civic Pass",
+    "logo": "civic_logo.png",
+    "oneLiner": "A leading provider of identity and access management solutions.",
+    "website": "https://www.civic.com"
   }
 ]
