@@ -1,11 +1,5 @@
 [
   {
-    "name": "Helix Markets",
-    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
-    "website": "https://www.helixmarkets.io/",
-    "logo": "helix_logo.webp"
-  },
-  {
     "name": "OpenChat",
     "oneLiner": "Decentralized alternative to WhatsApp",
     "website": "https://oc.app/",
@@ -52,11 +46,23 @@
     "logo": "sonic-dex_logo.webp"
   },
   {
+    "name": "Helix Markets",
+    "oneLiner": "Bringing true ownership and full transparency to crypto trading",
+    "website": "https://www.helixmarkets.io/",
+    "logo": "helix_logo.webp"
+  },
+  {
     "name": "Juno",
     "oneLiner": "Build Web3 at Lightning Speed",
     "website": "https://juno.build",
     "authOrigins": ["https://console.juno.build"],
     "logo": "juno_logo.svg"
+  },
+  {
+    "name": "Kinic",
+    "oneLiner": "The world's first Web3 search engine",
+    "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
+    "logo": "kinic_logo.webp"
   },
   {
     "name": "TAGGR",
@@ -358,12 +364,6 @@
     "website": "https://iclight.io/account",
     "logo": "icrouter_logo.webp",
     "oneLiner": "icRouter: A cross-chain network of assets"
-  },
-  {
-    "name": "Kinic",
-    "oneLiner": "The world's first Web3 search engine",
-    "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
-    "logo": "kinic_logo.webp"
   },
   {
     "name": "ubin",
