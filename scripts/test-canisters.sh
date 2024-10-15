@@ -1,10 +1,19 @@
 #!/bin/bash
+set -euo pipefail
 
 POCKET_IC_SERVER_VERSION=6.0.0
 POCKET_IC_SERVER_PATH="pocket-ic"
 PREVIOUS_II_WASM_PATH="internet_identity_previous.wasm.gz"
 PREVIOUS_ARCHIVE_WASM_PATH="archive_previous.wasm.gz"
 
+# Check if the script is run from the root of the project
+project_root=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ "$project_root" != "$(pwd)" ]; then
+  echo "Please run this script from the root of the project."
+  exit 1
+fi
+
+RUNNER_OS=${RUNNER_OS:-}
 if [[ $OSTYPE == "linux-gnu"* ]] || [[ $RUNNER_OS == "Linux" ]]; then
   PLATFORM=linux
 elif [[ $OSTYPE == "darwin"* ]] || [[ $RUNNER_OS == "macOS" ]]; then

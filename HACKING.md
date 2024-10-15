@@ -119,7 +119,7 @@ There are plenty of unit and integration tests that cover the different canister
 To run the canister tests, run the following command from the root directory:
 
 ```bash
-./scripts.test.canisters.sh
+./scripts.test-canisters.sh
 ```
 
 ### Building the backend
