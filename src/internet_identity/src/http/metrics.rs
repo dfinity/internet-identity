@@ -6,7 +6,7 @@ use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::AggregationWindow::{Day, Month};
 use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_COUNT, PD_SESS_SEC};
 use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
-use ic_cdk::api::stable::stable_size;
+use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
 use std::time::Duration;
@@ -89,11 +89,22 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         stable_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
+    w.encode_gauge(
+        "internet_identity_stable_memory_bytes",
+        (stable_size() * WASM_PAGE_SIZE_IN_BYTES) as f64,
+        "Size of the stable memory allocated by this canister.",
+    )?;
     #[cfg(target_arch = "wasm32")]
     w.encode_gauge(
         "internet_identity_heap_pages",
         core::arch::wasm32::memory_size::<0>() as f64,
         "Number of heap memory pages used by this canister.",
+    )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "internet_identity_heap_memory_bytes",
+        (core::arch::wasm32::memory_size::<0>() as u64 * WASM_PAGE_SIZE_IN_BYTES) as f64,
+        "Size of the heap memory allocated by this canister.",
     )?;
     w.encode_gauge(
         "internet_identity_temp_keys_count",

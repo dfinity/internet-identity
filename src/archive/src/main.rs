@@ -39,7 +39,7 @@
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
-use ic_cdk::api::stable::stable_size;
+use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -633,6 +633,23 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         "ii_archive_stable_memory_pages",
         stable_size() as f64,
         "Number of stable memory pages used by this canister.",
+    )?;
+    w.encode_gauge(
+        "ii_archive_stable_memory_bytes",
+        (stable_size() * WASM_PAGE_SIZE_IN_BYTES) as f64,
+        "Size of the stable memory allocated by this canister.",
+    )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "ii_archive_heap_pages",
+        core::arch::wasm32::memory_size::<0>() as f64,
+        "Number of heap memory pages used by this canister.",
+    )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "ii_archive_heap_memory_bytes",
+        (core::arch::wasm32::memory_size::<0>() as u64 * WASM_PAGE_SIZE_IN_BYTES) as f64,
+        "Size of the heap memory allocated by this canister.",
     )?;
     with_call_info(|call_info| {
         if let Some(successful_fetch) = &call_info.last_successful_fetch {
