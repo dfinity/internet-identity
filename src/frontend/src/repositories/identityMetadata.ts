@@ -143,16 +143,12 @@ export class IdentityMetadataRepository {
    * We consider the metadata to not be crucial for the application.
    * Therefore, we don't want to disrupt user flows if there is an error with the metadata.
    *
-   * @param {Partial<IdentityMetadata>} partialMetadata
-   * @returns {Promise<void>} To indicate that the metadata has been set.
    */
-  updateMetadata = async (
-    partialMetadata: Partial<IdentityMetadata>
-  ): Promise<void> => {
+  updateMetadata = (partialMetadata: Partial<IdentityMetadata>) => {
     try {
-      this.metadata = Promise.resolve(
+      this.metadata = this.metadata.then((metadataMap) =>
         updateMetadataMapV2({
-          metadataMap: await this.metadata,
+          metadataMap: metadataMap,
           partialIdentityMetadata: partialMetadata,
         })
       );
@@ -163,7 +159,6 @@ export class IdentityMetadataRepository {
         unknownToString(e, "unknown error")
       );
     }
-    // Do nothing if the metadata is not loaded.
   };
 
   /**
@@ -177,6 +172,8 @@ export class IdentityMetadataRepository {
     if (this.updatedMetadata) {
       try {
         await this.setter(await this.metadata);
+        // after commiting metadata is no longer 'updated'
+        this.updatedMetadata = false;
         return true;
       } catch (error) {
         console.warn(
