@@ -39,7 +39,7 @@
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
-use ic_cdk::api::stable::stable_size;
+use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
 use ic_cdk::api::time;
 use ic_cdk::{call, caller, id, print, trap};
 use ic_cdk_macros::{init, post_upgrade, query, update};
@@ -575,7 +575,6 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
-    const WASM_PAGE_SIZE_IN_BYTES: f64 = 65536.0;
     with_config(|config| {
         w.encode_gauge(
             "ii_archive_last_upgrade_timestamp_seconds",
@@ -637,7 +636,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     )?;
     w.encode_gauge(
         "ii_archive_stable_memory_bytes",
-        stable_size() as f64 * WASM_PAGE_SIZE_IN_BYTES,
+        (stable_size() * WASM_PAGE_SIZE_IN_BYTES) as f64,
         "Size of the stable memory allocated by this canister.",
     )?;
     #[cfg(target_arch = "wasm32")]
@@ -649,7 +648,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     #[cfg(target_arch = "wasm32")]
     w.encode_gauge(
         "ii_archive_heap_memory_bytes",
-        core::arch::wasm32::memory_size::<0>() as f64 * WASM_PAGE_SIZE_IN_BYTES,
+        (core::arch::wasm32::memory_size::<0>() * WASM_PAGE_SIZE_IN_BYTES) as f64,
         "Size of the heap memory allocated by this canister.",
     )?;
     with_call_info(|call_info| {
