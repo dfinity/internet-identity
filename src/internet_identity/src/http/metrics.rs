@@ -21,6 +21,8 @@ pub fn metrics() -> Result<Vec<u8>, std::io::Error> {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
+    const WASM_PAGE_SIZE_IN_BYTES: f64 = 65536.0;
+
     state::storage_borrow(|storage| {
         w.encode_gauge(
             "internet_identity_user_count",
