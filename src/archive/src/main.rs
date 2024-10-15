@@ -575,6 +575,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
+    const WASM_PAGE_SIZE_IN_BYTES: f64 = 65536.0;
     with_config(|config| {
         w.encode_gauge(
             "ii_archive_last_upgrade_timestamp_seconds",
@@ -633,6 +634,23 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         "ii_archive_stable_memory_pages",
         stable_size() as f64,
         "Number of stable memory pages used by this canister.",
+    )?;
+    w.encode_gauge(
+        "ii_archive_stable_memory_bytes",
+        stable_size() as f64 * WASM_PAGE_SIZE_IN_BYTES,
+        "Size of the stable memory allocated by this canister.",
+    )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "ii_archive_heap_pages",
+        core::arch::wasm32::memory_size::<0>() as f64,
+        "Number of heap memory pages used by this canister.",
+    )?;
+    #[cfg(target_arch = "wasm32")]
+    w.encode_gauge(
+        "ii_archive_heap_memory_bytes",
+        core::arch::wasm32::memory_size::<0>() as f64 * WASM_PAGE_SIZE_IN_BYTES,
+        "Size of the heap memory allocated by this canister.",
     )?;
     with_call_info(|call_info| {
         if let Some(successful_fetch) = &call_info.last_successful_fetch {
