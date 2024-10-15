@@ -648,7 +648,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     #[cfg(target_arch = "wasm32")]
     w.encode_gauge(
         "ii_archive_heap_memory_bytes",
-        (core::arch::wasm32::memory_size::<0>() * WASM_PAGE_SIZE_IN_BYTES) as f64,
+        (core::arch::wasm32::memory_size::<0>() as u64 * WASM_PAGE_SIZE_IN_BYTES) as f64,
         "Size of the heap memory allocated by this canister.",
     )?;
     with_call_info(|call_info| {
