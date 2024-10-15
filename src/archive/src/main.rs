@@ -575,7 +575,6 @@ fn http_request(req: HttpRequest) -> HttpResponse {
 }
 
 fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
-    const WASM_PAGE_SIZE_IN_BYTES: f64 = 65536.0;
     with_config(|config| {
         w.encode_gauge(
             "ii_archive_last_upgrade_timestamp_seconds",
