@@ -10,11 +10,11 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-* [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
-* Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-* CMake
-* [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-* Node.js v16+
+- [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
+- Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+- CMake
+- [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
+- Node.js v16+
 
 > NOTE! If you're only going to hack on the HTML and CSS code, see the [showcase](#showcase) section.
 
@@ -38,7 +38,6 @@ dfx deploy internet_identity --no-wallet
 > `II_DUMMY_CAPTCHA` to `0`:\
 > `II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet`
 
-
 Then the canister can be used as
 
 ```bash
@@ -56,7 +55,7 @@ The `dfx` executable can proxy queries to the canister. To view it, run the foll
 echo "http://$(dfx canister id internet_identity).localhost:4943"
 ```
 
-*Note: The URL doesn't work for safari.*
+_Note: The URL doesn't work for safari._
 
 ### Building the frontend
 
@@ -95,6 +94,7 @@ into the following issues:
 #### Test suites
 
 We have a set of Selenium tests that run through the various flows. To set up a local deployment follow these steps:
+
 1. Start a local replica with `dfx start`
 1. Deploy II and the other test canisters with `dfx deploy --no-wallet`
 1. Start the vite dev server with TLS enabled: `TLS_DEV_SERVER=1 npm run dev`
@@ -112,6 +112,15 @@ If you open a PR that isn't formatted according to `prettier`, CI will automatic
 
 We use `eslint` to check the frontend code. You can run it with `npm run lint`.
 
+#### Canisters tests
+
+There are plenty of unit and integration tests that cover the different canisters of this repository which cover all the functionality that Internet Identity offer.
+
+To run the canister tests, run the following command from the root directory:
+
+```bash
+./scripts.test-canisters.sh
+```
 
 ### Building the backend
 
@@ -138,21 +147,26 @@ This will produce `./internet_identity.wasm.gz`.
 ## Attribute Sharing / Verifiable Credentials
 
 To experiment with Attribute Sharing / Verifiable Credentials feature, one can start a demo VC-issuer by running
+
 ```bash
 dfx deploy issuer
 ```
+
 This will deploy also `internet_identity`, and provision the issuer for the testing environment.
 See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
 
 Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
+
 ```bash
 dfx deploy test_app
 ```
 
 Afterward one can serve the frontends locally via:
+
 ```bash
 npm run dev
 ```
+
 and access the issuer FE at http://issuer.localhost:5173/, and the test-app at http://test_app.localhost:5173/
 (the relying party is functionality is at the bottom of the page).
 
@@ -160,17 +174,16 @@ and access the issuer FE at http://issuer.localhost:5173/, and the test-app at h
 
 The simplest way to make visual changes (HTML & CSS, and non-flow JS) is to start the showcase:
 
-``` bash
+```bash
 npm run showcase
 ```
 
 This will start a webserver showcasing most II pages & components. The showcase can also be built:
 
-``` bash
+```bash
 npm run build:showcase [--base 'some-base/']
 npm run preview:showcase [--base 'some-base/']
 ```
-
 
 [releases]: https://github.com/dfinity/internet-identity/releases
 [docker-build]: ./README.md#building-with-docker
