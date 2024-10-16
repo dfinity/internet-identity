@@ -1,3 +1,4 @@
+import { CAPTCHA_ENABLED } from "$src/test-e2e/constants";
 import {
   AddDeviceSuccessView,
   AddRemoteDeviceInstructionsView,
@@ -16,8 +17,10 @@ export const FLOWS = {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
     await registerView.create();
-    await registerView.waitForRegisterConfirm();
-    await registerView.confirmRegisterConfirm();
+    if (CAPTCHA_ENABLED) {
+      await registerView.waitForRegisterConfirm();
+      await registerView.confirmRegisterConfirm();
+    }
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();
@@ -53,8 +56,10 @@ export const FLOWS = {
     await pinRegistrationView.setPin(pin);
     await pinRegistrationView.waitForConfirmPin();
     await pinRegistrationView.confirmPin(pin);
-    await registerView.waitForRegisterConfirm();
-    await registerView.confirmRegisterConfirm();
+    if (CAPTCHA_ENABLED) {
+      await registerView.waitForRegisterConfirm();
+      await registerView.confirmRegisterConfirm();
+    }
     await registerView.waitForIdentity();
     const userNumber = await registerView.registerGetIdentity();
     await registerView.registerConfirmIdentity();

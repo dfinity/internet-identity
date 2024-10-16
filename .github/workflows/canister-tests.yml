@@ -402,8 +402,12 @@ jobs:
       matrix:
         device: [ 'desktop', 'mobile' ]
         # We run the integration tests on both the official and legacy domains, to make sure
-        # the webapp (routes, csp, etc) works on both.
-        domain: [ 'https://identity.internetcomputer.org', 'https://identity.ic0.app' ]
+        # the webapp (routes, csp, etc) works on both. Captchas are statically enabled on one
+        # domain and disabled on the other.
+        # Both settings are combined in one single matrix variable as otherwise there would be
+        # excessively many combinations to be run and it would be questionable how much more of
+        # a signal we would get from that.
+        settings: [{domain: 'https://identity.internetcomputer.org', captcha: 'enabled'}, {domain: 'https://identity.ic0.app', captcha: 'disabled'}]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
@@ -414,7 +418,7 @@ jobs:
 
     env:
       # Suffix used for tagging artifacts
-      artifact_suffix: ${{ contains(matrix.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-${{ matrix.shard }}
+      artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}-${{ matrix.shard }}
 
     steps:
       - uses: actions/checkout@v4
@@ -461,8 +465,12 @@ jobs:
 
       - name: Deploy canisters
         run: |
+          captcha_flag="${{ matrix.settings.captcha }}"
+          # Build the "CaptchaEnabled" / "CaptchaDisabled" variants from the matrix captcha value
+          # (i.e. capitalize the first letter)
+          captcha_variant="Captcha$(tr '[:lower:]' '[:upper:]' <<< ${captcha_flag:0:1})${captcha_flag:1}"
           # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz
+          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { $captcha_variant }}}})"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
           dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
 
@@ -485,9 +493,10 @@ jobs:
       # NOTE: we run chrome in headless mode because that's the only thing that works in GHA
       # NOTE: the last bit (tr) replaces 1_N with 1/N
       - run: |
-          II_URL=${{ matrix.domain }} \
+          II_URL=${{ matrix.settings.domain }} \
             SCREEN=${{ matrix.device }} \
             II_E2E_CHROME_OPTS="--headless" \
+            II_CAPTCHA=${{ matrix.settings.captcha }} \
             npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
 
       - name: Stop dfx
