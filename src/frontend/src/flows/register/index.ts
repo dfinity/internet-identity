@@ -7,8 +7,6 @@ import {
 import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { setPinFlow } from "$src/flows/pin/setPin";
-import { pinStepper } from "$src/flows/pin/stepper";
-import { registerStepper } from "$src/flows/register/stepper";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
@@ -140,8 +138,6 @@ export const registerFlow = async ({
           alias,
           pubKey: identity.getPublicKey().toDer(),
         }),
-        captchaStepper: pinStepper({ current: "captcha" }),
-        finishStepper: pinStepper({ current: "finish" }),
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
@@ -162,8 +158,6 @@ export const registerFlow = async ({
           credentialId: identity.rawId,
           authenticatorAttachment: identity.getAuthenticatorAttachment(),
         }),
-        captchaStepper: registerStepper({ current: "captcha" }),
-        finishStepper: registerStepper({ current: "finish" }),
         authnMethod: "passkey" as const,
       };
     }
@@ -176,16 +170,12 @@ export const registerFlow = async ({
   const {
     identity,
     authnMethodData,
-    captchaStepper,
-    finishStepper,
     finalizeIdentity,
     finishSlot,
     authnMethod,
   }: {
     identity: SignIdentity;
     authnMethodData: AuthnMethodData;
-    captchaStepper: TemplateResult;
-    finishStepper: TemplateResult;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
     authnMethod: "pin" | "passkey";
@@ -200,7 +190,6 @@ export const registerFlow = async ({
   if (startResult.nextStep.step === "checkCaptcha") {
     const captchaResult = await promptCaptcha({
       captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      stepper: captchaStepper,
       checkCaptcha,
     });
     if (captchaResult === "canceled") {
@@ -240,7 +229,6 @@ export const registerFlow = async ({
   ]);
   await displayUserNumber({
     userNumber,
-    stepper: finishStepper,
     marketingIntroSlot: finishSlot,
   });
   return { ...result, authnMethod };

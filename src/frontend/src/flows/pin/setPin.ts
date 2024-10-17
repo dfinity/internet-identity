@@ -4,7 +4,6 @@ import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
-import { pinStepper } from "./stepper";
 
 import { confirmPin } from "$src/flows/pin/confirmPin";
 import { promptPinInfo } from "$src/flows/pin/pinInfo";
@@ -34,7 +33,6 @@ const setPinTemplate = ({
     focus,
   });
   const slot = html`
-    ${pinStepper({ current: "set_pin" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.set_pin_for_ii}</h1>
     </hgroup>

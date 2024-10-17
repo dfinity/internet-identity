@@ -12,7 +12,6 @@ import {
 } from "$src/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
-import { registerStepper } from "./stepper";
 
 import copyJson from "./passkey.json";
 
@@ -44,7 +43,6 @@ const savePasskeyTemplate = ({
   `;
 
   const slot = html`
-    ${registerStepper({ current: "create" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.save_passkey}</h1>
       <p class="t-paragraph">
