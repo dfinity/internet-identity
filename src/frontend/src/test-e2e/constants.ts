@@ -27,6 +27,8 @@ export const ISSUER_CUSTOM_ORIGIN_NICE_URL = `https://nice-issuer-custom-orig.co
 export const II_URL =
   process.env.II_URL ?? "https://identity.internetcomputer.org";
 
+export const CAPTCHA_ENABLED = process.env.II_CAPTCHA === "enabled" ?? false;
+
 export const DEVICE_NAME1 = "FIDO Passkey";
 export const RECOVERY_PHRASE_NAME = "Recovery Phrase";
 
