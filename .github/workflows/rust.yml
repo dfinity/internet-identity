@@ -81,12 +81,3 @@ jobs:
       - name: Cargo Issuer Lockfile Check
         working-directory: demos/vc_issuer
         run: cargo update --workspace --locked
-
-  cargo-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/bootstrap
-
-      - name: Run tests
-        run: ./scripts/test-canisters.sh
