@@ -391,18 +391,26 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
+    needs: [cached-build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/bootstrap
-      - uses: ./.github/actions/setup-node
+      - name: "Download II wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_test_cached.wasm.gz
+          path: .
 
-      # run the build
-      - run: npm ci
-        shell: bash
+      - name: "Download archive wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: archive.wasm.gz
+          path: .
+
+      - name: Move wasms
+        run: mv internet_identity_test_cached.wasm.gz internet_identity.wasm.gz
 
       - name: Run tests
-        run: ./scripts/test-canisters.sh
+        run: ./scripts/test-canisters.sh --no-build
 
   ######################
   # The end-to-end tests #
