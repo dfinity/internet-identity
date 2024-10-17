@@ -221,12 +221,10 @@ export const registerFlow = async ({
     recoveryPageShownTimestampMillis: Date.now(),
   });
   // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
-  // This way, dropping of at that point does not negatively impact UX with additional nagging
-  // To the user this just looks like the captcha takes a bit longer to verify.
-  await Promise.all([
-    result.connection.commitMetadata(),
-    setAnchorUsed(userNumber),
-  ]);
+  // This way, dropping of at that point does not negatively impact UX with additional nagging.
+  await withLoader(() =>
+    Promise.all([result.connection.commitMetadata(), setAnchorUsed(userNumber)])
+  );
   await displayUserNumber({
     userNumber,
     marketingIntroSlot: finishSlot,
