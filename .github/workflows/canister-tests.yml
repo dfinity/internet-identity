@@ -8,7 +8,6 @@ on:
   push:
 
 jobs:
-
   #####################
   # The docker builds #
   #####################
@@ -99,7 +98,7 @@ jobs:
 
       - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}
       - run: sha256sum ${{ matrix.name }}
-      - name: 'Upload ${{ matrix.name }}'
+      - name: "Upload ${{ matrix.name }}"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -129,7 +128,7 @@ jobs:
 
       - run: mv out/archive.wasm.gz archive.wasm.gz
       - run: sha256sum archive.wasm.gz
-      - name: 'Upload archive.wasm.gz'
+      - name: "Upload archive.wasm.gz"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -143,7 +142,7 @@ jobs:
     needs: docker-build-ii
     steps:
       - uses: actions/checkout@v4
-      - name: 'Download wasm'
+      - name: "Download wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
@@ -183,7 +182,7 @@ jobs:
         run: ./build.sh
       - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
-      - name: 'Upload VC issuer'
+      - name: "Upload VC issuer"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -209,7 +208,7 @@ jobs:
       - name: "Build test app canister"
         working-directory: demos/test-app
         run: ./build.sh
-      - name: 'Upload test app'
+      - name: "Upload test app"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -235,12 +234,12 @@ jobs:
             demos/vc_issuer/target
           key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
-      - name: 'Download VC issuer wasm'
+      - name: "Download VC issuer wasm"
         uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
-      - name: 'Download II wasm'
+      - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
@@ -270,7 +269,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -325,7 +324,7 @@ jobs:
         run: |
           mv /tmp/test-archive/canister-tests-${{ matrix.os }}.tar.zst .
 
-      - name: 'Upload canister test archive'
+      - name: "Upload canister test archive"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -339,8 +338,8 @@ jobs:
     needs: [canister-tests-build, cached-build, docker-build-archive]
     strategy:
       matrix:
-        os: [ ubuntu-latest , macos-latest ]
-        partition: ['1/3', '2/3', '3/3']
+        os: [ubuntu-latest, macos-latest]
+        partition: ["1/3", "2/3", "3/3"]
     steps:
       - uses: actions/checkout@v4
 
@@ -349,7 +348,7 @@ jobs:
           set -euo pipefail
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
-      - name: 'Download nextest test archive'
+      - name: "Download nextest test archive"
         uses: actions/download-artifact@v4
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
@@ -360,13 +359,13 @@ jobs:
           gzip -d pocket-ic.gz
           chmod +x pocket-ic
 
-      - name: 'Download II wasm'
+      - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test_cached.wasm.gz
           path: .
 
-      - name: 'Download archive wasm'
+      - name: "Download archive wasm"
         uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
@@ -391,6 +390,16 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+  test-canisters-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/bootstrap
+      - uses: ./.github/actions/setup-node
+
+      - name: Run tests
+        run: ./scripts/test-canisters.sh
+
   ######################
   # The end-to-end tests #
   ######################
@@ -400,19 +409,26 @@ jobs:
     needs: [cached-build, test-app-build, vc_demo_issuer-build]
     strategy:
       matrix:
-        device: [ 'desktop', 'mobile' ]
+        device: ["desktop", "mobile"]
         # We run the integration tests on both the official and legacy domains, to make sure
         # the webapp (routes, csp, etc) works on both. Captchas are statically enabled on one
         # domain and disabled on the other.
         # Both settings are combined in one single matrix variable as otherwise there would be
         # excessively many combinations to be run and it would be questionable how much more of
         # a signal we would get from that.
-        settings: [{domain: 'https://identity.internetcomputer.org', captcha: 'enabled'}, {domain: 'https://identity.ic0.app', captcha: 'disabled'}]
+        settings:
+          [
+            {
+              domain: "https://identity.internetcomputer.org",
+              captcha: "enabled",
+            },
+            { domain: "https://identity.ic0.app", captcha: "disabled" },
+          ]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: [ '1_6', '2_6', '3_6', '4_6', '5_6', '6_6' ]
+        shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -439,22 +455,22 @@ jobs:
           echo node --version
           node --version
 
-      - name: 'Run dfx'
+      - name: "Run dfx"
         run: dfx start --background --artificial-delay 0
 
-      - name: 'Download II wasm'
+      - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test_cached.wasm.gz
           path: .
 
-      - name: 'Download test app wasm'
+      - name: "Download test app wasm"
         uses: actions/download-artifact@v4
         with:
           name: test_app.wasm
           path: demos/test-app
 
-      - name: 'Download VC issuer wasm'
+      - name: "Download VC issuer wasm"
         uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
@@ -549,7 +565,7 @@ jobs:
         run: |
           dfx start --background --artificial-delay 0
 
-      - name: 'Download wasm'
+      - name: "Download wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
@@ -588,25 +604,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-ii, docker-build-archive, test-app-build, vc_demo_issuer-build]
+    needs:
+      [
+        docker-build-ii,
+        docker-build-archive,
+        test-app-build,
+        vc_demo_issuer-build,
+      ]
     steps:
       - uses: actions/checkout@v4
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
-      - name: 'Download II wasm'
+      - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
 
-      - name: 'Download archive wasm'
+      - name: "Download archive wasm"
         uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
 
-      - name: 'Install key'
+      - name: "Install key"
         env:
           DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
         run: |
@@ -624,7 +646,7 @@ jobs:
             --wasm internet_identity_production.wasm.gz \
             fgte5-ciaaa-aaaad-aaatq-cai
 
-      - name: 'Download test app wasm'
+      - name: "Download test app wasm"
         uses: actions/download-artifact@v4
         with:
           name: test_app.wasm
@@ -637,7 +659,7 @@ jobs:
             --wasm ./test_app.wasm \
             vt36r-2qaaa-aaaad-aad5a-cai
 
-      - name: 'Download VC issuer wasm'
+      - name: "Download VC issuer wasm"
         uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
@@ -658,7 +680,6 @@ jobs:
       - name: "Deploy archive"
         run: scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic
 
-
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
   # On release tags, a new release is created and the assets are uploaded.
   release:
@@ -668,37 +689,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 'Download test build'
+      - name: "Download test build"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
 
-      - name: 'Download dev build'
+      - name: "Download dev build"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_dev.wasm.gz
           path: .
 
-      - name: 'Download production build'
+      - name: "Download production build"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_production.wasm.gz
           path: .
 
-      - name: 'Download archive'
+      - name: "Download archive"
         uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
           path: .
 
-      - name: 'Download issuer'
+      - name: "Download issuer"
         uses: actions/download-artifact@v4
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
 
-      - name: 'Get GHA job IDs'
+      - name: "Get GHA job IDs"
         uses: actions/github-script@v7
         id: pipeline-jobs
         with:
@@ -714,7 +735,7 @@ jobs:
                   html_url: job.html_url}
               });
 
-      - name: 'Get latest release'
+      - name: "Get latest release"
         uses: actions/github-script@v7
         id: latest-release-tag
         with:
@@ -726,7 +747,7 @@ jobs:
       # it on its own, GitHub is really bad at figuring which tag to use as the previous tag (for
       # listing contributions since).
       # https://github.com/github/feedback/discussions/5975
-      - name: 'Generate CHANGELOG'
+      - name: "Generate CHANGELOG"
         uses: actions/github-script@v7
         id: changelog
         with:
@@ -792,7 +813,6 @@ jobs:
           # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
         # Bump the version in the download links and create A Pull Request
       - name: Update README
         env:
@@ -815,7 +835,7 @@ jobs:
           author: gix-bot <gix-bot@users.noreply.github.com>
           branch: bot-release-readme-update
           delete-branch: true
-          title: 'Update release in README'
+          title: "Update release in README"
 
         # Since this may be triggered on tag push, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.
@@ -857,7 +877,7 @@ jobs:
         run: ./scripts/build
 
       - run: mv internet_identity.wasm.gz internet_identity_test.wasm.gz
-      - name: 'Upload test build'
+      - name: "Upload test build"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -872,13 +892,13 @@ jobs:
     needs: [docker-build-ii, cached-build]
     steps:
       - uses: actions/checkout@v4
-      - name: 'Download docker build'
+      - name: "Download docker build"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test.wasm.gz
           path: .
       - run: mv internet_identity_test.wasm.gz docker.wasm.gz
-      - name: 'Download native cached build'
+      - name: "Download native cached build"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test_cached.wasm.gz
@@ -909,7 +929,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/check-build
       - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-      - name: 'Upload clean build'
+      - name: "Upload clean build"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
@@ -918,10 +938,8 @@ jobs:
           # file when downloaded
           path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
 
-
-
   verify-clean-build-hash:
-    needs: ['clean-build', 'docker-build-ii']
+    needs: ["clean-build", "docker-build-ii"]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -956,7 +974,6 @@ jobs:
             echo "sha mismatch: clean build '$clean_build_sha256' /= prod build '$prod_build_sha256'"
             exit 1
           fi
-
 
   interface-compatibility:
     runs-on: ubuntu-latest
