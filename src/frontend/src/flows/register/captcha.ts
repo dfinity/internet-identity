@@ -15,7 +15,6 @@ export const promptCaptchaTemplate = <T>({
   checkCaptcha,
   onContinue,
   i18n,
-  stepper,
   focus: focus_,
   scrollToTop = false,
 }: {
@@ -26,7 +25,6 @@ export const promptCaptchaTemplate = <T>({
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
   onContinue: (result: Exclude<T, WrongCaptchaSolution>) => void;
   i18n: I18n;
-  stepper: TemplateResult;
   focus?: boolean;
   /* put the page into view */
   scrollToTop?: boolean;
@@ -146,7 +144,6 @@ export const promptCaptchaTemplate = <T>({
 
   const promptCaptchaSlot = html`
     <article ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
-      ${stepper}
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <form autocomplete="off" @submit=${asyncReplace(next)} class="l-stack">
         <div
@@ -214,11 +211,9 @@ export function promptCaptchaPage<T>(
 
 export const promptCaptcha = <T>({
   captcha_png_base64,
-  stepper,
   checkCaptcha,
 }: {
   captcha_png_base64: string;
-  stepper: TemplateResult;
   checkCaptcha: (
     solution: string
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
@@ -231,7 +226,6 @@ export const promptCaptcha = <T>({
       checkCaptcha,
       onContinue: resolve,
       i18n,
-      stepper,
       scrollToTop: true,
       focus: true,
     });

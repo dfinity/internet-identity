@@ -3,7 +3,6 @@ import { PinResult, pinInput } from "$src/components/pinInput";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { TemplateResult, html } from "lit-html";
-import { pinStepper } from "./stepper";
 
 import { Chan } from "$src/utils/utils";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -64,7 +63,6 @@ const confirmPinTemplate = ({
     focus,
   });
   const slot = html`
-    ${pinStepper({ current: "set_pin" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">${copy.confirm_pin}</h1>
     </hgroup>

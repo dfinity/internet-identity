@@ -6,7 +6,6 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$src/components/toast";
     import { i18n } from "../i18n";
-    import { registerStepper } from "$src/flows/register/stepper";
     import { promptCaptchaPage } from "$src/flows/register/captcha";
     import { dummyChallenge } from "../constants";
 
@@ -24,7 +23,6 @@ import Screen from "../layouts/Screen.astro";
         }
         return undefined;
       },
-      stepper: registerStepper({ current: "captcha" }),
       onContinue: () => toast.info("Done"),
       i18n,
     });

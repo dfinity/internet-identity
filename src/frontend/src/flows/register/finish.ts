@@ -18,22 +18,18 @@ export const displayUserNumberTemplate = ({
   onContinue,
   userNumber,
   identityBackground,
-  stepper,
   marketingIntroSlot,
   scrollToTop = false,
 }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: PreLoadImage;
-  stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
   /* put the page into view */
   scrollToTop?: boolean;
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
-
-  ${stepper}
 <hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
@@ -126,12 +122,10 @@ export const displayUserNumberWarmup = (): OmitParams<
 export const displayUserNumber = ({
   userNumber,
   identityBackground,
-  stepper,
   marketingIntroSlot,
 }: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
-  stepper: TemplateResult;
   marketingIntroSlot?: TemplateResult;
 }): Promise<void> => {
   return new Promise((resolve) =>
@@ -139,7 +133,6 @@ export const displayUserNumber = ({
       onContinue: () => resolve(),
       userNumber,
       identityBackground,
-      stepper,
       marketingIntroSlot,
       scrollToTop: true,
     })

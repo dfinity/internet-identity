@@ -8,7 +8,6 @@ import Screen from "../layouts/Screen.astro";
     import { userNumber } from "../constants";
     import { i18n } from "../i18n";
     import { displayUserNumberPage } from "$src/flows/register/finish";
-    import { registerStepper } from "$src/flows/register/stepper";
     import { tempKeyWarningBox } from "$src/flows/manage/tempKeys";
     import identityCardBackground from "$src/assets/identityCardBackground.png";
     import { PreLoadImage } from "$src/utils/preLoadImage";
@@ -19,7 +18,6 @@ import Screen from "../layouts/Screen.astro";
       identityBackground,
       userNumber,
       onContinue: () => toast.info("done"),
-      stepper: registerStepper({ current: "finish" }),
       marketingIntroSlot: tempKeyWarningBox({ i18n }),
     });
   </script>

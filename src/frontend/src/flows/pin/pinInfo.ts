@@ -1,6 +1,5 @@
 import { warningIcon } from "$src/components/icons";
 import { mainWindow } from "$src/components/mainWindow";
-import { pinStepper } from "$src/flows/pin/stepper";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
 import { TemplateResult, html } from "lit-html";
@@ -22,7 +21,6 @@ const pinInfoTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   const slot = html`
-    ${pinStepper({ current: "set_pin" })}
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
       <h1 class="t-title t-title--main">
         ${copy.create_temporary_key_form_pin}
