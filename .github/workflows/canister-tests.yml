@@ -397,6 +397,10 @@ jobs:
       - uses: ./.github/actions/bootstrap
       - uses: ./.github/actions/setup-node
 
+      # run the build
+      - run: npm ci
+        shell: bash
+
       - name: Run tests
         run: ./scripts/test-canisters.sh
 
