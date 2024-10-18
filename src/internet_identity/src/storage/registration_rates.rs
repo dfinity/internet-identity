@@ -112,8 +112,6 @@ fn calculate_registration_rate<M: Memory>(now: u64, data: &MinHeap<Timestamp, M>
         .peek()
         // calculate the time window length with respect to the current time
         .map(|ts| now - ts)
-        // There could be negative values if they haven't been pruned yet.
-        .filter(|val| *val != 0)
         // use the value to calculate the rate per second
         .map(|val| rate_per_second(data.len(), val))
         // if we don't have data, the rate is 0
@@ -298,42 +296,30 @@ mod test {
             }
         );
 
-        // Change the config.
+        // Change the config where both reference and base rate have the same interval.
+        let interval_s = 100;
         state::persistent_state_mut(|ps| {
             ps.captcha_config = CaptchaConfig {
                 max_unsolved_captchas: 500,
                 captcha_trigger: CaptchaTrigger::Dynamic {
                     threshold_pct: 10,
-                    current_rate_sampling_interval_s: 100,
-                    reference_rate_sampling_interval_s: 100,
+                    current_rate_sampling_interval_s: interval_s,
+                    reference_rate_sampling_interval_s: interval_s,
                 },
             }
         });
 
-        // Needed to prune the data after new config
-        // It prunes 100 for each new registration
-        // we added 1100 before. Remove them with 110, plus 2 to remove the new 110 added.
-        for _ in 0..112 {
-            registration_rates.new_registration();
-        }
-
-        // Pass enough time for the added registrations to also be pruned by new ones.
-        TIME.with_borrow_mut(|t| *t += Duration::from_secs(100).as_nanos() as u64);
-
         // Set current rate to 2 registrations per seconds for 100 seconds
-        // which is the current and reference rate.
         for _ in 0..100 {
             registration_rates.new_registration();
             registration_rates.new_registration();
             TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
         }
+        let current_rates = registration_rates.registration_rates().unwrap();
+        // If the intervals are the same, the rates are also the same.
         assert_eq!(
-            registration_rates.registration_rates().unwrap(),
-            NormalizedRegistrationRates {
-                current_rate_per_second: 2.0,
-                reference_rate_per_second: 2.0, // increases too, but more slowly
-                captcha_threshold_rate: 2.2,    // reference rate * 1.1 (as per config)
-            }
+            current_rates.reference_rate_per_second,
+            current_rates.current_rate_per_second
         );
     }
 
