@@ -112,6 +112,8 @@ fn calculate_registration_rate<M: Memory>(now: u64, data: &MinHeap<Timestamp, M>
         .peek()
         // calculate the time window length with respect to the current time
         .map(|ts| now - ts)
+        // the value _could_ be 0 if the oldest timestamp was added in the same execution round
+        .filter(|val| *val != 0)
         // use the value to calculate the rate per second
         .map(|val| rate_per_second(data.len(), val))
         // if we don't have data, the rate is 0
