@@ -410,7 +410,8 @@ jobs:
         run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
 
       - name: Run tests
-        run: pwd |
+        run: |
+          pwd
           ./scripts/test-canisters.sh --no-build
 
   ######################
