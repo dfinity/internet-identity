@@ -9,10 +9,10 @@ use std::time::Duration;
 
 pub struct RegistrationRates<M: Memory> {
     /// Min heap of registration timestamps to calculate the reference registration rate.
-    /// [prune_data] removes values that  are in the past whenever new data is added.
+    /// [prune_data] removes values that are older than now minus the reference rate interval whenever new data is added.
     reference_rate_data: MinHeap<Timestamp, M>,
     /// Min heap of registration timestamps to calculate the current registration rate.
-    /// [prune_data] removes values that  are in the past whenever new data is added.
+    /// [prune_data] removes values that are older than now minus the current rate interval whenever new data is added.
     current_rate_data: MinHeap<Timestamp, M>,
 }
 
@@ -47,33 +47,22 @@ impl<M: Memory> RegistrationRates<M> {
     }
     pub fn new_registration(&mut self) {
         self.prune_expired();
-        let Some(data_retention) = dynamic_captcha_config() else {
+        // Return if no dynamic captcha
+        if dynamic_captcha_config().is_none() {
             return;
         };
 
         let now = time();
-        self.reference_rate_data
-            .push(&(now + data_retention.reference_rate_retention_ns))
-            .expect("out of memory");
-        self.current_rate_data
-            .push(&(now + data_retention.current_rate_retention_ns))
-            .expect("out of memory");
+        self.reference_rate_data.push(&now).expect("out of memory");
+        self.current_rate_data.push(&now).expect("out of memory");
     }
 
     pub fn registration_rates(&self) -> Option<NormalizedRegistrationRates> {
         let config = dynamic_captcha_config()?;
         let now = time();
 
-        let reference_rate_per_second = calculate_registration_rate(
-            now,
-            &self.reference_rate_data,
-            config.reference_rate_retention_ns,
-        );
-        let current_rate_per_second = calculate_registration_rate(
-            now,
-            &self.current_rate_data,
-            config.current_rate_retention_ns,
-        );
+        let reference_rate_per_second = calculate_registration_rate(now, &self.reference_rate_data);
+        let current_rate_per_second = calculate_registration_rate(now, &self.current_rate_data);
         let captcha_threshold_rate = reference_rate_per_second * config.threshold_multiplier;
         let rates = NormalizedRegistrationRates {
             reference_rate_per_second,
@@ -84,8 +73,17 @@ impl<M: Memory> RegistrationRates<M> {
     }
 
     fn prune_expired(&mut self) {
-        prune_data(&mut self.reference_rate_data);
-        prune_data(&mut self.current_rate_data);
+        let Some(data_retention) = dynamic_captcha_config() else {
+            return;
+        };
+        prune_data(
+            &mut self.reference_rate_data,
+            data_retention.reference_rate_retention_ns,
+        );
+        prune_data(
+            &mut self.current_rate_data,
+            data_retention.current_rate_retention_ns,
+        );
     }
 }
 
@@ -108,20 +106,13 @@ impl<M: Memory> RegistrationRates<M> {
 /// However, because the data is not actually spanning 3 weeks, this underestimates the actual rate.
 /// Taking into account that the data is only spanning 3 days we get the following:
 /// 3 registrations / 259200 seconds = 0.00001157407407 registrations / second
-fn calculate_registration_rate<M: Memory>(
-    now: u64,
-    data: &MinHeap<Timestamp, M>,
-    data_retention_ns: u64,
-) -> f64 {
+fn calculate_registration_rate<M: Memory>(now: u64, data: &MinHeap<Timestamp, M>) -> f64 {
     data
-        // get the oldest expiration timestamp
+        // get the oldest value
         .peek()
-        // calculate the registration timestamp from expiration
-        .map(|ts| ts - data_retention_ns)
         // calculate the time window length with respect to the current time
         .map(|ts| now - ts)
         // the value _could_ be 0 if the oldest timestamp was added in the same execution round
-        // -> filter to avoid division by 0
         .filter(|val| *val != 0)
         // use the value to calculate the rate per second
         .map(|val| rate_per_second(data.len(), val))
@@ -151,7 +142,7 @@ fn dynamic_captcha_config() -> Option<DynamicCaptchaConfig> {
     }
 }
 
-fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>) {
+fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) {
     const MAX_TO_PRUNE: usize = 100;
 
     let now = time();
@@ -162,7 +153,7 @@ fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>) {
 
         // The timestamps are sorted because the expiration is constant and time() is monotonic
         // -> we can stop pruning once we reach a not expired timestamp
-        if timestamp > now {
+        if timestamp > (now - interval_ns) {
             break;
         }
         data.pop();
@@ -278,6 +269,59 @@ mod test {
                 reference_rate_per_second: 1.2, // increases too, but more slowly
                 captcha_threshold_rate: 1.44,   // reference rate * 1.2 (as per config)
             }
+        );
+    }
+
+    #[test]
+    fn previous_config_should_not_affect_new_config() {
+        let mut registration_rates = setup();
+        // initialize reference rate with 1 registration / second
+        for _ in 0..1000 {
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        // raise current rate to 3 registrations / second
+        for _ in 0..100 {
+            registration_rates.new_registration();
+            registration_rates.new_registration();
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        assert_eq!(
+            registration_rates.registration_rates().unwrap(),
+            NormalizedRegistrationRates {
+                current_rate_per_second: 3.0,
+                reference_rate_per_second: 1.2, // increases too, but more slowly
+                captcha_threshold_rate: 1.44,   // reference rate * 1.2 (as per config)
+            }
+        );
+
+        // Change the config where both reference and base rate have the same interval.
+        let interval_s = 100;
+        state::persistent_state_mut(|ps| {
+            ps.captcha_config = CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 10,
+                    current_rate_sampling_interval_s: interval_s,
+                    reference_rate_sampling_interval_s: interval_s,
+                },
+            }
+        });
+
+        // Set current rate to 2 registrations per seconds for 100 seconds
+        for _ in 0..100 {
+            registration_rates.new_registration();
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+        let current_rates = registration_rates.registration_rates().unwrap();
+        // If the intervals are the same, the rates are also the same.
+        assert_eq!(
+            current_rates.reference_rate_per_second,
+            current_rates.current_rate_per_second
         );
     }
 
