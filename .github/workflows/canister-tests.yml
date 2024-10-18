@@ -391,7 +391,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [cached-build]
+    needs: [cached-build, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
       - name: "Download II wasm"
