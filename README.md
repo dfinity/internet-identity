@@ -52,6 +52,7 @@ Use the Internet Identity canister in your local dfx project by adding the follo
       "type": "custom",
       "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2024-10-01/internet_identity.did",
       "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2024-10-01/internet_identity_dev.wasm.gz",
+      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
       "remote": {
         "id": {
           "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"

@@ -16,18 +16,6 @@ describe("authentication", () => {
     await constructIdentity.waitForExist();
     await constructIdentity.click();
 
-    // Pass Captcha
-    const captchaInput = await browser.$("#captchaInput");
-    await captchaInput.waitForExist();
-    await captchaInput.setValue("a");
-    await browser.waitUntil(async () => {
-      return (await captchaInput.getValue()) === "a";
-    });
-
-    const registerButton = await browser.$("#confirmRegisterButton");
-    await registerButton.waitForEnabled({ timeout: 30_000 });
-    await registerButton.click();
-
     await browser.$("h1").waitForExist();
     const title = await browser.$("h1");
 
