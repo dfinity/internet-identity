@@ -407,7 +407,7 @@ jobs:
           path: .
 
       - name: Move wasms
-        run: mv internet_identity_test_cached.wasm.gz internet_identity.wasm.gz
+        run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
 
       - name: Run tests
         run: ./scripts/test-canisters.sh --no-build
