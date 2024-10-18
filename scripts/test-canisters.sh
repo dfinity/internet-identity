@@ -20,6 +20,16 @@ else
   exit 1
 fi
 
+# Parse arguments for --no-build flag
+NO_BUILD=false
+for arg in "$@"; do
+  if [ "$arg" == "--no-build" ]; then
+    NO_BUILD=true
+    # Remove --no-build from the argument list so it's not passed to cargo test
+    set -- "${@/--no-build/}"
+  fi
+done
+
 if [ -f "./$PREVIOUS_II_WASM_PATH" ]; then
   echo "Using previous II wasm."
 else
@@ -43,13 +53,19 @@ else
   echo "PocketIC server already exists, skipping download."
 fi
 
-# Build II
-II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 ./scripts/build --internet-identity
+# Build II and Archive unless --no-build is specified
+if [ "$NO_BUILD" = false ]; then
+  echo "Building Internet Identity and Archive..."
+  # Build II
+  II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 ./scripts/build --internet-identity
 
-# Build Archive
-./scripts/build --archive
+  # Build Archive
+  ./scripts/build --archive
+else
+  echo "Skipping build due to --no-build flag."
+fi
 
 # Run tests
 
 echo "Running integration tests."
-cargo test "${@}"
+cargo test "${@:-}"
