@@ -394,6 +394,8 @@ jobs:
     needs: [cached-build, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
