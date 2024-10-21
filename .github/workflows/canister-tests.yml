@@ -417,11 +417,7 @@ jobs:
           touch dist/index.html
 
       - name: Run tests
-        run: |
-          pwd
-          ls -l
-          ls -l scripts
-          ./scripts/test-canisters.sh --no-build
+        run: ./scripts/test-canisters.sh --no-build
 
   ######################
   # The end-to-end tests #
