@@ -411,6 +411,11 @@ jobs:
       - name: Move wasms
         run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
 
+      - name: Create dummy assets
+        run: |
+          mkdir dist
+          touch dist/index.html
+
       - name: Run tests
         run: |
           pwd
