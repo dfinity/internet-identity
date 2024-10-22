@@ -8,8 +8,8 @@ use ic_certification::Hash;
 use ic_verifiable_credentials::issuer_api::{ArgumentValue, CredentialSpec};
 use ic_verifiable_credentials::{
     build_credential_jwt, canister_sig_pk_from_vc_signing_input, did_for_principal,
-    vc_signing_input, vc_signing_input_to_jws, CredentialParams,
-    II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL, VC_SIGNING_INPUT_DOMAIN,
+    vc_signing_input, vc_signing_input_to_jws, CredentialParams, II_CREDENTIAL_URL_PREFIX,
+    II_ISSUER_URL, VC_SIGNING_INPUT_DOMAIN,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
@@ -51,7 +51,7 @@ pub async fn prepare_id_alias(
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
         id_dapp: delegation::get_principal(identity_number, dapps.relying_party.clone()),
-        derivation_origin: dapps.relying_party.clone()
+        derivation_origin: dapps.relying_party.clone(),
     };
     let issuer_tuple = AliasTuple {
         id_alias: id_alias_principal,
