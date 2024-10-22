@@ -395,6 +395,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-test-canisters-script-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', '.node-version', 'package-lock.json') }}
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
@@ -417,7 +424,14 @@ jobs:
           touch dist/index.html
 
       - name: Run tests
-        run: ./scripts/test-canisters.sh --no-build
+        run: |
+          ./scripts/test-canisters.sh --no-build should_keep_new_anchor_across_rollback
+          ./scripts/test-canisters.sh --no-build should_issue_same_principal_after_restoring_backup
+          ./scripts/test-canisters.sh --no-build should_add_additional_device_after_ii_upgrade
+          ./scripts/test-canisters.sh --no-build should_keep_entries_across_rollback
+          ./scripts/test-canisters.sh --no-build should_report_daily_active_anchors
+          ./scripts/test-canisters.sh --no-build should_get_different_id_alias_for_different_relying_parties
+          ./scripts/test-canisters.sh --no-build should_get_valid_delegation
 
   ######################
   # The end-to-end tests #
