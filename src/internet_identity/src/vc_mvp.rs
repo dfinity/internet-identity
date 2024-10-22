@@ -60,11 +60,11 @@ pub async fn prepare_id_alias(
     };
 
     // rp_signing_input is sent to the relying party.
-    // Therefore, it needs to have the rp origin to confirm from where the principal is derived from.
+    // The relying party needs to have the derivation origin to confirm where the principal is derived from.
     let rp_signing_input = vc_signing_input(&id_alias_credential_jwt(&rp_tuple), &canister_sig_pk)
         .expect("failed getting signing_input");
     // issuer_signing_input is sent to the relying party.
-    // The issuer doesn't care so much from which origin is derived, but we keep it for consistency.
+    // The issuer needs to have the derivation origin to confirm where the principal is derived from.
     let issuer_signing_input =
         vc_signing_input(&id_alias_credential_jwt(&issuer_tuple), &canister_sig_pk)
             .expect("failed getting signing_input");
