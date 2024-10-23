@@ -8,8 +8,8 @@ use ic_certification::Hash;
 use ic_verifiable_credentials::issuer_api::{ArgumentValue, CredentialSpec};
 use ic_verifiable_credentials::{
     build_credential_jwt, canister_sig_pk_from_vc_signing_input, did_for_principal,
-    vc_signing_input, vc_signing_input_to_jws, AliasTuple, CredentialParams,
-    II_CREDENTIAL_URL_PREFIX, II_ISSUER_URL, VC_SIGNING_INPUT_DOMAIN,
+    vc_signing_input, vc_signing_input_to_jws, CredentialParams, II_CREDENTIAL_URL_PREFIX,
+    II_ISSUER_URL, VC_SIGNING_INPUT_DOMAIN,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, IdAliasCredentials, PreparedIdAlias, SignedIdAlias,
@@ -18,6 +18,15 @@ use internet_identity_interface::internet_identity::types::{FrontendHostname, Id
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+
+pub struct AliasTuple {
+    /// A temporary identity, used in attribute sharing flow.
+    pub id_alias: Principal,
+    /// An identity under which a user is known to a dapp.
+    pub id_dapp: Principal,
+    /// The derivation origin of the id_dapp
+    pub derivation_origin: String,
+}
 
 // The expiration of id_alias verifiable credentials.
 const ID_ALIAS_VC_EXPIRATION_PERIOD_NS: u64 = 15 * MINUTE_NS;
@@ -42,14 +51,20 @@ pub async fn prepare_id_alias(
     let rp_tuple = AliasTuple {
         id_alias: id_alias_principal,
         id_dapp: delegation::get_principal(identity_number, dapps.relying_party.clone()),
+        derivation_origin: dapps.relying_party.clone(),
     };
     let issuer_tuple = AliasTuple {
         id_alias: id_alias_principal,
         id_dapp: delegation::get_principal(identity_number, dapps.issuer.clone()),
+        derivation_origin: dapps.issuer.clone(),
     };
 
+    // rp_signing_input is sent to the relying party.
+    // The relying party needs to have the derivation origin to confirm where the principal is derived from.
     let rp_signing_input = vc_signing_input(&id_alias_credential_jwt(&rp_tuple), &canister_sig_pk)
         .expect("failed getting signing_input");
+    // issuer_signing_input is sent to the relying party.
+    // The issuer needs to have the derivation origin to confirm where the principal is derived from.
     let issuer_signing_input =
         vc_signing_input(&id_alias_credential_jwt(&issuer_tuple), &canister_sig_pk)
             .expect("failed getting signing_input");
@@ -141,7 +156,7 @@ fn id_alias_credential_jwt(alias_tuple: &AliasTuple) -> String {
     let expiration_timestamp_s: u32 =
         ((time() + ID_ALIAS_VC_EXPIRATION_PERIOD_NS) / 1_000_000_000) as u32;
     let params = CredentialParams {
-        spec: id_alias_credential_spec(alias_tuple.id_alias),
+        spec: id_alias_credential_spec(alias_tuple.id_alias, &alias_tuple.derivation_origin),
         subject_id: did_for_principal(alias_tuple.id_dapp),
         credential_id_url: prepare_credential_id_new(alias_tuple),
         issuer_url: II_ISSUER_URL.to_string(),
@@ -150,11 +165,15 @@ fn id_alias_credential_jwt(alias_tuple: &AliasTuple) -> String {
     build_credential_jwt(params)
 }
 
-fn id_alias_credential_spec(id_alias: Principal) -> CredentialSpec {
+fn id_alias_credential_spec(id_alias: Principal, origin: &FrontendHostname) -> CredentialSpec {
     let mut args = HashMap::new();
     args.insert(
         "hasIdAlias".to_string(),
         ArgumentValue::String(id_alias.to_text()),
+    );
+    args.insert(
+        "derivationOrigin".to_string(),
+        ArgumentValue::String(origin.to_string()),
     );
     CredentialSpec {
         credential_type: "InternetIdentityIdAlias".to_string(),
