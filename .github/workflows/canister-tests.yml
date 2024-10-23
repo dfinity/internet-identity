@@ -424,10 +424,15 @@ jobs:
           touch dist/index.html
 
       - name: Run tests
+        # should_keep_new_anchor_across_rollback uses previous II wasm
+        # should_issue_same_principal_after_restoring_backup uses a stable memory backup
+        # should_keep_entries_across_rollback uses previous archive wasm
+        # should_report_daily_active_anchors tests stats
+        # should_get_different_id_alias_for_different_relying_parties tests VCs
+        # should_get_valid_delegation tests II core functionality
         run: |
           ./scripts/test-canisters.sh --no-build should_keep_new_anchor_across_rollback
           ./scripts/test-canisters.sh --no-build should_issue_same_principal_after_restoring_backup
-          ./scripts/test-canisters.sh --no-build should_add_additional_device_after_ii_upgrade
           ./scripts/test-canisters.sh --no-build should_keep_entries_across_rollback
           ./scripts/test-canisters.sh --no-build should_report_daily_active_anchors
           ./scripts/test-canisters.sh --no-build should_get_different_id_alias_for_different_relying_parties
