@@ -315,10 +315,6 @@ The summary is given by the Candid interface:
 ### Identity management (legacy API)
 #### The `create_challenge` and `register`  methods
 
-:::note
-API V2: `captcha_create` and `identity_register`
-:::
-
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
 The `register` method is used to create a new user. The Internet Identity Service backend creates a *fresh* Identity Anchor, creates the account record, and adds the given device as the first device.
@@ -447,6 +443,30 @@ Fetches all data associated with an anchor including registration mode and tenta
 Fetches the principal for a given user and front end.
 
 ### Identity management (API V2 only)
+
+#### The `identity_registration_start` method
+
+**Authorization**: Any non-anonymous identity can call this
+
+Initiates the registration of a new identity. Identity registration is a multistep process:
+1. Start the registration (this call). 
+2. Solve the captcha, if any. Whether this step is required is indicated by the result of the first (this) call.
+3. Provide an authentication method to authenticate with in the future.
+
+The `sender` principal must be the same in all subsequent calls. After successfully completing the registration flow, this principal is authorized to make additional calls for a short amount of time (e.g. `prepare_delegation` to initiate a session with a dapp).
+
+#### The `check_captcha` method
+
+**Authorization**: Only `sender` principals that have previously called `identity_registration_start` are authorized to call this method.
+
+This call is used to supply a solution to the captcha challenge returned from `identity_registration_start`, if any.
+
+#### The `identity_registration_finish` method
+
+**Authorization**: Only `sender` principals that have previously called `identity_registration_start` are authorized to call this method.
+
+Supply an authentication method to complete the process of creating a new identity. If successful, the identity number of the newly created identity is returned.
+
 #### The `authn_method_metadata_replace` query method
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
