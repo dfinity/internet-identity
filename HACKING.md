@@ -34,9 +34,12 @@ dfx deploy internet_identity --no-wallet
 ```
 
 > [!NOTE]\
-> By default, a dummy (fixed) CAPTCHA is used. If you want to use the real (random) CAPTCHA, set
-> `II_DUMMY_CAPTCHA` to `0`:\
-> `II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet`
+> By default, the CAPTCHA is disabled used. If you want to use the real (random) CAPTCHA, set
+> `II_DUMMY_CAPTCHA` to `0` and configure II to use a CAPTCHA:
+> ```
+> II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet \
+>     --argument '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
+> ```
 
 Then the canister can be used as
 
@@ -106,6 +109,12 @@ The tests can be executed by running:
 ```bash
 npm run test:e2e
 ```
+
+> [!NOTE]\
+> By default, the e2e tests expect the CAPTCHA to be disabled. If you want to run the e2e tests against II with (dummy) CAPTCHA enabled, make sure that the II_DUMMY_CAPTCHA=1 was set when building II and then run:
+> ```
+> II_CAPTCHA=enabled npm run test:e2e
+> ```
 
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
