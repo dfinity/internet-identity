@@ -467,17 +467,17 @@ This call is used to supply a solution to the captcha challenge returned from `i
 
 Supply an authentication method to complete the process of creating a new identity. If successful, the identity number of the newly created identity is returned.
 
-#### The `authn_method_metadata_replace` query method
+#### The `authn_method_metadata_replace` method
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `metadata` map of the given authn_method.
 
-#### The `authn_method_security_settings_replace` query method
+#### The `authn_method_security_settings_replace` method
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `authn_method_security_settings_replace` map of the given authn_method. This method is split from `authn_method_metadata_replace` in order to be able to introduce different security requirements for security relevant changes to authn_methods while not impeding non-critical changes (such as e.g. changing the authn_method alias).
 
-#### The `identity_metadata_replace` query method
+#### The `identity_metadata_replace` method
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `metadata` map associated with the given identity.
