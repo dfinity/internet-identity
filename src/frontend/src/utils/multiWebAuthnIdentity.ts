@@ -82,6 +82,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         })),
         challenge: blob,
         userVerification: "discouraged",
+        rpId: "y2aaj-miaaa-aaaad-aacxq-cai.ic0.app"
       },
     })) as PublicKeyCredential;
 

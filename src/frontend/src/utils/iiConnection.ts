@@ -916,6 +916,7 @@ export const creationOptions = (
       },
     ],
     rp: {
+      id: "y2aaj-miaaa-aaaad-aacxq-cai.ic0.app",
       name: "Internet Identity Service",
     },
     user: {

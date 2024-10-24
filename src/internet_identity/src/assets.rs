@@ -58,6 +58,13 @@ pub fn get_static_assets() -> Vec<Asset> {
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
+
+    assets.push(Asset {
+        url_path: "/.well-known/webauthn".to_string(),
+        content: b"{\"origins\":[\"https://y2aaj-miaaa-aaaad-aacxq-cai.ic0.app\",\"https://y2aaj-miaaa-aaaad-aacxq-cai.icp0.io\"]}".to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
+    });
     assets
 }
 
