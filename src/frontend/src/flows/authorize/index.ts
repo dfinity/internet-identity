@@ -88,7 +88,6 @@ export const authnTemplateAuthorize = ({
           ${name} `
       )}
       ${mkChasm({ message: isAltOriginOf(action) ?? strong(origin) })}
-      <p class="t-lead l-stack">${copy.first_time_subtitle}</p>
     </div>
   `;
 
