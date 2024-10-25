@@ -82,18 +82,8 @@ export const displayUserNumberTemplate = ({
     <section class="c-marketing-block">
       ${marketingIntroSlot}
       <aside class="l-stack">
-        <h3 class="t-title">This number is your Internet Identity</h3>
-        <p class="t-paragraph">With your Internet Identity and your passkey, you will be able to create and securely connect to Internet Computer dapps</p>
-      </aside>
-
-      <aside class="l-stack">
         <h3 class="t-title">Why is it important to save this number?</h3>
-        <p class="t-paragraph">If you lose this number, you will lose access to all of the accounts that you created with it</p>
-      </aside>
-
-      <aside class="l-stack">
-        <h3 class="t-title">Is this number secret?</h3>
-        <p class="t-paragraph"> No, this number is unique to you but it is not secret</p>
+        <p class="t-paragraph">This number is unique but not secret. If you lose this number, you will lose access to all of the accounts that you created with it</p>
       </aside>
     </section>
 
