@@ -69,6 +69,10 @@ To access Internet Identity or configure it for your dapp, use one of the follow
 * Chrome, Firefox: `http://<canister_id>.localhost:4943`
 * Safari: `http://localhost:4943?canisterId=<canister_id>`
 
+#### Note on Apple Silicon
+
+If you are running into build issues on Apple Silicon (specifically, if rollup is trying to access @rollup/rollup-darwin-x64), try using nvm to install node.
+
 ### Architecture Overview
 
 Internet Identity is an authentication service for the [Internet Computer][ic]. All programs on the Internet Computer are Wasm modules, or canisters (canister smart contracts).

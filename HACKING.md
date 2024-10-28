@@ -121,6 +121,8 @@ If you open a PR that isn't formatted according to `prettier`, CI will automatic
 
 We use `eslint` to check the frontend code. You can run it with `npm run lint`.
 
+Please note that you will need to have bash 5 or later installed to run the e2e tests. You can check your bash version by running `bash --version`.
+
 #### Canisters tests
 
 There are plenty of unit and integration tests that cover the different canisters of this repository which cover all the functionality that Internet Identity offer.
