@@ -1133,9 +1133,7 @@ a:hover,
   }
 
   .c-landingPage__left__content {
-    padding: 0;
-    /* We don't need to account for the logo with absolute position */
-    margin-top: 0;
+    display: none;
   }
 
   .c-landingPage__right {
