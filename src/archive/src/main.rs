@@ -634,8 +634,9 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         stable_size() as f64,
         "Number of stable memory pages used by this canister.",
     )?;
+    // Don't use the prefix ii_archive so that it gets picked up by a default alarm.
     w.encode_gauge(
-        "ii_archive_stable_memory_bytes",
+        "stable_memory_bytes",
         (stable_size() * WASM_PAGE_SIZE_IN_BYTES) as f64,
         "Size of the stable memory allocated by this canister.",
     )?;
@@ -645,9 +646,10 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         core::arch::wasm32::memory_size::<0>() as f64,
         "Number of heap memory pages used by this canister.",
     )?;
+    // Don't use the prefix ii_archive so that it gets picked up by a default alarm.
     #[cfg(target_arch = "wasm32")]
     w.encode_gauge(
-        "ii_archive_heap_memory_bytes",
+        "heap_memory_bytes",
         (core::arch::wasm32::memory_size::<0>() as u64 * WASM_PAGE_SIZE_IN_BYTES) as f64,
         "Size of the heap memory allocated by this canister.",
     )?;
