@@ -97,17 +97,27 @@ const savePasskeyTemplate = ({
 export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
 // Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
-export const savePasskeyOrPin = async (): Promise<
-  IIWebAuthnIdentity | "canceled"
-> => {
-  try {
-    const identity = await withLoader(() => constructIdentity({}));
-    return identity;
-  } catch (e) {
-    console.error("Failed to create identity:", e);
-    toast.error(errorMessage(e));
-    return "canceled";
-  }
+export const savePasskeyOrPin = ({
+  pinAllowed,
+}: {
+  pinAllowed: boolean;
+}): Promise<IIWebAuthnIdentity | "pin" | "canceled"> => {
+  return new Promise((resolve) =>
+    savePasskeyPage({
+      i18n: new I18n(),
+      cancel: () => resolve("canceled"),
+      scrollToTop: true,
+      constructPasskey: async () => {
+        try {
+          const identity = await withLoader(() => constructIdentity({}));
+          resolve(identity);
+        } catch (e) {
+          toast.error(errorMessage(e));
+        }
+      },
+      constructPin: pinAllowed ? () => resolve("pin") : undefined,
+    })
+  );
 };
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error
