@@ -94,6 +94,12 @@ const registerFlowOpts: RegisterFlowOpts = {
       connection: mockConnection,
     };
   },
+  registrationAllowed: true,
+  storePinIdentity: () => {
+    toast.info("PIN identity was stored");
+    return Promise.resolve();
+  },
+  pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
 } as const;
 
@@ -180,6 +186,7 @@ export const iiFlows: Record<string, () => void> = {
   registerWithPin: async () => {
     const result = await registerFlow({
       ...registerFlowOpts,
+      pinAllowed: () => Promise.resolve(true),
     });
     toast.success(registerSuccessToastTemplate(result));
   },
