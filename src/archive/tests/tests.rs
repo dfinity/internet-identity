@@ -521,9 +521,9 @@ mod metrics_tests {
             "ii_archive_virtual_memory_pages{kind=\"log_data\"}",
             "ii_archive_virtual_memory_pages{kind=\"anchor_index\"}",
             "ii_archive_stable_memory_pages",
-            "ii_archive_stable_memory_bytes",
+            "stable_memory_bytes",
             "ii_archive_heap_pages",
-            "ii_archive_heap_memory_bytes",
+            "heap_memory_bytes",
             // The metrics
             //   * ii_archive_last_successful_fetch_timestamp_seconds
             //   * ii_archive_last_successful_fetch_entries_count
@@ -674,7 +674,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_stable_memory_bytes",
+            "stable_memory_bytes",
             3074f64 * WASM_PAGE_SIZE as f64, // the memory_manager pre-allocates a lot of memory (1024 page buckets per virtual memory and some overhead)
         );
         assert_metric(
@@ -684,7 +684,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_heap_memory_bytes",
+            "heap_memory_bytes",
             49f64 * WASM_PAGE_SIZE as f64,
         );
 
@@ -719,7 +719,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_stable_memory_bytes",
+            "stable_memory_bytes",
             3074f64 * WASM_PAGE_SIZE as f64, // does not change due to pre-allocation
         );
         assert_metric(
@@ -729,7 +729,7 @@ mod metrics_tests {
         );
         assert_metric(
             &get_metrics(&env, canister_id),
-            "ii_archive_heap_memory_bytes", // does not change due to pre-allocation
+            "heap_memory_bytes", // does not change due to pre-allocation
             51f64 * WASM_PAGE_SIZE as f64,
         );
 
