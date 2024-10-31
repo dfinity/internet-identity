@@ -149,7 +149,9 @@ export const authenticatorItem = ({
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
           : undefined}
         ${nonNullish(lastUsageFormattedString)
-          ? html`<i class="t-muted">&nbsp;Last used: ${lastUsageFormattedString}</i>`
+          ? html`<i class="t-muted"
+              >&nbsp;Last used: ${lastUsageFormattedString}</i
+            >`
           : undefined}
       </div>
       ${settingsDropdown({
