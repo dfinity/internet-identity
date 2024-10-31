@@ -47,7 +47,6 @@ export const authenticatorsSection = ({
   ];
 
   const authenticators = dedupLabels(authenticators_);
-  console.log(authenticators);
 
   return html`
     <aside class=${wrapClasses.join(" ")} data-role="passkeys">
