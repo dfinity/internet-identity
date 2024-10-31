@@ -291,14 +291,14 @@ function isPinAuthenticated(
 export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices_: DeviceData[],
+  devices_: DeviceWithUsage[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
   return new Promise((resolve) => {
-    const devices = devicesFromDeviceDatas({
+    const devices = devicesFromDevicesWithUsage({
       devices: devices_,
       userNumber,
       connection,
@@ -437,7 +437,7 @@ export const readRecovery = ({
 
 // Convert devices read from the canister into types that are easier to work with
 // and that better represent what we expect.
-export const devicesFromDeviceDatas = ({
+export const devicesFromDevicesWithUsage = ({
   devices: devices_,
   reload,
   connection,

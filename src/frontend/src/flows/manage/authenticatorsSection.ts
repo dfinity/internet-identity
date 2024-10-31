@@ -47,6 +47,7 @@ export const authenticatorsSection = ({
   ];
 
   const authenticators = dedupLabels(authenticators_);
+  console.log(authenticators);
 
   return html`
     <aside class=${wrapClasses.join(" ")} data-role="passkeys">
@@ -109,7 +110,7 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, dupCount, warn, remove, rename },
+  authenticator: { alias, last_usage, dupCount, warn, remove, rename },
   index,
   icon,
 }: {
@@ -125,6 +126,20 @@ export const authenticatorItem = ({
     settings.push({ action: "remove", caption: "Remove", fn: () => remove() });
   }
 
+  let lastUsageTimeStamp: Date | undefined;
+  let lastUsageFormattedString: string | undefined;
+
+  if (last_usage.length > 0 && typeof last_usage[0] === "bigint") {
+    lastUsageTimeStamp = new Date(Number(last_usage[0] / BigInt(1000000)));
+  }
+
+  if (lastUsageTimeStamp) {
+    lastUsageFormattedString = new Intl.DateTimeFormat(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(lastUsageTimeStamp);
+  }
+
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
@@ -133,6 +148,9 @@ export const authenticatorItem = ({
         ${alias}
         ${nonNullish(dupCount) && dupCount > 0
           ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
+          : undefined}
+        ${nonNullish(lastUsageFormattedString)
+          ? html`<i class="t-muted">&nbsp;Last used: ${lastUsageFormattedString}</i>`
           : undefined}
       </div>
       ${settingsDropdown({
