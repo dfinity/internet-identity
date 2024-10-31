@@ -1,5 +1,6 @@
 import {
   DeviceData,
+  DeviceWithUsage,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
 import identityCardBackground from "$src/assets/identityCardBackground.png";
@@ -303,6 +304,7 @@ export const displayManage = (
       connection,
       reload: resolve,
     });
+
     if (devices.dupPhrase) {
       toast.error(
         "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
@@ -441,7 +443,7 @@ export const devicesFromDeviceDatas = ({
   connection,
   userNumber,
 }: {
-  devices: DeviceData[];
+  devices: DeviceWithUsage[];
   reload: (connection?: AuthenticatedConnection) => void;
   connection: AuthenticatedConnection;
   userNumber: bigint;
@@ -470,6 +472,7 @@ export const devicesFromDeviceDatas = ({
 
       const authenticator = {
         alias: device.alias,
+        last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
         remove: hasSingleDevice
