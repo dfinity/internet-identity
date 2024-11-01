@@ -1,9 +1,9 @@
 import { warningIcon } from "$src/components/icons";
+import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
-import { formatLastUsage } from "$src/utils/time";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
