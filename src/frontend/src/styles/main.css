@@ -995,6 +995,12 @@ a:hover,
   font-size: var(--rs-split-page-title);
   font-weight: 600;
   line-height: 1.1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* We don't want to break the lines of the title */
+  white-space: nowrap;
 }
 
 .c-landingPage__logo {
@@ -1028,7 +1034,7 @@ a:hover,
 
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 
   padding: 0 20%;
