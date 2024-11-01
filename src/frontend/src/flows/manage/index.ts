@@ -1,5 +1,6 @@
 import {
   DeviceData,
+  DeviceWithUsage,
   IdentityAnchorInfo,
 } from "$generated/internet_identity_types";
 import identityCardBackground from "$src/assets/identityCardBackground.png";
@@ -290,19 +291,20 @@ function isPinAuthenticated(
 export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices_: DeviceData[],
+  devices_: DeviceWithUsage[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
   return new Promise((resolve) => {
-    const devices = devicesFromDeviceDatas({
+    const devices = devicesFromDevicesWithUsage({
       devices: devices_,
       userNumber,
       connection,
       reload: resolve,
     });
+
     if (devices.dupPhrase) {
       toast.error(
         "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
@@ -435,13 +437,13 @@ export const readRecovery = ({
 
 // Convert devices read from the canister into types that are easier to work with
 // and that better represent what we expect.
-export const devicesFromDeviceDatas = ({
+export const devicesFromDevicesWithUsage = ({
   devices: devices_,
   reload,
   connection,
   userNumber,
 }: {
-  devices: DeviceData[];
+  devices: DeviceWithUsage[];
   reload: (connection?: AuthenticatedConnection) => void;
   connection: AuthenticatedConnection;
   userNumber: bigint;
@@ -470,6 +472,7 @@ export const devicesFromDeviceDatas = ({
 
       const authenticator = {
         alias: device.alias,
+        last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
         remove: hasSingleDevice

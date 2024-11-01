@@ -1,4 +1,5 @@
 import { warningIcon } from "$src/components/icons";
+import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
@@ -109,7 +110,7 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, dupCount, warn, remove, rename },
+  authenticator: { alias, last_usage, dupCount, warn, remove, rename },
   index,
   icon,
 }: {
@@ -125,21 +126,42 @@ export const authenticatorItem = ({
     settings.push({ action: "remove", caption: "Remove", fn: () => remove() });
   }
 
+  let lastUsageTimeStamp: Date | undefined;
+  let lastUsageFormattedString: string | undefined;
+
+  if (last_usage.length > 0 && typeof last_usage[0] === "bigint") {
+    lastUsageTimeStamp = new Date(Number(last_usage[0] / BigInt(1000000)));
+  }
+
+  if (lastUsageTimeStamp) {
+    lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
+  }
+
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(icon) ? undefined : html`${icon}`}
-      <div class="c-action-list__label">
-        ${alias}
-        ${nonNullish(dupCount) && dupCount > 0
-          ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
-          : undefined}
+      <div class="c-action-list__label--stacked c-action-list__label">
+        <div class="c-action-list__label c-action-list__label--spacer">
+          ${alias}
+          ${nonNullish(dupCount) && dupCount > 0
+            ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
+            : undefined}
+          <div class="c-action-list__label"></div>
+          ${settingsDropdown({
+            alias,
+            id: `authenticator-${index}`,
+            settings,
+          })}
+        </div>
+        <div>
+          ${nonNullish(lastUsageFormattedString)
+            ? html`<div class="t-muted">
+                Last used: ${lastUsageFormattedString}
+              </div>`
+            : undefined}
+        </div>
       </div>
-      ${settingsDropdown({
-        alias,
-        id: `authenticator-${index}`,
-        settings,
-      })}
     </li>
   `;
 };
