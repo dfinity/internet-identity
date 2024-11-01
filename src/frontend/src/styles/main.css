@@ -2751,6 +2751,10 @@ a.c-action-list__item {
   justify-content: center;
 }
 
+.c-action-list__label--spacer {
+  width: 100%;
+}
+
 .c-action-list__action {
   cursor: pointer;
   color: var(--rc-text);

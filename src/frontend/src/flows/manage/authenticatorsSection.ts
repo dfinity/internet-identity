@@ -133,32 +133,38 @@ export const authenticatorItem = ({
   }
 
   if (lastUsageTimeStamp) {
-    lastUsageFormattedString = new Intl.DateTimeFormat(undefined, {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(lastUsageTimeStamp);
+    const now = new Date();
+    const diffInDays = Math.round((lastUsageTimeStamp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    lastUsageFormattedString = new Intl.RelativeTimeFormat('en', {
+      numeric: 'auto',
+      style: 'long'
+    }).format(diffInDays, 'day');
   }
 
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(icon) ? undefined : html`${icon}`}
-      <div class="c-action-list__label">
-        ${alias}
-        ${nonNullish(dupCount) && dupCount > 0
-          ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
-          : undefined}
+      <div class="c-action-list__label--stacked c-action-list__label">
+        <div class="c-action-list__label c-action-list__label--spacer">
+          ${alias}
+          ${nonNullish(dupCount) && dupCount > 0
+            ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
+            : undefined}
+            <div class="c-action-list__label"></div>
+            ${settingsDropdown({
+              alias,
+              id: `authenticator-${index}`,
+              settings,
+            })}
+        </div>
+        <div>
         ${nonNullish(lastUsageFormattedString)
-          ? html`<i class="t-muted"
-              >&nbsp;Last used: ${lastUsageFormattedString}</i
-            >`
+          ? html`<div class="t-muted">Last used: ${lastUsageFormattedString}</div>`
           : undefined}
+        </div>
       </div>
-      ${settingsDropdown({
-        alias,
-        id: `authenticator-${index}`,
-        settings,
-      })}
     </li>
   `;
 };
