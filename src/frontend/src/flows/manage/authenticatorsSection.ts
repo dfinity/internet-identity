@@ -134,12 +134,14 @@ export const authenticatorItem = ({
 
   if (lastUsageTimeStamp) {
     const now = new Date();
-    const diffInDays = Math.round((lastUsageTimeStamp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
-    lastUsageFormattedString = new Intl.RelativeTimeFormat('en', {
-      numeric: 'auto',
-      style: 'long'
-    }).format(diffInDays, 'day');
+    const diffInDays = Math.round(
+      (lastUsageTimeStamp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    lastUsageFormattedString = new Intl.RelativeTimeFormat("en", {
+      numeric: "auto",
+      style: "long",
+    }).format(diffInDays, "day");
   }
 
   return html`
@@ -152,17 +154,19 @@ export const authenticatorItem = ({
           ${nonNullish(dupCount) && dupCount > 0
             ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
             : undefined}
-            <div class="c-action-list__label"></div>
-            ${settingsDropdown({
-              alias,
-              id: `authenticator-${index}`,
-              settings,
-            })}
+          <div class="c-action-list__label"></div>
+          ${settingsDropdown({
+            alias,
+            id: `authenticator-${index}`,
+            settings,
+          })}
         </div>
         <div>
-        ${nonNullish(lastUsageFormattedString)
-          ? html`<div class="t-muted">Last used: ${lastUsageFormattedString}</div>`
-          : undefined}
+          ${nonNullish(lastUsageFormattedString)
+            ? html`<div class="t-muted">
+                Last used: ${lastUsageFormattedString}
+              </div>`
+            : undefined}
         </div>
       </div>
     </li>
