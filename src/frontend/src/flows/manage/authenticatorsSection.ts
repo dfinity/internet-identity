@@ -3,6 +3,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
+import { formatLastUsage } from "$src/utils/time";
 
 // The maximum number of authenticator (non-recovery) devices we allow.
 // The canister limits the _total_ number of devices (recovery included) to 10,
@@ -133,15 +134,7 @@ export const authenticatorItem = ({
   }
 
   if (lastUsageTimeStamp) {
-    const now = new Date();
-    const diffInDays = Math.round(
-      (lastUsageTimeStamp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    lastUsageFormattedString = new Intl.RelativeTimeFormat("en", {
-      numeric: "auto",
-      style: "long",
-    }).format(diffInDays, "day");
+    lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
   }
 
   return html`
