@@ -57,12 +57,19 @@ impl<M: Memory> RegistrationRates<M> {
         self.current_rate_data.push(&now).expect("out of memory");
     }
 
+    /// Calculates the registration rates for the current and reference intervals along with the threschold.
+    /// 
+    /// The calculation assumes that the data has been pruned of old timestamps before the rates are calculated.
+    /// 
+    /// Initially the window for the rate calculation was the difference between now and the oldest point.
+    /// However, we have accumulated data the last 3 weeks.
+    /// Therefore, we can assume that we have data for all the interval and use the interval as the window.
+    /// Otherwise, the rate will be underestimated.
     pub fn registration_rates(&self) -> Option<NormalizedRegistrationRates> {
         let config = dynamic_captcha_config()?;
-        let now = time();
-
-        let reference_rate_per_second = calculate_registration_rate(now, &self.reference_rate_data);
-        let current_rate_per_second = calculate_registration_rate(now, &self.current_rate_data);
+        
+        let reference_rate_per_second = rate_per_second(self.reference_rate_data.len(), config.reference_rate_retention_ns);
+        let current_rate_per_second = rate_per_second(self.current_rate_data.len(), config.current_rate_retention_ns);
         let captcha_threshold_rate = reference_rate_per_second * config.threshold_multiplier;
         let rates = NormalizedRegistrationRates {
             reference_rate_per_second,
@@ -85,39 +92,6 @@ impl<M: Memory> RegistrationRates<M> {
             data_retention.current_rate_retention_ns,
         );
     }
-}
-
-/// Calculates the rate per second of registrations taking into account for how long data has
-/// already been collected. Adjusting the window to the actual data collected is important because
-/// * rates are underestimated by fixed window calculations
-/// * the reference registration rate window is generally longer than the current rate window
-///
-/// => this means that the captcha would be triggered prematurely during the period where data has
-/// not been collected for the full reference registration rate data retention window.
-///
-/// Example:
-/// * `data_retention_ns` is 3 weeks
-/// * there are currently 3 data points: `[1727768623000000000, 1727855023000000000, 1727941423000000000]`
-///   (these are 24h apart each)
-///
-/// If the rate was calculated over a 3-week time window, this would be
-/// 3 registrations / 1814400 seconds = 0.000001653439153 registrations / second
-///
-/// However, because the data is not actually spanning 3 weeks, this underestimates the actual rate.
-/// Taking into account that the data is only spanning 3 days we get the following:
-/// 3 registrations / 259200 seconds = 0.00001157407407 registrations / second
-fn calculate_registration_rate<M: Memory>(now: u64, data: &MinHeap<Timestamp, M>) -> f64 {
-    data
-        // get the oldest value
-        .peek()
-        // calculate the time window length with respect to the current time
-        .map(|ts| now - ts)
-        // the value _could_ be 0 if the oldest timestamp was added in the same execution round
-        .filter(|val| *val != 0)
-        // use the value to calculate the rate per second
-        .map(|val| rate_per_second(data.len(), val))
-        // if we don't have data, the rate is 0
-        .unwrap_or(0.0)
 }
 
 fn rate_per_second(count: u64, duration_ns: u64) -> f64 {
@@ -203,13 +177,12 @@ mod test {
 
         registration_rates.new_registration();
 
-        // 1 data point -> still 0 rates
         assert_eq!(
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
-                reference_rate_per_second: 0.0,
-                current_rate_per_second: 0.0,
-                captcha_threshold_rate: 0.0,
+                reference_rate_per_second: 0.001, // 1 / 1000, as per config
+                current_rate_per_second: 0.01, // 1 / 100, as per config
+                captcha_threshold_rate: 0.0012, // 20% more than the reference rate, as per config
             }
         );
 
@@ -220,9 +193,9 @@ mod test {
         assert_eq!(
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
-                reference_rate_per_second: 2.0,
-                current_rate_per_second: 2.0,
-                captcha_threshold_rate: 2.4, // 20% more than the reference rate, as per config
+                reference_rate_per_second: 0.002, // 2 / 1000, as per config
+                current_rate_per_second: 0.02, // 2 / 100, as per config
+                captcha_threshold_rate: 0.0024, // 20% more than the reference rate, as per config
             }
         );
     }
