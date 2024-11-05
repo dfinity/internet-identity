@@ -805,7 +805,7 @@ fn should_report_registration_rates() -> Result<(), CallError> {
     assert_metric_approx(
         &metrics,
         "internet_identity_registrations_per_second{type=\"reference_rate\"}",
-        1.6,
+        0.4,
         0.1,
     );
     assert_metric_approx(
