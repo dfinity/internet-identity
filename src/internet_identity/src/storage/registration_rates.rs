@@ -319,9 +319,9 @@ mod test {
         assert_eq!(
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
-                current_rate_per_second: 100.0,
-                reference_rate_per_second: 100.0,
-                captcha_threshold_rate: 120.0,
+                current_rate_per_second: 1.0,
+                reference_rate_per_second: 0.1,
+                captcha_threshold_rate: 0.12,
             }
         );
 
@@ -329,16 +329,14 @@ mod test {
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(1000).as_nanos() as u64);
 
         // Adding a new data point prunes everything except the one data point added now
-        // -> there are at least 2 data points required to calculate a rate
-        // -> rates are 0.0
         registration_rates.new_registration();
 
         assert_eq!(
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
-                current_rate_per_second: 0.0,
-                reference_rate_per_second: 0.0,
-                captcha_threshold_rate: 0.0,
+                current_rate_per_second: 0.01,
+                reference_rate_per_second: 0.001,
+                captcha_threshold_rate: 0.0012,
             }
         );
     }
