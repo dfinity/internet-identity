@@ -58,18 +58,24 @@ impl<M: Memory> RegistrationRates<M> {
     }
 
     /// Calculates the registration rates for the current and reference intervals along with the threschold.
-    /// 
+    ///
     /// The calculation assumes that the data has been pruned of old timestamps before the rates are calculated.
-    /// 
+    ///
     /// Initially the window for the rate calculation was the difference between now and the oldest point.
     /// However, we have accumulated data the last 3 weeks.
     /// Therefore, we can assume that we have data for all the interval and use the interval as the window.
     /// Otherwise, the rate will be underestimated.
     pub fn registration_rates(&self) -> Option<NormalizedRegistrationRates> {
         let config = dynamic_captcha_config()?;
-        
-        let reference_rate_per_second = rate_per_second(self.reference_rate_data.len(), config.reference_rate_retention_ns);
-        let current_rate_per_second = rate_per_second(self.current_rate_data.len(), config.current_rate_retention_ns);
+
+        let reference_rate_per_second = rate_per_second(
+            self.reference_rate_data.len(),
+            config.reference_rate_retention_ns,
+        );
+        let current_rate_per_second = rate_per_second(
+            self.current_rate_data.len(),
+            config.current_rate_retention_ns,
+        );
         let captcha_threshold_rate = reference_rate_per_second * config.threshold_multiplier;
         let rates = NormalizedRegistrationRates {
             reference_rate_per_second,
@@ -181,8 +187,8 @@ mod test {
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
                 reference_rate_per_second: 0.001, // 1 / 1000, as per config
-                current_rate_per_second: 0.01, // 1 / 100, as per config
-                captcha_threshold_rate: 0.0012, // 20% more than the reference rate, as per config
+                current_rate_per_second: 0.01,    // 1 / 100, as per config
+                captcha_threshold_rate: 0.0012,   // 20% more than the reference rate, as per config
             }
         );
 
@@ -194,8 +200,8 @@ mod test {
             registration_rates.registration_rates().unwrap(),
             NormalizedRegistrationRates {
                 reference_rate_per_second: 0.002, // 2 / 1000, as per config
-                current_rate_per_second: 0.02, // 2 / 100, as per config
-                captcha_threshold_rate: 0.0024, // 20% more than the reference rate, as per config
+                current_rate_per_second: 0.02,    // 2 / 100, as per config
+                captcha_threshold_rate: 0.0024,   // 20% more than the reference rate, as per config
             }
         );
     }
