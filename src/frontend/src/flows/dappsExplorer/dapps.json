@@ -29,6 +29,12 @@
     "logo": "yuku_logo.png"
   },
   {
+    "name": "dragginz",
+    "oneLiner": "Dragginz is a virtual pets game from the creators of Neopets. Hatch and raise Dragginz to accompany you on your adventures.",
+    "website": "https://dragginz.io/",
+    "logo": "dragginz_logo.webp"
+  },
+  {
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
     "logo": "icdex_logo.webp"
