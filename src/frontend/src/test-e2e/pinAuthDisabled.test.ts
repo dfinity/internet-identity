@@ -3,7 +3,8 @@ import { FLOWS } from "./flows";
 import { runInBrowser, switchToPopup } from "./util";
 import { AuthenticateView, DemoAppView, RegisterView } from "./views";
 
-test("Cannot register with PIN if dapp disallows PIN", async () => {
+// TODO: GIX-3138 Clean up after release
+test.skip("Cannot register with PIN if dapp disallows PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
@@ -21,7 +22,7 @@ test("Cannot register with PIN if dapp disallows PIN", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Cannot auth with PIN if dapp disallows PIN", async () => {
+test.skip("Cannot auth with PIN if dapp disallows PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 

@@ -23,7 +23,9 @@ import {
 
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
 
-test("PIN registration not enabled on non-Apple device", async () => {
+// TODO: GIX-3138 Clean up after release
+// TODO: Test login with PIN only GIX-3139
+test.skip("PIN registration not enabled on non-Apple device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
     const welcomeView = new WelcomeView(browser);
@@ -38,7 +40,7 @@ test("PIN registration not enabled on non-Apple device", async () => {
 // The PIN auth feature is only enabled for Apple specific user agents, so tests set the user
 // agent to chrome on macOS
 
-test("Register and Log in with PIN identity", async () => {
+test.skip("Register and Log in with PIN identity", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
@@ -53,7 +55,7 @@ test("Register and Log in with PIN identity", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Register with PIN and login without prefilled identity number", async () => {
+test.skip("Register with PIN and login without prefilled identity number", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     await browser.url(II_URL);
@@ -72,7 +74,7 @@ test("Register with PIN and login without prefilled identity number", async () =
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Register and log in with PIN identity, retry on wrong PIN", async () => {
+test.skip("Register and log in with PIN identity, retry on wrong PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     const wrongPin = "456321";
@@ -98,7 +100,7 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Should not prompt for PIN after deleting temp key", async () => {
+test.skip("Should not prompt for PIN after deleting temp key", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     await addVirtualAuthenticator(browser);
@@ -121,7 +123,7 @@ test("Should not prompt for PIN after deleting temp key", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Log into client application using PIN registration flow", async () => {
+test.skip("Log into client application using PIN registration flow", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
@@ -142,7 +144,7 @@ test("Log into client application using PIN registration flow", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Register with PIN then log into client application", async () => {
+test.skip("Register with PIN then log into client application", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 

@@ -57,6 +57,9 @@ export class RenameView extends View {
 }
 
 export class RegisterView extends View {
+  // View: Passkey or PIN registration
+  // TODO: GIX-3138 Clean up after release
+  // At the moment it's used only in skipped tests.
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-action="construct-identity"]')
