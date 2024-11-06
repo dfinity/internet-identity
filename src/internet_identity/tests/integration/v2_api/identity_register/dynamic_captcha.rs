@@ -34,15 +34,15 @@ fn should_require_captcha_above_threshold_rate() {
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_dynamic_captcha());
     let authn_method = test_authn_method();
 
-    // initialize a base rate of one registration every 2 seconds
-    for _ in 0..10 {
+    // initialize a base rate of one registration every 4 seconds for 100 seconds (reference rate)
+    for _ in 0..25 {
         create_identity_with_authn_method(&env, canister_id, &authn_method);
-        env.advance_time(Duration::from_secs(2))
+        env.advance_time(Duration::from_secs(4))
     }
 
     // Double the rate of registrations to one per second
-    // The 20% threshold rate should allow 5 registrations before the captcha kicks in
-    for i in 0..5 {
+    // The 20% threshold rate should allow 2 registrations before the captcha kicks in
+    for i in 0..2 {
         let flow_principal = test_principal(i);
         let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
             .expect("API call failed")
