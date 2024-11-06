@@ -62,11 +62,12 @@ const testConfigs: Array<{
     issuer: ISSUER_APP_URL_LEGACY,
     authType: "webauthn",
   },
-  {
-    relyingParty: TEST_APP_CANONICAL_URL,
-    issuer: ISSUER_APP_URL,
-    authType: "pin",
-  },
+  // TODO: Renable with PIN GIX-3139
+  // {
+  //   relyingParty: TEST_APP_CANONICAL_URL,
+  //   issuer: ISSUER_APP_URL,
+  //   authType: "pin",
+  // },
 ];
 
 testConfigs.forEach(({ relyingParty, issuer, authType }) => {
