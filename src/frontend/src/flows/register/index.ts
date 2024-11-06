@@ -33,9 +33,9 @@ export const registerFlow = async ({
   identityRegistrationStart,
   checkCaptcha,
   identityRegistrationFinish,
-  storePinIdentity,
+  storePinIdentity: _storePinIdentity,
   registrationAllowed,
-  pinAllowed,
+  pinAllowed: _pinAllowed,
   uaParser,
 }: {
   identityRegistrationStart: () => Promise<
