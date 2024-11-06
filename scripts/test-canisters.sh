@@ -22,9 +22,8 @@ fi
 
 # Parse arguments for --no-build flag
 NO_BUILD=false
-args=("$@")
 filtered_args=()
-for arg in "${args[@]}"; do
+for arg in "$@"; do
   if [ "$arg" != "--no-build" ]; then
     filtered_args+=("$arg")
   else
@@ -70,4 +69,4 @@ fi
 # Run tests
 
 echo "Running integration tests."
-cargo test "${filtered_args[@]}"
+cargo test "${filtered_args[@]:-}"
