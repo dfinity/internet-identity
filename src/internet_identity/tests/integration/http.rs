@@ -805,19 +805,19 @@ fn should_report_registration_rates() -> Result<(), CallError> {
     assert_metric_approx(
         &metrics,
         "internet_identity_registrations_per_second{type=\"reference_rate\"}",
-        1.6,
+        0.4,
         0.1,
     );
     assert_metric_approx(
         &metrics,
         "internet_identity_registrations_per_second{type=\"current_rate\"}",
-        1.3,
+        2f64,
         0.1,
     );
     assert_metric_approx(
         &metrics,
         "internet_identity_registrations_per_second{type=\"captcha_threshold_rate\"}",
-        1.9,
+        0.48,
         0.1,
     );
     Ok(())
