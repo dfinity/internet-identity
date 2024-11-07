@@ -63,7 +63,7 @@ impl<M: Memory> RegistrationRates<M> {
         if dynamic_captcha_config().is_none() {
             return;
         };
-
+        
         let now = time();
         self.reference_rate_data.push(&now).expect("out of memory");
         self.current_rate_data.push(&now).expect("out of memory");
@@ -104,6 +104,7 @@ impl<M: Memory> RegistrationRates<M> {
                 .map(|interval| interval < config.current_rate_retention_ns)
                 .unwrap_or(false),
         };
+
         Some(rates)
     }
 
@@ -153,8 +154,8 @@ fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) -> 
     const MAX_TO_PRUNE: usize = 100;
 
     let now = time();
-    let mut longest_pruned_interval = None;
-    for i in 0..MAX_TO_PRUNE {
+    let mut latest_pruned_interval = None;
+    for _ in 0..MAX_TO_PRUNE {
         let Some(timestamp) = data.peek() else {
             break;
         };
@@ -164,15 +165,12 @@ fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) -> 
         if timestamp > (now - interval_ns) {
             break;
         }
-
-        // The oldest timestamp is the first one. Therefore, the longest interval can only be with the first one.
-        if i == 0 {
-            longest_pruned_interval = Some(now - timestamp);
-        }
+        
+        latest_pruned_interval = Some(now - timestamp);
         data.pop();
     }
 
-    longest_pruned_interval
+    latest_pruned_interval
 }
 
 #[cfg(not(test))]
@@ -265,6 +263,63 @@ mod test {
                 is_reference_data_insufficient: false,
             }
         );
+    }
+
+    #[test]
+    fn should_take_last_pruned_data_for_pruned_interval() {
+        let mut registration_rates = setup();
+
+        // Add data so that reference rate has enough data.
+        for _ in 0..1000 {
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
+        registration_rates.new_registration();
+        // Timestamps [10]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(60).as_nanos() as u64);
+        registration_rates.new_registration();
+        // Timestamps [10, 70]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
+        registration_rates.new_registration();
+        // Timestamps [10, 70, 80]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(20).as_nanos() as u64);
+        registration_rates.new_registration();
+        // Timestamps [10, 70, 80, 100]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(90).as_nanos() as u64);
+        registration_rates.new_registration();
+        // Timestamps [100, 190]. 10, 70 and 80
+
+        assert!(!registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+
+        // Change the config for current rate interval from 100 to 150
+        // Timestamps [100, 190] are there. And 10, 70 and 80 were removed.
+        // But 70 and 80 should have been counted with a config of 150.
+        let new_current_interval_s = 150;
+        state::persistent_state_mut(|ps| {
+            ps.captcha_config = CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 10,
+                    current_rate_sampling_interval_s: new_current_interval_s,
+                    reference_rate_sampling_interval_s: 100,
+                },
+            }
+        });
+
+        // Captcha should be disable because we could have insufficient data
+        assert!(registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
     }
 
     #[test]
