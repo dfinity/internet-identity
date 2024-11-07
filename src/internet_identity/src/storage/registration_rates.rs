@@ -88,6 +88,7 @@ impl<M: Memory> RegistrationRates<M> {
             self.current_rate_data.len(),
             config.current_rate_retention_ns,
         );
+
         let captcha_threshold_rate = reference_rate_per_second * config.threshold_multiplier;
         let rates = NormalizedRegistrationRates {
             reference_rate_per_second,
@@ -202,7 +203,7 @@ mod test {
 
     #[test]
     fn should_calculate_rates() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
 
         // no data -> 0 rates
         assert_eq!(
@@ -247,7 +248,7 @@ mod test {
 
     #[test]
     fn should_calculate_rates_many_data_points() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
         for _ in 0..1000 {
             registration_rates.new_registration();
             TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
@@ -266,8 +267,8 @@ mod test {
     }
 
     #[test]
-    fn should_take_last_pruned_data_for_pruned_interval() {
-        let mut registration_rates = setup();
+    fn should_enable_captcha_if_current_rate_could_have_missing_data() {
+        let mut registration_rates = setup(100, 1000);
 
         // Add data so that reference rate has enough data.
         for _ in 0..1000 {
@@ -277,23 +278,28 @@ mod test {
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
         registration_rates.new_registration();
-        // Timestamps [10]
+
+        // State of the current registrations heap: [10]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(60).as_nanos() as u64);
         registration_rates.new_registration();
-        // Timestamps [10, 70]
+        
+        // State of the current registrations heap: [10, 70]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
         registration_rates.new_registration();
-        // Timestamps [10, 70, 80]
+        
+        // State of the current registrations heap: [10, 70, 80]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(20).as_nanos() as u64);
         registration_rates.new_registration();
-        // Timestamps [10, 70, 80, 100]
+        
+        // State of the current registrations heap: [10, 70, 80, 100]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(90).as_nanos() as u64);
         registration_rates.new_registration();
-        // Timestamps [100, 190]. 10, 70 and 80
+        
+        // State of the current registrations heap: [100, 190]. 10, 70 and 80 got pruned.
 
         assert!(!registration_rates
             .registration_rates()
@@ -301,8 +307,8 @@ mod test {
             .captcha_required());
 
         // Change the config for current rate interval from 100 to 150
-        // Timestamps [100, 190] are there. And 10, 70 and 80 were removed.
-        // But 70 and 80 should have been counted with a config of 150.
+        // Timestamps [100, 190] are there. However, 70 and 80 should have been counted with a config of 150.
+        // They were pruned because the config at that time was 100. Therefore, there is missing data when we go to 150.
         let new_current_interval_s = 150;
         state::persistent_state_mut(|ps| {
             ps.captcha_config = CaptchaConfig {
@@ -323,8 +329,70 @@ mod test {
     }
 
     #[test]
+    fn should_enable_captcha_if_reference_rate_could_have_missing_data() {
+        let mut registration_rates = setup(100, 100);
+
+        // Add data so that reference rate has enough data.
+        for _ in 0..100 {
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
+        registration_rates.new_registration();
+
+        // State of the current registrations heap: [10]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(60).as_nanos() as u64);
+        registration_rates.new_registration();
+        
+        // State of the current registrations heap: [10, 70]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
+        registration_rates.new_registration();
+        
+        // State of the current registrations heap: [10, 70, 80]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(20).as_nanos() as u64);
+        registration_rates.new_registration();
+        
+        // State of the current registrations heap: [10, 70, 80, 100]
+
+        TIME.with_borrow_mut(|t| *t += Duration::from_secs(90).as_nanos() as u64);
+        registration_rates.new_registration();
+        
+        // State of the current registrations heap: [100, 190]. 10, 70 and 80 got pruned.
+
+        assert!(!registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+
+        // Change the config for current rate interval from 100 to 150
+        // Timestamps [100, 190] are there. However, 70 and 80 should have been counted with a config of 150.
+        // They were pruned because the config at that time was 100. Therefore, there is missing data when we go to 150.
+        let new_reference_interval_s = 150;
+        state::persistent_state_mut(|ps| {
+            ps.captcha_config = CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 10,
+                    current_rate_sampling_interval_s: 100,
+                    reference_rate_sampling_interval_s: new_reference_interval_s,
+                },
+            }
+        });
+
+        // Captcha should be disable because we could have insufficient data
+        assert!(registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+    }
+
+    #[test]
     fn should_only_use_recent_data_for_current_rate() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
         // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
             registration_rates.new_registration();
@@ -353,7 +421,7 @@ mod test {
 
     #[test]
     fn previous_config_should_not_affect_new_config_shorter_window() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
         // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
             registration_rates.new_registration();
@@ -408,7 +476,7 @@ mod test {
 
     #[test]
     fn changing_longer_reference_window_enables_captcha() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
         // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
             registration_rates.new_registration();
@@ -440,7 +508,7 @@ mod test {
 
     #[test]
     fn changing_longer_current_window_enables_captcha() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
         // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
             registration_rates.new_registration();
@@ -472,7 +540,7 @@ mod test {
 
     #[test]
     fn should_prune_old_data() {
-        let mut registration_rates = setup();
+        let mut registration_rates = setup(100, 1000);
 
         // add 100 registrations at t0
         for _ in 0..100 {
@@ -545,7 +613,7 @@ mod test {
         assert!(registration_rates.registration_rates().is_none());
     }
 
-    fn setup() -> RegistrationRates<VectorMemory> {
+    fn setup(current_rate_sampling_interval_s: u64, reference_rate_sampling_interval_s: u64) -> RegistrationRates<VectorMemory> {
         reset_time();
 
         // setup config
@@ -554,8 +622,8 @@ mod test {
                 max_unsolved_captchas: 500,
                 captcha_trigger: CaptchaTrigger::Dynamic {
                     threshold_pct: 20,
-                    current_rate_sampling_interval_s: 100,
-                    reference_rate_sampling_interval_s: 1000,
+                    current_rate_sampling_interval_s,
+                    reference_rate_sampling_interval_s,
                 },
             }
         });
