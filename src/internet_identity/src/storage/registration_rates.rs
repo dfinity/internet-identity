@@ -11,9 +11,13 @@ pub struct RegistrationRates<M: Memory> {
     /// Min heap of registration timestamps to calculate the reference registration rate.
     /// [prune_data] removes values that are older than now minus the reference rate interval whenever new data is added.
     reference_rate_data: MinHeap<Timestamp, M>,
+    /// The interval between the moment of prunning and the oldest data point pruned for the `reference_rate_data`
+    reference_last_pruned_interval_ns: Option<u64>,
     /// Min heap of registration timestamps to calculate the current registration rate.
     /// [prune_data] removes values that are older than now minus the current rate interval whenever new data is added.
     current_rate_data: MinHeap<Timestamp, M>,
+    /// The interval between the moment of prunning and the oldest data point pruned for the `current_rate_data`
+    current_last_pruned_interval_ns: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,11 +25,17 @@ pub struct NormalizedRegistrationRates {
     pub reference_rate_per_second: f64,
     pub current_rate_per_second: f64,
     pub captcha_threshold_rate: f64,
+    pub is_reference_data_insufficient: bool,
+    pub is_current_data_insufficient: bool,
 }
 
 impl NormalizedRegistrationRates {
     pub fn captcha_required(&self) -> bool {
-        self.current_rate_per_second > self.captcha_threshold_rate
+        // The data might be insuficcient when the config changes to a longer window.
+        // In that case, we trigger the captcha to be on the safe side.
+        self.is_current_data_insufficient
+            || self.is_reference_data_insufficient
+            || self.current_rate_per_second > self.captcha_threshold_rate
     }
 }
 
@@ -42,7 +52,9 @@ impl<M: Memory> RegistrationRates<M> {
     ) -> Self {
         Self {
             reference_rate_data,
+            reference_last_pruned_interval_ns: None,
             current_rate_data,
+            current_last_pruned_interval_ns: None,
         }
     }
     pub fn new_registration(&mut self) {
@@ -81,6 +93,16 @@ impl<M: Memory> RegistrationRates<M> {
             reference_rate_per_second,
             current_rate_per_second,
             captcha_threshold_rate,
+            // The only moment we won't have last pruned interval is when we upgrade to the code with this data.
+            // In that case, assume we have sufficient data because we won't change the config at the same time.
+            is_reference_data_insufficient: self
+                .reference_last_pruned_interval_ns
+                .map(|interval| interval < config.reference_rate_retention_ns)
+                .unwrap_or(false),
+            is_current_data_insufficient: self
+                .current_last_pruned_interval_ns
+                .map(|interval| interval < config.current_rate_retention_ns)
+                .unwrap_or(false),
         };
         Some(rates)
     }
@@ -89,14 +111,18 @@ impl<M: Memory> RegistrationRates<M> {
         let Some(data_retention) = dynamic_captcha_config() else {
             return;
         };
-        prune_data(
+        // If prunning doesn't return a a new interval, do not change the interval.
+        self.reference_last_pruned_interval_ns = prune_data(
             &mut self.reference_rate_data,
             data_retention.reference_rate_retention_ns,
-        );
-        prune_data(
+        )
+        .or(self.reference_last_pruned_interval_ns);
+        // If prunning doesn't return a a new interval, do not change the interval.
+        self.current_last_pruned_interval_ns = prune_data(
             &mut self.current_rate_data,
             data_retention.current_rate_retention_ns,
-        );
+        )
+        .or(self.current_last_pruned_interval_ns);
     }
 }
 
@@ -122,11 +148,13 @@ fn dynamic_captcha_config() -> Option<DynamicCaptchaConfig> {
     }
 }
 
-fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) {
+/// Prune data older than the `now - interval` and return the longest interval pruned
+fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) -> Option<u64> {
     const MAX_TO_PRUNE: usize = 100;
 
     let now = time();
-    for _ in 0..MAX_TO_PRUNE {
+    let mut longest_pruned_interval = None;
+    for i in 0..MAX_TO_PRUNE {
         let Some(timestamp) = data.peek() else {
             break;
         };
@@ -136,8 +164,15 @@ fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) {
         if timestamp > (now - interval_ns) {
             break;
         }
+
+        // The oldest timestamp is the first one. Therefore, the longest interval can only be with the first one.
+        if i == 0 {
+            longest_pruned_interval = Some(now - timestamp);
+        }
         data.pop();
     }
+
+    longest_pruned_interval
 }
 
 #[cfg(not(test))]
@@ -178,6 +213,8 @@ mod test {
                 reference_rate_per_second: 0.0,
                 current_rate_per_second: 0.0,
                 captcha_threshold_rate: 0.0,
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
 
@@ -189,6 +226,8 @@ mod test {
                 reference_rate_per_second: 0.001, // 1 / 1000, as per config
                 current_rate_per_second: 0.01,    // 1 / 100, as per config
                 captcha_threshold_rate: 0.0012,   // 20% more than the reference rate, as per config
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
 
@@ -202,6 +241,8 @@ mod test {
                 reference_rate_per_second: 0.002, // 2 / 1000, as per config
                 current_rate_per_second: 0.02,    // 2 / 100, as per config
                 captcha_threshold_rate: 0.0024,   // 20% more than the reference rate, as per config
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
     }
@@ -220,6 +261,8 @@ mod test {
                 reference_rate_per_second: 1.0,
                 current_rate_per_second: 1.0,
                 captcha_threshold_rate: 1.2, // 20% more than the reference rate, as per config
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
     }
@@ -247,12 +290,14 @@ mod test {
                 current_rate_per_second: 3.0,
                 reference_rate_per_second: 1.2, // increases too, but more slowly
                 captcha_threshold_rate: 1.44,   // reference rate * 1.2 (as per config)
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
     }
 
     #[test]
-    fn previous_config_should_not_affect_new_config() {
+    fn previous_config_should_not_affect_new_config_shorter_window() {
         let mut registration_rates = setup();
         // initialize reference rate with 1 registration / second
         for _ in 0..1000 {
@@ -274,6 +319,8 @@ mod test {
                 current_rate_per_second: 3.0,
                 reference_rate_per_second: 1.2, // increases too, but more slowly
                 captcha_threshold_rate: 1.44,   // reference rate * 1.2 (as per config)
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
 
@@ -305,6 +352,70 @@ mod test {
     }
 
     #[test]
+    fn changing_longer_reference_window_enables_captcha() {
+        let mut registration_rates = setup();
+        // initialize reference rate with 1 registration / second
+        for _ in 0..1000 {
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        assert!(!registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+
+        let longer_reference_window = 2000;
+        state::persistent_state_mut(|ps| {
+            ps.captcha_config = CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 10,
+                    current_rate_sampling_interval_s: 100,
+                    reference_rate_sampling_interval_s: longer_reference_window,
+                },
+            }
+        });
+
+        assert!(registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+    }
+
+    #[test]
+    fn changing_longer_current_window_enables_captcha() {
+        let mut registration_rates = setup();
+        // initialize reference rate with 1 registration / second
+        for _ in 0..1000 {
+            registration_rates.new_registration();
+            TIME.with_borrow_mut(|t| *t += Duration::from_secs(1).as_nanos() as u64);
+        }
+
+        assert!(!registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+
+        let longer_current_window = 200;
+        state::persistent_state_mut(|ps| {
+            ps.captcha_config = CaptchaConfig {
+                max_unsolved_captchas: 500,
+                captcha_trigger: CaptchaTrigger::Dynamic {
+                    threshold_pct: 10,
+                    current_rate_sampling_interval_s: longer_current_window,
+                    reference_rate_sampling_interval_s: 1000,
+                },
+            }
+        });
+
+        assert!(registration_rates
+            .registration_rates()
+            .expect("reference rates is not defined")
+            .captcha_required());
+    }
+
+    #[test]
     fn should_prune_old_data() {
         let mut registration_rates = setup();
 
@@ -322,6 +433,8 @@ mod test {
                 current_rate_per_second: 1.0,
                 reference_rate_per_second: 0.1,
                 captcha_threshold_rate: 0.12,
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
 
@@ -337,6 +450,8 @@ mod test {
                 current_rate_per_second: 0.01,
                 reference_rate_per_second: 0.001,
                 captcha_threshold_rate: 0.0012,
+                is_current_data_insufficient: false,
+                is_reference_data_insufficient: false,
             }
         );
     }
