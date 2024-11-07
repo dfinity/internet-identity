@@ -63,7 +63,7 @@ impl<M: Memory> RegistrationRates<M> {
         if dynamic_captcha_config().is_none() {
             return;
         };
-        
+
         let now = time();
         self.reference_rate_data.push(&now).expect("out of memory");
         self.current_rate_data.push(&now).expect("out of memory");
@@ -166,7 +166,7 @@ fn prune_data<M: Memory>(data: &mut MinHeap<Timestamp, M>, interval_ns: u64) -> 
         if timestamp > (now - interval_ns) {
             break;
         }
-        
+
         latest_pruned_interval = Some(now - timestamp);
         data.pop();
     }
@@ -283,22 +283,22 @@ mod test {
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(60).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70, 80]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(20).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70, 80, 100]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(90).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [100, 190]. 10, 70 and 80 got pruned.
 
         assert!(!registration_rates
@@ -345,22 +345,22 @@ mod test {
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(60).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(10).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70, 80]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(20).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [10, 70, 80, 100]
 
         TIME.with_borrow_mut(|t| *t += Duration::from_secs(90).as_nanos() as u64);
         registration_rates.new_registration();
-        
+
         // State of the current registrations heap: [100, 190]. 10, 70 and 80 got pruned.
 
         assert!(!registration_rates
@@ -613,7 +613,10 @@ mod test {
         assert!(registration_rates.registration_rates().is_none());
     }
 
-    fn setup(current_rate_sampling_interval_s: u64, reference_rate_sampling_interval_s: u64) -> RegistrationRates<VectorMemory> {
+    fn setup(
+        current_rate_sampling_interval_s: u64,
+        reference_rate_sampling_interval_s: u64,
+    ) -> RegistrationRates<VectorMemory> {
         reset_time();
 
         // setup config
