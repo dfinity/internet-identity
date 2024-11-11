@@ -1111,7 +1111,7 @@ a:hover,
 
     padding: 0 var(--rs-split-page-bezzel--mobile);
 
-    max-width: var(--rs-main-content-width);
+    width: var(--rs-main-content-width);
   }
 
   .c-landingPage__logo {
@@ -1161,7 +1161,7 @@ a:hover,
 
 @media (max-width: 512px) {
   .c-landingPage__container {
-    max-width: none;
+    width: 100%;
   }
 }
 
