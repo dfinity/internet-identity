@@ -210,11 +210,9 @@ const authenticate = async (
     autoSelectionIdentity: autoSelectionIdentity,
   });
 
-  
   // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =
-  authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
-  
+    authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
   const result = await withLoader(() =>
     fetchDelegation({
@@ -224,7 +222,7 @@ const authenticate = async (
       maxTimeToLive: authContext.authRequest.maxTimeToLive,
     })
   );
-  
+
   if ("error" in result) {
     return {
       kind: "failure",
@@ -240,8 +238,8 @@ const authenticate = async (
     await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
   }
 
-    // Ignore the response of committing the metadata because it's not crucial.
-    void authSuccess.connection.commitMetadata();
+  // Ignore the response of committing the metadata because it's not crucial.
+  void authSuccess.connection.commitMetadata();
 
   const [userKey, parsed_signed_delegation] = result;
 
