@@ -210,20 +210,10 @@ const authenticate = async (
     autoSelectionIdentity: autoSelectionIdentity,
   });
 
-  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
-  // one. The exact flow depends on the device they use.
-  // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
-  // may have already closed the II window
-  if (!authSuccess.newAnchor) {
-    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
-  }
-
   // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
-  // Ignore the response of committing the metadata because it's not crucial.
-  void authSuccess.connection.commitMetadata();
   const result = await withLoader(() =>
     fetchDelegation({
       connection: authSuccess.connection,
@@ -239,6 +229,17 @@ const authenticate = async (
       text: "Unexpected error",
     };
   }
+
+  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
+  // one. The exact flow depends on the device they use.
+  // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
+  // may have already closed the II window
+  if (!authSuccess.newAnchor) {
+    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+  }
+
+  // Ignore the response of committing the metadata because it's not crucial.
+  void authSuccess.connection.commitMetadata();
 
   const [userKey, parsed_signed_delegation] = result;
 
