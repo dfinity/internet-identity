@@ -891,12 +891,10 @@ fn verify_response_certification(
 fn find_hashed_asset_path(search_name: &str) -> Result<String, String> {
     let dist_dir = fs::read_dir("../../dist").expect("Unable to read dist directory");
 
-    for entry in dist_dir {
-        if let Ok(entry) = entry {
-            let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.contains(search_name) {
-                return Ok(format!("/{}", filename));
-            }
+    for entry in dist_dir.flatten() {
+        let filename = entry.file_name().to_string_lossy().to_string();
+        if filename.contains(search_name) {
+            return Ok(format!("/{}", filename));
         }
     }
 
