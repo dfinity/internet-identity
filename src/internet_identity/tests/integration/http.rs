@@ -20,7 +20,6 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::fs;
 use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -112,9 +111,68 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
+    //get index page
+    let index_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string and find the font URL
+    let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the css URL in the HTML
+    let css_url = {
+        let css_suffix = "cacheable.css";
+        let css_end = html
+            .find(css_suffix)
+            .expect("Could not find cacheable.css in HTML");
+        let prefix_start = html[..css_end]
+            .rfind('/')
+            .expect("Could not find starting / for CSS URL");
+
+        html[prefix_start..css_end + css_suffix.len()].to_string()
+    };
+
+    //get css file
+    let css_request = HttpRequest {
+        method: "GET".to_string(),
+        url: css_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+
+    let css_response = http_request(&env, canister_id, &css_request)?;
+
+    let css_body = String::from_utf8(css_response.body.into_vec()).expect("Failed to parse CSS");
+
+    // Find the css URL in the HTML
+    let font_url = css_body
+        .lines()
+        .find(|line| line.contains("CircularXXWeb-Regular"))
+        .and_then(|line| {
+            // Extract URL from the line using the pattern: url(/path) format("woff2")
+            if let Some(url_start) = line.find("url(") {
+                let start = url_start + 4; // "url(" is 4 chars
+                if let Some(url_end) = line[start..].find(")") {
+                    let url = line[start..start + url_end].trim_matches(|c| c == '"' || c == '/');
+                    Some(format!("/{}", url))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .expect("Could not find css URL in HTML");
+
     let request = HttpRequest {
         method: "GET".to_string(),
-        url: remove_gz_extension(&find_hashed_asset_path("CircularXXWeb-Regular").unwrap()),
+        url: font_url,
         headers: vec![],
         body: ByteBuf::new(),
         certificate_version: Some(CERTIFICATION_VERSION),
@@ -141,18 +199,46 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 
 /// Verifies that the cache-control header is set for all cacheable assets.
 #[test]
-fn should_set_cache_control_for_spa_file() -> Result<(), CallError> {
-    const CERTIFICATION_VERSION: u16 = 2;
+fn should_set_cache_control_for_spa() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 1;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    let request = HttpRequest {
+    //get index page
+    let index_request = HttpRequest {
         method: "GET".to_string(),
-        url: remove_gz_extension(&find_hashed_asset_path("spa").unwrap()),
+        url: "/".to_string(),
         headers: vec![],
         body: ByteBuf::new(),
-        certificate_version: Some(CERTIFICATION_VERSION),
+        certificate_version: None,
     };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string and find the font URL
+    let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the spa URL in the HTML
+    let spa_url = {
+        let spa_suffix = "cacheable.js";
+        let spa_end = html
+            .find(spa_suffix)
+            .expect("Could not find cacheable.js in HTML");
+        let prefix_start = html[..spa_end]
+            .rfind('/')
+            .expect("Could not find starting / for spa URL");
+
+        html[prefix_start..spa_end + spa_suffix.len()].to_string()
+    };
+
+    //get spa file
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: spa_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+
     let http_response = http_request(&env, canister_id, &request)?;
 
     assert_eq!(http_response.status_code, 200);
@@ -885,22 +971,4 @@ fn verify_response_certification(
         min_certification_version as u8,
     )
     .unwrap_or_else(|e| panic!("validation failed: {e}"))
-}
-
-/// Finds the hashed asset path in the dist directory.
-fn find_hashed_asset_path(search_name: &str) -> Result<String, String> {
-    let dist_dir = fs::read_dir("../../dist").expect("Unable to read dist directory");
-
-    for entry in dist_dir.flatten() {
-        let filename = entry.file_name().to_string_lossy().to_string();
-        if filename.contains(search_name) {
-            return Ok(format!("/{}", filename));
-        }
-    }
-
-    Err(format!("Could not find asset with name: {}", search_name))
-}
-
-fn remove_gz_extension(path: &str) -> String {
-    path.strip_suffix(".gz").unwrap_or(path).to_string()
 }
