@@ -20,6 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::fs;
 use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -113,7 +114,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 
     let request = HttpRequest {
         method: "GET".to_string(),
-        url: "/CircularXXWeb-Regular.woff2".to_string(),
+        url: remove_gz_extension(&find_hashed_asset_path("CircularXXWeb-Regular").unwrap()),
         headers: vec![],
         body: ByteBuf::new(),
         certificate_version: Some(CERTIFICATION_VERSION),
@@ -123,7 +124,41 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     assert_eq!(http_response.status_code, 200);
     assert!(http_response.headers.contains(&(
         "Cache-Control".to_string(),
-        "public, max-age=604800".to_string()
+        "public, max-age=31536000".to_string()
+    )));
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        request,
+        http_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
+/// Verifies that the cache-control header is set for all cacheable assets.
+#[test]
+fn should_set_cache_control_for_spa_file() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: remove_gz_extension(&find_hashed_asset_path("spa").unwrap()),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(http_response.status_code, 200);
+    assert!(http_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
     )));
 
     let result = verify_response_certification(
@@ -850,4 +885,24 @@ fn verify_response_certification(
         min_certification_version as u8,
     )
     .unwrap_or_else(|e| panic!("validation failed: {e}"))
+}
+
+/// Finds the hashed asset path in the dist directory.
+fn find_hashed_asset_path(search_name: &str) -> Result<String, String> {
+    let dist_dir = fs::read_dir("../../dist").expect("Unable to read dist directory");
+
+    for entry in dist_dir {
+        if let Ok(entry) = entry {
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.contains(search_name) {
+                return Ok(format!("/{}", filename));
+            }
+        }
+    }
+
+    Err(format!("Could not find asset with name: {}", search_name))
+}
+
+fn remove_gz_extension(path: &str) -> String {
+    path.strip_suffix(".gz").unwrap_or(path).to_string()
 }

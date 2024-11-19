@@ -55,18 +55,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
         output: {
           entryFileNames: `[name].js`,
           // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
-          chunkFileNames: (chunkInfo) => {
-            if(chunkInfo.name === 'spa') {
-              return `${chunkInfo.name.replace(/.es6|.min/gm, "")}-[hash].js`;
-            }
-            return `${chunkInfo.name.replace(/.es6|.min/gm, "")}.js`;
-          },
-          assetFileNames: (assetInfo) => {
-            if(assetInfo.name === 'spa.css') {
-              return `spa-[hash].css`;
-            }
-            return `[name].[ext]`;
-          },
+          chunkFileNames: (chunkInfo) =>
+            `${chunkInfo.name.replace(/.es6|.min/gm, "")}-[hash]-cacheable.js`,
+
+          assetFileNames: `[name]-[hash]-cacheable.[ext]`,
         },
       },
       commonjsOptions: {
