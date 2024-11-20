@@ -117,7 +117,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         url: "/".to_string(),
         headers: vec![],
         body: ByteBuf::new(),
-        certificate_version: None,
+        certificate_version: Some(CERTIFICATION_VERSION),
     };
     let index_response = http_request(&env, canister_id, &index_request)?;
 
@@ -143,10 +143,19 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         url: css_url,
         headers: vec![],
         body: ByteBuf::new(),
-        certificate_version: None,
+        certificate_version: Some(CERTIFICATION_VERSION),
     };
 
     let css_response = http_request(&env, canister_id, &css_request)?;
+
+    let css_result = verify_response_certification(
+        &env,
+        canister_id,
+        css_request,
+        css_response.clone(),
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(css_result.verification_version, CERTIFICATION_VERSION);
 
     let css_body = String::from_utf8(css_response.body.into_vec()).expect("Failed to parse CSS");
 
@@ -170,17 +179,17 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         })
         .expect("Could not find css URL in HTML");
 
-    let request = HttpRequest {
+    let font_request = HttpRequest {
         method: "GET".to_string(),
         url: font_url,
         headers: vec![],
         body: ByteBuf::new(),
         certificate_version: Some(CERTIFICATION_VERSION),
     };
-    let http_response = http_request(&env, canister_id, &request)?;
+    let font_response = http_request(&env, canister_id, &font_request)?;
 
-    assert_eq!(http_response.status_code, 200);
-    assert!(http_response.headers.contains(&(
+    assert_eq!(font_response.status_code, 200);
+    assert!(font_response.headers.contains(&(
         "Cache-Control".to_string(),
         "public, max-age=31536000".to_string()
     )));
@@ -188,8 +197,8 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     let result = verify_response_certification(
         &env,
         canister_id,
-        request,
-        http_response,
+        font_request,
+        font_response,
         CERTIFICATION_VERSION,
     );
     assert_eq!(result.verification_version, CERTIFICATION_VERSION);
@@ -200,7 +209,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 /// Verifies that the cache-control header is set for all cacheable assets.
 #[test]
 fn should_set_cache_control_for_spa() -> Result<(), CallError> {
-    const CERTIFICATION_VERSION: u16 = 1;
+    const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -210,7 +219,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
         url: "/".to_string(),
         headers: vec![],
         body: ByteBuf::new(),
-        certificate_version: None,
+        certificate_version: Some(CERTIFICATION_VERSION),
     };
     let index_response = http_request(&env, canister_id, &index_request)?;
 
@@ -236,7 +245,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
         url: spa_url,
         headers: vec![],
         body: ByteBuf::new(),
-        certificate_version: None,
+        certificate_version: Some(CERTIFICATION_VERSION),
     };
 
     let http_response = http_request(&env, canister_id, &request)?;
