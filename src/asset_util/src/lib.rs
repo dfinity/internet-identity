@@ -103,7 +103,7 @@ impl CertifiedAssets {
         if url_path.contains("cacheable") {
             headers.push((
                 "Cache-Control".to_string(),
-                "public, max-age=604800".to_string(), // cache for 1 week
+                "public, max-age=31536000".to_string(), // cache for 1 year
             ));
         }
 
