@@ -8,6 +8,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
+use flate2::read::GzDecoder;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -20,6 +21,7 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::io::Read;
 use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -206,7 +208,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Verifies that the cache-control header is set for all cacheable assets.
+/// Verifies that the cache-control header is set for the spa.
 #[test]
 fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
@@ -264,6 +266,120 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
         CERTIFICATION_VERSION,
     );
     assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
+/// Verifies that the cache-control header is set for the icons.
+#[test]
+fn should_set_cache_control_for_icons() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    //get index page
+    let index_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string and find the font URL
+    let index_html =
+        String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the spa URL in the HTML
+    let spa_url = {
+        let spa_suffix = "cacheable.js";
+        let spa_end = index_html
+            .find(spa_suffix)
+            .expect("Could not find cacheable.js in HTML");
+        let prefix_start = index_html[..spa_end]
+            .rfind('/')
+            .expect("Could not find starting / for spa URL");
+
+        index_html[prefix_start..spa_end + spa_suffix.len()].to_string()
+    };
+
+    //get spa file
+    let spa_request = HttpRequest {
+        method: "GET".to_string(),
+        url: spa_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
+    let spa_response = http_request(&env, canister_id, &spa_request)?;
+
+    assert_eq!(spa_response.status_code, 200);
+    assert!(spa_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
+    )));
+
+    let spa_result = verify_response_certification(
+        &env,
+        canister_id,
+        spa_request,
+        spa_response.clone(),
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(spa_result.verification_version, CERTIFICATION_VERSION);
+
+    let spa_bytes = spa_response.body.into_vec();
+
+    // decompress the spa bytes
+    let mut decoder = GzDecoder::new(&spa_bytes[..]);
+    let mut spa_body = String::new();
+    decoder.read_to_string(&mut spa_body).unwrap();
+
+    // Find the icon URL in the HTML
+    let icon_url = spa_body
+        .lines()
+        .find(|line| line.contains("icpswap_logo"))
+        .and_then(|line| {
+            if let Some(url_start) = line.find("\"/icpswap_logo") {
+                if let Some(url_end) = line[url_start..].find(".webp\"") {
+                    let url = line[url_start..url_start + url_end + 5]
+                        .trim_matches(|c| c == '"' || c == '/');
+                    Some(format!("/{}", url))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .expect("Could not find icon URL in HTML");
+
+    let icon_request = HttpRequest {
+        method: "GET".to_string(),
+        url: icon_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
+    let icon_response = http_request(&env, canister_id, &icon_request)?;
+
+    assert_eq!(icon_response.status_code, 200);
+    assert!(icon_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
+    )));
+
+    let icon_result = verify_response_certification(
+        &env,
+        canister_id,
+        icon_request,
+        icon_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(icon_result.verification_version, CERTIFICATION_VERSION);
 
     Ok(())
 }
