@@ -1,5 +1,9 @@
 import { features } from "$src/features";
-const iconFiles = import.meta.glob('../../assets/icons/*', { eager: true, query: '?url', import: 'default' });
+const iconFiles = import.meta.glob("../../assets/icons/*", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used
