@@ -11,6 +11,6 @@ export const LEGACY_II_URL = "https://identity.ic0.app";
 
 export const PORTAL_II_URL = "https://internetcomputer.org/internet-identity";
 
-// Default support page to link when error is shown to user
+// Default support page URL for when error is shown to user
 export const ERROR_SUPPORT_URL =
   "https://identitysupport.dfinity.org/hc/en-us/articles/32301362727188";
