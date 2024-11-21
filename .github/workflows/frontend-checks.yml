@@ -29,7 +29,7 @@ jobs:
         run: |
           while read -r logo
           do
-            if [ ! -f src/frontend/assets/icons/"$logo" ]
+            if [ ! -f src/frontend/assets/src/assets/icons/"$logo" ]
             then
               echo "Logo not found: $logo"
               exit 1
@@ -62,7 +62,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'dist-showcase'
+          path: "dist-showcase"
 
   # Deploy the showcase to GitHub Pages
   showcase-deploy:
