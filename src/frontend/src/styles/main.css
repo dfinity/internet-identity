@@ -1718,12 +1718,6 @@ by all browsers (FF is missing) */
   fill: currentColor;
 }
 
-.c-button--secondary {
-  background: var(--rc-button-secondary);
-  color: var(--rc-onButton-secondary);
-  border: var(--rs-line) solid var(--rc-line-interaction);
-}
-
 .c-button--textOnly {
   background: transparent;
   color: var(--rc-interaction-text);
@@ -1737,10 +1731,23 @@ by all browsers (FF is missing) */
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
+  color: var(--rc-onButton);
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
+  text-decoration: none;
+}
+
+.c-button--secondary {
+  background: var(--rc-button-secondary);
+  color: var(--rc-onButton-secondary);
+  border: var(--rs-line) solid var(--rc-line-interaction);
+}
+
+.c-button--secondary:not([disabled]):hover,
+.c-button--secondary:not([disabled]):focus {
+  color: var(--rc-onButton-secondary);
 }
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
@@ -3142,6 +3149,19 @@ input[type="checkbox"] {
   animation-duration: 5s;
   animation-iteration-count: infinite;
   animation-timing-function: ease-in-out;
+}
+
+.c-loader__link {
+  color: var(--rc-surface);
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 72px);
+}
+
+.c-loader__link:hover, .c-loader__link:focus {
+  color: var(--rc-surface);
 }
 
 /* Wrap QR codes in a white square (for legibility) and prettify a bit */
