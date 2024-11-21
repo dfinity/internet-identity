@@ -4,7 +4,7 @@ name: Dapps Update
 on:
   schedule:
     # Check for updates daily
-    - cron:  '0 0 * * *'
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
@@ -32,13 +32,14 @@ jobs:
           base: main
           add-paths: |
             src/frontend/src/flows/dappsExplorer/dapps.json
-            src/frontend/assets/icons
+            src/frontend/assets/src/assets/icons
           commit-message: Update dapps
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>
           branch: bot-dapps-update
           delete-branch: true
-          title: 'Update dapps list'
+          title:
+            "Update dapps list"
 
             # Since the this is a scheduled job, a failure won't be shown on any
             # PR status. To notify the team, we send a message to our Slack channel on failure.
