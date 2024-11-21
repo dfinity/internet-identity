@@ -113,7 +113,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    //get index page
+    // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
         url: "/".to_string(),
@@ -126,7 +126,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     // Convert body to string and find the font URL
     let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
 
-    // Find the css URL in the HTML
+    // Find the CSS URL in the HTML
     let css_url = {
         let css_suffix = "cacheable.css";
         let css_end = html
@@ -139,7 +139,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         html[prefix_start..css_end + css_suffix.len()].to_string()
     };
 
-    //get css file
+    // Get CSS file
     let css_request = HttpRequest {
         method: "GET".to_string(),
         url: css_url,
@@ -161,7 +161,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 
     let css_body = String::from_utf8(css_response.body.into_vec()).expect("Failed to parse CSS");
 
-    // Find the css URL in the HTML
+    // Find the CSS URL in the HTML
     let font_url = css_body
         .lines()
         .find(|line| line.contains("CircularXXWeb-Regular"))
@@ -215,7 +215,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    //get index page
+    // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
         url: "/".to_string(),
@@ -241,7 +241,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
         html[prefix_start..spa_end + spa_suffix.len()].to_string()
     };
 
-    //get spa file
+    // Get spa file
     let request = HttpRequest {
         method: "GET".to_string(),
         url: spa_url,
@@ -277,7 +277,7 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    //get index page
+    // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
         url: "/".to_string(),
@@ -304,7 +304,7 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
         index_html[prefix_start..spa_end + spa_suffix.len()].to_string()
     };
 
-    //get spa file
+    // Get spa file
     let spa_request = HttpRequest {
         method: "GET".to_string(),
         url: spa_url,
@@ -332,7 +332,7 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
 
     let spa_bytes = spa_response.body.into_vec();
 
-    // decompress the spa bytes
+    // Decompress the spa bytes
     let mut decoder = GzDecoder::new(&spa_bytes[..]);
     let mut spa_body = String::new();
     decoder.read_to_string(&mut spa_body).unwrap();
