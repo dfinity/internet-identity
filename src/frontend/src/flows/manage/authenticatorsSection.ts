@@ -129,7 +129,7 @@ export const authenticatorItem = ({
   let lastUsageTimeStamp: Date | undefined;
   let lastUsageFormattedString: string | undefined;
 
-  if (last_usage.length > 0 && typeof last_usage[0] === "bigint") {
+  if (last_usage?.length > 0 && typeof last_usage[0] === "bigint") {
     lastUsageTimeStamp = new Date(Number(last_usage[0] / BigInt(1000000)));
   }
 
