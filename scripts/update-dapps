@@ -10,7 +10,7 @@ cd "$SCRIPTS_DIR/.."
 # The path where we save the list of dapps in II
 DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
 # The path where we save logos in II
-II_LOGO_PREFIX="src/frontend/assets/icons"
+II_LOGO_PREFIX="src/frontend/assets/src/assets/icons"
 
 function title() {
     echo "Update dapps descriptions & logos from dfinity/portal"
