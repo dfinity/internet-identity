@@ -111,19 +111,149 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    let request = HttpRequest {
+    //get index page
+    let index_request = HttpRequest {
         method: "GET".to_string(),
-        url: "/CircularXXWeb-Regular.woff2".to_string(),
+        url: "/".to_string(),
         headers: vec![],
         body: ByteBuf::new(),
         certificate_version: Some(CERTIFICATION_VERSION),
     };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string and find the font URL
+    let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the css URL in the HTML
+    let css_url = {
+        let css_suffix = "cacheable.css";
+        let css_end = html
+            .find(css_suffix)
+            .expect("Could not find cacheable.css in HTML");
+        let prefix_start = html[..css_end]
+            .rfind('/')
+            .expect("Could not find starting / for CSS URL");
+
+        html[prefix_start..css_end + css_suffix.len()].to_string()
+    };
+
+    //get css file
+    let css_request = HttpRequest {
+        method: "GET".to_string(),
+        url: css_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
+    let css_response = http_request(&env, canister_id, &css_request)?;
+
+    let css_result = verify_response_certification(
+        &env,
+        canister_id,
+        css_request,
+        css_response.clone(),
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(css_result.verification_version, CERTIFICATION_VERSION);
+
+    let css_body = String::from_utf8(css_response.body.into_vec()).expect("Failed to parse CSS");
+
+    // Find the css URL in the HTML
+    let font_url = css_body
+        .lines()
+        .find(|line| line.contains("CircularXXWeb-Regular"))
+        .and_then(|line| {
+            // Extract URL from the line using the pattern: url(/path) format("woff2")
+            if let Some(url_start) = line.find("url(") {
+                let start = url_start + 4; // "url(" is 4 chars
+                if let Some(url_end) = line[start..].find(")") {
+                    let url = line[start..start + url_end].trim_matches(|c| c == '"' || c == '/');
+                    Some(format!("/{}", url))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .expect("Could not find css URL in HTML");
+
+    let font_request = HttpRequest {
+        method: "GET".to_string(),
+        url: font_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let font_response = http_request(&env, canister_id, &font_request)?;
+
+    assert_eq!(font_response.status_code, 200);
+    assert!(font_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
+    )));
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        font_request,
+        font_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
+/// Verifies that the cache-control header is set for the spa file.
+#[test]
+fn should_set_cache_control_for_spa() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    //get index page
+    let index_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string and find the font URL
+    let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the spa URL in the HTML
+    let spa_url = {
+        let spa_suffix = "cacheable.js";
+        let spa_end = html
+            .find(spa_suffix)
+            .expect("Could not find cacheable.js in HTML");
+        let prefix_start = html[..spa_end]
+            .rfind('/')
+            .expect("Could not find starting / for spa URL");
+
+        html[prefix_start..spa_end + spa_suffix.len()].to_string()
+    };
+
+    //get spa file
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: spa_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
     let http_response = http_request(&env, canister_id, &request)?;
 
     assert_eq!(http_response.status_code, 200);
     assert!(http_response.headers.contains(&(
         "Cache-Control".to_string(),
-        "public, max-age=604800".to_string()
+        "public, max-age=31536000".to_string()
     )));
 
     let result = verify_response_certification(
