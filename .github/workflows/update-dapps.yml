@@ -32,7 +32,7 @@ jobs:
           base: main
           add-paths: |
             src/frontend/src/flows/dappsExplorer/dapps.json
-            src/frontend/assets/src/assets/icons
+            src/frontend/src/assets/icons
           commit-message: Update dapps
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>
