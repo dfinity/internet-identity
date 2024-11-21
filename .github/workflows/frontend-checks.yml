@@ -29,7 +29,7 @@ jobs:
         run: |
           while read -r logo
           do
-            if [ ! -f src/frontend/assets/src/assets/icons/"$logo" ]
+            if [ ! -f src/frontend/src/assets/icons/"$logo" ]
             then
               echo "Logo not found: $logo"
               exit 1
