@@ -208,7 +208,6 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     Ok(())
 }
 
-
 /// Verifies that the cache-control header is set for the spa file.
 #[test]
 fn should_set_cache_control_for_spa() -> Result<(), CallError> {
