@@ -117,7 +117,7 @@ function update() {
             --show-error \
             --silent \
             "$portal_url/$portal_logo_path" \
-            --output "$II_LOGO_PREFIX/$logo"
+            --output "$ii_logo_path"
 
     done < <(jq -cMr <"$DAPPS_JSON" '.[] | .logo')
 
