@@ -3160,7 +3160,8 @@ input[type="checkbox"] {
   transform: translate(-50%, 72px);
 }
 
-.c-loader__link:hover, .c-loader__link:focus {
+.c-loader__link:hover,
+.c-loader__link:focus {
   color: var(--rc-surface);
 }
 
