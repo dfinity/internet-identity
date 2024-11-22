@@ -277,6 +277,10 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
+    // Icon we are testing for
+    const ICON_NAME: &str = "icpswap_logo";
+    const ICON_SUFFIX: &str = ".webp";
+
     // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
@@ -340,10 +344,10 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     // Find the icon URL in the HTML
     let icon_url = spa_body
         .lines()
-        .find(|line| line.contains("icpswap_logo"))
+        .find(|line| line.contains(ICON_NAME))
         .and_then(|line| {
-            if let Some(url_start) = line.find("\"/icpswap_logo") {
-                if let Some(url_end) = line[url_start..].find(".webp\"") {
+            if let Some(url_start) = line.find(&format!("\"/{ICON_NAME}")) {
+                if let Some(url_end) = line[url_start..].find(&format!("{ICON_SUFFIX}\"")) {
                     let url = line[url_start..url_start + url_end + 5]
                         .trim_matches(|c| c == '"' || c == '/');
                     Some(format!("/{}", url))
