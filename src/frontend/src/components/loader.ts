@@ -14,7 +14,7 @@ const loader = (takingForever = false) =>
       target="_blank"
       rel="noopener noreferrer"
       class="c-loader__link"
-      >Ongoing issues</a
+      >Check ongoing issues</a
     >`}
   </div>`;
 
