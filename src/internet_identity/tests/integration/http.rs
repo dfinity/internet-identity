@@ -8,6 +8,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
+use flate2::read::GzDecoder;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -20,6 +21,7 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::io::Read;
 use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
@@ -111,7 +113,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    //get index page
+    // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
         url: "/".to_string(),
@@ -121,10 +123,10 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     };
     let index_response = http_request(&env, canister_id, &index_request)?;
 
-    // Convert body to string and find the font URL
+    // Convert body to string
     let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
 
-    // Find the css URL in the HTML
+    // Find the CSS URL in the HTML
     let css_url = {
         let css_suffix = "cacheable.css";
         let css_end = html
@@ -137,7 +139,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
         html[prefix_start..css_end + css_suffix.len()].to_string()
     };
 
-    //get css file
+    // Get CSS file
     let css_request = HttpRequest {
         method: "GET".to_string(),
         url: css_url,
@@ -159,7 +161,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 
     let css_body = String::from_utf8(css_response.body.into_vec()).expect("Failed to parse CSS");
 
-    // Find the css URL in the HTML
+    // Find the Font URL in the CSS
     let font_url = css_body
         .lines()
         .find(|line| line.contains("CircularXXWeb-Regular"))
@@ -206,14 +208,14 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     Ok(())
 }
 
-/// Verifies that the cache-control header is set for the spa file.
+/// Verifies that the cache-control header is set for the SPA file.
 #[test]
 fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
-    //get index page
+    // Get index page
     let index_request = HttpRequest {
         method: "GET".to_string(),
         url: "/".to_string(),
@@ -223,10 +225,10 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     };
     let index_response = http_request(&env, canister_id, &index_request)?;
 
-    // Convert body to string and find the font URL
+    // Convert body to string
     let html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
 
-    // Find the spa URL in the HTML
+    // Find the SPA URL in the HTML
     let spa_url = {
         let spa_suffix = "cacheable.js";
         let spa_end = html
@@ -239,7 +241,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
         html[prefix_start..spa_end + spa_suffix.len()].to_string()
     };
 
-    //get spa file
+    // Get SPA file
     let request = HttpRequest {
         method: "GET".to_string(),
         url: spa_url,
@@ -268,6 +270,124 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     Ok(())
 }
 
+/// Verifies that the cache-control header is set for the icons.
+#[test]
+fn should_set_cache_control_for_icons() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    // Icon we are testing for
+    const ICON_NAME: &str = "icpswap_logo";
+    const ICON_SUFFIX: &str = ".webp";
+
+    // Get index page
+    let index_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let index_response = http_request(&env, canister_id, &index_request)?;
+
+    // Convert body to string
+    let index_html =
+        String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
+    // Find the SPA URL in the HTML
+    let spa_url = {
+        let spa_suffix = "cacheable.js";
+        let spa_end = index_html
+            .find(spa_suffix)
+            .expect("Could not find cacheable.js in HTML");
+        let prefix_start = index_html[..spa_end]
+            .rfind('/')
+            .expect("Could not find starting / for spa URL");
+
+        index_html[prefix_start..spa_end + spa_suffix.len()].to_string()
+    };
+
+    // Get SPA file
+    let spa_request = HttpRequest {
+        method: "GET".to_string(),
+        url: spa_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
+    let spa_response = http_request(&env, canister_id, &spa_request)?;
+
+    assert_eq!(spa_response.status_code, 200);
+    assert!(spa_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
+    )));
+
+    let spa_result = verify_response_certification(
+        &env,
+        canister_id,
+        spa_request,
+        spa_response.clone(),
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(spa_result.verification_version, CERTIFICATION_VERSION);
+
+    let spa_bytes = spa_response.body.into_vec();
+
+    // Decompress the SPA bytes
+    let mut decoder = GzDecoder::new(&spa_bytes[..]);
+    let mut spa_body = String::new();
+    decoder.read_to_string(&mut spa_body).unwrap();
+
+    // Find the icon URL in the HTML
+    let icon_url = spa_body
+        .lines()
+        .find(|line| line.contains(ICON_NAME))
+        .and_then(|line| {
+            if let Some(url_start) = line.find(&format!("\"/{ICON_NAME}")) {
+                if let Some(url_end) = line[url_start..].find(&format!("{ICON_SUFFIX}\"")) {
+                    let url = line[url_start..url_start + url_end + 5]
+                        .trim_matches(|c| c == '"' || c == '/');
+                    Some(format!("/{}", url))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .expect("Could not find icon URL in HTML");
+
+    let icon_request = HttpRequest {
+        method: "GET".to_string(),
+        url: icon_url,
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+
+    let icon_response = http_request(&env, canister_id, &icon_request)?;
+
+    assert_eq!(icon_response.status_code, 200);
+    assert!(icon_response.headers.contains(&(
+        "Cache-Control".to_string(),
+        "public, max-age=31536000".to_string()
+    )));
+
+    let icon_result = verify_response_certification(
+        &env,
+        canister_id,
+        icon_request,
+        icon_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(icon_result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
 /// Verifies that expected metrics are available via the HTTP endpoint.
 #[test]
 fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
@@ -287,9 +407,9 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
         "internet_identity_prepare_id_alias_counter",
     ];
     let env = env();
-    env.advance_time(Duration::from_secs(300)); // advance time to see it reflected on the metrics endpoint
+    env.advance_time(Duration::from_secs(300)); // Advance time to see it reflected on the metrics endpoint
 
-    // spawn an archive so that we also get the archive related metrics
+    // Spawn an archive so that we also get the archive related metrics
     let canister_id = install_ii_canister_with_arg(
         &env,
         II_WASM.clone(),

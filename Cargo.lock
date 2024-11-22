@@ -1952,6 +1952,7 @@ dependencies = [
  "candid_parser",
  "canister_tests",
  "captcha",
+ "flate2",
  "getrandom",
  "hex",
  "hex-literal",

@@ -10,7 +10,7 @@ cd "$SCRIPTS_DIR/.."
 # The path where we save the list of dapps in II
 DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
 # The path where we save logos in II
-II_LOGO_PREFIX="src/frontend/assets/icons"
+II_LOGO_PREFIX="src/frontend/src/assets/icons"
 
 function title() {
     echo "Update dapps descriptions & logos from dfinity/portal"
@@ -65,7 +65,7 @@ function update() {
     # The actual path prefix where logos are stored
     portal_filepath_prefix="static/img/showcase"
     # The path where we save logos in II
-    II_LOGO_PREFIX="src/frontend/assets/icons"
+    II_LOGO_PREFIX="src/frontend/src/assets/icons"
 
     # The path where we save the list of dapps in II
     DAPPS_JSON="$PWD/src/frontend/src/flows/dappsExplorer/dapps.json"
@@ -117,7 +117,7 @@ function update() {
             --show-error \
             --silent \
             "$portal_url/$portal_logo_path" \
-            --output "src/frontend/assets/icons/$logo"
+            --output "$ii_logo_path"
 
     done < <(jq -cMr <"$DAPPS_JSON" '.[] | .logo')
 

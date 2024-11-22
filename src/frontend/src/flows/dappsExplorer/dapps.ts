@@ -1,5 +1,10 @@
-import { BASE_URL } from "$src/environment";
 import { features } from "$src/features";
+// This path should point to internet-identity/src/frontend/src/assets/icons/*
+const iconFiles = import.meta.glob("../../assets/icons/*", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used
@@ -39,7 +44,8 @@ export class KnownDapp {
 
   // Path to use for logo files
   public get logoSrc(): string {
-    return BASE_URL + "icons/" + this.descr.logo;
+    const path = `../../assets/icons/${this.descr.logo}`;
+    return iconFiles[path] as string;
   }
 
   public get name(): string {
