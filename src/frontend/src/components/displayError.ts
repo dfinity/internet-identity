@@ -1,3 +1,4 @@
+import { ERROR_SUPPORT_URL } from "$src/config";
 import { TemplateElement } from "$src/utils/lit-html";
 import { nonNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";
@@ -40,6 +41,13 @@ ${options.detail}</pre
         >
           ${options.primaryButton}
         </button>
+        <a
+          href="${ERROR_SUPPORT_URL}"
+          target="_blank"
+          class="c-button c-button--secondary"
+        >
+          Go to support
+        </a>
       </div>`,
   });
 
