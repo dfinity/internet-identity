@@ -1,4 +1,5 @@
 import { features } from "$src/features";
+// This path should point to internet-identity/src/frontend/src/assets/icons/*
 const iconFiles = import.meta.glob("../../assets/icons/*", {
   eager: true,
   query: "?url",
