@@ -49,7 +49,7 @@
     "name": "Helix Markets",
     "oneLiner": "Bringing true ownership and full transparency to crypto trading",
     "website": "https://www.helixmarkets.io/",
-    "logo": "helix_logo.svg"
+    "logo": "helix_logo.webp"
   },
   {
     "name": "Juno",
@@ -367,7 +367,7 @@
   },
   {
     "name": "icgpt",
-    "oneLiner": "A fun dApp to demonstrate onchain LLMs",
+    "oneLiner": "A chat app that uses Qwen2.5-instruct LLM with 0.5 billion parameters, the largest LLM currently live on ICP.",
     "website": "https://icgpt.icpp.world/",
     "logo": "icpp-logo.dracula-cyan.112x112.png"
   },
@@ -439,7 +439,7 @@
   },
   {
     "name": "ICPEx",
-    "oneLiner": "Decentralized exchange built entirely on the chain based on the ICP.",
+    "oneLiner": "A fully on-chain decentralized exchange powered by the Proactive Market Maker (PMM) algorithm.",
     "website": "https://icpex.org/",
     "logo": "icpex_logo.png"
   },
@@ -465,7 +465,7 @@
     "name": "Hamster",
     "oneLiner": "One-stop infrastructure, developer toolkit and middleware DevOps service platform",
     "website": "https://hamsternet.io/",
-    "logo": "hamster_logo.svg"
+    "logo": "hamster_logo.png"
   },
   {
     "name": "RIIDE",
@@ -505,7 +505,7 @@
     "name": "Dotmeet",
     "oneLiner": "A city-based events calendar app helping web3 communities and companies in effectively reaching their target audience within cities.",
     "website": "https://dotmeet.app/",
-    "logo": "dotmeet_logo.svg"
+    "logo": "dotmeet_logo.webp"
   },
   {
     "name": "Doxa",
@@ -597,5 +597,10 @@
     "logo": "civic_logo.png",
     "oneLiner": "A leading provider of identity and access management solutions.",
     "website": "https://www.civic.com"
+  },
+  {
+    "name": "IC Toolkit",
+    "logo": "ictoolkit_logo.png",
+    "website": "https://ic-toolkit.app"
   }
 ]
