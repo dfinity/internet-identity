@@ -14,7 +14,7 @@ import { withLoader } from "$src/components/loader";
 import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
-import { LEGACY_II_URL } from "$src/config";
+import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$src/config";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
@@ -96,6 +96,10 @@ export const authFlowManage = async (connection: Connection) => {
   const i18n = new I18n();
   const dapps = shuffleArray(getDapps());
 
+  const params = new URLSearchParams(window.location.search);
+  const allowPinAuthentication =
+    params.get(ENABLE_PIN_QUERY_PARAM_KEY) !== null;
+
   const identityBackground = new PreLoadImage(identityCardBackground);
   // Go through the login flow, potentially creating an anchor.
   const {
@@ -106,8 +110,7 @@ export const authFlowManage = async (connection: Connection) => {
     connection,
     i18n,
     templates: authnTemplateManage({ dapps }),
-    allowPinAuthentication:
-      true /* when authenticating to II directly we always allow pin */,
+    allowPinAuthentication,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add

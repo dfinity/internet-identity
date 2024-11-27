@@ -1,10 +1,17 @@
 import { AuthnMethodData } from "$generated/internet_identity_types";
 import { withLoader } from "$src/components/loader";
-import { PinIdentityMaterial } from "$src/crypto/pinIdentity";
+import {
+  PinIdentityMaterial,
+  constructPinIdentity,
+} from "$src/crypto/pinIdentity";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
+import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
-import { passkeyAuthnMethodData } from "$src/utils/authnMethodData";
+import {
+  passkeyAuthnMethodData,
+  pinAuthnMethodData,
+} from "$src/utils/authnMethodData";
 import {
   AlreadyInProgress,
   ApiError,
@@ -23,7 +30,10 @@ import {
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
+import { TemplateResult } from "lit-html";
 import type { UAParser } from "ua-parser-js";
+import { tempKeyWarningBox } from "../manage/tempKeys";
+import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
@@ -33,9 +43,9 @@ export const registerFlow = async ({
   identityRegistrationStart,
   checkCaptcha,
   identityRegistrationFinish,
-  storePinIdentity: _storePinIdentity,
+  storePinIdentity,
   registrationAllowed,
-  pinAllowed: _pinAllowed,
+  pinAllowed,
   uaParser,
 }: {
   identityRegistrationStart: () => Promise<
@@ -87,6 +97,7 @@ export const registerFlow = async ({
   | RateLimitExceeded
   | "canceled"
 > => {
+  console.log("in da registerFlow");
   if (!registrationAllowed) {
     const result = await registerDisabled();
     result satisfies { tag: "canceled" };
@@ -98,24 +109,82 @@ export const registerFlow = async ({
   const flowStart = precomputeFirst(() => identityRegistrationStart());
 
   const displayUserNumber = displayUserNumberWarmup();
-  const identity = await savePasskeyOrPin();
-  if (identity === undefined) {
-    // TODO: Return something meaningful if getting the identity fails
+  const savePasskeyResult = await savePasskeyOrPin({
+    pinAllowed: await pinAllowed(),
+  });
+  if (savePasskeyResult === "canceled") {
     return "canceled";
   }
-  const alias = await inferPasskeyAlias({
-    authenticatorType: identity.getAuthenticatorAttachment(),
-    userAgent: navigator.userAgent,
-    uaParser,
-  });
+  const result_ = await (async () => {
+    if (savePasskeyResult === "pin") {
+      const pinResult = await setPinFlow();
+      if (pinResult.tag === "canceled") {
+        return "canceled";
+      }
 
-  const authnMethodData = passkeyAuthnMethodData({
-    alias,
-    pubKey: identity.getPublicKey().toDer(),
-    credentialId: identity.rawId,
-    authenticatorAttachment: identity.getAuthenticatorAttachment(),
-  });
-  const authnMethod = "passkey" as const;
+      pinResult.tag satisfies "ok";
+
+      // XXX: this withLoader could be replaced with one that indicates what's happening (like the
+      // "Hang tight, ..." spinner)
+      const { identity, pinIdentityMaterial } = await withLoader(() =>
+        constructPinIdentity(pinResult)
+      );
+      const alias = await inferPinAlias({
+        userAgent: navigator.userAgent,
+        uaParser,
+      });
+      return {
+        identity,
+        authnMethodData: pinAuthnMethodData({
+          alias,
+          pubKey: identity.getPublicKey().toDer(),
+        }),
+        finalizeIdentity: (userNumber: bigint) =>
+          storePinIdentity({ userNumber, pinIdentityMaterial }),
+        finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
+        authnMethod: "pin" as const,
+      };
+    } else {
+      const identity = savePasskeyResult;
+      // TODO: Return something meaningful if getting the passkey identity fails
+      if (identity === undefined) {
+        return "canceled";
+      }
+      const alias = await inferPasskeyAlias({
+        authenticatorType: identity.getAuthenticatorAttachment(),
+        userAgent: navigator.userAgent,
+        uaParser,
+      });
+      return {
+        identity,
+        authnMethodData: passkeyAuthnMethodData({
+          alias,
+          pubKey: identity.getPublicKey().toDer(),
+          credentialId: identity.rawId,
+          authenticatorAttachment: identity.getAuthenticatorAttachment(),
+        }),
+        authnMethod: "passkey" as const,
+      };
+    }
+  })();
+
+  if (result_ === "canceled") {
+    return "canceled";
+  }
+
+  const {
+    identity,
+    authnMethodData,
+    finalizeIdentity,
+    finishSlot,
+    authnMethod,
+  }: {
+    identity: SignIdentity;
+    authnMethodData: AuthnMethodData;
+    finalizeIdentity?: (userNumber: bigint) => Promise<void>;
+    finishSlot?: TemplateResult;
+    authnMethod: "pin" | "passkey";
+  } = result_;
 
   const startResult = await flowStart();
   if (startResult.kind !== "registrationFlowStepSuccess") {
@@ -150,6 +219,7 @@ export const registerFlow = async ({
   result.kind satisfies "loginSuccess";
 
   const userNumber = result.userNumber;
+  await finalizeIdentity?.(userNumber);
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
   result.connection.updateIdentityMetadata({
@@ -162,6 +232,7 @@ export const registerFlow = async ({
   );
   await displayUserNumber({
     userNumber,
+    marketingIntroSlot: finishSlot,
   });
   return { ...result, authnMethod };
 };
