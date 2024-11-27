@@ -24,10 +24,9 @@ import {
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
 
 // TODO: GIX-3138 Clean up after release
-// TODO: Test login with PIN only GIX-3139
-test.skip("PIN registration not enabled on non-Apple device", async () => {
+test("PIN registration not enabled on non-Apple device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
     await welcomeView.register();
@@ -40,11 +39,11 @@ test.skip("PIN registration not enabled on non-Apple device", async () => {
 // The PIN auth feature is only enabled for Apple specific user agents, so tests set the user
 // agent to chrome on macOS
 
-test.skip("Register and Log in with PIN identity", async () => {
+test("Register and Log in with PIN identity", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -55,10 +54,10 @@ test.skip("Register and Log in with PIN identity", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test.skip("Register with PIN and login without prefilled identity number", async () => {
+test("Register with PIN and login without prefilled identity number", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
 
     const mainView = new MainView(browser);
@@ -68,18 +67,18 @@ test.skip("Register with PIN and login without prefilled identity number", async
     await wipeStorage(browser);
 
     // load the II page again
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     await FLOWS.loginPinWelcomeView(userNumber, pin, browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test.skip("Register and log in with PIN identity, retry on wrong PIN", async () => {
+test("Register and log in with PIN identity, retry on wrong PIN", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     const wrongPin = "456321";
 
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -100,12 +99,12 @@ test.skip("Register and log in with PIN identity, retry on wrong PIN", async () 
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test.skip("Should not prompt for PIN after deleting temp key", async () => {
+test("Should not prompt for PIN after deleting temp key", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
     await addVirtualAuthenticator(browser);
 
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -123,6 +122,7 @@ test.skip("Should not prompt for PIN after deleting temp key", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
+// TODO: Remove. This won't be reenabled.
 test.skip("Log into client application using PIN registration flow", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
@@ -144,11 +144,11 @@ test.skip("Log into client application using PIN registration flow", async () =>
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test.skip("Register with PIN then log into client application", async () => {
+test("Register with PIN then log into client application", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
-    await browser.url(II_URL);
+    await browser.url(`${II_URL}?enablePin`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
 
     const demoAppView = new DemoAppView(browser);
