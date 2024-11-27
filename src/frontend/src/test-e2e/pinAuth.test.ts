@@ -15,11 +15,13 @@ import {
 import { AuthenticateView, DemoAppView, MainView, PinAuthView } from "./views";
 
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
+// Same as in frontend/src/config.ts
+const ENABLE_PIN_QUERY_PARAM_KEY = "enablePin";
 
 // TODO: GIX-3138 Clean up after release
 test("PIN registration not enabled on non-Apple device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     // The PIN registration flow should not be enabled and go directly to login with passkey
     await addVirtualAuthenticator(browser);
     await FLOWS.registerNewIdentityWelcomeView(browser);
@@ -36,7 +38,7 @@ test("Register and Log in with PIN identity", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -50,7 +52,7 @@ test("Register and Log in with PIN identity", async () => {
 test("Register with PIN and login without prefilled identity number", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
 
     const mainView = new MainView(browser);
@@ -60,7 +62,7 @@ test("Register with PIN and login without prefilled identity number", async () =
     await wipeStorage(browser);
 
     // load the II page again
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     await FLOWS.loginPinWelcomeView(userNumber, pin, browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
@@ -71,7 +73,7 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
     const pin = "123456";
     const wrongPin = "456321";
 
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -97,7 +99,7 @@ test("Should not prompt for PIN after deleting temp key", async () => {
     const pin = "123456";
     await addVirtualAuthenticator(browser);
 
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
     const mainView = new MainView(browser);
     await mainView.waitForDisplay(); // we should be logged in
@@ -119,7 +121,7 @@ test("Register with PIN then log into client application", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const pin = "123456";
 
-    await browser.url(`${II_URL}?enablePin`);
+    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
 
     const demoAppView = new DemoAppView(browser);
