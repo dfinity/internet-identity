@@ -7,7 +7,6 @@ import { caretDownIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
-import { ENABLE_PIN_QUERY_PARAM_KEY } from "$src/config";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
@@ -195,13 +194,6 @@ const authenticate = async (
     });
   }
 
-  const params = new URLSearchParams(window.location.search);
-  // Only allow PIN if query param is set and the request allows it
-  const allowPinAuthentication =
-    params.get(ENABLE_PIN_QUERY_PARAM_KEY) !== null
-      ? authContext.authRequest.allowPinAuthentication ?? false
-      : false;
-
   const authSuccess = await authenticateBox({
     connection,
     i18n,
@@ -213,7 +205,9 @@ const authenticate = async (
         dapp.hasOrigin(authContext.requestOrigin)
       ),
     }),
-    allowPinAuthentication,
+    // This allows logging in with a PIN but not registering with a PIN
+    allowPinAuthentication:
+      authContext.authRequest.allowPinAuthentication ?? true,
     autoSelectionIdentity: autoSelectionIdentity,
   });
 
