@@ -7,7 +7,7 @@ import Screen from "../layouts/Screen.astro";
     import { withLoader } from "$src/components/loader";
     import { showMessage } from "$src/components/message";
 
-    withLoader(() => new Promise(() => showMessage({ message: "Loading..." })))
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." })), true)
   </script>
   <style>
     /* Disable loader animation */
