@@ -7,7 +7,7 @@ const loaderUrl = import.meta.glob("./loader.svg", {
   eager: true,
   query: "?url",
   import: "default",
-})["./loader.svg"];
+})["./loader.svg"] as string;
 
 // Duration in milliseconds a user considers as taking forever
 const TAKING_FOREVER = 10000;
