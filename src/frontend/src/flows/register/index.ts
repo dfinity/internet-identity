@@ -98,7 +98,6 @@ export const registerFlow = async ({
   | RateLimitExceeded
   | "canceled"
 > => {
-  console.log("in da registerFlow");
   if (!registrationAllowed) {
     const result = await registerDisabled();
     result satisfies { tag: "canceled" };
