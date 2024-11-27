@@ -63,11 +63,6 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
 
   // Iterate the pages and screenshot them
   for (const pageName of pageNames) {
-    // Skip the loader, because it's animated
-    if (pageName === "loader") {
-      continue;
-    }
-
     await visit(browser, `http://localhost:5174/${pageName}`);
 
     await browser.execute('document.body.style.caretColor = "transparent"');
