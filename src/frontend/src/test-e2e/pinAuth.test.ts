@@ -12,14 +12,7 @@ import {
   switchToPopup,
   wipeStorage,
 } from "./util";
-import {
-  AuthenticateView,
-  DemoAppView,
-  MainView,
-  PinAuthView,
-  RegisterView,
-  WelcomeView,
-} from "./views";
+import { AuthenticateView, DemoAppView, MainView, PinAuthView } from "./views";
 
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
 
@@ -27,12 +20,12 @@ const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
 test("PIN registration not enabled on non-Apple device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(`${II_URL}?enablePin`);
-    const welcomeView = new WelcomeView(browser);
-    await welcomeView.waitForDisplay();
-    await welcomeView.register();
-    const registerView = new RegisterView(browser);
-    await registerView.waitForDisplay();
-    await registerView.assertPinRegistrationNotShown();
+    // The PIN registration flow should not be enabled and go directly to login with passkey
+    await addVirtualAuthenticator(browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.logout();
   }, EDGE_USER_AGENT);
 }, 300_000);
 
@@ -119,28 +112,6 @@ test("Should not prompt for PIN after deleting temp key", async () => {
 
     // login now happens using the WebAuthn flow
     await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
-  }, APPLE_USER_AGENT);
-}, 300_000);
-
-// TODO: Remove. This won't be reenabled.
-test.skip("Log into client application using PIN registration flow", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const pin = "123456";
-
-    const demoAppView = new DemoAppView(browser);
-    await demoAppView.open(TEST_APP_NICE_URL, II_URL);
-    await demoAppView.waitForDisplay();
-    expect(await demoAppView.getPrincipal()).toBe("");
-    await demoAppView.signin();
-    await switchToPopup(browser);
-    await FLOWS.registerPinNewIdentityAuthenticateView(pin, browser);
-
-    const principal = await demoAppView.waitForAuthenticated();
-    expect(await demoAppView.whoami()).toBe(principal);
-
-    // default value
-    const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (8 * 60 * 60_000_000_000)).toBeCloseTo(1);
   }, APPLE_USER_AGENT);
 }, 300_000);
 
