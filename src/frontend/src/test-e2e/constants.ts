@@ -41,3 +41,6 @@ export const APPLE_USER_AGENT =
 // Edge on Windows
 export const EDGE_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/116.0.1938.81";
+
+// Same as in frontend/src/config.ts
+export const ENABLE_PIN_QUERY_PARAM_KEY = "enablePin";

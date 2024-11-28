@@ -2,6 +2,7 @@ import {
   APPLE_USER_AGENT,
   DEVICE_NAME1,
   EDGE_USER_AGENT,
+  ENABLE_PIN_QUERY_PARAM_KEY,
   II_URL,
   TEST_APP_NICE_URL,
 } from "./constants";
@@ -15,10 +16,7 @@ import {
 import { AuthenticateView, DemoAppView, MainView, PinAuthView } from "./views";
 
 const DEFAULT_PIN_DEVICE_NAME = "Chrome on Mac OS";
-// Same as in frontend/src/config.ts
-const ENABLE_PIN_QUERY_PARAM_KEY = "enablePin";
 
-// TODO: GIX-3138 Clean up after release
 test("PIN registration not enabled on non-Apple device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);

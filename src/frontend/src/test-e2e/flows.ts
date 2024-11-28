@@ -15,9 +15,6 @@ import {
 export const FLOWS = {
   register: async function (browser: WebdriverIO.Browser): Promise<string> {
     const registerView = new RegisterView(browser);
-    // TODO: GIX-3138 Clean up after release
-    // await registerView.waitForDisplay();
-    // await registerView.create();
     if (CAPTCHA_ENABLED) {
       await registerView.waitForRegisterConfirm();
       await registerView.confirmRegisterConfirm();
