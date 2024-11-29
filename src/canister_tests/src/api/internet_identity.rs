@@ -1,3 +1,4 @@
+//! The functions here are derived (manually) from Internet Identity's Candid file
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::BufferedEntry;
@@ -10,8 +11,6 @@ pub mod api_v2;
 
 // API of verifiable credentials MVP.
 pub mod vc_mvp;
-
-/** The functions here are derived (manually) from Internet Identity's Candid file */
 
 /// A fake "health check" method that just checks the canister is alive a well.
 pub fn health_check(env: &PocketIc, canister_id: CanisterId) {

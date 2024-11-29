@@ -87,7 +87,7 @@ pub fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
         chars.push(next);
     }
 
-    return String::from_utf8_lossy(&chars).to_string();
+    String::from_utf8_lossy(&chars).to_string()
 }
 
 #[cfg(feature = "dummy_captcha")]
