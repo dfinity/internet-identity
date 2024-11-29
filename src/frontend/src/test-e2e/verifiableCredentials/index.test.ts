@@ -2,6 +2,7 @@ import { runInBrowser } from "$src/test-e2e/util";
 
 import {
   APPLE_USER_AGENT,
+  ENABLE_PIN_QUERY_PARAM_KEY,
   II_URL,
   ISSUER_APP_URL,
   ISSUER_APP_URL_LEGACY,
@@ -51,26 +52,29 @@ const testConfigs: Array<{
   relyingParty: string;
   issuer: string;
   authType: "pin" | "webauthn";
+  iiUrl: string;
 }> = [
   {
     relyingParty: TEST_APP_CANONICAL_URL_LEGACY,
     issuer: ISSUER_APP_URL,
     authType: "webauthn",
+    iiUrl: II_URL,
   },
   {
     relyingParty: TEST_APP_CANONICAL_URL,
     issuer: ISSUER_APP_URL_LEGACY,
     authType: "webauthn",
+    iiUrl: II_URL,
   },
-  // TODO: Renable with PIN GIX-3139
-  // {
-  //   relyingParty: TEST_APP_CANONICAL_URL,
-  //   issuer: ISSUER_APP_URL,
-  //   authType: "pin",
-  // },
+  {
+    relyingParty: TEST_APP_CANONICAL_URL,
+    issuer: ISSUER_APP_URL,
+    authType: "pin",
+    iiUrl: `${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`,
+  },
 ];
 
-testConfigs.forEach(({ relyingParty, issuer, authType }) => {
+testConfigs.forEach(({ relyingParty, issuer, authType, iiUrl }) => {
   const testSuffix = `RP: ${getDomain(relyingParty)}, ISS: ${getDomain(
     issuer
   )}, auth: ${authType}`;
@@ -86,7 +90,7 @@ testConfigs.forEach(({ relyingParty, issuer, authType }) => {
             frontendHostname: issuer,
           });
 
-          await browser.url(II_URL);
+          await browser.url(iiUrl);
           const authConfig = await register[authType](browser);
 
           // Add employee

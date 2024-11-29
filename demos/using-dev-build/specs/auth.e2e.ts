@@ -9,14 +9,6 @@ describe("authentication", () => {
     // Click on "Create an Internet Identity Anchor"
     await browser.$("#registerButton").click();
 
-    // Construct Identity (no-op)
-    // TODO: GIX-3138 Clean up after release
-    // const constructIdentity = await browser.$(
-    //   '[data-action="construct-identity"]'
-    // );
-    // await constructIdentity.waitForExist();
-    // await constructIdentity.click();
-
     await browser.$("h1").waitForExist();
     const title = await browser.$("h1");
 
