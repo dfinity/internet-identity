@@ -1,5 +1,10 @@
 [
   {
+    "name": "Bitfinity EVM",
+    "website": "https://bitfinity.network/",
+    "logo": "bitfinity_evm.svg"
+  },
+  {
     "name": "OpenChat",
     "oneLiner": "Decentralized alternative to WhatsApp",
     "website": "https://oc.app/",
@@ -32,7 +37,7 @@
     "name": "dragginz",
     "oneLiner": "Dragginz is a virtual pets game from the creators of Neopets. Hatch and raise Dragginz to accompany you on your adventures.",
     "website": "https://dragginz.io/",
-    "logo": "dragginz_logo.webp"
+    "logo": "dragginz_logo.png"
   },
   {
     "name": "ICDex",
@@ -52,11 +57,23 @@
     "logo": "helix_logo.svg"
   },
   {
+    "name": "Catalyze",
+    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
+    "oneLiner": "Manage your Web3 communities and events",
+    "logo": "catalyze_logo.png"
+  },
+  {
     "name": "Juno",
     "oneLiner": "Build Web3 at Lightning Speed",
     "website": "https://juno.build",
     "authOrigins": ["https://console.juno.build"],
     "logo": "juno_logo.svg"
+  },
+  {
+    "name": "OISY Wallet",
+    "oneLiner": "Browser-based multi-chain wallet",
+    "website": "https://oisy.com",
+    "logo": "oisy_logo.svg"
   },
   {
     "name": "Kinic",
@@ -86,15 +103,21 @@
     "logo": "nnsfront-enddapp_logo-dark.webp"
   },
   {
-    "name": "OISY Wallet",
-    "oneLiner": "Browser-based multi-chain wallet",
-    "website": "https://oisy.com",
-    "logo": "oisy_logo.svg"
-  },
-  {
     "name": "Trax",
     "website": "https://trax.so/",
     "logo": "trax_logo.webp"
+  },
+  {
+    "name": "RuBaRu",
+    "oneLiner": "The fully on-chain content creator/influencer platform: own your profile, own your content, and earn fair incentives.",
+    "website": "https://rubaru.app/",
+    "logo": "rubaru_logo.png"
+  },
+  {
+    "name": "Boom DAO",
+    "oneLiner": "Powering the next generation of fully onchain games, and providing a collaborative hub for all things web3 gaming.",
+    "website": "https://boomdao.xyz/",
+    "logo": "boom-dao-logo.png"
   },
   {
     "name": "DecideAI",
@@ -154,15 +177,33 @@
     "logo": "seers_logo.webp"
   },
   {
+    "name": "Water Neuron",
+    "oneLiner": "A liquid staking protocol designed for ICP. Staking ICP becomes straightforward and efficient.",
+    "website": "https://waterneuron.fi/stake/",
+    "logo": "waterneuron_logo.png"
+  },
+  {
     "name": "Nuance",
     "website": "https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app/",
     "logo": "nuance_logo.webp"
+  },
+  {
+    "name": "Cosmicrafts",
+    "oneLiner": "Blast through the metaverse with Cosmicrafts, where interstellar mayhem meets epic battles for the ultimate cosmic showdown!",
+    "website": "https://cosmicrafts.com/",
+    "logo": "cosmicrafts_logo.png"
   },
   {
     "name": "Kontribute",
     "oneLiner": "Web3 storytelling",
     "website": "https://kontribute.app",
     "logo": "kontribute_logo.webp"
+  },
+  {
+    "name": "Factland DAO",
+    "oneLiner": "A Web3 community building decentralized trust in the age of misinformation",
+    "website": "https://factland.org",
+    "logo": "factland_logo.png"
   },
   {
     "name": "Saga Tarot",
@@ -209,6 +250,18 @@
     "logo": "icevent_logo_112x112.png"
   },
   {
+    "name": "Bink",
+    "oneLiner": "Superior alternative to Linktree",
+    "website": "https://b.ink",
+    "logo": "bink_logo.svg"
+  },
+  {
+    "name": "Bitomni",
+    "oneLiner": "BTCFi-driven omnichain asset management protocol.",
+    "website": "https://bitomni.io",
+    "logo": "bitomni_logo.svg"
+  },
+  {
     "name": "Usergeek",
     "oneLiner": "Product analytics for IC dapps",
     "website": "https://usergeek.app/",
@@ -227,6 +280,11 @@
     "logo": "canister-store_logo.png"
   },
   {
+    "name": "KongSwap",
+    "logo": "kong_logo.png",
+    "website": "https://www.kongswap.io/"
+  },
+  {
     "name": "cyql.io",
     "website": "https://cyql.io/",
     "logo": "cyqlio_logo.svg",
@@ -235,7 +293,7 @@
   {
     "name": "Dbox",
     "website": "https://dbox.foundation/",
-    "logo": "dbox_logo.webp"
+    "logo": "dbox_logo.png"
   },
   {
     "name": "Tipjar",
@@ -342,6 +400,12 @@
     "oneLiner": "Send updates from canisters to your users"
   },
   {
+    "name": "Flower Power DAO",
+    "website": "https://fpdao.app",
+    "logo": "fpdao_logo.png",
+    "oneLiner": "The story of blockchain, told in Art."
+  },
+  {
     "name": "TaxLint",
     "oneLiner": "A decentralised, private, and secure automated Tax Report aimed to help users to count ICP and ICRC1 token transactions.",
     "website": "https://www.taxlint.online/",
@@ -354,10 +418,22 @@
     "logo": "icpsig_logo.png"
   },
   {
+    "name": "Hobbi",
+    "website": "https://hobbi.me",
+    "logo": "hobbi_logo.svg",
+    "oneLiner": "Hobbi, the web3 social platform"
+  },
+  {
     "name": "icRouter",
     "website": "https://iclight.io/account",
     "logo": "icrouter_logo.webp",
     "oneLiner": "icRouter: A cross-chain network of assets"
+  },
+  {
+    "name": "Vault k8s Canister",
+    "website": "https://github.com/Zondax/vault-k8s-canister",
+    "oneLiner": "IC-based secret sharing, ensuring flexible, secure management.",
+    "logo": "zondax-logo.svg"
   },
   {
     "name": "ubin",
@@ -366,8 +442,14 @@
     "oneLiner": "Allows you to seamlessly launch your file storage smart contracts on ICP and interact with them via a file explorer in the browser."
   },
   {
+    "name": "user controlled mind and body canister",
+    "website": "https://github.com/blueberryxtech/ic-mind-body-canister",
+    "oneLiner": "tooling for uploading and accessing mind and body data from a firebase API onto ICP canister, blueberry data as a reference example",
+    "logo": "ic-mind-body-canister.png"
+  },
+  {
     "name": "icgpt",
-    "oneLiner": "A fun dApp to demonstrate onchain LLMs",
+    "oneLiner": "A chat app that uses Qwen2.5-instruct LLM with 0.5 billion parameters, the largest LLM currently live on ICP.",
     "website": "https://icgpt.icpp.world/",
     "logo": "icpp-logo.dracula-cyan.112x112.png"
   },
@@ -384,6 +466,12 @@
     "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
   },
   {
+    "name": "Accelar",
+    "website": "https://www.accelar.io",
+    "logo": "accelar_logo.svg",
+    "oneLiner": "A unified product development infrastructure that allows for efficient development, launching, and management of web3 features including LLMs on ICP."
+  },
+  {
     "name": "ICP Governor",
     "oneLiner": "ICP Governor is an application used to manage a single DAO: create proposals, vote, timelock and execute them.",
     "website": "https://b4umt-saaaa-aaaak-afnpa-cai.icp0.io/",
@@ -396,10 +484,28 @@
     "logo": "formify_logo.webp"
   },
   {
+    "name": "Blendsafe",
+    "oneLiner": "A MultiSignature wallet and omnichain module designed for cross-chain message signing, suitable for multiple blockchain ecosystems.",
+    "website": "https://blendsafe.com/",
+    "logo": "blendsafe.svg"
+  },
+  {
     "name": "OpenFPL",
     "oneLiner": "Decentralised Fantasy Football.",
     "website": "https://openfpl.xyz/",
     "logo": "openfpl_logo.png"
+  },
+  {
+    "name": "Gitcoin Passport Client",
+    "oneLiner": "A UI that securely retrieves anti-Sybil scoring data from Gitcoin Passport and stores it in a DB.",
+    "website": "https://internet-computer.vporton.name/gitcoin-passport-client/",
+    "logo": "gitcoin-client.png"
+  },
+  {
+    "name": "Game Bloc",
+    "oneLiner": "A decentralized platform empowering gamers and gaming organizations to create, manage, and participate in game tournaments.",
+    "website": "https://cv4ma-4qaaa-aaaal-adntq-cai.icp0.io/",
+    "logo": "gamebloc_logo.png"
   },
   {
     "name": "AllKinds",
@@ -420,10 +526,22 @@
     "logo": "ReCheck_logo.png"
   },
   {
+    "name": "B4B",
+    "oneLiner": "A Web3 influencer marketing protocol that brings transparency, ownership, escrow, and onchain history from all socials.",
+    "website": "https://b4b.world",
+    "logo": "b4b_logo.png"
+  },
+  {
     "name": "ICTO",
     "oneLiner": "ICTO is a one-stop platform automating token operations on the Internet Computer.",
     "website": "https://icto.app",
     "logo": "icto_logo.png"
+  },
+  {
+    "name": "AppIC DAO",
+    "oneLiner": "First-ever infrastructure layer that allows transferring and swapping of tokens between ICP and blockchains such as Bitcoin, Ethereum, and Solana.",
+    "website": "https://app.appic.solutions/",
+    "logo": "appic_logo.png"
   },
   {
     "name": "OptiGames",
@@ -438,8 +556,20 @@
     "oneLiner": "A decentralized Panda meme brand built on the Internet Computer."
   },
   {
+    "name": "odoc",
+    "oneLiner": "Tasks managment, documentations, and smart contracts for online workers and freelancers.",
+    "website": "https://lwdq3-vqaaa-aaaal-acwda-cai.icp0.io/",
+    "logo": "odoc_logo.png"
+  },
+  {
+    "name": "ZkCross",
+    "oneLiner": "One-click limitless liquidity across blockchains.",
+    "website": "https://zkcross.network/",
+    "logo": "zkCross_logo.svg"
+  },
+  {
     "name": "ICPEx",
-    "oneLiner": "Decentralized exchange built entirely on the chain based on the ICP.",
+    "oneLiner": "A fully on-chain decentralized exchange powered by the Proactive Market Maker (PMM) algorithm.",
     "website": "https://icpex.org/",
     "logo": "icpex_logo.png"
   },
@@ -448,6 +578,12 @@
     "oneLiner": "A web3 app that functions as a gated DAO, treasury, data storage solution, and more.",
     "website": "https://fkkq7-siaaa-aaaap-qaaya-cai.ic0.app/",
     "logo": "personal_dao_logo.png"
+  },
+  {
+    "name": "IC Footprint",
+    "oneLiner": "A blockchain ESG platform that tracks ICP environmental metrics and provides tooling to reduce the environmental impact of the network.",
+    "website": "https://owqnd-biaaa-aaaak-qidaq-cai.icp0.io/",
+    "logo": "ic_footprint_logo.svg"
   },
   {
     "name": "B3Wallet",
@@ -480,6 +616,12 @@
     "oneLiner": "A crypto neobank that offers fully onchain bitcoin borrowing and lending on ICP."
   },
   {
+    "name": "Konectª",
+    "website": "https://qmtwu-wqaaa-aaaan-qlrya-cai.icp0.io/",
+    "logo": "konecta_logo.svg",
+    "oneLiner": "A new protocol that gathers notifications and events from all your apps implementing it, and compiles them into a user-specific canister."
+  },
+  {
     "name": "EstateDAO",
     "website": "https://wbdy5-yyaaa-aaaap-abysq-cai.icp0.io/",
     "logo": "estatedao_logo.png",
@@ -508,10 +650,22 @@
     "logo": "dotmeet_logo.svg"
   },
   {
+    "name": "Syron",
+    "oneLiner": "A USD-pegged stablecoin, overcollateralized with Bitcoin and powered by Chain Fusion.",
+    "website": "https://tyrondao.org",
+    "logo": "syron_logo.png"
+  },
+  {
     "name": "Doxa",
     "oneLiner": "A multi-stablecoin plartform with the doxa dollar.",
     "website": "https://i7m4z-gqaaa-aaaak-qddtq-cai.icp0.io/",
     "logo": "doxa_logo.webp"
+  },
+  {
+    "name": "Motodex",
+    "oneLiner": "A hyper-casual, motorcycle race game where players develop their riders and improve high-speed tracks.",
+    "website": "https://motodex.dexstudios.games/",
+    "logo": "motodex_logo.png"
   },
   {
     "name": "Fomowell",
@@ -545,10 +699,26 @@
     "authOrigins": "https://zoncircle.com"
   },
   {
+    "name": "NeuronPool",
+    "oneLiner": "Stake your ICP, join the pool and win big rewards!",
+    "website": "https://neuronpool.com/",
+    "logo": "neuronpool_logo.svg",
+    "authOrigins": [
+      "https://stake.neuronpool.com",
+      "https://t3c6p-zqaaa-aaaar-qafuq-cai.icp0.io"
+    ]
+  },
+  {
     "name": "BIT10",
     "oneLiner": "BIT10 is the S&P500 of Bitcoin DeFi Assets",
     "website": "https://www.bit10.app",
     "logo": "bit10_logo.webp"
+  },
+  {
+    "name": "icecube",
+    "oneLiner": "An open-source, 100% onchain social network.",
+    "website": "https://mjlwf-iqaaa-aaaan-qmtna-cai.icp0.io/home",
+    "logo": "icecube_logo.png"
   },
   {
     "name": "Bridge 23",
@@ -575,6 +745,12 @@
     "oneLiner": "Unlocking financial freedom, block by block."
   },
   {
+    "name": "Moonshift",
+    "website": "https://moonshift.app",
+    "logo": "moonshift_logo.png",
+    "oneLiner": "Gamified quest board where projects can create “Shifts” or marketing bounties for their community to collect."
+  },
+  {
     "name": "PlexiMail",
     "logo": "pleximail_logo.png",
     "oneLiner": "The end-to-end encrypted, ICP canister-based, trustless secure email service.",
@@ -597,5 +773,10 @@
     "logo": "civic_logo.png",
     "oneLiner": "A leading provider of identity and access management solutions.",
     "website": "https://www.civic.com"
+  },
+  {
+    "name": "IC Toolkit",
+    "logo": "ictoolkit_logo.png",
+    "website": "https://ic-toolkit.app"
   }
 ]
