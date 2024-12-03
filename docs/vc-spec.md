@@ -169,7 +169,7 @@ the context contains a time-stamped yet unsigned VC, for which the canister sign
 available only at `get_credential`-call.
 
 **NOTE:**
-The signed credential must use the verifiable credential domain separator `"iccs_verifiable_credential"` as an array of bytes.
+The convention is to sign the credential with the domain separator `"iccs_verifiable_credential"` as an array of bytes. This is achieved by adding a prefix that consists of a 1-byte lenth of the domain separator, followed by the actual separator. See [vc_signing_input_hash](https://docs.rs/ic-verifiable-credentials/1.0.1/ic_verifiable_credentials/fn.vc_signing_input_hash.html).
 
 ### 4: Get Credential
 
