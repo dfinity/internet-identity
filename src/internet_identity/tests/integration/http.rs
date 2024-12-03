@@ -31,6 +31,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         ("/", None),
         ("/index.js", Some("gzip")),
         ("/.well-known/ic-domains", None),
+        ("/.well-known/webauthn", None),
     ];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());

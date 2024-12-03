@@ -387,6 +387,7 @@ lazy_static! {
         let mut map = HashMap::new();
         map.insert(Path::new(".well-known/ic-domains").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
         map.insert(Path::new(".well-known/ii-alternative-origins").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
+        map.insert(Path::new(".well-known/webauthn").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
         map
     };
 }
@@ -642,6 +643,11 @@ fn should_return_correct_extension() {
     let path_extension_encoding = [
         (
             ".well-known/ic-domains",
+            ContentType::JSON,
+            ContentEncoding::Identity,
+        ),
+        (
+            ".well-known/webauthn",
             ContentType::JSON,
             ContentEncoding::Identity,
         ),

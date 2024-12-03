@@ -58,6 +58,16 @@ pub fn get_static_assets() -> Vec<Asset> {
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
+
+    // Required to share passkeys with the different domains.
+    // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
+    // Maximum of 5 labels. If we want to support more, we'll need to set them in the configuration.
+    assets.push(Asset {
+        url_path: "/.well-known/webauthn".to_string(),
+        content: b"{\"origins\":[\"https://beta.identity.ic0.app\",\"https://beta.identity.internetcomputer.org\",\"https://identity.internetcomputer.org\",\"https://identity.ic0.app\",\"https://identity.icp0.io\"]}".to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
     assets
 }
 
