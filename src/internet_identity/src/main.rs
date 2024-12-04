@@ -13,7 +13,7 @@ use authz_utils::{
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
-use ic_cdk::call;
+use ic_cdk::{call, println};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -378,6 +378,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
+    println!("in da post_upgrade");
     state::init_from_stable_memory();
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
@@ -386,7 +387,11 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
+    let state_related_origins = state::persistent_state(|storage| {
+        storage.related_origins.clone()
+    });
+    let related_origins = maybe_arg.clone().map(|arg| arg.related_origins).unwrap_or(state_related_origins);
+    init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
 }

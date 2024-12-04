@@ -87,6 +87,7 @@ impl From<StorablePersistentState> for PersistentState {
             captcha_config: s.captcha_config.unwrap_or(DEFAULT_CAPTCHA_CONFIG),
             related_origins: s.related_origins,
             event_stats_24h_start: s.event_stats_24h_start,
+            related_origins: s.related_origins,
         }
     }
 }
@@ -151,6 +152,7 @@ mod tests {
             },
             related_origins: None,
             event_stats_24h_start: None,
+            related_origins: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

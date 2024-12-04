@@ -6,14 +6,15 @@ use crate::state;
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use ic_cdk::api;
+use ic_cdk::{api, println};
 use include_dir::{include_dir, Dir};
+use serde_json::json;
 use sha2::Digest;
 
 // used both in init and post_upgrade
-pub fn init_assets() {
+pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
     state::assets_mut(|certified_assets| {
-        let assets = get_static_assets();
+        let assets = get_static_assets(maybe_related_origins);
 
         // Extract integrity hashes for all inlined scripts, from all the HTML files.
         let integrity_hashes = assets
@@ -47,7 +48,7 @@ fn fixup_html(html: &str) -> String {
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
-pub fn get_static_assets() -> Vec<Asset> {
+pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asset> {
     let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
 
     // Required to make II available on the identity.internetcomputer.org domain.
@@ -59,15 +60,26 @@ pub fn get_static_assets() -> Vec<Asset> {
         content_type: ContentType::OCTETSTREAM,
     });
 
-    // Required to share passkeys with the different domains.
-    // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
-    // Maximum of 5 labels. If we want to support more, we'll need to set them in the configuration.
-    assets.push(Asset {
-        url_path: "/.well-known/webauthn".to_string(),
-        content: b"{\"origins\":[\"https://beta.identity.ic0.app\",\"https://beta.identity.internetcomputer.org\",\"https://identity.internetcomputer.org\",\"https://identity.ic0.app\",\"https://identity.icp0.io\"]}".to_vec(),
-        encoding: ContentEncoding::Identity,
-        content_type: ContentType::OCTETSTREAM,
-    });
+    println!("in da get_static_assets");
+
+    // if let Some(related_origins) = maybe_related_origins {
+    //     println!("related_origin: {}", related_origins[0]);
+    //     // Serialize the content into JSON and convert it to a Vec<u8>
+    //     let content = json!({
+    //         "origins": related_origins,
+    //     })
+    //     .to_string()
+    //     .into_bytes();
+    //     // Required to share passkeys with the different domains.
+    //     // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
+    //     // Maximum of 5 labels. If we want to support more, we'll need to set them in the configuration.
+    //     assets.push(Asset {
+    //         url_path: "/.well-known/webauthn".to_string(),
+    //         content,
+    //         encoding: ContentEncoding::Identity,
+    //         content_type: ContentType::OCTETSTREAM,
+    //     });
+    // }
     assets
 }
 
