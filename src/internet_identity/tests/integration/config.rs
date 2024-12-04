@@ -162,7 +162,7 @@ fn should_override_partially() -> Result<(), CallError> {
         related_origins: Some(related_origins_2.clone()),
     };
 
-    let __ =
+    let _ =
         upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_3.clone()));
 
     let expected_config_3 = InternetIdentityInit {
