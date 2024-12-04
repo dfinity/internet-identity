@@ -1,5 +1,7 @@
 use canister_tests::api::internet_identity as api;
-use canister_tests::framework::{env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM};
+use canister_tests::framework::{
+    env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
+};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, RateLimitConfig,
 };
@@ -74,7 +76,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
 
     assert_eq!(api::config(&env, canister_id)?, config);
-    
+
     let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
 
     assert_eq!(api::config(&env, canister_id)?, config);
@@ -135,8 +137,9 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: Some(new_captcha.clone()),
         related_origins: None,
     };
-    
-    let _ = upgrade_ii_canister_with_arg(&env,  canister_id, II_WASM.clone(), Some(config_2.clone()));
+
+    let _ =
+        upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_2.clone()));
 
     let expected_config_2 = InternetIdentityInit {
         captcha_config: Some(new_captcha.clone()),
@@ -158,8 +161,9 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
     };
-    
-    let __ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_3.clone()));
+
+    let __ =
+        upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_3.clone()));
 
     let expected_config_3 = InternetIdentityInit {
         related_origins: Some(related_origins_2.clone()),
