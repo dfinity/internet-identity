@@ -29,6 +29,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
@@ -558,6 +559,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
