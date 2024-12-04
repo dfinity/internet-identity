@@ -346,6 +346,7 @@ fn config() -> InternetIdentityInit {
         canister_creation_cycles_cost: Some(persistent_state.canister_creation_cycles_cost),
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
         captcha_config: Some(persistent_state.captcha_config.clone()),
+        related_origins: persistent_state.related_origins.clone(),
     })
 }
 
