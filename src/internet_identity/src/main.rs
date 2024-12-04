@@ -416,6 +416,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.captcha_config = captcha_config;
             })
         }
+        if let Some(related_origins) = arg.related_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.related_origins = Some(related_origins);
+            })
+        }
     }
 }
 
