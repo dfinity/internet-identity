@@ -103,6 +103,8 @@ pub struct PersistentState {
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
     // Configuration of the captcha challenge during registration flow
     pub captcha_config: CaptchaConfig,
+    // Configuration for Related Origins Requests
+    pub related_origins: Option<Vec<String>>,
     // Key into the event_data BTreeMap where the 24h tracking window starts.
     // This key is used to remove old entries from the 24h event aggregations.
     // If it is `none`, then the 24h window starts from the newest entry in the event_data
@@ -121,6 +123,7 @@ impl Default for PersistentState {
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
+            related_origins: None,
             event_stats_24h_start: None,
         }
     }

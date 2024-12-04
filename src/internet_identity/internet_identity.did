@@ -257,6 +257,8 @@ type InternetIdentityInit = record {
     register_rate_limit : opt RateLimitConfig;
     // Configuration of the captcha in the registration flow.
     captcha_config: opt CaptchaConfig;
+    // Configuration for Related Origins Requests
+    related_origins: opt vec text;
 };
 
 type ChallengeKey = text;
