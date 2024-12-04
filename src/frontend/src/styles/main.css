@@ -1731,7 +1731,6 @@ by all browsers (FF is missing) */
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
-  color: var(--rc-onButton);
   opacity: 0.9;
   box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
