@@ -8,6 +8,12 @@ use pocket_ic::CallError;
 #[test]
 fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
     let env = env();
+    let related_origins: Vec<String> = [
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+        "https://identity.icp0.io".to_string(),
+    ]
+    .to_vec();
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -29,6 +35,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
                 reference_rate_sampling_interval_s: 9999,
             },
         }),
+        related_origins: Some(related_origins),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
