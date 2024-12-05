@@ -20,10 +20,14 @@ export class FeatureFlag {
     this.#key = key;
     this.#defaultValue = defaultValue;
     const storedValue = this.#storage.getItem(this.#key);
-    this.#value =
-      storedValue === null
-        ? this.#defaultValue
-        : Boolean(JSON.parse(storedValue));
+    try {
+      this.#value =
+        storedValue === null
+          ? this.#defaultValue
+          : Boolean(JSON.parse(storedValue));
+    } catch {
+      this.#value = this.#defaultValue;
+    }
   }
 
   isEnabled(): boolean {
