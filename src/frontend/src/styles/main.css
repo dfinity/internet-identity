@@ -1724,11 +1724,6 @@ by all browsers (FF is missing) */
   border: none;
 }
 
-.c-button--textOnly:hover,
-.c-button--textOnly:focus {
-  color: var(--rc-interactionHighlight-text);
-}
-
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
   color: var(--rc-onButton);
@@ -1737,6 +1732,11 @@ by all browsers (FF is missing) */
   outline: 2px dotted transparent;
   outline-offset: 2px;
   text-decoration: none;
+}
+
+.c-button--textOnly:not([disabled]):hover,
+.c-button--textOnly:not([disabled]):focus {
+  color: var(--rc-interactionHighlight-text);
 }
 
 .c-button--secondary {
