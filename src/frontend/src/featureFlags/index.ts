@@ -54,7 +54,9 @@ const initializedFeatureFlags = Object.fromEntries(
 );
 
 // Make feature flags configurable from browser console
-Object.assign(window, "__featureFlags", initializedFeatureFlags);
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+window.__featureFlags = initializedFeatureFlags;
 
 // Export initialized feature flags as named exports
 export const { DOMAIN_COMPATIBILITY } = initializedFeatureFlags;
