@@ -61,15 +61,13 @@ pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asse
     });
 
     if let Some(related_origins) = maybe_related_origins {
-        // Serialize the content into JSON and convert it to a Vec<u8>
+        // Required to share passkeys with the different domains. Maximum of 5 labels.
+        // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
         let content = json!({
             "origins": related_origins,
         })
         .to_string()
         .into_bytes();
-        // Required to share passkeys with the different domains.
-        // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
-        // Maximum of 5 labels. If we want to support more, we'll need to set them in the configuration.
         assets.push(Asset {
             url_path: "/.well-known/webauthn".to_string(),
             content,
