@@ -126,11 +126,6 @@
     "logo": "decideai_logo.png"
   },
   {
-    "name": "Arth",
-    "website": "https://play.google.com/store/apps/details?id=com.foo.arth&pli=1",
-    "logo": "arth_logo.png"
-  },
-  {
     "name": "AutoRoyale",
     "website": "https://cm6iy-sqaaa-aaaam-abmxq-cai.icp0.io/",
     "logo": "autoroyale_logo.png",
@@ -406,12 +401,6 @@
     "oneLiner": "The story of blockchain, told in Art."
   },
   {
-    "name": "TaxLint",
-    "oneLiner": "A decentralised, private, and secure automated Tax Report aimed to help users to count ICP and ICRC1 token transactions.",
-    "website": "https://www.taxlint.online/",
-    "logo": "taxlint_logo.png"
-  },
-  {
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
@@ -430,22 +419,10 @@
     "oneLiner": "icRouter: A cross-chain network of assets"
   },
   {
-    "name": "Vault k8s Canister",
-    "website": "https://github.com/Zondax/vault-k8s-canister",
-    "oneLiner": "IC-based secret sharing, ensuring flexible, secure management.",
-    "logo": "zondax-logo.svg"
-  },
-  {
     "name": "ubin",
     "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
     "logo": "asset-app_logo.png",
     "oneLiner": "Allows you to seamlessly launch your file storage smart contracts on ICP and interact with them via a file explorer in the browser."
-  },
-  {
-    "name": "user controlled mind and body canister",
-    "website": "https://github.com/blueberryxtech/ic-mind-body-canister",
-    "oneLiner": "tooling for uploading and accessing mind and body data from a firebase API onto ICP canister, blueberry data as a reference example",
-    "logo": "ic-mind-body-canister.png"
   },
   {
     "name": "icgpt",
@@ -506,12 +483,6 @@
     "oneLiner": "A decentralized platform empowering gamers and gaming organizations to create, manage, and participate in game tournaments.",
     "website": "https://cv4ma-4qaaa-aaaal-adntq-cai.icp0.io/",
     "logo": "gamebloc_logo.png"
-  },
-  {
-    "name": "AllKinds",
-    "oneLiner": "A web3 social network where people find more meaningful connections.",
-    "website": "https://allkinds.xyz/",
-    "logo": "allkinds_logo.svg"
   },
   {
     "name": "Dmail Network",
@@ -719,12 +690,6 @@
     "oneLiner": "An open-source, 100% onchain social network.",
     "website": "https://mjlwf-iqaaa-aaaan-qmtna-cai.icp0.io/home",
     "logo": "icecube_logo.png"
-  },
-  {
-    "name": "Bridge 23",
-    "oneLiner": "Bridge 23 is a fully featured data marketplace running on ICP where everyone can sell their data directly to merchants, companies and institutions.",
-    "website": "https://alpha.bridge23.app/login",
-    "logo": "bridge23_logo.png"
   },
   {
     "name": "Event Hub",
