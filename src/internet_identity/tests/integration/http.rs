@@ -20,6 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 use pocket_ic::{CallError, PocketIc};
 use serde_bytes::ByteBuf;
+use serde_json::json;
 use std::collections::HashMap;
 use std::io::Read;
 use std::time::Duration;
@@ -31,7 +32,6 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
         ("/", None),
         ("/index.js", Some("gzip")),
         ("/.well-known/ic-domains", None),
-        ("/.well-known/webauthn", None),
     ];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -74,6 +74,134 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
             assert_eq!(result.verification_version, certification_version);
         }
     }
+    Ok(())
+}
+
+/// Verifies that `.well-known/webauthn` assets are delivered, certified and have security headers if present in the config.
+#[test]
+fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
+    let env = env();
+    let related_origins: Vec<String> = [
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+    ]
+    .to_vec();
+    let config = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: Some(related_origins.clone()),
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    for certification_version in 1..=2 {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: "/.well-known/webauthn".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(certification_version),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
+        let response_body = String::from_utf8_lossy(&http_response.body).to_string();
+
+        assert_eq!(http_response.status_code, 200);
+
+        let expected_content = json!({
+            "origins": related_origins,
+        })
+        .to_string();
+        assert_eq!(response_body, expected_content);
+
+        // check the appropriate Content-Type header is set
+        let (_, content_type) = http_response
+            .headers
+            .iter()
+            .find(|(name, _)| name.to_lowercase() == "content-type")
+            .expect("Content-Encoding header not found");
+        assert_eq!(
+            content_type, "application/json",
+            "unexpected Content-Encoding header value"
+        );
+        verify_security_headers(&http_response.headers);
+
+        let result = verify_response_certification(
+            &env,
+            canister_id,
+            request,
+            http_response,
+            certification_version,
+        );
+        assert_eq!(result.verification_version, certification_version);
+    }
+    Ok(())
+}
+
+#[test]
+fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
+    let env = env();
+    let related_origins: Vec<String> = [
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+    ]
+    .to_vec();
+    let config = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: Some(related_origins.clone()),
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/webauthn".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+    let response_body = String::from_utf8_lossy(&http_response.body).to_string();
+    assert_eq!(http_response.status_code, 200);
+    let expected_content = json!({
+        "origins": related_origins,
+    })
+    .to_string();
+    assert_eq!(response_body, expected_content);
+
+    let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
+
+    let http_response_1 = http_request(&env, canister_id, &request)?;
+    let response_body_1 = String::from_utf8_lossy(&http_response_1.body).to_string();
+    assert_eq!(response_body_1, expected_content);
+
+    let related_origins_2: Vec<String> = [
+        "https://beta.identity.internetcomputer.org".to_string(),
+        "https://beta.identity.ic0.app".to_string(),
+    ]
+    .to_vec();
+    let config_2 = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: Some(related_origins_2.clone()),
+    };
+
+    let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_2));
+
+    let http_response_2 = http_request(&env, canister_id, &request)?;
+    let response_body_2 = String::from_utf8_lossy(&http_response_2.body).to_string();
+    let expected_content_2 = json!({
+        "origins": related_origins_2,
+    })
+    .to_string();
+    assert_eq!(response_body_2, expected_content_2);
     Ok(())
 }
 

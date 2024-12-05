@@ -6,7 +6,7 @@ use crate::state;
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use ic_cdk::{api, println};
+use ic_cdk::api;
 use include_dir::{include_dir, Dir};
 use serde_json::json;
 use sha2::Digest;
@@ -60,10 +60,7 @@ pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asse
         content_type: ContentType::OCTETSTREAM,
     });
 
-    println!("in da get_static_assets");
-
     if let Some(related_origins) = maybe_related_origins {
-        println!("related_origin: {}", related_origins[0]);
         // Serialize the content into JSON and convert it to a Vec<u8>
         let content = json!({
             "origins": related_origins,
@@ -77,7 +74,7 @@ pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asse
             url_path: "/.well-known/webauthn".to_string(),
             content,
             encoding: ContentEncoding::Identity,
-            content_type: ContentType::OCTETSTREAM,
+            content_type: ContentType::JSON,
         });
     }
     assets
