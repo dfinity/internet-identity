@@ -1,7 +1,7 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { determineWebAuthnRpId } from "./determineWebAuthnRpId";
+import { findWebAuthnRpId } from "./findWebAuthnRpId";
 
-describe("determineWebAuthnRpId", () => {
+describe("findWebAuthnRpId", () => {
   const mockDeviceData = (origin: [] | [string]): DeviceData => ({
     origin,
     alias: "test-device",
@@ -25,7 +25,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBeUndefined();
+    expect(findWebAuthnRpId(currentUrl, devices)).toBeUndefined();
   });
 
   test("returns undefined for devices with default domain when the current domain matches", () => {
@@ -36,7 +36,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBeUndefined();
+    expect(findWebAuthnRpId(currentUrl, devices)).toBeUndefined();
   });
 
   test("returns undefined if a device is registered for the current domain", () => {
@@ -46,7 +46,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://beta.identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBeUndefined();
+    expect(findWebAuthnRpId(currentUrl, devices)).toBeUndefined();
   });
 
   test("returns undefined if a device is registered for the current domain", () => {
@@ -57,7 +57,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.internetcomputer.org";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBeUndefined();
+    expect(findWebAuthnRpId(currentUrl, devices)).toBeUndefined();
   });
 
   test("returns the second default preferred domain if no device is registered for the current domain", () => {
@@ -67,7 +67,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBe(
+    expect(findWebAuthnRpId(currentUrl, devices)).toBe(
       "https://identity.internetcomputer.org"
     );
   });
@@ -79,7 +79,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.internetcomputer.org";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBe(
+    expect(findWebAuthnRpId(currentUrl, devices)).toBe(
       "https://identity.ic0.app"
     );
   });
@@ -90,7 +90,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices)).toBe(
+    expect(findWebAuthnRpId(currentUrl, devices)).toBe(
       "https://identity.icp0.io"
     );
   });
@@ -104,7 +104,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(determineWebAuthnRpId(currentUrl, devices, preferredDomains)).toBe(
+    expect(findWebAuthnRpId(currentUrl, devices, preferredDomains)).toBe(
       "https://identity.icp0.io"
     );
   });
@@ -115,7 +115,7 @@ describe("determineWebAuthnRpId", () => {
     ];
     const currentUrl = "not-a-valid-url";
 
-    expect(() => determineWebAuthnRpId(currentUrl, devices)).toThrowError(
+    expect(() => findWebAuthnRpId(currentUrl, devices)).toThrowError(
       "Invalid URL: not-a-valid-url"
     );
   });
@@ -124,7 +124,7 @@ describe("determineWebAuthnRpId", () => {
     const devices: DeviceData[] = [mockDeviceData(["https://otherdomain.com"])];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(() => determineWebAuthnRpId(currentUrl, devices)).toThrowError(
+    expect(() => findWebAuthnRpId(currentUrl, devices)).toThrowError(
       "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
     );
   });
@@ -133,7 +133,7 @@ describe("determineWebAuthnRpId", () => {
     const devices: DeviceData[] = [];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(() => determineWebAuthnRpId(currentUrl, devices)).toThrowError(
+    expect(() => findWebAuthnRpId(currentUrl, devices)).toThrowError(
       "Not possible. Every registered user has at least one device."
     );
   });

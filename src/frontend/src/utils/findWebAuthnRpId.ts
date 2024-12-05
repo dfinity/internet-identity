@@ -34,14 +34,14 @@ const getDevicesForDomain = (
  * 3. If there is no device registered for the current domain and none of the preferred domains.
  *    Raise an error because the devices should be registered in one of the preferred domains.
  *
- * @param currentUrl
- * @param devices
- * @param preferredDomains
+ * @param currentUrl {string} The current URL of the page.
+ * @param devices {DeviceData[]} The list of devices registered for the user.
+ * @param preferredDomains {string[]} The list of domains in order or preference to use as the RP ID.
  * @returns {string | undefined} The RP ID to use for WebAuthn registration.
  * `undefined` when the RP ID is the same as the current domain and is not needed.
- * @throws {Error} If devices are not registered for any of the preferred domains.
+ * @throws {Error} If devices are not registered for any of the preferred domains, no devices exist or the current domain is invalid.
  */
-export const determineWebAuthnRpId = (
+export const findWebAuthnRpId = (
   currentUrl: string,
   devices: DeviceData[],
   preferredDomains: string[] = ["ic0.app", "internetcomputer.org", "icp0.io"]
