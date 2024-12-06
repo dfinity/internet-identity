@@ -1,6 +1,6 @@
 import { DeviceData } from "$generated/internet_identity_types";
 
-const defaultDomain = "https://identity.ic0.app";
+const DEFAULT_DOMAIN = "https://identity.ic0.app";
 
 /**
  * Helper to extract the top and secondary level domain from a URL.
@@ -14,13 +14,13 @@ const defaultDomain = "https://identity.ic0.app";
  * @throws {Error} If the URL does not contain a top and secondary level domain.
  */
 const getTopAndSecondaryLevelDomain = (url: string): string => {
-  const parts = new URL(url).hostname.split(".").reverse();
+  const parts = new URL(url).hostname.split(".");
 
   if (parts.length < 2) {
     throw new Error("Invalid URL: Unable to extract domain.");
   }
 
-  return `${parts[1]}.${parts[0]}`;
+  return parts.slice(-2).join('.');
 };
 
 /**
@@ -37,7 +37,7 @@ const getDevicesForDomain = (
 ): DeviceData[] =>
   devices.filter((d) => {
     if (d.origin.length === 0)
-      return domain === getTopAndSecondaryLevelDomain(defaultDomain);
+      return domain === getTopAndSecondaryLevelDomain(DEFAULT_DOMAIN);
     return d.origin.some((o) => getTopAndSecondaryLevelDomain(o) === domain);
   });
 
@@ -81,7 +81,7 @@ export const findWebAuthnRpId = (
           "Not possible. Call this function only if devices exist."
         );
       }
-      return devices[0].origin[0] ?? defaultDomain;
+      return devices[0].origin[0] ?? DEFAULT_DOMAIN;
     };
 
     // Try current domain first if devices exist
