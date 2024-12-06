@@ -386,7 +386,12 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    init_assets();
+    let state_related_origins = state::persistent_state(|storage| storage.related_origins.clone());
+    let related_origins = maybe_arg
+        .clone()
+        .map(|arg| arg.related_origins)
+        .unwrap_or(state_related_origins);
+    init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
 }
