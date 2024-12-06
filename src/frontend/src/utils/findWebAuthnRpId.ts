@@ -20,7 +20,7 @@ const getTopAndSecondaryLevelDomain = (url: string): string => {
     throw new Error("Invalid URL: Unable to extract domain.");
   }
 
-  return parts.slice(-2).join('.');
+  return parts.slice(-2).join(".");
 };
 
 /**
@@ -66,42 +66,37 @@ export const findWebAuthnRpId = (
   devices: DeviceData[],
   preferredDomains: string[] = ["ic0.app", "internetcomputer.org", "icp0.io"]
 ): string | undefined => {
-  try {
-    const currentDomain = getTopAndSecondaryLevelDomain(currentUrl);
+  const currentDomain = getTopAndSecondaryLevelDomain(currentUrl);
 
-    if (devices.length === 0) {
+  if (devices.length === 0) {
+    throw new Error(
+      "Not possible. Every registered user has at least one device."
+    );
+  }
+
+  const getFirstDomain = (devices: DeviceData[]): string => {
+    if (devices[0] === undefined) {
       throw new Error(
-        "Not possible. Every registered user has at least one device."
+        "Not possible. Call this function only if devices exist."
       );
     }
+    return devices[0].origin[0] ?? DEFAULT_DOMAIN;
+  };
 
-    const getFirstDomain = (devices: DeviceData[]): string => {
-      if (devices[0] === undefined) {
-        throw new Error(
-          "Not possible. Call this function only if devices exist."
-        );
-      }
-      return devices[0].origin[0] ?? DEFAULT_DOMAIN;
-    };
-
-    // Try current domain first if devices exist
-    if (getDevicesForDomain(devices, currentDomain).length > 0) {
-      return undefined;
-    }
-
-    // Check based on the order of preferred domains if there is no device with the current domain.
-    for (const domain of preferredDomains) {
-      const devicesForDomain = getDevicesForDomain(devices, domain);
-      if (devicesForDomain.length > 0) {
-        return getFirstDomain(devicesForDomain);
-      }
-    }
-
-    throw new Error(
-      "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
-    );
-  } catch (error) {
-    console.error(error);
-    throw error;
+  // Try current domain first if devices exist
+  if (getDevicesForDomain(devices, currentDomain).length > 0) {
+    return undefined;
   }
+
+  // Check based on the order of preferred domains if there is no device with the current domain.
+  for (const domain of preferredDomains) {
+    const devicesForDomain = getDevicesForDomain(devices, domain);
+    if (devicesForDomain.length > 0) {
+      return getFirstDomain(devicesForDomain);
+    }
+  }
+
+  throw new Error(
+    "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
+  );
 };
