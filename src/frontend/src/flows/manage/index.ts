@@ -97,8 +97,7 @@ export const authFlowManage = async (connection: Connection) => {
   const dapps = shuffleArray(getDapps());
 
   const params = new URLSearchParams(window.location.search);
-  const allowPinAuthentication =
-    params.get(ENABLE_PIN_QUERY_PARAM_KEY) !== null;
+  const allowPinRegistration = params.get(ENABLE_PIN_QUERY_PARAM_KEY) !== null;
 
   const identityBackground = new PreLoadImage(identityCardBackground);
   // Go through the login flow, potentially creating an anchor.
@@ -110,7 +109,8 @@ export const authFlowManage = async (connection: Connection) => {
     connection,
     i18n,
     templates: authnTemplateManage({ dapps }),
-    allowPinAuthentication,
+    allowPinLogin: true,
+    allowPinRegistration,
   });
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add

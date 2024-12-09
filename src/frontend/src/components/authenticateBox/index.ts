@@ -71,13 +71,15 @@ export const authenticateBox = async ({
   connection,
   i18n,
   templates,
-  allowPinAuthentication,
+  allowPinLogin,
+  allowPinRegistration,
   autoSelectionIdentity,
 }: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
-  allowPinAuthentication: boolean;
+  allowPinLogin: boolean;
+  allowPinRegistration: boolean;
   autoSelectionIdentity?: bigint;
 }): Promise<{
   userNumber: bigint;
@@ -96,7 +98,7 @@ export const authenticateBox = async ({
       recover: () => useRecovery(connection),
       registerFlowOpts: await getRegisterFlowOpts({
         connection,
-        allowPinAuthentication,
+        allowPinRegistration,
       }),
       verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
         pinIdentityAuthenticatorValidity({
@@ -106,7 +108,7 @@ export const authenticateBox = async ({
         }),
       retrievePinIdentityMaterial: ({ userNumber }) =>
         idbRetrievePinIdentityMaterial({ userNumber }),
-      allowPinAuthentication,
+      allowPinLogin: allowPinLogin,
       autoSelectIdentity,
     });
 
@@ -176,7 +178,7 @@ export const authenticateBoxFlow = async <I>({
   registerFlowOpts,
   verifyPinValidity,
   retrievePinIdentityMaterial,
-  allowPinAuthentication,
+  allowPinLogin,
   autoSelectIdentity,
 }: {
   i18n: I18n;
@@ -204,7 +206,7 @@ export const authenticateBoxFlow = async <I>({
   }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
-  allowPinAuthentication: boolean;
+  allowPinLogin: boolean;
   autoSelectIdentity?: bigint;
   verifyPinValidity: (opts: {
     userNumber: bigint;
@@ -256,7 +258,7 @@ export const authenticateBoxFlow = async <I>({
       loginPasskey,
       loginPinIdentityMaterial,
       verifyPinValidity,
-      allowPinAuthentication,
+      allowPinLogin,
     });
 
   // Prompt for an identity number
@@ -640,7 +642,7 @@ const pinIdentityToDerPubkey = async (
 // Find and use a passkey, whether PIN or webauthn
 const useIdentityFlow = async <I>({
   userNumber,
-  allowPinAuthentication,
+  allowPinLogin,
   retrievePinIdentityMaterial,
   verifyPinValidity,
   loginPasskey,
@@ -657,7 +659,7 @@ const useIdentityFlow = async <I>({
   ) => Promise<
     LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
   >;
-  allowPinAuthentication: boolean;
+  allowPinLogin: boolean;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -718,7 +720,7 @@ const useIdentityFlow = async <I>({
   isValid satisfies "valid";
 
   // if there is a PIN but allowPinAuth is false, then error out
-  if (!allowPinAuthentication) {
+  if (!allowPinLogin) {
     return { kind: "pinNotAllowed" };
   }
 
@@ -767,16 +769,16 @@ const useIdentityFlow = async <I>({
 export const useIdentity = ({
   userNumber,
   connection,
-  allowPinAuthentication,
+  allowPinLogin,
 }: {
   userNumber: bigint;
   connection: Connection;
-  allowPinAuthentication: boolean;
+  allowPinLogin: boolean;
 }) =>
   useIdentityFlow({
     userNumber,
     retrievePinIdentityMaterial: idbRetrievePinIdentityMaterial,
-    allowPinAuthentication,
+    allowPinLogin,
 
     verifyPinValidity: (opts) =>
       pinIdentityAuthenticatorValidity({ ...opts, connection }),
