@@ -719,7 +719,7 @@ const useIdentityFlow = async <I>({
   }
   isValid satisfies "valid";
 
-  // if there is a PIN but allowPinAuth is false, then error out
+  // if there is a PIN but allowPinLogin is false, then error out
   if (!allowPinLogin) {
     return { kind: "pinNotAllowed" };
   }
