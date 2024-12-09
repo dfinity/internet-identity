@@ -165,6 +165,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey: pubkey.clone(),
             credential_id: credential_id.clone(),
+            origin: Some(origin.clone()),
         }),
         metadata: HashMap::from([
             (ALIAS.to_string(), MetadataEntryV2::String(alias.clone())),
@@ -196,6 +197,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey,
             credential_id,
+            origin: Some(origin.clone()),
         }),
         metadata: HashMap::from([
             (

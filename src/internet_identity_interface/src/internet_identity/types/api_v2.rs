@@ -33,6 +33,7 @@ pub struct PublicKeyAuthn {
 pub struct WebAuthn {
     pub pubkey: PublicKey,
     pub credential_id: CredentialId,
+    pub origin: Option<String>,
 }
 
 /// Supported authentication methods
