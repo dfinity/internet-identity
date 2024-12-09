@@ -480,7 +480,6 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
         "purpose",
         "key_type",
         "protection",
-        "origin",
         "last_usage_timestamp",
         "metadata",
         "usage",
