@@ -123,6 +123,7 @@ impl From<DeviceWithUsage> for AuthnMethodData {
             AuthnMethod::WebAuthn(WebAuthn {
                 credential_id,
                 pubkey: device_data.pubkey.clone(),
+                origin: device_data.origin.clone(),
             })
         } else {
             AuthnMethod::PubKey(PublicKeyAuthn {
@@ -261,7 +262,6 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
         // Remove the metadata entries that have a dedicated field in the `DeviceData` struct in
         // order to avoid duplication.
         let alias = remove_metadata_string(&mut data, "alias")?.unwrap_or_default();
-        let origin = remove_metadata_string(&mut data, "origin")?;
 
         let mut key_type = remove_metadata_string(&mut data, "authenticator_attachment")?
             .map(|key_type| match key_type.as_str() {
@@ -281,12 +281,13 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
                 .unwrap_or(KeyType::Unknown);
         }
 
-        let (pubkey, credential_id) = match data.authn_method {
+        let (pubkey, credential_id, origin) = match data.authn_method {
             AuthnMethod::WebAuthn(WebAuthn {
                 pubkey,
                 credential_id,
-            }) => (pubkey, Some(credential_id)),
-            AuthnMethod::PubKey(PublicKeyAuthn { pubkey }) => (pubkey, None),
+                origin,
+            }) => (pubkey, Some(credential_id), origin),
+            AuthnMethod::PubKey(PublicKeyAuthn { pubkey }) => (pubkey, None, None),
         };
 
         Ok(DeviceWithUsage {

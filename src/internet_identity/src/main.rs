@@ -509,6 +509,7 @@ mod v2_api {
                     AuthnMethod::WebAuthn(WebAuthn {
                         credential_id,
                         pubkey: device.pubkey,
+                        origin: device.origin,
                     })
                 } else {
                     AuthnMethod::PubKey(PublicKeyAuthn {
