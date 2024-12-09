@@ -132,7 +132,7 @@ const verifyCredentials = async ({
   const authResult = await useIdentity({
     userNumber,
     connection,
-    allowPinAuthentication: true,
+    allowPinLogin: true,
   });
 
   if ("tag" in authResult) {
