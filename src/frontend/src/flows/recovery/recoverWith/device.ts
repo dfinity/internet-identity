@@ -1,3 +1,4 @@
+import { CredentialId, DeviceData } from "$generated/internet_identity_types";
 import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
 import { toast } from "$src/components/toast";
 import {
@@ -74,8 +75,11 @@ const attemptRecovery = async ({
   | { kind: "noRecovery" }
   | { kind: "tooManyRecovery" }
 > => {
-  const { recovery_credentials: recoveryCredentials } =
-    await connection.lookupCredentials(userNumber);
+  const devices = await connection.lookupAll(userNumber);
+
+  const recoveryCredentials = devices.filter(
+    ({ purpose }) => "recovery" in purpose
+  );
 
   if (recoveryCredentials.length === 0) {
     return { kind: "noRecovery" };
@@ -85,7 +89,17 @@ const attemptRecovery = async ({
     return { kind: "tooManyRecovery" };
   }
 
-  return await connection.fromWebauthnCredentials(userNumber, [
-    recoveryCredentials[0],
-  ]);
+  const hasCredentialId = (
+    device: Omit<DeviceData, "alias">
+  ): device is Omit<DeviceData, "alias"> & { credential_id: [CredentialId] } =>
+    device.credential_id.length === 1;
+
+  const credentialData = recoveryCredentials
+    .filter(hasCredentialId)
+    .map(({ credential_id, pubkey }) => ({
+      pubkey,
+      credential_id: credential_id[0],
+    }));
+
+  return await connection.fromWebauthnCredentials(userNumber, credentialData);
 };
