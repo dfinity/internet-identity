@@ -418,7 +418,7 @@ fn check_anchor_invariants(
     /// The number of devices is limited. The front-end limits the devices further
     /// by only allowing 8 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
-    /// Note however, that a free device slot does not guarantee that it will fit the the anchor
+    /// Note however, that a free device slot does not guarantee that it will fit the anchor
     /// due to the `VARIABLE_FIELDS_LIMIT`.
     const MAX_DEVICES_PER_ANCHOR: usize = 10;
 
