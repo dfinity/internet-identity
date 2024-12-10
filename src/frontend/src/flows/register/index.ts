@@ -1,6 +1,5 @@
 import { AuthnMethodData } from "$generated/internet_identity_types";
 import { withLoader } from "$src/components/loader";
-import { ENABLE_PIN_QUERY_PARAM_KEY } from "$src/config";
 import {
   PinIdentityMaterial,
   constructPinIdentity,
@@ -241,20 +240,16 @@ export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 
 export const getRegisterFlowOpts = async ({
   connection,
-  allowPinAuthentication,
+  allowPinRegistration,
 }: {
   connection: Connection;
-  allowPinAuthentication: boolean;
+  allowPinRegistration: boolean;
 }): Promise<RegisterFlowOpts> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
   const tempIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
-  const params = new URLSearchParams(window.location.search);
-  // Only allow PIN if query param is set and the request allows it
-  const allowPinRegistration =
-    params.get(ENABLE_PIN_QUERY_PARAM_KEY) !== null && allowPinAuthentication;
   return {
     /** Check that the current origin is not the explicit canister id or a raw url.
      *  Explanation why we need to do this:

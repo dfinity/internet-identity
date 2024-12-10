@@ -205,9 +205,9 @@ const authenticate = async (
         dapp.hasOrigin(authContext.requestOrigin)
       ),
     }),
-    // This allows logging in with a PIN but not registering with a PIN
-    allowPinAuthentication:
-      authContext.authRequest.allowPinAuthentication ?? true,
+    allowPinLogin: authContext.authRequest.allowPinAuthentication ?? true,
+    // Registration with PIN is not allowed anymore
+    allowPinRegistration: false,
     autoSelectionIdentity: autoSelectionIdentity,
   });
 
