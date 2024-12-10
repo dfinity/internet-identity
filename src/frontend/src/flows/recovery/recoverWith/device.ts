@@ -86,6 +86,10 @@ const attemptRecovery = async ({
   }
 
   return await connection.fromWebauthnCredentials(userNumber, [
-    recoveryCredentials[0],
+    {
+      pubkey: recoveryCredentials[0].pubkey,
+      credentialId: recoveryCredentials[0].credential_id,
+      origin: undefined,
+    },
   ]);
 };

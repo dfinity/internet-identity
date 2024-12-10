@@ -1,6 +1,13 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { DerEncodedPublicKey } from "@dfinity/agent";
+import { CredentialId } from "./multiWebAuthnIdentity";
 
 const DEFAULT_DOMAIN = "https://identity.ic0.app";
+
+export type CredentialData = {
+  pubkey: DerEncodedPublicKey;
+  credentialId: CredentialId;
+  origin?: string;
+};
 
 /**
  * Helper to extract the top and secondary level domain from a URL.
@@ -16,8 +23,12 @@ const DEFAULT_DOMAIN = "https://identity.ic0.app";
 const getTopAndSecondaryLevelDomain = (url: string): string => {
   const parts = new URL(url).hostname.split(".");
 
-  if (parts.length < 2) {
+  if (parts.length < 1) {
     throw new Error("Invalid URL: Unable to extract domain.");
+  }
+
+  if (parts.length === 1) {
+    return url;
   }
 
   return parts.slice(-2).join(".");
@@ -29,17 +40,15 @@ const getTopAndSecondaryLevelDomain = (url: string): string => {
  * @param devices - The list of devices registered for the user.
  * @param domain - The domain to check for devices. It must be a top and secondary level domain e.g. "ic0.app"
  * We need this to support the beta domains with the same functions: beta.identity.ic0.app, beta.identity.internetcomputer.org
- * @returns {DeviceData[]} The list of devices registered for the domain.
+ * @returns {CredentialData[]} The list of devices registered for the domain.
  */
 const getDevicesForDomain = (
-  devices: DeviceData[],
+  devices: CredentialData[],
   domain: string
-): DeviceData[] =>
-  devices.filter((d) => {
-    if (d.origin.length === 0)
-      return domain === getTopAndSecondaryLevelDomain(DEFAULT_DOMAIN);
-    return d.origin.some((o) => getTopAndSecondaryLevelDomain(o) === domain);
-  });
+): CredentialData[] =>
+  devices.filter(
+    (d) => domain === getTopAndSecondaryLevelDomain(d.origin ?? DEFAULT_DOMAIN)
+  );
 
 /**
  * Returns the domain to use as the RP ID for WebAuthn registration.
@@ -63,7 +72,7 @@ const getDevicesForDomain = (
  */
 export const findWebAuthnRpId = (
   currentUrl: string,
-  devices: DeviceData[],
+  devices: CredentialData[],
   preferredDomains: string[] = ["ic0.app", "internetcomputer.org", "icp0.io"]
 ): string | undefined => {
   const currentDomain = getTopAndSecondaryLevelDomain(currentUrl);
@@ -74,13 +83,13 @@ export const findWebAuthnRpId = (
     );
   }
 
-  const getFirstDomain = (devices: DeviceData[]): string => {
+  const getFirstDomain = (devices: CredentialData[]): string => {
     if (devices[0] === undefined) {
       throw new Error(
         "Not possible. Call this function only if devices exist."
       );
     }
-    return devices[0].origin[0] ?? DEFAULT_DOMAIN;
+    return devices[0].origin ?? DEFAULT_DOMAIN;
   };
 
   // Try current domain first if devices exist
@@ -99,4 +108,29 @@ export const findWebAuthnRpId = (
   throw new Error(
     "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
   );
+};
+
+/**
+ * Returns the domains used for Related Domain Requests standard.
+ *
+ * @returns {string[]} The list of domains used for Related Domain Requests.
+ */
+export const webauthRelatedDomains = () => {
+  const BETA_URLS = [
+    "https://beta.identity.ic0.app",
+    "https://beta.identity.internetcomputer.org",
+    "https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+  ];
+  const PROD_URLS = [
+    "https://identity.ic0.app/",
+    "https://identity.internetcomputer.org",
+    "https://identity.icp0.io",
+  ];
+  const url = new URL(window.location.origin);
+  if (PROD_URLS.includes(url.origin)) {
+    return PROD_URLS;
+  }
+  if (BETA_URLS.includes(url.origin)) {
+    return BETA_URLS;
+  }
 };

@@ -16,12 +16,14 @@ import {
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import borc from "borc";
+import { findWebAuthnRpId } from "./findWebAuthnRpId";
 import { bufferEqual } from "./iiConnection";
 
 export type CredentialId = ArrayBuffer;
 export type CredentialData = {
   pubkey: DerEncodedPublicKey;
   credentialId: CredentialId;
+  origin?: string;
 };
 
 /**
@@ -74,6 +76,17 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
+    const currentUrl = new URL(window.location.origin);
+    let rpId;
+    try {
+      rpId = findWebAuthnRpId(currentUrl.origin, this.credentialData);
+      if (rpId !== undefined) {
+        rpId = new URL(rpId).hostname;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
@@ -82,6 +95,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         })),
         challenge: blob,
         userVerification: "discouraged",
+        rpId,
       },
     })) as PublicKeyCredential;
 
