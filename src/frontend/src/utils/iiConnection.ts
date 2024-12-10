@@ -7,6 +7,7 @@ import {
   AddTentativeDeviceResponse,
   AnchorCredentials,
   AuthnMethodData,
+  CredentialId,
   DeviceData,
   DeviceKey,
   FrontendHostname,
@@ -26,7 +27,6 @@ import {
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
-  WebAuthnCredential,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
@@ -53,6 +53,12 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
+
+export type CredentialData = {
+  pubkey: PublicKey;
+  credentialId: CredentialId;
+  origin?: string;
+};
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -361,17 +367,17 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.flatMap(({ credential_id, pubkey }) => {
+      devices.flatMap(({ credential_id, pubkey, origin }) => {
         return credential_id.length === 0
           ? []
-          : [{ credential_id: credential_id[0], pubkey }];
+          : [{ credentialId: credential_id[0], pubkey, origin: origin[0] }];
       })
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: WebAuthnCredential[]
+    credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -380,9 +386,10 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : MultiWebAuthnIdentity.fromCredentials(
-          credentials.map(({ credential_id, pubkey }) => ({
+          credentials.map(({ credentialId, pubkey, origin }) => ({
             pubkey: derFromPubkey(pubkey),
-            credentialId: Buffer.from(credential_id),
+            credentialId: Buffer.from(credentialId),
+            origin,
           }))
         );
     let delegationIdentity: DelegationIdentity;
