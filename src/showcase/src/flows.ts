@@ -124,7 +124,7 @@ export const iiFlows: Record<string, () => void> = {
           connection: mockConnection,
         });
       },
-      allowPinAuthentication: true,
+      allowPinLogin: true,
       loginPinIdentityMaterial: async ({ pin }) => {
         toast.info(html`Valid PIN is '123456'`);
         await withLoader(
