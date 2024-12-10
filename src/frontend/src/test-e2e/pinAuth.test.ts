@@ -42,6 +42,8 @@ test("Register and Log in with PIN identity", async () => {
     await mainView.waitForDisplay(); // we should be logged in
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
     await mainView.logout();
+    // We want to make sure that the query param is not needed for login
+    await browser.url(II_URL);
     await FLOWS.loginPinAuthenticateView(userNumber, pin, browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
@@ -59,8 +61,8 @@ test("Register with PIN and login without prefilled identity number", async () =
     // clear storage, so that the identity number is not prefilled
     await wipeStorage(browser);
 
-    // load the II page again
-    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
+    // We want to make sure that the query param is not needed for login
+    await browser.url(II_URL);
     await FLOWS.loginPinWelcomeView(userNumber, pin, browser);
     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
   }, APPLE_USER_AGENT);
