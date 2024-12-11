@@ -26,7 +26,6 @@ import {
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
-  WebAuthnCredential,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { features } from "$src/features";
@@ -50,6 +49,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { convertToCredentialData, CredentialData } from "./credential-devices";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
@@ -361,17 +361,13 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.flatMap(({ credential_id, pubkey }) => {
-        return credential_id.length === 0
-          ? []
-          : [{ credential_id: credential_id[0], pubkey }];
-      })
+      devices.map(convertToCredentialData)
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: WebAuthnCredential[]
+    credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -379,12 +375,7 @@ export class Connection {
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(
-          credentials.map(({ credential_id, pubkey }) => ({
-            pubkey: derFromPubkey(pubkey),
-            credentialId: Buffer.from(credential_id),
-          }))
-        );
+      : MultiWebAuthnIdentity.fromCredentials(credentials);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by

@@ -1,4 +1,4 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { CredentialData } from "./credential-devices";
 
 const DEFAULT_DOMAIN = "https://identity.ic0.app";
 
@@ -32,14 +32,12 @@ const getTopAndSecondaryLevelDomain = (url: string): string => {
  * @returns {DeviceData[]} The list of devices registered for the domain.
  */
 const getDevicesForDomain = (
-  devices: DeviceData[],
+  devices: CredentialData[],
   domain: string
-): DeviceData[] =>
-  devices.filter((d) => {
-    if (d.origin.length === 0)
-      return domain === getTopAndSecondaryLevelDomain(DEFAULT_DOMAIN);
-    return d.origin.some((o) => getTopAndSecondaryLevelDomain(o) === domain);
-  });
+): CredentialData[] =>
+  devices.filter(
+    (d) => getTopAndSecondaryLevelDomain(d.origin ?? DEFAULT_DOMAIN) === domain
+  );
 
 /**
  * Returns the domain to use as the RP ID for WebAuthn registration.
@@ -63,7 +61,7 @@ const getDevicesForDomain = (
  */
 export const findWebAuthnRpId = (
   currentUrl: string,
-  devices: DeviceData[],
+  devices: CredentialData[],
   preferredDomains: string[] = ["ic0.app", "internetcomputer.org", "icp0.io"]
 ): string | undefined => {
   const currentDomain = getTopAndSecondaryLevelDomain(currentUrl);
@@ -74,13 +72,13 @@ export const findWebAuthnRpId = (
     );
   }
 
-  const getFirstDomain = (devices: DeviceData[]): string => {
+  const getFirstDomain = (devices: CredentialData[]): string => {
     if (devices[0] === undefined) {
       throw new Error(
         "Not possible. Call this function only if devices exist."
       );
     }
-    return devices[0].origin[0] ?? DEFAULT_DOMAIN;
+    return devices[0].origin ?? DEFAULT_DOMAIN;
   };
 
   // Try current domain first if devices exist

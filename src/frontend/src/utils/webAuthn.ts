@@ -1,9 +1,9 @@
 import { DeviceData } from "$generated/internet_identity_types";
 import { features } from "$src/features";
 import {
-  creationOptions,
   DummyIdentity,
   IIWebAuthnIdentity,
+  creationOptions,
 } from "$src/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import { WebAuthnIdentity } from "@dfinity/identity";

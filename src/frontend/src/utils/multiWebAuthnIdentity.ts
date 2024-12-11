@@ -7,22 +7,12 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
-import {
-  DerEncodedPublicKey,
-  PublicKey,
-  Signature,
-  SignIdentity,
-} from "@dfinity/agent";
+import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import borc from "borc";
+import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
-
-export type CredentialId = ArrayBuffer;
-export type CredentialData = {
-  pubkey: DerEncodedPublicKey;
-  credentialId: CredentialId;
-};
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
