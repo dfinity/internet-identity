@@ -44,7 +44,7 @@ export const checkRequiredBrowserVersion = (
 };
 
 /**
- * Checks if the user agent string supports Webauthn with Related Origis Requests.
+ * Checks if the user agent string supports Webauthn with Related Origin Requests.
  *
  * Safari >18: https://developer.apple.com/documentation/safari-release-notes/safari-18-release-notes
  * Firefox: Not supported yet
