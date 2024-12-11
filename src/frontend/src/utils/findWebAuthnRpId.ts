@@ -1,26 +1,45 @@
 import { CredentialData } from "./credential-devices";
 
+// This is used when the origin is empty in the device data.
 const DEFAULT_DOMAIN = "https://identity.ic0.app";
+export const PROD_DOMAINS = [
+  "https://identity.ic0.app",
+  "https://identity.internetcomputer.org",
+  "https://identity.icp0.io",
+];
+export const BETA_DOMAINS = [
+  "https://beta.identity.ic0.app",
+  "https://beta.identity.internetcomputer.org",
+  "https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+];
 
 /**
- * Helper to extract the top and secondary level domain from a URL.
+ * Returns the related domains ordered by preference.
  *
- * Example: "https://identity.ic0.app" -> "ic0.app"
- *
- * @param url {string} The URL to extract the domain from.
- * @returns {string} The top and secondary level domain.
- *
- * @throws {Error} If the URL is invalid.
- * @throws {Error} If the URL does not contain a top and secondary level domain.
+ * It reads the current URL and returns the set related to the current url.
  */
-const getTopAndSecondaryLevelDomain = (url: string): string => {
-  const parts = new URL(url).hostname.split(".");
-
-  if (parts.length < 2) {
-    throw new Error("Invalid URL: Unable to extract domain.");
+export const relatedDomains = (): string[] => {
+  const currentUrl = new URL(window.location.origin);
+  if (PROD_DOMAINS.includes(currentUrl.origin)) {
+    return PROD_DOMAINS;
   }
+  if (BETA_DOMAINS.includes(currentUrl.origin)) {
+    return BETA_DOMAINS;
+  }
+  // Only beta and prod have related domains.
+  return [];
+};
 
-  return parts.slice(-2).join(".");
+const sameDomain = (url1: string, url2: string): boolean =>
+  new URL(url1).hostname === new URL(url2).hostname;
+
+const hostname = (url: string): string => new URL(url).hostname;
+
+const getFirstHostname = (devices: CredentialData[]): string => {
+  if (devices[0] === undefined) {
+    throw new Error("Not possible. Call this function only if devices exist.");
+  }
+  return hostname(devices[0].origin ?? DEFAULT_DOMAIN);
 };
 
 /**
@@ -35,9 +54,7 @@ const getDevicesForDomain = (
   devices: CredentialData[],
   domain: string
 ): CredentialData[] =>
-  devices.filter(
-    (d) => getTopAndSecondaryLevelDomain(d.origin ?? DEFAULT_DOMAIN) === domain
-  );
+  devices.filter((d) => sameDomain(d.origin ?? DEFAULT_DOMAIN, domain));
 
 /**
  * Returns the domain to use as the RP ID for WebAuthn registration.
@@ -51,8 +68,8 @@ const getDevicesForDomain = (
  *
  * @param currentUrl - The current URL of the page.
  * @param devices - The list of devices registered for the user.
- * @param preferredDomains - Optional list of domains in order or preference to use as the RP ID.
- * @returns {string | undefined} The RP ID to use for WebAuthn registration.
+ * @param relatedDomains - Optional list of domains in order or preference to use as the RP ID.
+ * @returns {string | undefined} The RP ID (as hostname without schema) to use for WebAuthn registration.
  * `undefined` when the RP ID is the same as the current domain and is not needed.
  *
  * @throws {Error} If devices are not registered for any of the preferred domains.
@@ -62,35 +79,28 @@ const getDevicesForDomain = (
 export const findWebAuthnRpId = (
   currentUrl: string,
   devices: CredentialData[],
-  preferredDomains: string[] = ["ic0.app", "internetcomputer.org", "icp0.io"]
+  relatedDomains: string[]
 ): string | undefined => {
-  const currentDomain = getTopAndSecondaryLevelDomain(currentUrl);
-
+  // If there are no related domains, RP ID should not be set.
+  if (relatedDomains.length === 0) {
+    return undefined;
+  }
   if (devices.length === 0) {
     throw new Error(
       "Not possible. Every registered user has at least one device."
     );
   }
 
-  const getFirstDomain = (devices: CredentialData[]): string => {
-    if (devices[0] === undefined) {
-      throw new Error(
-        "Not possible. Call this function only if devices exist."
-      );
-    }
-    return devices[0].origin ?? DEFAULT_DOMAIN;
-  };
-
   // Try current domain first if devices exist
-  if (getDevicesForDomain(devices, currentDomain).length > 0) {
+  if (getDevicesForDomain(devices, currentUrl).length > 0) {
     return undefined;
   }
 
   // Check based on the order of preferred domains if there is no device with the current domain.
-  for (const domain of preferredDomains) {
+  for (const domain of relatedDomains) {
     const devicesForDomain = getDevicesForDomain(devices, domain);
     if (devicesForDomain.length > 0) {
-      return getFirstDomain(devicesForDomain);
+      return getFirstHostname(devicesForDomain);
     }
   }
 
