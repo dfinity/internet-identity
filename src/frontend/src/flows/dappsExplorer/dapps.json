@@ -58,7 +58,7 @@
   },
   {
     "name": "Catalyze",
-    "website": "https://aqs24-xaaaa-aaaal-qbbea-cai.ic0.app/",
+    "website": "https://catalyze.one/",
     "oneLiner": "Manage your Web3 communities and events",
     "logo": "catalyze_logo.png"
   },
@@ -743,5 +743,10 @@
     "name": "IC Toolkit",
     "logo": "ictoolkit_logo.png",
     "website": "https://ic-toolkit.app"
+  },
+  {
+    "name": "ICP Tokens",
+    "website": "https://icptokens.net",
+    "logo": "icptokens_logo.svg"
   }
 ]
