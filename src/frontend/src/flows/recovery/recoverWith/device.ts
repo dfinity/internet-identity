@@ -1,6 +1,7 @@
 import { CredentialId, DeviceData } from "$generated/internet_identity_types";
 import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
 import { toast } from "$src/components/toast";
+import { convertToCredentialData } from "$src/utils/credential-devices";
 import {
   AuthFail,
   Connection,
@@ -96,10 +97,7 @@ const attemptRecovery = async ({
 
   const credentialData = recoveryCredentials
     .filter(hasCredentialId)
-    .map(({ credential_id, pubkey }) => ({
-      pubkey,
-      credential_id: credential_id[0],
-    }));
+    .map(convertToCredentialData);
 
   return await connection.fromWebauthnCredentials(userNumber, credentialData);
 };

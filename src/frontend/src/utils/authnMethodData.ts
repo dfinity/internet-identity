@@ -3,8 +3,8 @@ import {
   AuthnMethodSecuritySettings,
   MetadataMapV2,
 } from "$generated/internet_identity_types";
+import { CredentialId } from "$src/utils/credential-devices";
 import { readDeviceOrigin } from "$src/utils/iiConnection";
-import { CredentialId } from "$src/utils/multiWebAuthnIdentity";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
 

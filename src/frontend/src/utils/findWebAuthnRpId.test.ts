@@ -1,16 +1,11 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { CredentialData } from "./credential-devices";
 import { findWebAuthnRpId } from "./findWebAuthnRpId";
 
 describe("findWebAuthnRpId", () => {
-  const mockDeviceData = (origin: [] | [string]): DeviceData => ({
+  const mockDeviceData = (origin?: string): CredentialData => ({
     origin,
-    alias: "test-device",
-    metadata: [],
-    protection: { protected: null },
-    pubkey: [],
-    key_type: { platform: null },
-    purpose: { authentication: null },
-    credential_id: [],
+    credentialId: new ArrayBuffer(1),
+    pubkey: new ArrayBuffer(1),
   });
 
   beforeEach(() => {
@@ -18,10 +13,10 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns undefined if a device is registered for the current domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.ic0.app"]),
-      mockDeviceData(["https://identity.internetcomputer.org"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
@@ -29,10 +24,10 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns undefined for devices with default domain when the current domain matches", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData([]), // Empty origin defaults to defaultDomain `https://identity.ic0.app`
-      mockDeviceData(["https://identity.internetcomputer.org"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData(), // Empty origin defaults to defaultDomain `https://identity.ic0.ap`
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
@@ -40,9 +35,9 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns undefined if a device is registered for the current domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://beta.identity.ic0.app"]),
-      mockDeviceData(["https://beta.identity.internetcomputer.org"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://beta.identity.ic0.app"),
+      mockDeviceData("https://beta.identity.internetcomputer.org"),
     ];
     const currentUrl = "https://beta.identity.ic0.app";
 
@@ -50,10 +45,10 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns undefined if a device is registered for the current domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.ic0.app"]),
-      mockDeviceData(["https://identity.internetcomputer.org"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.internetcomputer.org";
 
@@ -61,9 +56,9 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns the second default preferred domain if no device is registered for the current domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.internetcomputer.org"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
@@ -73,9 +68,9 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns the first default preferred domain if no device is registered for the current domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.ic0.app"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.internetcomputer.org";
 
@@ -85,8 +80,8 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("returns the least preferred domain if devices are only on that domain", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
@@ -98,9 +93,9 @@ describe("findWebAuthnRpId", () => {
   test("uses preferred domains when provided", () => {
     const preferredDomains = ["ic0.app", "icp0.io", "internetcomputer.org"];
 
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.internetcomputer.org"]),
-      mockDeviceData(["https://identity.icp0.io"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
@@ -110,8 +105,8 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("throws an error if the current domain is invalid", () => {
-    const devices: DeviceData[] = [
-      mockDeviceData(["https://identity.ic0.app"]),
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
     ];
     const currentUrl = "not-a-valid-url";
 
@@ -121,7 +116,9 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("throws an error if no devices are registered for the current or preferred domains", () => {
-    const devices: DeviceData[] = [mockDeviceData(["https://otherdomain.com"])];
+    const devices: CredentialData[] = [
+      mockDeviceData("https://otherdomain.com"),
+    ];
     const currentUrl = "https://identity.ic0.app";
 
     expect(() => findWebAuthnRpId(currentUrl, devices)).toThrowError(
@@ -130,7 +127,7 @@ describe("findWebAuthnRpId", () => {
   });
 
   test("throws an error if there are no registered devices", () => {
-    const devices: DeviceData[] = [];
+    const devices: CredentialData[] = [];
     const currentUrl = "https://identity.ic0.app";
 
     expect(() => findWebAuthnRpId(currentUrl, devices)).toThrowError(
