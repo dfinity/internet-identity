@@ -7,12 +7,15 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
+import { findWebAuthnRpId, relatedDomains } from "./findWebAuthnRpId";
 import { bufferEqual } from "./iiConnection";
+import { supportsWebauthRoR } from "./userAgent";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
@@ -64,6 +67,14 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
+    const currentUrl = new URL(window.location.origin);
+    const userAgent = window.navigator.userAgent;
+    const rorDomains = relatedDomains();
+    const rpId =
+      DOMAIN_COMPATIBILITY.isEnabled() && supportsWebauthRoR(userAgent)
+        ? findWebAuthnRpId(currentUrl.origin, this.credentialData, rorDomains)
+        : undefined;
+
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
@@ -72,6 +83,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         })),
         challenge: blob,
         userVerification: "discouraged",
+        rpId,
       },
     })) as PublicKeyCredential;
 
