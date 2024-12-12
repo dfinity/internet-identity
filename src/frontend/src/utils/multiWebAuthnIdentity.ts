@@ -67,12 +67,14 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
-    const currentUrl = new URL(window.location.origin);
-    const userAgent = window.navigator.userAgent;
-    const rorDomains = relatedDomains();
     const rpId =
-      DOMAIN_COMPATIBILITY.isEnabled() && supportsWebauthRoR(userAgent)
-        ? findWebAuthnRpId(currentUrl.origin, this.credentialData, rorDomains)
+      DOMAIN_COMPATIBILITY.isEnabled() &&
+      supportsWebauthRoR(window.navigator.userAgent)
+        ? findWebAuthnRpId(
+            window.location.origin,
+            this.credentialData,
+            relatedDomains()
+          )
         : undefined;
 
     const result = (await navigator.credentials.get({
