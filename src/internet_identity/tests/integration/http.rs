@@ -561,7 +561,20 @@ fn must_not_cache_well_known_ic_domains() -> Result<(), CallError> {
 fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let related_origins: Vec<String> = [
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+    ]
+    .to_vec();
+    let config = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: Some(related_origins.clone()),
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
     // Get index page
     let well_known_request = HttpRequest {
