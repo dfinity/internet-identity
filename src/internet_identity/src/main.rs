@@ -10,11 +10,21 @@ use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
-use candid::Principal;
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use base64::Engine;
+use candid::{Nat, Principal};
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::management_canister::http_request::{CanisterHttpRequestArgument, HttpMethod};
+use ic_cdk::api::{caller, management_canister, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_stable_structures::Storable;
+use identity_jose::jwk::{Jwk, JwkParamsRsa};
+use identity_jose::jws::JwsAlgorithm::RS256;
+use identity_jose::jws::{
+    Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
+    VerificationInput,
+};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
@@ -22,7 +32,9 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde_bytes::ByteBuf;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
@@ -273,6 +285,126 @@ async fn prepare_delegation(
     .await
 }
 
+async fn decode_and_validate_jwt(
+    jwt: String,
+    salt: Vec<u8>,
+    skip_verification: bool,
+) -> (String, String) {
+    if skip_verification == true {
+        // Skip verification in this prototype `get_jwt_delegation` method for now
+        // since we can't make a http outcall in a query method.
+        //
+        // The verification is not skipped in `prepare_jwt_delegation` since this
+        // method is an update method and thus can make a http outcall.
+        //
+        // In a non prototype implementation this isn't an issue since we would be
+        // caching and reusing the public keys from the http outcall until they expire.
+        let decoder = Decoder::new();
+        let jws = decoder
+            .decode_compact_serialization(jwt.as_bytes(), None)
+            .unwrap();
+        let claims: serde_json::Value = serde_json::from_slice(jws.claims()).unwrap();
+        let iss = claims.get("iss").unwrap().as_str().unwrap();
+        let sub = claims.get("sub").unwrap().as_str().unwrap();
+
+        return (iss.to_string(), sub.to_string());
+    }
+
+    let request = CanisterHttpRequestArgument {
+        url: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+        method: HttpMethod::GET,
+        body: None,
+        max_response_bytes: None,
+        transform: None,
+        headers: vec![],
+    };
+
+    let (response,) = management_canister::http_request::http_request(request, 2000000000)
+        .await
+        .unwrap();
+    if response.status != Nat::from(200u8) {
+        trap(&String::from_utf8(response.body).unwrap());
+    }
+    let keys: serde_json::Value = serde_json::from_slice(response.body.as_slice()).unwrap();
+
+    let decoder = Decoder::new();
+    let jws = decoder
+        .decode_compact_serialization(jwt.as_bytes(), None)
+        .unwrap();
+    let kid = jws.protected_header().unwrap().kid().unwrap();
+    let claims: serde_json::Value = serde_json::from_slice(jws.claims()).unwrap();
+    let iss = claims.get("iss").unwrap().as_str().unwrap();
+    let sub = claims.get("sub").unwrap().as_str().unwrap();
+    let nonce = claims.get("nonce").unwrap().as_str().unwrap();
+
+    // Find key based on JWT claim kid
+    let key = keys
+        .get("keys")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry.get("kid").unwrap().as_str().unwrap() == kid)
+        .unwrap();
+    let jwk: Jwk = serde_json::from_value(key.clone()).unwrap();
+
+    let verifier = JwsVerifierFn::from(
+        |input: VerificationInput, jwk: &Jwk| -> Result<(), SignatureVerificationError> {
+            if input.alg != RS256 {
+                return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
+            }
+
+            let hashed_input = Sha256::digest(input.signing_input);
+            let scheme = Pkcs1v15Sign::new::<Sha256>();
+            let JwkParamsRsa { n, e, .. } = jwk.try_rsa_params().unwrap();
+            let n = BASE64_URL_SAFE_NO_PAD.decode(&n).unwrap();
+            let e = BASE64_URL_SAFE_NO_PAD.decode(&e).unwrap();
+
+            let rsa_key = RsaPublicKey::new(
+                rsa::BigUint::from_bytes_be(&n),
+                rsa::BigUint::from_bytes_be(&e),
+            )
+            .unwrap();
+
+            rsa_key
+                .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
+                .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
+        },
+    );
+
+    jws.verify(&verifier, &jwk).unwrap();
+
+    let mut hasher = Sha256::new();
+    hasher.update(salt);
+    hasher.update(caller().to_bytes());
+    let hash: [u8; 32] = hasher.finalize().into();
+    let nonce_to_compare = BASE64_URL_SAFE_NO_PAD.encode(hash);
+
+    if nonce != nonce_to_compare {
+        trap("Invalid nonce");
+    }
+
+    if iss != "https://accounts.google.com" {
+        trap("Only Google OpenID is supported");
+    }
+
+    // Missing in prototype: validating other claims like e.g. exp and iat
+
+    (iss.to_string(), sub.to_string())
+}
+
+#[update]
+async fn prepare_jwt_delegation(
+    jwt: String,
+    salt: Vec<u8>,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    max_time_to_live: Option<u64>,
+) -> (UserKey, Timestamp) {
+    let (iss, sub) = decode_and_validate_jwt(jwt, salt, false).await;
+    delegation::prepare_jwt_delegation(&iss, &sub, frontend, session_key, max_time_to_live).await
+}
+
 #[query]
 fn get_delegation(
     anchor_number: AnchorNumber,
@@ -284,6 +416,18 @@ fn get_delegation(
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
+}
+
+#[query]
+async fn get_jwt_delegation(
+    jwt: String,
+    salt: Vec<u8>,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> GetDelegationResponse {
+    let (iss, sub) = decode_and_validate_jwt(jwt, salt, true).await;
+    delegation::get_jwt_delegation(&iss, &sub, frontend, session_key, expiration)
 }
 
 #[query]

@@ -3,6 +3,7 @@ import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
 import { authFlowManage, renderManageWarmup } from "./flows/manage";
+import { callbackFlow } from "./flows/redirect";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 
@@ -43,6 +44,9 @@ void createSpa(async (connection) => {
   if (url.hash === "#authorize") {
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
+  } else if (url.pathname === "/callback") {
+    // User was returned here after previous redirect
+    return callbackFlow();
   } else {
     // The default flow
     return authFlowManage(connection);

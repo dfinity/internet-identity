@@ -460,6 +460,11 @@ export const idlFactory = ({ IDL }) => {
         [GetDelegationResponse],
         ['query'],
       ),
+    'get_jwt_delegation' : IDL.Func(
+        [IDL.Text, IDL.Vec(IDL.Nat8), FrontendHostname, SessionKey, Timestamp],
+        [GetDelegationResponse],
+        ['query'],
+      ),
     'get_id_alias' : IDL.Func(
         [GetIdAliasRequest],
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
@@ -506,6 +511,11 @@ export const idlFactory = ({ IDL }) => {
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
+        [UserKey, Timestamp],
+        [],
+      ),
+    'prepare_jwt_delegation' : IDL.Func(
+        [IDL.Text, IDL.Vec(IDL.Nat8), FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
         [],
       ),

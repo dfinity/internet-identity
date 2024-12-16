@@ -1,25 +1,21 @@
-import {
-  AuthnTemplates,
-  authenticateBox,
-} from "$src/components/authenticateBox";
+import { AuthnTemplates } from "$src/components/authenticateBox";
 import { displayError } from "$src/components/displayError";
 import { caretDownIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
-import { getDapps } from "$src/flows/dappsExplorer/dapps";
-import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
-import { getAnchorIfLastUsed, setKnownPrincipal } from "$src/storage";
+import { GOOGLE_REQUEST_CONFIG, createRequestJWT } from "$src/oauth";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
 import { Chan } from "$src/utils/utils";
-import { Principal } from "@dfinity/principal";
+import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
+import { Signature } from "@dfinity/agent";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
-import { Delegation, fetchDelegation } from "./fetchDelegation";
+import { Delegation } from "./fetchDelegation";
 import copyJson from "./index.json";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 
@@ -186,78 +182,79 @@ const authenticate = async (
     };
   }
 
-  let autoSelectionIdentity = undefined;
-  if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
-    autoSelectionIdentity = await getAnchorIfLastUsed({
-      principal: authContext.authRequest.autoSelectionPrincipal,
-      origin: authContext.requestOrigin,
-    });
-  }
-
-  const authSuccess = await authenticateBox({
-    connection,
-    i18n,
-    templates: authnTemplateAuthorize({
-      origin: authContext.requestOrigin,
-      derivationOrigin: authContext.authRequest.derivationOrigin,
-      i18n,
-      knownDapp: getDapps().find((dapp) =>
-        dapp.hasOrigin(authContext.requestOrigin)
-      ),
-    }),
-    allowPinLogin: authContext.authRequest.allowPinAuthentication ?? true,
-    // Registration with PIN is not allowed anymore
-    allowPinRegistration: false,
-    autoSelectionIdentity: autoSelectionIdentity,
-  });
-
   // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =
     authContext.authRequest.derivationOrigin ?? authContext.requestOrigin;
 
-  const result = await withLoader(() =>
-    fetchDelegation({
-      connection: authSuccess.connection,
-      derivationOrigin,
-      publicKey: authContext.authRequest.sessionPublicKey,
-      maxTimeToLive: authContext.authRequest.maxTimeToLive,
-    })
+  const page = document.getElementById("pageContent")!;
+  page.innerHTML = "";
+  page.style.display = "flex";
+  page.style.alignItems = "center";
+  page.style.justifyContent = "center";
+  page.style.height = "100dvh";
+
+  const googleSignInButton = document.createElement("button");
+  googleSignInButton.innerText = "Continue with Google";
+  googleSignInButton.className = "c-button";
+  googleSignInButton.style.width = "auto";
+  page.appendChild(googleSignInButton);
+
+  const identity = await ECDSAKeyIdentity.generate();
+  const requestJWT = await createRequestJWT(GOOGLE_REQUEST_CONFIG, {
+    principal: identity.getPrincipal(),
+    mediation: "required",
+  });
+
+  const { jwt, salt } = await new Promise<{ jwt: string; salt: ArrayBuffer }>(
+    (resolve) => {
+      googleSignInButton.onclick = () => {
+        googleSignInButton.disabled = true;
+        void withLoader(requestJWT).then(resolve);
+      };
+    }
   );
 
-  if ("error" in result) {
-    return {
-      kind: "failure",
-      text: "Unexpected error",
-    };
-  }
+  const [userKey, parsed_signed_delegation] = await withLoader(async () => {
+    const actor = await connection.createActor(identity);
+    const [userKey, timestamp] = await actor.prepare_jwt_delegation(
+      jwt,
+      new Uint8Array(salt),
+      derivationOrigin,
+      authContext.authRequest.sessionPublicKey,
+      []
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    const response = await actor.get_jwt_delegation(
+      jwt,
+      new Uint8Array(salt),
+      derivationOrigin,
+      authContext.authRequest.sessionPublicKey,
+      timestamp
+    );
+    if ("no_such_delegation" in response) {
+      throw new Error("Delegation not found");
+    }
 
-  // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
-  // one. The exact flow depends on the device they use.
-  // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
-  // may have already closed the II window
-  if (!authSuccess.newAnchor) {
-    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
-  }
-
-  // Ignore the response of committing the metadata because it's not crucial.
-  void authSuccess.connection.commitMetadata();
-
-  const [userKey, parsed_signed_delegation] = result;
-
-  const userPublicKey = Uint8Array.from(userKey);
-  const principal = Principal.selfAuthenticating(userPublicKey);
-
-  await setKnownPrincipal({
-    userNumber: authSuccess.userNumber,
-    origin: authContext.requestOrigin,
-    principal,
+    return [
+      userKey,
+      {
+        delegation: {
+          pubkey: Uint8Array.from(response.signed_delegation.delegation.pubkey),
+          expiration: BigInt(response.signed_delegation.delegation.expiration),
+          targets: undefined,
+        },
+        signature: Uint8Array.from(
+          response.signed_delegation.signature
+        ) as unknown as Signature,
+      },
+    ];
   });
 
   return {
     kind: "success",
     delegations: [parsed_signed_delegation],
     userPublicKey: Uint8Array.from(userKey),
-    authnMethod: authSuccess.authnMethod,
+    authnMethod: "passkey",
   };
 };
 /** Run the authentication flow, including postMessage protocol, offering to authenticate

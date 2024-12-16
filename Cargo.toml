@@ -47,4 +47,4 @@ regex = "1.10"
 serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"
-sha2 = "0.10"
+sha2 = { version = "0.10", features = ["oid"] }

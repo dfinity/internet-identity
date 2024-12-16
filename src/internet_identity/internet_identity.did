@@ -689,6 +689,11 @@ service : (opt InternetIdentityInit) -> {
     prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
     get_delegation: (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
+    // JWT Prototype Authentication protocol
+    // =======================
+    prepare_jwt_delegation : (text, blob, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
+    get_jwt_delegation: (text, blob, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
+
     // Attribute Sharing MVP API
     // =========================
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.

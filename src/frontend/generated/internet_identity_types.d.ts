@@ -367,6 +367,10 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
+  'get_jwt_delegation' : ActorMethod<
+    [string, Uint8Array, FrontendHostname, SessionKey, Timestamp],
+    GetDelegationResponse
+  >,
   'get_id_alias' : ActorMethod<
     [GetIdAliasRequest],
     { 'Ok' : IdAliasCredentials } |
@@ -404,6 +408,10 @@ export interface _SERVICE {
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
+    [UserKey, Timestamp]
+  >,
+  'prepare_jwt_delegation' : ActorMethod<
+    [string, Uint8Array, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
   >,
   'prepare_id_alias' : ActorMethod<
