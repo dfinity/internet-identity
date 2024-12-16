@@ -399,7 +399,8 @@ async fn decode_and_validate_jwt(
 // Sort Google keys and their properties since they're returned occasionally in a random order
 fn sort_google_certs(body: Vec<u8>) -> Result<Vec<u8>, String> {
     // Parse the input JSON
-    let data: serde_json::Value = serde_json::from_slice(&body).map_err(|_| "Invalid JSON".to_string())?;
+    let data: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|_| "Invalid JSON".to_string())?;
 
     // Extract and validate the "keys" array
     let keys = data
@@ -429,7 +430,6 @@ fn sort_google_certs(body: Vec<u8>) -> Result<Vec<u8>, String> {
     // Convert the result to JSON and return
     serde_json::to_vec(&result).map_err(|_| "Unable to encode JSON".to_string())
 }
-
 
 #[query]
 fn transform_google_certs(raw: http_request::TransformArgs) -> http_request::HttpResponse {
