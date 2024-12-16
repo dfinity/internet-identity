@@ -88,7 +88,6 @@ const requestWithRedirect = async (
   authURL.searchParams.set("redirect_uri", redirectURL.href);
   authURL.searchParams.set("scope", "openid profile email");
   authURL.searchParams.set("state", toBase64URL(state));
-  authURL.searchParams.set("state", toBase64URL(state));
   authURL.searchParams.set("nonce", toBase64URL(nonce));
   if (options.mediation === "required") {
     authURL.searchParams.set(
