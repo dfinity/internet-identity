@@ -5,9 +5,6 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 export interface RequestConfig {
   // OAuth client ID
   clientId: string;
-  // OAuth client secret, some OpenID clients require it for every flow,
-  // as long as PKCE is used, exposing this client secret is not a risk.
-  clientSecret?: string;
   // OAuth authentication URL
   authURL: string;
   // Optional, FedCM config URL
@@ -26,9 +23,8 @@ export interface RequestOptions {
 export const GOOGLE_REQUEST_CONFIG: RequestConfig = {
   clientId:
     "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com",
-  // clientSecret: "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",
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
-  // configURL: "https://accounts.google.com/gsi/fedcm.json",
+  configURL: "https://accounts.google.com/gsi/fedcm.json",
 };
 
 const requestWithCredentials = async (
@@ -75,21 +71,13 @@ const toBase64 = (bytes: ArrayBuffer): string =>
 const toBase64URL = (bytes: ArrayBuffer): string =>
   toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-const createRequestWithRedirect = async (
+const requestWithRedirect = async (
   config: Omit<RequestConfig, "configURL">,
   options: Omit<RequestOptions, "principal">,
   nonce: ArrayBuffer
-): Promise<() => Promise<string>> => {
+): Promise<string> => {
   const state = new Uint8Array(12);
   window.crypto.getRandomValues(state);
-
-  const codeVerifier = new Uint8Array(96);
-  window.crypto.getRandomValues(codeVerifier);
-
-  const codeChallenge = await window.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(toBase64URL(codeVerifier))
-  );
 
   const redirectURL = new URL(window.location.origin);
   redirectURL.pathname = "/callback";
@@ -115,19 +103,18 @@ const createRequestWithRedirect = async (
     authURL.searchParams.set("login_hint", options.loginHint);
   }
 
-  return async () => {
-    const callback = await redirectInPopup(authURL.href);
-    const callbackURL = new URL(callback);
-    const searchParams = new URLSearchParams(callbackURL.hash);
-    const id_token = searchParams.get("id_token");
-    if (searchParams.get("state") === toBase64URL(state)) {
-      throw new Error("Invalid state");
-    }
-    if (isNullish(id_token)) {
-      throw new Error("No token received");
-    }
-    return id_token;
-  };
+  const callback = await redirectInPopup(authURL.href);
+  const callbackURL = new URL(callback);
+  const searchParams = new URLSearchParams(callbackURL.hash);
+  const id_token = searchParams.get("id_token");
+  if (searchParams.get("state") === toBase64URL(state)) {
+    throw new Error("Invalid state");
+  }
+  if (isNullish(id_token)) {
+    throw new Error("No token received");
+  }
+
+  return id_token;
 };
 
 export const createRequestJWT = async (
@@ -144,16 +131,15 @@ export const createRequestJWT = async (
   bytes.set(options.principal.toUint8Array(), 32);
   const nonce = await window.crypto.subtle.digest("SHA-256", bytes);
 
-  const redirect = await createRequestWithRedirect(config, options, nonce);
   return async (): Promise<{ jwt: string; salt: ArrayBuffer }> => {
     if (isNullish(config.configURL)) {
       // FedCM is not supported for this OpenID Provider
-      return { jwt: await redirect(), salt };
+      return { jwt: await requestWithRedirect(config, options, nonce), salt };
     }
     let jwt = await requestWithCredentials(config, options, nonce);
     if (isNullish(jwt)) {
       // FedCM is not supported in this browser
-      jwt = await redirect();
+      jwt = await requestWithRedirect(config, options, nonce);
     }
     return { jwt, salt };
   };
