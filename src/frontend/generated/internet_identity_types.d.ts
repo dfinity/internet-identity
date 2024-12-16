@@ -367,14 +367,14 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_jwt_delegation' : ActorMethod<
-    [string, Uint8Array, FrontendHostname, SessionKey, Timestamp],
-    GetDelegationResponse
-  >,
   'get_id_alias' : ActorMethod<
     [GetIdAliasRequest],
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
+  >,
+  'get_jwt_delegation' : ActorMethod<
+    [string, Uint8Array | number[], FrontendHostname, SessionKey, Timestamp],
+    GetDelegationResponse
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -410,14 +410,20 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
   >,
-  'prepare_jwt_delegation' : ActorMethod<
-    [string, Uint8Array, FrontendHostname, SessionKey, [] | [bigint]],
-    [UserKey, Timestamp]
-  >,
   'prepare_id_alias' : ActorMethod<
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  'prepare_jwt_delegation' : ActorMethod<
+    [
+      string,
+      Uint8Array | number[],
+      FrontendHostname,
+      SessionKey,
+      [] | [bigint],
+    ],
+    [UserKey, Timestamp]
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
