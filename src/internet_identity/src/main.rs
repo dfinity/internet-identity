@@ -14,8 +14,8 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::{Nat, Principal};
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
-use ic_cdk::api::management_canister::http_request::{CanisterHttpRequestArgument, HttpMethod};
-use ic_cdk::api::{caller, management_canister, set_certified_data, trap};
+use ic_cdk::api::management_canister::http_request;
+use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_stable_structures::Storable;
@@ -35,7 +35,7 @@ use internet_identity_interface::internet_identity::types::*;
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -310,16 +310,19 @@ async fn decode_and_validate_jwt(
         return (iss.to_string(), sub.to_string());
     }
 
-    let request = CanisterHttpRequestArgument {
+    let request = http_request::CanisterHttpRequestArgument {
         url: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-        method: HttpMethod::GET,
+        method: http_request::HttpMethod::GET,
         body: None,
         max_response_bytes: None,
-        transform: None,
+        transform: Some(http_request::TransformContext::from_name(
+            "transform_google_certs".to_string(),
+            vec![],
+        )),
         headers: vec![],
     };
 
-    let (response,) = management_canister::http_request::http_request(request, 2000000000)
+    let (response,) = http_request::http_request(request, 30_000_000_000)
         .await
         .unwrap();
     if response.status != Nat::from(200u8) {
@@ -391,6 +394,52 @@ async fn decode_and_validate_jwt(
     // Missing in prototype: validating other claims like e.g. exp and iat
 
     (iss.to_string(), sub.to_string())
+}
+
+// Sort Google keys and their properties since they're returned occasionally in a random order
+fn sort_google_certs(body: Vec<u8>) -> Result<Vec<u8>, String> {
+    // Parse the input JSON
+    let data: serde_json::Value = serde_json::from_slice(&body).map_err(|_| "Invalid JSON".to_string())?;
+
+    // Extract and validate the "keys" array
+    let keys = data
+        .get("keys")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("Keys not found or not an array")?;
+
+    // Filter and process keys
+    let mut sorted_keys: Vec<BTreeMap<String, String>> = keys
+        .iter()
+        .filter_map(|key| key.as_object()) // Ensure each key is an object
+        .filter(|key| key.contains_key("kid")) // Ensure each key has a "kid" property
+        .map(|key| {
+            // Collect and sort the key's properties
+            key.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
+                .collect()
+        })
+        .collect();
+
+    // Sort the keys by the "kid" property
+    sorted_keys.sort_by_key(|key| key.get("kid").cloned());
+
+    // Wrap sorted keys back in an object with a "keys" property
+    let result = serde_json::json!({ "keys": sorted_keys });
+
+    // Convert the result to JSON and return
+    serde_json::to_vec(&result).map_err(|_| "Unable to encode JSON".to_string())
+}
+
+
+#[query]
+fn transform_google_certs(raw: http_request::TransformArgs) -> http_request::HttpResponse {
+    // The expiry header is stripped in this prototype but in prod
+    // it should be retained and rounded down to manage key expiry.
+    http_request::HttpResponse {
+        status: raw.response.status,
+        body: sort_google_certs(raw.response.body).unwrap(),
+        ..Default::default()
+    }
 }
 
 #[update]
