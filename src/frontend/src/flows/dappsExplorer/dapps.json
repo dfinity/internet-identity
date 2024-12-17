@@ -1,5 +1,11 @@
 [
   {
+    "name": "DecideAI",
+    "oneLiner": "A fullstack decentralized AI platform",
+    "website": "https://decideai.xyz",
+    "logo": "decideai_logo.png"
+  },
+  {
     "name": "Bitfinity EVM",
     "website": "https://bitfinity.network/",
     "logo": "bitfinity_evm.svg"
@@ -118,12 +124,6 @@
     "oneLiner": "Powering the next generation of fully onchain games, and providing a collaborative hub for all things web3 gaming.",
     "website": "https://boomdao.xyz/",
     "logo": "boom-dao-logo.png"
-  },
-  {
-    "name": "DecideAI",
-    "oneLiner": "A fullstack decentralized AI platform",
-    "website": "https://decideai.xyz",
-    "logo": "decideai_logo.png"
   },
   {
     "name": "AutoRoyale",
