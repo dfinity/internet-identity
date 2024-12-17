@@ -2,6 +2,7 @@ import { CredentialData } from "./credential-devices";
 import {
   BETA_DOMAINS,
   PROD_DOMAINS,
+  excludeCredentialsFromOrigins,
   findWebAuthnRpId,
 } from "./findWebAuthnRpId";
 
@@ -163,5 +164,110 @@ describe("findWebAuthnRpId", () => {
     ).toThrowError(
       "Not possible. Every registered user has at least one device."
     );
+  });
+});
+
+describe("excludeCredentialsFromOrigins", () => {
+  const mockDeviceData = (origin?: string): CredentialData => ({
+    origin,
+    credentialId: new ArrayBuffer(1),
+    pubkey: new ArrayBuffer(1),
+  });
+
+  test("excludes credentials from specified origins", () => {
+    const credentials = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
+    ];
+    const originsToExclude = new Set(["https://identity.ic0.app"]);
+    const currentOrigin = "https://identity.internetcomputer.org";
+
+    const result = excludeCredentialsFromOrigins(
+      credentials,
+      originsToExclude,
+      currentOrigin
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual([
+      mockDeviceData("https://identity.internetcomputer.org"),
+      mockDeviceData("https://identity.icp0.io"),
+    ]);
+  });
+
+  test("treats undefined credential origins as DEFAULT_DOMAIN", () => {
+    const credentials = [
+      mockDeviceData(undefined), // Should be treated as DEFAULT_DOMAIN
+      mockDeviceData("https://identity.internetcomputer.org"),
+    ];
+    const originsToExclude = new Set(["https://identity.ic0.app"]); // Should match DEFAULT_DOMAIN
+    const currentOrigin = "https://identity.internetcomputer.org";
+
+    const result = excludeCredentialsFromOrigins(
+      credentials,
+      originsToExclude,
+      currentOrigin
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result).toEqual([
+      mockDeviceData("https://identity.internetcomputer.org"),
+    ]);
+  });
+
+  test("treats undefined origins in exclusion set as currentOrigin", () => {
+    const credentials = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+    ];
+    const originsToExclude = new Set([undefined]); // Should be treated as currentOrigin
+    const currentOrigin = "https://identity.internetcomputer.org";
+
+    const result = excludeCredentialsFromOrigins(
+      credentials,
+      originsToExclude,
+      currentOrigin
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result).toEqual([mockDeviceData("https://identity.ic0.app")]);
+  });
+
+  test("returns empty array when all credentials are excluded", () => {
+    const credentials = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+    ];
+    const originsToExclude = new Set([
+      "https://identity.ic0.app",
+      "https://identity.internetcomputer.org",
+    ]);
+    const currentOrigin = "https://identity.ic0.app";
+
+    const result = excludeCredentialsFromOrigins(
+      credentials,
+      originsToExclude,
+      currentOrigin
+    );
+
+    expect(result).toHaveLength(0);
+  });
+
+  test("returns all credentials when no origins to exclude", () => {
+    const credentials = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.internetcomputer.org"),
+    ];
+    const originsToExclude = new Set<string>();
+    const currentOrigin = "https://identity.ic0.app";
+
+    const result = excludeCredentialsFromOrigins(
+      credentials,
+      originsToExclude,
+      currentOrigin
+    );
+
+    expect(result).toEqual(credentials);
   });
 });

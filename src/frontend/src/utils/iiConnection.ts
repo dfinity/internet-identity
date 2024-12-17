@@ -51,7 +51,12 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { convertToCredentialData, CredentialData } from "./credential-devices";
-import { findWebAuthnRpId, relatedDomains } from "./findWebAuthnRpId";
+import {
+  excludeCredentialsFromOrigins,
+  findWebAuthnRpId,
+  hasCredentialsFromMultipleOrigins,
+  relatedDomains,
+} from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -137,6 +142,12 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
+  // The rpID is used to get the passkey from the browser's WebAuthn API.
+  // Using different rpIDs allows us to have compatibility across multiple domains.
+  // However, when one RP ID is used and the user cancels, it must be because the user is in a device
+  // registered in another domain. In this case, we must try the other rpID.
+  // Map<userNumber, Set<rpID>>
+  private _cancelledRpIds: Map<bigint, Set<string | undefined>> = new Map();
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -376,15 +387,17 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
-    // TODO: Filter out the credentials from the used rpIDs.
+    const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
+    const currentOrigin = window.location.origin;
+    const filteredCredentials = excludeCredentialsFromOrigins(
+      credentials,
+      cancelledRpIds,
+      currentOrigin
+    );
     const rpId =
       DOMAIN_COMPATIBILITY.isEnabled() &&
       supportsWebauthRoR(window.navigator.userAgent)
-        ? findWebAuthnRpId(
-            window.location.origin,
-            credentials,
-            relatedDomains()
-          )
+        ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
         : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
@@ -393,7 +406,7 @@ export class Connection {
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
+      : MultiWebAuthnIdentity.fromCredentials(filteredCredentials, rpId);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -402,6 +415,14 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
+        // We only want to cache cancelled rpids if there can be multiple rpids.
+        if (hasCredentialsFromMultipleOrigins(credentials)) {
+          if (this._cancelledRpIds.has(userNumber)) {
+            this._cancelledRpIds.get(userNumber)?.add(rpId);
+          } else {
+            this._cancelledRpIds.set(userNumber, new Set([rpId]));
+          }
+        }
         return { kind: "webAuthnFailed" };
       }
 

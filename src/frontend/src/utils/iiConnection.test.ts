@@ -57,11 +57,13 @@ const mockActor = {
   lookup: vi.fn().mockResolvedValue([mockDevice]),
 } as unknown as ActorSubclass<_SERVICE>;
 
+const currentOrigin = "https://identity.internetcomputer.org";
+
 beforeEach(() => {
   infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
-    origin: "https://identity.internetcomputer.org",
+    origin: currentOrigin,
   });
   DOMAIN_COMPATIBILITY.reset();
 });
@@ -112,6 +114,7 @@ test("commits changes on identity metadata", async () => {
 });
 
 describe("Connection.login", () => {
+  let failSign = false;
   beforeEach(() => {
     vi.spyOn(MultiWebAuthnIdentity, "fromCredentials").mockImplementation(
       () => {
@@ -133,6 +136,9 @@ describe("Connection.login", () => {
             return new MockMultiWebAuthnIdentity(credentials, rpId);
           }
           override sign() {
+            if (failSign) {
+              throw new DOMException("Error test", "NotAllowedError");
+            }
             this._actualIdentity = mockIdentity;
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
@@ -189,7 +195,7 @@ describe("Connection.login", () => {
   it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
     DOMAIN_COMPATIBILITY.set(true);
     vi.stubGlobal("navigator", {
-      // Supports RoR
+      // Does NOT Supports RoR
       userAgent:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
     });
@@ -204,6 +210,78 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToCredentialData(mockDevice)],
         undefined
+      );
+    }
+  });
+
+  it("connection exludes rpId when user cancels", async () => {
+    // This one will fail because it's not the device the user is using at the moment.
+    const currentOriginDevice: DeviceData = {
+      alias: "mockDevice",
+      metadata: [],
+      origin: [currentOrigin],
+      protection: { protected: null },
+      pubkey: new Uint8Array(),
+      key_type: { platform: null },
+      purpose: { authentication: null },
+      credential_id: [],
+    };
+    const currentOriginCredentialData =
+      convertToCredentialData(currentOriginDevice);
+    const currentDevice: DeviceData = {
+      alias: "mockDevice",
+      metadata: [],
+      origin: [],
+      protection: { protected: null },
+      pubkey: new Uint8Array(),
+      key_type: { platform: null },
+      purpose: { authentication: null },
+      credential_id: [],
+    };
+    const currentDeviceCredentialData = convertToCredentialData(currentDevice);
+    const mockActor = {
+      identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+      lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+    } as unknown as ActorSubclass<_SERVICE>;
+    DOMAIN_COMPATIBILITY.set(true);
+    vi.stubGlobal("navigator", {
+      // Supports RoR
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+    });
+    const connection = new Connection("aaaaa-aa", mockActor);
+
+    failSign = true;
+    const firstLoginResult = await connection.login(BigInt(12345));
+
+    expect(firstLoginResult.kind).toBe("webAuthnFailed");
+    expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+    expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        currentOriginCredentialData,
+        currentDeviceCredentialData,
+      ]),
+      undefined
+    );
+
+    failSign = false;
+    const secondLoginResult = await connection.login(BigInt(12345));
+
+    expect(secondLoginResult.kind).toBe("loginSuccess");
+    if (secondLoginResult.kind === "loginSuccess") {
+      expect(secondLoginResult.connection).toBeInstanceOf(
+        AuthenticatedConnection
+      );
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+        2,
+        expect.arrayContaining([currentDeviceCredentialData]),
+        "identity.ic0.app"
+      );
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+        2,
+        expect.not.arrayContaining([currentOriginCredentialData]),
+        "identity.ic0.app"
       );
     }
   });
