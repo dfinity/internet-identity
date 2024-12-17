@@ -389,16 +389,17 @@ export class Connection {
   ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
     const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
     const currentOrigin = window.location.origin;
+    const dynamicRPIdEnabled =
+      DOMAIN_COMPATIBILITY.isEnabled() &&
+      supportsWebauthRoR(window.navigator.userAgent);
     const filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
-    const rpId =
-      DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent)
-        ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
-        : undefined;
+    const rpId = dynamicRPIdEnabled
+      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+      : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -416,7 +417,10 @@ export class Connection {
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
         // We only want to cache cancelled rpids if there can be multiple rpids.
-        if (hasCredentialsFromMultipleOrigins(credentials)) {
+        if (
+          dynamicRPIdEnabled &&
+          hasCredentialsFromMultipleOrigins(credentials)
+        ) {
           if (this._cancelledRpIds.has(userNumber)) {
             this._cancelledRpIds.get(userNumber)?.add(rpId);
           } else {
