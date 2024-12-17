@@ -373,4 +373,104 @@ describe("Connection.login", () => {
       }
     });
   });
+
+  describe("domains compatibility flag enabled and browser doesn't support", () => {
+    beforeEach(() => {
+      DOMAIN_COMPATIBILITY.set(true);
+      vi.stubGlobal("navigator", {
+        // Does NOT Supports RoR
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+      });
+    });
+
+    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("loginSuccess");
+      if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+          [convertToCredentialData(mockDevice)],
+          undefined
+        );
+      }
+    });
+  });
+
+  describe("domains compatibility flag disabled", () => {
+    beforeEach(() => {
+      DOMAIN_COMPATIBILITY.set(false);
+      vi.stubGlobal("navigator", {
+        // Supports RoR
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+      });
+    });
+
+    it("login returns authenticated connection without rpID if flag is not enabled", async () => {
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("loginSuccess");
+      if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+          [convertToCredentialData(mockDevice)],
+          undefined
+        );
+      }
+    });
+
+    it("connection does not exlud rpId when user cancels", async () => {
+      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
+      const currentOriginCredentialData =
+        convertToCredentialData(currentOriginDevice);
+      const currentDevice: DeviceData = createMockDevice();
+      const currentDeviceCredentialData =
+        convertToCredentialData(currentDevice);
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      failSign = true;
+      const firstLoginResult = await connection.login(BigInt(12345));
+
+      expect(firstLoginResult.kind).toBe("webAuthnFailed");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          currentOriginCredentialData,
+          currentDeviceCredentialData,
+        ]),
+        undefined
+      );
+
+      failSign = false;
+      const secondLoginResult = await connection.login(BigInt(12345));
+
+      expect(secondLoginResult.kind).toBe("loginSuccess");
+      if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.connection).toBeInstanceOf(
+          AuthenticatedConnection
+        );
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+          2,
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentOriginCredentialData,
+          ]),
+          undefined
+        );
+      }
+    });
+  });
 });

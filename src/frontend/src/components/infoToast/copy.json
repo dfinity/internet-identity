@@ -1,0 +1,7 @@
+{
+  "en": {
+    "title_possibly_wrong_rp_id": "Please try again",
+    "message_possibly_wrong_rp_id_1": "The wrong domain was set for the passkey and the browser couldn't find it.",
+    "message_possibly_wrong_rp_id_2": "Try again and another domain will be used."
+  }
+}
