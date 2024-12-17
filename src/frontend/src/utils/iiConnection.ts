@@ -137,7 +137,11 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  public constructor(readonly canisterId: string) {}
+  public constructor(
+    readonly canisterId: string,
+    // Used for testing purposes
+    readonly overrideActor?: ActorSubclass<_SERVICE>
+  ) {}
 
   identity_registration_start = async ({
     tempIdentity,
@@ -534,6 +538,9 @@ export class Connection {
   createActor = async (
     identity?: SignIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
+    if (this.overrideActor !== undefined) {
+      return this.overrideActor;
+    }
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
