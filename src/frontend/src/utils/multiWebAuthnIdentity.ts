@@ -7,15 +7,12 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
-import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
-import { findWebAuthnRpId, relatedDomains } from "./findWebAuthnRpId";
 import { bufferEqual } from "./iiConnection";
-import { supportsWebauthRoR } from "./userAgent";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
@@ -27,15 +24,19 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * @param json - json to parse
    */
   public static fromCredentials(
-    credentialData: CredentialData[]
+    credentialData: CredentialData[],
+    rpId: string | undefined
   ): MultiWebAuthnIdentity {
-    return new this(credentialData);
+    return new this(credentialData, rpId);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
   protected _actualIdentity?: WebAuthnIdentity;
 
-  protected constructor(readonly credentialData: CredentialData[]) {
+  protected constructor(
+    readonly credentialData: CredentialData[],
+    readonly rpId: string | undefined
+  ) {
     super();
     this._actualIdentity = undefined;
   }
@@ -67,16 +68,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
-    const rpId =
-      DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent)
-        ? findWebAuthnRpId(
-            window.location.origin,
-            this.credentialData,
-            relatedDomains()
-          )
-        : undefined;
-
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
@@ -85,7 +76,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         })),
         challenge: blob,
         userVerification: "discouraged",
-        rpId,
+        rpId: this.rpId,
       },
     })) as PublicKeyCredential;
 

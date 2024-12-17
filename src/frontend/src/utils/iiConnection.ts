@@ -28,6 +28,7 @@ import {
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { features } from "$src/features";
 import {
   IdentityMetadata,
@@ -50,8 +51,10 @@ import {
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { convertToCredentialData, CredentialData } from "./credential-devices";
+import { findWebAuthnRpId, relatedDomains } from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 
 /*
@@ -134,7 +137,11 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  public constructor(readonly canisterId: string) {}
+  public constructor(
+    readonly canisterId: string,
+    // Used for testing purposes
+    readonly overrideActor?: ActorSubclass<_SERVICE>
+  ) {}
 
   identity_registration_start = async ({
     tempIdentity,
@@ -369,13 +376,24 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
+    // TODO: Filter out the credentials from the used rpIDs.
+    const rpId =
+      DOMAIN_COMPATIBILITY.isEnabled() &&
+      supportsWebauthRoR(window.navigator.userAgent)
+        ? findWebAuthnRpId(
+            window.location.origin,
+            credentials,
+            relatedDomains()
+          )
+        : undefined;
+
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(credentials);
+      : MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -520,6 +538,9 @@ export class Connection {
   createActor = async (
     identity?: SignIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
+    if (this.overrideActor !== undefined) {
+      return this.overrideActor;
+    }
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
