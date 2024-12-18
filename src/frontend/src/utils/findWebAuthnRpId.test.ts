@@ -180,7 +180,7 @@ describe("excludeCredentialsFromOrigins", () => {
       mockDeviceData("https://identity.internetcomputer.org"),
       mockDeviceData("https://identity.icp0.io"),
     ];
-    const originsToExclude = new Set(["https://identity.ic0.app"]);
+    const originsToExclude = new Set(["identity.ic0.app"]);
     const currentOrigin = "https://identity.internetcomputer.org";
 
     const result = excludeCredentialsFromOrigins(
@@ -201,7 +201,7 @@ describe("excludeCredentialsFromOrigins", () => {
       mockDeviceData(undefined), // Should be treated as DEFAULT_DOMAIN
       mockDeviceData("https://identity.internetcomputer.org"),
     ];
-    const originsToExclude = new Set(["https://identity.ic0.app"]); // Should match DEFAULT_DOMAIN
+    const originsToExclude = new Set(["identity.ic0.app"]); // Should match DEFAULT_DOMAIN
     const currentOrigin = "https://identity.internetcomputer.org";
 
     const result = excludeCredentialsFromOrigins(
@@ -240,8 +240,8 @@ describe("excludeCredentialsFromOrigins", () => {
       mockDeviceData("https://identity.internetcomputer.org"),
     ];
     const originsToExclude = new Set([
-      "https://identity.ic0.app",
-      "https://identity.internetcomputer.org",
+      "identity.ic0.app",
+      "identity.internetcomputer.org",
     ]);
     const currentOrigin = "https://identity.ic0.app";
 

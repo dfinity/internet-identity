@@ -43,21 +43,21 @@ export const hasCredentialsFromMultipleOrigins = (
  * Two origins match if they have the same hostname (domain).
  *
  * @param credentials - List of credential devices to filter
- * @param origins - Set of origins to exclude (undefined values are treated as `currentOrigin`)
+ * @param rpIds - Set of origins to exclude (undefined values are treated as `currentOrigin`)
  * @param currentOrigin - The current origin to use when comparing against undefined origins
  * @returns Filtered list of credentials, excluding those from the specified origins
  */
 export const excludeCredentialsFromOrigins = (
   credentials: CredentialData[],
-  origins: Set<string | undefined>,
+  rpIds: Set<string | undefined>,
   currentOrigin: string
 ): CredentialData[] => {
-  if (origins.size === 0) {
+  if (rpIds.size === 0) {
     return credentials;
   }
   // Change `undefined` to the current origin.
-  const originsToExclude = Array.from(origins).map(
-    (origin) => origin ?? currentOrigin
+  const originsToExclude = Array.from(rpIds).map(
+    (origin) => `https://${origin}` ?? currentOrigin
   );
   return credentials.filter(
     (credential) =>
