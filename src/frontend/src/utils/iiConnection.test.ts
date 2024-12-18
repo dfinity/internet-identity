@@ -176,7 +176,7 @@ describe("Connection.login", () => {
       }
     });
 
-    it("connection exludes rpId when user cancels", async () => {
+    it("connection excludes rpId when user cancels", async () => {
       // This one would fail because it's not the device the user is using at the moment.
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
@@ -193,7 +193,7 @@ describe("Connection.login", () => {
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
 
-      expect(firstLoginResult.kind).toBe("webAuthnFailed");
+      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -327,7 +327,7 @@ describe("Connection.login", () => {
       }
     });
 
-    it("connection does not exlud rpId when user cancels", async () => {
+    it("connection does not exclude rpId when user cancels", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
         convertToCredentialData(currentOriginDevice);
@@ -427,7 +427,7 @@ describe("Connection.login", () => {
       }
     });
 
-    it("connection does not exlud rpId when user cancels", async () => {
+    it("connection does not exclude rpId when user cancels", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
         convertToCredentialData(currentOriginDevice);
