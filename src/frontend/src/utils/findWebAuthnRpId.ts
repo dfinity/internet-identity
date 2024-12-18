@@ -30,6 +30,43 @@ export const relatedDomains = (): string[] => {
   return [];
 };
 
+export const hasCredentialsFromMultipleOrigins = (
+  credentials: CredentialData[]
+): boolean =>
+  new Set(credentials.map(({ origin }) => origin ?? DEFAULT_DOMAIN)).size > 1;
+
+/**
+ * Filters out credentials from specific origins.
+ *
+ * This function takes a list of credentials and removes any that match the provided origins.
+ * If a credential has no origin (undefined), it is treated as if it had the `DEFAULT_DOMAIN`.
+ * Two origins match if they have the same hostname (domain).
+ *
+ * @param credentials - List of credential devices to filter
+ * @param origins - Set of origins to exclude (undefined values are treated as `currentOrigin`)
+ * @param currentOrigin - The current origin to use when comparing against undefined origins
+ * @returns Filtered list of credentials, excluding those from the specified origins
+ */
+export const excludeCredentialsFromOrigins = (
+  credentials: CredentialData[],
+  origins: Set<string | undefined>,
+  currentOrigin: string
+): CredentialData[] => {
+  if (origins.size === 0) {
+    return credentials;
+  }
+  // Change `undefined` to the current origin.
+  const originsToExclude = Array.from(origins).map(
+    (origin) => origin ?? currentOrigin
+  );
+  return credentials.filter(
+    (credential) =>
+      originsToExclude.filter((originToExclude) =>
+        sameDomain(credential.origin ?? DEFAULT_DOMAIN, originToExclude)
+      ).length === 0
+  );
+};
+
 const sameDomain = (url1: string, url2: string): boolean =>
   new URL(url1).hostname === new URL(url2).hostname;
 
