@@ -124,6 +124,7 @@ export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
+export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -360,7 +361,12 @@ export class Connection {
   login = async (
     userNumber: bigint
   ): Promise<
-    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    | LoginSuccess
+    | AuthFail
+    | WebAuthnFailed
+    | PossiblyWrongRPID
+    | UnknownUser
+    | ApiError
   > => {
     let devices: Omit<DeviceData, "alias">[];
     try {
@@ -386,7 +392,7 @@ export class Connection {
   fromWebauthnCredentials = async (
     userNumber: bigint,
     credentials: CredentialData[]
-  ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
+  ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
@@ -426,6 +432,8 @@ export class Connection {
           } else {
             this._cancelledRpIds.set(userNumber, new Set([rpId]));
           }
+          // We want to user to retry again and a new RP ID will be used.
+          return { kind: "possiblyWrongRPID" };
         }
         return { kind: "webAuthnFailed" };
       }

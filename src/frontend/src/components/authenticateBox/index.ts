@@ -33,6 +33,7 @@ import {
   InvalidCaller,
   LoginSuccess,
   NoRegistrationFlow,
+  PossiblyWrongRPID,
   RateLimitExceeded,
   RegisterNoSpace,
   UnexpectedCall,
@@ -50,6 +51,8 @@ import {
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
+import { infoToastTemplate } from "../infoToast";
+import infoToastCopy from "../infoToast/copy.json";
 
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
@@ -189,7 +192,12 @@ export const authenticateBoxFlow = async <I>({
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
-    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    | LoginSuccess
+    | AuthFail
+    | WebAuthnFailed
+    | PossiblyWrongRPID
+    | UnknownUser
+    | ApiError
   >;
   loginPinIdentityMaterial: ({
     userNumber,
@@ -218,6 +226,7 @@ export const authenticateBoxFlow = async <I>({
       newAnchor: boolean;
       authnMethod: "pin" | "passkey" | "recovery";
     })
+  | PossiblyWrongRPID
   | FlowError
   | { tag: "canceled" }
   | { tag: "deviceAdded" }
@@ -267,6 +276,7 @@ export const authenticateBoxFlow = async <I>({
         newAnchor: boolean;
         authnMethod: "pin" | "passkey" | "recovery";
       })
+    | PossiblyWrongRPID
     | FlowError
     | { tag: "canceled" }
     | { tag: "deviceAdded" }
@@ -345,13 +355,28 @@ export type FlowError =
   | RegisterNoSpace;
 
 export const handleLoginFlowResult = async <E>(
-  result: (LoginSuccess & E) | FlowError
+  result: (LoginSuccess & E) | PossiblyWrongRPID | FlowError
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
   if (result.kind === "loginSuccess") {
     await setAnchorUsed(result.userNumber);
     return result;
+  }
+
+  if (result.kind === "possiblyWrongRPID") {
+    const i18n = new I18n();
+    const copy = i18n.i18n(infoToastCopy);
+    toast.info(
+      infoToastTemplate({
+        title: copy.title_possibly_wrong_rp_id,
+        messages: [
+          copy.message_possibly_wrong_rp_id_1,
+          copy.message_possibly_wrong_rp_id_2,
+        ],
+      })
+    );
+    return undefined;
   }
 
   result satisfies FlowError;
@@ -657,7 +682,12 @@ const useIdentityFlow = async <I>({
   loginPasskey: (
     userNumber: bigint
   ) => Promise<
-    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    | LoginSuccess
+    | AuthFail
+    | WebAuthnFailed
+    | PossiblyWrongRPID
+    | UnknownUser
+    | ApiError
   >;
   allowPinLogin: boolean;
   verifyPinValidity: (opts: {
@@ -680,6 +710,7 @@ const useIdentityFlow = async <I>({
     })
   | AuthFail
   | WebAuthnFailed
+  | PossiblyWrongRPID
   | UnknownUser
   | ApiError
   | BadPin
