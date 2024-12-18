@@ -56,8 +56,8 @@ export const excludeCredentialsFromOrigins = (
     return credentials;
   }
   // Change `undefined` to the current origin.
-  const originsToExclude = Array.from(rpIds).map(
-    (origin) => `https://${origin}` ?? currentOrigin
+  const originsToExclude = Array.from(rpIds).map((origin) =>
+    origin === undefined ? currentOrigin : `https://${origin}`
   );
   return credentials.filter(
     (credential) =>
