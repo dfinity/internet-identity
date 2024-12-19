@@ -1,0 +1,9 @@
+{
+  "en": {
+    "title": "Change Current Device's Origin",
+    "paragraph": "Your current device is stored with a different origin. To avoid a bad user experience, you need to change the current device's origin with the new one.",
+    "skip": "Skip",
+    "replace_origin": "Change Origin",
+    "label_icon": "Recommended Action"
+  }
+}
