@@ -372,6 +372,10 @@ export interface _SERVICE {
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
   >,
+  'get_jwt_delegation' : ActorMethod<
+    [string, Uint8Array | number[], FrontendHostname, SessionKey, Timestamp],
+    GetDelegationResponse
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
@@ -410,6 +414,16 @@ export interface _SERVICE {
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  'prepare_jwt_delegation' : ActorMethod<
+    [
+      string,
+      Uint8Array | number[],
+      FrontendHostname,
+      SessionKey,
+      [] | [bigint],
+    ],
+    [UserKey, Timestamp]
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

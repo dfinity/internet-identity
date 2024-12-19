@@ -465,6 +465,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
         ['query'],
       ),
+    'get_jwt_delegation' : IDL.Func(
+        [IDL.Text, IDL.Vec(IDL.Nat8), FrontendHostname, SessionKey, Timestamp],
+        [GetDelegationResponse],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -512,6 +517,17 @@ export const idlFactory = ({ IDL }) => {
     'prepare_id_alias' : IDL.Func(
         [PrepareIdAliasRequest],
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
+        [],
+      ),
+    'prepare_jwt_delegation' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Vec(IDL.Nat8),
+          FrontendHostname,
+          SessionKey,
+          IDL.Opt(IDL.Nat64),
+        ],
+        [UserKey, Timestamp],
         [],
       ),
     'register' : IDL.Func(
