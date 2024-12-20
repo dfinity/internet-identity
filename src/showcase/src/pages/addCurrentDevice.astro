@@ -6,9 +6,9 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$src/components/toast";
     import { i18n } from "../i18n";
-    import { replaceCurrentDeviceOriginPage } from "$src/flows/addDevice/replaceCurrentDeviceOrigin";
+    import { addCurrentDevicePage } from "$src/flows/addDevice/addCurrentDevice";
 
-    replaceCurrentDeviceOriginPage({
+    addCurrentDevicePage({
       replace: () => toast.info("Replace device's origin"),
       skip: () => toast.info("Skip"),
       i18n,

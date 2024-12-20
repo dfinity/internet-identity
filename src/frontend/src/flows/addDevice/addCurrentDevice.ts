@@ -2,9 +2,9 @@ import { infoScreenTemplate } from "$src/components/infoScreen";
 import { I18n } from "$src/i18n";
 import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
-import copyJson from "./replaceCurrentDeviceOrigin.json";
+import copyJson from "./addCurrentDevice.json";
 
-const replaceCurrentDeviceOriginTemplate = ({
+const addCurrentDeviceTemplate = ({
   replace,
   skip,
   i18n,
@@ -29,19 +29,17 @@ const replaceCurrentDeviceOriginTemplate = ({
   });
 };
 
-export const replaceCurrentDeviceOriginPage = renderPage(
-  replaceCurrentDeviceOriginTemplate
-);
+export const addCurrentDevicePage = renderPage(addCurrentDeviceTemplate);
 
-// Prompt the user to change the origin of the current device.
-// Changing the origin improves the UX of the user when logging in with a different device.
-export const replaceCurrentDeviceOrigin = (): Promise<{
-  action: "skip" | "replace-origin-device";
+// Prompt the user to add the current device (with the current origin).
+// Adding the current device to the current origin improves the UX of the user when they come back to this origin.
+export const addCurrentDevice = (): Promise<{
+  action: "skip" | "add-current-device";
 }> => {
   return new Promise((resolve) =>
-    replaceCurrentDeviceOriginPage({
+    addCurrentDevicePage({
       i18n: new I18n(),
-      replace: () => resolve({ action: "replace-origin-device" }),
+      replace: () => resolve({ action: "add-current-device" }),
       skip: () => resolve({ action: "skip" }),
     })
   );
