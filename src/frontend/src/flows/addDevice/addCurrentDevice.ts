@@ -19,7 +19,7 @@ const addCurrentDeviceTemplate = ({
     cancel: skip,
     cancelText: copy.skip,
     next: add,
-    nextText: copy.replace_origin,
+    nextText: copy.add,
     title: copy.title,
     paragraph: copy.paragraph,
     scrollToTop: true,
