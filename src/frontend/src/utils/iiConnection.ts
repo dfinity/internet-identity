@@ -94,6 +94,7 @@ export type LoginSuccess = {
   kind: "loginSuccess";
   connection: AuthenticatedConnection;
   userNumber: bigint;
+  showAddCurrentDevice: boolean;
 };
 
 export type RegFlowNextStep =
@@ -323,6 +324,7 @@ export class Connection {
           actor
         ),
         userNumber,
+        showAddCurrentDevice: false,
       };
     }
 
@@ -460,6 +462,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection,
+      showAddCurrentDevice: cancelledRpIds.size > 0,
     };
   };
   fromIdentity = async (
@@ -480,6 +483,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection,
+      showAddCurrentDevice: false,
     };
   };
 
@@ -520,6 +524,7 @@ export class Connection {
         userNumber,
         actor
       ),
+      showAddCurrentDevice: false,
     };
   };
 
