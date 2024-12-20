@@ -89,6 +89,7 @@ export const authenticateBox = async ({
   connection: AuthenticatedConnection;
   newAnchor: boolean;
   authnMethod: "pin" | "passkey" | "recovery";
+  showAddCurrentDevice: boolean;
 }> => {
   const promptAuth = async (autoSelectIdentity?: bigint) =>
     authenticateBoxFlow<PinIdentityMaterial>({

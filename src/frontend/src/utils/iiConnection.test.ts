@@ -168,6 +168,7 @@ describe("Connection.login", () => {
       expect(loginResult.kind).toBe("loginSuccess");
       if (loginResult.kind === "loginSuccess") {
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToCredentialData(mockDevice)],
@@ -208,6 +209,7 @@ describe("Connection.login", () => {
 
       expect(secondLoginResult.kind).toBe("loginSuccess");
       if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
         expect(secondLoginResult.connection).toBeInstanceOf(
           AuthenticatedConnection
         );
@@ -258,6 +260,7 @@ describe("Connection.login", () => {
 
       expect(secondLoginResult.kind).toBe("loginSuccess");
       if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(secondLoginResult.connection).toBeInstanceOf(
           AuthenticatedConnection
         );
@@ -291,6 +294,7 @@ describe("Connection.login", () => {
 
       expect(loginResult.kind).toBe("loginSuccess");
       if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
@@ -318,6 +322,7 @@ describe("Connection.login", () => {
 
       expect(loginResult.kind).toBe("loginSuccess");
       if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
@@ -358,6 +363,7 @@ describe("Connection.login", () => {
 
       expect(secondLoginResult.kind).toBe("loginSuccess");
       if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(secondLoginResult.connection).toBeInstanceOf(
           AuthenticatedConnection
         );
@@ -391,6 +397,7 @@ describe("Connection.login", () => {
 
       expect(loginResult.kind).toBe("loginSuccess");
       if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
@@ -419,6 +426,7 @@ describe("Connection.login", () => {
       expect(loginResult.kind).toBe("loginSuccess");
       if (loginResult.kind === "loginSuccess") {
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToCredentialData(mockDevice)],
@@ -461,6 +469,7 @@ describe("Connection.login", () => {
         expect(secondLoginResult.connection).toBeInstanceOf(
           AuthenticatedConnection
         );
+        expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
           2,

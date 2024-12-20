@@ -92,6 +92,7 @@ const registerFlowOpts: RegisterFlowOpts = {
       kind: "loginSuccess",
       userNumber: BigInt(12356),
       connection: mockConnection,
+      showAddCurrentDevice: false,
     };
   },
   registrationAllowed: true,
@@ -122,6 +123,7 @@ export const iiFlows: Record<string, () => void> = {
           kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: mockConnection,
+          showAddCurrentDevice: false,
         });
       },
       allowPinLogin: true,
@@ -138,6 +140,7 @@ export const iiFlows: Record<string, () => void> = {
           kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: mockConnection,
+          showAddCurrentDevice: false,
         });
       },
       recover: () => {
@@ -146,6 +149,7 @@ export const iiFlows: Record<string, () => void> = {
           kind: "loginSuccess",
           userNumber: BigInt(1234),
           connection: mockConnection,
+          showAddCurrentDevice: false,
         });
       },
       retrievePinIdentityMaterial: ({ userNumber }) => {
