@@ -5,11 +5,11 @@ import { TemplateResult } from "lit-html";
 import copyJson from "./addCurrentDevice.json";
 
 const addCurrentDeviceTemplate = ({
-  replace,
+  add,
   skip,
   i18n,
 }: {
-  replace: () => void;
+  add: () => void;
   skip: () => void;
   i18n: I18n;
 }): TemplateResult => {
@@ -18,13 +18,13 @@ const addCurrentDeviceTemplate = ({
   return infoScreenTemplate({
     cancel: skip,
     cancelText: copy.skip,
-    next: replace,
+    next: add,
     nextText: copy.replace_origin,
     title: copy.title,
     paragraph: copy.paragraph,
     scrollToTop: true,
     icon: "info",
-    pageId: "replace-current-device-origin",
+    pageId: "add-current-device",
     label: copy.label_icon,
   });
 };
@@ -39,7 +39,7 @@ export const addCurrentDevice = (): Promise<{
   return new Promise((resolve) =>
     addCurrentDevicePage({
       i18n: new I18n(),
-      replace: () => resolve({ action: "add-current-device" }),
+      add: () => resolve({ action: "add-current-device" }),
       skip: () => resolve({ action: "skip" }),
     })
   );
