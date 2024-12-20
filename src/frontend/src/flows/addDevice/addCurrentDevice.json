@@ -3,7 +3,7 @@
     "title": "Add Current Device",
     "paragraph": "Please add the current device to your identity to improve the user experience with Internet Identity.",
     "skip": "Skip",
-    "replace_origin": "Add",
+    "add": "Add",
     "label_icon": "Recommended Action"
   }
 }
