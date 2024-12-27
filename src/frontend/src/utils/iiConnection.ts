@@ -387,7 +387,7 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToCredentialData)
+      devices.map(convertToCredentialData).filter(nonNullish)
     );
   };
 

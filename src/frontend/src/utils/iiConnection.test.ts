@@ -22,7 +22,7 @@ const createMockDevice = (origin?: string): DeviceData => ({
   pubkey: new Uint8Array(),
   key_type: { platform: null },
   purpose: { authentication: null },
-  credential_id: [],
+  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
 });
 const mockDevice = createMockDevice();
 
@@ -480,6 +480,54 @@ describe("Connection.login", () => {
           undefined
         );
       }
+    });
+  });
+
+  describe("when a device credential id is missing", () => {
+    it("connection does not use this device to authenticate", async () => {
+      const deviceWithCredentialId: DeviceData = createMockDevice();
+      const deviceWithoutCredentialId: DeviceData = createMockDevice();
+      deviceWithoutCredentialId.credential_id = [];
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi
+          .fn()
+          .mockResolvedValue([
+            deviceWithCredentialId,
+            deviceWithoutCredentialId,
+          ]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+      await connection.login(BigInt(12345));
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        [convertToCredentialData(deviceWithCredentialId)],
+        undefined
+      );
+    });
+  });
+
+  describe("when device credential id is invalid", () => {
+    it("connection does not use this device to authenticate", async () => {
+      const deviceValidCredentialId: DeviceData = createMockDevice();
+      const deviceInvalidCredentialId: DeviceData = createMockDevice();
+      deviceInvalidCredentialId.credential_id = [Uint8Array.from([])];
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi
+          .fn()
+          .mockResolvedValue([
+            deviceValidCredentialId,
+            deviceInvalidCredentialId,
+          ]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+      await connection.login(BigInt(12345));
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        [convertToCredentialData(deviceValidCredentialId)],
+        undefined
+      );
     });
   });
 });
