@@ -50,7 +50,10 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { convertToCredentialData, CredentialData } from "./credential-devices";
+import {
+  convertToValidCredentialData,
+  CredentialData,
+} from "./credential-devices";
 import {
   excludeCredentialsFromOrigins,
   findWebAuthnRpId,
@@ -387,7 +390,7 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToCredentialData)
+      devices.map(convertToValidCredentialData).filter(nonNullish)
     );
   };
 

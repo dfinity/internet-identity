@@ -10,7 +10,10 @@ import {
 } from "$src/repositories/identityMetadata";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
-import { CredentialData, convertToCredentialData } from "./credential-devices";
+import {
+  CredentialData,
+  convertToValidCredentialData,
+} from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 
@@ -22,7 +25,7 @@ const createMockDevice = (origin?: string): DeviceData => ({
   pubkey: new Uint8Array(),
   key_type: { platform: null },
   purpose: { authentication: null },
-  credential_id: [],
+  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
 });
 const mockDevice = createMockDevice();
 
@@ -171,7 +174,7 @@ describe("Connection.login", () => {
         expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToCredentialData(mockDevice)],
+          [convertToValidCredentialData(mockDevice)],
           "identity.ic0.app"
         );
       }
@@ -181,10 +184,10 @@ describe("Connection.login", () => {
       // This one would fail because it's not the device the user is using at the moment.
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
-        convertToCredentialData(currentOriginDevice);
+        convertToValidCredentialData(currentOriginDevice);
       const currentDevice: DeviceData = createMockDevice();
       const currentDeviceCredentialData =
-        convertToCredentialData(currentDevice);
+        convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
@@ -230,10 +233,10 @@ describe("Connection.login", () => {
     it("connection doesn't exclude rpId if user has only one domain", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
-        convertToCredentialData(currentOriginDevice);
+        convertToValidCredentialData(currentOriginDevice);
       const currentOriginDevice2: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData2 =
-        convertToCredentialData(currentOriginDevice2);
+        convertToValidCredentialData(currentOriginDevice2);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi
@@ -298,7 +301,7 @@ describe("Connection.login", () => {
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToCredentialData(mockDevice)],
+          [convertToValidCredentialData(mockDevice)],
           undefined
         );
       }
@@ -326,7 +329,7 @@ describe("Connection.login", () => {
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToCredentialData(mockDevice)],
+          [convertToValidCredentialData(mockDevice)],
           undefined
         );
       }
@@ -335,10 +338,10 @@ describe("Connection.login", () => {
     it("connection does not exclude rpId when user cancels", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
-        convertToCredentialData(currentOriginDevice);
+        convertToValidCredentialData(currentOriginDevice);
       const currentDevice: DeviceData = createMockDevice();
       const currentDeviceCredentialData =
-        convertToCredentialData(currentDevice);
+        convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
@@ -401,7 +404,7 @@ describe("Connection.login", () => {
         expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToCredentialData(mockDevice)],
+          [convertToValidCredentialData(mockDevice)],
           undefined
         );
       }
@@ -429,7 +432,7 @@ describe("Connection.login", () => {
         expect(loginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToCredentialData(mockDevice)],
+          [convertToValidCredentialData(mockDevice)],
           undefined
         );
       }
@@ -438,10 +441,10 @@ describe("Connection.login", () => {
     it("connection does not exclude rpId when user cancels", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
-        convertToCredentialData(currentOriginDevice);
+        convertToValidCredentialData(currentOriginDevice);
       const currentDevice: DeviceData = createMockDevice();
       const currentDeviceCredentialData =
-        convertToCredentialData(currentDevice);
+        convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
@@ -480,6 +483,54 @@ describe("Connection.login", () => {
           undefined
         );
       }
+    });
+  });
+
+  describe("when a device credential id is missing", () => {
+    it("connection does not use this device to authenticate", async () => {
+      const deviceWithCredentialId: DeviceData = createMockDevice();
+      const deviceWithoutCredentialId: DeviceData = createMockDevice();
+      deviceWithoutCredentialId.credential_id = [];
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi
+          .fn()
+          .mockResolvedValue([
+            deviceWithCredentialId,
+            deviceWithoutCredentialId,
+          ]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+      await connection.login(BigInt(12345));
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        [convertToValidCredentialData(deviceWithCredentialId)],
+        undefined
+      );
+    });
+  });
+
+  describe("when device credential id is invalid", () => {
+    it("connection does not use this device to authenticate", async () => {
+      const deviceValidCredentialId: DeviceData = createMockDevice();
+      const deviceInvalidCredentialId: DeviceData = createMockDevice();
+      deviceInvalidCredentialId.credential_id = [Uint8Array.from([])];
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi
+          .fn()
+          .mockResolvedValue([
+            deviceValidCredentialId,
+            deviceInvalidCredentialId,
+          ]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+      await connection.login(BigInt(12345));
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        [convertToValidCredentialData(deviceValidCredentialId)],
+        undefined
+      );
     });
   });
 });

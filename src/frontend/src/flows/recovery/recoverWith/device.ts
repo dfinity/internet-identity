@@ -1,10 +1,9 @@
-import { CredentialId, DeviceData } from "$generated/internet_identity_types";
 import { infoToastTemplate } from "$src/components/infoToast";
 import infoToastCopy from "$src/components/infoToast/copy.json";
 import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
 import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
-import { convertToCredentialData } from "$src/utils/credential-devices";
+import { convertToValidCredentialData } from "$src/utils/credential-devices";
 import {
   AuthFail,
   Connection,
@@ -13,6 +12,7 @@ import {
   WebAuthnFailed,
 } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
+import { nonNullish } from "@dfinity/utils";
 
 export const recoverWithDeviceTemplate = ({
   next,
@@ -110,14 +110,9 @@ const attemptRecovery = async ({
     return { kind: "tooManyRecovery" };
   }
 
-  const hasCredentialId = (
-    device: Omit<DeviceData, "alias">
-  ): device is Omit<DeviceData, "alias"> & { credential_id: [CredentialId] } =>
-    device.credential_id.length === 1;
-
   const credentialData = recoveryCredentials
-    .filter(hasCredentialId)
-    .map(convertToCredentialData);
+    .map(convertToValidCredentialData)
+    .filter(nonNullish);
 
   return await connection.fromWebauthnCredentials(userNumber, credentialData);
 };
