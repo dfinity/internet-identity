@@ -11,7 +11,7 @@ export type CredentialData = {
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
   new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
 
-export const convertToCredentialData = (
+export const convertToValidCredentialData = (
   device: Omit<DeviceData, "alias">
 ): CredentialData | undefined => {
   // In certain cases, e.g. Chrome on Windows 10, an invalid credential id is

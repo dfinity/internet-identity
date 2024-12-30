@@ -3,7 +3,7 @@ import infoToastCopy from "$src/components/infoToast/copy.json";
 import { promptUserNumberTemplate } from "$src/components/promptUserNumber";
 import { toast } from "$src/components/toast";
 import { I18n } from "$src/i18n";
-import { convertToCredentialData } from "$src/utils/credential-devices";
+import { convertToValidCredentialData } from "$src/utils/credential-devices";
 import {
   AuthFail,
   Connection,
@@ -111,7 +111,7 @@ const attemptRecovery = async ({
   }
 
   const credentialData = recoveryCredentials
-    .map(convertToCredentialData)
+    .map(convertToValidCredentialData)
     .filter(nonNullish);
 
   return await connection.fromWebauthnCredentials(userNumber, credentialData);
