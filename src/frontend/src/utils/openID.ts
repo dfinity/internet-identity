@@ -1,4 +1,5 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
+import { II_OPENID_GOOGLE_CLIENT_ID } from "$src/environment";
 import { redirectInPopup } from "$src/flows/redirect";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -22,8 +23,7 @@ export interface RequestOptions {
 }
 
 export const GOOGLE_REQUEST_CONFIG: RequestConfig = {
-  clientId:
-    "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com",
+  clientId: II_OPENID_GOOGLE_CLIENT_ID,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
   configURL: "https://accounts.google.com/gsi/fedcm.json",
 };
