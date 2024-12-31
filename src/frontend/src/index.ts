@@ -1,4 +1,5 @@
 import { handleLoginFlowResult } from "$src/components/authenticateBox";
+import { callbackFlow } from "$src/flows/redirect";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
@@ -43,6 +44,9 @@ void createSpa(async (connection) => {
   if (url.hash === "#authorize") {
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
+  } else if (url.pathname === "/callback") {
+    // User was returned here after previous redirect
+    return callbackFlow();
   } else {
     // The default flow
     return authFlowManage(connection);

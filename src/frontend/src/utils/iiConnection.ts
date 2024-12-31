@@ -917,11 +917,12 @@ export class AuthenticatedConnection extends Connection {
     return { error: "internal_error" };
   };
 
-  addJwt = async (jwt: JWT, salt: Salt) => {
-    const result = await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
-    if ("Err" in result) {
-      throw result.Err;
-    }
+  addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
+    await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
+  };
+
+  removeJWT = async (iss: string, sub: string): Promise<void> => {
+    await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
   };
 }
 
