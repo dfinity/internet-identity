@@ -34,6 +34,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
+import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
@@ -153,6 +154,8 @@ export class Connection {
   // registered in another domain. In this case, we must try the other rpID.
   // Map<userNumber, Set<rpID>>
   private _cancelledRpIds: Map<bigint, Set<string | undefined>> = new Map();
+  protected _mockOpenID = new MockOpenID();
+
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -615,6 +618,7 @@ export class Connection {
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
+
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -662,9 +666,15 @@ export class AuthenticatedConnection extends Connection {
     return this.actor;
   }
 
-  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
+  getAnchorInfo = async (): Promise<
+    IdentityAnchorInfo & { credentials: OpenIDCredential[] }
+  > => {
     const actor = await this.getActor();
-    return await actor.get_anchor_info(this.userNumber);
+    const anchorInfo = await actor.get_anchor_info(this.userNumber);
+    const mockedAnchorInfo = await this._mockOpenID.get_anchor_info(
+      this.userNumber
+    );
+    return { ...anchorInfo, ...mockedAnchorInfo };
   };
 
   getPrincipal = async ({
@@ -905,6 +915,20 @@ export class AuthenticatedConnection extends Connection {
 
     console.error("Unknown error", err);
     return { error: "internal_error" };
+  };
+
+  addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
+    const result = await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
+    if ("Err" in result) {
+      throw new Error(result.Err);
+    }
+  };
+
+  removeJWT = async (iss: string, sub: string): Promise<void> => {
+    const result = await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
+    if ("Err" in result) {
+      throw new Error(result.Err);
+    }
   };
 }
 
