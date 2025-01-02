@@ -1,6 +1,9 @@
 import { withLoader } from "$src/components/loader";
 
 export const callbackFlow = (): Promise<never> => {
+  // User was returned here after redirect from a OpenID flow callback,
+  // these flows are always handled in a popup and the callback url is
+  // returned to the opener window through the PostMessage API.
   window.opener.postMessage(window.location.href, window.location.origin);
 
   return withLoader(

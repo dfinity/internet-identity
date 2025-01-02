@@ -45,9 +45,7 @@ void createSpa(async (connection) => {
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
   } else if (url.pathname === "/callback") {
-    // User was returned here after redirect from a OpenID flow callback,
-    // these flows are always handled in a popup and the callback url is
-    // returned to the opener window through the PostMessage API.
+    // User was returned here after redirect from a OpenID flow callback
     return callbackFlow();
   } else {
     // The default flow
