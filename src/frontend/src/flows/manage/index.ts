@@ -21,6 +21,7 @@ import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
 import { linkedAccountsSection } from "$src/flows/manage/linkedAccountsSection";
+import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import {
   TempKeyWarningAction,
   tempKeyWarningBox,
@@ -34,9 +35,10 @@ import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import { OpenIDCredential } from "$src/utils/mockOpenID";
 import {
   GOOGLE_REQUEST_CONFIG,
-  createRequestJWT,
+  createAnonymousNonce,
   decodeJWT,
-  getMetadataString,
+  isPermissionError,
+  requestJWT,
 } from "$src/utils/openID";
 import { PreLoadImage } from "$src/utils/preLoadImage";
 import {
@@ -45,7 +47,6 @@ import {
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
 import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -323,16 +324,17 @@ export const displayManage = async (
   credentials: OpenIDCredential[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
+
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
 
-  // Create method to initiate JWT request
-  const identity = await ECDSAKeyIdentity.generate();
-  const requestJWT = await createRequestJWT(GOOGLE_REQUEST_CONFIG, {
-    principal: identity.getPrincipal(),
-    mediation: "required",
-  });
+  // Create anonymous nonce and salt for connection principal
+  const { nonce, salt } = await createAnonymousNonce(
+    connection.identity.getPrincipal()
+  );
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -370,23 +372,28 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
-      const { jwt, salt } = await requestJWT();
-      const { iss, sub } = decodeJWT(jwt);
-      if (
-        credentials.find(
-          (credential) => credential.iss === iss && credential.sub === sub
-        )
-      ) {
-        toast.error("This account has already been linked");
-        return;
+      try {
+        const jwt = await withLoader(() =>
+          requestJWT(GOOGLE_REQUEST_CONFIG, {
+            mediation: "required",
+            nonce,
+          })
+        );
+        const { iss, sub } = decodeJWT(jwt);
+        if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
+          toast.error(copy.account_already_linked);
+          return;
+        }
+        await connection.addJWT(jwt, salt);
+        resolve();
+      } catch (error) {
+        if (isPermissionError(error)) {
+          toast.error(copy.third_party_sign_in_permission_required);
+        }
       }
-      await connection.addJWT(jwt, new Uint8Array(salt));
-      resolve();
     };
     const onUnlinkAccount = async (credential: OpenIDCredential) => {
-      const name =
-        getMetadataString(credential.metadata, "name") ?? credential.sub;
-      if (!confirm(`Do you really want to unlink the account "${name}"?`)) {
+      if (!confirm(copy.unlink_account_confirmation.toString())) {
         return;
       }
       await connection.removeJWT(credential.iss, credential.sub);

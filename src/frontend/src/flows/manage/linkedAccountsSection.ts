@@ -1,4 +1,6 @@
 import { googleIcon } from "$src/components/icons";
+import copyJson from "$src/flows/manage/linkedAccountsSection.json";
+import { I18n } from "$src/i18n";
 import { OpenIDCredential } from "$src/utils/mockOpenID";
 import { getMetadataString } from "$src/utils/openID";
 import { formatLastUsage } from "$src/utils/time";
@@ -23,6 +25,8 @@ export const linkedAccountsSection = ({
   onUnlinkAccount: (credential: OpenIDCredential) => void;
   hasOtherAuthMethods: boolean;
 }): TemplateResult => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
   const unlinkAvailable = credentials.length > 1 || hasOtherAuthMethods;
 
   return html` <aside
@@ -32,8 +36,8 @@ export const linkedAccountsSection = ({
     <h2 class="t-title">Linked Accounts</h2>
     <p class="t-paragraph t-lead">
       ${credentials.length === 0
-        ? "Link your online account to hold assets and securely sign into dapps."
-        : "Use your online accounts to hold assets and securely sign into dapps."}
+        ? copy.link_your_account_to_hold_assets_and_sign_into_dapps
+        : copy.use_your_accounts_to_hold_assets_and_sign_into_dapps}
     </p>
     <div class="c-action-list">
       <ul>
@@ -53,15 +57,14 @@ export const linkedAccountsSection = ({
           @click="${() => onLinkAccount()}"
           id="linkAdditionalAccount"
         >
-          <span class="c-tooltip__message c-card c-card--tight"
-            >You can link up to ${MAX_CREDENTIALS} online accounts. You must
-            unlink an account before you can link another.</span
-          >
-          <span
-            >${credentials.length === 0
-              ? "Link account"
-              : "Link additional account"}</span
-          >
+          <span class="c-tooltip__message c-card c-card--tight">
+            ${copy.max_linked_accounts_reached}
+          </span>
+          <span>
+            ${credentials.length === 0
+              ? copy.link_account
+              : copy.link_additional_account}
+          </span>
         </button>
       </div>
     </div>
@@ -79,10 +82,12 @@ export const accountItem = ({
   unlink: (credential: OpenIDCredential) => void;
   unlinkAvailable: boolean;
 }) => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
   const settings = [
     {
       action: "unlink",
-      caption: "Unlink",
+      caption: copy.unlink.toString(),
       fn: () => unlink(credential),
     },
   ];
@@ -99,7 +104,7 @@ export const accountItem = ({
     <li class="c-action-list__item" data-account=${credential.sub}>
       ${
         nonNullish(picture)
-          ? html`<div class="c-action-list__avatar">
+          ? html` <div class="c-action-list__avatar">
               <img src="${picture}" alt="" aria-hidden="true" loading="lazy" />
               <div class="c-action-list__avatar--badge">${googleIcon}</div>
             </div>`
@@ -124,7 +129,9 @@ export const accountItem = ({
           }
         </div>
         <div>
-          <div class="t-muted">Last used: ${lastUsageFormattedString}</div>
+          <div class="t-muted">
+            ${copy.last_used}: ${lastUsageFormattedString}
+          </div>
         </div>
       </div>
     </li>
