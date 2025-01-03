@@ -54,6 +54,49 @@ pub async fn prepare_delegation(
     )
 }
 
+pub async fn prepare_jwt_delegation(
+    iss: &str,
+    sub: &str,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    max_time_to_live: Option<u64>,
+) -> (UserKey, Timestamp) {
+    state::ensure_salt_set().await;
+    check_frontend_length(&frontend);
+
+    let session_duration_ns = u64::min(
+        max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+        MAX_EXPIRATION_PERIOD_NS,
+    );
+    let expiration = time().saturating_add(session_duration_ns);
+    let salt = state::salt();
+
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    blob.push(iss.bytes().len() as u8);
+    blob.extend(iss.bytes());
+
+    blob.push(sub.bytes().len() as u8);
+    blob.extend(sub.bytes());
+
+    blob.push(frontend.bytes().len() as u8);
+    blob.extend(frontend.bytes());
+
+    let seed = hash_bytes(blob);
+
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+    });
+    update_root_hash();
+
+    (
+        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration,
+    )
+}
+
 /// Update metrics and the list of latest front-end origins.
 fn delegation_bookkeeping(
     frontend: FrontendHostname,
@@ -108,6 +151,52 @@ pub fn get_delegation(
         let inputs = CanisterSigInputs {
             domain: DELEGATION_SIG_DOMAIN,
             seed: &calculate_seed(anchor_number, &frontend),
+            message: &delegation_signature_msg(&session_key, expiration, None),
+        };
+        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+            Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+                delegation: Delegation {
+                    pubkey: session_key,
+                    expiration,
+                    targets: None,
+                },
+                signature: ByteBuf::from(signature),
+            }),
+            Err(_) => GetDelegationResponse::NoSuchDelegation,
+        }
+    })
+}
+
+pub fn get_jwt_delegation(
+    iss: &str,
+    sub: &str,
+    frontend: FrontendHostname,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> GetDelegationResponse {
+    check_frontend_length(&frontend);
+
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let salt = state::salt();
+
+        let mut blob: Vec<u8> = vec![];
+        blob.push(salt.len() as u8);
+        blob.extend_from_slice(&salt);
+
+        blob.push(iss.bytes().len() as u8);
+        blob.extend(iss.bytes());
+
+        blob.push(sub.bytes().len() as u8);
+        blob.extend(sub.bytes());
+
+        blob.push(frontend.bytes().len() as u8);
+        blob.extend(frontend.bytes());
+
+        let seed = hash_bytes(blob);
+
+        let inputs = CanisterSigInputs {
+            domain: DELEGATION_SIG_DOMAIN,
+            seed: &seed,
             message: &delegation_signature_msg(&session_key, expiration, None),
         };
         match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {

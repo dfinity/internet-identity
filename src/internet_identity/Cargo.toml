@@ -25,6 +25,7 @@ rand = { version ="*", default-features = false }
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false}
 
 # All IC deps
 candid.workspace = true
@@ -35,6 +36,7 @@ ic-metrics-encoder.workspace = true
 ic-stable-structures.workspace = true
 ic-canister-sig-creation.workspace = true
 ic-verifiable-credentials.workspace = true
+rsa = "0.9.7"
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
@@ -47,7 +49,6 @@ canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true
 ic-response-verification.workspace = true
-identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false}
 flate2 = "1.0"
 
 
