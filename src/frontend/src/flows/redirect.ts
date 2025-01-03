@@ -1,5 +1,7 @@
 import { withLoader } from "$src/components/loader";
 
+export const REDIRECT_CALLBACK_PATH = "/callback";
+
 export const callbackFlow = (): Promise<never> => {
   // User was returned here after redirect from a OpenID flow callback,
   // these flows are always handled in a popup and the callback url is

@@ -1,5 +1,5 @@
 import { handleLoginFlowResult } from "$src/components/authenticateBox";
-import { callbackFlow } from "$src/flows/redirect";
+import { callbackFlow, REDIRECT_CALLBACK_PATH } from "$src/flows/redirect";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
@@ -44,7 +44,7 @@ void createSpa(async (connection) => {
   if (url.hash === "#authorize") {
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
-  } else if (url.pathname === "/callback") {
+  } else if (url.pathname === REDIRECT_CALLBACK_PATH) {
     // User was returned here after redirect from a OpenID flow callback
     return callbackFlow();
   } else {

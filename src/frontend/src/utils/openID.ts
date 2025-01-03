@@ -1,6 +1,6 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
 import { II_OPENID_GOOGLE_CLIENT_ID } from "$src/environment";
-import { redirectInPopup } from "$src/flows/redirect";
+import { REDIRECT_CALLBACK_PATH, redirectInPopup } from "$src/flows/redirect";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
@@ -93,10 +93,7 @@ const requestWithRedirect = async (
   options: RequestOptions
 ): Promise<string> => {
   const state = toBase64URL(window.crypto.getRandomValues(new Uint8Array(12)));
-
-  const redirectURL = new URL(window.location.origin);
-  redirectURL.pathname = "/callback";
-
+  const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
   const authURL = new URL(config.authURL);
   authURL.searchParams.set("response_type", "id_token");
   authURL.searchParams.set("client_id", config.clientId);
