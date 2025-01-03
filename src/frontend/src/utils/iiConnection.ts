@@ -918,17 +918,11 @@ export class AuthenticatedConnection extends Connection {
   };
 
   addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
-    const result = await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
-    if ("Err" in result) {
-      throw new Error(result.Err);
-    }
+    await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
   };
 
   removeJWT = async (iss: string, sub: string): Promise<void> => {
-    const result = await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
-    if ("Err" in result) {
-      throw new Error(result.Err);
-    }
+    await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
   };
 }
 

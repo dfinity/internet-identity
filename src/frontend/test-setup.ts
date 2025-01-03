@@ -7,6 +7,7 @@ vi.mock("./src/environment.ts", () => ({
   DUMMY_AUTH: false,
   DUMMY_CAPTCHA: false,
   VERSION: ",,clean",
+  II_OPENID_GOOGLE_CLIENT_ID: "",
 }));
 
 export type WebAuthnCredential = {

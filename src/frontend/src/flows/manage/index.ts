@@ -15,10 +15,13 @@ import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$src/config";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { linkedAccountsSection } from "$src/flows/manage/linkedAccountsSection";
+import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import {
   TempKeyWarningAction,
   tempKeyWarningBox,
@@ -29,6 +32,14 @@ import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
+import { OpenIDCredential } from "$src/utils/mockOpenID";
+import {
+  GOOGLE_REQUEST_CONFIG,
+  createAnonymousNonce,
+  decodeJWT,
+  isPermissionError,
+  requestJWT,
+} from "$src/utils/openID";
 import { PreLoadImage } from "$src/utils/preLoadImage";
 import {
   isProtected,
@@ -147,6 +158,9 @@ const displayManageTemplate = ({
   onAddDevice,
   addRecoveryPhrase,
   addRecoveryKey,
+  credentials,
+  onLinkAccount,
+  onUnlinkAccount,
   dapps,
   exploreDapps,
   identityBackground,
@@ -157,6 +171,9 @@ const displayManageTemplate = ({
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  credentials: OpenIDCredential[];
+  onLinkAccount: () => void;
+  onUnlinkAccount: (credential: OpenIDCredential) => void;
   dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: PreLoadImage;
@@ -182,6 +199,14 @@ const displayManageTemplate = ({
       onAddDevice,
       warnNoPasskeys,
     })}
+    ${OPENID_AUTHENTICATION.isEnabled()
+      ? linkedAccountsSection({
+          credentials,
+          onLinkAccount,
+          onUnlinkAccount,
+          hasOtherAuthMethods: authenticators.length > 0,
+        })
+      : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
     <aside class="l-stack">
       ${dappsTeaser({
@@ -245,7 +270,7 @@ export const renderManage = async ({
   // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
   // loop forever
   for (;;) {
-    let anchorInfo: IdentityAnchorInfo;
+    let anchorInfo: IdentityAnchorInfo & { credentials: OpenIDCredential[] };
     try {
       // Ignore the `commitMetadata` response, it's not critical for the application.
       void connection.commitMetadata();
@@ -267,6 +292,7 @@ export const renderManage = async ({
       userNumber,
       connection,
       anchorInfo.devices,
+      anchorInfo.credentials,
       identityBackground
     );
     connection = newConnection ?? connection;
@@ -291,21 +317,32 @@ function isPinAuthenticated(
   );
 }
 
-export const displayManage = (
+export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
+  credentials: OpenIDCredential[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
+  const i18n = new I18n();
+  const copy = i18n.i18n(copyJson);
+
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
+
+  // Create anonymous nonce and salt for connection principal
+  const { nonce, salt } = await createAnonymousNonce(
+    connection.identity.getPrincipal()
+  );
+
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
       devices: devices_,
       userNumber,
       connection,
       reload: resolve,
+      hasOtherAuthMethods: credentials.length > 0,
     });
 
     if (devices.dupPhrase) {
@@ -331,6 +368,35 @@ export const displayManage = (
       }
       doAdd satisfies "ok";
       await setupPhrase(userNumber, connection);
+      resolve();
+    };
+
+    const onLinkAccount = async () => {
+      try {
+        const jwt = await withLoader(() =>
+          requestJWT(GOOGLE_REQUEST_CONFIG, {
+            mediation: "required",
+            nonce,
+          })
+        );
+        const { iss, sub } = decodeJWT(jwt);
+        if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
+          toast.error(copy.account_already_linked);
+          return;
+        }
+        await connection.addJWT(jwt, salt);
+        resolve();
+      } catch (error) {
+        if (isPermissionError(error)) {
+          toast.error(copy.third_party_sign_in_permission_required);
+        }
+      }
+    };
+    const onUnlinkAccount = async (credential: OpenIDCredential) => {
+      if (!confirm(copy.unlink_account_confirmation.toString())) {
+        return;
+      }
+      await connection.removeJWT(credential.iss, credential.sub);
       resolve();
     };
 
@@ -369,6 +435,9 @@ export const displayManage = (
           await setupKey({ connection });
           resolve();
         },
+        credentials,
+        onLinkAccount,
+        onUnlinkAccount,
         dapps,
         exploreDapps: async () => {
           await dappsExplorer({ dapps });
@@ -445,11 +514,13 @@ export const devicesFromDevicesWithUsage = ({
   reload,
   connection,
   userNumber,
+  hasOtherAuthMethods,
 }: {
   devices: DeviceWithUsage[];
   reload: (connection?: AuthenticatedConnection) => void;
   connection: AuthenticatedConnection;
   userNumber: bigint;
+  hasOtherAuthMethods: boolean;
 }): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
 
@@ -478,9 +549,10 @@ export const devicesFromDevicesWithUsage = ({
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
-        remove: hasSingleDevice
-          ? undefined
-          : () => deleteDevice({ connection, device, reload }),
+        remove:
+          hasSingleDevice && !hasOtherAuthMethods
+            ? undefined
+            : () => deleteDevice({ connection, device, reload }),
       };
 
       if ("browser_storage_key" in device.key_type) {

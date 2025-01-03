@@ -189,7 +189,7 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
-         img-src 'self' data:;\
+         img-src 'self' data: https://*.googleusercontent.com;\
          script-src {strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:;\
          base-uri 'none';\
          form-action 'none';\

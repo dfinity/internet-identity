@@ -17,20 +17,9 @@ export interface OpenIDCredential {
 export class MockOpenID {
   #credentials: OpenIDCredential[] = [];
 
-  add_jwt(
-    _userNumber: UserNumber,
-    jwt: JWT,
-    _salt: Salt
-  ): Promise<{ Ok: null } | { Err: string }> {
+  add_jwt(_userNumber: UserNumber, jwt: JWT, _salt: Salt): Promise<void> {
     const [_header, body, _signature] = jwt.split(".");
     const { iss, sub, aud, email, name, picture } = JSON.parse(atob(body));
-    if (
-      this.#credentials.find(
-        (credential) => credential.iss === iss && credential.sub === sub
-      )
-    ) {
-      return Promise.resolve({ Err: "This account has already been linked" });
-    }
     this.#credentials.push({
       iss,
       sub,
@@ -43,19 +32,15 @@ export class MockOpenID {
         ["picture", { String: picture }],
       ],
     });
-    return Promise.resolve({ Ok: null });
+    return Promise.resolve();
   }
 
-  remove_jwt(
-    _userNumber: UserNumber,
-    iss: string,
-    sub: string
-  ): Promise<{ Ok: null } | { Err: string }> {
+  remove_jwt(_userNumber: UserNumber, iss: string, sub: string): Promise<void> {
     const index = this.#credentials.findIndex(
       (credential) => credential.iss === iss && credential.sub === sub
     );
     this.#credentials.splice(index, 1);
-    return Promise.resolve({ Ok: null });
+    return Promise.resolve();
   }
 
   get_anchor_info(_userNumber: UserNumber): Promise<{

@@ -284,7 +284,7 @@
 
   --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
   --rs-list-parcel-bezel: var(--vs-bezel);
-  --rs-list-gutter: var(--vs-gutter);
+  --rs-list-gutter: calc(var(--vs-gutter) * 2);
 
   --rs-footer-stack: var(--vs-stack);
   --rs-footer-gutter: calc(var(--vs-gutter) * 3.5);
@@ -601,6 +601,10 @@ body {
   overflow-wrap: break-word;
   word-wrap: break-word;
   hyphens: auto;
+}
+
+.t-nowrap {
+  white-space: nowrap;
 }
 
 a,
@@ -2722,6 +2726,39 @@ a.c-action-list__item {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
+}
+
+.c-action-list__avatar {
+  height: 4rem;
+  width: 4rem;
+  position: relative;
+}
+
+.c-action-list__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.c-action-list__avatar--badge {
+  width: 2rem;
+  height: 2rem;
+  position: absolute;
+  bottom: -0.2rem;
+  right: -0.2rem;
+  background: var(--rc-light);
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rc-line);
+}
+
+.c-action-list__avatar--badge svg {
+  width: 1.6rem;
+  height: 1.6rem;
 }
 
 .c-action-list__item + .c-action-list__item::before {
