@@ -14,7 +14,7 @@ jobs:
   # Job that starts the showcase and takes a screenshot of every page and
   # saves it in artifacts (both head & base branches)
   screenshots:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         device: ["desktop", "mobile"]
