@@ -42,7 +42,7 @@
     "@typescript-eslint/eslint-plugin": "6.7.5",
     "@typescript-eslint/parser": "6.7.5",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
-    "@wdio/globals": "^8.39.0",
+    "@wdio/globals": "^8.41.0",
     "astro": "4.16.18",
     "eslint": "8.51.0",
     "fake-indexeddb": "^4.0.2",
@@ -53,7 +53,7 @@
     "typescript": "5.2.2",
     "vite": "^5.4.6",
     "vitest": "^1.6.0",
-    "webdriverio": "^8.39.0"
+    "webdriverio": "^8.41.0"
   },
   "dependencies": {
     "@dfinity/agent": "^2.1.2",

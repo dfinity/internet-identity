@@ -8,7 +8,7 @@ name: Release Build Check
 on:
   schedule:
     # check build daily at 7:30
-    - cron:  '30 7 * * *'
+    - cron: "30 7 * * *"
 
 jobs:
   # First, gather some info about the latest release, namely:
@@ -19,7 +19,7 @@ jobs:
       ref: ${{ steps.release.outputs.ref }}
       ii_prod_sha256: ${{ steps.release.outputs.ii_prod_sha256 }}
       archive_sha256: ${{ steps.release.outputs.archive_sha256 }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Get latest release information
         run: |
@@ -57,7 +57,7 @@ jobs:
     needs: latest-release
     strategy:
       matrix:
-        os: [ ubuntu-22.04, ubuntu-20.04, macos-13, macos-14 ]
+        os: [ubuntu-22.04, ubuntu-20.04, macos-13, macos-14]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,7 +86,7 @@ jobs:
       matrix:
         # docker builds on macos are flaky or not supported at all (in case of ARM based runners). The signal they gave
         # was minimal, so we will skip them for now until there is a reliable way to run docker images on macos runners.
-        os: [ ubuntu-22.04, ubuntu-20.04 ]
+        os: [ubuntu-22.04, ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
         with:
