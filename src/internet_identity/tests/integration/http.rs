@@ -517,6 +517,99 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     Ok(())
 }
 
+#[test]
+fn must_not_cache_well_known_ic_domains() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+
+    // Get index page
+    let well_known_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/ic-domains".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let well_known_response = http_request(&env, canister_id, &well_known_request)?;
+
+    assert_eq!(well_known_response.status_code, 200);
+    println!("{:?}", well_known_response.headers);
+    assert!(
+        !well_known_response // Make sure we have no cache-control headers whatsoever on the response
+            .headers
+            .clone()
+            .into_iter()
+            .map(|headers| headers.0) // Get only the key
+            .collect::<Vec<String>>()
+            .contains(&"Cache-Control".to_string())
+    );
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        well_known_request,
+        well_known_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
+#[test]
+fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let related_origins: Vec<String> = [
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+    ]
+    .to_vec();
+    let config = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: Some(related_origins.clone()),
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    // Get index page
+    let well_known_request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/webauthn".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let well_known_response = http_request(&env, canister_id, &well_known_request)?;
+
+    assert_eq!(well_known_response.status_code, 200);
+    println!("{:?}", well_known_response.headers);
+    assert!(
+        !well_known_response // Make sure we have no cache-control headers whatsoever on the response
+            .headers
+            .clone()
+            .into_iter()
+            .map(|headers| headers.0) // Get only the key
+            .collect::<Vec<String>>()
+            .contains(&"Cache-Control".to_string())
+    );
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        well_known_request,
+        well_known_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+
+    Ok(())
+}
+
 /// Verifies that expected metrics are available via the HTTP endpoint.
 #[test]
 fn ii_canister_serves_http_metrics() -> Result<(), CallError> {

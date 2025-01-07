@@ -433,7 +433,7 @@ xr-spatial-tracking=()",
     let rgx = Regex::new(
         "^default-src 'none';\
 connect-src 'self' https:;\
-img-src 'self' data:;\
+img-src 'self' data: https://\\*.googleusercontent.com;\
 script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
 base-uri 'none';\
 form-action 'none';\

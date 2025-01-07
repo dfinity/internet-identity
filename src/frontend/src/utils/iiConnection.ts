@@ -28,11 +28,13 @@ import {
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { features } from "$src/features";
 import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
+import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
   Actor,
@@ -49,9 +51,19 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { convertToCredentialData, CredentialData } from "./credential-devices";
+import {
+  convertToValidCredentialData,
+  CredentialData,
+} from "./credential-devices";
+import {
+  excludeCredentialsFromOrigins,
+  findWebAuthnRpId,
+  hasCredentialsFromMultipleOrigins,
+  relatedDomains,
+} from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
+import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 
 /*
@@ -86,6 +98,7 @@ export type LoginSuccess = {
   kind: "loginSuccess";
   connection: AuthenticatedConnection;
   userNumber: bigint;
+  showAddCurrentDevice: boolean;
 };
 
 export type RegFlowNextStep =
@@ -116,6 +129,7 @@ export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
+export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -134,7 +148,19 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  public constructor(readonly canisterId: string) {}
+  // The rpID is used to get the passkey from the browser's WebAuthn API.
+  // Using different rpIDs allows us to have compatibility across multiple domains.
+  // However, when one RP ID is used and the user cancels, it must be because the user is in a device
+  // registered in another domain. In this case, we must try the other rpID.
+  // Map<userNumber, Set<rpID>>
+  private _cancelledRpIds: Map<bigint, Set<string | undefined>> = new Map();
+  protected _mockOpenID = new MockOpenID();
+
+  public constructor(
+    readonly canisterId: string,
+    // Used for testing purposes
+    readonly overrideActor?: ActorSubclass<_SERVICE>
+  ) {}
 
   identity_registration_start = async ({
     tempIdentity,
@@ -304,6 +330,7 @@ export class Connection {
           actor
         ),
         userNumber,
+        showAddCurrentDevice: false,
       };
     }
 
@@ -342,7 +369,12 @@ export class Connection {
   login = async (
     userNumber: bigint
   ): Promise<
-    LoginSuccess | AuthFail | WebAuthnFailed | UnknownUser | ApiError
+    | LoginSuccess
+    | AuthFail
+    | WebAuthnFailed
+    | PossiblyWrongRPID
+    | UnknownUser
+    | ApiError
   > => {
     let devices: Omit<DeviceData, "alias">[];
     try {
@@ -361,21 +393,35 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToCredentialData)
+      devices.map(convertToValidCredentialData).filter(nonNullish)
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
     credentials: CredentialData[]
-  ): Promise<LoginSuccess | WebAuthnFailed | AuthFail> => {
+  ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
+    const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
+    const currentOrigin = window.location.origin;
+    const dynamicRPIdEnabled =
+      DOMAIN_COMPATIBILITY.isEnabled() &&
+      supportsWebauthRoR(window.navigator.userAgent);
+    const filteredCredentials = excludeCredentialsFromOrigins(
+      credentials,
+      cancelledRpIds,
+      currentOrigin
+    );
+    const rpId = dynamicRPIdEnabled
+      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+      : undefined;
+
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
      * that is used in the register flow.
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(credentials);
+      : MultiWebAuthnIdentity.fromCredentials(filteredCredentials, rpId);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -384,6 +430,19 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
+        // We only want to cache cancelled rpids if there can be multiple rpids.
+        if (
+          dynamicRPIdEnabled &&
+          hasCredentialsFromMultipleOrigins(credentials)
+        ) {
+          if (this._cancelledRpIds.has(userNumber)) {
+            this._cancelledRpIds.get(userNumber)?.add(rpId);
+          } else {
+            this._cancelledRpIds.set(userNumber, new Set([rpId]));
+          }
+          // We want to user to retry again and a new RP ID will be used.
+          return { kind: "possiblyWrongRPID" };
+        }
         return { kind: "webAuthnFailed" };
       }
 
@@ -409,6 +468,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection,
+      showAddCurrentDevice: cancelledRpIds.size > 0,
     };
   };
   fromIdentity = async (
@@ -429,6 +489,7 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection,
+      showAddCurrentDevice: false,
     };
   };
 
@@ -469,6 +530,7 @@ export class Connection {
         userNumber,
         actor
       ),
+      showAddCurrentDevice: false,
     };
   };
 
@@ -520,6 +582,9 @@ export class Connection {
   createActor = async (
     identity?: SignIdentity
   ): Promise<ActorSubclass<_SERVICE>> => {
+    if (this.overrideActor !== undefined) {
+      return this.overrideActor;
+    }
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
@@ -553,6 +618,7 @@ export class Connection {
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
+
   public constructor(
     public canisterId: string,
     public identity: SignIdentity,
@@ -600,9 +666,15 @@ export class AuthenticatedConnection extends Connection {
     return this.actor;
   }
 
-  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
+  getAnchorInfo = async (): Promise<
+    IdentityAnchorInfo & { credentials: OpenIDCredential[] }
+  > => {
     const actor = await this.getActor();
-    return await actor.get_anchor_info(this.userNumber);
+    const anchorInfo = await actor.get_anchor_info(this.userNumber);
+    const mockedAnchorInfo = await this._mockOpenID.get_anchor_info(
+      this.userNumber
+    );
+    return { ...anchorInfo, ...mockedAnchorInfo };
   };
 
   getPrincipal = async ({
@@ -843,6 +915,14 @@ export class AuthenticatedConnection extends Connection {
 
     console.error("Unknown error", err);
     return { error: "internal_error" };
+  };
+
+  addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
+    await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
+  };
+
+  removeJWT = async (iss: string, sub: string): Promise<void> => {
+    await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
   };
 }
 

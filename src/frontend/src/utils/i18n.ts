@@ -46,6 +46,11 @@ export class I18n<Lang extends string> {
       });
 
       acc[k] = asyncReplace(value);
+
+      // Implement `toString` to return plain text translation label,
+      // to be used outside of lit html renders e.g. native confirm modal
+      acc[k].toString = () => copy[this.lang][k];
+
       return acc;
     }, {} as DynamicCopy<Keys>);
 
