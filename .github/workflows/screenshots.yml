@@ -36,6 +36,8 @@ jobs:
       - run: npm ci
       - name: Save screenshots
         run: |
+          chromedriver --version
+          google-chrome --version
           npm run showcase&
           showcase_pid=$!
 
@@ -48,8 +50,6 @@ jobs:
             SCREENSHOTS_TYPE=${{ matrix.device }} \
             npm run screenshots
           kill "$showcase_pid"
-          chromedriver --version
-          google-chrome --version
 
       - name: Summary
         run: |
