@@ -63,7 +63,7 @@ jobs:
           path: screenshots/${{ matrix.device }}/*.png
 
   notify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: screenshots
     concurrency: image-dumpster
     # This should never take long, but _in case_ our setup changes inadvertently
