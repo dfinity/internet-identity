@@ -4,25 +4,25 @@ A GitHub Action for recording file sizes in git notes.
 
 ## Usage
 
-``` yaml
-  record-readme-size:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/file-size
-        with:
-          file: README.md
+```yaml
+record-readme-size:
+  runs-on: ubuntu-22.04
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/file-size
+      with:
+        file: README.md
 ```
 
 To use the notes, first fetch them:
 
-``` bash
+```bash
 $ git fetch origin refs/notes/file-size/*:refs/notes/file-size/*
 ```
 
 Then, each note contains a number, which is the size in bytes. The following example plots the values:
 
-``` bash
+```bash
 $ git log \
     --reverse --notes="notes/file-size/README.md" \
     --pretty='format:%h%x09%s%x09%N' | tail -n 10 \

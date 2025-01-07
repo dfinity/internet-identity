@@ -6,12 +6,12 @@ on:
     # Run every Tuesday:
     #   summer: 7pm Zurich time
     #   winter: 8pm Zurich time
-    - cron:  '0 18 * * 2'
+    - cron: "0 18 * * 2"
   workflow_dispatch:
 
 jobs:
   deploy-rc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       ii_canister_id: jqajs-xiaaa-aaaad-aab5q-cai
       testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai
@@ -60,7 +60,7 @@ jobs:
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
-      - name: 'Install key'
+      - name: "Install key"
         env:
           DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
         run: |
