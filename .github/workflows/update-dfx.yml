@@ -5,12 +5,12 @@ name: dfx Update
 on:
   schedule:
     # check for new dfx releases daily at 7:30
-    - cron:  '30 7 * * *'
+    - cron: "30 7 * * *"
   workflow_dispatch:
 
 jobs:
   dfx-update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +50,7 @@ jobs:
           author: gix-bot <gix-bot@users.noreply.github.com>
           branch: bot-dfx-update
           delete-branch: true
-          title: 'Update dfx'
+          title: "Update dfx"
 
         # Since this is a scheduled job, a failure won't be shown on any
         # PR status. To notify the team, we send a message to our Slack channel on failure.

@@ -6,7 +6,7 @@ on:
 
 jobs:
   cargo-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,7 +36,7 @@ jobs:
           message: "🤖 cargo-fmt auto-update"
 
   cargo-clippy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/bootstrap
@@ -69,7 +69,7 @@ jobs:
           cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
 
   check-lockfile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/bootstrap

@@ -2,10 +2,9 @@
 
 A GitHub Action for sending slack notifications. For more information, see slack's [documentation](https://api.slack.com/messaging/webhooks). In particular, note that the channel and workspace are set by the webhook URL, not directly by this action.
 
-
 ## Usage
 
-``` yaml
+```yaml
 name: My Action
 
 on:
@@ -13,7 +12,7 @@ on:
 
 jobs:
   share-love:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: ./.github/actions/slack
         with:
