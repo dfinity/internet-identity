@@ -104,7 +104,7 @@ async function withChrome<T>(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "122.0.6261.111	", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "131.0.6778.139", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
