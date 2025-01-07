@@ -11,15 +11,14 @@ on:
   pull_request:
 
 jobs:
-
   # Job that starts the showcase and takes a screenshot of every page and
   # saves it in artifacts (both head & base branches)
   screenshots:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        device: [ 'desktop', 'mobile' ]
-        ref: [ 'head', 'base' ]
+        device: ["desktop", "mobile"]
+        ref: ["head", "base"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
     steps:
@@ -49,6 +48,8 @@ jobs:
             SCREENSHOTS_TYPE=${{ matrix.device }} \
             npm run screenshots
           kill "$showcase_pid"
+          chromedriver --version
+          google-chrome --version
 
       - name: Summary
         run: |
@@ -69,8 +70,7 @@ jobs:
     # and this starts taking longer than expected, then we want to be aware of it.
     timeout-minutes: 5
     steps:
-
-        # Configuration used throughout the job
+      # Configuration used throughout the job
       - name: Initialize config
         run: |
           now=$(date +%s)
@@ -295,7 +295,6 @@ jobs:
           git config --add --bool push.autoSetupRemote true
 
           git push --force
-
 
         # Use the GitHub API to post links to screenshots if necessary
       - name: Notify PR of screen changes
