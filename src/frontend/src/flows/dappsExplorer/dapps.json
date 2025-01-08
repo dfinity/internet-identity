@@ -11,12 +11,6 @@
     "logo": "bitfinity_evm.svg"
   },
   {
-    "name": "OpenChat",
-    "oneLiner": "Decentralized alternative to WhatsApp",
-    "website": "https://oc.app/",
-    "logo": "openchat_logo.webp"
-  },
-  {
     "name": "ICPSwap",
     "website": "https://icpswap.com",
     "logo": "icpswap_logo.webp"
@@ -748,5 +742,11 @@
     "name": "ICP Tokens",
     "website": "https://icptokens.net",
     "logo": "icptokens_logo.svg"
+  },
+  {
+    "name": "OpenChat",
+    "oneLiner": "Decentralized alternative to WhatsApp",
+    "website": "https://oc.app/",
+    "logo": "openchat_logo.webp"
   }
 ]
