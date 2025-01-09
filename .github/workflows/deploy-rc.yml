@@ -11,7 +11,7 @@ on:
 
 jobs:
   deploy-rc:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       ii_canister_id: jqajs-xiaaa-aaaad-aab5q-cai
       testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai

@@ -12,7 +12,7 @@ on:
 
 jobs:
   share-love:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: ./.github/actions/slack
         with:
