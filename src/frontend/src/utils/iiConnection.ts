@@ -28,7 +28,7 @@ import {
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
-import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
+import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$src/featureFlags";
 import { features } from "$src/features";
 import {
   IdentityMetadata,
@@ -389,6 +389,12 @@ export class Connection {
 
     if (devices.length === 0) {
       return { kind: "unknownUser", userNumber };
+    }
+
+    if (HARDWARE_KEY_TEST.isEnabled()) {
+      devices = devices.filter(
+        (device) => Object.keys(device.key_type)[0] === "unknown"
+      );
     }
 
     return this.fromWebauthnCredentials(
