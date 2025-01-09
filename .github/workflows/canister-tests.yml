@@ -542,6 +542,9 @@ jobs:
           TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
+          chromedriver --version
+          google-chrome --version
+          node --version
 
       # run unit tests & e2e tests
       # NOTE: we run chrome in headless mode because that's the only thing that works in GHA
