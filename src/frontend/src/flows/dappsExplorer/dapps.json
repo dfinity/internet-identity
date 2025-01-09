@@ -486,8 +486,7 @@
   },
   {
     "name": "Datapond",
-    "oneLiner": "A hub for exposing and tracing data used by AI to generate results.",
-    "website": "https://recheck.io/",
+    "website": "https://datapond.ai/",
     "logo": "ReCheck_logo.png"
   },
   {
@@ -742,6 +741,31 @@
     "name": "ICP Tokens",
     "website": "https://icptokens.net",
     "logo": "icptokens_logo.svg"
+  },
+  {
+    "name": "ICSpore",
+    "website": "https://qnoqa-vaaaa-aaaap-qhima-cai.icp0.io/",
+    "logo": "icspore_logo.webp"
+  },
+  {
+    "name": "DAO Venture",
+    "website": "https://bpo6s-4qaaa-aaaap-acava-cai.icp0.io/",
+    "logo": "daoventure_logo.webp"
+  },
+  {
+    "name": "Solutio",
+    "website": "https://home.solutio.one/",
+    "logo": "solutio_logo.webp"
+  },
+  {
+    "name": "Lendfinity",
+    "website": "https://www.lendfinity.xyz/",
+    "logo": "lendfinity_logo.webp"
+  },
+  {
+    "name": "CLOAD",
+    "website": "https://cload.one/",
+    "logo": "cload_logo.webp"
   },
   {
     "name": "OpenChat",
