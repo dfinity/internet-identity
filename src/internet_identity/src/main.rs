@@ -4,6 +4,7 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::openid::google;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -12,6 +13,7 @@ use authz_utils::{
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
+use ic_cdk::api::management_canister::http_request;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
@@ -371,6 +373,12 @@ fn acknowledge_entries(sequence_number: u64) {
     archive::acknowledge_entries(sequence_number)
 }
 
+/// This query method name _must_ match `google::TRANSFORM_CERTS_METHOD`.
+#[query]
+fn transform_google_certs(raw: http_request::TransformArgs) -> http_request::HttpResponse {
+    google::transform_certs(&raw)
+}
+
 #[init]
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     state::init_new();
@@ -395,6 +403,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
+    openid::setup_timers();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
