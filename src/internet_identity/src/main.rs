@@ -36,6 +36,7 @@ mod conversions;
 mod delegation;
 mod http;
 mod ii_domain;
+mod openid;
 mod state;
 mod stats;
 mod storage;
