@@ -393,7 +393,9 @@ export class Connection {
 
     if (HARDWARE_KEY_TEST.isEnabled()) {
       devices = devices.filter(
-        (device) => Object.keys(device.key_type)[0] === "unknown"
+        (device) =>
+          Object.keys(device.key_type)[0] === "unknown" ||
+          Object.keys(device.key_type)[0] === "cross_platform"
       );
     }
 
