@@ -16,9 +16,6 @@ const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 // The response size is a little under 1KB, so 10KB should give us large enough margin
 const MAX_CERTS_RESPONSE_SIZE: u64 = 10_000;
 
-// All HTTP outcalls are expected to be at least within a 5 minutes window
-const CACHE_CONTROL_WINDOW_SIZE: u32 = 5 * 60;
-
 const HTTP_STATUS_OK: u8 = 200;
 
 #[derive(Serialize, Deserialize)]
@@ -26,6 +23,7 @@ struct GoogleCerts {
     keys: Vec<Jwk>,
 }
 
+#[allow(unused)]
 pub async fn get_certs(transform_method: &str) -> Result<Vec<Jwk>, String> {
     let request = CanisterHttpRequestArgument {
         url: GOOGLE_CERTS_URL.into(),
@@ -58,7 +56,8 @@ pub async fn get_certs(transform_method: &str) -> Result<Vec<Jwk>, String> {
 // so we deserialize, sort the keys and serialize to make the response the same across all nodes.
 //
 // This function traps since HTTP outcall transforms can't return or log errors anyway.
-pub fn transform_certs(raw: TransformArgs) -> HttpResponse {
+#[allow(unused)]
+pub fn transform_certs(raw: &TransformArgs) -> HttpResponse {
     if raw.response.status != HTTP_STATUS_OK {
         trap("Invalid response status")
     };
@@ -99,7 +98,7 @@ fn should_transform_to_same() {
     };
 
     assert_eq!(
-        transform_certs(TransformArgs {
+        transform_certs(&TransformArgs {
             response: input,
             context: vec![]
         }),
