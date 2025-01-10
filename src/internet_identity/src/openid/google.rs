@@ -32,7 +32,10 @@ pub async fn get_certs() -> Result<Vec<Jwk>, String> {
         method: HttpMethod::GET,
         body: None,
         max_response_bytes: Some(MAX_CERTS_RESPONSE_SIZE),
-        transform: Some(TransformContext::from_name(TRANSFORM_CERTS_METHOD.into(), vec![])),
+        transform: Some(TransformContext::from_name(
+            TRANSFORM_CERTS_METHOD.into(),
+            vec![],
+        )),
         headers: vec![
             HttpHeader {
                 name: "Accept".into(),
