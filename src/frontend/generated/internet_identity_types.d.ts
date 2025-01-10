@@ -144,6 +144,15 @@ export interface GetIdAliasRequest {
   'identity_number' : IdentityNumber,
 }
 export type HeaderField = [string, string];
+export interface HttpOutcallArgs {
+  'context' : Uint8Array | number[],
+  'response' : HttpOutcallResponse,
+}
+export interface HttpOutcallResponse {
+  'status' : bigint,
+  'body' : Uint8Array | number[],
+  'headers' : Array<{ 'value' : string, 'name' : string }>,
+}
 export interface HttpRequest {
   'url' : string,
   'method' : string,
@@ -418,6 +427,10 @@ export interface _SERVICE {
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  'transform_google_certs' : ActorMethod<
+    [HttpOutcallArgs],
+    HttpOutcallResponse
+  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

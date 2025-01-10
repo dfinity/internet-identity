@@ -349,6 +349,15 @@ export const idlFactory = ({ IDL }) => {
       IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
     ),
   });
+  const HttpOutcallResponse = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text })),
+  });
+  const HttpOutcallArgs = IDL.Record({
+    'context' : IDL.Vec(IDL.Nat8),
+    'response' : HttpOutcallResponse,
+  });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
@@ -522,6 +531,11 @@ export const idlFactory = ({ IDL }) => {
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
+    'transform_google_certs' : IDL.Func(
+        [HttpOutcallArgs],
+        [HttpOutcallResponse],
+        ['query'],
+      ),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
