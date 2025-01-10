@@ -2,6 +2,7 @@
 const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: false,
   OPENID_AUTHENTICATION: false,
+  HARDWARE_KEY_TEST: false,
 } as const satisfies Record<string, boolean>;
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -64,5 +65,8 @@ const initializedFeatureFlags = Object.fromEntries(
 window.__featureFlags = initializedFeatureFlags;
 
 // Export initialized feature flags as named exports
-export const { DOMAIN_COMPATIBILITY, OPENID_AUTHENTICATION } =
-  initializedFeatureFlags;
+export const {
+  DOMAIN_COMPATIBILITY,
+  OPENID_AUTHENTICATION,
+  HARDWARE_KEY_TEST,
+} = initializedFeatureFlags;
