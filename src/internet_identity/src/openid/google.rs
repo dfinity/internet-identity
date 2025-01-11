@@ -71,7 +71,7 @@ async fn fetch_certs() -> Result<Vec<Jwk>, String> {
         ],
     };
 
-    let (response, ) = http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
+    let (response,) = http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
         .await
         .map_err(|(_, err)| err)?;
 
