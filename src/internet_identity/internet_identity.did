@@ -589,20 +589,6 @@ type IdRegFinishError = variant {
     StorageError: text;
 };
 
-type HttpOutcallResponse = record {
-   status: nat;
-   headers: vec record {
-       name: text;
-       value: text;
-   };
-   body: blob;
-};
-
-type HttpOutcallArgs = record {
-    response: HttpOutcallResponse;
-    context: blob;
-};
-
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -726,7 +712,4 @@ service : (opt InternetIdentityInit) -> {
     // Only callable by this IIs archive canister.
     fetch_entries: () -> (vec BufferedArchiveEntry);
     acknowledge_entries: (sequence_number: nat64) -> ();
-
-    // Transform Google certs HTTP outcall response
-    transform_google_certs : (HttpOutcallArgs) -> (HttpOutcallResponse) query;
 }

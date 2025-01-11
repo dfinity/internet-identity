@@ -31,7 +31,7 @@ identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa5
 
 # All IC deps
 candid.workspace = true
-ic-cdk.workspace = true
+ic-cdk = { workspace = true, features = ["transform-closure"] }
 ic-cdk-macros.workspace = true
 ic-cdk-timers.workspace = true
 ic-certification.workspace = true
