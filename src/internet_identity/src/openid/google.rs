@@ -28,7 +28,7 @@ struct GoogleCerts {
 }
 
 thread_local! {
-    static GOOGLE_CERTS: RefCell<Vec<Jwk>> = const { RefCell::new(vec![]) };
+    static CERTS: RefCell<Vec<Jwk>> = const { RefCell::new(vec![]) };
 }
 
 pub fn setup_timers() {
@@ -40,7 +40,7 @@ fn schedule_fetch_certs(delay: Option<u64>) {
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
             let new_delay = if let Ok(google_certs) = fetch_certs().await {
-                GOOGLE_CERTS.replace(google_certs);
+                CERTS.replace(google_certs);
                 FETCH_CERTS_INTERVAL
             } else {
                 // Try again earlier with backoff if fetch failed, the HTTP outcall responses
@@ -71,7 +71,7 @@ async fn fetch_certs() -> Result<Vec<Jwk>, String> {
         ],
     };
 
-    let (response, ) = http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
+    let (response,) = http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
         .await
         .map_err(|(_, err)| err)?;
 
