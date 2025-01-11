@@ -486,8 +486,7 @@
   },
   {
     "name": "Datapond",
-    "oneLiner": "A hub for exposing and tracing data used by AI to generate results.",
-    "website": "https://recheck.io/",
+    "website": "https://datapond.ai/",
     "logo": "ReCheck_logo.png"
   },
   {
@@ -686,6 +685,12 @@
     "logo": "icecube_logo.png"
   },
   {
+    "name": "Bridge 23",
+    "oneLiner": "Bridge23 is Your AI Employee Department",
+    "website": "https://bridge23.app",
+    "logo": "bridge23_logo.svg"
+  },
+  {
     "name": "Event Hub",
     "oneLiner": "Event Hub Broadcaster is an event-driven system managed by Attention DAO for connecting ecosystem projects on ICP.",
     "website": "https://attentiondao.app/dao",
@@ -742,6 +747,31 @@
     "name": "ICP Tokens",
     "website": "https://icptokens.net",
     "logo": "icptokens_logo.svg"
+  },
+  {
+    "name": "ICSpore",
+    "website": "https://qnoqa-vaaaa-aaaap-qhima-cai.icp0.io/",
+    "logo": "icspore_logo.png"
+  },
+  {
+    "name": "DAO Venture",
+    "website": "https://bpo6s-4qaaa-aaaap-acava-cai.icp0.io/",
+    "logo": "daoventure_logo.png"
+  },
+  {
+    "name": "Solutio",
+    "website": "https://home.solutio.one/",
+    "logo": "solutio_logo.svg"
+  },
+  {
+    "name": "Lendfinity",
+    "website": "https://www.lendfinity.xyz/",
+    "logo": "lendfinity_logo.svg"
+  },
+  {
+    "name": "CLOAD",
+    "website": "https://cload.one/",
+    "logo": "cload_logo.png"
   },
   {
     "name": "OpenChat",
