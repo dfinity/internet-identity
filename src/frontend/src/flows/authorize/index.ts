@@ -7,6 +7,7 @@ import { caretDownIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
@@ -19,6 +20,7 @@ import { nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
+import { addCurrentDeviceScreen } from "../addDevice/addCurrentDevice";
 import { Delegation, fetchDelegation } from "./fetchDelegation";
 import copyJson from "./index.json";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
@@ -210,6 +212,13 @@ const authenticate = async (
     allowPinRegistration: false,
     autoSelectionIdentity: autoSelectionIdentity,
   });
+
+  if (authSuccess.showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
+    await addCurrentDeviceScreen(
+      authSuccess.userNumber,
+      authSuccess.connection
+    );
+  }
 
   // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =

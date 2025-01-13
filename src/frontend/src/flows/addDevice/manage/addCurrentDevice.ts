@@ -27,17 +27,21 @@ const displayFailedToAddDevice = (error: Error) =>
   });
 
 /**
- * Add a new device (i.e. a device connected to the browser the user is
- * currently using, like a YubiKey, or FaceID, or, or. Not meant to be used to
- * add e.g. _another_ browser, macbook or iPhone.)
+ * Add a new device form the current browser.
+ *
+ * Used to add a device connected to the browser the user is
+ * currently using, like a YubiKey, or FaceID.
+ *
+ * Used to add current device in the current origin.
+ *
  * @param userNumber anchor to add the device to
  * @param connection authenticated II connection
  * @param devices already existing devices
  */
-export const addFIDODevice = async (
+export const addCurrentDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices: DeviceData[]
+  devices: Omit<DeviceData, "alias">[]
 ): Promise<void> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
