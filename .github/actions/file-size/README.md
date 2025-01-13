@@ -6,7 +6,7 @@ A GitHub Action for recording file sizes in git notes.
 
 ```yaml
 record-readme-size:
-  runs-on: ubuntu-22.04
+  runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/file-size
