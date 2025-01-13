@@ -31,6 +31,7 @@ mod archive;
 mod assets;
 mod authz_utils;
 
+mod constants;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -41,7 +42,6 @@ mod state;
 mod stats;
 mod storage;
 mod vc_mvp;
-mod constants;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
