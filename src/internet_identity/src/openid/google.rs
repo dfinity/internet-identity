@@ -205,9 +205,9 @@ fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), Signature
         rsa::BigUint::from_bytes_be(&n),
         rsa::BigUint::from_bytes_be(&e),
     )
-        .map_err(|_| {
-            SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-        })?;
+    .map_err(|_| {
+        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+    })?;
 
     rsa_key
         .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
