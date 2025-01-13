@@ -46,10 +46,10 @@ export const checkRequiredBrowserVersion = (
 /**
  * Checks if the user agent string supports Webauthn with Related Origin Requests.
  *
- * Safari >18: https://developer.apple.com/documentation/safari-release-notes/safari-18-release-notes
+ * Safari >=18: https://developer.apple.com/documentation/safari-release-notes/safari-18-release-notes
  * Firefox: Not supported yet
- * Chrome >128: https://web.dev/articles/webauthn-related-origin-requests#browser_support
- * Edge >128: https://passkeys.dev/device-support/#ror
+ * Chrome >=128: https://web.dev/articles/webauthn-related-origin-requests#browser_support
+ * Edge >=128: https://passkeys.dev/device-support/#ror
  *
  * @param userAgent
  * @returns {boolean}
