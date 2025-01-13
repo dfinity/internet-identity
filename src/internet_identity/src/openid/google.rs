@@ -184,6 +184,36 @@ pub fn verify(
     })
 }
 
+#[allow(clippy::needless_pass_by_value)]
+fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), SignatureVerificationError> {
+    if input.alg != RS256 {
+        return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
+    }
+
+    let hashed_input = Sha256::digest(input.signing_input);
+    let scheme = Pkcs1v15Sign::new::<Sha256>();
+    let JwkParamsRsa { n, e, .. } = jwk.try_rsa_params().map_err(|_| {
+        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+    })?;
+    let n = BASE64_URL_SAFE_NO_PAD.decode(n).map_err(|_| {
+        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+    })?;
+    let e = BASE64_URL_SAFE_NO_PAD.decode(e).map_err(|_| {
+        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+    })?;
+    let rsa_key = RsaPublicKey::new(
+        rsa::BigUint::from_bytes_be(&n),
+        rsa::BigUint::from_bytes_be(&e),
+    )
+        .map_err(|_| {
+            SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+        })?;
+
+    rsa_key
+        .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
+        .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
+}
+
 fn verify_claims(
     claims: &Claims,
     session_principal: &Principal,
@@ -213,36 +243,6 @@ fn verify_claims(
     }
 
     Ok(())
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), SignatureVerificationError> {
-    if input.alg != RS256 {
-        return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
-    }
-
-    let hashed_input = Sha256::digest(input.signing_input);
-    let scheme = Pkcs1v15Sign::new::<Sha256>();
-    let JwkParamsRsa { n, e, .. } = jwk.try_rsa_params().map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-    let n = BASE64_URL_SAFE_NO_PAD.decode(&n).map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-    let e = BASE64_URL_SAFE_NO_PAD.decode(&e).map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-    let rsa_key = RsaPublicKey::new(
-        rsa::BigUint::from_bytes_be(&n),
-        rsa::BigUint::from_bytes_be(&e),
-    )
-    .map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-
-    rsa_key
-        .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
-        .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
 }
 
 #[test]
