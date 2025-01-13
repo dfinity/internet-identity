@@ -41,6 +41,7 @@ mod state;
 mod stats;
 mod storage;
 mod vc_mvp;
+mod constants;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
