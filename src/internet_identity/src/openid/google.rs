@@ -330,10 +330,9 @@ fn should_return_credential() {
 
 #[test]
 fn cert_should_be_missing() {
-    let (jwt, _, session_principal, session_salt, timestamp, _) =
-        valid_verification_test_data();
+    let (jwt, _, session_principal, session_salt, timestamp, _) = valid_verification_test_data();
     CERTS.replace(vec![]);
-    
+
     assert_eq!(
         verify(&jwt, &session_principal, &session_salt, timestamp),
         Err("Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into())
@@ -359,8 +358,7 @@ fn signature_should_be_invalid() {
 
 #[test]
 fn issuer_should_be_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) =
-        valid_verification_test_data();
+    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
     let mut invalid_claims = claims;
     invalid_claims.iss = "invalid-issuer".into();
     assert_eq!(
@@ -376,8 +374,7 @@ fn issuer_should_be_invalid() {
 
 #[test]
 fn audience_should_be_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) =
-        valid_verification_test_data();
+    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
     let mut invalid_claims = claims;
     invalid_claims.aud = "invalid-audience".into();
     assert_eq!(
@@ -441,12 +438,7 @@ fn should_be_not_valid_yet() {
     let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
 
     assert_eq!(
-        verify_claims(
-            &claims,
-            &session_principal,
-            &session_salt,
-            timestamp - 1
-        ),
+        verify_claims(&claims, &session_principal, &session_salt, timestamp - 1),
         Err("JWT is not valid yet".into())
     );
 }
