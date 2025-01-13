@@ -395,6 +395,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
+    openid::setup_timers();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
