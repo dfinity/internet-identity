@@ -39,13 +39,14 @@ pub fn setup_timers() {
 fn schedule_fetch_certs(delay: Option<u64>) {
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
-            let new_delay = if let Ok(google_certs) = fetch_certs().await {
-                CERTS.replace(google_certs);
-                FETCH_CERTS_INTERVAL
-            } else {
+            let new_delay = match fetch_certs().await {
+                Ok(google_certs) => {
+                    CERTS.replace(google_certs);
+                    FETCH_CERTS_INTERVAL
+                }
                 // Try again earlier with backoff if fetch failed, the HTTP outcall responses
                 // aren't the same across nodes when we fetch at the moment of key rotation.
-                min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2)
+                Err(_) => min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2),
             };
             schedule_fetch_certs(Some(new_delay));
         });
@@ -94,7 +95,7 @@ fn transform_certs(response: HttpResponse) -> HttpResponse {
         serde_json::from_slice(response.body.as_slice()).unwrap_or_else(|_| trap("Invalid JSON"));
 
     let mut sorted_keys = certs.keys.clone();
-    sorted_keys.sort_by_key(|key| key.kid().unwrap().to_owned());
+    sorted_keys.sort_by_key(|key| key.kid().unwrap_or_else(|| trap("Invalid JSON")).to_owned());
 
     let body = serde_json::to_vec(&GoogleCerts { keys: sorted_keys })
         .unwrap_or_else(|_| trap("Invalid JSON"));
