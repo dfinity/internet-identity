@@ -15,7 +15,7 @@ import { logoutSection } from "$src/components/logout";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$src/config";
-import { OPENID_AUTHENTICATION } from "$src/featureFlags";
+import { DOMAIN_COMPATIBILITY, OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
@@ -50,6 +50,7 @@ import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
+import { addCurrentDeviceScreen } from "../addDevice/addCurrentDevice";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
@@ -116,6 +117,7 @@ export const authFlowManage = async (connection: Connection) => {
     userNumber,
     connection: authenticatedConnection,
     newAnchor,
+    showAddCurrentDevice,
   } = await authenticateBox({
     connection,
     i18n,
@@ -123,6 +125,10 @@ export const authFlowManage = async (connection: Connection) => {
     allowPinLogin: true,
     allowPinRegistration,
   });
+
+  if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
+    await addCurrentDeviceScreen(userNumber, authenticatedConnection);
+  }
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
