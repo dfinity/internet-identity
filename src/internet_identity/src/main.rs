@@ -393,7 +393,8 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         .clone()
         .map(|arg| arg.related_origins)
         .unwrap_or(state_related_origins);
-    let state_openid_google_client_id = persistent_state(|storage| storage.openid_google_client_id.clone());
+    let state_openid_google_client_id =
+        persistent_state(|storage| storage.openid_google_client_id.clone());
     let openid_google_client_id = maybe_arg
         .clone()
         .map(|arg| arg.openid_google_client_id)
