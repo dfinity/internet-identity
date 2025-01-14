@@ -151,7 +151,7 @@ async fn archive_change_required(archive_canister: Principal, config: &ArchiveCo
 
     if !status
         .init
-        .map_or(false, |init| init == config_to_init(config))
+        .is_some_and(|init| init == config_to_init(config))
     {
         // the init arguments have changed --> deployment required regardless of wasm hash
         return true;
