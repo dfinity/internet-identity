@@ -299,16 +299,16 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     Ok(())
 }
 
-#[cfg(not(test))]
-fn caller() -> Principal {
-    ic_cdk::caller()
-}
-
 #[cfg(test)]
 thread_local! {
     static TEST_CALLER: RefCell<Principal> = RefCell::new(Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap());
     static TEST_TIME: RefCell<u64> = const { RefCell::new(1_736_794_102_000_000_000) };
     static TEST_CERTS: RefCell<Vec<Jwk>> = RefCell::new(serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#).unwrap().keys);
+}
+
+#[cfg(not(test))]
+fn caller() -> Principal {
+    ic_cdk::caller()
 }
 
 #[cfg(test)]
