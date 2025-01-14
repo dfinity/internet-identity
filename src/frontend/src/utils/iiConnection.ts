@@ -415,12 +415,10 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    console.log("in da fromWebauthnCredentials");
     const rpIdOverride = await getAnchorRpId({
       userNumber,
       origin: window.location.origin,
     });
-    console.log("rpIdOverride", rpIdOverride);
     const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
@@ -439,7 +437,6 @@ export class Connection {
         ? rpIdOverride
         : findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
-    console.log("rpId", rpId);
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
