@@ -34,6 +34,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
+import { getAnchorRpId } from "$src/storage";
 import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
@@ -99,6 +100,9 @@ export type LoginSuccess = {
   connection: AuthenticatedConnection;
   userNumber: bigint;
   showAddCurrentDevice: boolean;
+  // `null` means that no RP ID was used.
+  // `undefined` means that the field doesn't apply.
+  rpIdUsed?: string | null;
 };
 
 export type RegFlowNextStep =
@@ -331,6 +335,8 @@ export class Connection {
         ),
         userNumber,
         showAddCurrentDevice: false,
+        // TODO: Change to the default RP ID when we implement ID-30
+        rpIdUsed: undefined,
       };
     }
 
@@ -409,6 +415,12 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
+    console.log("in da fromWebauthnCredentials");
+    const rpIdOverride = await getAnchorRpId({
+      userNumber,
+      origin: window.location.origin,
+    });
+    console.log("rpIdOverride", rpIdOverride);
     const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
@@ -420,8 +432,14 @@ export class Connection {
       currentOrigin
     );
     const rpId = dynamicRPIdEnabled
-      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+      ? // If `rpIdOverride` is `null` it means that last successful RP ID was `undefined`.
+        rpIdOverride === null
+        ? undefined
+        : typeof rpIdOverride === "string"
+        ? rpIdOverride
+        : findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
+    console.log("rpId", rpId);
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -472,11 +490,16 @@ export class Connection {
       actor
     );
 
+    // If RP ID is enabled and it's not set, we want to set it as so.
+    // `undefined` means that the field doesn't apply.
+    const rpIdUsed = dynamicRPIdEnabled && rpId === undefined ? null : rpId;
+
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
       showAddCurrentDevice: cancelledRpIds.size > 0,
+      rpIdUsed,
     };
   };
   fromIdentity = async (
@@ -498,6 +521,7 @@ export class Connection {
       userNumber,
       connection,
       showAddCurrentDevice: false,
+      rpIdUsed: undefined,
     };
   };
 

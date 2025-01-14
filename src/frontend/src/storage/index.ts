@@ -31,8 +31,30 @@ export const getAnchors = async (): Promise<bigint[]> => {
   return anchors;
 };
 
-/** Set the specified anchor as used "just now" */
-export const setAnchorUsed = async (userNumber: bigint) => {
+export const cleanUpRpIdMapper = async (userNumber: bigint) => {
+  await withStorage((storage) => {
+    const ix = userNumber.toString();
+    const anchors = storage.anchors;
+    const oldAnchor = anchors[ix];
+
+    if (isNullish(oldAnchor)) {
+      return storage;
+    }
+
+    storage.anchors[ix] = {
+      ...oldAnchor,
+      originRpIDMapper: {},
+    };
+
+    return storage;
+  });
+};
+
+/** Set the specified anchor as used "just now" along with which RP ID and in which II origin it was used */
+export const setAnchorUsed = async (
+  userNumber: bigint,
+  rpIdOriginPair?: { origin: string; rpId: string | null }
+) => {
   await withStorage((storage) => {
     const ix = userNumber.toString();
 
@@ -41,10 +63,18 @@ export const setAnchorUsed = async (userNumber: bigint) => {
       knownPrincipals: [],
     };
     const oldAnchor = anchors[ix] ?? defaultAnchor;
+    const originRpIDMapper = oldAnchor.originRpIDMapper ?? {};
+    if (rpIdOriginPair !== undefined) {
+      originRpIDMapper[rpIdOriginPair.origin] = rpIdOriginPair.rpId;
+    }
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
-    storage.anchors[ix] = { ...oldAnchor, lastUsedTimestamp: nowMillis() };
+    storage.anchors[ix] = {
+      ...oldAnchor,
+      lastUsedTimestamp: nowMillis(),
+      originRpIDMapper,
+    };
     return storage;
   });
 };
@@ -79,6 +109,39 @@ export const getAnchorByPrincipal = async ({
   }
 
   return;
+};
+
+/**
+ * Returns the last RP ID successfully used for the specific anchor in the specific ii origin.
+ *
+ * @param params
+ * @param params.userNumber The anchor number.
+ * @param params.origin The origin of the ii.
+ * @returns {string | null | undefined} The RP ID used for the specific anchor in the specific ii origin.
+ * - `string` is the RP ID to be used.
+ * - `null` means that the RP ID used was `undefined`.
+ * - `undefined` means that the RP ID used was not found.
+ */
+export const getAnchorRpId = async ({
+  userNumber,
+  origin,
+}: {
+  userNumber: bigint;
+  origin: string;
+}): Promise<string | undefined | null> => {
+  const storage = await readStorage();
+  const anchors = storage.anchors;
+
+  const anchorData = anchors[userNumber.toString()];
+  if (
+    isNullish(anchorData) ||
+    isNullish(anchorData.originRpIDMapper) ||
+    anchorData.originRpIDMapper[origin] === undefined
+  ) {
+    return undefined;
+  }
+
+  return anchorData.originRpIDMapper[origin];
 };
 
 /** Look up an anchor by principal, if it is the last used for the given origin.
@@ -653,9 +716,19 @@ const PrincipalDataV4 = z.object({
   lastUsedTimestamp: z.number(),
 });
 
+/**
+ * Mapper of which RP ID was used to get the credential for each origin.
+ *
+ * Record<ii_origin, rp_id>
+ * rp_id can be `null` if the RP ID used was `undefined`.
+ *   It means that we can skip the RP ID calculation and we need to set it as `undeifined`.
+ */
+const originRpIDMapper = z.record(z.string().nullable());
+
 const AnchorV4 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
+  originRpIDMapper: originRpIDMapper.optional(),
 
   knownPrincipals: z.array(PrincipalDataV4),
 });

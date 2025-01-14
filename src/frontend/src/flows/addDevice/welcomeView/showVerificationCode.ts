@@ -178,7 +178,11 @@ const handlePollResult = async ({
   result: "match" | "canceled" | typeof AsyncCountdown.timeout;
 }): Promise<"ok" | "canceled"> => {
   if (result === "match") {
-    await setAnchorUsed(userNumber);
+    // TODO: Set to default rpId when implementing ID-30
+    await setAnchorUsed(userNumber, {
+      rpId: null,
+      origin: window.location.origin,
+    });
     return "ok";
   } else if (result === AsyncCountdown.timeout) {
     await displayError({
