@@ -134,8 +134,6 @@ function build_canister() {
     echo Running cargo build "${cargo_build_args[@]}"
     echo RUSTFLAGS: "$RUSTFLAGS"
 
-    [ -n "${II_OPENID_GOOGLE_CLIENT_ID:-}" ] && export II_OPENID_GOOGLE_CLIENT_ID
-
     RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
 
     if [ "$ONLY_DEPS" != "1" ]

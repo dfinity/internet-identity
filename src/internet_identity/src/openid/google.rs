@@ -1,13 +1,20 @@
-use crate::constants;
 use crate::openid::OpenIdCredential;
+use crate::openid::OpenIdProvider;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
 use candid::{Deserialize, Nat};
-use ic_cdk::api::management_canister::http_request::{
-    http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
-};
-use ic_cdk::{spawn, trap};
+#[cfg(not(test))]
+use ic_cdk::api::management_canister::http_request::http_request_with_closure;
+#[cfg(not(test))]
+use ic_cdk::api::management_canister::http_request::CanisterHttpRequestArgument;
+#[cfg(not(test))]
+use ic_cdk::api::management_canister::http_request::HttpMethod;
+use ic_cdk::api::management_canister::http_request::{HttpHeader, HttpResponse};
+#[cfg(not(test))]
+use ic_cdk::spawn;
+use ic_cdk::trap;
+#[cfg(not(test))]
 use ic_cdk_timers::set_timer;
 use ic_stable_structures::Storable;
 use identity_jose::jwk::{Jwk, JwkParamsRsa};
@@ -16,29 +23,33 @@ use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
 };
-use internet_identity_interface::internet_identity::types::{MetadataEntryV2, Timestamp};
+use internet_identity_interface::internet_identity::types::MetadataEntryV2;
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
+#[cfg(not(test))]
 use std::cmp::min;
 use std::collections::HashMap;
 use std::convert::Into;
+use std::rc::Rc;
+#[cfg(not(test))]
 use std::time::Duration;
 
-pub const ISSUER: &str = "https://accounts.google.com";
+const ISSUER: &str = "https://accounts.google.com";
 
-const AUDIENCE: &str = constants::OPENID_GOOGLE_CLIENT_ID;
-
+#[cfg(not(test))]
 const CERTS_URL: &str = "https://www.googleapis.com/oauth2/v3/certs";
 
 // The amount of cycles needed to make the HTTP outcall with a large enough margin
+#[cfg(not(test))]
 const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
 const HTTP_STATUS_OK: u8 = 200;
 
 // Fetch the Google certs every hour, the responses are always
 // valid for at least 5 hours so that should be enough margin.
+#[cfg(not(test))]
 const FETCH_CERTS_INTERVAL: u64 = 60 * 60;
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
@@ -57,38 +68,100 @@ struct Claims {
     aud: String,
     nonce: String,
     iat: u64,
-    // Google specific claims
-    email: String,
-    name: String,
-    picture: String,
+    // Optional Google specific claims
+    email: Option<String>,
+    name: Option<String>,
+    picture: Option<String>,
 }
 
-thread_local! {
-    static CERTS: RefCell<Vec<Jwk>> = const { RefCell::new(vec![]) };
+pub struct Provider {
+    client_id: String,
+    certs: Rc<RefCell<Vec<Jwk>>>,
 }
 
-pub fn setup_timers() {
-    // Fetch the certs directly after canister initialization.
-    schedule_fetch_certs(None);
+impl OpenIdProvider for Provider {
+    fn issuer(&self) -> &'static str {
+        ISSUER
+    }
+
+    fn verify(&self, jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
+        // Decode JWT and verify claims
+        let validation_item = Decoder::new()
+            .decode_compact_serialization(jwt.as_bytes(), None)
+            .map_err(|_| "Unable to decode JWT")?;
+        let claims: Claims = serde_json::from_slice(validation_item.claims())
+            .map_err(|_| "Unable to decode claims or expected claims are missing")?;
+        verify_claims(&self.client_id, &claims, salt)?;
+
+        // Verify JWT signature
+        let kid = validation_item.kid().ok_or("JWT is missing kid")?;
+        let certs = self.certs.borrow();
+        let cert = certs
+            .iter()
+            .find(|cert| cert.kid().is_some_and(|v| v == kid))
+            .ok_or(format!("Certificate not found for {kid}"))?;
+        validation_item
+            .verify(&JwsVerifierFn::from(verify_signature), cert)
+            .map_err(|_| "Invalid signature")?;
+
+        // Return credential with Google specific metadata
+        let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
+        if let Some(email) = claims.email {
+            metadata.insert("email".into(), MetadataEntryV2::String(email));
+        }
+        if let Some(name) = claims.name {
+            metadata.insert("name".into(), MetadataEntryV2::String(name));
+        }
+        if let Some(picture) = claims.picture {
+            metadata.insert("picture".into(), MetadataEntryV2::String(picture));
+        }
+        Ok(OpenIdCredential {
+            iss: claims.iss,
+            sub: claims.sub,
+            aud: claims.aud,
+            principal: Principal::anonymous(),
+            last_usage_timestamp: time(),
+            metadata,
+        })
+    }
 }
 
-fn schedule_fetch_certs(delay: Option<u64>) {
+impl Provider {
+    #[cfg(not(test))]
+    pub fn create(client_id: String) -> Provider {
+        let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
+        schedule_fetch_certs(Rc::clone(&certs), None);
+        Provider { client_id, certs }
+    }
+
+    #[cfg(test)]
+    pub fn create(client_id: String) -> Provider {
+        let certs = Rc::new(RefCell::new(
+            TEST_CERTS.with(|certs| certs.borrow().clone()),
+        ));
+        Provider { client_id, certs }
+    }
+}
+
+#[cfg(not(test))]
+fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u64>) {
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
             let new_delay = match fetch_certs().await {
                 Ok(google_certs) => {
-                    CERTS.replace(google_certs);
+                    certs_reference.replace(google_certs);
                     FETCH_CERTS_INTERVAL
                 }
                 // Try again earlier with backoff if fetch failed, the HTTP outcall responses
                 // aren't the same across nodes when we fetch at the moment of key rotation.
                 Err(_) => min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2),
             };
-            schedule_fetch_certs(Some(new_delay));
+            schedule_fetch_certs(certs_reference, Some(new_delay));
         });
     });
 }
 
+#[cfg(not(test))]
 async fn fetch_certs() -> Result<Vec<Jwk>, String> {
     let request = CanisterHttpRequestArgument {
         url: CERTS_URL.into(),
@@ -146,61 +219,44 @@ fn transform_certs(response: HttpResponse) -> HttpResponse {
     }
 }
 
-pub fn verify(
-    jwt: &str,
-    session_principal: &Principal,
-    session_salt: &[u8; 32],
-    timestamp: Timestamp,
-) -> Result<OpenIdCredential, String> {
-    let validation_item = Decoder::new()
-        .decode_compact_serialization(jwt.as_bytes(), None)
-        .map_err(|_| "Unable to decode JWT")?;
-    let kid = validation_item.kid().ok_or("JWT is missing kid")?;
-    let certs = CERTS.with(|certs| certs.borrow().clone());
-    let cert = certs
-        .iter()
-        .find(|cert| cert.kid().is_some_and(|v| v == kid))
-        .ok_or(format!("Certificate not found for {kid}"))?;
-
-    let claims: Claims = serde_json::from_slice(validation_item.claims())
-        .map_err(|_| "Unable to decode claims or expected claims are missing")?;
-
-    validation_item
-        .verify(&JwsVerifierFn::from(verify_signature), cert)
-        .map_err(|_| "Invalid signature")?;
-    verify_claims(&claims, session_principal, session_salt, timestamp)?;
-
-    Ok(OpenIdCredential {
-        iss: claims.iss,
-        sub: claims.sub,
-        aud: claims.aud,
-        principal: Principal::anonymous(),
-        last_usage_timestamp: timestamp,
-        metadata: HashMap::from([
-            ("email".into(), MetadataEntryV2::String(claims.email)),
-            ("name".into(), MetadataEntryV2::String(claims.name)),
-            ("picture".into(), MetadataEntryV2::String(claims.picture)),
-        ]),
-    })
-}
-
+/// Verifier implementation for `identity_jose` that verifies the signature of a JWT.
+///
+/// - `input`: A `VerificationInput` struct containing the JWT's algorithm (`alg`),
+///   the signing input (payload to be hashed and verified), and the decoded signature.
+/// - `jwk`: A reference to a `Jwk` (JSON Web Key) that contains the RSA public key
+///   parameters (`n` and `e`) used to verify the JWT signature.
 #[allow(clippy::needless_pass_by_value)]
 fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), SignatureVerificationError> {
+    // Ensure the algorithm specified in the JWT header matches the expected algorithm (RS256).
+    // JSON Web Keys (JWK) returned from Google API (v3) always use RSA with SHA-256.
+    // If the algorithm does not match, return an UnsupportedAlg error.
     if input.alg != RS256 {
         return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
     }
 
+    // Compute the SHA-256 hash of the JWT payload (the signing input).
+    // This hashed value will be used for signature verification.
     let hashed_input = Sha256::digest(input.signing_input);
+
+    // Define the signature scheme to be used for verification (RSA PKCS#1 v1.5 with SHA-256).
     let scheme = Pkcs1v15Sign::new::<Sha256>();
+
+    // Extract the RSA parameters (modulus 'n' and exponent 'e') from the JWK.
     let JwkParamsRsa { n, e, .. } = jwk.try_rsa_params().map_err(|_| {
         SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
     })?;
+
+    // Decode the base64-url encoded modulus 'n' of the RSA public key.
     let n = BASE64_URL_SAFE_NO_PAD.decode(n).map_err(|_| {
         SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
     })?;
+
+    // Decode the base64-url encoded public exponent 'e' of the RSA public key.
     let e = BASE64_URL_SAFE_NO_PAD.decode(e).map_err(|_| {
         SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
     })?;
+
+    // Construct the RSA public key using the decoded modulus and exponent.
     let rsa_key = RsaPublicKey::new(
         rsa::BigUint::from_bytes_be(&n),
         rsa::BigUint::from_bytes_be(&e),
@@ -209,40 +265,64 @@ fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), Signature
         SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
     })?;
 
+    // Verify the JWT signature using the RSA public key and the defined signature scheme.
+    // If the signature is invalid, return an InvalidSignature error.
     rsa_key
         .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
         .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
 }
 
-fn verify_claims(
-    claims: &Claims,
-    session_principal: &Principal,
-    session_salt: &[u8; 32],
-    timestamp: Timestamp,
-) -> Result<(), String> {
+fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result<(), String> {
+    let now = time();
     let mut hasher = Sha256::new();
-    hasher.update(session_salt);
-    hasher.update(session_principal.to_bytes());
+    hasher.update(salt);
+    hasher.update(caller().to_bytes());
     let hash: [u8; 32] = hasher.finalize().into();
     let expected_nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
 
     if claims.iss != ISSUER {
         return Err(format!("Invalid issuer: {}", claims.iss));
     }
-    if claims.aud != AUDIENCE {
+    if &claims.aud != client_id {
         return Err(format!("Invalid audience: {}", claims.aud));
     }
     if claims.nonce != expected_nonce {
         return Err(format!("Invalid nonce: {}", claims.nonce));
     }
-    if timestamp > claims.iat * 1_000_000_000 + MAX_VALIDITY_WINDOW {
+    if now > claims.iat * 1_000_000_000 + MAX_VALIDITY_WINDOW {
         return Err("JWT is no longer valid".into());
     }
-    if timestamp < claims.iat * 1_000_000_000 {
+    if now < claims.iat * 1_000_000_000 {
         return Err("JWT is not valid yet".into());
     }
 
     Ok(())
+}
+
+#[cfg(not(test))]
+fn caller() -> Principal {
+    ic_cdk::caller()
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_CALLER: RefCell<Principal> = RefCell::new(Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap());
+    static TEST_TIME: RefCell<u64> = const { RefCell::new(1_736_794_102_000_000_000) };
+    static TEST_CERTS: RefCell<Vec<Jwk>> = RefCell::new(serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#).unwrap().keys);
+}
+
+#[cfg(test)]
+fn caller() -> Principal {
+    TEST_CALLER.with(|caller| *caller.borrow())
+}
+
+#[cfg(not(test))]
+fn time() -> u64 {
+    ic_cdk::api::time()
+}
+#[cfg(test)]
+fn time() -> u64 {
+    TEST_TIME.with(|time| *time.borrow())
 }
 
 #[test]
@@ -265,85 +345,76 @@ fn should_transform_certs_to_same() {
 }
 
 #[cfg(test)]
-fn valid_verification_test_data() -> (String, Certs, Principal, [u8; 32], Timestamp, Claims) {
+fn test_data() -> (String, [u8; 32], Claims) {
     // This JWT is for testing purposes, it's already been expired before this commit has been made,
     // additionally the audience of this JWT is a test Google client registration, not production.
     let jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRkMTI1ZDVmNDYyZmJjNjAxNGFlZGFiODFkZGYzYmNlZGFiNzA4NDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NTQzMTk5NDYxOS1jYmJmZ3RuN28wcHAwZHBmY2cybDY2YmM0cmNnN3FidS5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjQ1NDMxOTk0NjE5LWNiYmZndG43bzBwcDBkcGZjZzJsNjZiYzRyY2c3cWJ1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTE1MTYwNzE2MzM4ODEzMDA2OTAyIiwiaGQiOiJkZmluaXR5Lm9yZyIsImVtYWlsIjoidGhvbWFzLmdsYWRkaW5lc0BkZmluaXR5Lm9yZyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6ImV0aURhTEdjUmRtNS1yY3FlMFpRVWVNZ3BmcDR2OVRPT1lVUGJoUng3bkkiLCJuYmYiOjE3MzY3OTM4MDIsIm5hbWUiOiJUaG9tYXMgR2xhZGRpbmVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lTTWxja0M1RjZxaGlOWnpfREZtWGp5OTY4LXlPaEhPTjR4TGhRdXVNSDNuQlBXQT1zOTYtYyIsImdpdmVuX25hbWUiOiJUaG9tYXMiLCJmYW1pbHlfbmFtZSI6IkdsYWRkaW5lcyIsImlhdCI6MTczNjc5NDEwMiwiZXhwIjoxNzM2Nzk3NzAyLCJqdGkiOiIwMWM1NmYyMGM1MzFkNDhhYjU0ZDMwY2I4ZmRiNzU0MmM0ZjdmNjg4In0.f47b0HNskm-85sT5XtoRzORnfobK2nzVFG8jTH6eS_qAyu0ojNDqVsBtGN4A7HdjDDCOIMSu-R5e413xuGJIWLadKrLwXmguRFo3SzLrXeja-A-rP-axJsb5QUJZx1mwYd1vUNzLB9bQojU3Na6Hdvq09bMtTwaYdCn8Q9v3RErN-5VUxELmSbSXbf10A-IsS7jtzPjxHV6ueq687Ppeww6Q7AGGFB4t9H8qcDbI1unSdugX3-MfMWJLzVHbVxDgfAcLem1c2iAspvv_D5aPLeJF5HLRR2zg-Jil1BFTOoEPAAPFr1MEsvDMWSTt5jLyuMrnS4jiMGudGGPV4DDDww";
-    let certs: Certs = serde_json::from_str(r#"{
-          "keys": [
-            {
-              "n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q",
-              "use": "sig",
-              "kty": "RSA",
-              "alg": "RS256",
-              "kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847",
-              "e": "AQAB"
-            }
-          ]
-        }"#).unwrap();
-    let session_principal =
-        Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae")
-            .unwrap();
-    let session_salt: [u8; 32] = [
+    let salt: [u8; 32] = [
         143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83, 81,
         139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
     ];
-    let timestamp: u64 = 1_736_794_102_000_000_000;
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .unwrap();
     let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
 
-    (
-        jwt.into(),
-        certs,
-        session_principal,
-        session_salt,
-        timestamp,
-        claims,
-    )
+    (jwt.into(), salt, claims)
 }
 
 #[test]
 fn should_return_credential() {
-    let (jwt, certs, session_principal, session_salt, timestamp, claims) =
-        valid_verification_test_data();
-    CERTS.replace(certs.keys);
+    let (jwt, salt, claims) = test_data();
+    let provider = Provider::create(claims.aud.clone());
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,
         aud: claims.aud,
         principal: Principal::anonymous(),
-        last_usage_timestamp: timestamp,
+        last_usage_timestamp: time(),
         metadata: HashMap::from([
-            ("email".into(), MetadataEntryV2::String(claims.email)),
-            ("name".into(), MetadataEntryV2::String(claims.name)),
-            ("picture".into(), MetadataEntryV2::String(claims.picture)),
+            (
+                "email".into(),
+                MetadataEntryV2::String(claims.email.unwrap()),
+            ),
+            ("name".into(), MetadataEntryV2::String(claims.name.unwrap())),
+            (
+                "picture".into(),
+                MetadataEntryV2::String(claims.picture.unwrap()),
+            ),
         ]),
     };
 
+    assert_eq!(provider.verify(&jwt, &salt), Ok(credential));
+}
+
+#[test]
+fn should_return_error_when_encoding_invalid() {
+    let (_, salt, claims) = test_data();
+    let provider = Provider::create(claims.aud.clone());
+    let invalid_jwt = "invalid-jwt";
+
     assert_eq!(
-        verify(&jwt, &session_principal, &session_salt, timestamp),
-        Ok(credential)
+        provider.verify(invalid_jwt, &salt),
+        Err("Unable to decode JWT".into())
     );
 }
 
 #[test]
-fn cert_should_be_missing() {
-    let (jwt, _, session_principal, session_salt, timestamp, _) = valid_verification_test_data();
-    CERTS.replace(vec![]);
+fn should_return_error_when_cert_missing() {
+    TEST_CERTS.replace(vec![]);
+    let (jwt, salt, claims) = test_data();
+    let provider = Provider::create(claims.aud.clone());
 
     assert_eq!(
-        verify(&jwt, &session_principal, &session_salt, timestamp),
+        provider.verify(&jwt, &salt),
         Err("Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into())
     );
 }
 
 #[test]
-fn signature_should_be_invalid() {
-    let (jwt, certs, session_principal, session_salt, timestamp, _) =
-        valid_verification_test_data();
-    CERTS.replace(certs.keys);
+fn should_return_error_when_signature_invalid() {
+    let (jwt, salt, claims) = test_data();
+    let provider = Provider::create(claims.aud.clone());
     let chunks: Vec<&str> = jwt.split('.').collect();
     let header = chunks[0];
     let payload = chunks[1];
@@ -351,94 +422,86 @@ fn signature_should_be_invalid() {
     let invalid_jwt = [header, payload, invalid_signature].join(".");
 
     assert_eq!(
-        verify(&invalid_jwt, &session_principal, &session_salt, timestamp),
+        provider.verify(&invalid_jwt, &salt),
         Err("Invalid signature".into())
     );
 }
 
 #[test]
-fn issuer_should_be_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
+fn should_return_error_when_invalid_issuer() {
+    let (_, salt, claims) = test_data();
+    let client_id = claims.aud.clone();
     let mut invalid_claims = claims;
     invalid_claims.iss = "invalid-issuer".into();
+
     assert_eq!(
-        verify_claims(
-            &invalid_claims,
-            &session_principal,
-            &session_salt,
-            timestamp
-        ),
+        verify_claims(&client_id, &invalid_claims, &salt),
         Err(format!("Invalid issuer: {}", invalid_claims.iss))
     );
 }
 
 #[test]
-fn audience_should_be_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
+fn should_return_error_when_invalid_audience() {
+    let (_, salt, claims) = test_data();
+    let client_id = claims.aud.clone();
     let mut invalid_claims = claims;
     invalid_claims.aud = "invalid-audience".into();
+
     assert_eq!(
-        verify_claims(
-            &invalid_claims,
-            &session_principal,
-            &session_salt,
-            timestamp
-        ),
+        verify_claims(&client_id, &invalid_claims, &salt),
         Err(format!("Invalid audience: {}", invalid_claims.aud))
     );
 }
 
 #[test]
-fn nonce_should_be_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
-    let invalid_session_principal =
-        Principal::from_text("necp6-24oof-6e2i2-xg7fk-pawxw-nlol2-by5bb-mltvt-sazk6-nqrzz-zae")
-            .unwrap();
-    let invalid_session_salt: [u8; 32] = [
+fn should_return_error_when_invalid_salt() {
+    let (_, _, claims) = test_data();
+    let client_id = &claims.aud;
+    let invalid_salt: [u8; 32] = [
         143, 79, 58, 224, 18, 15, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83, 81, 139,
         161, 218, 224, 243, 4, 120, 26, 123, 229, 242, 200, 189,
     ];
 
     assert_eq!(
-        verify_claims(
-            &claims,
-            &invalid_session_principal,
-            &session_salt,
-            timestamp
-        ),
-        Err("Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into())
-    );
-    assert_eq!(
-        verify_claims(
-            &claims,
-            &session_principal,
-            &invalid_session_salt,
-            timestamp
-        ),
+        verify_claims(client_id, &claims, &invalid_salt),
         Err("Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into())
     );
 }
 
 #[test]
-fn should_be_no_longer_invalid() {
-    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
+fn should_return_error_when_invalid_caller() {
+    TEST_CALLER.replace(
+        Principal::from_text("necp6-24oof-6e2i2-xg7fk-pawxw-nlol2-by5bb-mltvt-sazk6-nqrzz-zae")
+            .unwrap(),
+    );
+    let (_, salt, claims) = test_data();
+    let client_id = &claims.aud;
 
     assert_eq!(
-        verify_claims(
-            &claims,
-            &session_principal,
-            &session_salt,
-            timestamp + MAX_VALIDITY_WINDOW + 1
-        ),
+        verify_claims(client_id, &claims, &salt),
+        Err("Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_no_longer_valid() {
+    TEST_TIME.replace(time() + MAX_VALIDITY_WINDOW + 1);
+    let (_, salt, claims) = test_data();
+    let client_id = &claims.aud;
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
         Err("JWT is no longer valid".into())
     );
 }
 #[test]
-fn should_be_not_valid_yet() {
-    let (_, _, session_principal, session_salt, timestamp, claims) = valid_verification_test_data();
+fn should_return_error_when_not_valid_yet() {
+    TEST_TIME.replace(time() - 1);
+    let (_, salt, claims) = test_data();
+    let client_id = &claims.aud;
 
     assert_eq!(
-        verify_claims(&claims, &session_principal, &session_salt, timestamp - 1),
+        verify_claims(client_id, &claims, &salt),
         Err("JWT is not valid yet".into())
     );
 }

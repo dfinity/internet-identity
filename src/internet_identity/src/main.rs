@@ -31,7 +31,6 @@ mod archive;
 mod assets;
 mod authz_utils;
 
-mod constants;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -349,6 +348,7 @@ fn config() -> InternetIdentityInit {
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
+        openid_google_client_id: persistent_state.openid_google_client_id.clone(),
     })
 }
 
@@ -388,15 +388,20 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let state_related_origins = state::persistent_state(|storage| storage.related_origins.clone());
+    let state_related_origins = persistent_state(|storage| storage.related_origins.clone());
     let related_origins = maybe_arg
         .clone()
         .map(|arg| arg.related_origins)
         .unwrap_or(state_related_origins);
+    let state_openid_google_client_id = persistent_state(|storage| storage.openid_google_client_id.clone());
+    let openid_google_client_id = maybe_arg
+        .clone()
+        .map(|arg| arg.openid_google_client_id)
+        .unwrap_or(state_openid_google_client_id);
     init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
-    openid::setup_timers();
+    openid_google_client_id.map(openid::setup_google);
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
