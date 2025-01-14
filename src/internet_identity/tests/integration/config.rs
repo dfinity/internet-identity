@@ -32,6 +32,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
             },
         }),
         related_origins: None,
+        openid_google_client_id: None,
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -71,6 +72,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
+        openid_google_client_id: None,
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -115,6 +117,7 @@ fn should_override_partially() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
+        openid_google_client_id: None,
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -136,6 +139,7 @@ fn should_override_partially() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: Some(new_captcha.clone()),
         related_origins: None,
+        openid_google_client_id: None,
     };
 
     let _ =
@@ -160,6 +164,7 @@ fn should_override_partially() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
+        openid_google_client_id: None,
     };
 
     let _ =
