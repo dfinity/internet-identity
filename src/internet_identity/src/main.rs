@@ -388,21 +388,20 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let state_related_origins = persistent_state(|storage| storage.related_origins.clone());
-    let related_origins = maybe_arg
-        .clone()
-        .map(|arg| arg.related_origins)
-        .unwrap_or(state_related_origins);
-    let state_openid_google_client_id =
-        persistent_state(|storage| storage.openid_google_client_id.clone());
-    let openid_google_client_id = maybe_arg
-        .clone()
-        .map(|arg| arg.openid_google_client_id)
-        .unwrap_or(state_openid_google_client_id);
+    let related_origins = maybe_arg.clone().map_or_else(
+        || persistent_state(|storage| storage.related_origins.clone()),
+        |arg| arg.related_origins,
+    );
+    let openid_google_client_id = maybe_arg.clone().map_or_else(
+        || persistent_state(|storage| storage.openid_google_client_id.clone()),
+        |arg| arg.openid_google_client_id,
+    );
     init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
-    openid_google_client_id.map(openid::setup_google);
+    if let Some(client_id) = openid_google_client_id {
+        openid::setup_google(client_id);
+    }
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
