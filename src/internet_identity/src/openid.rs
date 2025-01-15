@@ -32,11 +32,8 @@ thread_local! {
 }
 
 pub fn setup_google(client_id: String) {
-    OPEN_ID_PROVIDERS.with(|providers| {
-        providers
-            .borrow_mut()
-            .push(Box::new(google::Provider::create(client_id)));
-    });
+    OPEN_ID_PROVIDERS
+        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(client_id))));
 }
 
 #[allow(unused)]
@@ -47,9 +44,8 @@ pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
     let claims: PartialClaims =
         serde_json::from_slice(validation_item.claims()).map_err(|_| "Unable to decode claims")?;
 
-    OPEN_ID_PROVIDERS.with(|providers| {
+    OPEN_ID_PROVIDERS.with_borrow(|providers| {
         match providers
-            .borrow()
             .iter()
             .find(|provider| provider.issuer() == claims.iss)
         {
@@ -61,6 +57,7 @@ pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
 
 #[cfg(test)]
 struct ExampleProvider;
+
 #[cfg(test)]
 impl OpenIdProvider for ExampleProvider {
     fn issuer(&self) -> &'static str {
@@ -71,6 +68,7 @@ impl OpenIdProvider for ExampleProvider {
         Ok(self.credential())
     }
 }
+
 #[cfg(test)]
 impl ExampleProvider {
     fn credential(&self) -> OpenIdCredential {

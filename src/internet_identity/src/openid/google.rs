@@ -4,18 +4,8 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
 use candid::{Deserialize, Nat};
-#[cfg(not(test))]
-use ic_cdk::api::management_canister::http_request::http_request_with_closure;
-#[cfg(not(test))]
-use ic_cdk::api::management_canister::http_request::CanisterHttpRequestArgument;
-#[cfg(not(test))]
-use ic_cdk::api::management_canister::http_request::HttpMethod;
 use ic_cdk::api::management_canister::http_request::{HttpHeader, HttpResponse};
-#[cfg(not(test))]
-use ic_cdk::spawn;
 use ic_cdk::trap;
-#[cfg(not(test))]
-use ic_cdk_timers::set_timer;
 use ic_stable_structures::Storable;
 use identity_jose::jwk::{Jwk, JwkParamsRsa};
 use identity_jose::jws::JwsAlgorithm::RS256;
@@ -27,14 +17,10 @@ use internet_identity_interface::internet_identity::types::MetadataEntryV2;
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::cell::RefCell;
-#[cfg(not(test))]
-use std::cmp::min;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
-#[cfg(not(test))]
-use std::time::Duration;
 
 const ISSUER: &str = "https://accounts.google.com";
 
@@ -50,11 +36,13 @@ const HTTP_STATUS_OK: u8 = 200;
 // Fetch the Google certs every hour, the responses are always
 // valid for at least 5 hours so that should be enough margin.
 #[cfg(not(test))]
-const FETCH_CERTS_INTERVAL: u64 = 60 * 60;
+const FETCH_CERTS_INTERVAL: u64 = 60 * 60; // 1 hour in seconds
+
+const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
-const MAX_VALIDITY_WINDOW: u64 = 60_000_000_000; // 5 minutes in nanos, same as ingress expiry
+const MAX_VALIDITY_WINDOW: u64 = 5 * 60 * NANOSECONDS_PER_SECOND; // 5 minutes in nanos, same as ingress expiry
 
 #[derive(Serialize, Deserialize)]
 struct Certs {
@@ -127,24 +115,27 @@ impl OpenIdProvider for Provider {
 }
 
 impl Provider {
-    #[cfg(not(test))]
     pub fn create(client_id: String) -> Provider {
-        let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
-        schedule_fetch_certs(Rc::clone(&certs), None);
-        Provider { client_id, certs }
-    }
+        #[cfg(test)]
+        let certs = Rc::new(RefCell::new(TEST_CERTS.take()));
 
-    #[cfg(test)]
-    pub fn create(client_id: String) -> Provider {
-        let certs = Rc::new(RefCell::new(
-            TEST_CERTS.with(|certs| certs.borrow().clone()),
-        ));
+        #[cfg(not(test))]
+        let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
+
+        #[cfg(not(test))]
+        schedule_fetch_certs(Rc::clone(&certs), None);
+
         Provider { client_id, certs }
     }
 }
 
 #[cfg(not(test))]
 fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u64>) {
+    use ic_cdk::spawn;
+    use ic_cdk_timers::set_timer;
+    use std::cmp::min;
+    use std::time::Duration;
+
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
             let new_delay = match fetch_certs().await {
@@ -163,6 +154,10 @@ fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u6
 
 #[cfg(not(test))]
 async fn fetch_certs() -> Result<Vec<Jwk>, String> {
+    use ic_cdk::api::management_canister::http_request::{
+        http_request_with_closure, CanisterHttpRequestArgument, HttpMethod,
+    };
+
     let request = CanisterHttpRequestArgument {
         url: CERTS_URL.into(),
         method: HttpMethod::GET,
@@ -219,6 +214,30 @@ fn transform_certs(response: HttpResponse) -> HttpResponse {
     }
 }
 
+fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
+    // Extract the RSA parameters (modulus 'n' and exponent 'e') from the JWK.
+    let JwkParamsRsa { n, e, .. } = jwk
+        .try_rsa_params()
+        .map_err(|_| "Unable to extract modulus and exponent")?;
+
+    // Decode the base64-url encoded modulus 'n' of the RSA public key.
+    let n = BASE64_URL_SAFE_NO_PAD
+        .decode(n)
+        .map_err(|_| "Unable to decode modulus")?;
+
+    // Decode the base64-url encoded public exponent 'e' of the RSA public key.
+    let e = BASE64_URL_SAFE_NO_PAD
+        .decode(e)
+        .map_err(|_| "Unable to decode exponent")?;
+
+    // Construct the RSA public key using the decoded modulus and exponent.
+    RsaPublicKey::new(
+        rsa::BigUint::from_bytes_be(&n),
+        rsa::BigUint::from_bytes_be(&e),
+    )
+    .map_err(|_| "Unable to construct RSA public key".into())
+}
+
 /// Verifier implementation for `identity_jose` that verifies the signature of a JWT.
 ///
 /// - `input`: A `VerificationInput` struct containing the JWT's algorithm (`alg`),
@@ -241,33 +260,14 @@ fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), Signature
     // Define the signature scheme to be used for verification (RSA PKCS#1 v1.5 with SHA-256).
     let scheme = Pkcs1v15Sign::new::<Sha256>();
 
-    // Extract the RSA parameters (modulus 'n' and exponent 'e') from the JWK.
-    let JwkParamsRsa { n, e, .. } = jwk.try_rsa_params().map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-
-    // Decode the base64-url encoded modulus 'n' of the RSA public key.
-    let n = BASE64_URL_SAFE_NO_PAD.decode(n).map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-
-    // Decode the base64-url encoded public exponent 'e' of the RSA public key.
-    let e = BASE64_URL_SAFE_NO_PAD.decode(e).map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
-    })?;
-
-    // Construct the RSA public key using the decoded modulus and exponent.
-    let rsa_key = RsaPublicKey::new(
-        rsa::BigUint::from_bytes_be(&n),
-        rsa::BigUint::from_bytes_be(&e),
-    )
-    .map_err(|_| {
-        SignatureVerificationError::from(SignatureVerificationErrorKind::KeyDecodingFailure)
+    // Create RSA public key from JWK
+    let public_key = create_rsa_public_key(jwk).map_err(|_| {
+        SignatureVerificationError::new(SignatureVerificationErrorKind::KeyDecodingFailure)
     })?;
 
     // Verify the JWT signature using the RSA public key and the defined signature scheme.
     // If the signature is invalid, return an InvalidSignature error.
-    rsa_key
+    public_key
         .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
         .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
 }
@@ -289,10 +289,10 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if claims.nonce != expected_nonce {
         return Err(format!("Invalid nonce: {}", claims.nonce));
     }
-    if now > claims.iat * 1_000_000_000 + MAX_VALIDITY_WINDOW {
+    if now > claims.iat * NANOSECONDS_PER_SECOND + MAX_VALIDITY_WINDOW {
         return Err("JWT is no longer valid".into());
     }
-    if now < claims.iat * 1_000_000_000 {
+    if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
 
@@ -301,9 +301,9 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
 
 #[cfg(test)]
 thread_local! {
-    static TEST_CALLER: RefCell<Principal> = RefCell::new(Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap());
-    static TEST_TIME: RefCell<u64> = const { RefCell::new(1_736_794_102_000_000_000) };
-    static TEST_CERTS: RefCell<Vec<Jwk>> = RefCell::new(serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#).unwrap().keys);
+    static TEST_CALLER: Cell<Principal> = Cell::new(Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap());
+    static TEST_TIME: Cell<u64> = const { Cell::new(1_736_794_102 * NANOSECONDS_PER_SECOND) };
+    static TEST_CERTS: Cell<Vec<Jwk>> = Cell::new(serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#).unwrap().keys);
 }
 
 #[cfg(not(test))]
@@ -313,7 +313,7 @@ fn caller() -> Principal {
 
 #[cfg(test)]
 fn caller() -> Principal {
-    TEST_CALLER.with(|caller| *caller.borrow())
+    TEST_CALLER.get()
 }
 
 #[cfg(not(test))]
@@ -322,7 +322,7 @@ fn time() -> u64 {
 }
 #[cfg(test)]
 fn time() -> u64 {
-    TEST_TIME.with(|time| *time.borrow())
+    TEST_TIME.get()
 }
 
 #[test]
@@ -494,6 +494,7 @@ fn should_return_error_when_no_longer_valid() {
         Err("JWT is no longer valid".into())
     );
 }
+
 #[test]
 fn should_return_error_when_not_valid_yet() {
     TEST_TIME.replace(time() - 1);

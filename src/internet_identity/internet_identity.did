@@ -259,6 +259,8 @@ type InternetIdentityInit = record {
     captcha_config: opt CaptchaConfig;
     // Configuration for Related Origins Requests
     related_origins: opt vec text;
+    // Configuration for OpenID Google client
+    openid_google_client_id: opt text;
 };
 
 type ChallengeKey = text;

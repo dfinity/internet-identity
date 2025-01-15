@@ -44,12 +44,13 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
 #[test]
 fn should_retain_config_after_none() -> Result<(), CallError> {
     let env = env();
-    let related_origins: Vec<String> = [
+    let related_origins = [
         "https://identity.internetcomputer.org".to_string(),
         "https://identity.ic0.app".to_string(),
         "https://identity.icp0.io".to_string(),
     ]
     .to_vec();
+    let openid_google_client_id = "https://example.com".to_string();
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -72,7 +73,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google_client_id: None,
+        openid_google_client_id: Some(openid_google_client_id),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -89,12 +90,13 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
 #[test]
 fn should_override_partially() -> Result<(), CallError> {
     let env = env();
-    let related_origins: Vec<String> = [
+    let related_origins = [
         "https://identity.internetcomputer.org".to_string(),
         "https://identity.ic0.app".to_string(),
         "https://identity.icp0.io".to_string(),
     ]
     .to_vec();
+    let openid_google_client_id = "https://example.com".to_string();
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -117,7 +119,7 @@ fn should_override_partially() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google_client_id: None,
+        openid_google_client_id: Some(openid_google_client_id),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -157,6 +159,7 @@ fn should_override_partially() -> Result<(), CallError> {
         "https://identity.ic0.app".to_string(),
     ]
     .to_vec();
+    let openid_google_client_id_2 = "https://example2.com".to_string();
     let config_3 = InternetIdentityInit {
         assigned_user_number_range: None,
         archive_config: None,
@@ -164,7 +167,7 @@ fn should_override_partially() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
-        openid_google_client_id: None,
+        openid_google_client_id: Some(openid_google_client_id_2.clone()),
     };
 
     let _ =
@@ -172,6 +175,7 @@ fn should_override_partially() -> Result<(), CallError> {
 
     let expected_config_3 = InternetIdentityInit {
         related_origins: Some(related_origins_2.clone()),
+        openid_google_client_id: Some(openid_google_client_id_2.clone()),
         ..expected_config_2
     };
 
