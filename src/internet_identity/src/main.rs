@@ -434,6 +434,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.related_origins = Some(related_origins);
             })
         }
+        if let Some(openid_google_client_id) = arg.openid_google_client_id {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.openid_google_client_id = Some(openid_google_client_id);
+            })
+        }
     }
 }
 
