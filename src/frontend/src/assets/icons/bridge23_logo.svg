@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+<path d="M0 0 C132 0 264 0 400 0 C400 132 400 264 400 400 C268 400 136 400 0 400 C0 268 0 136 0 0 Z " fill="#000000" transform="translate(0,0)"/>
+<path d="M0 0 C6.6 0 13.2 0 20 0 C20 64.02 20 128.04 20 194 C13.4 194 6.8 194 0 194 C0 129.98 0 65.96 0 0 Z " fill="#FDFDFD" transform="translate(174,103)"/>
+<path d="M0 0 C6.93 0 13.86 0 21 0 C21 37.62 21 75.24 21 114 C14.07 114 7.14 114 0 114 C0 76.38 0 38.76 0 0 Z " fill="#F7F7F7" transform="translate(262,143)"/>
+<path d="M0 0 C6.93 0 13.86 0 21 0 C21 37.29 21 74.58 21 113 C14.07 113 7.14 113 0 113 C0 75.71 0 38.42 0 0 Z " fill="#F8F8F8" transform="translate(204,143)"/>
+<path d="M0 0 C6.93 0 13.86 0 21 0 C21 37.29 21 74.58 21 113 C14.07 113 7.14 113 0 113 C0 75.71 0 38.42 0 0 Z " fill="#F9F9F9" transform="translate(145,143)"/>
+<path d="M0 0 C6.93 0 13.86 0 21 0 C21 36.96 21 73.92 21 112 C14.07 112 7.14 112 0 112 C0 75.04 0 38.08 0 0 Z " fill="#FBFBFB" transform="translate(232,144)"/>
+<path d="M0 0 C6.6 0 13.2 0 20 0 C20 36.96 20 73.92 20 112 C13.4 112 6.8 112 0 112 C0 75.04 0 38.08 0 0 Z " fill="#FEFEFE" transform="translate(117,144)"/>
+</svg>
