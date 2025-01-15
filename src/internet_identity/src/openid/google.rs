@@ -17,12 +17,12 @@ use internet_identity_interface::internet_identity::types::MetadataEntryV2;
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+#[cfg(test)]
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
-#[cfg(test)]
-use std::cell::Cell;
 
 const ISSUER: &str = "https://accounts.google.com";
 
