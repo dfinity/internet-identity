@@ -196,6 +196,7 @@ pub struct InternetIdentityInit {
     pub register_rate_limit: Option<RateLimitConfig>,
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
+    pub openid_google_client_id: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

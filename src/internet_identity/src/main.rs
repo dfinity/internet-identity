@@ -348,6 +348,7 @@ fn config() -> InternetIdentityInit {
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
+        openid_google_client_id: persistent_state.openid_google_client_id.clone(),
     })
 }
 
@@ -387,15 +388,20 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let state_related_origins = state::persistent_state(|storage| storage.related_origins.clone());
-    let related_origins = maybe_arg
-        .clone()
-        .map(|arg| arg.related_origins)
-        .unwrap_or(state_related_origins);
+    let related_origins = maybe_arg.as_ref().map_or_else(
+        || persistent_state(|storage| storage.related_origins.clone()),
+        |arg| arg.related_origins.clone(),
+    );
+    let openid_google_client_id = maybe_arg.as_ref().map_or_else(
+        || persistent_state(|storage| storage.openid_google_client_id.clone()),
+        |arg| arg.openid_google_client_id.clone(),
+    );
     init_assets(related_origins);
     apply_install_arg(maybe_arg);
     update_root_hash();
-    openid::setup_timers();
+    if let Some(client_id) = openid_google_client_id {
+        openid::setup_google(client_id);
+    }
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -426,6 +432,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(related_origins) = arg.related_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.related_origins = Some(related_origins);
+            })
+        }
+        if let Some(openid_google_client_id) = arg.openid_google_client_id {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.openid_google_client_id = Some(openid_google_client_id);
             })
         }
     }

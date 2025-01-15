@@ -14,8 +14,9 @@ serde.workspace = true
 serde_bytes.workspace = true
 serde_cbor.workspace = true
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-sha2.workspace = true
+sha2 = { workspace = true, features = ["oid"]}
 base64.workspace = true
+rsa.workspace = true
 
 # Captcha deps
 lodepng = "*"
