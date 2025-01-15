@@ -82,9 +82,9 @@ async fn add_tentative_device(
         tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
     match result {
         Ok(TentativeRegistrationInfo {
-               verification_code,
-               device_registration_timeout,
-           }) => AddTentativeDeviceResponse::AddedTentatively {
+            verification_code,
+            device_registration_timeout,
+        }) => AddTentativeDeviceResponse::AddedTentatively {
             verification_code,
             device_registration_timeout,
         },
@@ -154,7 +154,7 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
     })
-        .unwrap_or_else(|err| trap(err.as_str()))
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
@@ -165,7 +165,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
             anchor_management::update(anchor, device_key, device_data),
         ))
     })
-        .unwrap_or_else(|err| trap(err.as_str()))
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
@@ -176,7 +176,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
             anchor_management::replace(anchor_number, anchor, device_key, device_data),
         ))
     })
-        .unwrap_or_else(|err| trap(err.as_str()))
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 #[update]
@@ -187,7 +187,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
             anchor_management::remove(anchor_number, anchor, device_key),
         ))
     })
-        .unwrap_or_else(|err| trap(err.as_str()))
+    .unwrap_or_else(|err| trap(err.as_str()))
 }
 
 /// Returns all devices of the anchor (authentication and recovery) but no information about device registrations.
@@ -271,7 +271,7 @@ async fn prepare_delegation(
         max_time_to_live,
         &ii_domain,
     )
-        .await
+    .await
 }
 
 #[query]
@@ -470,7 +470,7 @@ fn update_root_hash() {
 /// Calls raw rand to retrieve a random salt (32 bytes).
 async fn random_salt() -> Salt {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
-        Ok((res, )) => res,
+        Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get salt: {err}")),
     };
     let salt: Salt = res[..].try_into().unwrap_or_else(|_| {
@@ -752,7 +752,7 @@ mod attribute_sharing_mvp {
                 issuer: req.issuer.clone(),
             },
         )
-            .await;
+        .await;
         Ok(prepared_id_alias)
     }
 
@@ -791,11 +791,11 @@ mod test {
             CandidSource::Text(&canister_interface),
             CandidSource::File(Path::new("internet_identity.did")),
         )
-            .unwrap_or_else(|e| {
-                panic!(
-                    "the canister code interface is not equal to the did file: {:?}",
-                    e
-                )
-            });
+        .unwrap_or_else(|e| {
+            panic!(
+                "the canister code interface is not equal to the did file: {:?}",
+                e
+            )
+        });
     }
 }
