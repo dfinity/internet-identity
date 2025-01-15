@@ -31,6 +31,7 @@ export const idlFactory = ({ IDL }) => {
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'openid_google_client_id' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -561,6 +562,7 @@ export const init = ({ IDL }) => {
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'openid_google_client_id' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];

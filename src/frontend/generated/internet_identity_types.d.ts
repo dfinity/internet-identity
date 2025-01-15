@@ -205,6 +205,7 @@ export interface InternetIdentityInit {
   'canister_creation_cycles_cost' : [] | [bigint],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
+  'openid_google_client_id' : [] | [string],
   'register_rate_limit' : [] | [RateLimitConfig],
 }
 export interface InternetIdentityStats {
