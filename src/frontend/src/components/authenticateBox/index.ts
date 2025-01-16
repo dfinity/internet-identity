@@ -361,11 +361,7 @@ export const handleLoginFlowResult = async <E>(
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
   if (result.kind === "loginSuccess") {
-    const rpIdPair =
-      result.rpIdUsed !== undefined
-        ? { rpId: result.rpIdUsed, origin: window.location.origin }
-        : undefined;
-    await setAnchorUsed(result.userNumber, rpIdPair);
+    await setAnchorUsed(result.userNumber);
     return result;
   }
 

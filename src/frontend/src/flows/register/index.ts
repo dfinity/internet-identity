@@ -227,11 +227,7 @@ export const registerFlow = async ({
   // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
   // This way, dropping of at that point does not negatively impact UX with additional nagging.
   await withLoader(() =>
-    Promise.all([
-      result.connection.commitMetadata(),
-      // TODO: Set to default rpId when implementing ID-30
-      setAnchorUsed(userNumber, { rpId: null, origin: window.location.origin }),
-    ])
+    Promise.all([result.connection.commitMetadata(), setAnchorUsed(userNumber)])
   );
   await displayUserNumber({
     userNumber,

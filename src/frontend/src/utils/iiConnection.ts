@@ -34,7 +34,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { getAnchorRpId } from "$src/storage";
+import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
 import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
@@ -100,9 +100,6 @@ export type LoginSuccess = {
   connection: AuthenticatedConnection;
   userNumber: bigint;
   showAddCurrentDevice: boolean;
-  // `null` means that no RP ID was used.
-  // `undefined` means that the field doesn't apply.
-  rpIdUsed?: string | null;
 };
 
 export type RegFlowNextStep =
@@ -335,8 +332,6 @@ export class Connection {
         ),
         userNumber,
         showAddCurrentDevice: false,
-        // TODO: Change to the default RP ID when we implement ID-30
-        rpIdUsed: undefined,
       };
     }
 
@@ -415,11 +410,13 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    const rpIdOverride = await getAnchorRpId({
+    console.log("in da fromWebauthnCredentials");
+    // Get cancelled rpids for the user from local storage.
+    const cancelledRpIds = await getCancelledRpIds({
       userNumber,
       origin: window.location.origin,
     });
-    const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
+    console.log("got cancelledRpIds", cancelledRpIds);
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
@@ -430,12 +427,7 @@ export class Connection {
       currentOrigin
     );
     const rpId = dynamicRPIdEnabled
-      ? // If `rpIdOverride` is `null` it means that last successful RP ID was `undefined`.
-        rpIdOverride === null
-        ? undefined
-        : typeof rpIdOverride === "string"
-        ? rpIdOverride
-        : findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
@@ -458,13 +450,18 @@ export class Connection {
           dynamicRPIdEnabled &&
           hasCredentialsFromMultipleOrigins(credentials)
         ) {
-          if (this._cancelledRpIds.has(userNumber)) {
-            this._cancelledRpIds.get(userNumber)?.add(rpId);
-          } else {
-            this._cancelledRpIds.set(userNumber, new Set([rpId]));
+          try {
+            await addAnchorCancelledRpId({
+              userNumber,
+              origin: currentOrigin,
+              cancelledRpId: rpId,
+            });
+            // We want to user to retry again and a new RP ID will be used.
+            return { kind: "possiblyWrongRPID" };
+          } catch (e: unknown) {
+            console.error("Error adding cancelled RP ID to local storage", e);
+            return { kind: "webAuthnFailed" };
           }
-          // We want to user to retry again and a new RP ID will be used.
-          return { kind: "possiblyWrongRPID" };
         }
         return { kind: "webAuthnFailed" };
       }
@@ -487,16 +484,11 @@ export class Connection {
       actor
     );
 
-    // If RP ID is enabled and it's not set, we want to set it as so.
-    // `undefined` means that the field doesn't apply.
-    const rpIdUsed = dynamicRPIdEnabled && rpId === undefined ? null : rpId;
-
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
       showAddCurrentDevice: cancelledRpIds.size > 0,
-      rpIdUsed,
     };
   };
   fromIdentity = async (
@@ -518,7 +510,6 @@ export class Connection {
       userNumber,
       connection,
       showAddCurrentDevice: false,
-      rpIdUsed: undefined,
     };
   };
 

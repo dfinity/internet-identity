@@ -43,18 +43,79 @@ export const cleanUpRpIdMapper = async (userNumber: bigint) => {
 
     storage.anchors[ix] = {
       ...oldAnchor,
-      originRpIDMapper: {},
+      cancelledRpIdsMapper: {},
     };
 
     return storage;
   });
 };
 
+/**
+ * Adds a RP ID as cancelled RP ID into the set of cancelled RP IDs for that anchor and origin.
+ *
+ * @param userNumber
+ * @param origin
+ * @param cancelledRpId
+ */
+export const addAnchorCancelledRpId = async ({
+  userNumber,
+  origin,
+  cancelledRpId,
+}: {
+  userNumber: bigint;
+  origin: string;
+  cancelledRpId: string | undefined;
+}) => {
+  await withStorage((storage) => {
+    const ix = userNumber.toString();
+    const anchors = storage.anchors;
+    const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
+      knownPrincipals: [],
+    };
+    const oldAnchor = anchors[ix] ?? defaultAnchor;
+
+    const cancelledRpIdsMapper = oldAnchor?.cancelledRpIdsMapper ?? {};
+    const originCancelledRpIds = cancelledRpIdsMapper[origin] ?? [];
+    originCancelledRpIds.push(cancelledRpId);
+
+    storage.anchors[ix] = {
+      ...oldAnchor,
+      lastUsedTimestamp: nowMillis(),
+      cancelledRpIdsMapper: {
+        ...cancelledRpIdsMapper,
+        [origin]: originCancelledRpIds,
+      },
+    };
+
+    return storage;
+  });
+};
+
+/**
+ * Returns the last RP ID successfully used for the specific anchor in the specific ii origin.
+ *
+ * @param params
+ * @param params.userNumber The anchor number.
+ * @param params.origin The origin of the ii.
+ * @returns {Set<string | undefined>} The set of cancelled RP IDs for the anchor and origin. `undefined` is a valid cancelled RP ID.
+ */
+export const getCancelledRpIds = async ({
+  userNumber,
+  origin,
+}: {
+  userNumber: bigint;
+  origin: string;
+}): Promise<Set<string | undefined>> => {
+  const storage = await readStorage();
+  const anchors = storage.anchors;
+  console.log(anchors);
+
+  const anchorData = anchors[userNumber.toString()];
+  return new Set(anchorData?.cancelledRpIdsMapper?.[origin] ?? []);
+};
+
 /** Set the specified anchor as used "just now" along with which RP ID and in which II origin it was used */
-export const setAnchorUsed = async (
-  userNumber: bigint,
-  rpIdOriginPair?: { origin: string; rpId: string | null }
-) => {
+export const setAnchorUsed = async (userNumber: bigint) => {
   await withStorage((storage) => {
     const ix = userNumber.toString();
 
@@ -63,17 +124,12 @@ export const setAnchorUsed = async (
       knownPrincipals: [],
     };
     const oldAnchor = anchors[ix] ?? defaultAnchor;
-    const originRpIDMapper = oldAnchor.originRpIDMapper ?? {};
-    if (rpIdOriginPair !== undefined) {
-      originRpIDMapper[rpIdOriginPair.origin] = rpIdOriginPair.rpId;
-    }
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
     storage.anchors[ix] = {
       ...oldAnchor,
       lastUsedTimestamp: nowMillis(),
-      originRpIDMapper,
     };
     return storage;
   });
@@ -109,39 +165,6 @@ export const getAnchorByPrincipal = async ({
   }
 
   return;
-};
-
-/**
- * Returns the last RP ID successfully used for the specific anchor in the specific ii origin.
- *
- * @param params
- * @param params.userNumber The anchor number.
- * @param params.origin The origin of the ii.
- * @returns {string | null | undefined} The RP ID used for the specific anchor in the specific ii origin.
- * - `string` is the RP ID to be used.
- * - `null` means that the RP ID used was `undefined`.
- * - `undefined` means that the RP ID used was not found.
- */
-export const getAnchorRpId = async ({
-  userNumber,
-  origin,
-}: {
-  userNumber: bigint;
-  origin: string;
-}): Promise<string | undefined | null> => {
-  const storage = await readStorage();
-  const anchors = storage.anchors;
-
-  const anchorData = anchors[userNumber.toString()];
-  if (
-    isNullish(anchorData) ||
-    isNullish(anchorData.originRpIDMapper) ||
-    anchorData.originRpIDMapper[origin] === undefined
-  ) {
-    return undefined;
-  }
-
-  return anchorData.originRpIDMapper[origin];
 };
 
 /** Look up an anchor by principal, if it is the last used for the given origin.
@@ -717,18 +740,18 @@ const PrincipalDataV4 = z.object({
 });
 
 /**
- * Mapper of which RP ID was used to get the credential for each origin.
+ * Mapper of which RP ID didn't work for the user
  *
- * Record<ii_origin, rp_id>
- * rp_id can be `null` if the RP ID used was `undefined`.
- *   It means that we can skip the RP ID calculation and we need to set it as `undeifined`.
+ * Record<ii_origin, Set<rp_id>>
  */
-const originRpIDMapper = z.record(z.string().nullable());
+const cancelledRpIdsMapper = z.record(
+  z.array(z.union([z.string(), z.undefined()]))
+);
 
 const AnchorV4 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
-  originRpIDMapper: originRpIDMapper.optional(),
+  cancelledRpIdsMapper: cancelledRpIdsMapper.optional(),
 
   knownPrincipals: z.array(PrincipalDataV4),
 });

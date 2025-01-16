@@ -89,11 +89,7 @@ export const addCurrentDevice = async (
     );
   }
 
-  // TODO: Set to default rpId when implementing ID-30
-  await setAnchorUsed(userNumber, {
-    rpId: null,
-    origin: window.location.origin,
-  });
+  await setAnchorUsed(userNumber);
 };
 
 const unknownError = (): Error => {
