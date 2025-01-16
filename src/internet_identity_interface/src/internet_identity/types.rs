@@ -189,10 +189,10 @@ pub struct AnchorCredentials {
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
-/// 
-/// Each field is wrapped in `Option<>` to indicate whether the field should 
+///
+/// Each field is wrapped in `Option<>` to indicate whether the field should
 /// keep the previous value or update to a new value (e.g. `None` keeps the previous value).
-/// 
+///
 /// Some fields, like `openid_google`, have an additional nested `Option<>`,
 /// this indicates enable/disable status (e.g. `Some(None)` disables a feature).
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
