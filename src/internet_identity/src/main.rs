@@ -396,7 +396,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         .as_ref()
         .and_then(|arg| arg.openid_google.clone())
         .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
-    init_assets(Some(related_origins));
+    init_assets(related_origins.is_empty().then_some(related_origins));
     apply_install_arg(maybe_arg);
     update_root_hash();
     if let Some(config) = openid_google {
