@@ -3,7 +3,8 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, RateLimitConfig,
+    ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, OpenIdConfig,
+    RateLimitConfig,
 };
 use pocket_ic::CallError;
 
@@ -32,7 +33,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
             },
         }),
         related_origins: None,
-        openid_google_client_id: None,
+        openid_google: None,
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -50,7 +51,9 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
         "https://identity.icp0.io".to_string(),
     ]
     .to_vec();
-    let openid_google_client_id = "https://example.com".to_string();
+    let openid_google = OpenIdConfig {
+        client_id: "https://example.com".into(),
+    };
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -73,7 +76,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google_client_id: Some(openid_google_client_id),
+        openid_google: Some(Some(openid_google)),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -96,7 +99,9 @@ fn should_override_partially() -> Result<(), CallError> {
         "https://identity.icp0.io".to_string(),
     ]
     .to_vec();
-    let openid_google_client_id = "https://example.com".to_string();
+    let openid_google = Some(OpenIdConfig {
+        client_id: "https://example.com".into(),
+    });
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -119,7 +124,7 @@ fn should_override_partially() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google_client_id: Some(openid_google_client_id),
+        openid_google: Some(openid_google),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -141,7 +146,7 @@ fn should_override_partially() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: Some(new_captcha.clone()),
         related_origins: None,
-        openid_google_client_id: None,
+        openid_google: None,
     };
 
     let _ =
@@ -159,7 +164,7 @@ fn should_override_partially() -> Result<(), CallError> {
         "https://identity.ic0.app".to_string(),
     ]
     .to_vec();
-    let openid_google_client_id_2 = "https://example2.com".to_string();
+    let openid_google2 = None;
     let config_3 = InternetIdentityInit {
         assigned_user_number_range: None,
         archive_config: None,
@@ -167,7 +172,7 @@ fn should_override_partially() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
-        openid_google_client_id: Some(openid_google_client_id_2.clone()),
+        openid_google: Some(openid_google2.clone()),
     };
 
     let _ =
@@ -175,7 +180,7 @@ fn should_override_partially() -> Result<(), CallError> {
 
     let expected_config_3 = InternetIdentityInit {
         related_origins: Some(related_origins_2.clone()),
-        openid_google_client_id: Some(openid_google_client_id_2.clone()),
+        openid_google: Some(openid_google2.clone()),
         ..expected_config_2
     };
 

@@ -1,6 +1,6 @@
 use candid::{Deserialize, Principal};
 use identity_jose::jws::Decoder;
-use internet_identity_interface::internet_identity::types::{MetadataEntryV2, Timestamp};
+use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig, Timestamp};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -31,9 +31,9 @@ thread_local! {
     static OPEN_ID_PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
 }
 
-pub fn setup_google(client_id: String) {
+pub fn setup_google(config: OpenIdConfig) {
     OPEN_ID_PROVIDERS
-        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(client_id))));
+        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
 }
 
 #[allow(unused)]

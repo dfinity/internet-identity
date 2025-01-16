@@ -8,9 +8,7 @@ use crate::stats::event_stats::EventKey;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, FrontendHostname, RateLimitConfig, Timestamp,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -33,7 +31,7 @@ pub struct StorablePersistentState {
     event_stats_24h_start: Option<EventKey>,
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
-    openid_google_client_id: Option<String>,
+    openid_google: Option<OpenIdConfig>,
 }
 
 impl Storable for StorablePersistentState {
@@ -72,7 +70,7 @@ impl From<PersistentState> for StorablePersistentState {
             event_stats_24h_start: s.event_stats_24h_start,
             captcha_config: Some(s.captcha_config),
             related_origins: s.related_origins,
-            openid_google_client_id: s.openid_google_client_id,
+            openid_google: s.openid_google,
         }
     }
 }
@@ -88,7 +86,7 @@ impl From<StorablePersistentState> for PersistentState {
             active_authn_method_stats: s.active_authn_method_stats,
             captcha_config: s.captcha_config.unwrap_or(DEFAULT_CAPTCHA_CONFIG),
             related_origins: s.related_origins,
-            openid_google_client_id: s.openid_google_client_id,
+            openid_google: s.openid_google,
             event_stats_24h_start: s.event_stats_24h_start,
         }
     }
@@ -134,7 +132,7 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             }),
             related_origins: None,
-            openid_google_client_id: None,
+            openid_google: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -154,7 +152,7 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             },
             related_origins: None,
-            openid_google_client_id: None,
+            openid_google: None,
             event_stats_24h_start: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);

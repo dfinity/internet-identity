@@ -105,8 +105,8 @@ pub struct PersistentState {
     pub captcha_config: CaptchaConfig,
     // Configuration for Related Origins Requests
     pub related_origins: Option<Vec<String>>,
-    // Configuration for OpenID Google client id
-    pub openid_google_client_id: Option<String>,
+    // Configuration for OpenID Google client
+    pub openid_google: Option<OpenIdConfig>,
     // Key into the event_data BTreeMap where the 24h tracking window starts.
     // This key is used to remove old entries from the 24h event aggregations.
     // If it is `none`, then the 24h window starts from the newest entry in the event_data
@@ -126,7 +126,7 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
-            openid_google_client_id: None,
+            openid_google: None,
             event_stats_24h_start: None,
         }
     }

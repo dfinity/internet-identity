@@ -93,7 +93,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
-        openid_google_client_id: None,
+        openid_google: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
@@ -155,7 +155,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
-        openid_google_client_id: None,
+        openid_google: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
@@ -193,7 +193,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
-        openid_google_client_id: None,
+        openid_google: None,
     };
 
     let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_2));
@@ -576,7 +576,7 @@ fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
-        openid_google_client_id: None,
+        openid_google: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 

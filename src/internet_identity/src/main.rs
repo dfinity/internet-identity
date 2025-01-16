@@ -348,7 +348,7 @@ fn config() -> InternetIdentityInit {
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
-        openid_google_client_id: persistent_state.openid_google_client_id.clone(),
+        openid_google: Some(persistent_state.openid_google.clone()),
     })
 }
 
@@ -388,19 +388,19 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let related_origins = maybe_arg.as_ref().map_or_else(
-        || persistent_state(|storage| storage.related_origins.clone()),
-        |arg| arg.related_origins.clone(),
-    );
-    let openid_google_client_id = maybe_arg.as_ref().map_or_else(
-        || persistent_state(|storage| storage.openid_google_client_id.clone()),
-        |arg| arg.openid_google_client_id.clone(),
-    );
-    init_assets(related_origins);
+    let related_origins = maybe_arg
+        .as_ref()
+        .and_then(|arg| arg.related_origins.clone())
+        .unwrap_or(persistent_state(|storage| storage.related_origins.clone()).unwrap_or(vec![]));
+    let openid_google = maybe_arg
+        .as_ref()
+        .and_then(|arg| arg.openid_google.clone())
+        .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
+    init_assets(Some(related_origins));
     apply_install_arg(maybe_arg);
     update_root_hash();
-    if let Some(client_id) = openid_google_client_id {
-        openid::setup_google(client_id);
+    if let Some(config) = openid_google {
+        openid::setup_google(config);
     }
 }
 
@@ -434,9 +434,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.related_origins = Some(related_origins);
             })
         }
-        if let Some(openid_google_client_id) = arg.openid_google_client_id {
+        if let Some(openid_google) = arg.openid_google {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.openid_google_client_id = Some(openid_google_client_id);
+                persistent_state.openid_google = openid_google;
             })
         }
     }
