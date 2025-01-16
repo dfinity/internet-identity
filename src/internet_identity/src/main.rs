@@ -24,6 +24,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::ops::Not;
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -396,7 +397,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         .as_ref()
         .and_then(|arg| arg.openid_google.clone())
         .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
-    init_assets(related_origins.is_empty().then_some(related_origins));
+    init_assets(related_origins.is_empty().not().then_some(related_origins));
     apply_install_arg(maybe_arg);
     update_root_hash();
     if let Some(config) = openid_google {
