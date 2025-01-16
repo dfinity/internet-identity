@@ -33,7 +33,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
             },
         }),
         related_origins: None,
-        openid_google: None,
+        openid_google: Some(None),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
