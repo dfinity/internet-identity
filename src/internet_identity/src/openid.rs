@@ -1,6 +1,8 @@
 use candid::{Deserialize, Principal};
 use identity_jose::jws::Decoder;
-use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig, Timestamp};
+use internet_identity_interface::internet_identity::types::{
+    MetadataEntryV2, OpenIdConfig, Timestamp,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
