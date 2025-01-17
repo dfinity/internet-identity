@@ -61,6 +61,18 @@ fn install_and_assert(
     Ok(canister_id)
 }
 
+/// Utility method to upgrade and check if config matches upgrade config
+fn upgrade_and_assert(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    config: &InternetIdentityInit,
+    expected_config: &InternetIdentityInit,
+) -> Result<(), CallError> {
+    upgrade_ii_canister_with_arg(env, canister_id, II_WASM.clone(), Some(config.clone()))?;
+    assert_config(env, canister_id, expected_config)?;
+    Ok(())
+}
+
 /// Utility method to upgrade with other config change and check if any other config hasn't changed
 fn unrelated_change_and_assert(
     env: &PocketIc,
@@ -91,18 +103,6 @@ fn unrelated_change_and_assert(
     upgrade_ii_canister_with_arg(env, canister_id, II_WASM.clone(), Some(other_config.clone()))?;
     assert_config(env, canister_id, &expected_config)?;
     Ok(canister_id)
-}
-
-/// Utility method to upgrade and check if config matches upgrade config
-fn upgrade_and_assert(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    config: &InternetIdentityInit,
-    expected_config: &InternetIdentityInit,
-) -> Result<(), CallError> {
-    upgrade_ii_canister_with_arg(env, canister_id, II_WASM.clone(), Some(config.clone()))?;
-    assert_config(env, canister_id, expected_config)?;
-    Ok(())
 }
 
 #[test]
