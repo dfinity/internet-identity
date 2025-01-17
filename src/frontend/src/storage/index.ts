@@ -189,6 +189,94 @@ export const setKnownPrincipal = async ({
   });
 };
 
+/**
+ * Sets the `cancelledRpIdsMapper` field to an empty object.
+ *
+ * This is needed when a user removes a device from their account.
+ * @param userNumber {bigint} The anchor number.
+ */
+export const cleanUpRpIdMapper = async (userNumber: bigint) => {
+  await withStorage((storage) => {
+    const anchorIndex = userNumber.toString();
+    const anchors = storage.anchors;
+    const oldAnchor = anchors[anchorIndex];
+
+    if (isNullish(oldAnchor)) {
+      return storage;
+    }
+
+    storage.anchors[anchorIndex] = {
+      ...oldAnchor,
+      cancelledRpIdsMapper: {},
+    };
+
+    return storage;
+  });
+};
+
+/**
+ * Adds a RP ID as cancelled RP ID into the set of cancelled RP IDs for that anchor and origin.
+ *
+ * @param userNumber
+ * @param origin
+ * @param cancelledRpId
+ */
+export const addAnchorCancelledRpId = async ({
+  userNumber,
+  origin,
+  cancelledRpId,
+}: {
+  userNumber: bigint;
+  origin: string;
+  cancelledRpId: string | undefined;
+}) => {
+  await withStorage((storage) => {
+    const anchorIndex = userNumber.toString();
+    const anchors = storage.anchors;
+    const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
+      knownPrincipals: [],
+    };
+    const oldAnchor = anchors[anchorIndex] ?? defaultAnchor;
+
+    const cancelledRpIdsMapper = oldAnchor?.cancelledRpIdsMapper ?? {};
+    const originCancelledRpIds = cancelledRpIdsMapper[origin] ?? [];
+    originCancelledRpIds.push(cancelledRpId);
+
+    storage.anchors[anchorIndex] = {
+      ...oldAnchor,
+      lastUsedTimestamp: nowMillis(),
+      cancelledRpIdsMapper: {
+        ...cancelledRpIdsMapper,
+        [origin]: originCancelledRpIds,
+      },
+    };
+
+    return storage;
+  });
+};
+
+/**
+ * Returns the last RP ID successfully used for the specific anchor in the specific ii origin.
+ *
+ * @param params
+ * @param params.userNumber The anchor number.
+ * @param params.origin The origin of the ii.
+ * @returns {Set<string | undefined>} The set of cancelled RP IDs for the anchor and origin. `undefined` is a valid cancelled RP ID.
+ */
+export const getCancelledRpIds = async ({
+  userNumber,
+  origin,
+}: {
+  userNumber: bigint;
+  origin: string;
+}): Promise<Set<string | undefined>> => {
+  const storage = await readStorage();
+  const anchors = storage.anchors;
+
+  const anchorData = anchors[userNumber.toString()];
+  return new Set(anchorData?.cancelledRpIdsMapper?.[origin] ?? []);
+};
+
 /** Accessing functions */
 
 // Simply read the storage without updating it
@@ -653,9 +741,19 @@ const PrincipalDataV4 = z.object({
   lastUsedTimestamp: z.number(),
 });
 
+/**
+ * Mapper of which RP ID didn't work for the user
+ *
+ * Record<ii_origin, Set<rp_id>>
+ */
+const cancelledRpIdsMapper = z.record(
+  z.array(z.union([z.string(), z.undefined()]))
+);
+
 const AnchorV4 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
+  cancelledRpIdsMapper: cancelledRpIdsMapper.optional(),
 
   knownPrincipals: z.array(PrincipalDataV4),
 });
