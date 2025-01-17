@@ -241,8 +241,8 @@ type CaptchaConfig = record {
 // Each field is wrapped is `opt` to indicate whether the field should
 // keep the previous value or update to a new value (e.g. `null` keeps the previous value).
 //
-// Some fields, like `openid_google`, have an additional nested `opt`,
-// this indicates enable/disable status (e.g. `opt null` disables a feature).
+// Some fields, like `openid_google`, have an additional nested `opt`, this indicates
+// enable/disable status (e.g. `opt null` disables a feature while `null` leaves it untouched).
 type InternetIdentityInit = record {
     // Set lowest and highest anchor
     assigned_user_number_range : opt record {
