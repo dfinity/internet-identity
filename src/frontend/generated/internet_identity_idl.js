@@ -1,6 +1,7 @@
 export const idlFactory = ({ IDL }) => {
   const MetadataMap = IDL.Rec();
   const MetadataMapV2 = IDL.Rec();
+  const OpenIdConfig = IDL.Record({ 'client_id' : IDL.Text });
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -26,12 +27,12 @@ export const idlFactory = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
+    'openid_google' : IDL.Opt(IDL.Opt(OpenIdConfig)),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
-    'openid_google_client_id' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -532,6 +533,7 @@ export const idlFactory = ({ IDL }) => {
   });
 };
 export const init = ({ IDL }) => {
+  const OpenIdConfig = IDL.Record({ 'client_id' : IDL.Text });
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -557,12 +559,12 @@ export const init = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
+    'openid_google' : IDL.Opt(IDL.Opt(OpenIdConfig)),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
-    'openid_google_client_id' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];

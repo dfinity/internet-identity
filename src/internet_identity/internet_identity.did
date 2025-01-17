@@ -237,7 +237,12 @@ type CaptchaConfig = record {
 };
 
 // Init arguments of II which can be supplied on install and upgrade.
-// Setting a value to null keeps the previous value.
+//
+// Each field is wrapped is `opt` to indicate whether the field should
+// keep the previous value or update to a new value (e.g. `null` keeps the previous value).
+//
+// Some fields, like `openid_google`, have an additional nested `opt`, this indicates
+// enable/disable status (e.g. `opt null` disables a feature while `null` leaves it untouched).
 type InternetIdentityInit = record {
     // Set lowest and highest anchor
     assigned_user_number_range : opt record {
@@ -260,7 +265,7 @@ type InternetIdentityInit = record {
     // Configuration for Related Origins Requests
     related_origins: opt vec text;
     // Configuration for OpenID Google client
-    openid_google_client_id: opt text;
+    openid_google: opt opt OpenIdConfig;
 };
 
 type ChallengeKey = text;
@@ -316,6 +321,10 @@ type BufferedArchiveEntry = record {
     timestamp: Timestamp;
     sequence_number: nat64;
     entry: blob;
+};
+
+type OpenIdConfig = record {
+    client_id: text;
 };
 
 // API V2 specific types

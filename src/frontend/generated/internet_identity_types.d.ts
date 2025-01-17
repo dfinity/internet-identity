@@ -200,12 +200,12 @@ export type IdentityMetadataReplaceError = {
   };
 export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
+  'openid_google' : [] | [[] | [OpenIdConfig]],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
-  'openid_google_client_id' : [] | [string],
   'register_rate_limit' : [] | [RateLimitConfig],
 }
 export interface InternetIdentityStats {
@@ -237,6 +237,7 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface OpenIdConfig { 'client_id' : string }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {

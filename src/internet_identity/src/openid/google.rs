@@ -13,7 +13,7 @@ use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
 };
-use internet_identity_interface::internet_identity::types::MetadataEntryV2;
+use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig};
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -117,7 +117,7 @@ impl OpenIdProvider for Provider {
 }
 
 impl Provider {
-    pub fn create(client_id: String) -> Provider {
+    pub fn create(config: OpenIdConfig) -> Provider {
         #[cfg(test)]
         let certs = Rc::new(RefCell::new(TEST_CERTS.take()));
 
@@ -127,7 +127,10 @@ impl Provider {
         #[cfg(not(test))]
         schedule_fetch_certs(Rc::clone(&certs), None);
 
-        Provider { client_id, certs }
+        Provider {
+            client_id: config.client_id,
+            certs,
+        }
     }
 }
 
@@ -366,7 +369,9 @@ fn test_data() -> (String, [u8; 32], Claims) {
 #[test]
 fn should_return_credential() {
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(claims.aud.clone());
+    let provider = Provider::create(OpenIdConfig {
+        client_id: claims.aud.clone(),
+    });
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,
@@ -392,7 +397,9 @@ fn should_return_credential() {
 #[test]
 fn should_return_error_when_encoding_invalid() {
     let (_, salt, claims) = test_data();
-    let provider = Provider::create(claims.aud.clone());
+    let provider = Provider::create(OpenIdConfig {
+        client_id: claims.aud.clone(),
+    });
     let invalid_jwt = "invalid-jwt";
 
     assert_eq!(
@@ -405,7 +412,9 @@ fn should_return_error_when_encoding_invalid() {
 fn should_return_error_when_cert_missing() {
     TEST_CERTS.replace(vec![]);
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(claims.aud.clone());
+    let provider = Provider::create(OpenIdConfig {
+        client_id: claims.aud.clone(),
+    });
 
     assert_eq!(
         provider.verify(&jwt, &salt),
@@ -416,7 +425,9 @@ fn should_return_error_when_cert_missing() {
 #[test]
 fn should_return_error_when_signature_invalid() {
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(claims.aud.clone());
+    let provider = Provider::create(OpenIdConfig {
+        client_id: claims.aud.clone(),
+    });
     let chunks: Vec<&str> = jwt.split('.').collect();
     let header = chunks[0];
     let payload = chunks[1];

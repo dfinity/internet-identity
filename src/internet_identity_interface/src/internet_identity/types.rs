@@ -188,6 +188,13 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
+/// Init arguments of II which can be supplied on install and upgrade.
+///
+/// Each field is wrapped in `Option<>` to indicate whether the field should
+/// keep the previous value or update to a new value (e.g. `None` keeps the previous value).
+///
+/// Some fields, like `openid_google`, have an additional nested `Option<>`, this indicates
+/// enable/disable status (e.g. `Some(None)` disables a feature while `None` leaves it untouched).
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentityInit {
     pub assigned_user_number_range: Option<(AnchorNumber, AnchorNumber)>,
@@ -196,7 +203,7 @@ pub struct InternetIdentityInit {
     pub register_rate_limit: Option<RateLimitConfig>,
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
-    pub openid_google_client_id: Option<String>,
+    pub openid_google: Option<Option<OpenIdConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -273,4 +280,9 @@ pub enum DeployArchiveResult {
     CreationInProgress,
     #[serde(rename = "failed")]
     Failed(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct OpenIdConfig {
+    pub client_id: String,
 }
