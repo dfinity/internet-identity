@@ -11,9 +11,12 @@ import { expect } from "vitest";
 import {
   MAX_SAVED_ANCHORS,
   MAX_SAVED_PRINCIPALS,
+  addAnchorCancelledRpId,
+  cleanUpRpIdMapper,
   getAnchorByPrincipal,
   getAnchorIfLastUsed,
   getAnchors,
+  getCancelledRpIds,
   setAnchorUsed,
   setKnownPrincipal,
 } from ".";
@@ -411,6 +414,79 @@ test(
     );
 
     expect(await getAnchorIfLastUsed({ principal, origin })).not.toBeDefined();
+  })
+);
+
+test(
+  "should create an anchor after adding a cancelled RP ID",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const userNumber = BigInt(10000);
+    const cancelledRpId = "https://identity.ic0.app";
+
+    expect(await getAnchors()).toEqual([]);
+    await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
+    expect(await getAnchors()).toEqual([userNumber]);
+  })
+);
+
+test(
+  "should reset the cancelled RP IDs by user number",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const userNumber = BigInt(10000);
+    const anotherUserNumber = BigInt(10001);
+    const cancelledRpId = "https://identity.ic0.app";
+
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
+      new Set([])
+    );
+    await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
+    await addAnchorCancelledRpId({
+      userNumber: anotherUserNumber,
+      origin,
+      cancelledRpId,
+    });
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
+      new Set([cancelledRpId])
+    );
+    expect(
+      await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
+    ).toEqual(new Set([cancelledRpId]));
+    await cleanUpRpIdMapper(userNumber);
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
+      new Set([])
+    );
+    expect(
+      await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
+    ).toEqual(new Set([cancelledRpId]));
+  })
+);
+
+test(
+  "should add cancelled RP IDs per origin",
+  withStorage(async () => {
+    const origin = "https://example.com";
+    const undefinedOrigin = undefined;
+    const anotherOrigin = "https://another.com";
+    const userNumber = BigInt(10000);
+    const cancelledRpId = "https://identity.ic0.app";
+
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
+      new Set([])
+    );
+    await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
+    await addAnchorCancelledRpId({
+      userNumber,
+      origin,
+      cancelledRpId: undefinedOrigin,
+    });
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
+      new Set([cancelledRpId, undefined])
+    );
+    expect(
+      await getCancelledRpIds({ userNumber, origin: anotherOrigin })
+    ).toEqual(new Set([]));
   })
 );
 
