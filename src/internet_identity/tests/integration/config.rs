@@ -78,26 +78,20 @@ fn unrelated_change_and_assert(
     env: &PocketIc,
     canister_id: CanisterId,
 ) -> Result<CanisterId, CallError> {
+    let captcha_config = Some(CaptchaConfig {
+        max_unsolved_captchas: 5000,
+        captcha_trigger: CaptchaTrigger::Dynamic {
+            threshold_pct: 100,
+            current_rate_sampling_interval_s: 600,
+            reference_rate_sampling_interval_s: 3600,
+        },
+    });
     let other_config = InternetIdentityInit {
-        captcha_config: Some(CaptchaConfig {
-            max_unsolved_captchas: 5000,
-            captcha_trigger: CaptchaTrigger::Dynamic {
-                threshold_pct: 100,
-                current_rate_sampling_interval_s: 600,
-                reference_rate_sampling_interval_s: 3600,
-            },
-        }),
+        captcha_config: captcha_config.clone(),
         ..InternetIdentityInit::default()
     };
     let expected_config = InternetIdentityInit {
-        captcha_config: Some(CaptchaConfig {
-            max_unsolved_captchas: 5000,
-            captcha_trigger: CaptchaTrigger::Dynamic {
-                threshold_pct: 100,
-                current_rate_sampling_interval_s: 600,
-                reference_rate_sampling_interval_s: 3600,
-            },
-        }),
+        captcha_config,
         ..api::config(env, canister_id)?
     };
     upgrade_ii_canister_with_arg(
