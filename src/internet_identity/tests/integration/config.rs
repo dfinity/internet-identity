@@ -85,7 +85,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
 
     let canister_id = install_and_assert(&env, &config)?;
     upgrade_and_assert(&env, canister_id, &config, &config)?;
-    
+
     Ok(())
 }
 
