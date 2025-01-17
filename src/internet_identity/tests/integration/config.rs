@@ -100,7 +100,12 @@ fn unrelated_change_and_assert(
         }),
         ..api::config(env, canister_id)?
     };
-    upgrade_ii_canister_with_arg(env, canister_id, II_WASM.clone(), Some(other_config.clone()))?;
+    upgrade_ii_canister_with_arg(
+        env,
+        canister_id,
+        II_WASM.clone(),
+        Some(other_config.clone()),
+    )?;
     assert_config(env, canister_id, &expected_config)?;
     Ok(canister_id)
 }
