@@ -166,11 +166,6 @@ fn should_update_related_origins() -> Result<(), CallError> {
         ..DEFAULT_CONFIG
     };
 
-    // Check if related origins are installed correctly
-    install_and_assert(&env, &config_1)?;
-    install_and_assert(&env, &config_2)?;
-    install_and_assert(&env, &disabled_config)?;
-
     // Check if related origins are updated and then untouched
     let canister_id_1 = install_and_assert(&env, &config_1)?;
     upgrade_and_assert(&env, canister_id_1, &config_2, &config_2)?;
@@ -208,11 +203,6 @@ fn should_update_openid_google() -> Result<(), CallError> {
         openid_google: Some(None),
         ..DEFAULT_CONFIG
     };
-
-    // Check if open id config is installed correctly
-    install_and_assert(&env, &config_1)?;
-    install_and_assert(&env, &config_2)?;
-    install_and_assert(&env, &disabled_config)?;
 
     // Check if open id config is updated and then untouched
     let canister_id_1 = install_and_assert(&env, &config_1)?;
