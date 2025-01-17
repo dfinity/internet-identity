@@ -744,6 +744,12 @@ const PrincipalDataV4 = z.object({
 /**
  * Mapper of which RP ID didn't work for the user
  *
+ * The Relying Party ID is used to get the passkey from the browser's WebAuthn API.
+ * Using different RP IDs allows us to have compatibility across multiple domains.
+ * However, when one RP ID is used and the user cancels, it must be because the user is in a device
+ * registered in another domain. In this case, we must try the other RP ID.
+ * By persisting this information, we ensure that the user won't have a bad UX a second time.
+ *
  * Record<ii_origin, Set<rp_id>>
  */
 const cancelledRpIdsMapper = z.record(
