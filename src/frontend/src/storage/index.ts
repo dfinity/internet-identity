@@ -197,15 +197,15 @@ export const setKnownPrincipal = async ({
  */
 export const cleanUpRpIdMapper = async (userNumber: bigint) => {
   await withStorage((storage) => {
-    const ix = userNumber.toString();
+    const anchorIndex = userNumber.toString();
     const anchors = storage.anchors;
-    const oldAnchor = anchors[ix];
+    const oldAnchor = anchors[anchorIndex];
 
     if (isNullish(oldAnchor)) {
       return storage;
     }
 
-    storage.anchors[ix] = {
+    storage.anchors[anchorIndex] = {
       ...oldAnchor,
       cancelledRpIdsMapper: {},
     };
@@ -231,18 +231,18 @@ export const addAnchorCancelledRpId = async ({
   cancelledRpId: string | undefined;
 }) => {
   await withStorage((storage) => {
-    const ix = userNumber.toString();
+    const anchorIndex = userNumber.toString();
     const anchors = storage.anchors;
     const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
       knownPrincipals: [],
     };
-    const oldAnchor = anchors[ix] ?? defaultAnchor;
+    const oldAnchor = anchors[anchorIndex] ?? defaultAnchor;
 
     const cancelledRpIdsMapper = oldAnchor?.cancelledRpIdsMapper ?? {};
     const originCancelledRpIds = cancelledRpIdsMapper[origin] ?? [];
     originCancelledRpIds.push(cancelledRpId);
 
-    storage.anchors[ix] = {
+    storage.anchors[anchorIndex] = {
       ...oldAnchor,
       lastUsedTimestamp: nowMillis(),
       cancelledRpIdsMapper: {
