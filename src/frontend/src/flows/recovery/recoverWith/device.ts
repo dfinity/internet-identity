@@ -99,7 +99,8 @@ const attemptRecovery = async ({
   const devices = await connection.lookupAll(userNumber);
 
   const recoveryCredentials = devices.filter(
-    ({ purpose }) => "recovery" in purpose
+    ({ purpose, key_type }) =>
+      "recovery" in purpose && !("seed_phrase" in key_type)
   );
 
   if (recoveryCredentials.length === 0) {
