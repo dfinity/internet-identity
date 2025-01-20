@@ -21,7 +21,7 @@ export const promptUserNumberTemplate = ({
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
   const defaultMessage = "Please provide an Internet Identity.";
-  const promptUserNumberSlot = html` <hgroup>
+  const promptUserNumberSlot = html` <hgroup data-page="prompt-user-number">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${message ?? defaultMessage}</p>
     </hgroup>
@@ -39,6 +39,7 @@ export const promptUserNumberTemplate = ({
         @click="${anchorInput.submit}"
         id="userNumberContinue"
         class="c-button"
+        data-action="next"
       >
         Continue
       </button>

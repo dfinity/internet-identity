@@ -1001,6 +1001,35 @@ export class RecoverSeedPhraseView extends View {
   }
 }
 
+export class PromptUserNumberView extends View {
+  async waitForUserNumberDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="prompt-user-number"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterUserNumber(userNumber: string): Promise<void> {
+    // Assume the only input on this screen is the user number input
+    const input = await this.browser.$("input");
+    await input.setValue(userNumber);
+  }
+
+  async enterUserNumberContinue(): Promise<void> {
+    await this.browser.$('[data-action="next"]').click();
+  }
+}
+export class PromptDeviceAliasView extends View {
+  async waitForDeviceAliasDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="prompt-device-alias"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async skipDeviceAlias(): Promise<void> {
+    await this.browser.$('[data-action="skip"]').click();
+  }
+}
+
 export class ErrorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser

@@ -6,6 +6,8 @@ import {
   MainView,
   PinAuthView,
   PinRegistrationView,
+  PromptDeviceAliasView,
+  PromptUserNumberView,
   RecoverSeedPhraseView,
   RecoveryMethodSelectorView,
   RegisterView,
@@ -150,6 +152,7 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDisplay();
     await mainView.addRecoveryDevice();
+    await mainView.waitForDisplay();
     await browser.pause(10_000);
 
     // Wait for the main view to be displayed again to ensure that the recovery
@@ -194,8 +197,18 @@ export const FLOWS = {
     await recoveryView.enterSeedPhraseContinue();
     await recoveryView.skipDeviceEnrollment();
   },
-  recoverUsingDevice: async (browser: WebdriverIO.Browser): Promise<void> => {
+  recoverUsingDevice: async (
+    browser: WebdriverIO.Browser,
+    userNumber: string
+  ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.recoverDevice();
+    const userNumberView = new PromptUserNumberView(browser);
+    await userNumberView.waitForUserNumberDisplay();
+    await userNumberView.enterUserNumber(userNumber);
+    await userNumberView.enterUserNumberContinue();
+    const deviceAliasView = new PromptDeviceAliasView(browser);
+    await deviceAliasView.waitForDeviceAliasDisplay();
+    await deviceAliasView.skipDeviceAlias();
   },
 };
