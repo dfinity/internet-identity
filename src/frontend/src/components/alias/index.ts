@@ -22,7 +22,7 @@ export const promptDeviceAliasTemplate = (props: {
 
   const aliasInput: Ref<HTMLInputElement> = createRef();
   const promptDeviceAliasSlot = html`
-    <hgroup class="t-centered">
+    <hgroup class="t-centered" data-page="prompt-device-alias">
       <h1 class="t-title t-title--main">${props.title}</h1>
       <p class="t-lead t-paragraph l-stack">
         ${props.message ?? copy.specify_alias}
@@ -69,10 +69,16 @@ export const promptDeviceAliasTemplate = (props: {
           type="button"
           class="c-button c-button--secondary"
           @click="${() => props.cancel()}"
+          data-action="skip"
         >
           ${props.cancelText ?? copy.cancel}
         </button>
-        <button id="pickAliasSubmit" type="submit" class="c-button">
+        <button
+          id="pickAliasSubmit"
+          type="submit"
+          class="c-button"
+          data-action="next"
+        >
           ${copy.next}
         </button>
       </div>
