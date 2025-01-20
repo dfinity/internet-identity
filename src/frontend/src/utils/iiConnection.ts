@@ -966,7 +966,8 @@ export const readDeviceOrigin = (): [] | [string] => {
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: Omit<DeviceData, "alias">[] = [],
-  authenticatorAttachment?: AuthenticatorAttachment
+  authenticatorAttachment?: AuthenticatorAttachment,
+  rpId?: string
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
@@ -996,6 +997,7 @@ export const creationOptions = (
     ],
     rp: {
       name: "Internet Identity Service",
+      id: rpId,
     },
     user: {
       id: window.crypto.getRandomValues(new Uint8Array(16)),
