@@ -15,6 +15,7 @@ test("Recover with phrase", async () => {
     const _userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
     await mainView.waitForDisplay();
     await mainView.logout();
@@ -33,6 +34,7 @@ test("Recover with device", async () => {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await removeVirtualAuthenticator(browser, loginAuthenticator);
+    await browser.pause(10000);
 
     await addVirtualAuthenticator(browser);
     await FLOWS.addRecoveryMechanismDevice(browser);
@@ -53,6 +55,7 @@ test("Recover with both phrase and device", async () => {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await removeVirtualAuthenticator(browser, loginAuthenticator);
+    await browser.pause(10000);
 
     await addVirtualAuthenticator(browser);
     const seedPhrase = await FLOWS.addRecoveryMechanismSeedPhrase(browser);
