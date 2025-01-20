@@ -277,10 +277,14 @@ export class MainView extends View {
     await this.browser.$("#logoutButton").click();
   }
 
-  async addRecovery(): Promise<void> {
+  async addRecoverySeedPhrase(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
     await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
+  }
+
+  async addRecoveryDevice(): Promise<void> {
+    await this.browser.$('[data-action="add-recovery-device"]').click();
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
@@ -304,7 +308,7 @@ export class MainView extends View {
     await this.browser.$('[data-page="protect-phrase-info"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
 
-    const recoveryView = new RecoverView(this.browser);
+    const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
@@ -322,7 +326,7 @@ export class MainView extends View {
     await this.browser.$('[data-page="unprotect-phrase-info"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
 
-    const recoveryView = new RecoverView(this.browser);
+    const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
@@ -538,7 +542,7 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-role="anchor-input"]').click();
   }
 
-  async recover(): Promise<void> {
+  async recoverSeedPhrase(): Promise<void> {
     await await this.browser.$('[data-role="more-options"]').click();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
@@ -547,6 +551,17 @@ export class AuthenticateView extends View {
       .$('[data-action="recover-with-phrase"]')
       .waitForDisplayed();
     await this.browser.$('[data-action="recover-with-phrase"]').click();
+  }
+
+  async recoverDevice(): Promise<void> {
+    await await this.browser.$('[data-role="more-options"]').click();
+    await this.browser.$("#recoverButton").waitForDisplayed();
+    await this.browser.$("#recoverButton").scrollIntoView();
+    await this.browser.$("#recoverButton").click();
+    await this.browser
+      .$('[data-action="recover-with-device"]')
+      .waitForDisplayed();
+    await this.browser.$('[data-action="recover-with-device"]').click();
   }
 }
 
@@ -955,7 +970,7 @@ export class DemoAppView extends View {
   }
 }
 
-export class RecoverView extends View {
+export class RecoverSeedPhraseView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser

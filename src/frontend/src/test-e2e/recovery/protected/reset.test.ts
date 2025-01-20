@@ -1,6 +1,6 @@
 import { FLOWS } from "../../flows";
 import { addVirtualAuthenticator, runInBrowser } from "../../util";
-import { MainView, RecoverView } from "../../views";
+import { MainView, RecoverSeedPhraseView } from "../../views";
 
 import { DEVICE_NAME1, II_URL, RECOVERY_PHRASE_NAME } from "../../constants";
 
@@ -22,7 +22,7 @@ test("Reset protected recovery phrase", async () => {
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
 
-    const recoveryView = new RecoverView(browser);
+    const recoveryView = new RecoverSeedPhraseView(browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
@@ -50,7 +50,7 @@ test("Reset protected recovery phrase, confirm with incorrect seed phrase", asyn
     await browser.execute("window.scrollTo(0, document.body.scrollHeight)");
     await mainView.reset(RECOVERY_PHRASE_NAME);
 
-    const recoveryView = new RecoverView(browser);
+    const recoveryView = new RecoverSeedPhraseView(browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase("10000 definitely incorrect");
     await recoveryView.enterSeedPhraseContinue();
