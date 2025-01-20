@@ -16,9 +16,11 @@ import { verifyTentativeDevice } from "./verifyTentativeDevice";
 export const addDevice = async ({
   userNumber,
   connection,
+  origin,
 }: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
+  origin: string;
 }): Promise<void> => {
   // Enter registration mode and get info about the anchor
   const [timestamp, anchorInfo]: [Timestamp, IdentityAnchorInfo] =
@@ -35,7 +37,8 @@ export const addDevice = async ({
     const result = await pollForTentativeDevice(
       userNumber,
       connection,
-      timestamp
+      timestamp,
+      origin
     );
 
     if (result === "timeout") {

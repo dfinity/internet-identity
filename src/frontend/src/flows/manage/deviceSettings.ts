@@ -6,6 +6,7 @@ import { withLoader } from "$src/components/loader";
 import { recoverWithPhrase } from "$src/flows/recovery/recoverWith/phrase";
 import { phraseWizard } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
+import { cleanUpRpIdMapper } from "$src/storage";
 import {
   AuthenticatedConnection,
   bufferEqual,
@@ -20,7 +21,6 @@ import {
 } from "$src/utils/recoveryDevice";
 import { unknownToString } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-
 import copyJson from "./deviceSettings.json";
 
 /* Rename the device and return */
@@ -56,10 +56,12 @@ export const deleteDevice = async ({
   connection,
   device,
   reload,
+  userNumber,
 }: {
   connection: AuthenticatedConnection;
   device: DeviceData;
   reload: () => void;
+  userNumber: bigint;
 }) => {
   const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
     .buffer as DerEncodedPublicKey;
@@ -90,8 +92,11 @@ export const deleteDevice = async ({
     return;
   }
 
-  await withLoader(async () => {
-    await connection.remove(device.pubkey);
+  await withLoader(() => {
+    return Promise.all([
+      connection.remove(device.pubkey),
+      cleanUpRpIdMapper(userNumber),
+    ]);
   });
 
   if (sameDevice) {
