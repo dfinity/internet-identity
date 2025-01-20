@@ -34,6 +34,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
+import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
 import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import {
@@ -148,12 +149,6 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  // The rpID is used to get the passkey from the browser's WebAuthn API.
-  // Using different rpIDs allows us to have compatibility across multiple domains.
-  // However, when one RP ID is used and the user cancels, it must be because the user is in a device
-  // registered in another domain. In this case, we must try the other rpID.
-  // Map<userNumber, Set<rpID>>
-  private _cancelledRpIds: Map<bigint, Set<string | undefined>> = new Map();
   protected _mockOpenID = new MockOpenID();
 
   public constructor(
@@ -409,7 +404,11 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
+    // Get cancelled rpids for the user from local storage.
+    const cancelledRpIds = await getCancelledRpIds({
+      userNumber,
+      origin: window.location.origin,
+    });
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
@@ -443,13 +442,18 @@ export class Connection {
           dynamicRPIdEnabled &&
           hasCredentialsFromMultipleOrigins(credentials)
         ) {
-          if (this._cancelledRpIds.has(userNumber)) {
-            this._cancelledRpIds.get(userNumber)?.add(rpId);
-          } else {
-            this._cancelledRpIds.set(userNumber, new Set([rpId]));
+          try {
+            await addAnchorCancelledRpId({
+              userNumber,
+              origin: currentOrigin,
+              cancelledRpId: rpId,
+            });
+            // We want to user to retry again and a new RP ID will be used.
+            return { kind: "possiblyWrongRPID" };
+          } catch (e: unknown) {
+            console.error("Error adding cancelled RP ID to local storage", e);
+            return { kind: "webAuthnFailed" };
           }
-          // We want to user to retry again and a new RP ID will be used.
-          return { kind: "possiblyWrongRPID" };
         }
         return { kind: "webAuthnFailed" };
       }

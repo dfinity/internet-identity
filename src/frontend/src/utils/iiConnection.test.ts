@@ -10,6 +10,8 @@ import {
 } from "$src/repositories/identityMetadata";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
+import { IDBFactory } from "fake-indexeddb";
+import { clear as idbClear } from "idb-keyval";
 import {
   CredentialData,
   convertToValidCredentialData,
@@ -63,7 +65,13 @@ const mockActor = {
 
 const currentOrigin = "https://identity.internetcomputer.org";
 
-beforeEach(() => {
+beforeAll(() => {
+  // Initialize the IndexedDB global
+  global.indexedDB = new IDBFactory();
+});
+
+beforeEach(async () => {
+  await idbClear();
   infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
@@ -228,6 +236,62 @@ describe("Connection.login", () => {
           "identity.ic0.app"
         );
       }
+    });
+
+    // Test that the cancelled RP IDs are persisted across browser refrheses
+    it("connection excludes rpId when user cancels after new Conection is created", async () => {
+      // This one would fail because it's not the device the user is using at the moment.
+      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
+      const currentOriginCredentialData =
+        convertToValidCredentialData(currentOriginDevice);
+      const currentDevice: DeviceData = createMockDevice();
+      const currentDeviceCredentialData =
+        convertToValidCredentialData(currentDevice);
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      failSign = true;
+      const firstLoginResult = await connection.login(BigInt(12345));
+
+      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          currentOriginCredentialData,
+          currentDeviceCredentialData,
+        ]),
+        undefined
+      );
+
+      failSign = false;
+      const secondLoginResult = await connection.login(BigInt(12345));
+
+      expect(secondLoginResult.kind).toBe("loginSuccess");
+      if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
+        expect(secondLoginResult.connection).toBeInstanceOf(
+          AuthenticatedConnection
+        );
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+          2,
+          expect.arrayContaining([currentDeviceCredentialData]),
+          "identity.ic0.app"
+        );
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+          2,
+          expect.not.arrayContaining([currentOriginCredentialData]),
+          "identity.ic0.app"
+        );
+      }
+
+      const newConnection = new Connection("aaaaa-aa", mockActor);
+      const thirdLoginResult = await newConnection.login(BigInt(12345));
+
+      expect(thirdLoginResult.kind).toBe("loginSuccess");
     });
 
     it("connection doesn't exclude rpId if user has only one domain", async () => {
