@@ -8,6 +8,7 @@ import {
   AuthenticatedConnection,
   creationOptions,
 } from "$src/utils/iiConnection";
+import { readDeviceOrigin } from "$src/utils/readDeviceOrigin";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
@@ -41,14 +42,17 @@ const displayFailedToAddDevice = (error: Error) =>
 export const addCurrentDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices: Omit<DeviceData, "alias">[]
+  devices: Omit<DeviceData, "alias">[],
+  origin: string | undefined
 ): Promise<void> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
   let newDevice: WebAuthnIdentity;
+  // RP ID must be without schema and port
+  const rpId = origin !== undefined ? new URL(origin).hostname : undefined;
   try {
     newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices),
+      publicKey: creationOptions(devices, undefined, rpId),
     });
   } catch (error: unknown) {
     if (isWebAuthnDuplicateDevice(error)) {
@@ -78,6 +82,7 @@ export const addCurrentDevice = async (
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },
+        origin ?? readDeviceOrigin(),
         newDevice.rawId
       )
     );

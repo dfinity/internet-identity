@@ -4,9 +4,9 @@ import {
   MetadataMapV2,
 } from "$generated/internet_identity_types";
 import { CredentialId } from "$src/utils/credential-devices";
-import { readDeviceOrigin } from "$src/utils/iiConnection";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
+import { readDeviceOrigin } from "./readDeviceOrigin";
 
 /**
  * Helper to create a new PinIdentity authn method to be used in a registration flow.
@@ -77,7 +77,7 @@ const defaultSecuritySettings = (): AuthnMethodSecuritySettings => {
 
 const addOriginToMetadata = (metadata: MetadataMapV2) => {
   const origin = readDeviceOrigin();
-  if (origin.length !== 0) {
+  if (origin !== undefined) {
     metadata.push(["origin", { String: origin[0] }]);
   }
 };

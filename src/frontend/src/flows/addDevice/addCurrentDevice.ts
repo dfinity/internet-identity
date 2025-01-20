@@ -1,5 +1,6 @@
 import { infoScreenTemplate } from "$src/components/infoScreen";
 import { I18n } from "$src/i18n";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
@@ -43,10 +44,17 @@ export const addCurrentDeviceScreen = (
     addCurrentDevicePage({
       i18n: new I18n(),
       add: async () => {
-        const existingDevices = await connection.lookupAuthenticators(
-          userNumber
+        const credentials = await connection.lookupAuthenticators(userNumber);
+        const originNewDevice = getCredentialsOrigin({
+          credentials,
+          userAgent: navigator.userAgent,
+        });
+        await addCurrentDevice(
+          userNumber,
+          connection,
+          credentials,
+          originNewDevice
         );
-        await addCurrentDevice(userNumber, connection, existingDevices);
         resolve();
       },
       skip: () => resolve(),

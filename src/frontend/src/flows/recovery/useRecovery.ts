@@ -8,6 +8,7 @@ import {
   Connection,
   LoginSuccess,
 } from "$src/utils/iiConnection";
+import { readDeviceOrigin } from "$src/utils/readDeviceOrigin";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import {
@@ -160,6 +161,7 @@ const enrollAuthenticator = async ({
       { authentication: null },
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
+      readDeviceOrigin(),
       newDevice.rawId
     );
   } catch (error: unknown) {

@@ -1,7 +1,6 @@
+import { DEFAULT_DOMAIN } from "$showcase/constants";
 import { CredentialData } from "./credential-devices";
 
-// This is used when the origin is empty in the device data.
-const DEFAULT_DOMAIN = "https://identity.ic0.app";
 export const PROD_DOMAINS = [
   "https://identity.ic0.app",
   "https://identity.internetcomputer.org",

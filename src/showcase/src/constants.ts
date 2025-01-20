@@ -5,6 +5,9 @@ export const dapps = getDapps();
 
 export const iiLegacyOrigin = "https://identity.ic0.app";
 
+// This is used when the origin is empty in the device data.
+export const DEFAULT_DOMAIN = iiLegacyOrigin;
+
 const recoveryPhraseText =
   "10050 mandate vague same suspect eight pet gentle repeat maple actor about legal sword text food print material churn perfect sword blossom sleep vintage blouse";
 
