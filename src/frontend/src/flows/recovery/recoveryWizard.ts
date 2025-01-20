@@ -244,7 +244,7 @@ export const recoveryWizard = async (
       status: devicesStatus,
     });
     if (userChoice.action === "add-device") {
-      await addDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection, origin: window.origin });
     }
     if (userChoice.action === "do-not-remind") {
       connection.updateIdentityMetadata({
