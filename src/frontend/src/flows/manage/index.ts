@@ -289,7 +289,7 @@ export const renderManage = async ({
     }
     if (anchorInfo.device_registration.length !== 0) {
       // we are actually in a device registration process
-      await addDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection, origin: window.origin });
       continue;
     }
 
@@ -363,7 +363,7 @@ export const displayManage = async (
     }
 
     const onAddDevice = async () => {
-      await addDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection, origin: window.origin });
       resolve();
     };
     const addRecoveryPhrase = async () => {
