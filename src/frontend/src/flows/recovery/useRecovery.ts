@@ -160,6 +160,7 @@ const enrollAuthenticator = async ({
       { authentication: null },
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
+      window.origin,
       newDevice.rawId
     );
   } catch (error: unknown) {

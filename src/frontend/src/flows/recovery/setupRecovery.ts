@@ -64,6 +64,7 @@ export const setupKey = async ({
         { recovery: null },
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
+        window.origin,
         recoverIdentity.rawId
       );
     });
@@ -89,7 +90,8 @@ export const setupPhrase = async (
           { seed_phrase: null },
           { recovery: null },
           pubkey,
-          { unprotected: null }
+          { unprotected: null },
+          window.origin
         )
       ),
   });

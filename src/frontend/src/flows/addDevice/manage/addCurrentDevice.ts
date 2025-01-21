@@ -78,6 +78,7 @@ export const addCurrentDevice = async (
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },
+        window.origin,
         newDevice.rawId
       )
     );

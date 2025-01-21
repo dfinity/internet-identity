@@ -4,7 +4,6 @@ import {
   MetadataMapV2,
 } from "$generated/internet_identity_types";
 import { CredentialId } from "$src/utils/credential-devices";
-import { readDeviceOrigin } from "$src/utils/iiConnection";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
 
@@ -21,8 +20,8 @@ export const pinAuthnMethodData = ({
   const metadata: MetadataMapV2 = [
     ["alias", { String: alias }],
     ["usage", { String: "browser_storage_key" }],
+    ["origin", { String: window.origin }],
   ];
-  addOriginToMetadata(metadata);
   return {
     metadata,
     authn_method: {
@@ -47,8 +46,12 @@ export const passkeyAuthnMethodData = ({
   credentialId: CredentialId;
   authenticatorAttachment?: AuthenticatorAttachment;
 }): AuthnMethodData => {
-  const metadata: MetadataMapV2 = [["alias", { String: alias }]];
-  addOriginToMetadata(metadata);
+  const metadata: MetadataMapV2 = [
+    ["alias", { String: alias }],
+    // The origin in the metadata might not match the origin in the auth method if the origin is longer than 50 characters.
+    // TODO: Expect the origin as parameter because it might be different than the window if a RP ID is used.
+    ["origin", { String: window.origin }],
+  ];
   if (nonNullish(authenticatorAttachment)) {
     metadata.push([
       "authenticator_attachment",
@@ -73,11 +76,4 @@ const defaultSecuritySettings = (): AuthnMethodSecuritySettings => {
     protection: { Unprotected: null },
     purpose: { Authentication: null },
   };
-};
-
-const addOriginToMetadata = (metadata: MetadataMapV2) => {
-  const origin = readDeviceOrigin();
-  if (origin.length !== 0) {
-    metadata.push(["origin", { String: origin[0] }]);
-  }
 };

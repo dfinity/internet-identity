@@ -724,9 +724,14 @@ export class AuthenticatedConnection extends Connection {
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
     protection: DeviceData["protection"],
+    origin: string | undefined,
     credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
+    // The canister only allow for 50 characters, so for long domains we don't attach an origin
+    // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
+    const sanitizedOrigin =
+      nonNullish(origin) && origin.length > 50 ? origin : undefined;
     return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -736,7 +741,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
-      origin: readDeviceOrigin(),
+      origin: sanitizedOrigin === undefined ? [] : [sanitizedOrigin],
       metadata: [],
     });
   };
@@ -938,19 +943,6 @@ export class AuthenticatedConnection extends Connection {
     await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
   };
 }
-
-// Reads the "origin" used to infer what domain a FIDO device is available on.
-// The canister only allow for 50 characters, so for long domains we don't attach an origin
-// (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
-//
-// The return type is odd but that's what our didc version expects.
-export const readDeviceOrigin = (): [] | [string] => {
-  if (isNullish(window?.origin) || window.origin.length > 50) {
-    return [];
-  }
-
-  return [window.origin];
-};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
