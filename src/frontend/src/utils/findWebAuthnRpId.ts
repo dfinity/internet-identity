@@ -1,7 +1,6 @@
+import { iiLegacyOrigin } from "$showcase/constants";
 import { CredentialData } from "./credential-devices";
 
-// This is used when the origin is empty in the device data.
-const DEFAULT_DOMAIN = "https://identity.ic0.app";
 export const PROD_DOMAINS = [
   "https://identity.ic0.app",
   "https://identity.internetcomputer.org",
@@ -33,7 +32,7 @@ export const relatedDomains = (): string[] => {
 export const hasCredentialsFromMultipleOrigins = (
   credentials: CredentialData[]
 ): boolean =>
-  new Set(credentials.map(({ origin }) => origin ?? DEFAULT_DOMAIN)).size > 1;
+  new Set(credentials.map(({ origin }) => origin ?? iiLegacyOrigin)).size > 1;
 
 /**
  * Filters out credentials from specific origins.
@@ -62,7 +61,7 @@ export const excludeCredentialsFromOrigins = (
   return credentials.filter(
     (credential) =>
       originsToExclude.filter((originToExclude) =>
-        sameDomain(credential.origin ?? DEFAULT_DOMAIN, originToExclude)
+        sameDomain(credential.origin ?? iiLegacyOrigin, originToExclude)
       ).length === 0
   );
 };
@@ -76,7 +75,7 @@ const getFirstHostname = (devices: CredentialData[]): string => {
   if (devices[0] === undefined) {
     throw new Error("Not possible. Call this function only if devices exist.");
   }
-  return hostname(devices[0].origin ?? DEFAULT_DOMAIN);
+  return hostname(devices[0].origin ?? iiLegacyOrigin);
 };
 
 /**
@@ -91,7 +90,7 @@ const getDevicesForDomain = (
   devices: CredentialData[],
   domain: string
 ): CredentialData[] =>
-  devices.filter((d) => sameDomain(d.origin ?? DEFAULT_DOMAIN, domain));
+  devices.filter((d) => sameDomain(d.origin ?? iiLegacyOrigin, domain));
 
 /**
  * Returns the domain to use as the RP ID for WebAuthn registration.
