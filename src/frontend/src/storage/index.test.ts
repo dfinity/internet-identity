@@ -433,33 +433,49 @@ test(
 test(
   "should reset the cancelled RP IDs by user number",
   withStorage(async () => {
+    const creationDate = new Date("2025-01-05");
+    const lastUsedTimestamp = creationDate.getTime();
+    vi.useFakeTimers().setSystemTime(creationDate);
     const origin = "https://example.com";
     const userNumber = BigInt(10000);
     const anotherUserNumber = BigInt(10001);
     const cancelledRpId = "https://identity.ic0.app";
 
-    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
-      new Set([])
-    );
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([]),
+      lastUsedTimestamp: undefined,
+    });
     await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
     await addAnchorCancelledRpId({
       userNumber: anotherUserNumber,
       origin,
       cancelledRpId,
     });
-    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
-      new Set([cancelledRpId])
-    );
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([cancelledRpId]),
+      lastUsedTimestamp: undefined,
+    });
+    // Test that the last used timestamp is set
+    await setAnchorUsed(anotherUserNumber);
     expect(
       await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
-    ).toEqual(new Set([cancelledRpId]));
+    ).toEqual({
+      cancelledRpIds: new Set([cancelledRpId]),
+      lastUsedTimestamp,
+    });
     await cleanUpRpIdMapper(userNumber);
-    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
-      new Set([])
-    );
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([]),
+      lastUsedTimestamp: undefined,
+    });
     expect(
       await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
-    ).toEqual(new Set([cancelledRpId]));
+    ).toEqual({
+      cancelledRpIds: new Set([cancelledRpId]),
+      lastUsedTimestamp,
+    });
+
+    vi.useRealTimers();
   })
 );
 
@@ -472,20 +488,21 @@ test(
     const userNumber = BigInt(10000);
     const cancelledRpId = "https://identity.ic0.app";
 
-    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
-      new Set([])
-    );
+    expect(
+      (await getCancelledRpIds({ userNumber, origin })).cancelledRpIds
+    ).toEqual(new Set([]));
     await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
     await addAnchorCancelledRpId({
       userNumber,
       origin,
       cancelledRpId: undefinedOrigin,
     });
-    expect(await getCancelledRpIds({ userNumber, origin })).toEqual(
-      new Set([cancelledRpId, undefined])
-    );
     expect(
-      await getCancelledRpIds({ userNumber, origin: anotherOrigin })
+      (await getCancelledRpIds({ userNumber, origin })).cancelledRpIds
+    ).toEqual(new Set([cancelledRpId, undefined]));
+    expect(
+      (await getCancelledRpIds({ userNumber, origin: anotherOrigin }))
+        .cancelledRpIds
     ).toEqual(new Set([]));
   })
 );

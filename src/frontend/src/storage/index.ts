@@ -244,7 +244,8 @@ export const addAnchorCancelledRpId = async ({
 
     storage.anchors[anchorIndex] = {
       ...oldAnchor,
-      lastUsedTimestamp: nowMillis(),
+      // Only set on successful login.
+      lastUsedTimestamp: undefined,
       cancelledRpIdsMapper: {
         ...cancelledRpIdsMapper,
         [origin]: originCancelledRpIds,
@@ -269,12 +270,19 @@ export const getCancelledRpIds = async ({
 }: {
   userNumber: bigint;
   origin: string;
-}): Promise<Set<string | undefined>> => {
+}): Promise<{
+  cancelledRpIds: Set<string | undefined>;
+  lastUsedTimestamp?: number;
+}> => {
   const storage = await readStorage();
   const anchors = storage.anchors;
 
   const anchorData = anchors[userNumber.toString()];
-  return new Set(anchorData?.cancelledRpIdsMapper?.[origin] ?? []);
+  const cancelledRpIds = new Set(
+    anchorData?.cancelledRpIdsMapper?.[origin] ?? []
+  );
+  const lastUsedTimestamp = anchorData?.lastUsedTimestamp;
+  return { cancelledRpIds, lastUsedTimestamp };
 };
 
 /** Accessing functions */
@@ -371,7 +379,7 @@ const mostUnused = (anchors: Anchors): string | undefined => {
     lastUsedTimestamp: anchors[ix].lastUsedTimestamp,
   }));
 
-  arr.sort((a, b) => a.lastUsedTimestamp - b.lastUsedTimestamp);
+  arr.sort((a, b) => (a.lastUsedTimestamp ?? 0) - (b.lastUsedTimestamp ?? 0));
 
   return arr[0]?.ix;
 };
@@ -677,7 +685,7 @@ const PrincipalDataV3 = z.object({
 
 const AnchorV3 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
-  lastUsedTimestamp: z.number(),
+  lastUsedTimestamp: z.number().optional(),
 
   knownPrincipals: z.array(PrincipalDataV3),
 });
@@ -757,8 +765,8 @@ const cancelledRpIdsMapper = z.record(
 );
 
 const AnchorV4 = z.object({
-  /** Timestamp (mills since epoch) of when anchor was last used */
-  lastUsedTimestamp: z.number(),
+  /** Timestamp (mills since epoch) of when anchor was last successfully used */
+  lastUsedTimestamp: z.number().optional(),
   cancelledRpIdsMapper: cancelledRpIdsMapper.optional(),
 
   knownPrincipals: z.array(PrincipalDataV4),
