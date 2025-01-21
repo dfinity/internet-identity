@@ -8,7 +8,6 @@ import {
   creationOptions,
   IC_DERIVATION_PATH,
 } from "$src/utils/iiConnection";
-import { readDeviceOrigin } from "$src/utils/readDeviceOrigin";
 import { unreachable, unreachableLax } from "$src/utils/utils";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
@@ -65,7 +64,7 @@ export const setupKey = async ({
         { recovery: null },
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
-        readDeviceOrigin(),
+        window.origin,
         recoverIdentity.rawId
       );
     });
@@ -92,7 +91,7 @@ export const setupPhrase = async (
           { recovery: null },
           pubkey,
           { unprotected: null },
-          readDeviceOrigin()
+          window.origin
         )
       ),
   });

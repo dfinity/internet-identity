@@ -8,7 +8,6 @@ import {
   AuthenticatedConnection,
   creationOptions,
 } from "$src/utils/iiConnection";
-import { readDeviceOrigin } from "$src/utils/readDeviceOrigin";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
@@ -79,7 +78,7 @@ export const addCurrentDevice = async (
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },
-        readDeviceOrigin(),
+        window.origin,
         newDevice.rawId
       )
     );
