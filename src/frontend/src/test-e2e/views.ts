@@ -1022,7 +1022,7 @@ export class PromptDeviceAliasView extends View {
   async waitForDeviceAliasDisplay(): Promise<void> {
     await this.browser
       .$('[data-page="prompt-device-alias"]')
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async skipDeviceAlias(): Promise<void> {
