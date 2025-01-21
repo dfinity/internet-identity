@@ -1,4 +1,4 @@
-import { iiLegacyOrigin } from "$showcase/constants";
+import { iiLegacyOrigin } from "$src/constants";
 import { CredentialData } from "./credential-devices";
 
 export const PROD_DOMAINS = [

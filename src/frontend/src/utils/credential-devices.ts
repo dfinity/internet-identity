@@ -1,5 +1,5 @@
 import { DeviceData, DeviceKey } from "$generated/internet_identity_types";
-import { iiLegacyOrigin } from "$showcase/constants";
+import { iiLegacyOrigin } from "$src/constants";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { supportsWebauthRoR } from "./userAgent";
 
@@ -49,7 +49,9 @@ export const convertToValidCredentialData = (
  * - If they do, it returns the origin.
  * - If they don't, it returns `undefined`.
  *
- * @param credentials
+ * @param {Object} params
+ * @param {DeviceData[]} params.credentials - The devices to check.
+ * @param {string} params.userAgent - The user agent string.
  * @returns {string | undefined} The origin to use when adding a new device.
  * - If `undefined` then no common origin was found. Probalby use `window.origin` or `undefined` for RP ID.
  * - If `string` then the origin can be used to add a new device. Remember to use the hostname only for RP ID.
