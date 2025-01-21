@@ -77,7 +77,7 @@ const defaultSecuritySettings = (): AuthnMethodSecuritySettings => {
 
 const addOriginToMetadata = (metadata: MetadataMapV2) => {
   const origin = readDeviceOrigin();
-  if (origin !== undefined) {
+  if (nonNullish(origin)) {
     metadata.push(["origin", { String: origin }]);
   }
 };
