@@ -8,7 +8,6 @@ import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$src/repositories/identityMetadata";
-import { setAnchorUsed } from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
@@ -293,61 +292,6 @@ describe("Connection.login", () => {
       const thirdLoginResult = await newConnection.login(BigInt(12345));
 
       expect(thirdLoginResult.kind).toBe("loginSuccess");
-    });
-
-    it("show add current device depends on the last time the anchor was used", async () => {
-      const creationDate = new Date("2025-01-05");
-      vi.useFakeTimers().setSystemTime(creationDate);
-
-      const userNumber = BigInt(12345);
-      // This one would fail because it's not the device the user is using at the moment.
-      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
-      const currentDevice: DeviceData = createMockDevice();
-      const mockActor = {
-        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
-      } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      failSign = true;
-      const firstLoginResult = await connection.login(userNumber);
-
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
-
-      failSign = false;
-      const secondLoginResult = await connection.login(userNumber);
-
-      expect(secondLoginResult.kind).toBe("loginSuccess");
-      if (secondLoginResult.kind === "loginSuccess") {
-        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
-      }
-
-      // This is necessary to set the last used anchor timestamp
-      await setAnchorUsed(userNumber);
-      const oneDayMillis = 24 * 60 * 60 * 1000;
-      vi.useFakeTimers().advanceTimersByTime(oneDayMillis);
-
-      const newConnection = new Connection("aaaaa-aa", mockActor);
-      const thirdLoginResult = await newConnection.login(userNumber);
-
-      expect(thirdLoginResult.kind).toBe("loginSuccess");
-      if (thirdLoginResult.kind === "loginSuccess") {
-        expect(thirdLoginResult.showAddCurrentDevice).toBe(false);
-      }
-
-      // This is necessary to set the last used anchor timestamp
-      await setAnchorUsed(userNumber);
-      vi.useFakeTimers().advanceTimersByTime(oneDayMillis * 7 + 1000);
-
-      const anotherConnection = new Connection("aaaaa-aa", mockActor);
-      const fourthLoginResult = await anotherConnection.login(userNumber);
-
-      expect(fourthLoginResult.kind).toBe("loginSuccess");
-      if (fourthLoginResult.kind === "loginSuccess") {
-        expect(fourthLoginResult.showAddCurrentDevice).toBe(true);
-      }
-
-      vi.useRealTimers();
     });
 
     it("connection doesn't exclude rpId if user has only one domain", async () => {

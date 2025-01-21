@@ -19,6 +19,7 @@ import {
   getCancelledRpIds,
   setAnchorUsed,
   setKnownPrincipal,
+  setLastShownAddCurrentDevicePage,
 } from ".";
 
 beforeAll(() => {
@@ -461,7 +462,7 @@ test(
 test(
   "should not create an anchor after adding a cancelled RP ID",
   withStorage(async () => {
-    const origin = "https://example.com";
+    const origin = "https://identity.ic0.app";
     const userNumber = BigInt(10000);
     const cancelledRpId = "https://identity.ic0.app";
 
@@ -474,17 +475,14 @@ test(
 test(
   "should reset the cancelled RP IDs by user number",
   withStorage(async () => {
-    const creationDate = new Date("2025-01-05");
-    const lastUsedTimestamp = creationDate.getTime();
-    vi.useFakeTimers().setSystemTime(creationDate);
-    const origin = "https://example.com";
+    const origin = "https://identity.ic0.app";
     const userNumber = BigInt(10000);
     const anotherUserNumber = BigInt(10001);
     const cancelledRpId = "https://identity.ic0.app";
 
     expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
       cancelledRpIds: new Set([]),
-      lastUsedTimestamp: undefined,
+      lastShownAddCurrentDevicePage: undefined,
     });
     await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
     await addAnchorCancelledRpId({
@@ -494,7 +492,7 @@ test(
     });
     expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
       cancelledRpIds: new Set([cancelledRpId]),
-      lastUsedTimestamp: undefined,
+      lastShownAddCurrentDevicePage: undefined,
     });
     // Test that the last used timestamp is set
     await setAnchorUsed(anotherUserNumber);
@@ -502,30 +500,28 @@ test(
       await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
     ).toEqual({
       cancelledRpIds: new Set([cancelledRpId]),
-      lastUsedTimestamp,
+      lastShownAddCurrentDevicePage: undefined,
     });
     await cleanUpRpIdMapper(userNumber);
     expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
       cancelledRpIds: new Set([]),
-      lastUsedTimestamp: undefined,
+      lastShownAddCurrentDevicePage: undefined,
     });
     expect(
       await getCancelledRpIds({ userNumber: anotherUserNumber, origin })
     ).toEqual({
       cancelledRpIds: new Set([cancelledRpId]),
-      lastUsedTimestamp,
+      lastShownAddCurrentDevicePage: undefined,
     });
-
-    vi.useRealTimers();
   })
 );
 
 test(
   "should add cancelled RP IDs per origin",
   withStorage(async () => {
-    const origin = "https://example.com";
+    const origin = "https://identity.ic0.app";
     const undefinedOrigin = undefined;
-    const anotherOrigin = "https://another.com";
+    const anotherOrigin = "https://identity.internetcomputer.org";
     const userNumber = BigInt(10000);
     const cancelledRpId = "https://identity.ic0.app";
 
@@ -545,6 +541,43 @@ test(
       (await getCancelledRpIds({ userNumber, origin: anotherOrigin }))
         .cancelledRpIds
     ).toEqual(new Set([]));
+  })
+);
+
+test(
+  "should set the last time the user saw the add current device page",
+  withStorage(async () => {
+    const date = new Date(0);
+    vi.useFakeTimers().setSystemTime(date);
+    const origin = "https://identity.ic0.app";
+    const userNumber = BigInt(10000);
+    const cancelledRpId = undefined;
+
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([]),
+      lastShownAddCurrentDevicePage: undefined,
+    });
+
+    await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([cancelledRpId]),
+      lastShownAddCurrentDevicePage: undefined,
+    });
+
+    await setLastShownAddCurrentDevicePage(userNumber);
+    expect(await getCancelledRpIds({ userNumber, origin })).toEqual({
+      cancelledRpIds: new Set([cancelledRpId]),
+      lastShownAddCurrentDevicePage: date.getTime(),
+    });
+  })
+);
+
+test(
+  "setLastShownAddCurrentDevicePage doesn't create anchors",
+  withStorage(async () => {
+    const userNumber = BigInt(10000);
+    await setLastShownAddCurrentDevicePage(userNumber);
+    expect(await getAnchors()).toEqual([]);
   })
 );
 
