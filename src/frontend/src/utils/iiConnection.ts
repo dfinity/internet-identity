@@ -737,7 +737,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
-      origin: origin === undefined ? [] : [origin] readDeviceOrigin(),
+      origin: origin === undefined ? [] : [origin],
       metadata: [],
     });
   };
