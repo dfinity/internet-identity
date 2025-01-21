@@ -28,7 +28,6 @@ test("Recover with phrase", async () => {
 test("Recover with device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const loginAuthenticator = await addVirtualAuthenticator(browser);
-    await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
