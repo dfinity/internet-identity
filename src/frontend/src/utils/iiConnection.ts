@@ -405,7 +405,7 @@ export class Connection {
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     // Get cancelled rpids for the user from local storage.
-    const cancelledRpIds = await getCancelledRpIds({
+    const { cancelledRpIds } = await getCancelledRpIds({
       userNumber,
       origin: window.location.origin,
     });

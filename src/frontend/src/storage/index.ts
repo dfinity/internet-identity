@@ -269,12 +269,37 @@ export const getCancelledRpIds = async ({
 }: {
   userNumber: bigint;
   origin: string;
-}): Promise<Set<string | undefined>> => {
+}): Promise<{
+  cancelledRpIds: Set<string | undefined>;
+  lastShownAddCurrentDevicePage: number | undefined;
+}> => {
   const storage = await readStorage();
   const anchors = storage.anchors;
 
   const anchorData = anchors[userNumber.toString()];
-  return new Set(anchorData?.cancelledRpIdsMapper?.[origin] ?? []);
+  return {
+    cancelledRpIds: new Set(anchorData?.cancelledRpIdsMapper?.[origin] ?? []),
+    lastShownAddCurrentDevicePage: anchorData?.lastShownAddCurrentDevicePage,
+  };
+};
+
+export const setLastShownAddCurrentDevicePage = async (userNumber: bigint) => {
+  await withStorage((storage) => {
+    const anchorIndex = userNumber.toString();
+    const anchors = storage.anchors;
+    const oldAnchor = anchors[anchorIndex];
+
+    if (isNullish(oldAnchor)) {
+      return storage;
+    }
+
+    storage.anchors[anchorIndex] = {
+      ...oldAnchor,
+      lastShownAddCurrentDevicePage: nowMillis(),
+    };
+
+    return storage;
+  });
 };
 
 /** Accessing functions */
@@ -760,6 +785,9 @@ const AnchorV4 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
   cancelledRpIdsMapper: cancelledRpIdsMapper.optional(),
+  // Timestamp (mills since epoch) of when the user last saw the add current device page
+  // We use this to show the page only once per week.
+  lastShownAddCurrentDevicePage: z.number().optional(),
 
   knownPrincipals: z.array(PrincipalDataV4),
 });
