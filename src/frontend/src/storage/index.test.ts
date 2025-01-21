@@ -226,6 +226,23 @@ test(
 );
 
 test(
+  "unused anchors are not returned",
+  withStorage(async () => {
+    const anchors = [BigInt(10400), BigInt(10001), BigInt(1011003)];
+    for (const anchor of anchors) {
+      await setAnchorUsed(anchor);
+    }
+    await addAnchorCancelledRpId({
+      userNumber: BigInt(50001),
+      origin: "https://identity.ic0.app",
+      cancelledRpId: undefined,
+    });
+    anchors.sort();
+    expect(await getAnchors()).toStrictEqual(anchors);
+  })
+);
+
+test(
   "only N anchors are stored",
   withStorage(async () => {
     for (let i = 0; i < MAX_SAVED_ANCHORS + 5; i++) {
@@ -370,6 +387,30 @@ test(
 );
 
 test(
+  "should not retrieve anchor if not used",
+  withStorage(async () => {
+    const origin = "https://identity.ic0.app";
+    const principal = Principal.fromText(
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+    );
+    const userNumber = BigInt(10000);
+    await addAnchorCancelledRpId({
+      userNumber,
+      origin,
+      cancelledRpId: undefined,
+    });
+    expect(await getAnchorIfLastUsed({ principal, origin })).toBeUndefined();
+
+    await setKnownPrincipal({
+      userNumber,
+      origin,
+      principal,
+    });
+    expect(await getAnchorIfLastUsed({ principal, origin })).toBe(userNumber);
+  })
+);
+
+test(
   "latest principals on different origins can be retrieved",
   withStorage(async () => {
     const origin1 = "https://example1.com";
@@ -418,7 +459,7 @@ test(
 );
 
 test(
-  "should create an anchor after adding a cancelled RP ID",
+  "should not create an anchor after adding a cancelled RP ID",
   withStorage(async () => {
     const origin = "https://example.com";
     const userNumber = BigInt(10000);
@@ -426,7 +467,7 @@ test(
 
     expect(await getAnchors()).toEqual([]);
     await addAnchorCancelledRpId({ userNumber, origin, cancelledRpId });
-    expect(await getAnchors()).toEqual([userNumber]);
+    expect(await getAnchors()).toEqual([]);
   })
 );
 

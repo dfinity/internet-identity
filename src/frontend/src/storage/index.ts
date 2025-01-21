@@ -20,10 +20,12 @@ export const MAX_SAVED_ANCHORS = 10;
  * moment the user tries to verify a credential. */
 export const MAX_SAVED_PRINCIPALS = 40;
 
-/** Read saved anchors, sorted */
+/** Read saved and used anchors, sorted */
 export const getAnchors = async (): Promise<bigint[]> => {
   const data = await readStorage();
-  const anchors = Object.keys(data.anchors).map((ix) => BigInt(ix));
+  const anchors: bigint[] = Object.keys(data.anchors)
+    .filter((ix) => data.anchors[ix].lastUsedTimestamp !== undefined)
+    .map((ix) => BigInt(ix));
 
   // NOTE: This sort here is only used to ensure users see a stable ordering of anchors.
   anchors.sort();
@@ -112,7 +114,7 @@ export const getAnchorIfLastUsed = async ({
     const lastUsed = anchor.knownPrincipals.filter(
       (knownPrincipal) => knownPrincipal.originDigest === originDigest
     )[0];
-    if (isNullish(lastUsed)) {
+    if (isNullish(lastUsed) || isNullish(anchor.lastUsedTimestamp)) {
       continue;
     }
     candidates.push({
@@ -177,14 +179,20 @@ export const setKnownPrincipal = async ({
 
     // Add the new principal and sort (most recently used is first)
     dedupedPrincipals.push(principalData);
-    dedupedPrincipals.sort((a, b) => b.lastUsedTimestamp - a.lastUsedTimestamp);
+    dedupedPrincipals.sort(
+      (a, b) => (b.lastUsedTimestamp ?? 0) - (a.lastUsedTimestamp ?? 0)
+    );
 
     // Only keep the more recent N principals
     const prunedPrincipals = dedupedPrincipals.slice(0, MAX_SAVED_PRINCIPALS);
 
     // Here we try to be as non-destructive as possible and we keep potentially unknown
     // fields
-    storage.anchors[ix] = { ...oldAnchor, knownPrincipals: prunedPrincipals };
+    storage.anchors[ix] = {
+      ...oldAnchor,
+      knownPrincipals: prunedPrincipals,
+      lastUsedTimestamp: nowMillis(),
+    };
     return storage;
   });
 };
