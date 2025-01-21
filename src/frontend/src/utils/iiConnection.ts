@@ -405,10 +405,11 @@ export class Connection {
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     // Get cancelled rpids for the user from local storage.
-    const { cancelledRpIds } = await getCancelledRpIds({
-      userNumber,
-      origin: window.location.origin,
-    });
+    const { cancelledRpIds, lastShownAddCurrentDevicePage } =
+      await getCancelledRpIds({
+        userNumber,
+        origin: window.location.origin,
+      });
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
@@ -477,11 +478,20 @@ export class Connection {
       actor
     );
 
+    // We want to show the page to add the current device if
+    // there are cancelled rpids and the user hasn't seen the page in the last week.
+    const oneWeekMillis = 1000 * 60 * 60 * 24 * 7;
+    const weekAgoMillis = Date.now() - oneWeekMillis;
+    const showAddCurrentDevice =
+      cancelledRpIds.size > 0 &&
+      (lastShownAddCurrentDevicePage === undefined ||
+        lastShownAddCurrentDevicePage < weekAgoMillis);
+
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
-      showAddCurrentDevice: cancelledRpIds.size > 0,
+      showAddCurrentDevice,
     };
   };
   fromIdentity = async (

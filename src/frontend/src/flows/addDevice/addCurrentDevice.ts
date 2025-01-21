@@ -1,5 +1,6 @@
 import { infoScreenTemplate } from "$src/components/infoScreen";
 import { I18n } from "$src/i18n";
+import { setLastShownAddCurrentDevicePage } from "$src/storage";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
@@ -35,10 +36,11 @@ export const addCurrentDevicePage = renderPage(addCurrentDeviceTemplate);
 
 // Prompt the user to add the current device (with the current origin).
 // Adding the current device to the current origin improves the UX of the user when they come back to this origin.
-export const addCurrentDeviceScreen = (
+export const addCurrentDeviceScreen = async (
   userNumber: bigint,
   connection: AuthenticatedConnection
 ): Promise<void> => {
+  await setLastShownAddCurrentDevicePage(userNumber);
   return new Promise((resolve) =>
     addCurrentDevicePage({
       i18n: new I18n(),
