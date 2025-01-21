@@ -227,12 +227,10 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
           2,
-          expect.arrayContaining([currentDeviceCredentialData]),
-          "identity.ic0.app"
-        );
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
-          2,
-          expect.not.arrayContaining([currentOriginCredentialData]),
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentDeviceCredentialData,
+          ]),
           "identity.ic0.app"
         );
       }
@@ -278,12 +276,10 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
           2,
-          expect.arrayContaining([currentDeviceCredentialData]),
-          "identity.ic0.app"
-        );
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
-          2,
-          expect.not.arrayContaining([currentOriginCredentialData]),
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentDeviceCredentialData,
+          ]),
           "identity.ic0.app"
         );
       }

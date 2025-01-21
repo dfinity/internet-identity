@@ -428,7 +428,8 @@ export class Connection {
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(filteredCredentials, rpId);
+      : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
+        MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
