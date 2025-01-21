@@ -1,5 +1,5 @@
 import { DeviceData, DeviceKey } from "$generated/internet_identity_types";
-import { iiLegacyOrigin } from "$src/constants";
+import { II_LEGACY_ORIGIN } from "$src/constants";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { supportsWebauthRoR } from "./userAgent";
 
@@ -67,7 +67,7 @@ export const getCredentialsOrigin = ({
     return undefined;
   }
   const credentialOrigins = new Set(
-    credentials.map((c) => c.origin[0] ?? iiLegacyOrigin)
+    credentials.map((c) => c.origin[0] ?? II_LEGACY_ORIGIN)
   );
   if (credentialOrigins.size === 1) {
     return credentialOrigins.values().next().value;

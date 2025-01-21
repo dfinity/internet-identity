@@ -1,4 +1,4 @@
-import { iiLegacyOrigin } from "$src/constants";
+import { II_LEGACY_ORIGIN } from "$src/constants";
 import { CredentialData } from "./credential-devices";
 
 export const PROD_DOMAINS = [
@@ -32,7 +32,7 @@ export const relatedDomains = (): string[] => {
 export const hasCredentialsFromMultipleOrigins = (
   credentials: CredentialData[]
 ): boolean =>
-  new Set(credentials.map(({ origin }) => origin ?? iiLegacyOrigin)).size > 1;
+  new Set(credentials.map(({ origin }) => origin ?? II_LEGACY_ORIGIN)).size > 1;
 
 /**
  * Filters out credentials from specific origins.
@@ -61,7 +61,7 @@ export const excludeCredentialsFromOrigins = (
   return credentials.filter(
     (credential) =>
       originsToExclude.filter((originToExclude) =>
-        sameDomain(credential.origin ?? iiLegacyOrigin, originToExclude)
+        sameDomain(credential.origin ?? II_LEGACY_ORIGIN, originToExclude)
       ).length === 0
   );
 };
@@ -75,7 +75,7 @@ const getFirstHostname = (devices: CredentialData[]): string => {
   if (devices[0] === undefined) {
     throw new Error("Not possible. Call this function only if devices exist.");
   }
-  return hostname(devices[0].origin ?? iiLegacyOrigin);
+  return hostname(devices[0].origin ?? II_LEGACY_ORIGIN);
 };
 
 /**
@@ -90,7 +90,7 @@ const getDevicesForDomain = (
   devices: CredentialData[],
   domain: string
 ): CredentialData[] =>
-  devices.filter((d) => sameDomain(d.origin ?? iiLegacyOrigin, domain));
+  devices.filter((d) => sameDomain(d.origin ?? II_LEGACY_ORIGIN, domain));
 
 /**
  * Returns the domain to use as the RP ID for WebAuthn registration.

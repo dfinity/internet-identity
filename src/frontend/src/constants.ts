@@ -1,2 +1,2 @@
 // If credentials have no origin, it's because they were created in this domain
-export const iiLegacyOrigin = "https://identity.ic0.app";
+export const II_LEGACY_ORIGIN = "https://identity.ic0.app";
