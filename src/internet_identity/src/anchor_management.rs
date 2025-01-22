@@ -186,22 +186,21 @@ pub fn identity_metadata_replace(
     Ok(Operation::IdentityMetadataReplace { metadata_keys })
 }
 
-/// Adds an OpenID credential to the given anchor and returns the operation to be archived.
-/// Returns an error if the OpenID credential already exists.
+/// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
+/// Returns an error if the `OpenIdCredential` already exists.
 #[allow(unused)]
 pub fn add_openid_credential(
     anchor: &mut Anchor,
-    openid_credential_data: OpenIdCredentialData,
+    openid_credential: OpenIdCredential,
 ) -> Result<Operation, AnchorError> {
-    let openid_credential = OpenIdCredential::from(openid_credential_data);
     anchor.add_openid_credential(openid_credential.clone())?;
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
     })
 }
 
-/// Removes a device of the given anchor and returns the operation to be archived.
-/// Return an error if the OpenID credential to be removed does not exist
+/// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
+/// Return an error if the `OpenIdCredential` to be removed does not exist.
 #[allow(unused)]
 pub fn remove_openid_credential(
     anchor: &mut Anchor,

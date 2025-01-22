@@ -151,7 +151,7 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
             devices: storable_anchor.devices,
             openid_credentials: stable_anchor
                 .and_then(|anchor| anchor.openid_credentials)
-                .unwrap_or(vec![]),
+                .unwrap_or_default(),
             metadata: storable_anchor.metadata,
         }
     }
@@ -339,14 +339,25 @@ impl Anchor {
     }
 
     fn openid_credential_index(&self, iss: &str, sub: &str) -> Result<usize, AnchorError> {
-        let Some(index) = self.openid_credentials.iter().position(|entry| entry.iss == iss && entry.sub == sub) else {
+        let Some(index) = self
+            .openid_credentials
+            .iter()
+            .position(|entry| entry.iss == iss && entry.sub == sub)
+        else {
             return Err(AnchorError::OpenIdCredentialNotFound);
         };
         Ok(index)
     }
 
-    pub fn add_openid_credential(&mut self, openid_credential: OpenIdCredential) -> Result<(), AnchorError> {
-        if self.openid_credentials.iter().any(|entry| entry.iss == openid_credential.iss && entry.sub == openid_credential.sub) {
+    pub fn add_openid_credential(
+        &mut self,
+        openid_credential: OpenIdCredential,
+    ) -> Result<(), AnchorError> {
+        if self
+            .openid_credentials
+            .iter()
+            .any(|entry| entry.iss == openid_credential.iss && entry.sub == openid_credential.sub)
+        {
             return Err(AnchorError::DuplicateOpenIdCredential);
         }
         self.openid_credentials.push(openid_credential);

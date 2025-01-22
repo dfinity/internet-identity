@@ -12,11 +12,15 @@ use std::collections::HashMap;
 
 mod google;
 
+pub type Iss = String;
+pub type Sub = String;
+pub type Aud = String;
+
 #[derive(Debug, PartialEq, Eq, CandidType, Deserialize, Clone)]
 pub struct OpenIdCredential {
-    pub iss: String,
-    pub sub: String,
-    pub aud: String,
+    pub iss: Iss,
+    pub sub: Sub,
+    pub aud: Aud,
     pub delegation_principal: Principal,
     pub last_usage_timestamp: Timestamp,
     pub metadata: HashMap<String, MetadataEntryV2>,
@@ -62,7 +66,7 @@ pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
 }
 
 #[allow(clippy::cast_possible_truncation)]
-fn calculate_seed(client_id: &str, iss: &str, sub: &str) -> Hash {
+fn calculate_seed(client_id: &str, iss: &Iss, sub: &Sub) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
@@ -83,7 +87,7 @@ fn calculate_seed(client_id: &str, iss: &str, sub: &str) -> Hash {
     hasher.finalize().into()
 }
 
-fn get_delegation_principal(client_id: &str, iss: &str, sub: &str) -> Principal {
+fn get_delegation_principal(client_id: &str, iss: &Iss, sub: &Sub) -> Principal {
     let seed = calculate_seed(client_id, iss, sub);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(public_key)
