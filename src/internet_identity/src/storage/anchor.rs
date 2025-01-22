@@ -1,8 +1,11 @@
 use crate::ii_domain::IIDomain;
+use crate::openid::OpenIdCredential;
+use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
+use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
 use std::collections::HashMap;
 use std::fmt;
@@ -18,6 +21,7 @@ mod tests;
 pub struct Anchor {
     anchor_number: AnchorNumber,
     devices: Vec<Device>,
+    openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
@@ -99,6 +103,32 @@ impl From<Device> for DeviceDataWithoutAlias {
     }
 }
 
+impl From<OpenIdCredential> for OpenIdCredentialData {
+    fn from(openid_credential: OpenIdCredential) -> Self {
+        Self {
+            iss: openid_credential.iss,
+            sub: openid_credential.sub,
+            aud: openid_credential.aud,
+            delegation_principal: openid_credential.delegation_principal,
+            last_usage_timestamp: openid_credential.last_usage_timestamp,
+            metadata: openid_credential.metadata,
+        }
+    }
+}
+
+impl From<OpenIdCredentialData> for OpenIdCredential {
+    fn from(openid_credential: OpenIdCredentialData) -> Self {
+        Self {
+            iss: openid_credential.iss,
+            sub: openid_credential.sub,
+            aud: openid_credential.aud,
+            delegation_principal: openid_credential.delegation_principal,
+            last_usage_timestamp: openid_credential.last_usage_timestamp,
+            metadata: openid_credential.metadata,
+        }
+    }
+}
+
 impl From<Anchor> for StorableAnchor {
     fn from(anchor: Anchor) -> Self {
         Self {
@@ -108,11 +138,20 @@ impl From<Anchor> for StorableAnchor {
     }
 }
 
-impl From<(AnchorNumber, StorableAnchor)> for Anchor {
-    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
+impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
+    fn from(
+        (anchor_number, storable_anchor, stable_anchor): (
+            AnchorNumber,
+            StorableAnchor,
+            Option<StableAnchor>,
+        ),
+    ) -> Self {
         Anchor {
             anchor_number,
             devices: storable_anchor.devices,
+            openid_credentials: stable_anchor
+                .and_then(|anchor| anchor.openid_credentials)
+                .unwrap_or(vec![]),
             metadata: storable_anchor.metadata,
         }
     }
@@ -125,6 +164,7 @@ impl Anchor {
         Self {
             anchor_number,
             devices: vec![],
+            openid_credentials: vec![],
             metadata: None,
         }
     }
@@ -291,6 +331,32 @@ impl Anchor {
             (false, false, true) => DomainActivity::NonIIDomain,
             (false, false, false) => DomainActivity::None,
         }
+    }
+
+    /// Returns a reference to the list of OpenID credentials.
+    pub fn openid_credentials(&self) -> &Vec<OpenIdCredential> {
+        &self.openid_credentials
+    }
+
+    fn openid_credential_index(&self, iss: &str, sub: &str) -> Result<usize, AnchorError> {
+        let Some(index) = self.openid_credentials.iter().position(|entry| entry.iss == iss && entry.sub == sub) else {
+            return Err(AnchorError::OpenIdCredentialNotFound);
+        };
+        Ok(index)
+    }
+
+    pub fn add_openid_credential(&mut self, openid_credential: OpenIdCredential) -> Result<(), AnchorError> {
+        if self.openid_credentials.iter().any(|entry| entry.iss == openid_credential.iss && entry.sub == openid_credential.sub) {
+            return Err(AnchorError::DuplicateOpenIdCredential);
+        }
+        self.openid_credentials.push(openid_credential);
+        Ok(())
+    }
+
+    pub fn remove_openid_credential(&mut self, iss: &str, sub: &str) -> Result<(), AnchorError> {
+        let index = self.openid_credential_index(iss, sub)?;
+        self.openid_credentials.remove(index);
+        Ok(())
     }
 
     /// Returns a reference to the optional identity metadata map
@@ -594,6 +660,8 @@ pub enum AnchorError {
     DuplicateDevice {
         device_key: DeviceKey,
     },
+    DuplicateOpenIdCredential,
+    OpenIdCredentialNotFound,
     ReservedMetadataKey {
         key: String,
     },
@@ -631,7 +699,9 @@ impl fmt::Display for AnchorError {
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
             AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key),
-            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id.")
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
+            AnchorError::DuplicateOpenIdCredential => write!(f, "OpenID credential already exists on this anchor."),
+            AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
         }
     }
 }

@@ -1,5 +1,6 @@
-use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
+use crate::openid::{get_delegation_principal, OpenIdCredential};
+use crate::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
@@ -44,7 +45,7 @@ const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
-const MAX_VALIDITY_WINDOW: u64 = 5 * 60 * NANOSECONDS_PER_SECOND; // 5 minutes in nanos, same as ingress expiry
+const MAX_VALIDITY_WINDOW: u64 = 5 * MINUTE_NS; // Same as ingress expiry
 
 #[derive(Serialize, Deserialize)]
 struct Certs {
@@ -95,6 +96,7 @@ impl OpenIdProvider for Provider {
             .map_err(|_| "Invalid signature")?;
 
         // Return credential with Google specific metadata
+        let delegation_principal = get_delegation_principal(ISSUER, &claims.iss, &claims.sub);
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
@@ -109,7 +111,7 @@ impl OpenIdProvider for Provider {
             iss: claims.iss,
             sub: claims.sub,
             aud: claims.aud,
-            principal: Principal::anonymous(),
+            delegation_principal,
             last_usage_timestamp: time(),
             metadata,
         })
@@ -372,11 +374,12 @@ fn should_return_credential() {
     let provider = Provider::create(OpenIdConfig {
         client_id: claims.aud.clone(),
     });
+    let delegation_principal = get_delegation_principal(&claims.aud, &claims.iss, &claims.sub);
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,
         aud: claims.aud,
-        principal: Principal::anonymous(),
+        delegation_principal,
         last_usage_timestamp: time(),
         metadata: HashMap::from([
             (

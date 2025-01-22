@@ -153,7 +153,7 @@ fn register(
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
+        Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -163,7 +163,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::update(anchor, device_key, device_data),
+            anchor_management::update_device(anchor, device_key, device_data),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -174,7 +174,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::replace(anchor_number, anchor, device_key, device_data),
+            anchor_management::replace_device(anchor_number, anchor, device_key, device_data),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -185,7 +185,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::remove(anchor_number, anchor, device_key),
+            anchor_management::remove_device(anchor_number, anchor, device_key),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))

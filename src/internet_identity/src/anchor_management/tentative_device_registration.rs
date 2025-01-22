@@ -1,4 +1,4 @@
-use crate::anchor_management::add;
+use crate::anchor_management::add_device;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
@@ -129,7 +129,7 @@ pub fn verify_tentative_device(
 ) -> Result<((), Operation), VerifyTentativeDeviceError> {
     match get_verified_device(anchor_number, user_verification_code) {
         Ok(device) => {
-            let operation = add(anchor, device);
+            let operation = add_device(anchor, device);
             Ok(((), operation))
         }
         Err(err) => Err(err),

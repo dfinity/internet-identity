@@ -30,6 +30,12 @@ pub enum Operation {
     // See the II candid interface for more details.
     #[serde(rename = "identity_metadata_replace")]
     IdentityMetadataReplace { metadata_keys: Vec<String> },
+    
+    // OpenID credentials
+    #[serde(rename = "add_openid_credential")]
+    AddOpenIdCredential { iss: String },
+    #[serde(rename = "remove_openid_credential")]
+    RemoveOpenIdCredential { iss: String },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

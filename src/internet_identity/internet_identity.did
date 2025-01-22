@@ -327,6 +327,15 @@ type OpenIdConfig = record {
     client_id: text;
 };
 
+type OpenIdCredential = record {
+    iss: text;
+    sub: text;
+    aud: text;
+    delegation_principal: principal;
+    last_usage_timestamp: Timestamp;
+    metadata: MetadataMapV2;
+};
+
 // API V2 specific types
 // WARNING: These type are experimental and may change in the future.
 

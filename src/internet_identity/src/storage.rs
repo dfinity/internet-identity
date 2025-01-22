@@ -105,12 +105,14 @@ use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
+use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::storage::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
 pub mod registration_rates;
 
+pub mod stable_anchor;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
 mod storable_persistent_state;
@@ -128,13 +130,14 @@ const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
 /// MemoryManager parameters.
-const ANCHOR_MEMORY_INDEX: u8 = 0u8;
-const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
-const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2u8;
-const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
-const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
-const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
-const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
+const ANCHOR_MEMORY_INDEX: u8 = 0;
+const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1;
+const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2;
+const EVENT_DATA_MEMORY_INDEX: u8 = 3;
+const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4;
+const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5;
+const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6;
+const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7; // New (partial) anchor stored with stable structures
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -144,6 +147,7 @@ const REGISTRATION_REFERENCE_RATE_MEMORY_ID: MemoryId =
     MemoryId::new(REGISTRATION_REFERENCE_RATE_MEMORY_INDEX);
 const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
     MemoryId::new(REGISTRATION_CURRENT_RATE_MEMORY_INDEX);
+const STABLE_ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -203,6 +207,9 @@ pub struct Storage<M: Memory> {
     current_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the reference registration rate memory.
     reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the stable anchor memory.
+    stable_anchor_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    stable_anchor_memory: StableBTreeMap<AnchorNumber, StableAnchor, ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -264,6 +271,7 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(REGISTRATION_REFERENCE_RATE_MEMORY_ID);
         let registration_current_rate_memory =
             memory_manager.get(REGISTRATION_CURRENT_RATE_MEMORY_ID);
+        let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -296,6 +304,8 @@ impl<M: Memory + Clone> Storage<M> {
                 stats_aggregations_memory.clone(),
             ),
             event_aggregations: StableBTreeMap::init(stats_aggregations_memory),
+            stable_anchor_memory_wrapper: MemoryWrapper::new(stable_anchor_memory.clone()),
+            stable_anchor_memory: StableBTreeMap::init(stable_anchor_memory),
         }
     }
 
@@ -372,7 +382,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
-        let storable_anchor = StorableAnchor::from(data);
+        
+        // Write fixed 4KB anchor
+        let storable_anchor = StorableAnchor::from(data.clone());
         let buf = storable_anchor.to_bytes();
         if buf.len() > self.header.entry_size as usize {
             return Err(StorageError::EntrySizeLimitExceeded {
@@ -387,11 +399,17 @@ impl<M: Memory + Clone> Storage<M> {
 
         writer.write_all(&buf).expect("memory write failed");
         writer.flush().expect("memory write failed");
+
+        // Write unbounded stable structures anchor
+        let stable_anchor = StableAnchor::from(data);
+        self.stable_anchor_memory
+            .insert(anchor_number, stable_anchor);
         Ok(())
     }
 
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
+        // Read fixed 4KB anchor
         let record_number = self.anchor_number_to_record(anchor_number)?;
         let address = self.record_address(record_number);
 
@@ -399,8 +417,15 @@ impl<M: Memory + Clone> Storage<M> {
         let mut buf = vec![0; self.header.entry_size as usize];
 
         reader.read_exact(&mut buf).expect("failed to read memory");
+        
+        // Read unbounded stable structures anchor
         let storable_anchor = StorableAnchor::from_bytes(Cow::Owned(buf));
-        Ok(Anchor::from((anchor_number, storable_anchor)))
+        let stable_anchor = self.stable_anchor_memory.get(&anchor_number);
+        Ok(Anchor::from((
+            anchor_number,
+            storable_anchor,
+            stable_anchor,
+        )))
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -556,6 +581,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "current_registration_rate".to_string(),
                 self.current_registration_rate_memory_wrapper.size(),
+            ),
+            (
+                "stable_identities".to_string(),
+                self.stable_anchor_memory_wrapper.size(),
             ),
         ])
     }

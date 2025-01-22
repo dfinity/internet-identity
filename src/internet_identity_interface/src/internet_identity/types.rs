@@ -17,10 +17,12 @@ pub type FailedAttemptsCounter = u8;
 
 mod api_v2;
 pub mod vc_mvp;
+pub mod openid;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use api_v2::*;
+use crate::internet_identity::types::openid::OpenIdCredentialData;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceData {
@@ -173,6 +175,7 @@ pub struct DeviceRegistrationInfo {
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
+    pub openid_credentials: Vec<OpenIdCredentialData>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
