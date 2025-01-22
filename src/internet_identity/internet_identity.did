@@ -293,6 +293,8 @@ type IdentityAnchorInfo = record {
     devices : vec DeviceWithUsage;
     // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
+    // OpenID accounts linked to this anchor
+    openid_credentials: vec OpenIdCredential;
 };
 
 type AnchorCredentials = record {
