@@ -16,13 +16,13 @@ pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
 
 mod api_v2;
-pub mod vc_mvp;
 pub mod openid;
+pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
-pub use api_v2::*;
 use crate::internet_identity::types::openid::OpenIdCredentialData;
+pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub struct DeviceData {
