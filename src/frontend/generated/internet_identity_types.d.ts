@@ -238,6 +238,14 @@ export type MetadataMapV2 = Array<
   ]
 >;
 export interface OpenIdConfig { 'client_id' : string }
+export interface OpenIdCredential {
+  'aud' : string,
+  'iss' : string,
+  'sub' : string,
+  'delegation_principal' : Principal,
+  'metadata' : MetadataMapV2,
+  'last_usage_timestamp' : Timestamp,
+}
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
