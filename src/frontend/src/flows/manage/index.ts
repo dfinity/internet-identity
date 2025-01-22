@@ -628,7 +628,7 @@ export const domainWarning = (
   }
 };
 
-export const domainInfo = (
+const domainInfo = (
   device: DeviceData,
   allDevices: DeviceData[]
 ): TemplateResult | undefined => {
