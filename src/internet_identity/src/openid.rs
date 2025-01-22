@@ -1,5 +1,3 @@
-use crate::delegation::der_encode_canister_sig_key;
-use crate::state;
 use candid::{CandidType, Deserialize, Principal};
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
@@ -67,11 +65,9 @@ pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
 
 #[allow(clippy::cast_possible_truncation)]
 fn calculate_seed(client_id: &str, iss: &Iss, sub: &Sub) -> Hash {
-    let salt = state::salt();
-
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
-    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(&salt());
 
     blob.push(client_id.bytes().len() as u8);
     blob.extend(client_id.bytes());
@@ -87,10 +83,27 @@ fn calculate_seed(client_id: &str, iss: &Iss, sub: &Sub) -> Hash {
     hasher.finalize().into()
 }
 
+#[cfg(not(test))]
+fn salt() -> [u8; 32] {
+    crate::state::salt()
+}
+
+#[cfg(test)]
+fn salt() -> [u8; 32] {
+    [0; 32]
+}
+
+#[cfg(not(test))]
 fn get_delegation_principal(client_id: &str, iss: &Iss, sub: &Sub) -> Principal {
     let seed = calculate_seed(client_id, iss, sub);
-    let public_key = der_encode_canister_sig_key(seed.to_vec());
+    let public_key = crate::delegation::der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(public_key)
+}
+
+/// Skip `der_encode_canister_sig_key` in tests and create (invalid) Principal from seed data
+#[cfg(test)]
+fn get_delegation_principal(client_id: &str, iss: &Iss, sub: &Sub) -> Principal {
+    Principal::self_authenticating(calculate_seed(client_id, iss, sub))
 }
 
 #[cfg(test)]

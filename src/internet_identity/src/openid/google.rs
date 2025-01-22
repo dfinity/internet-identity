@@ -96,7 +96,7 @@ impl OpenIdProvider for Provider {
             .map_err(|_| "Invalid signature")?;
 
         // Return credential with Google specific metadata
-        let delegation_principal = get_delegation_principal(ISSUER, &claims.iss, &claims.sub);
+        let delegation_principal = get_delegation_principal(&self.client_id, &claims.iss, &claims.sub);
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
