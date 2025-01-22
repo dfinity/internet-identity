@@ -7,6 +7,7 @@ import { AuthenticatedConnection } from "$src/utils/iiConnection";
 
 import { DeviceData } from "$generated/internet_identity_types";
 import { infoScreenTemplate } from "$src/components/infoScreen";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { IdentityMetadata } from "$src/repositories/identityMetadata";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import { isNullish } from "@dfinity/utils";
@@ -238,10 +239,12 @@ export const recoveryWizard = async (
     nowInMillis,
   });
 
-  const originNewDevice = getCredentialsOrigin({
-    credentials,
-    userAgent: navigator.userAgent,
-  });
+  const originNewDevice = DOMAIN_COMPATIBILITY.isEnabled()
+    ? getCredentialsOrigin({
+        credentials,
+        userAgent: navigator.userAgent,
+      })
+    : undefined;
 
   if (devicesStatus !== "no-warning") {
     connection.updateIdentityMetadata({
