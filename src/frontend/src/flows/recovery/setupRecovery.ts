@@ -3,6 +3,7 @@ import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { generate } from "$src/crypto/mnemonic";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import {
   AuthenticatedConnection,
@@ -60,9 +61,10 @@ export const setupKey = async ({
         credentials: devices,
         userAgent: window.navigator.userAgent,
       });
-      const rpId = nonNullish(newDeviceOrigin)
-        ? new URL(newDeviceOrigin).host
-        : undefined;
+      const rpId =
+        nonNullish(newDeviceOrigin) && DOMAIN_COMPATIBILITY.isEnabled()
+          ? new URL(newDeviceOrigin).host
+          : undefined;
       const recoverIdentity = await WebAuthnIdentity.create({
         publicKey: creationOptions(devices, "cross-platform", rpId),
       });
