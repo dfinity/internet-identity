@@ -214,7 +214,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityAnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceWithUsage),
-    'openid_credentials' : IDL.Vec(OpenIdCredential),
+    'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;

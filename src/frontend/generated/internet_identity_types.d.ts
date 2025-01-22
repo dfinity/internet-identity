@@ -175,7 +175,7 @@ export type IdRegStartError = { 'InvalidCaller' : null } |
   { 'RateLimitExceeded' : null };
 export interface IdentityAnchorInfo {
   'devices' : Array<DeviceWithUsage>,
-  'openid_credentials' : Array<OpenIdCredential>,
+  'openid_credentials' : [] | [Array<OpenIdCredential>],
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface IdentityAuthnInfo {
