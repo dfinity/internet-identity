@@ -57,14 +57,15 @@ export const setupKey = async ({
     await withLoader(async () => {
       const devices =
         devices_ ?? (await connection.lookupAll(connection.userNumber));
-      const newDeviceOrigin = getCredentialsOrigin({
-        credentials: devices,
-        userAgent: window.navigator.userAgent,
-      });
-      const rpId =
-        nonNullish(newDeviceOrigin) && DOMAIN_COMPATIBILITY.isEnabled()
-          ? new URL(newDeviceOrigin).host
-          : undefined;
+      const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+        ? getCredentialsOrigin({
+            credentials: devices,
+            userAgent: window.navigator.userAgent,
+          })
+        : undefined;
+      const rpId = nonNullish(newDeviceOrigin)
+        ? new URL(newDeviceOrigin).host
+        : undefined;
       const recoverIdentity = await WebAuthnIdentity.create({
         publicKey: creationOptions(devices, "cross-platform", rpId),
       });
