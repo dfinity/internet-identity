@@ -1,9 +1,4 @@
-import {
-  AnchorCredentials,
-  CredentialId,
-  PublicKey,
-  WebAuthnCredential,
-} from "$generated/internet_identity_types";
+import { DeviceData } from "$generated/internet_identity_types";
 import { PinIdentityMaterial } from "../pin/idb";
 import { getDevicesStatus } from "./recoveryWizard";
 
@@ -15,52 +10,67 @@ const lessThanAWeekAgo = nowInMillis - 1;
 const pinIdentityMaterial: PinIdentityMaterial =
   {} as unknown as PinIdentityMaterial;
 
-const noCredentials: AnchorCredentials = {
-  credentials: [],
-  recovery_credentials: [],
-  recovery_phrases: [],
+const noCredentials: Omit<DeviceData, "alias">[] = [];
+
+const recoveryPhrase: Omit<DeviceData, "alias"> = {
+  origin: [],
+  protection: { unprotected: null },
+  // eslint-disable-next-line
+  pubkey: undefined as any,
+  key_type: { seed_phrase: null },
+  purpose: { recovery: null },
+  credential_id: [],
+  metadata: [],
 };
 
-const device: WebAuthnCredential = {
-  pubkey: [] as PublicKey,
-  credential_id: [] as CredentialId,
+const device: Omit<DeviceData, "alias"> = {
+  origin: [],
+  protection: { unprotected: null },
+  // eslint-disable-next-line
+  pubkey: undefined as any,
+  key_type: { unknown: null },
+  purpose: { authentication: null },
+  credential_id: [],
+  metadata: [],
 };
 
-const oneDeviceOnly: AnchorCredentials = {
-  credentials: [device],
-  recovery_credentials: [],
-  recovery_phrases: [],
+const recoveryDevice: Omit<DeviceData, "alias"> = {
+  metadata: [],
+  origin: [],
+  protection: { protected: null },
+  pubkey: new Uint8Array(),
+  key_type: { cross_platform: null },
+  purpose: { recovery: null },
+  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
 };
 
-const oneRecoveryDeviceOnly: AnchorCredentials = {
-  credentials: [],
-  recovery_credentials: [device],
-  recovery_phrases: [],
-};
+const oneDeviceOnly: Omit<DeviceData, "alias">[] = [device];
 
-const oneDeviceAndPhrase: AnchorCredentials = {
-  credentials: [device],
-  recovery_credentials: [],
-  recovery_phrases: [[] as PublicKey],
-};
+const oneRecoveryDeviceOnly: Omit<DeviceData, "alias">[] = [recoveryDevice];
 
-const twoDevices: AnchorCredentials = {
-  credentials: [device, { ...device }],
-  recovery_credentials: [],
-  recovery_phrases: [[] as PublicKey],
-};
+const oneDeviceAndPhrase: Omit<DeviceData, "alias">[] = [
+  device,
+  recoveryPhrase,
+];
 
-const threeDevices: AnchorCredentials = {
-  credentials: [device, { ...device }, { ...device }],
-  recovery_credentials: [],
-  recovery_phrases: [[] as PublicKey],
-};
+const twoDevices: Omit<DeviceData, "alias">[] = [
+  device,
+  { ...device },
+  recoveryPhrase,
+];
 
-const oneNormalOneRecovery: AnchorCredentials = {
-  credentials: [device],
-  recovery_credentials: [device],
-  recovery_phrases: [[] as PublicKey],
-};
+const threeDevices: Omit<DeviceData, "alias">[] = [
+  device,
+  { ...device },
+  { ...device },
+  recoveryPhrase,
+];
+
+const oneNormalOneRecovery: Omit<DeviceData, "alias">[] = [
+  device,
+  recoveryDevice,
+  recoveryPhrase,
+];
 
 test("getDevicesStatus returns 'pin-only' for user with pin and has seen recovery longer than a week ago", () => {
   expect(
