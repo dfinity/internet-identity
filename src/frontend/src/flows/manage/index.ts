@@ -50,7 +50,7 @@ import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
-import { addCurrentDeviceScreen } from "../addDevice/addCurrentDevice";
+import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
 import { authenticatorsSection } from "./authenticatorsSection";
 import {
   deleteDevice,
@@ -127,7 +127,10 @@ export const authFlowManage = async (connection: Connection) => {
   });
 
   if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
-    await addCurrentDeviceScreen(userNumber, authenticatedConnection);
+    await registerCurrentDeviceCurrentOrigin(
+      userNumber,
+      authenticatedConnection
+    );
   }
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
