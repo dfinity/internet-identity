@@ -25,12 +25,14 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
         .into_iter()
         .map(DeviceWithUsage::from)
         .collect();
-    let openid_credentials = Some(anchor
-        .openid_credentials()
-        .clone()
-        .into_iter()
-        .map(OpenIdCredentialData::from)
-        .collect());
+    let openid_credentials = Some(
+        anchor
+            .openid_credentials()
+            .clone()
+            .into_iter()
+            .map(OpenIdCredentialData::from)
+            .collect(),
+    );
     let now = time();
 
     state::tentative_device_registrations(|tentative_device_registrations| {
