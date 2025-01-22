@@ -8,7 +8,7 @@ use std::borrow::Cow;
 
 #[derive(CandidType, Deserialize, Clone)]
 pub struct StableAnchor {
-    pub openid_credentials: Option<Vec<OpenIdCredential>>,
+    pub openid_credentials: Vec<OpenIdCredential>,
 }
 
 impl Storable for StableAnchor {
@@ -25,7 +25,7 @@ impl Storable for StableAnchor {
 impl From<Anchor> for StableAnchor {
     fn from(anchor: Anchor) -> Self {
         Self {
-            openid_credentials: Some(anchor.openid_credentials().clone()),
+            openid_credentials: anchor.openid_credentials().clone(),
         }
     }
 }

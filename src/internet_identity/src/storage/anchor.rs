@@ -150,7 +150,7 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
             anchor_number,
             devices: storable_anchor.devices,
             openid_credentials: stable_anchor
-                .and_then(|anchor| anchor.openid_credentials)
+                .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
         }

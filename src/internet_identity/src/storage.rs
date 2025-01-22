@@ -423,9 +423,9 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Update `OpenIdCredential` to `AnchorNumber` lookup map
         let previous_openid_credentials = previous_stable_anchor
-            .and_then(|anchor| anchor.openid_credentials)
+            .map(|anchor| anchor.openid_credentials)
             .unwrap_or_default();
-        let current_openid_credentials = stable_anchor.openid_credentials.unwrap_or_default();
+        let current_openid_credentials = stable_anchor.openid_credentials;
         self.update_lookup_anchor_with_openid_credential(
             anchor_number,
             previous_openid_credentials,
