@@ -30,6 +30,7 @@ import {
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import { OpenIDCredential } from "$src/utils/mockOpenID";
@@ -519,6 +520,7 @@ export const readRecovery = ({
 
 // Convert devices read from the canister into types that are easier to work with
 // and that better represent what we expect.
+// Exported for testing purposes
 export const devicesFromDevicesWithUsage = ({
   devices: devices_,
   reload,
@@ -558,6 +560,7 @@ export const devicesFromDevicesWithUsage = ({
         alias: device.alias,
         last_usage: device.last_usage,
         warn: domainWarning(device),
+        info: domainInfo(device, devices_),
         rename: () => renameDevice({ connection, device, reload }),
         remove:
           hasSingleDevice && !hasOtherAuthMethods
@@ -586,6 +589,9 @@ export const devicesFromDevicesWithUsage = ({
 export const domainWarning = (
   device: DeviceData
 ): TemplateResult | undefined => {
+  if (DOMAIN_COMPATIBILITY.isEnabled()) {
+    return undefined;
+  }
   // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
   if (isRecoveryPhrase(device)) {
     return undefined;
@@ -596,27 +602,48 @@ export const domainWarning = (
     device.origin.length === 0 ? undefined : device.origin[0];
 
   // If this is the _old_ II (ic0.app) and no origin was recorded, then we can't infer much and don't show a warning.
-  if (window.origin === LEGACY_II_URL && isNullish(deviceOrigin)) {
+  if (window.location.origin === LEGACY_II_URL && isNullish(deviceOrigin)) {
     return undefined;
   }
 
   // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
-  if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
+  if (
+    window.location.origin === LEGACY_II_URL &&
+    deviceOrigin !== window.location.origin
+  ) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
   if (isNullish(deviceOrigin)) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
 
   // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
-  if (deviceOrigin !== window.origin) {
+  if (deviceOrigin !== window.location.origin) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
+};
+
+export const domainInfo = (
+  device: DeviceData,
+  allDevices: DeviceData[]
+): TemplateResult | undefined => {
+  if (!DOMAIN_COMPATIBILITY.isEnabled()) {
+    return undefined;
+  }
+  const commonOrigin = getCredentialsOrigin({
+    credentials: allDevices,
+    userAgent: window.navigator.userAgent,
+  });
+  if (nonNullish(commonOrigin)) {
+    return undefined;
+  }
+  return html`This passkey was registered in
+  ${device.origin[0] ?? LEGACY_II_URL}`;
 };
 
 const unknownError = (): Error => {

@@ -1,4 +1,4 @@
-import { warningIcon } from "$src/components/icons";
+import { infoIcon, warningIcon } from "$src/components/icons";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -110,7 +110,7 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, last_usage, dupCount, warn, remove, rename },
+  authenticator: { alias, last_usage, dupCount, warn, info, remove, rename },
   index,
   icon,
 }: {
@@ -137,9 +137,15 @@ export const authenticatorItem = ({
     lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
   }
 
+  // It's up to the caller to take care that only one of the icons is present.
+  // The UI is not ready to support multiple icons.
+  // `warn` is used to show a warning icon when the device was registered in a different oring than current one.
+  // `info` is used to show an info icon of where the device was registered, only when some device has a different origin than the others.
+  // `icon` is used for the PIN authenticator.
   return html`
     <li class="c-action-list__item" data-device=${alias}>
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
+      ${isNullish(info) ? undefined : itemInfo(info)}
       ${isNullish(icon) ? undefined : html`${icon}`}
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
@@ -174,6 +180,16 @@ const itemWarning = ({
   <span class="c-tooltip c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
+    ></span
+  >
+</div>`;
+
+const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
+  class="c-action-list__action"
+>
+  <span class="c-tooltip c-icon c-icon--ok" tabindex="0"
+    >${infoIcon}<span class="c-tooltip__message c-card c-card--tight"
+      >${msg}</span
     ></span
   >
 </div>`;
