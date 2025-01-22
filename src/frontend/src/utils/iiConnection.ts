@@ -741,7 +741,7 @@ export class AuthenticatedConnection extends Connection {
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
     const sanitizedOrigin =
-      nonNullish(origin) && origin.length < 50 ? origin : undefined;
+      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
     return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
