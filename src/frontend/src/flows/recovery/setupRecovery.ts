@@ -3,6 +3,7 @@ import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { generate } from "$src/crypto/mnemonic";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import {
   AuthenticatedConnection,
   creationOptions,
@@ -11,6 +12,7 @@ import {
 import { unreachable, unreachableLax } from "$src/utils/utils";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
 import { WebAuthnIdentity } from "@dfinity/identity";
+import { nonNullish } from "@dfinity/utils";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
 import { displaySeedPhrase } from "./displaySeedPhrase";
 
@@ -54,8 +56,15 @@ export const setupKey = async ({
     await withLoader(async () => {
       const devices =
         devices_ ?? (await connection.lookupAll(connection.userNumber));
+      const newDeviceOrigin = getCredentialsOrigin({
+        credentials: devices,
+        userAgent: window.navigator.userAgent,
+      });
+      const rpId = nonNullish(newDeviceOrigin)
+        ? new URL(newDeviceOrigin).host
+        : undefined;
       const recoverIdentity = await WebAuthnIdentity.create({
-        publicKey: creationOptions(devices, "cross-platform"),
+        publicKey: creationOptions(devices, "cross-platform", rpId),
       });
 
       await connection.add(
@@ -64,7 +73,7 @@ export const setupKey = async ({
         { recovery: null },
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
-        window.origin,
+        newDeviceOrigin ?? window.location.origin,
         recoverIdentity.rawId
       );
     });
