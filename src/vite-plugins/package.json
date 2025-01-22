@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "typescript": "*",
-    "vite": "^5.4.6",
+    "vite": "^5.4.14",
     "undici": "*",
     "vite-plugin-compression": "^0.5.1",
     "@dfinity/utils": "^2.1.2",
