@@ -200,12 +200,21 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const OpenIdCredential = IDL.Record({
+    'aud' : IDL.Text,
+    'iss' : IDL.Text,
+    'sub' : IDL.Text,
+    'delegation_principal' : IDL.Principal,
+    'metadata' : MetadataMapV2,
+    'last_usage_timestamp' : Timestamp,
+  });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
     'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceWithUsage),
+    'openid_credentials' : IDL.Vec(OpenIdCredential),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;
