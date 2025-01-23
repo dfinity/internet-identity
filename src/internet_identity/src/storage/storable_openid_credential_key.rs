@@ -24,7 +24,9 @@ impl From<StorableOpenIdCredentialKey> for OpenIdCredentialKey {
 
 impl From<&OpenIdCredentialKey> for StorableOpenIdCredentialKey {
     fn from(value: &OpenIdCredentialKey) -> Self {
-        StorableOpenIdCredentialKey { inner: value.clone() }
+        StorableOpenIdCredentialKey {
+            inner: value.clone(),
+        }
     }
 }
 
