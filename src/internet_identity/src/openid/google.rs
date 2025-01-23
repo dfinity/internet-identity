@@ -303,6 +303,15 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
+    if claims.email.as_ref().is_some_and(|val| val.len() > 256) {
+        return Err("Email too long".into());
+    }
+    if claims.name.as_ref().is_some_and(|val| val.len() > 64) {
+        return Err("Name too long".into());
+    }
+    if claims.picture.as_ref().is_some_and(|val| val.len() > 256) {
+        return Err("Picture URL too long".into());
+    }
 
     Ok(())
 }
