@@ -325,19 +325,40 @@ type BufferedArchiveEntry = record {
     entry: blob;
 };
 
+// OpenID specific types
+
+type Iss = text;
+type Sub = text;
+type Aud = text;
+type JWT = text;
+type Salt = blob;
+
 type OpenIdConfig = record {
     client_id: text;
 };
 
+type OpenIdCredentialKey = record { Iss; Sub };
+
 type OpenIdCredential = record {
-    iss: text;
-    sub: text;
-    aud: text;
+    iss: Iss;
+    sub: Sub;
+    aud: Aud;
     // The principal of a delegation created after verifying a JWT,
     // this is then used to interact with the other canister methods.
     delegation_principal: principal;
     last_usage_timestamp: Timestamp;
     metadata: MetadataMapV2;
+};
+
+type OpenIdCredentialAddError = variant {
+    Unauthorized: principal;
+    JwtVerificationFailed;
+    DuplicateOpenIdCredential;
+};
+
+type OpenIdCredentialRemoveError = variant {
+    Unauthorized: principal;
+    OpenIdCredentialNotFound;
 };
 
 // API V2 specific types
@@ -718,6 +739,11 @@ service : (opt InternetIdentityInit) -> {
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
     prepare_id_alias : (PrepareIdAliasRequest) -> (variant {Ok: PreparedIdAlias; Err: PrepareIdAliasError;});
     get_id_alias : (GetIdAliasRequest) -> (variant {Ok: IdAliasCredentials; Err: GetIdAliasError;}) query;
+
+    // OpenID credentials protocol
+    // =========================
+    openid_credential_add: (IdentityNumber, JWT, Salt) -> (variant {Ok; Err: OpenIdCredentialAddError;});
+    openid_credential_remove: (IdentityNumber, OpenIdCredentialKey) -> (variant {Ok; Err: OpenIdCredentialRemoveError;});
 
     // HTTP Gateway protocol
     // =====================

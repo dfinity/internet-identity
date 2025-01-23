@@ -4,6 +4,7 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::openid::OpenIdCredentialKey;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -17,6 +18,8 @@ use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialAddError;
+use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialRemoveError;
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
     PrepareIdAliasRequest, PreparedIdAlias,
@@ -739,6 +742,58 @@ mod v2_api {
                 Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
             }
         }
+    }
+}
+
+/// API for OpenID credentials
+mod openid_api {
+    use crate::anchor_management::{add_openid_credential, remove_openid_credential};
+    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
+    use crate::openid;
+    use crate::openid::OpenIdCredentialKey;
+    use ic_cdk::caller;
+    use ic_cdk_macros::update;
+    use internet_identity_interface::internet_identity::types::openid::{
+        OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+    };
+    use internet_identity_interface::internet_identity::types::IdentityNumber;
+
+    impl From<IdentityUpdateError> for OpenIdCredentialAddError {
+        fn from(_: IdentityUpdateError) -> Self {
+            OpenIdCredentialAddError::Unauthorized(caller())
+        }
+    }
+    impl From<IdentityUpdateError> for OpenIdCredentialRemoveError {
+        fn from(_: IdentityUpdateError) -> Self {
+            OpenIdCredentialRemoveError::Unauthorized(caller())
+        }
+    }
+
+    #[update]
+    fn openid_credential_add(
+        identity_number: IdentityNumber,
+        jwt: String,
+        salt: [u8; 32],
+    ) -> Result<(), OpenIdCredentialAddError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            let openid_credential = openid::verify(&jwt, &salt)
+                .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
+            add_openid_credential(anchor, openid_credential)
+                .map(|operation| ((), operation))
+                .map_err(|_| OpenIdCredentialAddError::DuplicateOpenIdCredential)
+        })
+    }
+
+    #[update]
+    fn openid_credential_remove(
+        identity_number: IdentityNumber,
+        openid_credential_key: OpenIdCredentialKey,
+    ) -> Result<(), OpenIdCredentialRemoveError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            remove_openid_credential(anchor, &openid_credential_key)
+                .map(|operation| ((), operation))
+                .map_err(|_| OpenIdCredentialRemoveError::OpenIdCredentialNotFound)
+        })
     }
 }
 

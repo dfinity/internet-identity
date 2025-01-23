@@ -9,6 +9,8 @@
     "link_additional_account": "Link additional account",
     "max_linked_accounts_reached": "You can link up to 100 online accounts. You must unlink an account before you can link another.",
     "unlink": "Unlink",
-    "last_used": "Last used"
+    "last_used": "Last used",
+    "authentication_failed": "Authentication failed",
+    "jwt_signature_invalid": "The account could not be linked due to an invalid signature"
   }
 }

@@ -106,6 +106,7 @@ use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
+use crate::storage::storable_openid_credential_key::StorableOpenIdCredentialKey;
 use crate::storage::storable_persistent_state::StorablePersistentState;
 use internet_identity_interface::internet_identity::types::*;
 
@@ -115,6 +116,7 @@ pub mod registration_rates;
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
+mod storable_openid_credential_key;
 mod storable_persistent_state;
 #[cfg(test)]
 mod tests;
@@ -216,7 +218,7 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
-        StableBTreeMap<OpenIdCredentialKey, AnchorNumber, ManagedMemory<M>>,
+        StableBTreeMap<StorableOpenIdCredentialKey, AnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -469,11 +471,12 @@ impl<M: Memory + Clone> Storage<M> {
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
         credential_to_be_removed.for_each(|key| {
-            self.lookup_anchor_with_openid_credential_memory.remove(key);
+            self.lookup_anchor_with_openid_credential_memory
+                .remove(&key.into());
         });
         credential_to_be_added.for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .insert(key.clone(), anchor_number);
+                .insert(key.into(), anchor_number);
         });
     }
 
@@ -482,7 +485,7 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         key: &OpenIdCredentialKey,
     ) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_openid_credential_memory.get(key)
+        self.lookup_anchor_with_openid_credential_memory.get(&key.into())
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
