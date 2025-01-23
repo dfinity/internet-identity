@@ -8,7 +8,11 @@ import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$src/repositories/identityMetadata";
-import { setLastShownAddCurrentDevicePage } from "$src/storage";
+import {
+  addAnchorCancelledRpId,
+  getCancelledRpIds,
+  setLastShownAddCurrentDevicePage,
+} from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
@@ -393,6 +397,111 @@ describe("Connection.login", () => {
           undefined
         );
       }
+    });
+
+    describe("Connection.fromWebauthnCredentials", () => {
+      const userNumber = BigInt(12345);
+      const deviceFromCurrentDomain: DeviceData =
+        createMockDevice(currentOrigin);
+      const credentialDataFromCurrentDomain = convertToValidCredentialData(
+        deviceFromCurrentDomain
+      ) as CredentialData;
+      const deviceAnotherDomain: DeviceData = createMockDevice(
+        "htts://identity.ic0.app"
+      );
+      const credentialDataAnotherDomain = convertToValidCredentialData(
+        deviceAnotherDomain
+      ) as CredentialData;
+      const skipCancelledRpIdsStorage = true;
+
+      it("doesn't use the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
+        const cancelledRpId = new URL(currentOrigin).hostname;
+        await addAnchorCancelledRpId({
+          userNumber,
+          origin: currentOrigin,
+          cancelledRpId,
+        });
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain],
+          skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("loginSuccess");
+        if (loginResult.kind === "loginSuccess") {
+          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(
+            1
+          );
+          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+            [credentialDataFromCurrentDomain],
+            // `undefined` means the current origin which is the one that was cancelled
+            undefined
+          );
+        }
+      });
+
+      it("uses the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
+        const cancelledRpId = new URL(currentOrigin).hostname;
+        await addAnchorCancelledRpId({
+          userNumber,
+          origin: currentOrigin,
+          cancelledRpId,
+        });
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const call = () =>
+          connection.fromWebauthnCredentials(
+            userNumber,
+            [credentialDataFromCurrentDomain],
+            !skipCancelledRpIdsStorage
+          );
+
+        // This is because the device is filtered out and then the `findWebAuthnRpId` doesn't receive any device.
+        await expect(call).rejects.toThrowError(
+          new Error(
+            "Not possible. Every registered user has at least one device."
+          )
+        );
+      });
+
+      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
+          skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("webAuthnFailed");
+        const { cancelledRpIds } = await getCancelledRpIds({
+          userNumber,
+          origin: currentOrigin,
+        });
+        expect(cancelledRpIds).toEqual(new Set());
+      });
+
+      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
+          !skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("possiblyWrongRPID");
+        const { cancelledRpIds } = await getCancelledRpIds({
+          userNumber,
+          origin: currentOrigin,
+        });
+        expect(cancelledRpIds).toEqual(new Set([undefined]));
+      });
     });
   });
 
