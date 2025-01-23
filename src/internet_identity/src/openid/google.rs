@@ -303,6 +303,15 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
+    if claims.email.as_ref().is_some_and(|val| val.len() > 256) {
+        return Err("Email too long".into());
+    }
+    if claims.name.as_ref().is_some_and(|val| val.len() > 128) {
+        return Err("Name too long".into());
+    }
+    if claims.picture.as_ref().is_some_and(|val| val.len() > 256) {
+        return Err("Picture URL too long".into());
+    }
 
     Ok(())
 }
@@ -522,5 +531,41 @@ fn should_return_error_when_not_valid_yet() {
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
         Err("JWT is not valid yet".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_email_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.email = Some("thisisanemailaddresswhichistoolongaccordingtothemaxlengththatisallowedbythestandardemailprotocolsandshouldnotbeconsideredasvalidbutitisusefultotestvalidationmechanismsintheapplicationwhichmayexceedstandardlimitationsforemailaddressesandshouldbetested@gmail.com".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Email too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_name_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.name = Some("Jonathan Maximilian Theodore Alexander Montgomery Fitzgerald Jameson Davidson Hawthorne Winchester Baldwin the Fifth of Lancaster".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Name too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_picture_url_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.picture = Some("https://lh3.googleusercontent.com/a/DFsf8fDFfldjfF8z_Hfdfsf8-lkdjFDF83f3f=s96-c&extraPadding=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Picture URL too long".into())
     );
 }
