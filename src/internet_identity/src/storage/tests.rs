@@ -153,8 +153,7 @@ fn should_write_and_update_openid_credential_lookup() {
     storage.write(anchor.clone()).unwrap();
     assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()), None);
     assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
-
-
+    
     // Check if OpenID credential lookup is written to storage when anchor is written
     anchor.add_openid_credential(openid_credential_2.clone()).unwrap();
     storage.write(anchor.clone()).unwrap();
