@@ -5,11 +5,8 @@ use ic_stable_structures::Storable;
 use serde::Deserialize;
 use std::borrow::Cow;
 
-// // Should fit enough characters for OpenID issuer and subject
-// const MAX_SIZE_BYTES: u32 = 256;
-
 /// Unbounded tuples are not supported yet in ic-stable-structures,
-/// this file implements a struct to wrap it into a bounded tuple.
+/// this file implements a struct to wrap it so it can be stored.
 
 #[derive(Deserialize, CandidType, Clone, Ord, Eq, PartialEq, PartialOrd)]
 pub struct StorableOpenIdCredentialKey(OpenIdCredentialKey);
