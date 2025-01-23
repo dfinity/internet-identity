@@ -402,14 +402,20 @@ export class Connection {
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[]
+    credentials: CredentialData[],
+    skipCancelledRpIdsStorage = false
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     // Get cancelled rpids for the user from local storage.
     const { cancelledRpIds, lastShownAddCurrentDevicePage } =
-      await getCancelledRpIds({
-        userNumber,
-        origin: window.location.origin,
-      });
+      skipCancelledRpIdsStorage
+        ? {
+            cancelledRpIds: new Set<string>(),
+            lastShownAddCurrentDevicePage: undefined,
+          }
+        : await getCancelledRpIds({
+            userNumber,
+            origin: window.location.origin,
+          });
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
@@ -442,6 +448,7 @@ export class Connection {
         // We only want to cache cancelled rpids if there can be multiple rpids.
         if (
           dynamicRPIdEnabled &&
+          !skipCancelledRpIdsStorage &&
           hasCredentialsFromMultipleOrigins(credentials)
         ) {
           try {
