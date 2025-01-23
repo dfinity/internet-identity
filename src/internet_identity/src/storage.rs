@@ -485,7 +485,8 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         key: &OpenIdCredentialKey,
     ) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_openid_credential_memory.get(&key.into())
+        self.lookup_anchor_with_openid_credential_memory
+            .get(&key.into())
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
