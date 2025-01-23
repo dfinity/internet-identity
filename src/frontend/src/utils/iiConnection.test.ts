@@ -649,4 +649,160 @@ describe("Connection.login", () => {
       );
     });
   });
+
+  describe("AuthenticatedConnection#add", () => {
+    const alias = "alias";
+    const keyType = { platform: null };
+    const purpose = { authentication: null };
+    const newPublicKey = new ArrayBuffer(0) as DerEncodedPublicKey;
+    const protection = { protected: null };
+
+    it("passes origin if origin less than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const origin = "https://identity.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        origin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [origin],
+        metadata: [],
+      });
+    });
+
+    it("doesn't pass origin if origin more than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const longOrigin = "https://thisisalongdominathatshouldbe50plus.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        longOrigin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("handles no origin being passed", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        undefined
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("passes credential id if present", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const credentialId = new Uint8Array([1, 2, 3, 4, 5]);
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        undefined,
+        credentialId.buffer
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [Array.from(credentialId)],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+  });
 });
