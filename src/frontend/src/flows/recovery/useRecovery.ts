@@ -1,6 +1,7 @@
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
@@ -129,10 +130,12 @@ const enrollAuthenticator = async ({
   try {
     const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
-      const newDeviceOrigin = getCredentialsOrigin({
-        credentials: devices,
-        userAgent: window.navigator.userAgent,
-      });
+      const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+        ? getCredentialsOrigin({
+            credentials: devices,
+            userAgent: window.navigator.userAgent,
+          })
+        : undefined;
       const rpId = nonNullish(newDeviceOrigin)
         ? new URL(newDeviceOrigin).hostname
         : undefined;
