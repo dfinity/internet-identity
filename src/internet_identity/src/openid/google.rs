@@ -533,3 +533,39 @@ fn should_return_error_when_not_valid_yet() {
         Err("JWT is not valid yet".into())
     );
 }
+
+#[test]
+fn should_return_error_when_email_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.email = Some("thisisanemailaddresswhichistoolongaccordingtothemaxlengththatisallowedbythestandardemailprotocolsandshouldnotbeconsideredasvalidbutitisusefultotestvalidationmechanismsintheapplicationwhichmayexceedstandardlimitationsforemailaddressesandshouldbetested@gmail.com".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Email too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_name_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.name = Some("Jonathan Maximilian Christopher Alexander Montgomery Smith-Johnson".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Name too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_picture_url_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.picture = Some("https://lh3.googleusercontent.com/a/DFsf8fDFfldjfF8z_Hfdfsf8-lkdjFDF83f3f=s96-c&extraPadding=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Picture URL too long".into())
+    );
+}
