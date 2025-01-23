@@ -504,12 +504,12 @@ fn should_add_openid_credential() {
         anchor.add_openid_credential(openid_credential_1.clone()),
         Ok(())
     );
-
-    // Check if an already added OpenID credential results in an error
     assert_eq!(
         anchor.openid_credentials,
         vec![openid_credential_0.clone(), openid_credential_1]
     );
+
+    // Check if an already added OpenID credential results in an error
     assert_eq!(
         anchor.add_openid_credential(openid_credential_0.clone()),
         Err(AnchorError::DuplicateOpenIdCredential)
