@@ -7,16 +7,15 @@ import {
 } from "$src/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
 import { WebAuthnIdentity } from "@dfinity/identity";
-import { isNullish } from "@dfinity/utils";
 
 export const constructIdentity = async ({
   devices,
+  rpId,
 }: {
-  devices?: () => Promise<Array<DeviceData>>;
+  devices?: Array<DeviceData>;
+  rpId?: string;
 }): Promise<IIWebAuthnIdentity> => {
-  const opts = isNullish(devices)
-    ? creationOptions()
-    : creationOptions(await devices());
+  const opts = creationOptions(devices, undefined, rpId);
 
   /* The Identity (i.e. key pair) used when creating the anchor.
    * If the "DUMMY_AUTH" feature is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.

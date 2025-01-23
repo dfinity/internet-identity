@@ -1,4 +1,3 @@
-import { DeviceWithUsage } from "$generated/internet_identity_types";
 import { promptDeviceAlias } from "$src/components/alias";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
@@ -8,6 +7,7 @@ import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import {
   AuthenticatedConnection,
   Connection,
+  IIWebAuthnIdentity,
   LoginSuccess,
 } from "$src/utils/iiConnection";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
@@ -18,6 +18,7 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
+import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { forgotNumber } from "./forgotNumber";
 import { promptRecovery } from "./promptRecovery";
@@ -123,20 +124,29 @@ const enrollAuthenticator = async ({
   userNumber: bigint;
   deviceAlias: string;
 }): Promise<"enrolled" | "error"> => {
-  let newDevice;
-  let devices: DeviceWithUsage[];
+  let newDevice: IIWebAuthnIdentity;
+  let newDeviceOrigin: string | undefined;
   try {
-    const devicesData = await withLoader(async () => {
+    const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
-      const newDevice = await constructIdentity({
-        devices: async () => {
-          return (await connection.getAnchorInfo()).devices;
-        },
+      const newDeviceOrigin = getCredentialsOrigin({
+        credentials: devices,
+        userAgent: window.navigator.userAgent,
       });
-      return { newDevice, devices };
+      const rpId = nonNullish(newDeviceOrigin)
+        ? new URL(newDeviceOrigin).hostname
+        : undefined;
+      const newDevice = await constructIdentity({
+        devices,
+        rpId,
+      });
+      return {
+        newDevice,
+        newDeviceOrigin,
+      };
     });
-    newDevice = devicesData.newDevice;
-    devices = devicesData.devices;
+    newDevice = newDeviceData.newDevice;
+    newDeviceOrigin = newDeviceData.newDeviceOrigin;
   } catch (error: unknown) {
     if (isWebAuthnDuplicateDevice(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
@@ -161,17 +171,13 @@ const enrollAuthenticator = async ({
   // running. Instead of starting a new loader explicitly (which would cause
   // flicker) we simply use `constructIdentity`'s.
   try {
-    const newDeviceOrigin = getCredentialsOrigin({
-      credentials: devices,
-      userAgent: window.navigator.userAgent,
-    });
     await connection.add(
       deviceAlias,
       authenticatorAttachmentToKeyType(newDevice.getAuthenticatorAttachment()),
       { authentication: null },
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
-      newDeviceOrigin ?? window.origin,
+      newDeviceOrigin ?? window.location.origin,
       newDevice.rawId
     );
   } catch (error: unknown) {
