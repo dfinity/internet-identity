@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState};
+use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
@@ -11,6 +12,7 @@ use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, DeviceProtection, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 const HEADER_SIZE: usize = 58;
 
@@ -128,6 +130,39 @@ fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 }
 
+#[test]
+fn should_write_and_update_openid_credential_lookup() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut anchor = storage.allocate_anchor().unwrap();
+    let openid_credential_0 = openid_credential(0);
+    let openid_credential_1 = openid_credential(1);
+    let openid_credential_2 = openid_credential(2);
+    anchor.add_openid_credential(openid_credential_0.clone()).unwrap();
+    anchor.add_openid_credential(openid_credential_1.clone()).unwrap();
+
+    // Check if both anchor and OpenID credential lookups are written to storage
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()).unwrap(), anchor.anchor_number());
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
+    
+    // Check if OpenID credential lookup is cleaned up from storage when anchor is written
+    anchor.remove_openid_credential(&openid_credential_0.key()).unwrap();
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()), None);
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
+
+
+    // Check if OpenID credential lookup is written to storage when anchor is written
+    anchor.add_openid_credential(openid_credential_2.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()), None);
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
+    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_2.key()).unwrap(), anchor.anchor_number());
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
@@ -142,6 +177,16 @@ fn sample_device() -> Device {
     }
 }
 
+fn openid_credential(n: u8) -> OpenIdCredential {
+    OpenIdCredential {
+        iss: "https://example.com".into(),
+        sub: n.to_string(),
+        aud: "example-aud".into(),
+        delegation_principal: Principal::anonymous(),
+        last_usage_timestamp: n.into(),
+        metadata: HashMap::default(),
+    }
+}
 fn sample_persistent_state() -> PersistentState {
     PersistentState {
         archive_state: ArchiveState::Created {
