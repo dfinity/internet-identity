@@ -1,5 +1,4 @@
 use crate::openid::OpenIdCredential;
-use crate::storage::anchor::Anchor;
 use candid::CandidType;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -20,12 +19,4 @@ impl Storable for StableAnchor {
     }
 
     const BOUND: Bound = Bound::Unbounded;
-}
-
-impl From<Anchor> for StableAnchor {
-    fn from(anchor: Anchor) -> Self {
-        Self {
-            openid_credentials: anchor.openid_credentials().clone(),
-        }
-    }
 }
