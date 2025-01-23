@@ -114,9 +114,9 @@ pub mod anchor;
 pub mod registration_rates;
 
 pub mod stable_anchor;
+mod storable_openid_credential_key;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
-mod storable_openid_credential_key;
 mod storable_persistent_state;
 #[cfg(test)]
 mod tests;
