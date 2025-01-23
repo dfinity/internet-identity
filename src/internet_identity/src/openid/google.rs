@@ -306,7 +306,7 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if claims.email.as_ref().is_some_and(|val| val.len() > 256) {
         return Err("Email too long".into());
     }
-    if claims.name.as_ref().is_some_and(|val| val.len() > 64) {
+    if claims.name.as_ref().is_some_and(|val| val.len() > 128) {
         return Err("Name too long".into());
     }
     if claims.picture.as_ref().is_some_and(|val| val.len() > 256) {
@@ -550,7 +550,7 @@ fn should_return_error_when_email_too_long() {
 fn should_return_error_when_name_too_long() {
     let (_, salt, mut claims) = test_data();
     let client_id = &claims.aud;
-    claims.name = Some("Jonathan Maximilian Christopher Alexander Montgomery Smith-Johnson".into());
+    claims.name = Some("Jonathan Maximilian Theodore Alexander Montgomery Fitzgerald Jameson Davidson Hawthorne Winchester Baldwin the Fifth of Lancaster".into());
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
