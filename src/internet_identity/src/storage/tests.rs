@@ -139,27 +139,66 @@ fn should_write_and_update_openid_credential_lookup() {
     let openid_credential_0 = openid_credential(0);
     let openid_credential_1 = openid_credential(1);
     let openid_credential_2 = openid_credential(2);
-    anchor.add_openid_credential(openid_credential_0.clone()).unwrap();
-    anchor.add_openid_credential(openid_credential_1.clone()).unwrap();
+    anchor
+        .add_openid_credential(openid_credential_0.clone())
+        .unwrap();
+    anchor
+        .add_openid_credential(openid_credential_1.clone())
+        .unwrap();
 
     // Check if both anchor and OpenID credential lookups are written to storage
     storage.write(anchor.clone()).unwrap();
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()).unwrap(), anchor.anchor_number());
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
-    
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&openid_credential_0.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
     // Check if OpenID credential lookup is cleaned up from storage when anchor is written
-    anchor.remove_openid_credential(&openid_credential_0.key()).unwrap();
+    anchor
+        .remove_openid_credential(&openid_credential_0.key())
+        .unwrap();
     storage.write(anchor.clone()).unwrap();
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()), None);
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
-    
+    assert_eq!(
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
     // Check if OpenID credential lookup is written to storage when anchor is written
-    anchor.add_openid_credential(openid_credential_2.clone()).unwrap();
+    anchor
+        .add_openid_credential(openid_credential_2.clone())
+        .unwrap();
     storage.write(anchor.clone()).unwrap();
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()), None);
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_1.key()).unwrap(), anchor.anchor_number());
-    assert_eq!(storage.lookup_anchor_with_openid_credential(&openid_credential_2.key()).unwrap(), anchor.anchor_number());
+    assert_eq!(
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&openid_credential_2.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
 }
 
 fn sample_device() -> Device {
