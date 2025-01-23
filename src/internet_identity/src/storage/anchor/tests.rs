@@ -2,8 +2,7 @@ use crate::openid::OpenIdCredential;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose,
-    Timestamp,
+    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
