@@ -210,7 +210,7 @@ pub fn remove_openid_credential(
 ) -> Result<Operation, AnchorError> {
     anchor.remove_openid_credential(key)?;
     let (iss, _) = key;
-    Ok(Operation::RemoveOpenIdCredential { iss: iss.into() })
+    Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
 }
 
 /// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
