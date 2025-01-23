@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 mod google;
 
+pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
@@ -22,6 +23,12 @@ pub struct OpenIdCredential {
     pub delegation_principal: Principal,
     pub last_usage_timestamp: Timestamp,
     pub metadata: HashMap<String, MetadataEntryV2>,
+}
+
+impl OpenIdCredential {
+    pub fn key(&self) -> OpenIdCredentialKey {
+        (self.iss.clone(), self.sub.clone())
+    }
 }
 
 trait OpenIdProvider {
@@ -44,6 +51,12 @@ pub fn setup_google(config: OpenIdConfig) {
         .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
 }
 
+/// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
+///
+/// # Arguments
+///
+/// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
+/// * `salt`: The random salt that was used to bind the nonce to the caller principal
 #[allow(unused)]
 pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
     let validation_item = Decoder::new()
@@ -63,8 +76,14 @@ pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
     })
 }
 
+/// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`
+///
+/// # Arguments
+///
+/// * `client_id`: The client id for which the `OpenIdCredential` was created
+/// * `(iss, sub)`: The key of the `OpenIdCredential` to create a `Hash` from
 #[allow(clippy::cast_possible_truncation)]
-fn calculate_seed(client_id: &str, iss: &Iss, sub: &Sub) -> Hash {
+fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
@@ -83,27 +102,36 @@ fn calculate_seed(client_id: &str, iss: &Iss, sub: &Sub) -> Hash {
     hasher.finalize().into()
 }
 
+/// Derive `Principal` for the delegation that can make calls on behalf of a `OpenIdCredential`
+///
+/// # Arguments
+///
+/// * `client_id`: The client id for which the `OpenIdCredential` was created
+/// * `key`: The key of the `OpenIdCredential` to create a `Principal` from
 #[cfg(not(test))]
-fn salt() -> [u8; 32] {
-    crate::state::salt()
-}
-
-#[cfg(test)]
-fn salt() -> [u8; 32] {
-    [0; 32]
-}
-
-#[cfg(not(test))]
-fn get_delegation_principal(client_id: &str, iss: &Iss, sub: &Sub) -> Principal {
-    let seed = calculate_seed(client_id, iss, sub);
+fn get_delegation_principal(client_id: &str, key: &OpenIdCredentialKey) -> Principal {
+    let seed = calculate_delegation_seed(client_id, key);
     let public_key = crate::delegation::der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(public_key)
 }
 
 /// Skip `der_encode_canister_sig_key` in tests and create (invalid) Principal from seed data
 #[cfg(test)]
-fn get_delegation_principal(client_id: &str, iss: &Iss, sub: &Sub) -> Principal {
-    Principal::self_authenticating(calculate_seed(client_id, iss, sub))
+fn get_delegation_principal(client_id: &str, key: &OpenIdCredentialKey) -> Principal {
+    Principal::self_authenticating(calculate_delegation_seed(client_id, key))
+}
+
+/// Get salt unique to this II canister instance, used to make the `Hash` (and thus `Principal`)
+/// unique between instances for the same `OpenIdCredential`, intentionally isolating the instances.
+#[cfg(not(test))]
+fn salt() -> [u8; 32] {
+    crate::state::salt()
+}
+
+/// Skip getting salt from state in tests, instead return a fixed salt
+#[cfg(test)]
+fn salt() -> [u8; 32] {
+    [0; 32]
 }
 
 #[cfg(test)]

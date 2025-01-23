@@ -1,7 +1,9 @@
+use crate::openid::OpenIdCredential;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
+    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose,
+    Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -485,6 +487,94 @@ fn should_not_allow_reserved_metadata_key() {
     }
 }
 
+#[test]
+fn should_add_openid_credential() {
+    let mut anchor = Anchor::new(ANCHOR_NUMBER);
+    let openid_credential_0 = openid_credential(0);
+    let openid_credential_1 = openid_credential(1);
+
+    // Check if OpenID credential is added
+    assert_eq!(
+        anchor.add_openid_credential(openid_credential_0.clone()),
+        Ok(())
+    );
+    assert_eq!(anchor.openid_credentials, vec![openid_credential_0.clone()]);
+
+    // Check if a different OpenID credential is added
+    assert_eq!(
+        anchor.add_openid_credential(openid_credential_1.clone()),
+        Ok(())
+    );
+
+    // Check if an already added OpenID credential results in an error
+    assert_eq!(
+        anchor.openid_credentials,
+        vec![openid_credential_0.clone(), openid_credential_1]
+    );
+    assert_eq!(
+        anchor.add_openid_credential(openid_credential_0.clone()),
+        Err(AnchorError::DuplicateOpenIdCredential)
+    );
+}
+
+#[test]
+fn should_remove_openid_credential() {
+    let mut anchor = Anchor::new(ANCHOR_NUMBER);
+    let openid_credential_0 = openid_credential(0);
+    let openid_credential_1 = openid_credential(1);
+
+    // Check if correct OpenID credential is removed
+    anchor
+        .add_openid_credential(openid_credential_0.clone())
+        .unwrap();
+    anchor
+        .add_openid_credential(openid_credential_1.clone())
+        .unwrap();
+    assert_eq!(
+        anchor.remove_openid_credential(&openid_credential_1.key()),
+        Ok(())
+    );
+    assert_eq!(anchor.openid_credentials, vec![openid_credential_0.clone()]);
+
+    // Check if removing a non-existent OpenID credential results in an error
+    assert_eq!(
+        anchor.remove_openid_credential(&openid_credential_1.key()),
+        Err(AnchorError::OpenIdCredentialNotFound)
+    );
+}
+
+#[test]
+fn should_update_openid_credential() {
+    let mut anchor = Anchor::new(ANCHOR_NUMBER);
+    let openid_credential_0 = openid_credential(0);
+    let openid_credential_1 = openid_credential(1);
+    let mut openid_credential_1_updated = openid_credential_1.clone();
+    openid_credential_1_updated.last_usage_timestamp += 1;
+    let openid_credential_2 = openid_credential(2);
+
+    // Check if correct OpenID credential is updated
+    anchor
+        .add_openid_credential(openid_credential_0.clone())
+        .unwrap();
+    anchor
+        .add_openid_credential(openid_credential_1.clone())
+        .unwrap();
+    assert_eq!(
+        anchor.update_openid_credential(openid_credential_1_updated.clone()),
+        Ok(())
+    );
+    assert_eq!(
+        anchor.openid_credentials,
+        vec![openid_credential_0.clone(), openid_credential_1_updated]
+    );
+
+    // Check if updating a non-existent OpenID credential results in an error
+    assert_eq!(
+        anchor.update_openid_credential(openid_credential_2),
+        Err(AnchorError::OpenIdCredentialNotFound)
+    );
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("public key of some sample device"),
@@ -542,6 +632,17 @@ fn recovery_phrase(n: u8, protection: DeviceProtection) -> Device {
         origin: None,
         last_usage_timestamp: None,
         metadata: None,
+    }
+}
+
+fn openid_credential(n: u8) -> OpenIdCredential {
+    OpenIdCredential {
+        iss: "https://example.com".into(),
+        sub: n.to_string(),
+        aud: "example-aud".into(),
+        delegation_principal: Principal::anonymous(),
+        last_usage_timestamp: n.into(),
+        metadata: HashMap::default(),
     }
 }
 

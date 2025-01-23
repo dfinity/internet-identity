@@ -97,7 +97,7 @@ impl OpenIdProvider for Provider {
 
         // Return credential with Google specific metadata
         let delegation_principal =
-            get_delegation_principal(&self.client_id, &claims.iss, &claims.sub);
+            get_delegation_principal(&self.client_id, &(claims.iss.clone(), claims.sub.clone()));
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
@@ -375,7 +375,7 @@ fn should_return_credential() {
     let provider = Provider::create(OpenIdConfig {
         client_id: claims.aud.clone(),
     });
-    let delegation_principal = get_delegation_principal(&claims.aud, &claims.iss, &claims.sub);
+    let delegation_principal = get_delegation_principal(&claims.aud, &(claims.iss.clone(), claims.sub.clone()));
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,

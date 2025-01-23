@@ -1,5 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
-use crate::openid::OpenIdCredential;
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
@@ -206,9 +206,19 @@ pub fn add_openid_credential(
 #[allow(unused)]
 pub fn remove_openid_credential(
     anchor: &mut Anchor,
-    iss: &str,
-    sub: &str,
+    key: &OpenIdCredentialKey,
 ) -> Result<Operation, AnchorError> {
-    anchor.remove_openid_credential(iss, sub)?;
+    anchor.remove_openid_credential(key)?;
+    let (iss, _) = key;
     Ok(Operation::RemoveOpenIdCredential { iss: iss.into() })
+}
+
+/// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
+/// Return an error if the `OpenIdCredential` to be updated does not exist.
+#[allow(unused)]
+pub fn update_openid_credential(
+    anchor: &mut Anchor,
+    openid_credential: OpenIdCredential,
+) -> Result<(), AnchorError> {
+    anchor.update_openid_credential(openid_credential)
 }

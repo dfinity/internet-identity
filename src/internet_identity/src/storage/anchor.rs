@@ -1,5 +1,5 @@
 use crate::ii_domain::IIDomain;
-use crate::openid::OpenIdCredential;
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -129,12 +129,17 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
     }
 }
 
-impl From<Anchor> for StorableAnchor {
+impl From<Anchor> for (StorableAnchor, StableAnchor) {
     fn from(anchor: Anchor) -> Self {
-        Self {
-            devices: anchor.devices,
-            metadata: anchor.metadata,
-        }
+        (
+            StorableAnchor {
+                devices: anchor.devices,
+                metadata: anchor.metadata,
+            },
+            StableAnchor {
+                openid_credentials: anchor.openid_credentials,
+            },
+        )
     }
 }
 
@@ -338,15 +343,11 @@ impl Anchor {
         &self.openid_credentials
     }
 
-    fn openid_credential_index(&self, iss: &str, sub: &str) -> Result<usize, AnchorError> {
-        let Some(index) = self
-            .openid_credentials
+    fn openid_credential_index(&self, key: &OpenIdCredentialKey) -> Result<usize, AnchorError> {
+        self.openid_credentials
             .iter()
-            .position(|entry| entry.iss == iss && entry.sub == sub)
-        else {
-            return Err(AnchorError::OpenIdCredentialNotFound);
-        };
-        Ok(index)
+            .position(|entry| &entry.key() == key)
+            .ok_or(AnchorError::OpenIdCredentialNotFound)
     }
 
     pub fn add_openid_credential(
@@ -354,9 +355,8 @@ impl Anchor {
         openid_credential: OpenIdCredential,
     ) -> Result<(), AnchorError> {
         if self
-            .openid_credentials
-            .iter()
-            .any(|entry| entry.iss == openid_credential.iss && entry.sub == openid_credential.sub)
+            .openid_credential_index(&openid_credential.key())
+            .is_ok()
         {
             return Err(AnchorError::DuplicateOpenIdCredential);
         }
@@ -364,9 +364,21 @@ impl Anchor {
         Ok(())
     }
 
-    pub fn remove_openid_credential(&mut self, iss: &str, sub: &str) -> Result<(), AnchorError> {
-        let index = self.openid_credential_index(iss, sub)?;
+    pub fn remove_openid_credential(
+        &mut self,
+        key: &OpenIdCredentialKey,
+    ) -> Result<(), AnchorError> {
+        let index = self.openid_credential_index(key)?;
         self.openid_credentials.remove(index);
+        Ok(())
+    }
+
+    pub fn update_openid_credential(
+        &mut self,
+        openid_credential: OpenIdCredential,
+    ) -> Result<(), AnchorError> {
+        let index = self.openid_credential_index(&openid_credential.key())?;
+        self.openid_credentials[index] = openid_credential;
         Ok(())
     }
 

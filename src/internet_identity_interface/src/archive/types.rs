@@ -32,7 +32,7 @@ pub enum Operation {
     IdentityMetadataReplace { metadata_keys: Vec<String> },
 
     // OpenID credentials, only the issuer is within the operation due to privacy considerations
-    #[serde(rename = "add_openid_credential")]
+    #[serde(rename = "insert_openid_credential")]
     AddOpenIdCredential { iss: String },
     #[serde(rename = "remove_openid_credential")]
     RemoveOpenIdCredential { iss: String },

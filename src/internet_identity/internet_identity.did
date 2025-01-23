@@ -333,6 +333,8 @@ type OpenIdCredential = record {
     iss: text;
     sub: text;
     aud: text;
+    // The principal of a delegation created after verifying a JWT,
+    // this is then used to interact with the other canister methods.
     delegation_principal: principal;
     last_usage_timestamp: Timestamp;
     metadata: MetadataMapV2;

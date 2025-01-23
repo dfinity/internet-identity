@@ -82,7 +82,7 @@
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
@@ -97,7 +97,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::openid::{Iss, OpenIdCredential, Sub};
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -130,15 +130,15 @@ const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
 /// MemoryManager parameters.
-const ANCHOR_MEMORY_INDEX: u8 = 0;
-const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1;
-const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2;
-const EVENT_DATA_MEMORY_INDEX: u8 = 3;
-const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4;
-const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5;
-const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6;
-const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7;
-const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8;
+const ANCHOR_MEMORY_INDEX: u8 = 0u8;
+const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
+const PERSISTENT_STATE_MEMORY_INDEX: u8 = 2u8;
+const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
+const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
+const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
+const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
+const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
+const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -216,7 +216,7 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
-        StableBTreeMap<(Iss, Sub), AnchorNumber, ManagedMemory<M>>,
+        StableBTreeMap<OpenIdCredentialKey, AnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -397,9 +397,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
+        let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();
 
         // Write fixed 4KB anchor
-        let storable_anchor = StorableAnchor::from(data.clone());
         let buf = storable_anchor.to_bytes();
         if buf.len() > self.header.entry_size as usize {
             return Err(StorageError::EntrySizeLimitExceeded {
@@ -416,9 +416,8 @@ impl<M: Memory + Clone> Storage<M> {
         writer.flush().expect("memory write failed");
 
         // Write unbounded stable structures anchor
-        let previous_stable_anchor = self.stable_anchor_memory.get(&anchor_number);
-        let stable_anchor = StableAnchor::from(data);
-        self.stable_anchor_memory
+        let previous_stable_anchor = self
+            .stable_anchor_memory
             .insert(anchor_number, stable_anchor.clone());
 
         // Update `OpenIdCredential` to `AnchorNumber` lookup map
@@ -463,29 +462,27 @@ impl<M: Memory + Clone> Storage<M> {
         previous: Vec<OpenIdCredential>,
         current: Vec<OpenIdCredential>,
     ) {
-        let credential_to_be_removed = previous
-            .iter()
-            .filter(|p| current.iter().all(|c| c.iss == p.iss && c.sub == p.sub));
-        let credential_to_be_added = current
-            .iter()
-            .filter(|c| previous.iter().all(|p| p.iss == c.iss && p.sub == c.sub));
-        credential_to_be_removed.for_each(|OpenIdCredential { iss, sub, .. }| {
-            self.lookup_anchor_with_openid_credential_memory
-                .remove(&(iss.clone(), sub.clone()));
+        let previous_set: BTreeSet<OpenIdCredentialKey> =
+            previous.into_iter().map(|cred| cred.key()).collect();
+        let current_set: BTreeSet<OpenIdCredentialKey> =
+            current.into_iter().map(|cred| cred.key()).collect();
+        let credential_to_be_removed = previous_set.difference(&current_set);
+        let credential_to_be_added = current_set.difference(&previous_set);
+        credential_to_be_removed.for_each(|key| {
+            self.lookup_anchor_with_openid_credential_memory.remove(key);
         });
-        credential_to_be_added.for_each(|OpenIdCredential { iss, sub, .. }| {
+        credential_to_be_added.for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .insert((iss.clone(), sub.clone()), anchor_number);
+                .insert(key.clone(), anchor_number);
         });
     }
 
     #[allow(unused)]
     pub fn lookup_anchor_with_openid_credential(
         &self,
-        openid_credential: OpenIdCredential,
+        key: &OpenIdCredentialKey,
     ) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_openid_credential_memory
-            .get(&(openid_credential.iss, openid_credential.sub))
+        self.lookup_anchor_with_openid_credential_memory.get(key)
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
