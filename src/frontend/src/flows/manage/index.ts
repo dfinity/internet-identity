@@ -4,6 +4,7 @@ import {
   IdentityAnchorInfo,
   OpenIdCredential,
   OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
 } from "$generated/internet_identity_types";
 import identityCardBackground from "$src/assets/identityCardBackground.png";
 import {
@@ -434,8 +435,31 @@ export const displayManage = async (
       if (!confirm(copy.unlink_account_confirmation.toString())) {
         return;
       }
-      await connection.removeOpenIdCredential(credential.iss, credential.sub);
-      resolve();
+      try {
+        await connection.removeOpenIdCredential(credential.iss, credential.sub);
+        resolve();
+      } catch (error) {
+        if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
+          switch (error.type) {
+            case "Unauthorized":
+              toast.error(copy.authentication_failed);
+              console.error(
+                `Authentication unexpectedly failed: ${error
+                  .value(error.type)
+                  .toText()}`
+              );
+              break;
+            case "OpenIdCredentialNotFound":
+              toast.error(copy.account_not_found);
+              break;
+            default: {
+              // Make sure all error cases are covered,
+              // else this will throw a TS error here.
+              const _ = error.type satisfies never;
+            }
+          }
+        }
+      }
     };
 
     // Function to figure out what temp keys warning should be shown, if any.

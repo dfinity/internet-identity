@@ -11,6 +11,7 @@
     "unlink": "Unlink",
     "last_used": "Last used",
     "authentication_failed": "Authentication failed",
-    "jwt_signature_invalid": "The account could not be linked due to an invalid signature"
+    "jwt_signature_invalid": "The account could not be linked due to an invalid signature",
+    "account_not_found": "The account could not be found"
   }
 }
