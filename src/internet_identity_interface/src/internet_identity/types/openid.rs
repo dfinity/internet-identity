@@ -12,3 +12,16 @@ pub struct OpenIdCredentialData {
     pub last_usage_timestamp: Timestamp,
     pub metadata: HashMap<String, MetadataEntryV2>,
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OpenIdCredentialAddError {
+    Unauthorized(Principal),
+    JwtVerificationFailed,
+    DuplicateOpenIdCredential,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OpenIdCredentialRemoveError {
+    Unauthorized(Principal),
+    OpenIdCredentialNotFound,
+}

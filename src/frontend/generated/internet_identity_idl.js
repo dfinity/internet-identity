@@ -200,10 +200,14 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const Aud = IDL.Text;
+  const Iss = IDL.Text;
+  const Sub = IDL.Text;
   const OpenIdCredential = IDL.Record({
-    'aud' : IDL.Text,
-    'iss' : IDL.Text,
-    'sub' : IDL.Text,
+    'aud' : Aud,
+    'iss' : Iss,
+    'sub' : Sub,
+    'delegation_principal' : IDL.Principal,
     'metadata' : MetadataMapV2,
     'last_usage_timestamp' : Timestamp,
   });
@@ -294,7 +298,6 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
-    'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
   const IdentityInfoError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -321,6 +324,18 @@ export const idlFactory = ({ IDL }) => {
     'InvalidCaller' : IDL.Null,
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
+  });
+  const JWT = IDL.Text;
+  const Salt = IDL.Vec(IDL.Nat8);
+  const OpenIdCredentialAddError = IDL.Variant({
+    'DuplicateOpenIdCredential' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'JwtVerificationFailed' : IDL.Null,
+  });
+  const OpenIdCredentialKey = IDL.Tuple(Iss, Sub);
+  const OpenIdCredentialRemoveError = IDL.Variant({
+    'OpenIdCredentialNotFound' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
   });
   const UserKey = PublicKey;
   const PrepareIdAliasRequest = IDL.Record({
@@ -515,6 +530,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'openid_credential_add' : IDL.Func(
+        [IdentityNumber, JWT, Salt],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
+        [],
+      ),
+    'openid_credential_remove' : IDL.Func(
+        [IdentityNumber, OpenIdCredentialKey],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialRemoveError })],
+        [],
+      ),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
