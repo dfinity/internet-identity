@@ -367,7 +367,17 @@ export const displayManage = async (
     }
 
     const onAddDevice = async () => {
-      await addDevice({ userNumber, connection, origin: window.origin });
+      const newDeviveOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+        ? getCredentialsOrigin({
+            credentials: devices_,
+            userAgent: navigator.userAgent,
+          })
+        : undefined;
+      await addDevice({
+        userNumber,
+        connection,
+        origin: newDeviveOrigin ?? window.origin,
+      });
       resolve();
     };
     const addRecoveryPhrase = async () => {
