@@ -220,10 +220,10 @@ export const recoveryWizard = async (
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
-  const [credentials, identityMetadata, pinIdentityMaterial] = await withLoader(
+  const [passkeys, identityMetadata, pinIdentityMaterial] = await withLoader(
     () =>
       Promise.all([
-        connection.lookupAll(userNumber),
+        connection.lookupPasskeys(userNumber),
         connection.getIdentityMetadata(),
         idbRetrievePinIdentityMaterial({
           userNumber,
@@ -233,7 +233,7 @@ export const recoveryWizard = async (
   const nowInMillis = Date.now();
 
   const devicesStatus = getDevicesStatus({
-    credentials,
+    credentials: passkeys,
     identityMetadata,
     pinIdentityMaterial,
     nowInMillis,
@@ -241,7 +241,7 @@ export const recoveryWizard = async (
 
   const originNewDevice = DOMAIN_COMPATIBILITY.isEnabled()
     ? getCredentialsOrigin({
-        credentials,
+        credentials: passkeys,
         userAgent: navigator.userAgent,
       })
     : undefined;

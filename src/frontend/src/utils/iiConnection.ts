@@ -578,6 +578,22 @@ export class Connection {
     return await actor.lookup(userNumber);
   };
 
+  /**
+   * Returns all the passkeys for a user. Including the recovery device.
+   * @param userNumber
+   * @returns {Promise<Omit<DeviceData, "alias">[]>}
+   */
+  lookupPasskeys = async (
+    userNumber: UserNumber
+  ): Promise<Omit<DeviceData, "alias">[]> => {
+    const actor = await this.createActor();
+    const allDevices = await actor.lookup(userNumber);
+    return allDevices.filter(
+      (device) =>
+        "platform" in device.key_type || "cross_platform" in device.key_type
+    );
+  };
+
   lookupAuthenticators = async (
     userNumber: UserNumber
   ): Promise<Omit<DeviceData, "alias">[]> => {

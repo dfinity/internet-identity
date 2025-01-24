@@ -914,4 +914,90 @@ describe("Connection.login", () => {
       });
     });
   });
+
+  describe("Connection#lookupPasskeys", () => {
+    it("should filter out pin, unknown, and pass phrase", async () => {
+      const passPhrase: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { seed_phrase: null },
+        purpose: { recovery: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const pinDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { browser_storage_key: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const platformDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { platform: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const platformDevice2: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { platform: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const crossPlatformDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { platform: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const mockActor = {
+        identity_info: vi.fn().mockImplementation(async () => {
+          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
+          infoResponse = await mockRawMetadata;
+          return { Ok: { metadata: mockRawMetadata } };
+        }),
+        lookup: vi
+          .fn()
+          .mockResolvedValue([
+            passPhrase,
+            pinDevice,
+            platformDevice,
+            crossPlatformDevice,
+            platformDevice2,
+          ]),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const passkeys = await connection.lookupPasskeys(BigInt(12345));
+      expect(passkeys).toHaveLength(3);
+      expect(passkeys).toEqual(
+        expect.arrayContaining([
+          platformDevice,
+          crossPlatformDevice,
+          platformDevice2,
+        ])
+      );
+      expect(passkeys).toEqual(
+        expect.not.arrayContaining([passPhrase, pinDevice])
+      );
+    });
+  });
 });
