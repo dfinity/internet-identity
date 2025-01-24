@@ -377,7 +377,15 @@ export const displayManage = async (
         return;
       }
       doAdd satisfies "ok";
-      await setupPhrase(userNumber, connection);
+      const newDeviceOrigin = getCredentialsOrigin({
+        credentials: devices_,
+        userAgent: window.navigator.userAgent,
+      });
+      await setupPhrase(
+        userNumber,
+        connection,
+        newDeviceOrigin ?? window.origin
+      );
       resolve();
     };
 
