@@ -55,7 +55,7 @@ export const linkedAccountsSection = ({
           ?disabled=${credentials.length >= MAX_CREDENTIALS}
           class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
           @click="${() => onLinkAccount()}"
-          id="linkAdditionalAccount"
+          id="linkAccount"
         >
           <span class="c-tooltip__message c-card c-card--tight">
             ${copy.max_linked_accounts_reached}

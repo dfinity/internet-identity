@@ -389,6 +389,10 @@ export class MainView extends View {
       `[data-action="${action}"][data-device="${deviceName}"]`
     );
   }
+
+  async addOpenIdCredential(): Promise<void> {
+    await this.browser.$("#linkAccount").click();
+  }
 }
 
 export class AddRemoteDeviceAliasView extends View {
