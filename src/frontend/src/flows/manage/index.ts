@@ -377,10 +377,12 @@ export const displayManage = async (
         return;
       }
       doAdd satisfies "ok";
-      const newDeviceOrigin = getCredentialsOrigin({
-        credentials: devices_,
-        userAgent: window.navigator.userAgent,
-      });
+      const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+        ? getCredentialsOrigin({
+            credentials: devices_,
+            userAgent: window.navigator.userAgent,
+          })
+        : undefined;
       await setupPhrase(
         userNumber,
         connection,
