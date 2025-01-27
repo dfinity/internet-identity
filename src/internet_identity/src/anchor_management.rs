@@ -12,8 +12,8 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
     IdentityAnchorInfo, MetadataEntry,
 };
-use std::collections::HashMap;
 use state::storage_borrow;
+use std::collections::HashMap;
 
 pub mod registration;
 pub mod tentative_device_registration;
