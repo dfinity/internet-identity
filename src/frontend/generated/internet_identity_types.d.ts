@@ -187,6 +187,7 @@ export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   'metadata' : MetadataMapV2,
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
+  'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
 export type IdentityInfoError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -246,7 +247,6 @@ export interface OpenIdCredential {
   'aud' : Aud,
   'iss' : Iss,
   'sub' : Sub,
-  'delegation_principal' : Principal,
   'metadata' : MetadataMapV2,
   'last_usage_timestamp' : Timestamp,
 }
