@@ -1,5 +1,5 @@
 use crate::internet_identity::types::{MetadataEntryV2, Timestamp};
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use std::collections::HashMap;
 
 /// Types for OpenID credentials, used for OpenID sign in
