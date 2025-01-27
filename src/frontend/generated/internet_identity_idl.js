@@ -204,7 +204,6 @@ export const idlFactory = ({ IDL }) => {
     'aud' : IDL.Text,
     'iss' : IDL.Text,
     'sub' : IDL.Text,
-    'delegation_principal' : IDL.Principal,
     'metadata' : MetadataMapV2,
     'last_usage_timestamp' : Timestamp,
   });
@@ -295,6 +294,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
+    'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
   const IdentityInfoError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
