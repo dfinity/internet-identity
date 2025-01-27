@@ -491,7 +491,7 @@ impl<M: Memory + Clone> Storage<M> {
             .lookup_anchor_with_openid_credential_memory
             .get(&key.clone().into())
             .map(Into::into)?;
-        anchor_numbers.first().map(Clone::clone)
+        anchor_numbers.first().copied()
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
