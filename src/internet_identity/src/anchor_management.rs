@@ -13,6 +13,7 @@ use internet_identity_interface::internet_identity::types::{
     IdentityAnchorInfo, MetadataEntry,
 };
 use std::collections::HashMap;
+use state::storage_borrow;
 
 pub mod registration;
 pub mod tentative_device_registration;
@@ -189,12 +190,15 @@ pub fn identity_metadata_replace(
 }
 
 /// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
-/// Returns an error if the `OpenIdCredential` already exists.
+/// Returns an error if the `OpenIdCredential` already exists in this or another anchor.
 #[allow(unused)]
 pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
 ) -> Result<Operation, AnchorError> {
+    if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
+        return Err(AnchorError::DuplicateOpenIdCredential);
+    }
     anchor.add_openid_credential(openid_credential.clone())?;
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
@@ -221,4 +225,10 @@ pub fn update_openid_credential(
     openid_credential: OpenIdCredential,
 ) -> Result<(), AnchorError> {
     anchor.update_openid_credential(openid_credential)
+}
+
+/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
+#[allow(unused)]
+pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
+    storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }

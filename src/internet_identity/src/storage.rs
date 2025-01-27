@@ -482,7 +482,6 @@ impl<M: Memory + Clone> Storage<M> {
         });
     }
 
-    #[allow(unused)]
     pub fn lookup_anchor_with_openid_credential(
         &self,
         key: &OpenIdCredentialKey,
