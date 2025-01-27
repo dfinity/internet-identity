@@ -108,8 +108,12 @@ export const registerFlow = async ({
   const flowStart = precomputeFirst(() => identityRegistrationStart());
 
   const displayUserNumber = displayUserNumberWarmup();
+  // We register the device's origin in the current domain.
+  // If we want to change it, we need to change this line.
+  const deviceOrigin = window.location.origin;
   const savePasskeyResult = await savePasskeyOrPin({
     pinAllowed: await pinAllowed(),
+    origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
     return "canceled";
@@ -161,6 +165,7 @@ export const registerFlow = async ({
           pubKey: identity.getPublicKey().toDer(),
           credentialId: identity.rawId,
           authenticatorAttachment: identity.getAuthenticatorAttachment(),
+          origin: deviceOrigin,
         }),
         authnMethod: "passkey" as const,
       };

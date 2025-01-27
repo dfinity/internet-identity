@@ -40,17 +40,18 @@ export const passkeyAuthnMethodData = ({
   pubKey,
   credentialId,
   authenticatorAttachment,
+  origin,
 }: {
   alias: string;
   pubKey: DerEncodedPublicKey;
   credentialId: CredentialId;
   authenticatorAttachment?: AuthenticatorAttachment;
+  origin: string;
 }): AuthnMethodData => {
   const metadata: MetadataMapV2 = [
     ["alias", { String: alias }],
     // The origin in the metadata might not match the origin in the auth method if the origin is longer than 50 characters.
-    // TODO: Expect the origin as parameter because it might be different than the window if a RP ID is used.
-    ["origin", { String: window.origin }],
+    ["origin", { String: origin }],
   ];
   if (nonNullish(authenticatorAttachment)) {
     metadata.push([
