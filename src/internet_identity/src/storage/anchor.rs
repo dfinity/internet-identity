@@ -109,7 +109,6 @@ impl From<OpenIdCredential> for OpenIdCredentialData {
             iss: openid_credential.iss,
             sub: openid_credential.sub,
             aud: openid_credential.aud,
-            delegation_principal: openid_credential.delegation_principal,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
         }
@@ -122,7 +121,6 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
             iss: openid_credential.iss,
             sub: openid_credential.sub,
             aud: openid_credential.aud,
-            delegation_principal: openid_credential.delegation_principal,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
         }

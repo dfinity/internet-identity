@@ -1,3 +1,4 @@
+use crate::delegation::der_encode_canister_sig_key;
 use candid::{CandidType, Deserialize, Principal};
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
@@ -20,7 +21,6 @@ pub struct OpenIdCredential {
     pub iss: Iss,
     pub sub: Sub,
     pub aud: Aud,
-    pub delegation_principal: Principal,
     pub last_usage_timestamp: Timestamp,
     pub metadata: HashMap<String, MetadataEntryV2>,
 }
@@ -28,6 +28,11 @@ pub struct OpenIdCredential {
 impl OpenIdCredential {
     pub fn key(&self) -> OpenIdCredentialKey {
         (self.iss.clone(), self.sub.clone())
+    }
+    pub fn principal(&self) -> Principal {
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        let public_key = der_encode_canister_sig_key(seed.to_vec());
+        Principal::self_authenticating(public_key)
     }
 }
 
@@ -102,25 +107,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
     hasher.finalize().into()
 }
 
-/// Derive `Principal` for the delegation that can make calls on behalf of a `OpenIdCredential`
-///
-/// # Arguments
-///
-/// * `client_id`: The client id for which the `OpenIdCredential` was created
-/// * `key`: The key of the `OpenIdCredential` to create a `Principal` from
-#[cfg(not(test))]
-fn get_delegation_principal(client_id: &str, key: &OpenIdCredentialKey) -> Principal {
-    let seed = calculate_delegation_seed(client_id, key);
-    let public_key = crate::delegation::der_encode_canister_sig_key(seed.to_vec());
-    Principal::self_authenticating(public_key)
-}
-
-/// Skip `der_encode_canister_sig_key` in tests and create (invalid) Principal from seed data
-#[cfg(test)]
-fn get_delegation_principal(client_id: &str, key: &OpenIdCredentialKey) -> Principal {
-    Principal::self_authenticating(calculate_delegation_seed(client_id, key))
-}
-
 /// Get salt unique to this II canister instance, used to make the `Hash` (and thus `Principal`)
 /// unique between instances for the same `OpenIdCredential`, intentionally isolating the instances.
 #[cfg(not(test))]
@@ -155,7 +141,6 @@ impl ExampleProvider {
             iss: self.issuer().into(),
             sub: "example-sub".into(),
             aud: "example-aud".into(),
-            delegation_principal: Principal::anonymous(),
             last_usage_timestamp: 0,
             metadata: HashMap::new(),
         }

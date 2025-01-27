@@ -106,6 +106,7 @@ use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
+use crate::storage::storable_anchor_number_list::StorableAnchorNumberList;
 use crate::storage::storable_openid_credential_key::StorableOpenIdCredentialKey;
 use crate::storage::storable_persistent_state::StorablePersistentState;
 use internet_identity_interface::internet_identity::types::*;
@@ -116,6 +117,7 @@ pub mod registration_rates;
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
+mod storable_anchor_number_list;
 mod storable_openid_credential_key;
 mod storable_persistent_state;
 #[cfg(test)]
@@ -218,7 +220,7 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
-        StableBTreeMap<StorableOpenIdCredentialKey, AnchorNumber, ManagedMemory<M>>,
+        StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList, ManagedMemory<M>>,
 }
 
 #[repr(packed)]
@@ -417,7 +419,7 @@ impl<M: Memory + Clone> Storage<M> {
         writer.write_all(&buf).expect("memory write failed");
         writer.flush().expect("memory write failed");
 
-        // Write unbounded stable structures anchor
+        // Write current and read previous unbounded stable structures anchor
         let previous_stable_anchor = self
             .stable_anchor_memory
             .insert(anchor_number, stable_anchor.clone());
@@ -427,7 +429,7 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|anchor| anchor.openid_credentials)
             .unwrap_or_default();
         let current_openid_credentials = stable_anchor.openid_credentials;
-        self.update_lookup_anchor_with_openid_credential(
+        self.update_lookup_anchors_with_openid_credential(
             anchor_number,
             previous_openid_credentials,
             current_openid_credentials,
@@ -457,8 +459,8 @@ impl<M: Memory + Clone> Storage<M> {
         )))
     }
 
-    /// Update `OpenIdCredential` to `AnchorNumber` lookup map
-    fn update_lookup_anchor_with_openid_credential(
+    /// Update `Vec<OpenIdCredential>` to `Vec<AnchorNumber>` lookup map
+    fn update_lookup_anchors_with_openid_credential(
         &mut self,
         anchor_number: AnchorNumber,
         previous: Vec<OpenIdCredential>,
@@ -470,13 +472,13 @@ impl<M: Memory + Clone> Storage<M> {
             current.into_iter().map(|cred| cred.key()).collect();
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
-        credential_to_be_removed.for_each(|key| {
+        credential_to_be_removed.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
                 .remove(&key.into());
         });
-        credential_to_be_added.for_each(|key| {
+        credential_to_be_added.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .insert(key.into(), anchor_number);
+                .insert(key.into(), vec![anchor_number].into());
         });
     }
 
@@ -485,8 +487,11 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         key: &OpenIdCredentialKey,
     ) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_openid_credential_memory
-            .get(&key.into())
+        let anchor_numbers: Vec<AnchorNumber> = self
+            .lookup_anchor_with_openid_credential_memory
+            .get(&key.clone().into())
+            .map(Into::into)?;
+        anchor_numbers.first().map(Clone::clone)
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -669,6 +674,7 @@ pub enum StorageError {
         space_required: u64,
         space_available: u64,
     },
+    DuplicateOpenIdCredential,
 }
 
 impl fmt::Display for StorageError {
@@ -697,6 +703,12 @@ impl fmt::Display for StorageError {
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
             ),
+            Self::DuplicateOpenIdCredential => {
+                write!(
+                    f,
+                    "OpenId credential has already been registered with an anchor"
+                )
+            }
         }
     }
 }

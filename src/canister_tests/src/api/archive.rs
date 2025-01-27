@@ -80,6 +80,10 @@ pub mod compat {
         },
         #[serde(rename = "remove_device")]
         RemoveDevice { device: PublicKey },
+        #[serde(rename = "add_openid_credential")]
+        AddOpenIdCredential { iss: String },
+        #[serde(rename = "remove_openid_credential")]
+        RemoveOpenIdCredential { iss: String },
     }
 
     impl From<Operation> for CompatOperation {
@@ -98,9 +102,13 @@ pub mod compat {
                     new_device,
                 },
                 Operation::RemoveDevice { device } => CompatOperation::RemoveDevice { device },
-                Operation::IdentityMetadataReplace { .. }
-                | Operation::AddOpenIdCredential { .. }
-                | Operation::RemoveOpenIdCredential { .. } => {
+                Operation::AddOpenIdCredential { iss } => {
+                    CompatOperation::AddOpenIdCredential { iss }
+                }
+                Operation::RemoveOpenIdCredential { iss } => {
+                    CompatOperation::RemoveOpenIdCredential { iss }
+                }
+                Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")
                 }
             }

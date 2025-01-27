@@ -7,7 +7,6 @@ use std::borrow::Cow;
 
 /// Unbounded tuples are not supported yet in ic-stable-structures,
 /// this file implements a struct to wrap it so it can be stored.
-
 #[derive(Deserialize, CandidType, Clone, Ord, Eq, PartialEq, PartialOrd)]
 pub struct StorableOpenIdCredentialKey(OpenIdCredentialKey);
 
@@ -17,9 +16,9 @@ impl From<StorableOpenIdCredentialKey> for OpenIdCredentialKey {
     }
 }
 
-impl From<&OpenIdCredentialKey> for StorableOpenIdCredentialKey {
-    fn from(value: &OpenIdCredentialKey) -> Self {
-        StorableOpenIdCredentialKey(value.clone())
+impl From<OpenIdCredentialKey> for StorableOpenIdCredentialKey {
+    fn from(value: OpenIdCredentialKey) -> Self {
+        StorableOpenIdCredentialKey(value)
     }
 }
 

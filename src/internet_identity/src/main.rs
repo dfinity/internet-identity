@@ -578,6 +578,7 @@ mod v2_api {
             authn_method_registration: anchor_info
                 .device_registration
                 .map(AuthnMethodRegistration::from),
+            openid_credentials: anchor_info.openid_credentials,
             metadata,
         };
         Ok(identity_info)
