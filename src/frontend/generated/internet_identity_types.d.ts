@@ -250,13 +250,15 @@ export interface OpenIdCredential {
   'metadata' : MetadataMapV2,
   'last_usage_timestamp' : Timestamp,
 }
-export type OpenIdCredentialAddError = { 'DuplicateOpenIdCredential' : null } |
+export type OpenIdCredentialAddError = {
+    'OpenIdCredentialAlreadyRegistered' : null
+  } |
+  { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'JwtVerificationFailed' : null };
 export type OpenIdCredentialKey = [Iss, Sub];
-export type OpenIdCredentialRemoveError = {
-    'OpenIdCredentialNotFound' : null
-  } |
+export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
+  { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };

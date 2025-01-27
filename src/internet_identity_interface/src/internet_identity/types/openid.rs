@@ -17,11 +17,13 @@ pub struct OpenIdCredentialData {
 pub enum OpenIdCredentialAddError {
     Unauthorized(Principal),
     JwtVerificationFailed,
-    DuplicateOpenIdCredential,
+    OpenIdCredentialAlreadyRegistered,
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum OpenIdCredentialRemoveError {
     Unauthorized(Principal),
     OpenIdCredentialNotFound,
+    InternalCanisterError(String),
 }

@@ -417,8 +417,11 @@ export const displayManage = async (
             case "JwtVerificationFailed":
               toast.error(copy.jwt_signature_invalid);
               break;
-            case "DuplicateOpenIdCredential":
+            case "OpenIdCredentialAlreadyRegistered":
               toast.error(copy.account_already_linked);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
               break;
             default: {
               // Make sure all error cases are covered,
@@ -451,6 +454,9 @@ export const displayManage = async (
               break;
             case "OpenIdCredentialNotFound":
               toast.error(copy.account_not_found);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
               break;
             default: {
               // Make sure all error cases are covered,

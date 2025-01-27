@@ -328,12 +328,14 @@ export const idlFactory = ({ IDL }) => {
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
-    'DuplicateOpenIdCredential' : IDL.Null,
+    'OpenIdCredentialAlreadyRegistered' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'JwtVerificationFailed' : IDL.Null,
   });
   const OpenIdCredentialKey = IDL.Tuple(Iss, Sub);
   const OpenIdCredentialRemoveError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
     'OpenIdCredentialNotFound' : IDL.Null,
     'Unauthorized' : IDL.Principal,
   });

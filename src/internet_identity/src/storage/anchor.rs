@@ -356,7 +356,7 @@ impl Anchor {
             .openid_credential_index(&openid_credential.key())
             .is_ok()
         {
-            return Err(AnchorError::DuplicateOpenIdCredential);
+            return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
         }
         self.openid_credentials.push(openid_credential);
         Ok(())
@@ -681,7 +681,7 @@ pub enum AnchorError {
     DuplicateDevice {
         device_key: DeviceKey,
     },
-    DuplicateOpenIdCredential,
+    OpenIdCredentialAlreadyRegistered,
     OpenIdCredentialNotFound,
     ReservedMetadataKey {
         key: String,
@@ -721,7 +721,7 @@ impl fmt::Display for AnchorError {
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
             AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key),
             AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
-            AnchorError::DuplicateOpenIdCredential => write!(f, "OpenID credential already exists on this anchor."),
+            AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
         }
     }

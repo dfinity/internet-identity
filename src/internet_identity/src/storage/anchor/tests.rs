@@ -509,10 +509,10 @@ fn should_add_openid_credential() {
         vec![openid_credential_0.clone(), openid_credential_1]
     );
 
-    // Check if an already added OpenID credential results in an error
+    // Check if an already registered OpenID credential results in an error
     assert_eq!(
         anchor.add_openid_credential(openid_credential_0.clone()),
-        Err(AnchorError::DuplicateOpenIdCredential)
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
     );
 }
 

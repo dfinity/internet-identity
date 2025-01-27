@@ -353,12 +353,14 @@ type OpenIdCredential = record {
 type OpenIdCredentialAddError = variant {
     Unauthorized: principal;
     JwtVerificationFailed;
-    DuplicateOpenIdCredential;
+    OpenIdCredentialAlreadyRegistered;
+    InternalCanisterError: text;
 };
 
 type OpenIdCredentialRemoveError = variant {
     Unauthorized: principal;
     OpenIdCredentialNotFound;
+    InternalCanisterError: text;
 };
 
 // API V2 specific types

@@ -752,6 +752,7 @@ mod openid_api {
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
     use crate::openid;
     use crate::openid::OpenIdCredentialKey;
+    use crate::storage::anchor::AnchorError;
     use ic_cdk::caller;
     use ic_cdk_macros::update;
     use internet_identity_interface::internet_identity::types::openid::{
@@ -781,7 +782,12 @@ mod openid_api {
                 .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
-                .map_err(|_| OpenIdCredentialAddError::DuplicateOpenIdCredential)
+                .map_err(|err| match err {
+                    AnchorError::OpenIdCredentialAlreadyRegistered => {
+                        OpenIdCredentialAddError::OpenIdCredentialAlreadyRegistered
+                    }
+                    err => OpenIdCredentialAddError::InternalCanisterError(err.to_string()),
+                })
         })
     }
 
@@ -793,7 +799,12 @@ mod openid_api {
         anchor_operation_with_authz_check(identity_number, |anchor| {
             remove_openid_credential(anchor, &openid_credential_key)
                 .map(|operation| ((), operation))
-                .map_err(|_| OpenIdCredentialRemoveError::OpenIdCredentialNotFound)
+                .map_err(|err| match err {
+                    AnchorError::OpenIdCredentialNotFound => {
+                        OpenIdCredentialRemoveError::OpenIdCredentialNotFound
+                    }
+                    err => OpenIdCredentialRemoveError::InternalCanisterError(err.to_string()),
+                })
         })
     }
 }

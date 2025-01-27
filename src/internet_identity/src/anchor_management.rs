@@ -196,10 +196,10 @@ pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
 ) -> Result<Operation, AnchorError> {
-    if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
-        return Err(AnchorError::DuplicateOpenIdCredential);
-    }
     anchor.add_openid_credential(openid_credential.clone())?;
+    if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
+        return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
+    }
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
     })
