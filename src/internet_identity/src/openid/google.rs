@@ -1,5 +1,5 @@
-use crate::openid::OpenIdProvider;
 use crate::openid::OpenIdCredential;
+use crate::openid::OpenIdProvider;
 use crate::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -47,11 +47,11 @@ const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
 const MAX_VALIDITY_WINDOW: u64 = 5 * MINUTE_NS; // Same as ingress expiry
 
-// Maximum length of the email claim in the Google JWT, in practice we expect Google to already 
+// Maximum length of the email claim in the Google JWT, in practice we expect Google to already
 // validate the email on their end for a sane maximum length. This is an additional sanity check.
 const MAX_EMAIL_LENGTH: usize = 256;
 
-// Maximum length of the name claim in the Google JWT, in practice we expect Google to already 
+// Maximum length of the name claim in the Google JWT, in practice we expect Google to already
 // validate the name on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
@@ -312,13 +312,25 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
-    if claims.email.as_ref().is_some_and(|val| val.len() > MAX_EMAIL_LENGTH) {
+    if claims
+        .email
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_EMAIL_LENGTH)
+    {
         return Err("Email too long".into());
     }
-    if claims.name.as_ref().is_some_and(|val| val.len() > MAX_NAME_LENGTH) {
+    if claims
+        .name
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_NAME_LENGTH)
+    {
         return Err("Name too long".into());
     }
-    if claims.picture.as_ref().is_some_and(|val| val.len() > MAX_PICTURE_URL_LENGTH) {
+    if claims
+        .picture
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_PICTURE_URL_LENGTH)
+    {
         return Err("Picture URL too long".into());
     }
 

@@ -1,8 +1,8 @@
+use crate::internet_identity::types::openid::OpenIdCredentialData;
 use crate::internet_identity::types::{CredentialId, PublicKey, Timestamp};
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use crate::internet_identity::types::openid::OpenIdCredentialData;
 
 pub type IdentityNumber = u64;
 
