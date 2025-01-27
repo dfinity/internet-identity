@@ -1,5 +1,5 @@
+use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
-use crate::openid::{get_delegation_principal, OpenIdCredential};
 use crate::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -46,6 +46,18 @@ const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
 const MAX_VALIDITY_WINDOW: u64 = 5 * MINUTE_NS; // Same as ingress expiry
+
+// Maximum length of the email claim in the Google JWT, in practice we expect Google to already
+// validate the email on their end for a sane maximum length. This is an additional sanity check.
+const MAX_EMAIL_LENGTH: usize = 256;
+
+// Maximum length of the name claim in the Google JWT, in practice we expect Google to already
+// validate the name on their end for a sane maximum length. This is an additional sanity check.
+const MAX_NAME_LENGTH: usize = 128;
+
+// Maximum length of the picture URL claim in the Google JWT, in practice we expect Google to not
+// send us a picture URL that is longer than needed. This is an additional sanity check.
+const MAX_PICTURE_URL_LENGTH: usize = 256;
 
 #[derive(Serialize, Deserialize)]
 struct Certs {
@@ -96,8 +108,6 @@ impl OpenIdProvider for Provider {
             .map_err(|_| "Invalid signature")?;
 
         // Return credential with Google specific metadata
-        let delegation_principal =
-            get_delegation_principal(&self.client_id, &(claims.iss.clone(), claims.sub.clone()));
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
@@ -112,7 +122,6 @@ impl OpenIdProvider for Provider {
             iss: claims.iss,
             sub: claims.sub,
             aud: claims.aud,
-            delegation_principal,
             last_usage_timestamp: time(),
             metadata,
         })
@@ -303,13 +312,25 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
-    if claims.email.as_ref().is_some_and(|val| val.len() > 256) {
+    if claims
+        .email
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_EMAIL_LENGTH)
+    {
         return Err("Email too long".into());
     }
-    if claims.name.as_ref().is_some_and(|val| val.len() > 128) {
+    if claims
+        .name
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_NAME_LENGTH)
+    {
         return Err("Name too long".into());
     }
-    if claims.picture.as_ref().is_some_and(|val| val.len() > 256) {
+    if claims
+        .picture
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_PICTURE_URL_LENGTH)
+    {
         return Err("Picture URL too long".into());
     }
 
@@ -384,13 +405,10 @@ fn should_return_credential() {
     let provider = Provider::create(OpenIdConfig {
         client_id: claims.aud.clone(),
     });
-    let delegation_principal =
-        get_delegation_principal(&claims.aud, &(claims.iss.clone(), claims.sub.clone()));
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,
         aud: claims.aud,
-        delegation_principal,
         last_usage_timestamp: time(),
         metadata: HashMap::from([
             (

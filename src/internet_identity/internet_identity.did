@@ -343,9 +343,6 @@ type OpenIdCredential = record {
     iss: Iss;
     sub: Sub;
     aud: Aud;
-    // The principal of a delegation created after verifying a JWT,
-    // this is then used to interact with the other canister methods.
-    delegation_principal: principal;
     last_usage_timestamp: Timestamp;
     metadata: MetadataMapV2;
 };
@@ -471,6 +468,7 @@ type IdentityAuthnInfo = record {
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_method_registration: opt AuthnMethodRegistrationInfo;
+    openid_credentials: opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata: MetadataMapV2;
 };
