@@ -674,7 +674,6 @@ pub enum StorageError {
         space_required: u64,
         space_available: u64,
     },
-    DuplicateOpenIdCredential,
 }
 
 impl fmt::Display for StorageError {
@@ -703,12 +702,6 @@ impl fmt::Display for StorageError {
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
             ),
-            Self::DuplicateOpenIdCredential => {
-                write!(
-                    f,
-                    "OpenId credential has already been registered with an anchor"
-                )
-            }
         }
     }
 }
