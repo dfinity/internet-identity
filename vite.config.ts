@@ -117,9 +117,13 @@ export default defineConfig(({ command, mode }): UserConfig => {
       command !== "serve"
         ? {}
         : {
-            https: process.env.TLS_DEV_SERVER === "1",
+            https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
             proxy: {
               "/api": `http://127.0.0.1:${readReplicaPort()}`,
+            },
+            allowedHosts: ["icp-api.io"],
+            cors: {
+              origin: ["https://identity.internetcomputer.org"],
             },
           },
   };
