@@ -2,6 +2,7 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
+  InternetIdentityInit,
   OpenIdCredential,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
@@ -36,8 +37,8 @@ import { I18n } from "$src/i18n";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
-  GOOGLE_REQUEST_CONFIG,
   createAnonymousNonce,
+  createGoogleRequestConfig,
   decodeJWT,
   isPermissionError,
   requestJWT,
@@ -349,6 +350,12 @@ export const displayManage = async (
     connection.identity.getPrincipal()
   );
 
+  // Get Google client id from config in background
+  const configRef: { current?: InternetIdentityInit } = {};
+  void connection.getConfig().then((config) => (configRef.current = config));
+  const getGoogleClientId = () =>
+    configRef.current?.openid_google[0]?.[0]?.client_id;
+
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
       devices: devices_,
@@ -385,9 +392,14 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
+      const googleClientId = getGoogleClientId();
+      if (isNullish(googleClientId)) {
+        toast.error(copy.linking_google_accounts_is_unavailable);
+        return;
+      }
       try {
         const jwt = await withLoader(() =>
-          requestJWT(GOOGLE_REQUEST_CONFIG, {
+          requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
             nonce,
           })

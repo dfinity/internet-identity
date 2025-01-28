@@ -16,6 +16,7 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  InternetIdentityInit,
   JWT,
   KeyType,
   MetadataMapV2,
@@ -634,6 +635,7 @@ export class Connection {
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
+  private configPromise: Promise<InternetIdentityInit> | undefined;
 
   public constructor(
     public canisterId: string,
@@ -940,6 +942,13 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
+  };
+
+  // Get previously fetched config, else fetch it
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.getActor().then((actor) => actor.config());
+    return this.configPromise;
   };
 }
 

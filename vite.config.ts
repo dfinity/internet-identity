@@ -27,9 +27,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
     II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
     II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
-    II_OPENID_GOOGLE_CLIENT_ID: `${
-      process.env.II_OPENID_GOOGLE_CLIENT_ID ?? ""
-    }`,
   };
 
   // Path "../../" have to be expressed relative to the "root".
