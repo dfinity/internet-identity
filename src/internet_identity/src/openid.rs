@@ -62,7 +62,6 @@ pub fn setup_google(config: OpenIdConfig) {
 ///
 /// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
 /// * `salt`: The random salt that was used to bind the nonce to the caller principal
-#[allow(unused)]
 pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)

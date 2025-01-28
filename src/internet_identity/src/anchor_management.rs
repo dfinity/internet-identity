@@ -1,11 +1,13 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::TentativeDeviceRegistration;
+use crate::state::{storage_borrow_mut, storage_replace, TentativeDeviceRegistration};
 use crate::storage::anchor::{Anchor, AnchorError, Device};
+use crate::storage::Storage;
 use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
+use ic_stable_structures::VectorMemory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
@@ -228,4 +230,51 @@ pub fn update_openid_credential(
 /// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
+}
+
+#[test]
+fn should_register_openid_credential_only_for_a_single_anchor() {
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let mut anchor_0 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let mut anchor_1 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let openid_credential = OpenIdCredential {
+        iss: "https://example.com".into(),
+        sub: "example-sub".into(),
+        aud: "example-aud".into(),
+        last_usage_timestamp: 0,
+        metadata: HashMap::default(),
+    };
+
+    // Check if OpenID credential can be added
+    assert_eq!(
+        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        Ok(Operation::AddOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+
+    // Check if adding OpenID credential twice returns an error
+    assert_eq!(
+        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+
+    // Check if adding OpenID credential to another anchor returns an error
+    assert_eq!(
+        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+    );
+
+    // Check if adding OpenID credential can be moved to another anchor
+    assert_eq!(
+        remove_openid_credential(&mut anchor_0, &openid_credential.key()),
+        Ok(Operation::RemoveOpenIdCredential { iss: openid_credential.iss.clone() })
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+    assert_eq!(
+        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+    );
 }
