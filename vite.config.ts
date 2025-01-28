@@ -125,8 +125,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
             cors: {
               origin: [
                 "https://identity.internetcomputer.org",
+                "https://identity.ic0.app",
                 "https://nice-name.com",
                 "https://nice-issuer-custom-orig.com",
+                "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
               ],
             },
           },
