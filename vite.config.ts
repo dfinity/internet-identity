@@ -121,9 +121,13 @@ export default defineConfig(({ command, mode }): UserConfig => {
             proxy: {
               "/api": `http://127.0.0.1:${readReplicaPort()}`,
             },
-            allowedHosts: true,
+            allowedHosts: ["icp-api.io"],
             cors: {
-              origin: "*",
+              origin: [
+                "https://identity.internetcomputer.org",
+                "https://nice-name.com",
+                "https://nice-issuer-custom-orig.com",
+              ],
             },
           },
   };
