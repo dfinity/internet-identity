@@ -37,7 +37,11 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
+import {
+  addAnchorCancelledRpId,
+  cleanUpRpIdMapper,
+  getCancelledRpIds,
+} from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -409,26 +413,35 @@ export class Connection {
     credentials: CredentialData[],
     skipCancelledRpIdsStorage = false
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
+    let cancelledRpIds: Set<string | undefined>;
     // Get cancelled rpids for the user from local storage.
-    const { cancelledRpIds, lastShownAddCurrentDevicePage } =
-      skipCancelledRpIdsStorage
-        ? {
-            cancelledRpIds: new Set<string>(),
-            lastShownAddCurrentDevicePage: undefined,
-          }
-        : await getCancelledRpIds({
-            userNumber,
-            origin: window.location.origin,
-          });
+    const persistedData = skipCancelledRpIdsStorage
+      ? {
+          cancelledRpIds: new Set<string>(),
+          lastShownAddCurrentDevicePage: undefined,
+        }
+      : await getCancelledRpIds({
+          userNumber,
+          origin: window.location.origin,
+        });
+    cancelledRpIds = persistedData.cancelledRpIds;
+    const lastShownAddCurrentDevicePage =
+      persistedData.lastShownAddCurrentDevicePage;
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
       supportsWebauthRoR(window.navigator.userAgent);
-    const filteredCredentials = excludeCredentialsFromOrigins(
+    let filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
+    // It probably means that the user cancelled a valid RP ID manually
+    if (filteredCredentials.length === 0) {
+      await cleanUpRpIdMapper(userNumber);
+      cancelledRpIds = new Set<string | undefined>();
+      filteredCredentials = credentials;
+    }
     const rpId = dynamicRPIdEnabled
       ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
