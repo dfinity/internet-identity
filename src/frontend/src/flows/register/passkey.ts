@@ -99,8 +99,10 @@ export const savePasskeyPage = renderPage(savePasskeyTemplate);
 // Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
 export const savePasskeyOrPin = async ({
   pinAllowed,
+  origin,
 }: {
   pinAllowed: boolean;
+  origin: string;
 }): Promise<IIWebAuthnIdentity | "pin" | "canceled" | undefined> => {
   if (pinAllowed) {
     return new Promise((resolve) => {
@@ -110,7 +112,13 @@ export const savePasskeyOrPin = async ({
         scrollToTop: true,
         constructPasskey: async () => {
           try {
-            const identity = await withLoader(() => constructIdentity({}));
+            const rpId =
+              origin === window.location.origin
+                ? undefined
+                : new URL(origin).hostname;
+            const identity = await withLoader(() =>
+              constructIdentity({ rpId })
+            );
             resolve(identity);
           } catch (e) {
             toast.error(errorMessage(e));
