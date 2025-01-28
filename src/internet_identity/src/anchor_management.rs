@@ -191,7 +191,6 @@ pub fn identity_metadata_replace(
 
 /// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
 /// Returns an error if the `OpenIdCredential` already exists in this or another anchor.
-#[allow(unused)]
 pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
@@ -207,7 +206,6 @@ pub fn add_openid_credential(
 
 /// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
 /// Return an error if the `OpenIdCredential` to be removed does not exist.
-#[allow(unused)]
 pub fn remove_openid_credential(
     anchor: &mut Anchor,
     key: &OpenIdCredentialKey,
@@ -228,7 +226,6 @@ pub fn update_openid_credential(
 }
 
 /// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
-#[allow(unused)]
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
