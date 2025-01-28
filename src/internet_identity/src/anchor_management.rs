@@ -270,7 +270,9 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
     // Check if OpenID credential can be moved to another anchor
     assert_eq!(
         remove_openid_credential(&mut anchor_0, &openid_credential.key()),
-        Ok(Operation::RemoveOpenIdCredential { iss: openid_credential.iss.clone() })
+        Ok(Operation::RemoveOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
     );
     storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
     assert_eq!(
