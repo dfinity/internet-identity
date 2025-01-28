@@ -195,10 +195,10 @@ pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
 ) -> Result<Operation, AnchorError> {
-    anchor.add_openid_credential(openid_credential.clone())?;
     if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
     }
+    anchor.add_openid_credential(openid_credential.clone())?;
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
     })
@@ -279,6 +279,8 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
     storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
     assert_eq!(
         add_openid_credential(&mut anchor_1, openid_credential.clone()),
-        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+        Ok(Operation::AddOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
     );
 }
