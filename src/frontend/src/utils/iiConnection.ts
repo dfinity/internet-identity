@@ -406,13 +406,20 @@ export class Connection {
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[]
+    credentials: CredentialData[],
+    skipCancelledRpIdsStorage = false
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     // Get cancelled rpids for the user from local storage.
-    const { cancelledRpIds } = await getCancelledRpIds({
-      userNumber,
-      origin: window.location.origin,
-    });
+    const { cancelledRpIds, lastShownAddCurrentDevicePage } =
+      skipCancelledRpIdsStorage
+        ? {
+            cancelledRpIds: new Set<string>(),
+            lastShownAddCurrentDevicePage: undefined,
+          }
+        : await getCancelledRpIds({
+            userNumber,
+            origin: window.location.origin,
+          });
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
@@ -445,6 +452,7 @@ export class Connection {
         // We only want to cache cancelled rpids if there can be multiple rpids.
         if (
           dynamicRPIdEnabled &&
+          !skipCancelledRpIdsStorage &&
           hasCredentialsFromMultipleOrigins(credentials)
         ) {
           try {
@@ -481,11 +489,20 @@ export class Connection {
       actor
     );
 
+    // We want to show the page to add the current device if
+    // there are cancelled rpids and the user hasn't seen the page in the last week.
+    const oneWeekMillis = 1000 * 60 * 60 * 24 * 7;
+    const weekAgoMillis = Date.now() - oneWeekMillis;
+    const showAddCurrentDevice =
+      cancelledRpIds.size > 0 &&
+      (lastShownAddCurrentDevicePage === undefined ||
+        lastShownAddCurrentDevicePage < weekAgoMillis);
+
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
-      showAddCurrentDevice: cancelledRpIds.size > 0,
+      showAddCurrentDevice,
     };
   };
   fromIdentity = async (
@@ -723,9 +740,14 @@ export class AuthenticatedConnection extends Connection {
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
     protection: DeviceData["protection"],
+    origin: string | undefined,
     credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
+    // The canister only allow for 50 characters, so for long domains we don't attach an origin
+    // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
+    const sanitizedOrigin =
+      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
     return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -735,7 +757,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
-      origin: readDeviceOrigin(),
+      origin: sanitizedOrigin === undefined ? [] : [sanitizedOrigin],
       metadata: [],
     });
   };
@@ -951,19 +973,6 @@ export class AuthenticatedConnection extends Connection {
     return this.configPromise;
   };
 }
-
-// Reads the "origin" used to infer what domain a FIDO device is available on.
-// The canister only allow for 50 characters, so for long domains we don't attach an origin
-// (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
-//
-// The return type is odd but that's what our didc version expects.
-export const readDeviceOrigin = (): [] | [string] => {
-  if (isNullish(window?.origin) || window.origin.length > 50) {
-    return [];
-  }
-
-  return [window.origin];
-};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
