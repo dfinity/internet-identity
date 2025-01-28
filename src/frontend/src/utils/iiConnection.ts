@@ -967,6 +967,7 @@ export class AuthenticatedConnection extends Connection {
   };
 
   // Get previously fetched config, else fetch it
+  // TODO: Discuss with prodsec if this should stay a query or should be update
   getConfig = (): Promise<InternetIdentityInit> => {
     this.configPromise =
       this.configPromise ?? this.getActor().then((actor) => actor.config());
