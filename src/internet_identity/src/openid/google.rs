@@ -1,5 +1,6 @@
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
+use crate::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
@@ -44,7 +45,19 @@ const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
-const MAX_VALIDITY_WINDOW: u64 = 5 * 60 * NANOSECONDS_PER_SECOND; // 5 minutes in nanos, same as ingress expiry
+const MAX_VALIDITY_WINDOW: u64 = 5 * MINUTE_NS; // Same as ingress expiry
+
+// Maximum length of the email claim in the Google JWT, in practice we expect Google to already
+// validate the email on their end for a sane maximum length. This is an additional sanity check.
+const MAX_EMAIL_LENGTH: usize = 256;
+
+// Maximum length of the name claim in the Google JWT, in practice we expect Google to already
+// validate the name on their end for a sane maximum length. This is an additional sanity check.
+const MAX_NAME_LENGTH: usize = 128;
+
+// Maximum length of the picture URL claim in the Google JWT, in practice we expect Google to not
+// send us a picture URL that is longer than needed. This is an additional sanity check.
+const MAX_PICTURE_URL_LENGTH: usize = 256;
 
 #[derive(Serialize, Deserialize)]
 struct Certs {
@@ -109,7 +122,6 @@ impl OpenIdProvider for Provider {
             iss: claims.iss,
             sub: claims.sub,
             aud: claims.aud,
-            principal: Principal::anonymous(),
             last_usage_timestamp: time(),
             metadata,
         })
@@ -300,6 +312,27 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     if now < claims.iat * NANOSECONDS_PER_SECOND {
         return Err("JWT is not valid yet".into());
     }
+    if claims
+        .email
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_EMAIL_LENGTH)
+    {
+        return Err("Email too long".into());
+    }
+    if claims
+        .name
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_NAME_LENGTH)
+    {
+        return Err("Name too long".into());
+    }
+    if claims
+        .picture
+        .as_ref()
+        .is_some_and(|val| val.len() > MAX_PICTURE_URL_LENGTH)
+    {
+        return Err("Picture URL too long".into());
+    }
 
     Ok(())
 }
@@ -376,7 +409,6 @@ fn should_return_credential() {
         iss: claims.iss,
         sub: claims.sub,
         aud: claims.aud,
-        principal: Principal::anonymous(),
         last_usage_timestamp: time(),
         metadata: HashMap::from([
             (
@@ -517,5 +549,41 @@ fn should_return_error_when_not_valid_yet() {
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
         Err("JWT is not valid yet".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_email_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.email = Some("thisisanemailaddresswhichistoolongaccordingtothemaxlengththatisallowedbythestandardemailprotocolsandshouldnotbeconsideredasvalidbutitisusefultotestvalidationmechanismsintheapplicationwhichmayexceedstandardlimitationsforemailaddressesandshouldbetested@gmail.com".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Email too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_name_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.name = Some("Jonathan Maximilian Theodore Alexander Montgomery Fitzgerald Jameson Davidson Hawthorne Winchester Baldwin the Fifth of Lancaster".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Name too long".into())
+    );
+}
+
+#[test]
+fn should_return_error_when_picture_url_too_long() {
+    let (_, salt, mut claims) = test_data();
+    let client_id = &claims.aud;
+    claims.picture = Some("https://lh3.googleusercontent.com/a/DFsf8fDFfldjfF8z_Hfdfsf8-lkdjFDF83f3f=s96-c&extraPadding=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".into());
+
+    assert_eq!(
+        verify_claims(client_id, &claims, &salt),
+        Err("Picture URL too long".into())
     );
 }

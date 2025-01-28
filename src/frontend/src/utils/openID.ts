@@ -1,5 +1,4 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
-import { II_OPENID_GOOGLE_CLIENT_ID } from "$src/environment";
 import { REDIRECT_CALLBACK_PATH, redirectInPopup } from "$src/flows/redirect";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -22,11 +21,11 @@ export interface RequestOptions {
   mediation?: CredentialMediationRequirement;
 }
 
-export const GOOGLE_REQUEST_CONFIG: RequestConfig = {
-  clientId: II_OPENID_GOOGLE_CLIENT_ID,
+export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
+  clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
   configURL: "https://accounts.google.com/gsi/fedcm.json",
-};
+});
 
 /**
  * Request JWT with the FedCM API

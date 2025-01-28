@@ -2,6 +2,10 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
+  InternetIdentityInit,
+  OpenIdCredential,
+  OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
 } from "$generated/internet_identity_types";
 import identityCardBackground from "$src/assets/identityCardBackground.png";
 import {
@@ -33,10 +37,9 @@ import { I18n } from "$src/i18n";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
-import { OpenIDCredential } from "$src/utils/mockOpenID";
 import {
-  GOOGLE_REQUEST_CONFIG,
   createAnonymousNonce,
+  createGoogleRequestConfig,
   decodeJWT,
   isPermissionError,
   requestJWT,
@@ -47,7 +50,12 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
+import {
+  OmitParams,
+  isCanisterError,
+  shuffleArray,
+  unreachable,
+} from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -181,9 +189,9 @@ const displayManageTemplate = ({
   onAddDevice: () => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
-  credentials: OpenIDCredential[];
+  credentials: OpenIdCredential[];
   onLinkAccount: () => void;
-  onUnlinkAccount: (credential: OpenIDCredential) => void;
+  onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: PreLoadImage;
@@ -280,7 +288,7 @@ export const renderManage = async ({
   // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
   // loop forever
   for (;;) {
-    let anchorInfo: IdentityAnchorInfo & { credentials: OpenIDCredential[] };
+    let anchorInfo: IdentityAnchorInfo;
     try {
       // Ignore the `commitMetadata` response, it's not critical for the application.
       void connection.commitMetadata();
@@ -302,7 +310,7 @@ export const renderManage = async ({
       userNumber,
       connection,
       anchorInfo.devices,
-      anchorInfo.credentials,
+      anchorInfo.openid_credentials[0] ?? [],
       identityBackground
     );
     connection = newConnection ?? connection;
@@ -331,7 +339,7 @@ export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
-  credentials: OpenIDCredential[],
+  credentials: OpenIdCredential[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
@@ -345,6 +353,12 @@ export const displayManage = async (
   const { nonce, salt } = await createAnonymousNonce(
     connection.identity.getPrincipal()
   );
+
+  // Get Google client id from config in background
+  const configRef: { current?: InternetIdentityInit } = {};
+  void connection.getConfig().then((config) => (configRef.current = config));
+  const getGoogleClientId = () =>
+    configRef.current?.openid_google[0]?.[0]?.client_id;
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -402,9 +416,14 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
+      const googleClientId = getGoogleClientId();
+      if (isNullish(googleClientId)) {
+        toast.error(copy.linking_google_accounts_is_unavailable);
+        return;
+      }
       try {
         const jwt = await withLoader(() =>
-          requestJWT(GOOGLE_REQUEST_CONFIG, {
+          requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
             nonce,
           })
@@ -414,20 +433,75 @@ export const displayManage = async (
           toast.error(copy.account_already_linked);
           return;
         }
-        await connection.addJWT(jwt, salt);
+        await connection.addOpenIdCredential(jwt, salt);
         resolve();
       } catch (error) {
         if (isPermissionError(error)) {
           toast.error(copy.third_party_sign_in_permission_required);
+          return;
         }
+        if (isCanisterError<OpenIdCredentialAddError>(error)) {
+          switch (error.type) {
+            case "Unauthorized":
+              toast.error(copy.authentication_failed);
+              console.error(
+                `Authentication unexpectedly failed: ${error
+                  .value(error.type)
+                  .toText()}`
+              );
+              break;
+            case "JwtVerificationFailed":
+              toast.error(copy.jwt_signature_invalid);
+              break;
+            case "OpenIdCredentialAlreadyRegistered":
+              toast.error(copy.account_already_linked);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
+              break;
+            default: {
+              // Make sure all error cases are covered,
+              // else this will throw a TS error here.
+              const _ = error.type satisfies never;
+            }
+          }
+          return;
+        }
+        throw error;
       }
     };
-    const onUnlinkAccount = async (credential: OpenIDCredential) => {
+    const onUnlinkAccount = async (credential: OpenIdCredential) => {
       if (!confirm(copy.unlink_account_confirmation.toString())) {
         return;
       }
-      await connection.removeJWT(credential.iss, credential.sub);
-      resolve();
+      try {
+        await connection.removeOpenIdCredential(credential.iss, credential.sub);
+        resolve();
+      } catch (error) {
+        if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
+          switch (error.type) {
+            case "Unauthorized":
+              toast.error(copy.authentication_failed);
+              console.error(
+                `Authentication unexpectedly failed: ${error
+                  .value(error.type)
+                  .toText()}`
+              );
+              break;
+            case "OpenIdCredentialNotFound":
+              toast.error(copy.account_not_found);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
+              break;
+            default: {
+              // Make sure all error cases are covered,
+              // else this will throw a TS error here.
+              const _ = error.type satisfies never;
+            }
+          }
+        }
+      }
     };
 
     // Function to figure out what temp keys warning should be shown, if any.

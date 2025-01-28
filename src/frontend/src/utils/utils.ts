@@ -360,3 +360,37 @@ export const isValidKey = <T>(
 ): key is keyof T => {
   return keys.includes(key as keyof T);
 };
+
+// Converts a union type to an intersection type to extract shared keys
+type UnionToIntersection<U> = (
+  U extends unknown ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never;
+
+// Utility to wrap Rust canister enum error into a JS error that can be thrown
+export class CanisterError<T extends Record<string, unknown>> extends Error {
+  readonly #value: T;
+
+  constructor(value: T) {
+    super();
+    Object.setPrototypeOf(this, CanisterError.prototype);
+    this.#value = value;
+  }
+
+  get type(): keyof UnionToIntersection<T> {
+    return Object.keys(this.#value)[0] as keyof UnionToIntersection<T>;
+  }
+
+  value<S extends keyof UnionToIntersection<T>>(
+    type: S
+  ): UnionToIntersection<T>[S] {
+    return this.#value[type as keyof T] as UnionToIntersection<T>[S];
+  }
+}
+
+export const isCanisterError = <T extends Record<string, unknown>>(
+  error: unknown
+): error is CanisterError<T> => {
+  return error instanceof CanisterError;
+};

@@ -1,7 +1,7 @@
+import { OpenIdCredential } from "$generated/internet_identity_types";
 import { googleIcon } from "$src/components/icons";
 import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import { I18n } from "$src/i18n";
-import { OpenIDCredential } from "$src/utils/mockOpenID";
 import { getMetadataString } from "$src/utils/openID";
 import { formatLastUsage } from "$src/utils/time";
 import { nonNullish } from "@dfinity/utils";
@@ -20,9 +20,9 @@ export const linkedAccountsSection = ({
   onUnlinkAccount,
   hasOtherAuthMethods,
 }: {
-  credentials: OpenIDCredential[];
+  credentials: OpenIdCredential[];
   onLinkAccount: () => void;
-  onUnlinkAccount: (credential: OpenIDCredential) => void;
+  onUnlinkAccount: (credential: OpenIdCredential) => void;
   hasOtherAuthMethods: boolean;
 }): TemplateResult => {
   const i18n = new I18n();
@@ -55,7 +55,7 @@ export const linkedAccountsSection = ({
           ?disabled=${credentials.length >= MAX_CREDENTIALS}
           class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
           @click="${() => onLinkAccount()}"
-          id="linkAdditionalAccount"
+          id="linkAccount"
         >
           <span class="c-tooltip__message c-card c-card--tight">
             ${copy.max_linked_accounts_reached}
@@ -77,9 +77,9 @@ export const accountItem = ({
   unlink,
   unlinkAvailable,
 }: {
-  credential: OpenIDCredential;
+  credential: OpenIdCredential;
   index: number;
-  unlink: (credential: OpenIDCredential) => void;
+  unlink: (credential: OpenIdCredential) => void;
   unlinkAvailable: boolean;
 }) => {
   const i18n = new I18n();

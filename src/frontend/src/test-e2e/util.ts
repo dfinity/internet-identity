@@ -463,3 +463,39 @@ export async function wipeStorage(browser: WebdriverIO.Browser): Promise<void> {
     await indexedDB.deleteDatabase("keyval-store");
   });
 }
+
+export const setOpenIdFeatureFlag = async (
+  browser: WebdriverIO.Browser,
+  enabled: true
+): Promise<void> => {
+  await browser.execute((enabled) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__featureFlags.OPENID_AUTHENTICATION.set(enabled);
+  }, enabled);
+};
+
+export const mockFedCM = async (
+  browser: WebdriverIO.Browser,
+  token: string
+): Promise<void> => {
+  await browser.execute((token) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__credentialsGet = navigator.credentials.get;
+    navigator.credentials.get = (options) => {
+      if (options && "identity" in options) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        navigator.credentials.get = window.__credentialsGet;
+        return Promise.resolve({
+          type: "identity",
+          token,
+        } as unknown as Credential);
+      }
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      return window.__credentialsGet(options);
+    };
+  }, token);
+};

@@ -293,6 +293,8 @@ type IdentityAnchorInfo = record {
     devices : vec DeviceWithUsage;
     // Device registration status used when adding devices, see DeviceRegistrationInfo
     device_registration: opt DeviceRegistrationInfo;
+    // OpenID accounts linked to this anchor
+    openid_credentials: opt vec OpenIdCredential;
 };
 
 type AnchorCredentials = record {
@@ -323,8 +325,39 @@ type BufferedArchiveEntry = record {
     entry: blob;
 };
 
+// OpenID specific types
+
+type Iss = text;
+type Sub = text;
+type Aud = text;
+type JWT = text;
+type Salt = blob;
+
 type OpenIdConfig = record {
     client_id: text;
+};
+
+type OpenIdCredentialKey = record { Iss; Sub };
+
+type OpenIdCredential = record {
+    iss: Iss;
+    sub: Sub;
+    aud: Aud;
+    last_usage_timestamp: Timestamp;
+    metadata: MetadataMapV2;
+};
+
+type OpenIdCredentialAddError = variant {
+    Unauthorized: principal;
+    JwtVerificationFailed;
+    OpenIdCredentialAlreadyRegistered;
+    InternalCanisterError: text;
+};
+
+type OpenIdCredentialRemoveError = variant {
+    Unauthorized: principal;
+    OpenIdCredentialNotFound;
+    InternalCanisterError: text;
 };
 
 // API V2 specific types
@@ -437,6 +470,7 @@ type IdentityAuthnInfo = record {
 type IdentityInfo = record {
     authn_methods: vec AuthnMethodData;
     authn_method_registration: opt AuthnMethodRegistrationInfo;
+    openid_credentials: opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata: MetadataMapV2;
 };
@@ -705,6 +739,11 @@ service : (opt InternetIdentityInit) -> {
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
     prepare_id_alias : (PrepareIdAliasRequest) -> (variant {Ok: PreparedIdAlias; Err: PrepareIdAliasError;});
     get_id_alias : (GetIdAliasRequest) -> (variant {Ok: IdAliasCredentials; Err: GetIdAliasError;}) query;
+
+    // OpenID credentials protocol
+    // =========================
+    openid_credential_add: (IdentityNumber, JWT, Salt) -> (variant {Ok; Err: OpenIdCredentialAddError;});
+    openid_credential_remove: (IdentityNumber, OpenIdCredentialKey) -> (variant {Ok; Err: OpenIdCredentialRemoveError;});
 
     // HTTP Gateway protocol
     // =====================

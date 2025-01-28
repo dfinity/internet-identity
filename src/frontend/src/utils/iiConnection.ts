@@ -16,12 +16,15 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  InternetIdentityInit,
+  JWT,
   KeyType,
   MetadataMapV2,
   PreparedIdAlias,
   PublicKey,
   Purpose,
   RegistrationFlowNextStep,
+  Salt,
   SessionKey,
   Timestamp,
   UserNumber,
@@ -35,8 +38,11 @@ import {
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
 import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
-import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
-import { diagnosticInfo, unknownToString } from "$src/utils/utils";
+import {
+  CanisterError,
+  diagnosticInfo,
+  unknownToString,
+} from "$src/utils/utils";
 import {
   Actor,
   ActorSubclass,
@@ -149,8 +155,6 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  protected _mockOpenID = new MockOpenID();
-
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -648,6 +652,7 @@ export class Connection {
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
+  private configPromise: Promise<InternetIdentityInit> | undefined;
 
   public constructor(
     public canisterId: string,
@@ -696,15 +701,9 @@ export class AuthenticatedConnection extends Connection {
     return this.actor;
   }
 
-  getAnchorInfo = async (): Promise<
-    IdentityAnchorInfo & { credentials: OpenIDCredential[] }
-  > => {
+  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
     const actor = await this.getActor();
-    const anchorInfo = await actor.get_anchor_info(this.userNumber);
-    const mockedAnchorInfo = await this._mockOpenID.get_anchor_info(
-      this.userNumber
-    );
-    return { ...anchorInfo, ...mockedAnchorInfo };
+    return actor.get_anchor_info(this.userNumber);
   };
 
   getPrincipal = async ({
@@ -952,12 +951,27 @@ export class AuthenticatedConnection extends Connection {
     return { error: "internal_error" };
   };
 
-  addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
-    await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
+  addOpenIdCredential = async (jwt: JWT, salt: Salt): Promise<void> => {
+    const actor = await this.getActor();
+    const res = await actor.openid_credential_add(this.userNumber, jwt, salt);
+    if ("Err" in res) throw new CanisterError(res.Err);
   };
 
-  removeJWT = async (iss: string, sub: string): Promise<void> => {
-    await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
+  removeOpenIdCredential = async (iss: string, sub: string): Promise<void> => {
+    const actor = await this.getActor();
+    const res = await actor.openid_credential_remove(this.userNumber, [
+      iss,
+      sub,
+    ]);
+    if ("Err" in res) throw new CanisterError(res.Err);
+  };
+
+  // Get previously fetched config, else fetch it
+  // TODO: Discuss with prodsec if this should stay a query or should be update
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.getActor().then((actor) => actor.config());
+    return this.configPromise;
   };
 }
 

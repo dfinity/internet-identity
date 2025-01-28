@@ -1,4 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
@@ -6,18 +7,33 @@ use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
-use internet_identity_interface::internet_identity::types::*;
+use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
+    IdentityAnchorInfo, MetadataEntry,
+};
+use state::storage_borrow;
 use std::collections::HashMap;
 
 pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    let devices = state::anchor(anchor_number)
-        .into_devices()
+    let anchor = state::anchor(anchor_number);
+    let devices = anchor
+        .devices()
+        .clone()
         .into_iter()
         .map(DeviceWithUsage::from)
         .collect();
+    let openid_credentials = Some(
+        anchor
+            .openid_credentials()
+            .clone()
+            .into_iter()
+            .map(OpenIdCredentialData::from)
+            .collect(),
+    );
     let now = time();
 
     state::tentative_device_registrations(|tentative_device_registrations| {
@@ -34,6 +50,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     expiration: *expiration,
                     tentative_device: Some(tentative_device.clone()),
                 }),
+                openid_credentials,
             },
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
                 IdentityAnchorInfo {
@@ -42,11 +59,13 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                         expiration: *expiration,
                         tentative_device: None,
                     }),
+                    openid_credentials,
                 }
             }
             None | Some(_) => IdentityAnchorInfo {
                 devices,
                 device_registration: None,
+                openid_credentials,
             },
         }
     })
@@ -81,7 +100,7 @@ pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operat
 
 /// Adds a device to the given anchor and returns the operation to be archived.
 /// Panics if this operation violates anchor constraints (see [Anchor]).
-pub fn add(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
+pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
     let new_device = Device::from(device_data);
     anchor
         .add_device(new_device.clone())
@@ -96,7 +115,11 @@ pub fn add(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
 /// Panics if
 /// * the device to be updated does not exist
 /// * the operation violates anchor constraints (see [Anchor])
-pub fn update(anchor: &mut Anchor, device_key: DeviceKey, device_data: DeviceData) -> Operation {
+pub fn update_device(
+    anchor: &mut Anchor,
+    device_key: DeviceKey,
+    device_data: DeviceData,
+) -> Operation {
     let Some(existing_device) = anchor.device(&device_key) else {
         trap("Could not find device to update, check device key")
     };
@@ -119,7 +142,7 @@ pub fn update(anchor: &mut Anchor, device_key: DeviceKey, device_data: DeviceDat
 /// Panics if
 /// * the device to be replaced does not exist
 /// * the operation violates anchor constraints (see [Anchor])
-pub fn replace(
+pub fn replace_device(
     anchor_number: AnchorNumber,
     anchor: &mut Anchor,
     old_device: DeviceKey,
@@ -142,7 +165,7 @@ pub fn replace(
 
 /// Removes a device of the given anchor and returns the operation to be archived.
 /// Panics if the device to be removed does not exist
-pub fn remove(
+pub fn remove_device(
     anchor_number: AnchorNumber,
     anchor: &mut Anchor,
     device_key: DeviceKey,
@@ -164,4 +187,100 @@ pub fn identity_metadata_replace(
     let metadata_keys = metadata.keys().cloned().collect();
     anchor.replace_identity_metadata(metadata)?;
     Ok(Operation::IdentityMetadataReplace { metadata_keys })
+}
+
+/// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
+/// Returns an error if the `OpenIdCredential` already exists in this or another anchor.
+pub fn add_openid_credential(
+    anchor: &mut Anchor,
+    openid_credential: OpenIdCredential,
+) -> Result<Operation, AnchorError> {
+    if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
+        return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
+    }
+    anchor.add_openid_credential(openid_credential.clone())?;
+    Ok(Operation::AddOpenIdCredential {
+        iss: openid_credential.iss,
+    })
+}
+
+/// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
+/// Return an error if the `OpenIdCredential` to be removed does not exist.
+pub fn remove_openid_credential(
+    anchor: &mut Anchor,
+    key: &OpenIdCredentialKey,
+) -> Result<Operation, AnchorError> {
+    anchor.remove_openid_credential(key)?;
+    let (iss, _) = key;
+    Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
+}
+
+/// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
+/// Return an error if the `OpenIdCredential` to be updated does not exist.
+#[allow(unused)]
+pub fn update_openid_credential(
+    anchor: &mut Anchor,
+    openid_credential: OpenIdCredential,
+) -> Result<(), AnchorError> {
+    anchor.update_openid_credential(openid_credential)
+}
+
+/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
+pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
+    storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
+}
+
+#[test]
+fn should_register_openid_credential_only_for_a_single_anchor() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let mut anchor_0 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let mut anchor_1 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let openid_credential = OpenIdCredential {
+        iss: "https://example.com".into(),
+        sub: "example-sub".into(),
+        aud: "example-aud".into(),
+        last_usage_timestamp: 0,
+        metadata: HashMap::default(),
+    };
+
+    // Check if OpenID credential can be added
+    assert_eq!(
+        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        Ok(Operation::AddOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+
+    // Check if adding OpenID credential twice returns an error
+    assert_eq!(
+        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+
+    // Check if adding OpenID credential to another anchor returns an error
+    assert_eq!(
+        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        Err(AnchorError::OpenIdCredentialAlreadyRegistered)
+    );
+
+    // Check if OpenID credential can be moved to another anchor
+    assert_eq!(
+        remove_openid_credential(&mut anchor_0, &openid_credential.key()),
+        Ok(Operation::RemoveOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
+    );
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
+    assert_eq!(
+        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        Ok(Operation::AddOpenIdCredential {
+            iss: openid_credential.iss.clone()
+        })
+    );
 }

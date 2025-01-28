@@ -1,3 +1,4 @@
+use crate::internet_identity::types::openid::OpenIdCredentialData;
 use crate::internet_identity::types::{CredentialId, PublicKey, Timestamp};
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
@@ -77,6 +78,7 @@ pub struct IdentityAuthnInfo {
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
     pub authn_method_registration: Option<AuthnMethodRegistration>,
+    pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub metadata: HashMap<String, MetadataEntryV2>,
 }
 

@@ -46,6 +46,12 @@ type Operation = variant {
         // Only the top level keys are archived for privacy reasons.
         metadata_keys: vec text;
     };
+    add_openid_credential: record {
+        iss: text;
+    };
+    remove_openid_credential: record {
+        iss: text;
+    };
 };
 
 type Entry = record {
