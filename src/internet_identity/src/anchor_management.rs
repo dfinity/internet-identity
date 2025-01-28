@@ -1,13 +1,11 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::{storage_borrow_mut, storage_replace, TentativeDeviceRegistration};
+use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
-use crate::storage::Storage;
 use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
-use ic_stable_structures::VectorMemory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
@@ -234,6 +232,10 @@ pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option
 
 #[test]
 fn should_register_openid_credential_only_for_a_single_anchor() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
     let mut anchor_0 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
     let mut anchor_1 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
