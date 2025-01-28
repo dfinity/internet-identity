@@ -8,6 +8,11 @@ import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$src/repositories/identityMetadata";
+import {
+  addAnchorCancelledRpId,
+  getCancelledRpIds,
+  setLastShownAddCurrentDevicePage,
+} from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
@@ -290,6 +295,61 @@ describe("Connection.login", () => {
       expect(thirdLoginResult.kind).toBe("loginSuccess");
     });
 
+    it("show add current device depends on the last time the anchor was used", async () => {
+      const creationDate = new Date("2025-01-05");
+      vi.useFakeTimers().setSystemTime(creationDate);
+
+      const userNumber = BigInt(12345);
+      // This one would fail because it's not the device the user is using at the moment.
+      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
+      const currentDevice: DeviceData = createMockDevice();
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      failSign = true;
+      const firstLoginResult = await connection.login(userNumber);
+
+      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+
+      failSign = false;
+      const secondLoginResult = await connection.login(userNumber);
+
+      expect(secondLoginResult.kind).toBe("loginSuccess");
+      if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
+      }
+
+      // This is necessary to set the last page shown timestamp
+      await setLastShownAddCurrentDevicePage(userNumber);
+      const oneDayMillis = 24 * 60 * 60 * 1000;
+      vi.useFakeTimers().advanceTimersByTime(oneDayMillis);
+
+      const newConnection = new Connection("aaaaa-aa", mockActor);
+      const thirdLoginResult = await newConnection.login(userNumber);
+
+      expect(thirdLoginResult.kind).toBe("loginSuccess");
+      if (thirdLoginResult.kind === "loginSuccess") {
+        expect(thirdLoginResult.showAddCurrentDevice).toBe(false);
+      }
+
+      // This is necessary to set the last page shown timestamp
+      await setLastShownAddCurrentDevicePage(userNumber);
+      vi.useFakeTimers().advanceTimersByTime(oneDayMillis * 7 + 1000);
+
+      const anotherConnection = new Connection("aaaaa-aa", mockActor);
+      const fourthLoginResult = await anotherConnection.login(userNumber);
+
+      expect(fourthLoginResult.kind).toBe("loginSuccess");
+      if (fourthLoginResult.kind === "loginSuccess") {
+        expect(fourthLoginResult.showAddCurrentDevice).toBe(true);
+      }
+
+      vi.useRealTimers();
+    });
+
     it("connection doesn't exclude rpId if user has only one domain", async () => {
       const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
       const currentOriginCredentialData =
@@ -337,6 +397,111 @@ describe("Connection.login", () => {
           undefined
         );
       }
+    });
+
+    describe("Connection.fromWebauthnCredentials", () => {
+      const userNumber = BigInt(12345);
+      const deviceFromCurrentDomain: DeviceData =
+        createMockDevice(currentOrigin);
+      const credentialDataFromCurrentDomain = convertToValidCredentialData(
+        deviceFromCurrentDomain
+      ) as CredentialData;
+      const deviceAnotherDomain: DeviceData = createMockDevice(
+        "htts://identity.ic0.app"
+      );
+      const credentialDataAnotherDomain = convertToValidCredentialData(
+        deviceAnotherDomain
+      ) as CredentialData;
+      const skipCancelledRpIdsStorage = true;
+
+      it("doesn't use the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
+        const cancelledRpId = new URL(currentOrigin).hostname;
+        await addAnchorCancelledRpId({
+          userNumber,
+          origin: currentOrigin,
+          cancelledRpId,
+        });
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain],
+          skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("loginSuccess");
+        if (loginResult.kind === "loginSuccess") {
+          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(
+            1
+          );
+          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+            [credentialDataFromCurrentDomain],
+            // `undefined` means the current origin which is the one that was cancelled
+            undefined
+          );
+        }
+      });
+
+      it("uses the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
+        const cancelledRpId = new URL(currentOrigin).hostname;
+        await addAnchorCancelledRpId({
+          userNumber,
+          origin: currentOrigin,
+          cancelledRpId,
+        });
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const call = () =>
+          connection.fromWebauthnCredentials(
+            userNumber,
+            [credentialDataFromCurrentDomain],
+            !skipCancelledRpIdsStorage
+          );
+
+        // This is because the device is filtered out and then the `findWebAuthnRpId` doesn't receive any device.
+        await expect(call).rejects.toThrowError(
+          new Error(
+            "Not possible. Every registered user has at least one device."
+          )
+        );
+      });
+
+      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
+          skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("webAuthnFailed");
+        const { cancelledRpIds } = await getCancelledRpIds({
+          userNumber,
+          origin: currentOrigin,
+        });
+        expect(cancelledRpIds).toEqual(new Set());
+      });
+
+      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
+        const connection = new Connection("aaaaa-aa", mockActor);
+
+        failSign = true;
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
+          !skipCancelledRpIdsStorage
+        );
+
+        expect(loginResult.kind).toBe("possiblyWrongRPID");
+        const { cancelledRpIds } = await getCancelledRpIds({
+          userNumber,
+          origin: currentOrigin,
+        });
+        expect(cancelledRpIds).toEqual(new Set([undefined]));
+      });
     });
   });
 
@@ -591,6 +756,162 @@ describe("Connection.login", () => {
         [convertToValidCredentialData(deviceValidCredentialId)],
         undefined
       );
+    });
+  });
+
+  describe("AuthenticatedConnection#add", () => {
+    const alias = "alias";
+    const keyType = { platform: null };
+    const purpose = { authentication: null };
+    const newPublicKey = new ArrayBuffer(0) as DerEncodedPublicKey;
+    const protection = { protected: null };
+
+    it("passes origin if origin less than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const origin = "https://identity.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        origin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [origin],
+        metadata: [],
+      });
+    });
+
+    it("doesn't pass origin if origin more than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const longOrigin = "https://thisisalongdominathatshouldbe50plus.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        longOrigin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("handles no origin being passed", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        undefined
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("passes credential id if present", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const credentialId = new Uint8Array([1, 2, 3, 4, 5]);
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        undefined,
+        credentialId.buffer
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [Array.from(credentialId)],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
     });
   });
 });
