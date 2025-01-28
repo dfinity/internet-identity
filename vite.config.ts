@@ -128,7 +128,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
                 "https://identity.ic0.app",
                 "https://nice-name.com",
                 "https://nice-issuer-custom-orig.com",
-                // "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
+                "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
                 // Test app
                 "https://bd3sg-teaaa-aaaaa-qaaba-cai.icp0.io",
                 // Test app
