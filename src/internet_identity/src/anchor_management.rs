@@ -267,7 +267,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
         Err(AnchorError::OpenIdCredentialAlreadyRegistered)
     );
 
-    // Check if adding OpenID credential can be moved to another anchor
+    // Check if OpenID credential can be moved to another anchor
     assert_eq!(
         remove_openid_credential(&mut anchor_0, &openid_credential.key()),
         Ok(Operation::RemoveOpenIdCredential { iss: openid_credential.iss.clone() })
