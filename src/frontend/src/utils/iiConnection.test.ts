@@ -14,7 +14,7 @@ import {
   setLastShownAddCurrentDevicePage,
 } from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
-import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
+import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
