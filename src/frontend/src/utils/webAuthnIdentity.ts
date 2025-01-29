@@ -9,6 +9,7 @@ import {
   wrapDER,
 } from "@dfinity/agent";
 import { bufFromBufLike } from "@dfinity/candid";
+import { isNullish } from "@dfinity/utils";
 import { randomBytes } from "@noble/hashes/utils";
 import borc from "borc";
 
@@ -245,7 +246,7 @@ export class WebAuthnIdentity extends SignIdentity {
         signature: new Uint8Array(response.signature),
       })
     );
-    if (!cbor) {
+    if (isNullish(cbor)) {
       throw new Error("failed to encode cbor");
     }
     return cbor.buffer as Signature;
