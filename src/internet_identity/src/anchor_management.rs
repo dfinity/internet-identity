@@ -189,8 +189,8 @@ pub fn identity_metadata_replace(
     Ok(Operation::IdentityMetadataReplace { metadata_keys })
 }
 
-/// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
-/// Returns an error if the `OpenIdCredential` already exists in this or another anchor.
+/// Adds an 'OpenIdCredential' to the given anchor and returns the operation to be archived.
+/// Returns an error if the 'OpenIdCredential' already exists in this or another anchor.
 pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
@@ -204,8 +204,8 @@ pub fn add_openid_credential(
     })
 }
 
-/// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
-/// Return an error if the `OpenIdCredential` to be removed does not exist.
+/// Removes an 'OpenIdCredential' of the given anchor and returns the operation to be archived.
+/// Return an error if the 'OpenIdCredential' to be removed does not exist.
 pub fn remove_openid_credential(
     anchor: &mut Anchor,
     key: &OpenIdCredentialKey,
@@ -215,8 +215,8 @@ pub fn remove_openid_credential(
     Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
 }
 
-/// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
-/// Return an error if the `OpenIdCredential` to be updated does not exist.
+/// Updates an 'OpenIdCredential' of the given anchor, used to update details like the metadata.
+/// Return an error if the 'OpenIdCredential' to be updated does not exist.
 #[allow(unused)]
 pub fn update_openid_credential(
     anchor: &mut Anchor,
@@ -225,7 +225,7 @@ pub fn update_openid_credential(
     anchor.update_openid_credential(openid_credential)
 }
 
-/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
+/// Lookup 'AnchorNumber' for the given 'OpenIdCredentialKey'.
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
