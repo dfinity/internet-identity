@@ -759,6 +759,36 @@ describe("Connection.login", () => {
     });
   });
 
+  describe("only pin device is available", () => {
+    it("returns a custom error", async () => {
+      const pinDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { browser_storage_key: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const mockActor = {
+        identity_info: vi.fn().mockImplementation(async () => {
+          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
+          infoResponse = await mockRawMetadata;
+          return { Ok: { metadata: mockRawMetadata } };
+        }),
+        identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
+        lookup: vi.fn().mockResolvedValue([pinDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("pinUserOtherDomain");
+    });
+  });
+
   describe("AuthenticatedConnection#add", () => {
     const alias = "alias";
     const keyType = { platform: null };
