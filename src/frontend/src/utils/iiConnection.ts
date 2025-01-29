@@ -982,7 +982,7 @@ export class AuthenticatedConnection extends Connection {
       jwt,
       salt,
       new Uint8Array(sessionIdentity.getPublicKey().toDer()),
-      maxTimeToLive ? [maxTimeToLive] : []
+      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
     );
     if ("Err" in res) throw new CanisterError(res.Err);
 

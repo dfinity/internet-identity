@@ -27,7 +27,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
-use openid::OpenIdCredential;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::ops::Not;
@@ -755,7 +754,7 @@ mod openid_api {
         add_openid_credential, lookup_anchor_with_openid_credential, remove_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid::{self, OpenIdCredential, OpenIdCredentialKey};
+    use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
         IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError, SessionKey,

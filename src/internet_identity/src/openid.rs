@@ -14,7 +14,6 @@ use internet_identity_interface::internet_identity::types::{
     Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, SessionKey, SignedDelegation,
     Timestamp,
 };
-use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
