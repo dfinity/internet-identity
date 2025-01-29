@@ -137,6 +137,8 @@ export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
 export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
+// The user has PIN identity but in another domain and II can't access it.
+export type PinUserOtherDomain = { kind: "pinUserOtherDomain" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -372,6 +374,7 @@ export class Connection {
     | AuthFail
     | WebAuthnFailed
     | PossiblyWrongRPID
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   > => {
@@ -390,8 +393,18 @@ export class Connection {
       return { kind: "unknownUser", userNumber };
     }
 
+    let webAuthnAuthenticators = devices.filter(
+      ({ key_type }) => !("browser_storage_key" in key_type)
+    );
+
+    // If we reach this point, it's because no PIN identity was found.
+    // Therefore, it's because it was created in another domain.
+    if (webAuthnAuthenticators.length === 0) {
+      return { kind: "pinUserOtherDomain" };
+    }
+
     if (HARDWARE_KEY_TEST.isEnabled()) {
-      devices = devices.filter(
+      webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
           Object.keys(device.key_type)[0] === "cross_platform"
@@ -400,7 +413,9 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToValidCredentialData).filter(nonNullish)
+      webAuthnAuthenticators
+        .map(convertToValidCredentialData)
+        .filter(nonNullish)
     );
   };
 
