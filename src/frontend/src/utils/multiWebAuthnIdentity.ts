@@ -7,6 +7,7 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
+import { webAuthnInIframe } from "$src/flows/iframeWebAuthn";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
@@ -68,7 +69,14 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
-    const result = (await navigator.credentials.get({
+    console.log("this.rpId", this.rpId);
+    const credentialsGet =
+      isNullish(this.rpId) || window.location.origin === this.rpId
+        ? (options: CredentialRequestOptions) =>
+            navigator.credentials.get(options)
+        : (options: CredentialRequestOptions) => webAuthnInIframe(options);
+    console.log("credentialsGet", credentialsGet);
+    const result = (await credentialsGet({
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",

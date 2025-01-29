@@ -423,15 +423,22 @@ export class Connection {
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent);
+      (true ?? supportsWebauthRoR(window.navigator.userAgent));
     const filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
+    console.log("filteredCredentials", filteredCredentials);
+    // const rpId = dynamicRPIdEnabled
+    //   ? filteredCredentials[0].origin ??
+    //   findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+    //   : undefined;
     const rpId = dynamicRPIdEnabled
       ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
+
+    console.log("rpId", rpId);
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity

@@ -51,6 +51,7 @@ export const excludeCredentialsFromOrigins = (
   rpIds: Set<string | undefined>,
   currentOrigin: string
 ): CredentialData[] => {
+  // if (true || rpIds.size === 0) {
   if (rpIds.size === 0) {
     return credentials;
   }
@@ -119,6 +120,7 @@ export const findWebAuthnRpId = (
 ): string | undefined => {
   // If there are no related domains, RP ID should not be set.
   if (relatedDomains.length === 0) {
+    // return undefined;
     return undefined;
   }
   if (devices.length === 0) {

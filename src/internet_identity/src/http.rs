@@ -196,7 +196,8 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
-         frame-ancestors 'none';"
+         frame-ancestors *;\
+         frame-src *;"
     );
     // for the dev build skip upgrading all connections to II to https
     #[cfg(not(feature = "dev_csp"))]
