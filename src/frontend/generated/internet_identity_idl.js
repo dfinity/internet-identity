@@ -327,6 +327,14 @@ export const idlFactory = ({ IDL }) => {
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
+  const OpenIdDelegationResponse = IDL.Record({
+    'anchor_number' : UserNumber,
+    'delegation_response' : GetDelegationResponse,
+  });
+  const OpenIdDelegationError = IDL.Variant({
+    'NoSuchAnchor' : IDL.Null,
+    'JwtVerificationFailed' : IDL.Null,
+  });
   const OpenIdCredentialAddError = IDL.Variant({
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -532,6 +540,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'openid_create_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : OpenIdDelegationResponse,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
+        [],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],

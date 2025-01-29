@@ -48,13 +48,16 @@ import {
   ActorSubclass,
   DerEncodedPublicKey,
   HttpAgent,
+  Signature,
   SignIdentity,
 } from "@dfinity/agent";
 import {
+  Delegation,
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
   Ed25519KeyIdentity,
+  SignedDelegation,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -964,6 +967,60 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
+  };
+
+  fromJwt = async (
+    jwt: JWT,
+    salt: Salt,
+    maxTimeToLive?: bigint
+  ): Promise<AuthenticatedConnection> => {
+    const sessionIdentity = await ECDSAKeyIdentity.generate({
+      extractable: false,
+    });
+    const actor = await this.createActor(sessionIdentity);
+    const res = await actor.openid_create_delegation(
+      jwt,
+      salt,
+      new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+      maxTimeToLive ? [maxTimeToLive] : []
+    );
+    if ("Err" in res) throw new CanisterError(res.Err);
+
+    const { anchor_number, delegation_response } = res.Ok;
+
+    if ("no_such_delegation" in delegation_response) throw "No such delegation";
+
+    // create delegationIdentity from signedDelegation
+    const signedDelegation = delegation_response.signed_delegation;
+
+    const transformedDelegation: SignedDelegation = {
+      delegation: new Delegation(
+        Uint8Array.from(signedDelegation.delegation.pubkey),
+        BigInt(signedDelegation.delegation.expiration),
+        undefined
+      ),
+      signature: Uint8Array.from(
+        signedDelegation.signature
+      ) as unknown as Signature,
+    };
+
+    const chain = DelegationChain.fromDelegations(
+      [transformedDelegation],
+      sessionIdentity.getPublicKey().toDer()
+    );
+
+    const JwtSignedIdentity = DelegationIdentity.fromDelegation(
+      sessionIdentity,
+      chain
+    );
+
+    return new AuthenticatedConnection(
+      this.canisterId,
+      sessionIdentity,
+      JwtSignedIdentity,
+      anchor_number,
+      actor
+    );
   };
 
   // Get previously fetched config, else fetch it

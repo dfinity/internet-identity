@@ -7,26 +7,27 @@ use crate::assets::init_assets;
 use crate::openid::OpenIdCredentialKey;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
-use anchor_management::{lookup_anchor_with_openid_credential, registration};
+use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
-use candid::{CandidType, Principal};
+use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialAddError;
-use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialRemoveError;
+use internet_identity_interface::internet_identity::types::openid::{
+    OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
+    OpenIdDelegationResponse,
+};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
 use openid::OpenIdCredential;
-use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::ops::Not;
@@ -291,29 +292,6 @@ fn get_delegation(
         trap(&format!("{} could not be authenticated.", caller()));
     };
     delegation::get_delegation(anchor_number, frontend, session_key, expiration)
-}
-
-#[derive(CandidType)]
-struct JwtDelegationResponse {
-    delegation_response: GetDelegationResponse,
-    anchor_number: AnchorNumber,
-}
-
-#[update]
-async fn jwt_delegation(
-    credential: OpenIdCredential,
-    session_key: SessionKey,
-    max_time_to_live: Option<u64>,
-) -> Result<JwtDelegationResponse, String> {
-    match lookup_anchor_with_openid_credential(&credential.clone().into()) {
-        Some(anchor_number) => Ok(JwtDelegationResponse {
-            delegation_response: credential
-                .create_jwt_delegation(session_key, max_time_to_live)
-                .await,
-            anchor_number,
-        }),
-        None => Err("No anchor associated with this credential".to_string()),
-    }
 }
 
 #[query]
@@ -773,17 +751,20 @@ mod v2_api {
 
 /// API for OpenID credentials
 mod openid_api {
-    use crate::anchor_management::{add_openid_credential, remove_openid_credential};
+    use crate::anchor_management::{
+        add_openid_credential, lookup_anchor_with_openid_credential, remove_openid_credential,
+    };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid;
-    use crate::openid::OpenIdCredentialKey;
+    use crate::openid::{self, OpenIdCredential, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
+    use crate::{
+        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError, SessionKey,
+    };
     use ic_cdk::caller;
     use ic_cdk_macros::update;
     use internet_identity_interface::internet_identity::types::openid::{
-        OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        OpenIdDelegationError, OpenIdDelegationResponse,
     };
-    use internet_identity_interface::internet_identity::types::IdentityNumber;
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -831,6 +812,28 @@ mod openid_api {
                     err => OpenIdCredentialRemoveError::InternalCanisterError(err.to_string()),
                 })
         })
+    }
+
+    //TODO: add tests for this
+    #[update]
+    async fn openid_create_delegation(
+        jwt: String,
+        salt: [u8; 32],
+        session_key: SessionKey,
+        max_time_to_live: Option<u64>,
+    ) -> Result<OpenIdDelegationResponse, OpenIdDelegationError> {
+        let openid_credential = openid::verify(&jwt, &salt)
+            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+
+        match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
+            Some(anchor_number) => Ok(OpenIdDelegationResponse {
+                delegation_response: openid_credential
+                    .create_jwt_delegation(session_key, max_time_to_live)
+                    .await,
+                anchor_number,
+            }),
+            None => Err(OpenIdDelegationError::NoSuchAnchor),
+        }
     }
 }
 
