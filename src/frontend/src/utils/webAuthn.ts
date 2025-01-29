@@ -6,7 +6,7 @@ import {
   creationOptions,
 } from "$src/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$src/utils/utils";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 export const constructIdentity = async ({
   devices,

@@ -14,7 +14,7 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { nonNullish } from "@dfinity/utils";
 import { addDeviceSuccess } from "../addDeviceSuccess";
 
