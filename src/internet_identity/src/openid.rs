@@ -60,6 +60,7 @@ impl OpenIdCredential {
         max_time_to_live: Option<u64>,
         //TODO: maybe add IIDomain
     ) -> (UserKey, Timestamp) {
+        state::ensure_salt_set().await;
         let session_duration_ns = u64::min(
             max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
             MAX_EXPIRATION_PERIOD_NS,
@@ -67,7 +68,6 @@ impl OpenIdCredential {
         let expiration = time().saturating_add(session_duration_ns);
         let seed = calculate_delegation_seed(&self.aud, &self.key());
 
-        // to get the signed delegation, we need to create a canister signature
         state::signature_map_mut(|sigs| {
             add_delegation_signature(sigs, session_key.clone(), seed.as_ref(), expiration);
         });
@@ -76,7 +76,7 @@ impl OpenIdCredential {
         // TODO: we are currently not doing bookkeeping in here.
 
         (
-            ByteBuf::from(der_encode_canister_sig_key(seed.into())),
+            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
             expiration,
         )
     }
@@ -92,6 +92,7 @@ impl OpenIdCredential {
                 seed: &calculate_delegation_seed(&self.aud, &self.key()),
                 message: &delegation_signature_msg(&session_key, expiration, None),
             };
+
             match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
                 Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                     delegation: Delegation {
@@ -162,7 +163,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-
     blob.push(client_id.bytes().len() as u8);
     blob.extend(client_id.bytes());
 
@@ -171,7 +171,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 
     blob.push(sub.bytes().len() as u8);
     blob.extend(sub.bytes());
-
     let mut hasher = Sha256::new();
     hasher.update(blob);
     hasher.finalize().into()
@@ -181,7 +180,7 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 /// unique between instances for the same `OpenIdCredential`, intentionally isolating the instances.
 #[cfg(not(test))]
 fn salt() -> [u8; 32] {
-    crate::state::salt()
+    state::salt()
 }
 
 /// Skip getting salt from state in tests, instead return a fixed salt
