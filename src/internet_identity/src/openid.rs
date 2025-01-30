@@ -11,8 +11,8 @@ use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::{
-    Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, SessionKey, SignedDelegation,
-    Timestamp,
+    Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
+    SignedDelegation, Timestamp,
 };
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
@@ -44,9 +44,12 @@ impl OpenIdCredential {
         (self.iss.clone(), self.sub.clone())
     }
     pub fn principal(&self) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key());
-        let public_key = der_encode_canister_sig_key(seed.to_vec());
+        let public_key = self.public_key();
         Principal::self_authenticating(public_key)
+    }
+    pub fn public_key(&self) -> PublicKey {
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        der_encode_canister_sig_key(seed.to_vec()).into()
     }
 
     //TODO: maybe this can be improved
