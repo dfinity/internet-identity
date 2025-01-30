@@ -70,7 +70,12 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       return this._actualIdentity.sign(blob);
     }
 
-    console.log("this.rpId", this.rpId);
+    console.log(
+      "this.rpId",
+      this.rpId,
+      isNullish(this.rpId),
+      window.location.origin === this.rpId
+    );
     const credentialsGet =
       isNullish(this.rpId) || window.location.origin === this.rpId
         ? (options: CredentialRequestOptions) =>

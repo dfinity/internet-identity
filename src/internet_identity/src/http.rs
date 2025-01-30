@@ -121,7 +121,7 @@ pub fn security_headers(integrity_hashes: Vec<String>) -> Vec<HeaderField> {
              navigation-override=(),\
              payment=(),\
              picture-in-picture=(),\
-             publickey-credentials-get=(self),\
+             publickey-credentials-get=*,\
              screen-wake-lock=(),\
              serial=(),\
              speaker-selection=(),\

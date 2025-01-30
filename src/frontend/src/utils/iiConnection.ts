@@ -37,11 +37,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import {
-  addAnchorCancelledRpId,
-  cleanUpRpIdMapper,
-  getCancelledRpIds,
-} from "$src/storage";
+import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -458,8 +454,8 @@ export class Connection {
     //   cancelledRpIds = new Set<string | undefined>();
     //   filteredCredentials = credentials;
     const rpId = dynamicRPIdEnabled
-        ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
-        : undefined;
+      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+      : undefined;
 
     console.log("rpId", rpId);
 
@@ -1030,6 +1026,7 @@ export const creationOptions = (
   return {
     authenticatorSelection: {
       userVerification: "preferred",
+      residentKey: "preferred",
       authenticatorAttachment,
     },
     excludeCredentials: exclude.flatMap((device) =>
