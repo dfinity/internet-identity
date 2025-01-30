@@ -1,3 +1,4 @@
+import { InternetIdentityInit } from "$generated/internet_identity_types";
 import { mkAnchorInput } from "$src/components/anchorInput";
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { flowErrorToastTemplate } from "$src/components/authenticateBox/errorToast";
@@ -42,6 +43,11 @@ import {
   bufferEqual,
 } from "$src/utils/iiConnection";
 import { TemplateElement, withRef } from "$src/utils/lit-html";
+import {
+  createAnonymousNonce,
+  createGoogleRequestConfig,
+  requestJWT,
+} from "$src/utils/openID";
 import { parseUserNumber } from "$src/utils/userNumber";
 import {
   NonEmptyArray,
@@ -49,6 +55,7 @@ import {
   unknownToString,
 } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
+import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";
@@ -88,7 +95,7 @@ export const authenticateBox = async ({
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
-  authnMethod: "pin" | "passkey" | "recovery";
+  authnMethod: "pin" | "passkey" | "recovery" | "openid";
   showAddCurrentDevice: boolean;
 }> => {
   const promptAuth = async (autoSelectIdentity?: bigint) =>
@@ -114,6 +121,7 @@ export const authenticateBox = async ({
         idbRetrievePinIdentityMaterial({ userNumber }),
       allowPinLogin: allowPinLogin,
       autoSelectIdentity,
+      connection,
     });
 
   // Retry until user has successfully authenticated
@@ -184,6 +192,7 @@ export const authenticateBoxFlow = async <I>({
   retrievePinIdentityMaterial,
   allowPinLogin,
   autoSelectIdentity,
+  connection,
 }: {
   i18n: I18n;
   templates: AuthnTemplates;
@@ -217,6 +226,7 @@ export const authenticateBoxFlow = async <I>({
   }) => Promise<I | undefined>;
   allowPinLogin: boolean;
   autoSelectIdentity?: bigint;
+  connection: Connection;
   verifyPinValidity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: I;
@@ -225,7 +235,7 @@ export const authenticateBoxFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid";
     })
   | PossiblyWrongRPID
   | FlowError
@@ -234,11 +244,17 @@ export const authenticateBoxFlow = async <I>({
 > => {
   const pages = authnScreens(i18n, { ...templates });
 
+  const configRef: { current?: InternetIdentityInit } = {};
+  void connection.getConfig().then((config) => (configRef.current = config));
+
+  const getGoogleClientId = () =>
+    configRef.current?.openid_google[0]?.[0]?.client_id;
+
   // The registration flow for a new identity
   const doRegister = async (): Promise<
     | (LoginSuccess & {
         newAnchor: true;
-        authnMethod: "pin" | "passkey" | "recovery";
+        authnMethod: "pin" | "passkey" | "recovery" | "openid";
       })
     | FlowError
     | { tag: "canceled" }
@@ -271,11 +287,51 @@ export const authenticateBoxFlow = async <I>({
       allowPinLogin,
     });
 
+  const doLoginWithGoogle = async (connection: Connection) => {
+    const googleClientId = getGoogleClientId();
+
+    if (isNullish(googleClientId)) {
+      toast.error("Google login is unavailable."); // TODO: put into copy / handle errors better
+      return;
+    }
+
+    const sessionIdentity = await ECDSAKeyIdentity.generate({
+      extractable: false,
+    });
+
+    const googleRequestConfig = createGoogleRequestConfig(googleClientId);
+    const { nonce, salt } = await createAnonymousNonce(
+      sessionIdentity.getPrincipal()
+    );
+
+    const jwt = await withLoader(() =>
+      requestJWT(googleRequestConfig, {
+        mediation: "required",
+        nonce,
+      })
+    );
+
+    const authenticatedConnection = await connection.fromJwt(
+      jwt,
+      salt,
+      sessionIdentity
+    );
+
+    return {
+      kind: "loginSuccess" as const,
+      connection: authenticatedConnection,
+      userNumber: authenticatedConnection.userNumber,
+      showAddCurrentDevice: false, // TODO: what does this do?
+      newAnchor: false,
+      authnMethod: "openid" as const,
+    };
+  };
+
   // Prompt for an identity number
   const doPrompt = async (): Promise<
     | (LoginSuccess & {
         newAnchor: boolean;
-        authnMethod: "pin" | "passkey" | "recovery";
+        authnMethod: "pin" | "passkey" | "recovery" | "openid";
       })
     | PossiblyWrongRPID
     | FlowError
@@ -293,6 +349,12 @@ export const authenticateBoxFlow = async <I>({
 
     if (result.tag === "register") {
       return await doRegister();
+    }
+
+    if (result.tag === "open_id_google") {
+      const loginResult = await doLoginWithGoogle(connection);
+      if (!loginResult) throw toast.error("Could not login with google"); // TODO: get from copy etc
+      return loginResult;
     }
 
     result satisfies { tag: "recover" };
@@ -429,7 +491,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       onSubmit: (userNumber: bigint) => void;
       recover: (userNumber?: bigint) => void;
       addDevice: (userNumber?: bigint) => void;
-      openIDGoogle: (userNumber?: bigint) => void;
+      loginOpenIDGoogle: (userNumber?: bigint) => void;
     }) => {
       const anchorInput = mkAnchorInput({
         onSubmit: useExistingProps.onSubmit,
@@ -467,7 +529,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         <button
           @click=${() =>
             withUserNumber((userNumber) =>
-              useExistingProps.openIDGoogle(userNumber)
+              useExistingProps.loginOpenIDGoogle(userNumber)
             )}
           id="addNewDeviceButton"
           class="c-button c-button--secondary"
@@ -551,7 +613,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
         | { tag: "submit"; userNumber: bigint }
         | { tag: "add_device"; userNumber?: bigint }
         | { tag: "recover"; userNumber?: bigint }
-        | { tag: "open_id_google"; userNumber?: bigint }
+        | { tag: "open_id_google" }
       >((resolve) =>
         pages.useExisting({
           register: () => resolve({ tag: "register" }),
@@ -561,8 +623,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "add_device", userNumber }),
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
-          openIDGoogle: (userNumber?: bigint) =>
-            resolve({ tag: "open_id_google", userNumber }),
+          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" }),
         })
       ),
     pick: (pickProps: {
@@ -721,7 +782,7 @@ const useIdentityFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid";
     })
   | AuthFail
   | WebAuthnFailed

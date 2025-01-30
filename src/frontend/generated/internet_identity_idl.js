@@ -327,14 +327,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
-  const OpenIdDelegationResponse = IDL.Record({
-    'anchor_number' : UserNumber,
-    'delegation_response' : GetDelegationResponse,
-  });
-  const OpenIdDelegationError = IDL.Variant({
-    'NoSuchAnchor' : IDL.Null,
-    'JwtVerificationFailed' : IDL.Null,
-  });
   const OpenIdCredentialAddError = IDL.Variant({
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -347,7 +339,16 @@ export const idlFactory = ({ IDL }) => {
     'OpenIdCredentialNotFound' : IDL.Null,
     'Unauthorized' : IDL.Principal,
   });
+  const OpenIdDelegationError = IDL.Variant({
+    'NoSuchAnchor' : IDL.Null,
+    'JwtVerificationFailed' : IDL.Null,
+  });
   const UserKey = PublicKey;
+  const OpenIdPrepareDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'anchor_number' : UserNumber,
+    'timestamp' : Timestamp,
+  });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
     'relying_party' : FrontendHostname,
@@ -540,16 +541,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
-    'openid_create_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey, IDL.Opt(IDL.Nat64)],
-        [
-          IDL.Variant({
-            'Ok' : OpenIdDelegationResponse,
-            'Err' : OpenIdDelegationError,
-          }),
-        ],
-        [],
-      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
@@ -558,6 +549,26 @@ export const idlFactory = ({ IDL }) => {
     'openid_credential_remove' : IDL.Func(
         [IdentityNumber, OpenIdCredentialKey],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialRemoveError })],
+        [],
+      ),
+    'openid_get_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : GetDelegationResponse,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'openid_prepare_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : OpenIdPrepareDelegationResponse,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
         [],
       ),
     'prepare_delegation' : IDL.Func(

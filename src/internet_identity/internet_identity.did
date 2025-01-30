@@ -365,8 +365,9 @@ type OpenIdDelegationError = variant {
     JwtVerificationFailed;
 };
 
-type OpenIdDelegationResponse = record {
-    delegation_response : GetDelegationResponse;
+type OpenIdPrepareDelegationResponse = record {
+    user_key : UserKey;
+    timestamp : Timestamp;
     anchor_number : UserNumber;
 };
 
@@ -757,7 +758,8 @@ service : (opt InternetIdentityInit) -> {
     // =========================
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
-    openid_create_delegation : (JWT, Salt, SessionKey, opt nat64) -> (variant { Ok : OpenIdDelegationResponse; Err : OpenIdDelegationError });
+    openid_prepare_delegation : (JWT, Salt, SessionKey, opt nat64) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
+    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : GetDelegationResponse; Err : OpenIdDelegationError });
 
     // HTTP Gateway protocol
     // =====================

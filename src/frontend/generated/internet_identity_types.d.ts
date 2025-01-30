@@ -262,9 +262,10 @@ export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type OpenIdDelegationError = { 'NoSuchAnchor' : null } |
   { 'JwtVerificationFailed' : null };
-export interface OpenIdDelegationResponse {
+export interface OpenIdPrepareDelegationResponse {
+  'user_key' : UserKey,
   'anchor_number' : UserNumber,
-  'delegation_response' : GetDelegationResponse,
+  'timestamp' : Timestamp,
 }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -434,11 +435,6 @@ export interface _SERVICE {
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
-  'openid_create_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey, [] | [bigint]],
-    { 'Ok' : OpenIdDelegationResponse } |
-      { 'Err' : OpenIdDelegationError }
-  >,
   'openid_credential_add' : ActorMethod<
     [IdentityNumber, JWT, Salt],
     { 'Ok' : null } |
@@ -448,6 +444,16 @@ export interface _SERVICE {
     [IdentityNumber, OpenIdCredentialKey],
     { 'Ok' : null } |
       { 'Err' : OpenIdCredentialRemoveError }
+  >,
+  'openid_get_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, Timestamp],
+    { 'Ok' : GetDelegationResponse } |
+      { 'Err' : OpenIdDelegationError }
+  >,
+  'openid_prepare_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, [] | [bigint]],
+    { 'Ok' : OpenIdPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError }
   >,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],

@@ -651,6 +651,91 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
+
+  getConfig = async () => {
+    const actor = await this.createActor();
+    return actor.config();
+  };
+
+  fromJwt = async (
+    jwt: JWT,
+    salt: Salt,
+    sessionIdentity: SignIdentity,
+    maxTimeToLive?: bigint
+  ): Promise<AuthenticatedConnection> => {
+    // const sessionIdentity = await ECDSAKeyIdentity.generate({
+    //   extractable: false,
+    // });
+
+    const actor = await this.createActor(sessionIdentity);
+
+    const prepareDelegationResponse = await actor.openid_prepare_delegation(
+      jwt,
+      salt,
+      new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
+    );
+
+    if ("Err" in prepareDelegationResponse)
+      throw new CanisterError(prepareDelegationResponse.Err);
+
+    console.log("3");
+    console.log("prepareDelegationResponse", prepareDelegationResponse);
+
+    const { anchor_number, timestamp, user_key } = prepareDelegationResponse.Ok;
+
+    const getDelegationResponse = await actor.openid_get_delegation(
+      jwt,
+      salt,
+      user_key,
+      timestamp
+    );
+
+    if ("Err" in getDelegationResponse)
+      throw new CanisterError(getDelegationResponse.Err);
+
+    console.log("getDelegationResponse", getDelegationResponse);
+
+    const delegationResponse = getDelegationResponse.Ok;
+
+    if ("no_such_delegation" in delegationResponse) throw "No such delegation";
+
+    // create delegationIdentity from signedDelegation
+    const signedDelegation = delegationResponse.signed_delegation;
+
+    const transformedDelegation: SignedDelegation = {
+      delegation: new Delegation(
+        Uint8Array.from(signedDelegation.delegation.pubkey),
+        BigInt(signedDelegation.delegation.expiration),
+        undefined
+      ),
+      signature: Uint8Array.from(
+        signedDelegation.signature
+      ) as unknown as Signature,
+    };
+
+    console.log("transformedDelegation", transformedDelegation);
+
+    const chain = DelegationChain.fromDelegations(
+      [transformedDelegation],
+      sessionIdentity.getPublicKey().toDer()
+    );
+
+    const JwtSignedIdentity = DelegationIdentity.fromDelegation(
+      sessionIdentity,
+      chain
+    );
+
+    console.log("JwtSignedIdentity", JwtSignedIdentity);
+
+    return new AuthenticatedConnection(
+      this.canisterId,
+      sessionIdentity,
+      JwtSignedIdentity,
+      anchor_number,
+      actor
+    );
+  };
 }
 
 export class AuthenticatedConnection extends Connection {
@@ -967,60 +1052,6 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
-  };
-
-  fromJwt = async (
-    jwt: JWT,
-    salt: Salt,
-    maxTimeToLive?: bigint
-  ): Promise<AuthenticatedConnection> => {
-    const sessionIdentity = await ECDSAKeyIdentity.generate({
-      extractable: false,
-    });
-    const actor = await this.createActor(sessionIdentity);
-    const res = await actor.openid_create_delegation(
-      jwt,
-      salt,
-      new Uint8Array(sessionIdentity.getPublicKey().toDer()),
-      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
-    );
-    if ("Err" in res) throw new CanisterError(res.Err);
-
-    const { anchor_number, delegation_response } = res.Ok;
-
-    if ("no_such_delegation" in delegation_response) throw "No such delegation";
-
-    // create delegationIdentity from signedDelegation
-    const signedDelegation = delegation_response.signed_delegation;
-
-    const transformedDelegation: SignedDelegation = {
-      delegation: new Delegation(
-        Uint8Array.from(signedDelegation.delegation.pubkey),
-        BigInt(signedDelegation.delegation.expiration),
-        undefined
-      ),
-      signature: Uint8Array.from(
-        signedDelegation.signature
-      ) as unknown as Signature,
-    };
-
-    const chain = DelegationChain.fromDelegations(
-      [transformedDelegation],
-      sessionIdentity.getPublicKey().toDer()
-    );
-
-    const JwtSignedIdentity = DelegationIdentity.fromDelegation(
-      sessionIdentity,
-      chain
-    );
-
-    return new AuthenticatedConnection(
-      this.canisterId,
-      sessionIdentity,
-      JwtSignedIdentity,
-      anchor_number,
-      actor
-    );
   };
 
   // Get previously fetched config, else fetch it
