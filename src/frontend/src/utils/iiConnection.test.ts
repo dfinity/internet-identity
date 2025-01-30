@@ -14,7 +14,7 @@ import {
   setLastShownAddCurrentDevicePage,
 } from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
-import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
+import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
@@ -241,6 +242,69 @@ describe("Connection.login", () => {
       }
     });
 
+    it("connection cleans up cancelled RP IDs if no credentials when user cancels in a valid RP ID", async () => {
+      // This one would fail because it's not the device the user is using at the moment.
+      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
+      const currentOriginCredentialData =
+        convertToValidCredentialData(currentOriginDevice);
+      const currentDevice: DeviceData = createMockDevice();
+      const currentDeviceCredentialData =
+        convertToValidCredentialData(currentDevice);
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      // First try. This is the right RP ID, but the user cancelled manually
+      failSign = true;
+      const firstLoginResult = await connection.login(BigInt(12345));
+
+      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          currentOriginCredentialData,
+          currentDeviceCredentialData,
+        ]),
+        undefined
+      );
+
+      failSign = true;
+      const secondLoginResult = await connection.login(BigInt(12345));
+
+      expect(secondLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+        2,
+        expect.arrayContaining([
+          currentOriginCredentialData,
+          currentDeviceCredentialData,
+        ]),
+        "identity.ic0.app"
+      );
+
+      failSign = false;
+      const thirdLoginResult = await connection.login(BigInt(12345));
+
+      expect(thirdLoginResult.kind).toBe("loginSuccess");
+      if (thirdLoginResult.kind === "loginSuccess") {
+        expect(thirdLoginResult.showAddCurrentDevice).toBe(false);
+        expect(thirdLoginResult.connection).toBeInstanceOf(
+          AuthenticatedConnection
+        );
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(3);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+          3,
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentDeviceCredentialData,
+          ]),
+          // The same RP ID as in the first login
+          undefined
+        );
+      }
+    });
+
     // Test that the cancelled RP IDs are persisted across browser refrheses
     it("connection excludes rpId when user cancels after new Conection is created", async () => {
       // This one would fail because it's not the device the user is using at the moment.
@@ -452,19 +516,14 @@ describe("Connection.login", () => {
         const connection = new Connection("aaaaa-aa", mockActor);
 
         failSign = true;
-        const call = () =>
-          connection.fromWebauthnCredentials(
-            userNumber,
-            [credentialDataFromCurrentDomain],
-            !skipCancelledRpIdsStorage
-          );
-
-        // This is because the device is filtered out and then the `findWebAuthnRpId` doesn't receive any device.
-        await expect(call).rejects.toThrowError(
-          new Error(
-            "Not possible. Every registered user has at least one device."
-          )
+        const loginResult = await connection.fromWebauthnCredentials(
+          userNumber,
+          [credentialDataFromCurrentDomain],
+          !skipCancelledRpIdsStorage
         );
+
+        // The user cancelled, but we can't know why.
+        expect(loginResult.kind).toBe("webAuthnFailed");
       });
 
       it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
@@ -756,6 +815,36 @@ describe("Connection.login", () => {
         [convertToValidCredentialData(deviceValidCredentialId)],
         undefined
       );
+    });
+  });
+
+  describe("only pin device is available", () => {
+    it("returns a custom error", async () => {
+      const pinDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { browser_storage_key: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const mockActor = {
+        identity_info: vi.fn().mockImplementation(async () => {
+          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
+          infoResponse = await mockRawMetadata;
+          return { Ok: { metadata: mockRawMetadata } };
+        }),
+        identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
+        lookup: vi.fn().mockResolvedValue([pinDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("pinUserOtherDomain");
     });
   });
 

@@ -10,8 +10,8 @@ import {
   IC_DERIVATION_PATH,
 } from "$src/utils/iiConnection";
 import { unreachable, unreachableLax } from "$src/utils/utils";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
-import { WebAuthnIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
 import { displaySeedPhrase } from "./displaySeedPhrase";

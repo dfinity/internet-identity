@@ -19,7 +19,7 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
 

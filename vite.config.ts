@@ -9,6 +9,7 @@ import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -68,6 +69,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       inlineScriptsPlugin,
+      // Needed to support WebAuthnIdentity in this repository due to borc dependency.
+      nodePolyfills({
+        include: ["buffer"],
+      }),
       [
         ...(mode === "development"
           ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]

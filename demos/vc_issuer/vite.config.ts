@@ -3,6 +3,7 @@ import {
   injectCanisterIdPlugin,
 } from "@dfinity/internet-identity-vite-plugins";
 import { defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig(({ command, mode }) => ({
   root: "./app",
@@ -20,6 +21,7 @@ export default defineConfig(({ command, mode }) => ({
     },
   },
   plugins: [
+    nodePolyfills({ include: ["buffer"] }),
     ...(mode === "development"
       ? [injectCanisterIdPlugin({ canisterName: "issuer" })]
       : []),

@@ -2,6 +2,9 @@
   "en": {
     "title_possibly_wrong_rp_id": "Please try again",
     "message_possibly_wrong_rp_id_1": "The wrong domain was set for the passkey and the browser couldn't find it.",
-    "message_possibly_wrong_rp_id_2": "Try again and another domain will be used."
+    "message_possibly_wrong_rp_id_2": "Try again and another domain will be used.",
+    "title_pin_another_domain": "Pin identity in another domain",
+    "message_pin_another_domain_1": "You seem to be using a PIN identity created in another domain.",
+    "message_pin_another_domain_2": "To access this domain you need to go to the other domain and add a passkey."
   }
 }

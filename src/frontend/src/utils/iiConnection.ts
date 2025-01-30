@@ -37,7 +37,11 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
+import {
+  addAnchorCancelledRpId,
+  cleanUpRpIdMapper,
+  getCancelledRpIds,
+} from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -137,6 +141,8 @@ export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
 export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
+// The user has PIN identity but in another domain and II can't access it.
+export type PinUserOtherDomain = { kind: "pinUserOtherDomain" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -372,6 +378,7 @@ export class Connection {
     | AuthFail
     | WebAuthnFailed
     | PossiblyWrongRPID
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   > => {
@@ -390,8 +397,18 @@ export class Connection {
       return { kind: "unknownUser", userNumber };
     }
 
+    let webAuthnAuthenticators = devices.filter(
+      ({ key_type }) => !("browser_storage_key" in key_type)
+    );
+
+    // If we reach this point, it's because no PIN identity was found.
+    // Therefore, it's because it was created in another domain.
+    if (webAuthnAuthenticators.length === 0) {
+      return { kind: "pinUserOtherDomain" };
+    }
+
     if (HARDWARE_KEY_TEST.isEnabled()) {
-      devices = devices.filter(
+      webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
           Object.keys(device.key_type)[0] === "cross_platform"
@@ -400,7 +417,9 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToValidCredentialData).filter(nonNullish)
+      webAuthnAuthenticators
+        .map(convertToValidCredentialData)
+        .filter(nonNullish)
     );
   };
 
@@ -409,34 +428,38 @@ export class Connection {
     credentials: CredentialData[],
     skipCancelledRpIdsStorage = false
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
+    let cancelledRpIds: Set<string | undefined>;
     // Get cancelled rpids for the user from local storage.
-    const { cancelledRpIds, lastShownAddCurrentDevicePage } =
-      skipCancelledRpIdsStorage
-        ? {
-            cancelledRpIds: new Set<string>(),
-            lastShownAddCurrentDevicePage: undefined,
-          }
-        : await getCancelledRpIds({
-            userNumber,
-            origin: window.location.origin,
-          });
+    const persistedData = skipCancelledRpIdsStorage
+      ? {
+          cancelledRpIds: new Set<string>(),
+          lastShownAddCurrentDevicePage: undefined,
+        }
+      : await getCancelledRpIds({
+          userNumber,
+          origin: window.location.origin,
+        });
+    cancelledRpIds = persistedData.cancelledRpIds;
+    const lastShownAddCurrentDevicePage =
+      persistedData.lastShownAddCurrentDevicePage;
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
-      (true ?? supportsWebauthRoR(window.navigator.userAgent));
-    const filteredCredentials = excludeCredentialsFromOrigins(
+      (true || supportsWebauthRoR(window.navigator.userAgent));
+    let filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
     console.log("filteredCredentials", filteredCredentials);
-    // const rpId = dynamicRPIdEnabled
-    //   ? filteredCredentials[0].origin ??
-    //   findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
-    //   : undefined;
+    // It probably means that the user cancelled a valid RP ID manually
+    // if (filteredCredentials.length === 0) {
+    //   await cleanUpRpIdMapper(userNumber);
+    //   cancelledRpIds = new Set<string | undefined>();
+    //   filteredCredentials = credentials;
     const rpId = dynamicRPIdEnabled
-      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
-      : undefined;
+        ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+        : undefined;
 
     console.log("rpId", rpId);
 

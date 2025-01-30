@@ -9,11 +9,12 @@
  */
 import { webAuthnInIframe } from "$src/flows/iframeWebAuthn";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
-import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
+import { DER_COSE_OID, unwrapDER } from "@dfinity/identity";
 import { isNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
