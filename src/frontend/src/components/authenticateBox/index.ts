@@ -429,6 +429,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       onSubmit: (userNumber: bigint) => void;
       recover: (userNumber?: bigint) => void;
       addDevice: (userNumber?: bigint) => void;
+      openIDGoogle: (userNumber?: bigint) => void;
     }) => {
       const anchorInput = mkAnchorInput({
         onSubmit: useExistingProps.onSubmit,
@@ -465,8 +466,8 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         </button>
         <button
           @click=${() =>
-            withUserNumber(
-              (userNumber) => console.log("todo") //TODO
+            withUserNumber((userNumber) =>
+              useExistingProps.openIDGoogle(userNumber)
             )}
           id="addNewDeviceButton"
           class="c-button c-button--secondary"
@@ -550,6 +551,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
         | { tag: "submit"; userNumber: bigint }
         | { tag: "add_device"; userNumber?: bigint }
         | { tag: "recover"; userNumber?: bigint }
+        | { tag: "open_id_google"; userNumber?: bigint }
       >((resolve) =>
         pages.useExisting({
           register: () => resolve({ tag: "register" }),
@@ -559,6 +561,8 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "add_device", userNumber }),
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
+          openIDGoogle: (userNumber?: bigint) =>
+            resolve({ tag: "open_id_google", userNumber }),
         })
       ),
     pick: (pickProps: {

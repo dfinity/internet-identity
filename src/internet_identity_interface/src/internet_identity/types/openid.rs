@@ -4,6 +4,8 @@ use crate::internet_identity::types::{
 use candid::{CandidType, Deserialize, Principal};
 use std::collections::HashMap;
 
+use super::UserKey;
+
 /// Types for OpenID credentials, used for OpenID sign in
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -31,8 +33,9 @@ pub enum OpenIdCredentialRemoveError {
 }
 
 #[derive(CandidType, Debug)]
-pub struct OpenIdDelegationResponse {
-    pub delegation_response: GetDelegationResponse,
+pub struct OpenIdPrepareDelegationResponse {
+    pub user_key: UserKey,
+    pub timestamp: Timestamp,
     pub anchor_number: AnchorNumber,
 }
 

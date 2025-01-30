@@ -12,8 +12,9 @@ use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::{
     Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
-    SignedDelegation, Timestamp,
+    SignedDelegation, Timestamp, UserKey,
 };
+use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
@@ -53,11 +54,12 @@ impl OpenIdCredential {
     }
 
     //TODO: maybe this can be improved
-    pub async fn create_jwt_delegation(
+    pub async fn prepare_jwt_delegation(
         &self,
         session_key: SessionKey,
         max_time_to_live: Option<u64>,
-    ) -> GetDelegationResponse {
+        //TODO: maybe add IIDomain
+    ) -> (UserKey, Timestamp) {
         let session_duration_ns = u64::min(
             max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
             MAX_EXPIRATION_PERIOD_NS,
@@ -71,15 +73,25 @@ impl OpenIdCredential {
         });
         update_root_hash();
 
-        let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
-            seed: &seed,
-            message: &delegation_signature_msg(&session_key, expiration, None),
-        };
-
         // TODO: we are currently not doing bookkeeping in here.
 
+        (
+            ByteBuf::from(der_encode_canister_sig_key(seed.into())),
+            expiration,
+        )
+    }
+
+    pub async fn get_jwt_delegation(
+        &self,
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> GetDelegationResponse {
         state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &calculate_delegation_seed(&self.aud, &self.key()),
+                message: &delegation_signature_msg(&session_key, expiration, None),
+            };
             match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
                 Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
                     delegation: Delegation {
@@ -89,7 +101,7 @@ impl OpenIdCredential {
                     },
                     signature: signature.into(),
                 }),
-                Err(_) => GetDelegationResponse::NoSuchDelegation, //TODO: this is technically the wrong error
+                Err(_) => GetDelegationResponse::NoSuchDelegation,
             }
         })
     }
