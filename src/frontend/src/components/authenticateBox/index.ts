@@ -459,9 +459,19 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
               useExistingProps.addDevice(userNumber)
             )}
           id="addNewDeviceButton"
-          class="c-button c-button--textOnly"
+          class="c-button c-button--secondary"
         >
           Continue with another device
+        </button>
+        <button
+          @click=${() =>
+            withUserNumber(
+              (userNumber) => console.log("todo") //TODO
+            )}
+          id="addNewDeviceButton"
+          class="c-button c-button--secondary"
+        >
+          Continue with Google
         </button>
 
         <ul class="c-link-group">
