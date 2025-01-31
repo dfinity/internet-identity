@@ -843,7 +843,7 @@ mod openid_api {
 
     //TODO: add tests for this
     #[query]
-    async fn openid_get_delegation(
+    fn openid_get_delegation(
         jwt: String,
         salt: [u8; 32],
         session_key: SessionKey,
@@ -853,9 +853,7 @@ mod openid_api {
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
         match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
-            Some(_) => Ok(openid_credential
-                .get_jwt_delegation(session_key, expiration)
-                .await),
+            Some(_) => Ok(openid_credential.get_jwt_delegation(session_key, expiration)),
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
     }

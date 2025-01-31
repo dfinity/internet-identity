@@ -61,6 +61,7 @@ impl OpenIdCredential {
         //TODO: maybe add IIDomain
     ) -> (UserKey, Timestamp) {
         state::ensure_salt_set().await;
+
         let session_duration_ns = u64::min(
             max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
             MAX_EXPIRATION_PERIOD_NS,
@@ -69,7 +70,7 @@ impl OpenIdCredential {
         let seed = calculate_delegation_seed(&self.aud, &self.key());
 
         state::signature_map_mut(|sigs| {
-            add_delegation_signature(sigs, session_key.clone(), seed.as_ref(), expiration);
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
         });
         update_root_hash();
 
@@ -81,7 +82,7 @@ impl OpenIdCredential {
         )
     }
 
-    pub async fn get_jwt_delegation(
+    pub fn get_jwt_delegation(
         &self,
         session_key: SessionKey,
         expiration: Timestamp,
@@ -100,7 +101,7 @@ impl OpenIdCredential {
                         expiration,
                         targets: None,
                     },
-                    signature: signature.into(),
+                    signature: ByteBuf::from(signature),
                 }),
                 Err(_) => GetDelegationResponse::NoSuchDelegation,
             }

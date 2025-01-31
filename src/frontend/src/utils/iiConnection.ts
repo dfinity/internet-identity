@@ -684,6 +684,7 @@ export class Connection {
           sessionKey,
           timestamp
         );
+        console.log(res);
         if ("Err" in res) {
           toast.error(
             "Error while fetching delegation: " +
