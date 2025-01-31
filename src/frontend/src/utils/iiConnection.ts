@@ -713,27 +713,24 @@ export class Connection {
     };
 
     const actor = await this.createActor(sessionIdentity);
+    const sessionKey = new Uint8Array(sessionIdentity.getPublicKey().toDer());
 
     const prepareDelegationResponse = await actor.openid_prepare_delegation(
       jwt,
       salt,
-      new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+      sessionKey,
       nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
     );
+
+    console.log(prepareDelegationResponse);
 
     if ("Err" in prepareDelegationResponse)
       throw new CanisterError(prepareDelegationResponse.Err);
 
-    const { anchor_number, timestamp, user_key } = prepareDelegationResponse.Ok;
+    const { anchor_number, timestamp } = prepareDelegationResponse.Ok;
 
     const signedDelegation = await withLoader(() =>
-      retryGetJwtDelegation(
-        jwt,
-        salt,
-        new Uint8Array(sessionIdentity.getPublicKey().toDer()),
-        timestamp,
-        actor
-      )
+      retryGetJwtDelegation(jwt, salt, sessionKey, timestamp, actor)
     );
 
     const transformedDelegation = {
