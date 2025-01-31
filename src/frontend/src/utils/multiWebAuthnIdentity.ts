@@ -86,7 +86,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         this._actualIdentity = new WebAuthnIdentity(
           cd.credentialId,
           unwrapDER(cd.pubkey, DER_COSE_OID),
-          undefined
+          undefined,
+          this.rpId
         );
         break;
       }

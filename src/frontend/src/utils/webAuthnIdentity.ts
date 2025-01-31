@@ -153,13 +153,17 @@ export class WebAuthnIdentity extends SignIdentity {
    * @param json - json to parse
    */
   public static fromJSON(json: string): WebAuthnIdentity {
-    const { publicKey, rawId } = JSON.parse(json);
+    const { publicKey, rawId, rpId } = JSON.parse(json);
 
-    if (typeof publicKey !== "string" || typeof rawId !== "string") {
+    if (
+      typeof publicKey !== "string" ||
+      typeof rawId !== "string" ||
+      (typeof rpId !== "string" && rpId !== undefined)
+    ) {
       throw new Error("Invalid JSON string.");
     }
 
-    return new this(fromHex(rawId), fromHex(publicKey), undefined);
+    return new this(fromHex(rawId), fromHex(publicKey), undefined, rpId);
   }
 
   /**
@@ -188,7 +192,8 @@ export class WebAuthnIdentity extends SignIdentity {
     return new this(
       creds.rawId,
       _authDataToCose(attObject.authData),
-      creds.authenticatorAttachment ?? undefined
+      creds.authenticatorAttachment ?? undefined,
+      credentialCreationOptions?.publicKey?.rp.id
     );
   }
 
@@ -197,7 +202,8 @@ export class WebAuthnIdentity extends SignIdentity {
   public constructor(
     public readonly rawId: ArrayBuffer,
     cose: ArrayBuffer,
-    protected authenticatorAttachment: AuthenticatorAttachment | undefined
+    protected authenticatorAttachment: AuthenticatorAttachment | undefined,
+    protected rpId: string | undefined
   ) {
     super();
     this._publicKey = new CosePublicKey(cose);
@@ -230,6 +236,7 @@ export class WebAuthnIdentity extends SignIdentity {
         ],
         challenge: blob,
         userVerification: "preferred",
+        rpId: this.rpId,
       },
     })) as PublicKeyCredentialWithAttachment;
 
@@ -259,6 +266,7 @@ export class WebAuthnIdentity extends SignIdentity {
     return {
       publicKey: toHex(this._publicKey.getCose()),
       rawId: toHex(this.rawId),
+      rpId: this.rpId,
     };
   }
 }
@@ -271,4 +279,6 @@ export interface JsonnableWebAuthnIdentity {
   publicKey: string;
   // The string representation of the local WebAuthn Credential.id (base64url encoded).
   rawId: string;
+  // The RP ID of the WebAuthn Credential.
+  rpId: string | undefined;
 }
