@@ -1,13 +1,22 @@
-use crate::delegation::der_encode_canister_sig_key;
+use crate::delegation::{
+    add_delegation_signature, der_encode_canister_sig_key, DEFAULT_EXPIRATION_PERIOD_NS,
+    MAX_EXPIRATION_PERIOD_NS,
+};
+use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
+use ic_canister_sig_creation::{
+    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
+};
+use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::{
-    MetadataEntryV2, OpenIdConfig, Timestamp,
+    Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
+    SignedDelegation, Timestamp, UserKey,
 };
+use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 mod google;
 
@@ -15,6 +24,12 @@ pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
+
+impl From<OpenIdCredential> for OpenIdCredentialKey {
+    fn from(credential: OpenIdCredential) -> Self {
+        (credential.iss, credential.sub)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, CandidType, Deserialize, Clone)]
 pub struct OpenIdCredential {
@@ -30,9 +45,67 @@ impl OpenIdCredential {
         (self.iss.clone(), self.sub.clone())
     }
     pub fn principal(&self) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key());
-        let public_key = der_encode_canister_sig_key(seed.to_vec());
+        let public_key = self.public_key();
         Principal::self_authenticating(public_key)
+    }
+    pub fn public_key(&self) -> PublicKey {
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        der_encode_canister_sig_key(seed.to_vec()).into()
+    }
+
+    //TODO: maybe this can be improved
+    pub async fn prepare_jwt_delegation(
+        &self,
+        session_key: SessionKey,
+        max_time_to_live: Option<u64>,
+        //TODO: maybe add IIDomain
+    ) -> (UserKey, Timestamp) {
+        state::ensure_salt_set().await;
+
+        let session_duration_ns = u64::min(
+            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
+            MAX_EXPIRATION_PERIOD_NS,
+        );
+        let expiration = time().saturating_add(session_duration_ns);
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+
+        state::signature_map_mut(|sigs| {
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+        });
+        update_root_hash();
+
+        // TODO: we are currently not doing bookkeeping in here.
+
+        (
+            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+            expiration,
+        )
+    }
+
+    pub fn get_jwt_delegation(
+        &self,
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> GetDelegationResponse {
+        state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &calculate_delegation_seed(&self.aud, &self.key()),
+                message: &delegation_signature_msg(&session_key, expiration, None),
+            };
+
+            match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+                Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+                    delegation: Delegation {
+                        pubkey: session_key,
+                        expiration,
+                        targets: None,
+                    },
+                    signature: ByteBuf::from(signature),
+                }),
+                Err(_) => GetDelegationResponse::NoSuchDelegation,
+            }
+        })
     }
 }
 
@@ -91,7 +164,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-
     blob.push(client_id.bytes().len() as u8);
     blob.extend(client_id.bytes());
 
@@ -100,7 +172,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 
     blob.push(sub.bytes().len() as u8);
     blob.extend(sub.bytes());
-
     let mut hasher = Sha256::new();
     hasher.update(blob);
     hasher.finalize().into()
@@ -110,7 +181,7 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 /// unique between instances for the same `OpenIdCredential`, intentionally isolating the instances.
 #[cfg(not(test))]
 fn salt() -> [u8; 32] {
-    crate::state::salt()
+    state::salt()
 }
 
 /// Skip getting salt from state in tests, instead return a fixed salt

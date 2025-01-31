@@ -111,6 +111,12 @@ pub fn check_authorization(
             return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
+    // check openid authorization
+    for credential in anchor.openid_credentials() {
+        if caller == credential.principal() {
+            return Ok((anchor.clone(), credential.public_key()));
+        }
+    }
     Err(AuthorizationError::from(caller))
 }
 

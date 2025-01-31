@@ -161,7 +161,7 @@ const authenticate = async (
       kind: "success";
       delegations: Delegation[];
       userPublicKey: Uint8Array;
-      authnMethod: "pin" | "passkey" | "recovery";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid";
     }
   | { kind: "failure"; text: string }
 > => {

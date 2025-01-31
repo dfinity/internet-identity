@@ -260,6 +260,13 @@ export type OpenIdCredentialKey = [Iss, Sub];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
+export type OpenIdDelegationError = { 'NoSuchAnchor' : null } |
+  { 'JwtVerificationFailed' : null };
+export interface OpenIdPrepareDelegationResponse {
+  'user_key' : UserKey,
+  'anchor_number' : UserNumber,
+  'timestamp' : Timestamp,
+}
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
@@ -437,6 +444,16 @@ export interface _SERVICE {
     [IdentityNumber, OpenIdCredentialKey],
     { 'Ok' : null } |
       { 'Err' : OpenIdCredentialRemoveError }
+  >,
+  'openid_get_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, Timestamp],
+    { 'Ok' : GetDelegationResponse } |
+      { 'Err' : OpenIdDelegationError }
+  >,
+  'openid_prepare_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, [] | [bigint]],
+    { 'Ok' : OpenIdPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError }
   >,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
