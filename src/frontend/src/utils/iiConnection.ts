@@ -37,11 +37,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import {
-  addAnchorCancelledRpId,
-  cleanUpRpIdMapper,
-  getCancelledRpIds,
-} from "$src/storage";
+import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -445,21 +441,23 @@ export class Connection {
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent);
+      (true || supportsWebauthRoR(window.navigator.userAgent));
     let filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
+    console.log("filteredCredentials", filteredCredentials);
     // It probably means that the user cancelled a valid RP ID manually
-    if (filteredCredentials.length === 0) {
-      await cleanUpRpIdMapper(userNumber);
-      cancelledRpIds = new Set<string | undefined>();
-      filteredCredentials = credentials;
-    }
+    // if (filteredCredentials.length === 0) {
+    //   await cleanUpRpIdMapper(userNumber);
+    //   cancelledRpIds = new Set<string | undefined>();
+    //   filteredCredentials = credentials;
     const rpId = dynamicRPIdEnabled
       ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
+
+    console.log("rpId", rpId);
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -1028,6 +1026,7 @@ export const creationOptions = (
   return {
     authenticatorSelection: {
       userVerification: "preferred",
+      residentKey: "preferred",
       authenticatorAttachment,
     },
     excludeCredentials: exclude.flatMap((device) =>
