@@ -363,6 +363,7 @@ type OpenIdCredentialRemoveError = variant {
 type OpenIdDelegationError = variant {
     NoSuchAnchor;
     JwtVerificationFailed;
+    NoSuchDelegation;
 };
 
 type OpenIdPrepareDelegationResponse = record {
@@ -758,8 +759,8 @@ service : (opt InternetIdentityInit) -> {
     // =========================
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
-    openid_prepare_delegation : (JWT, Salt, SessionKey, opt nat64) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
-    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : GetDelegationResponse; Err : OpenIdDelegationError });
+    openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
+    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError });
 
     // HTTP Gateway protocol
     // =====================
