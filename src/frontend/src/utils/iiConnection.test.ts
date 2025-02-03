@@ -17,7 +17,6 @@ import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
-import { undefined } from "zod";
 import {
   CredentialData,
   convertToValidCredentialData,
