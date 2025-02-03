@@ -55,12 +55,10 @@ export const deleteDevice = async ({
   connection,
   device,
   reload,
-  userNumber,
 }: {
   connection: AuthenticatedConnection;
   device: DeviceData;
   reload: () => void;
-  userNumber: bigint;
 }) => {
   const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
     .buffer as DerEncodedPublicKey;
