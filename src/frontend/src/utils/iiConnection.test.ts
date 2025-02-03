@@ -17,6 +17,7 @@ import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
 import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
+import { undefined } from "zod";
 import {
   CredentialData,
   convertToValidCredentialData,
@@ -189,7 +190,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          "identity.ic0.app"
+          "identity.ic0.app",
+          undefined
         );
       }
     });
@@ -218,6 +220,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -267,6 +270,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -330,6 +334,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -439,6 +444,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentOriginCredentialData2,
         ]),
+        undefined,
         undefined
       );
 
@@ -501,6 +507,7 @@ describe("Connection.login", () => {
           expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
             [credentialDataFromCurrentDomain],
             // `undefined` means the current origin which is the one that was cancelled
+            undefined,
             undefined
           );
         }
@@ -586,6 +593,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -614,6 +622,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -642,6 +651,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -689,6 +699,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -717,6 +728,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -745,6 +757,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -789,6 +802,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
+        undefined,
         undefined
       );
     });
@@ -813,6 +827,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
+        undefined,
         undefined
       );
     });
