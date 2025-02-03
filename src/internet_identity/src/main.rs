@@ -765,9 +765,7 @@ mod openid_api {
     use internet_identity_interface::internet_identity::types::openid::{
         OpenIdDelegationError, OpenIdPrepareDelegationResponse,
     };
-    use internet_identity_interface::internet_identity::types::{
-        GetDelegationResponse, SignedDelegation,
-    };
+    use internet_identity_interface::internet_identity::types::SignedDelegation;
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {

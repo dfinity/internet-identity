@@ -10,8 +10,8 @@ use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{
-    Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
-    SignedDelegation, Timestamp, UserKey,
+    Delegation, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey, SignedDelegation, Timestamp,
+    UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
