@@ -31,6 +31,7 @@ test("anchors are forwarded", () => {
     onSubmit: () => {},
     addDevice,
     recover,
+    loginOpenIDGoogle: () => {},
   });
   render(useExisting, document.body);
   const addDeviceButton = document.querySelector(
