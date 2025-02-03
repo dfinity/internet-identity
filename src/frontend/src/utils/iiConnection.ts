@@ -683,7 +683,6 @@ export class Connection {
           sessionKey,
           timestamp
         );
-        console.log(res);
         if ("Err" in res) {
           const errorMessage = Object.keys(res.Err)[0] || "unknown error";
           toast.error("Error while fetching delegation: " + errorMessage);
@@ -725,8 +724,6 @@ export class Connection {
         signedDelegation.signature
       ) as unknown as Signature,
     };
-
-    console.log("transformedDelegation", transformedDelegation);
 
     const chain = DelegationChain.fromDelegations(
       [transformedDelegation],
@@ -908,9 +905,6 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<[PublicKey, bigint] | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
-      console.log(
-        `prepare_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey})`
-      );
       const actor = await this.getActor();
       return await actor.prepare_delegation(
         this.userNumber,
@@ -931,9 +925,6 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<GetDelegationResponse | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
-      console.log(
-        `get_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey}, timestamp: ${timestamp})`
-      );
       const actor = await this.getActor();
       return await actor.get_delegation(
         this.userNumber,
