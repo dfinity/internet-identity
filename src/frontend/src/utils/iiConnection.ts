@@ -684,7 +684,9 @@ export class Connection {
           timestamp
         );
         if ("Err" in res) {
-          const errorMessage = Object.keys(res.Err)[0] || "unknown error";
+          const errorKeys = Object.keys(res.Err);
+          const errorMessage =
+            errorKeys.length > 0 ? errorKeys[0] : "unknown error";
           toast.error("Error while fetching delegation: " + errorMessage);
           continue;
         }
