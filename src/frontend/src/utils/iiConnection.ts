@@ -38,11 +38,6 @@ import {
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
 import {
-  addAnchorCancelledRpId,
-  cleanUpRpIdMapper,
-  getCancelledRpIds,
-} from "$src/storage";
-import {
   CanisterError,
   diagnosticInfo,
   unknownToString,
@@ -425,38 +420,18 @@ export class Connection {
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[],
-    skipCancelledRpIdsStorage = false
+    credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    let cancelledRpIds: Set<string | undefined>;
-    // Get cancelled rpids for the user from local storage.
-    const persistedData = skipCancelledRpIdsStorage
-      ? {
-          cancelledRpIds: new Set<string>(),
-          lastShownAddCurrentDevicePage: undefined,
-        }
-      : await getCancelledRpIds({
-          userNumber,
-          origin: window.location.origin,
-        });
-    cancelledRpIds = persistedData.cancelledRpIds;
-    const lastShownAddCurrentDevicePage =
-      persistedData.lastShownAddCurrentDevicePage;
+    const cancelledRpIds = new Set<string | undefined>();
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
       supportsWebauthRoR(window.navigator.userAgent);
-    let filteredCredentials = excludeCredentialsFromOrigins(
+    const filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
-    // It probably means that the user cancelled a valid RP ID manually
-    if (filteredCredentials.length === 0) {
-      await cleanUpRpIdMapper(userNumber);
-      cancelledRpIds = new Set<string | undefined>();
-      filteredCredentials = credentials;
-    }
     const rpId = dynamicRPIdEnabled
       ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
@@ -480,15 +455,9 @@ export class Connection {
         // We only want to cache cancelled rpids if there can be multiple rpids.
         if (
           dynamicRPIdEnabled &&
-          !skipCancelledRpIdsStorage &&
           hasCredentialsFromMultipleOrigins(credentials)
         ) {
           try {
-            await addAnchorCancelledRpId({
-              userNumber,
-              origin: currentOrigin,
-              cancelledRpId: rpId,
-            });
             // We want to user to retry again and a new RP ID will be used.
             return { kind: "possiblyWrongRPID" };
           } catch (e: unknown) {
@@ -517,14 +486,7 @@ export class Connection {
       actor
     );
 
-    // We want to show the page to add the current device if
-    // there are cancelled rpids and the user hasn't seen the page in the last week.
-    const oneWeekMillis = 1000 * 60 * 60 * 24 * 7;
-    const weekAgoMillis = Date.now() - oneWeekMillis;
-    const showAddCurrentDevice =
-      cancelledRpIds.size > 0 &&
-      (lastShownAddCurrentDevicePage === undefined ||
-        lastShownAddCurrentDevicePage < weekAgoMillis);
+    const showAddCurrentDevice = cancelledRpIds.size > 0;
 
     return {
       kind: "loginSuccess",
