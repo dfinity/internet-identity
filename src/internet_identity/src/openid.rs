@@ -98,7 +98,10 @@ impl OpenIdCredential {
                     },
                     signature: ByteBuf::from(signature),
                 }),
-                Err(_) => Err(OpenIdDelegationError::NoSuchDelegation),
+                Err(err) => {
+                    ic_cdk::println!("{}", err);
+                    Err(OpenIdDelegationError::NoSuchDelegation)
+                }
             }
         })
     }

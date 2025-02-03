@@ -686,18 +686,8 @@ export class Connection {
         );
         console.log(res);
         if ("Err" in res) {
-          toast.error(
-            "Error while fetching delegation: " +
-              unknownToString(res.Err, "unknown error")
-          );
-          continue;
-        }
-
-        if ("error" in res) {
-          toast.error(
-            "Error while fetching delegation: " +
-              unknownToString(res.error, "unknown error")
-          );
+          const errorMessage = Object.keys(res.Err)[0] || "unknown error";
+          toast.error("Error while fetching delegation: " + errorMessage);
           continue;
         }
 
@@ -716,8 +706,6 @@ export class Connection {
       salt,
       sessionKey
     );
-
-    console.log(prepareDelegationResponse);
 
     if ("Err" in prepareDelegationResponse)
       throw new CanisterError(prepareDelegationResponse.Err);

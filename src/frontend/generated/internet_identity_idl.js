@@ -560,7 +560,7 @@ export const idlFactory = ({ IDL }) => {
             'Err' : OpenIdDelegationError,
           }),
         ],
-        [],
+        ['query'],
       ),
     'openid_prepare_delegation' : IDL.Func(
         [JWT, Salt, SessionKey],
