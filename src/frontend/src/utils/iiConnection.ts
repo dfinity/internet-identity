@@ -751,17 +751,15 @@ export class Connection {
       sessionIdentity.getPublicKey().toDer()
     );
 
-    const JwtSignedIdentity = DelegationIdentity.fromDelegation(
+    const jwtSignedIdentity = DelegationIdentity.fromDelegation(
       sessionIdentity,
       chain
     );
 
-    console.log("JwtSignedIdentity", JwtSignedIdentity);
-
     return new AuthenticatedConnection(
       this.canisterId,
       sessionIdentity,
-      JwtSignedIdentity,
+      jwtSignedIdentity,
       anchor_number,
       actor
     );

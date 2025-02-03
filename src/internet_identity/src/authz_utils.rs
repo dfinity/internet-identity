@@ -92,7 +92,7 @@ where
     }
 }
 
-/// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the device used.
+/// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the public key of the authentication method used.
 /// Returns an error if the caller is not authorized.
 pub fn check_authorization(
     anchor_number: AnchorNumber,

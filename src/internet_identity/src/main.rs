@@ -765,7 +765,9 @@ mod openid_api {
     use internet_identity_interface::internet_identity::types::openid::{
         OpenIdDelegationError, OpenIdPrepareDelegationResponse,
     };
-    use internet_identity_interface::internet_identity::types::GetDelegationResponse;
+    use internet_identity_interface::internet_identity::types::{
+        GetDelegationResponse, SignedDelegation,
+    };
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -786,7 +788,7 @@ mod openid_api {
     ) -> Result<(), OpenIdCredentialAddError> {
         anchor_operation_with_authz_check(identity_number, |anchor| {
             let openid_credential = openid::verify(&jwt, &salt)
-                .map_err(|err| OpenIdCredentialAddError::JwtVerificationFailed)?;
+                .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -821,24 +823,20 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         session_key: SessionKey,
-        max_time_to_live: Option<u64>,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential = openid::verify(&jwt, &salt)
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
-        match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
-            Some(anchor_number) => {
-                let (user_key, timestamp) = openid_credential
-                    .prepare_jwt_delegation(session_key, max_time_to_live)
-                    .await;
-                Ok(OpenIdPrepareDelegationResponse {
-                    user_key,
-                    timestamp,
-                    anchor_number,
-                })
-            }
-            None => Err(OpenIdDelegationError::NoSuchAnchor),
-        }
+        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        let (user_key, timestamp) = openid_credential.prepare_jwt_delegation(session_key).await;
+
+        Ok(OpenIdPrepareDelegationResponse {
+            user_key,
+            timestamp,
+            anchor_number,
+        })
     }
 
     //TODO: add tests for this
@@ -848,12 +846,12 @@ mod openid_api {
         salt: [u8; 32],
         session_key: SessionKey,
         expiration: Timestamp,
-    ) -> Result<GetDelegationResponse, OpenIdDelegationError> {
+    ) -> Result<SignedDelegation, OpenIdDelegationError> {
         let openid_credential = openid::verify(&jwt, &salt)
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
         match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
-            Some(_) => Ok(openid_credential.get_jwt_delegation(session_key, expiration)),
+            Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
     }

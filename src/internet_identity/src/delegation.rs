@@ -18,11 +18,11 @@ use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
+const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)
-pub const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
+const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,

@@ -1,7 +1,5 @@
-use crate::delegation::{
-    add_delegation_signature, der_encode_canister_sig_key, DEFAULT_EXPIRATION_PERIOD_NS,
-    MAX_EXPIRATION_PERIOD_NS,
-};
+use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
+use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
 use ic_canister_sig_creation::{
@@ -10,6 +8,7 @@ use ic_canister_sig_creation::{
 use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
+use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{
     Delegation, GetDelegationResponse, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
     SignedDelegation, Timestamp, UserKey,
@@ -57,15 +56,11 @@ impl OpenIdCredential {
     pub async fn prepare_jwt_delegation(
         &self,
         session_key: SessionKey,
-        max_time_to_live: Option<u64>,
         //TODO: maybe add IIDomain
     ) -> (UserKey, Timestamp) {
         state::ensure_salt_set().await;
 
-        let session_duration_ns = u64::min(
-            max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
-            MAX_EXPIRATION_PERIOD_NS,
-        );
+        let session_duration_ns = 30 * MINUTE_NS;
         let expiration = time().saturating_add(session_duration_ns);
         let seed = calculate_delegation_seed(&self.aud, &self.key());
 
@@ -86,7 +81,7 @@ impl OpenIdCredential {
         &self,
         session_key: SessionKey,
         expiration: Timestamp,
-    ) -> GetDelegationResponse {
+    ) -> Result<SignedDelegation, OpenIdDelegationError> {
         state::assets_and_signatures(|certified_assets, sigs| {
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
@@ -95,7 +90,7 @@ impl OpenIdCredential {
             };
 
             match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-                Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
+                Ok(signature) => Ok(SignedDelegation {
                     delegation: Delegation {
                         pubkey: session_key,
                         expiration,
@@ -103,7 +98,7 @@ impl OpenIdCredential {
                     },
                     signature: ByteBuf::from(signature),
                 }),
-                Err(_) => GetDelegationResponse::NoSuchDelegation,
+                Err(_) => Err(OpenIdDelegationError::NoSuchDelegation),
             }
         })
     }
