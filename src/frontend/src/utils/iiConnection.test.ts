@@ -89,7 +89,7 @@ beforeEach(async () => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
     mockActor
@@ -104,7 +104,7 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
     mockActor
@@ -152,7 +152,7 @@ describe("Connection.login", () => {
             credentials: CredentialData[],
             rpId: string | undefined
           ) {
-            return new MockMultiWebAuthnIdentity(credentials, rpId);
+            return new MockMultiWebAuthnIdentity(credentials, rpId, undefined);
           }
           override sign() {
             if (failSign) {
@@ -863,7 +863,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -900,7 +900,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -937,7 +937,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -973,7 +973,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor

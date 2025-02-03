@@ -52,8 +52,8 @@ void createSpa(async (connection) => {
     // User was returned here after redirect from a OpenID flow callback
     return callbackFlow();
   } else if (url.hash === WEBAUTHN_IFRAME_PATH) {
-    // User was returned here after redirect from a OpenID flow callback
-    return webAuthnInIframeFlow();
+    // User needs to do cross-origin WebAuthn authentication in an iframe
+    return webAuthnInIframeFlow(connection);
   } else {
     // The default flow
     return authFlowManage(connection);

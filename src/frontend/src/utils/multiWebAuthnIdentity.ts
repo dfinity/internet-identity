@@ -27,9 +27,10 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    */
   public static fromCredentials(
     credentialData: CredentialData[],
-    rpId: string | undefined
+    rpId: string | undefined,
+    iframe: boolean | undefined
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId);
+    return new this(credentialData, rpId, iframe);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -37,7 +38,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   protected constructor(
     readonly credentialData: CredentialData[],
-    readonly rpId: string | undefined
+    readonly rpId: string | undefined,
+    readonly iframe: boolean | undefined
   ) {
     super();
     this._actualIdentity = undefined;
@@ -69,20 +71,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     if (this._actualIdentity) {
       return this._actualIdentity.sign(blob);
     }
-
-    console.log(
-      "this.rpId",
-      this.rpId,
-      isNullish(this.rpId),
-      window.location.origin === this.rpId
-    );
-    const credentialsGet =
-      isNullish(this.rpId) || window.location.origin === this.rpId
-        ? (options: CredentialRequestOptions) =>
-            navigator.credentials.get(options)
-        : (options: CredentialRequestOptions) => webAuthnInIframe(options);
-    console.log("credentialsGet", credentialsGet);
-    const result = (await credentialsGet({
+    const options: CredentialRequestOptions = {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
@@ -92,7 +81,12 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         userVerification: "discouraged",
         rpId: this.rpId,
       },
-    })) as PublicKeyCredential;
+    };
+    const result = (
+      isNullish(this.rpId) || this.iframe !== true
+        ? await navigator.credentials.get(options)
+        : await webAuthnInIframe(options)
+    ) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
       if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {

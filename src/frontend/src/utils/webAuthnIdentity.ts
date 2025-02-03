@@ -108,7 +108,6 @@ async function _createCredential(
         challenge: _createChallengeBuffer(),
         pubKeyCredParams: [
           { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
-          { type: "public-key", alg: PubKeyCoseAlgo.RSA_WITH_SHA256 },
         ],
         rp: {
           name: "Internet Identity Service",
@@ -142,7 +141,6 @@ async function _createCredential(
 // list of these algorithms. We only list the ones we support here.
 enum PubKeyCoseAlgo {
   ECDSA_WITH_SHA256 = -7,
-  RSA_WITH_SHA256 = -257,
 }
 
 /**

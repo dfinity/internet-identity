@@ -37,7 +37,11 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
+import {
+  addAnchorCancelledRpId,
+  cleanUpRpIdMapper,
+  getCancelledRpIds,
+} from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -157,6 +161,8 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
+  private configPromise: Promise<InternetIdentityInit> | undefined;
+
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -441,23 +447,21 @@ export class Connection {
     const currentOrigin = window.location.origin;
     const dynamicRPIdEnabled =
       DOMAIN_COMPATIBILITY.isEnabled() &&
-      (true || supportsWebauthRoR(window.navigator.userAgent));
+      supportsWebauthRoR(window.navigator.userAgent);
     let filteredCredentials = excludeCredentialsFromOrigins(
       credentials,
       cancelledRpIds,
       currentOrigin
     );
-    console.log("filteredCredentials", filteredCredentials);
     // It probably means that the user cancelled a valid RP ID manually
-    // if (filteredCredentials.length === 0) {
-    //   await cleanUpRpIdMapper(userNumber);
-    //   cancelledRpIds = new Set<string | undefined>();
-    //   filteredCredentials = credentials;
+    if (filteredCredentials.length === 0) {
+      await cleanUpRpIdMapper(userNumber);
+      cancelledRpIds = new Set<string | undefined>();
+      filteredCredentials = credentials;
+    }
     const rpId = dynamicRPIdEnabled
       ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
       : undefined;
-
-    console.log("rpId", rpId);
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -466,7 +470,7 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-        MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
+        MultiWebAuthnIdentity.fromCredentials(credentials, rpId, undefined);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -674,11 +678,21 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
+
+  /**
+   * Get previously fetched config, else fetch it
+   * TODO: Discuss with prodsec if this should stay a query or should be update,
+   *       alternatively the config can also be set directly in the html head.
+   */
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.createActor().then((actor) => actor.config());
+    return this.configPromise;
+  };
 }
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
-  private configPromise: Promise<InternetIdentityInit> | undefined;
 
   public constructor(
     public canisterId: string,
@@ -991,14 +1005,6 @@ export class AuthenticatedConnection extends Connection {
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
   };
-
-  // Get previously fetched config, else fetch it
-  // TODO: Discuss with prodsec if this should stay a query or should be update
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.getActor().then((actor) => actor.config());
-    return this.configPromise;
-  };
 }
 
 // The options sent to the browser when creating the credentials.
@@ -1026,7 +1032,6 @@ export const creationOptions = (
   return {
     authenticatorSelection: {
       userVerification: "preferred",
-      residentKey: "preferred",
       authenticatorAttachment,
     },
     excludeCredentials: exclude.flatMap((device) =>
