@@ -130,9 +130,12 @@ pub fn check_authorization(
 pub fn check_authz_and_record_activity(
     anchor_number: AnchorNumber,
 ) -> Result<Option<IIDomain>, IdentityUpdateError> {
+    ic_cdk::println!("check_authz_and_record_activity");
     let (mut anchor, device_key) =
         check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
+    ic_cdk::println!("achor: {:?}", anchor);
     let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
+    ic_cdk::println!("maybe_domain: {:?}", maybe_domain);
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;

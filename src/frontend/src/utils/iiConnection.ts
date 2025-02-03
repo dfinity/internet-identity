@@ -662,8 +662,7 @@ export class Connection {
   fromJwt = async (
     jwt: JWT,
     salt: Salt,
-    sessionIdentity: SignIdentity,
-    maxTimeToLive?: bigint
+    sessionIdentity: SignIdentity
   ): Promise<AuthenticatedConnection> => {
     const retryGetJwtDelegation = async (
       jwt: JWT,
