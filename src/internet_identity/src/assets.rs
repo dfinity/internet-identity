@@ -31,8 +31,10 @@ pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
                 acc
             });
 
-        *certified_assets =
-            CertifiedAssets::certify_assets(assets, &security_headers(integrity_hashes, maybe_related_origins));
+        *certified_assets = CertifiedAssets::certify_assets(
+            assets,
+            &security_headers(integrity_hashes, maybe_related_origins),
+        );
     });
 }
 
