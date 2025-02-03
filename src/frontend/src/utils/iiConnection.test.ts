@@ -150,9 +150,10 @@ describe("Connection.login", () => {
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
           static fromCredentials(
             credentials: CredentialData[],
-            rpId: string | undefined
+            rpId: string | undefined,
+            iframe: boolean | undefined
           ) {
-            return new MockMultiWebAuthnIdentity(credentials, rpId, undefined);
+            return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
           override sign() {
             if (failSign) {
@@ -162,7 +163,11 @@ describe("Connection.login", () => {
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
         }
-        return MockMultiWebAuthnIdentity.fromCredentials([], undefined);
+        return MockMultiWebAuthnIdentity.fromCredentials(
+          [],
+          undefined,
+          undefined
+        );
       }
     );
   });
