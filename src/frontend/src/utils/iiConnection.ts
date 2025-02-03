@@ -693,10 +693,6 @@ export class Connection {
           continue;
         }
 
-        if ("no_such_delegation" in res.Ok) {
-          continue;
-        }
-
         if ("error" in res) {
           toast.error(
             "Error while fetching delegation: " +
@@ -705,7 +701,7 @@ export class Connection {
           continue;
         }
 
-        return res.Ok.signed_delegation;
+        return res.Ok;
       }
       throw new Error(
         `Failed to retrieve a delegation after ${maxRetries} retries.`
@@ -718,8 +714,7 @@ export class Connection {
     const prepareDelegationResponse = await actor.openid_prepare_delegation(
       jwt,
       salt,
-      sessionKey,
-      nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
+      sessionKey
     );
 
     console.log(prepareDelegationResponse);

@@ -340,6 +340,7 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const OpenIdDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
   });
@@ -555,14 +556,14 @@ export const idlFactory = ({ IDL }) => {
         [JWT, Salt, SessionKey, Timestamp],
         [
           IDL.Variant({
-            'Ok' : GetDelegationResponse,
+            'Ok' : SignedDelegation,
             'Err' : OpenIdDelegationError,
           }),
         ],
         [],
       ),
     'openid_prepare_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey, IDL.Opt(IDL.Nat64)],
+        [JWT, Salt, SessionKey],
         [
           IDL.Variant({
             'Ok' : OpenIdPrepareDelegationResponse,
