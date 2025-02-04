@@ -134,7 +134,7 @@ pub fn security_headers(
                  navigation-override=(),\
                  payment=(),\
                  picture-in-picture=(),\
-                 publickey-credentials-get={public_key_credentials_get},\
+                 publickey-credentials-get=({public_key_credentials_get}),\
                  screen-wake-lock=(),\
                  serial=(),\
                  speaker-selection=(),\
