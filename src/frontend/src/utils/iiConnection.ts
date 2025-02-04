@@ -704,13 +704,14 @@ export class Connection {
     const prepareDelegationResponse = await actor.openid_prepare_delegation(
       jwt,
       salt,
-      sessionKey
+      sessionKey,
+      window.location.hostname
     );
 
     if ("Err" in prepareDelegationResponse)
       throw new CanisterError(prepareDelegationResponse.Err);
 
-    const { anchor_number, timestamp } = prepareDelegationResponse.Ok;
+    const { anchor_number, timestamp, user_key } = prepareDelegationResponse.Ok;
 
     const signedDelegation = await withLoader(() =>
       retryGetJwtDelegation(jwt, salt, sessionKey, timestamp, actor)
@@ -718,18 +719,25 @@ export class Connection {
 
     const transformedDelegation = {
       delegation: new Delegation(
-        Uint8Array.from(signedDelegation.delegation.pubkey),
-        BigInt(signedDelegation.delegation.expiration),
+        new Uint8Array(signedDelegation.delegation.pubkey),
+        signedDelegation.delegation.expiration,
         []
       ),
-      signature: Uint8Array.from(
-        signedDelegation.signature
-      ) as unknown as Signature,
+      signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
     };
+
+    // const transformedDelegation = {
+    //   delegation: new Delegation(
+    //     sessionIdentity.getPublicKey().toDer(),
+    //     signedDelegation.delegation.expiration,
+    //     []
+    //   ),
+    //   signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
+    // };
 
     const chain = DelegationChain.fromDelegations(
       [transformedDelegation],
-      sessionIdentity.getPublicKey().toDer()
+      new Uint8Array(user_key).buffer
     );
 
     const jwtSignedIdentity = DelegationIdentity.fromDelegation(
@@ -738,8 +746,6 @@ export class Connection {
     );
 
     actor = await this.createActor(jwtSignedIdentity);
-
-    // delegationidentity here should be an FE delegation i think
 
     return new AuthenticatedConnection(
       this.canisterId,

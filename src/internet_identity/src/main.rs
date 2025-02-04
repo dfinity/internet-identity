@@ -7,6 +7,7 @@ use crate::assets::init_assets;
 use crate::openid::OpenIdCredentialKey;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
+use crate::FrontendHostname;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -757,8 +758,8 @@ mod openid_api {
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
-        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError, SessionKey,
-        Timestamp,
+        FrontendHostname, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        SessionKey, Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -821,6 +822,7 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         session_key: SessionKey,
+        frontend: FrontendHostname,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential = openid::verify(&jwt, &salt)
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
@@ -828,7 +830,9 @@ mod openid_api {
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        let (user_key, timestamp) = openid_credential.prepare_jwt_delegation(session_key).await;
+        let (user_key, timestamp) = openid_credential
+            .prepare_jwt_delegation(session_key, frontend)
+            .await;
 
         Ok(OpenIdPrepareDelegationResponse {
             user_key,

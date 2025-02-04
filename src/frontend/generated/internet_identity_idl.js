@@ -563,7 +563,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'openid_prepare_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey],
+        [JWT, Salt, SessionKey, FrontendHostname],
         [
           IDL.Variant({
             'Ok' : OpenIdPrepareDelegationResponse,

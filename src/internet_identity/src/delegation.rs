@@ -55,7 +55,7 @@ pub async fn prepare_delegation(
 }
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(
+pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
     ii_domain: Option<IIDomain>,
     session_duration_ns: u64,

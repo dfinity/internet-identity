@@ -452,7 +452,7 @@ export interface _SERVICE {
       { 'Err' : OpenIdDelegationError }
   >,
   'openid_prepare_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey],
+    [JWT, Salt, SessionKey, FrontendHostname],
     { 'Ok' : OpenIdPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError }
   >,
