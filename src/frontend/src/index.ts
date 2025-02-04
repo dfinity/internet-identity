@@ -1,5 +1,9 @@
 import { handleLoginFlowResult } from "$src/components/authenticateBox";
-import { callbackFlow, REDIRECT_CALLBACK_PATH } from "$src/flows/redirect";
+import {
+  WEBAUTHN_IFRAME_PATH,
+  webAuthnInIframeFlow,
+} from "$src/flows/iframeWebAuthn";
+import { REDIRECT_CALLBACK_PATH, callbackFlow } from "$src/flows/redirect";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
@@ -47,6 +51,9 @@ void createSpa(async (connection) => {
   } else if (url.pathname === REDIRECT_CALLBACK_PATH) {
     // User was returned here after redirect from a OpenID flow callback
     return callbackFlow();
+  } else if (url.hash === WEBAUTHN_IFRAME_PATH) {
+    // User needs to do cross-origin WebAuthn authentication in an iframe
+    return webAuthnInIframeFlow(connection);
   } else {
     // The default flow
     return authFlowManage(connection);

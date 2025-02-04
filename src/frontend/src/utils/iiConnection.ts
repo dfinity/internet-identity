@@ -156,6 +156,8 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
+  private configPromise: Promise<InternetIdentityInit> | undefined;
+
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -443,7 +445,7 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-        MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
+        MultiWebAuthnIdentity.fromCredentials(credentials, rpId, undefined);
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -638,11 +640,21 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
+
+  /**
+   * Get previously fetched config, else fetch it
+   * TODO: Discuss with prodsec if this should stay a query or should be update,
+   *       alternatively the config can also be set directly in the html head.
+   */
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.createActor().then((actor) => actor.config());
+    return this.configPromise;
+  };
 }
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
-  private configPromise: Promise<InternetIdentityInit> | undefined;
 
   public constructor(
     public canisterId: string,
@@ -954,14 +966,6 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
-  };
-
-  // Get previously fetched config, else fetch it
-  // TODO: Discuss with prodsec if this should stay a query or should be update
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.getActor().then((actor) => actor.config());
-    return this.configPromise;
   };
 }
 

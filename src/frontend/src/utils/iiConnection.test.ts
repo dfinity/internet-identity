@@ -84,7 +84,7 @@ beforeEach(async () => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
     mockActor
@@ -99,7 +99,7 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
     mockActor
@@ -145,9 +145,10 @@ describe("Connection.login", () => {
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
           static fromCredentials(
             credentials: CredentialData[],
-            rpId: string | undefined
+            rpId: string | undefined,
+            iframe: boolean | undefined
           ) {
-            return new MockMultiWebAuthnIdentity(credentials, rpId);
+            return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
           override sign() {
             if (failSign) {
@@ -157,7 +158,11 @@ describe("Connection.login", () => {
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
         }
-        return MockMultiWebAuthnIdentity.fromCredentials([], undefined);
+        return MockMultiWebAuthnIdentity.fromCredentials(
+          [],
+          undefined,
+          undefined
+        );
       }
     );
   });
@@ -184,7 +189,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          "identity.ic0.app"
+          "identity.ic0.app",
+          undefined
         );
       }
     });
@@ -214,6 +220,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentOriginCredentialData2,
         ]),
+        undefined,
         undefined
       );
 
@@ -233,6 +240,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
             currentOriginCredentialData2,
           ]),
+          undefined,
           undefined
         );
       }
@@ -261,6 +269,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -289,6 +298,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -317,6 +327,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -336,6 +347,7 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
+          undefined,
           undefined
         );
       }
@@ -364,6 +376,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -392,6 +405,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          undefined,
           undefined
         );
       }
@@ -420,6 +434,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
+        undefined,
         undefined
       );
 
@@ -439,6 +454,7 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
+          undefined,
           undefined
         );
       }
@@ -464,6 +480,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
+        undefined,
         undefined
       );
     });
@@ -488,6 +505,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
+        undefined,
         undefined
       );
     });
@@ -538,7 +556,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -575,7 +593,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -612,7 +630,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -648,7 +666,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
