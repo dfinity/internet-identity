@@ -240,6 +240,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
             currentOriginCredentialData2,
           ]),
+          undefined,
           undefined
         );
       }
@@ -346,6 +347,7 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
+          undefined,
           undefined
         );
       }
@@ -452,6 +454,7 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
+          undefined,
           undefined
         );
       }
