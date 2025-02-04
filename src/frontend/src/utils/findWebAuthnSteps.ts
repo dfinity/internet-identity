@@ -49,12 +49,12 @@ export const findWebAuthnSteps = ({
       filteredCredentials,
       relatedOrigins
     );
-    // EXCEPTION: At the moment, to avoid bad UX, if the RP ID doesn't match the currento origin, the iframe will be used.
+    // EXCEPTION: At the moment, to avoid bad UX, if the RP ID doesn't match the current origin, the iframe will be used.
     // This is because it's hard to find out whether a user's credentials come from a third party password manager or not.
     // The iframe workaround works for all users.
     const useIframe =
       rpId !== undefined && rpId !== new URL(currentOrigin).hostname;
-    steps.push({ useIframe, rpId: rpId });
+    steps.push({ useIframe, rpId });
     rpIds.add(rpId);
     filteredCredentials = excludeCredentialsFromOrigins(
       filteredCredentials,
