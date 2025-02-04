@@ -698,7 +698,7 @@ export class Connection {
       );
     };
 
-    const actor = await this.createActor(sessionIdentity);
+    let actor = await this.createActor(sessionIdentity);
     const sessionKey = new Uint8Array(sessionIdentity.getPublicKey().toDer());
 
     const prepareDelegationResponse = await actor.openid_prepare_delegation(
@@ -736,6 +736,10 @@ export class Connection {
       sessionIdentity,
       chain
     );
+
+    actor = await this.createActor(jwtSignedIdentity);
+
+    // delegationidentity here should be an FE delegation i think
 
     return new AuthenticatedConnection(
       this.canisterId,

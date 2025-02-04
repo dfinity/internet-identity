@@ -97,8 +97,11 @@ where
 pub fn check_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<(Anchor, DeviceKey), AuthorizationError> {
+    ic_cdk::println!("check_authorization");
     let anchor = state::anchor(anchor_number);
+    ic_cdk::println!("anchor: {:?}", anchor);
     let caller = caller();
+    ic_cdk::println!("caller: {:?}", caller);
 
     for device in anchor.devices() {
         if caller == Principal::self_authenticating(&device.pubkey)
@@ -111,9 +114,14 @@ pub fn check_authorization(
             return Ok((anchor.clone(), device.pubkey.clone()));
         }
     }
+    ic_cdk::println!("check_authorization: no device found");
     // check openid authorization
     for credential in anchor.openid_credentials() {
+        //TODO: handle temp keys
+        ic_cdk::println!("credential: {:?}", credential);
+        ic_cdk::println!("credential.principal(): {:?}", credential.principal());
         if caller == credential.principal() {
+            ic_cdk::println!("check_authorization: credential found");
             return Ok((anchor.clone(), credential.public_key()));
         }
     }
@@ -130,12 +138,9 @@ pub fn check_authorization(
 pub fn check_authz_and_record_activity(
     anchor_number: AnchorNumber,
 ) -> Result<Option<IIDomain>, IdentityUpdateError> {
-    ic_cdk::println!("check_authz_and_record_activity");
     let (mut anchor, device_key) =
         check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
-    ic_cdk::println!("achor: {:?}", anchor);
     let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
-    ic_cdk::println!("maybe_domain: {:?}", maybe_domain);
     anchor_management::activity_bookkeeping(&mut anchor, &device_key);
     state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
