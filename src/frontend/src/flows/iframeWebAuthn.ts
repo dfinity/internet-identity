@@ -155,8 +155,7 @@ export const webAuthnInIframe = async (
   }
   const targetOrigin = `https://${options.publicKey?.rpId}`;
 
-  // Make sure iframe stays focused, the WebAuthn interaction will fail
-  // in particularly the Safari browser when focused has been lost.
+  // WebAuthn fails in Safari if the iframe does not remain focused.
   const iframe = document.body.appendChild(document.createElement("iframe"));
   iframe.style.position = "fixed";
   iframe.style.top = "0";
