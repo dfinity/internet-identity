@@ -62,7 +62,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
                     "unexpected Content-Encoding header value"
                 );
             }
-            verify_security_headers(&http_response.headers);
+            verify_security_headers(&http_response.headers, &None);
 
             let result = verify_response_certification(
                 &env,
@@ -95,7 +95,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
         related_origins: Some(related_origins.clone()),
         openid_google: None,
     };
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
 
     for certification_version in 1..=2 {
         let request = HttpRequest {
@@ -111,7 +111,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
         assert_eq!(http_response.status_code, 200);
 
         let expected_content = json!({
-            "origins": related_origins,
+            "origins": related_origins.clone(),
         })
         .to_string();
         assert_eq!(response_body, expected_content);
@@ -126,7 +126,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
             content_type, "application/json",
             "unexpected Content-Encoding header value"
         );
-        verify_security_headers(&http_response.headers);
+        verify_security_headers(&http_response.headers, &config.related_origins);
 
         let result = verify_response_certification(
             &env,
