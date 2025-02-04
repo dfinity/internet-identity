@@ -115,12 +115,5 @@ const attemptRecovery = async ({
     .map(convertToValidCredentialData)
     .filter(nonNullish);
 
-  // Cancelled RP IDs are based on the other credentials, we don't want them for the recovery device.
-  // If we had multiple recovery devices, we would need to handle this differently.
-  const skipCancelledRpIdsStorage = true;
-  return await connection.fromWebauthnCredentials(
-    userNumber,
-    credentialData,
-    skipCancelledRpIdsStorage
-  );
+  return await connection.fromWebauthnCredentials(userNumber, credentialData);
 };
