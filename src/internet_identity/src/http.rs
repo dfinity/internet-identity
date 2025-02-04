@@ -205,7 +205,7 @@ fn content_security_policy_header(
     let connect_src = format!("{connect_src} http:");
 
     // Allow related origins to embed one another
-    let related_origins = maybe_related_origins
+    let frame_src = maybe_related_origins
         .unwrap_or_default()
         .iter()
         .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
@@ -220,8 +220,8 @@ fn content_security_policy_header(
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
-         frame-ancestors {related_origins};\
-         frame-src {related_origins};"
+         frame-ancestors {frame_src};\
+         frame-src {frame_src};"
     );
     // for the dev build skip upgrading all connections to II to https
     #[cfg(not(feature = "dev_csp"))]
