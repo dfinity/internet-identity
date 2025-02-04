@@ -6,7 +6,6 @@ import { withLoader } from "$src/components/loader";
 import { recoverWithPhrase } from "$src/flows/recovery/recoverWith/phrase";
 import { phraseWizard } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
-import { cleanUpRpIdMapper } from "$src/storage";
 import {
   AuthenticatedConnection,
   bufferEqual,
@@ -56,12 +55,10 @@ export const deleteDevice = async ({
   connection,
   device,
   reload,
-  userNumber,
 }: {
   connection: AuthenticatedConnection;
   device: DeviceData;
   reload: () => void;
-  userNumber: bigint;
 }) => {
   const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
     .buffer as DerEncodedPublicKey;
@@ -93,10 +90,7 @@ export const deleteDevice = async ({
   }
 
   await withLoader(() => {
-    return Promise.all([
-      connection.remove(device.pubkey),
-      cleanUpRpIdMapper(userNumber),
-    ]);
+    return Promise.all([connection.remove(device.pubkey)]);
   });
 
   if (sameDevice) {
