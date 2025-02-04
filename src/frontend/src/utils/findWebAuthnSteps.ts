@@ -11,6 +11,7 @@ export type WebAuthnStep = {
 type Parameters = {
   // Does the user support Related Origin Requests?
   // Two sources are checked: the user agent and whether the user uses a third party provider for passkweys.
+  // Not used at the moment.
   supportsRor: boolean;
   devices: CredentialData[];
   currentOrigin: string;
