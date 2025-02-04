@@ -19,7 +19,13 @@ interface CredentialResponse {
     id: string;
   } & (
     | {
-        result: Omit<PublicKeyCredential, "getClientExtensionResults">;
+        result: Omit<PublicKeyCredential, "getClientExtensionResults"> & {
+          response: {
+            authenticatorData?: ArrayBuffer;
+            signature?: ArrayBuffer;
+            userHandle?: ArrayBuffer;
+          };
+        };
       }
     | {
         error: string;
@@ -63,12 +69,10 @@ const requestCredential = (
     window.addEventListener("message", listener);
 
     // Request credential
-    targetWindow.postMessage(
-      {
-        ii_credential_request: { id, options },
-      } as CredentialRequest,
-      targetOrigin
-    );
+    const request: CredentialRequest = {
+      ii_credential_request: { id, options },
+    };
+    targetWindow.postMessage(request, targetOrigin);
   });
 
 const handleCredentialRequest = (
@@ -85,46 +89,42 @@ const handleCredentialRequest = (
         const credential = (await navigator.credentials.get(
           event.data.ii_credential_request.options
         )) as PublicKeyCredential;
-        window.parent.postMessage(
-          {
-            ii_credential_response: {
-              id: event.data.ii_credential_request.id,
-              result: {
-                // Manually copy values here since credential is not enumerable
-                id: credential.id,
-                type: credential.type,
-                rawId: credential.rawId,
-                authenticatorAttachment: credential.authenticatorAttachment,
-                response: {
-                  clientDataJSON: credential.response.clientDataJSON,
-                  authenticatorData:
-                    "authenticatorData" in credential.response
-                      ? credential.response.authenticatorData
-                      : undefined,
-                  signature:
-                    "signature" in credential.response
-                      ? credential.response.signature
-                      : undefined,
-                  userHandle:
-                    "userHandle" in credential.response
-                      ? credential.response.userHandle
-                      : undefined,
-                },
+        const response: CredentialResponse = {
+          ii_credential_response: {
+            id: event.data.ii_credential_request.id,
+            result: {
+              // Manually copy values here since credential is not enumerable
+              id: credential.id,
+              type: credential.type,
+              rawId: credential.rawId,
+              authenticatorAttachment: credential.authenticatorAttachment,
+              response: {
+                clientDataJSON: credential.response.clientDataJSON,
+                authenticatorData:
+                  "authenticatorData" in credential.response
+                    ? (credential.response.authenticatorData as ArrayBuffer)
+                    : undefined,
+                signature:
+                  "signature" in credential.response
+                    ? (credential.response.signature as ArrayBuffer)
+                    : undefined,
+                userHandle:
+                  "userHandle" in credential.response
+                    ? (credential.response.userHandle as ArrayBuffer)
+                    : undefined,
               },
             },
-          } as CredentialResponse,
-          targetOrigin
-        );
+          },
+        };
+        window.parent.postMessage(response, targetOrigin);
       } catch (error) {
-        window.parent.postMessage(
-          {
-            ii_credential_response: {
-              id: event.data.ii_credential_request.id,
-              error,
-            },
-          } as CredentialResponse,
-          targetOrigin
-        );
+        const response: CredentialResponse = {
+          ii_credential_response: {
+            id: event.data.ii_credential_request.id,
+            error: String(error),
+          },
+        };
+        window.parent.postMessage(response, targetOrigin);
       }
     }
   });
@@ -136,6 +136,11 @@ export const webAuthnInIframeFlow = async (
   const config = await connection.getConfig();
   const targetOrigin = await waitForWindowReadyRequest(
     window.parent,
+    // We only establish a connection for the related origins in the II config,
+    // incoming requests from other origins are not listed here and ignored.
+    //
+    // Additionally, the CSP configuration will block any attempt to render II
+    // inside an iframe from domains that are not related origins.
     config.related_origins[0] ?? []
   );
 

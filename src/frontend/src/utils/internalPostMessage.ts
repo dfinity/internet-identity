@@ -20,6 +20,11 @@ const isReadyRequest = (data: unknown): data is ReadyRequest =>
 const isReadyResponse = (data: unknown): data is ReadyResponse =>
   typeof data === "object" && data !== null && "ii_ready_response" in data;
 
+/**
+ * Poll and wait to receive a response that indicates the window is ready
+ * @param targetWindow The window that should be polled till ready
+ * @param targetOrigin The origin of the loaded in the above window
+ */
 export const waitForWindowReadyResponse = (
   targetWindow: Window,
   targetOrigin: string
@@ -55,6 +60,12 @@ export const waitForWindowReadyResponse = (
     }, READY_TIMEOUT);
   });
 
+/**
+ * Listen for incoming requests and respond to indicate the window is ready
+ * @param targetWindow The window that is sending the incoming requests
+ * @param targetOrigins List of possible origins loaded in the above window
+ * @returns The origin from the above list that was actually loaded in the window
+ */
 export const waitForWindowReadyRequest = (
   targetWindow: Window,
   targetOrigins: string[]

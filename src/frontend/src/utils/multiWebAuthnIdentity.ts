@@ -10,7 +10,7 @@
 import { webAuthnInIframe } from "$src/flows/iframeWebAuthn";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER } from "@dfinity/identity";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
@@ -83,9 +83,9 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       },
     };
     const result = (
-      isNullish(this.rpId) || this.iframe !== true
-        ? await navigator.credentials.get(options)
-        : await webAuthnInIframe(options)
+      this.iframe === true && nonNullish(this.rpId)
+        ? await webAuthnInIframe(options)
+        : await navigator.credentials.get(options)
     ) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
