@@ -26,9 +26,10 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    */
   public static fromCredentials(
     credentialData: CredentialData[],
-    rpId: string | undefined
+    rpId: string | undefined,
+    useIframe: boolean | undefined = false
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId);
+    return new this(credentialData, rpId, useIframe);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -36,7 +37,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   protected constructor(
     readonly credentialData: CredentialData[],
-    readonly rpId: string | undefined
+    readonly rpId: string | undefined,
+    readonly useIframe: boolean | undefined = false
   ) {
     super();
     this._actualIdentity = undefined;
