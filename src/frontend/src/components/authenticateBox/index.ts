@@ -379,10 +379,7 @@ export const handleLoginFlowResult = async <E>(
     toast.info(
       infoToastTemplate({
         title: copy.title_possibly_wrong_web_authn_flow,
-        messages: [
-          copy.message_possibly_wrong_web_authn_flow_1,
-          copy.message_possibly_wrong_web_authn_flow_2,
-        ],
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
       })
     );
     return undefined;
