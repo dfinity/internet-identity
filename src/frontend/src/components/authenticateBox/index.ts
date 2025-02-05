@@ -321,7 +321,7 @@ export const authenticateBoxFlow = async <I>({
       kind: "loginSuccess" as const,
       connection: authenticatedConnection,
       userNumber: authenticatedConnection.userNumber,
-      showAddCurrentDevice: false, // TODO: what does this do?
+      showAddCurrentDevice: false,
       newAnchor: false,
       authnMethod: "openid" as const,
     };

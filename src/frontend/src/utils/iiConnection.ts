@@ -721,7 +721,9 @@ export class Connection {
       delegation: new Delegation(
         new Uint8Array(signedDelegation.delegation.pubkey),
         signedDelegation.delegation.expiration,
-        []
+        signedDelegation.delegation.targets?.[0]?.map((p) =>
+          Principal.from(p)
+        ) ?? undefined
       ),
       signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
     };
