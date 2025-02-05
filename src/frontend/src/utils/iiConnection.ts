@@ -424,7 +424,6 @@ export class Connection {
     userNumber: bigint,
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    console.log("in da fromWebauthnCredentials");
     if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
       const flows = findWebAuthnSteps({
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
@@ -467,7 +466,6 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
-        console.log("in da isWebAuthnCancel", this.webAuthFlows);
         // We only want to show a special error if the user might have to choose different web auth flow.
         if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
           // Increase the index to try the next flow.
@@ -475,7 +473,6 @@ export class Connection {
             flows: this.webAuthFlows.flows,
             currentIndex: this.webAuthFlows.currentIndex + 1,
           };
-          console.log("in da possiblyWrongRPID", this.webAuthFlows);
           // TODO: Change `possiblyWrongRPID` for something more descriptive and change the error message.
           return { kind: "possiblyWrongRPID" };
         }
@@ -502,7 +499,6 @@ export class Connection {
 
     // If the index is more than 0, it's because the first one failed.
     // We should offer to add the current device to the current origin.
-    console.log("in da fromWebauthnCredentials", this.webAuthFlows);
     const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
 
     return {
