@@ -61,8 +61,8 @@ import {
   convertToValidCredentialData,
   CredentialData,
 } from "./credential-devices";
+import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { relatedDomains } from "./findWebAuthnRpId";
-import { findWebAuthnSteps, WebAuthnStep } from "./findWebAuthnSteps";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -153,9 +153,8 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 
 export class Connection {
   private configPromise: Promise<InternetIdentityInit> | undefined;
-  // TODO: Rename `WebAuthnStep` and the util to use `flow` instead of `step`.
   private webAuthFlows:
-    | { flows: WebAuthnStep[]; currentIndex: number }
+    | { flows: WebAuthnFlow[]; currentIndex: number }
     | undefined;
 
   public constructor(
@@ -425,7 +424,7 @@ export class Connection {
     credentials: CredentialData[]
   ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
     if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
-      const flows = findWebAuthnSteps({
+      const flows = findWebAuthnFlows({
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
         currentOrigin: window.location.origin,
