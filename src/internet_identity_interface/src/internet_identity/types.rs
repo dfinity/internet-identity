@@ -289,3 +289,8 @@ pub enum DeployArchiveResult {
 pub struct OpenIdConfig {
     pub client_id: String,
 }
+
+pub enum AuthorizationKey {
+    DevicePubKey(DeviceKey),
+    OpenIdPubKey(PublicKey),
+}

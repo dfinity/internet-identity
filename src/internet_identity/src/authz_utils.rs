@@ -7,7 +7,9 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceKey, IdentityNumber,
+    AnchorNumber,
+    AuthorizationKey::{self, DevicePubKey, OpenIdPubKey},
+    IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
 
@@ -73,22 +75,45 @@ pub fn anchor_operation_with_authz_check<R, E>(
 where
     E: From<IdentityUpdateError>,
 {
-    let (mut anchor, device_key) = check_authorization(anchor_number)
+    let (mut anchor, authorization_key) = check_authorization(anchor_number)
         .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
-    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
-    let result = op(&mut anchor);
+    match authorization_key {
+        DevicePubKey(device_key) => {
+            anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
-    // write back anchor
-    state::storage_borrow_mut(|storage| storage.write(anchor))
-        .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+            let result = op(&mut anchor);
 
-    match result {
-        Ok((ret, operation)) => {
-            post_operation_bookkeeping(anchor_number, operation);
-            Ok(ret)
+            // write back anchor
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+
+            match result {
+                Ok((ret, operation)) => {
+                    post_operation_bookkeeping(anchor_number, operation);
+                    Ok(ret)
+                }
+                Err(err) => Err(err),
+            }
         }
-        Err(err) => Err(err),
+        OpenIdPubKey(_openid_key) => {
+            // TODO: add bookkeeping
+            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+
+            let result = op(&mut anchor);
+
+            // write back anchor
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+
+            match result {
+                Ok((ret, operation)) => {
+                    post_operation_bookkeeping(anchor_number, operation);
+                    Ok(ret)
+                }
+                Err(err) => Err(err),
+            }
+        }
     }
 }
 
@@ -148,10 +173,11 @@ pub fn check_authz_and_record_activity(
                 .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
             Ok(maybe_domain)
         }
-        OpenIdPubKey(openid_key) => {
-            anchor_management::activity_bookkeeping(&mut anchor, &device_key); //TODO
-            state::storage_borrow_mut(|storage| storage.write(anchor))
-                .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
+        OpenIdPubKey(_openid_key) => {
+            // TODO: add bookkeeping for openid
+            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+            // state::storage_borrow_mut(|storage| storage.write(anchor))
+            //     .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
             Ok(None)
         }
     }
