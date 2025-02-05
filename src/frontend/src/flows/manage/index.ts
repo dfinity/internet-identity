@@ -604,8 +604,7 @@ export const readRecovery = ({
     } else {
       return {
         recoveryKey: {
-          remove: () =>
-            deleteDevice({ connection, device, reload, userNumber }),
+          remove: () => deleteDevice({ connection, device, reload }),
         },
       };
     }
@@ -659,7 +658,7 @@ export const devicesFromDevicesWithUsage = ({
         remove:
           hasSingleDevice && !hasOtherAuthMethods
             ? undefined
-            : () => deleteDevice({ connection, device, reload, userNumber }),
+            : () => deleteDevice({ connection, device, reload }),
       };
 
       if ("browser_storage_key" in device.key_type) {

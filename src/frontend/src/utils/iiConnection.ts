@@ -40,7 +40,6 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { addAnchorCancelledRpId, getCancelledRpIds } from "$src/storage";
 import {
   CanisterError,
   diagnosticInfo,
@@ -67,12 +66,8 @@ import {
   convertToValidCredentialData,
   CredentialData,
 } from "./credential-devices";
-import {
-  excludeCredentialsFromOrigins,
-  findWebAuthnRpId,
-  hasCredentialsFromMultipleOrigins,
-  relatedDomains,
-} from "./findWebAuthnRpId";
+import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
+import { relatedDomains } from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -141,7 +136,9 @@ export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
-export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
+export type PossiblyWrongWebAuthnFlow = { kind: "possiblyWrongWebAuthnFlow" };
+// The user has PIN identity but in another domain and II can't access it.
+export type PinUserOtherDomain = { kind: "pinUserOtherDomain" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -160,6 +157,11 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
+  private configPromise: Promise<InternetIdentityInit> | undefined;
+  private webAuthFlows:
+    | { flows: WebAuthnFlow[]; currentIndex: number }
+    | undefined;
+
   public constructor(
     readonly canisterId: string,
     // Used for testing purposes
@@ -376,7 +378,8 @@ export class Connection {
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   > => {
@@ -395,8 +398,18 @@ export class Connection {
       return { kind: "unknownUser", userNumber };
     }
 
+    let webAuthnAuthenticators = devices.filter(
+      ({ key_type }) => !("browser_storage_key" in key_type)
+    );
+
+    // If we reach this point, it's because no PIN identity was found.
+    // Therefore, it's because it was created in another domain.
+    if (webAuthnAuthenticators.length === 0) {
+      return { kind: "pinUserOtherDomain" };
+    }
+
     if (HARDWARE_KEY_TEST.isEnabled()) {
-      devices = devices.filter(
+      webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
           Object.keys(device.key_type)[0] === "cross_platform"
@@ -405,37 +418,38 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToValidCredentialData).filter(nonNullish)
+      webAuthnAuthenticators
+        .map(convertToValidCredentialData)
+        .filter(nonNullish)
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[],
-    skipCancelledRpIdsStorage = false
-  ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    // Get cancelled rpids for the user from local storage.
-    const { cancelledRpIds, lastShownAddCurrentDevicePage } =
-      skipCancelledRpIdsStorage
-        ? {
-            cancelledRpIds: new Set<string>(),
-            lastShownAddCurrentDevicePage: undefined,
-          }
-        : await getCancelledRpIds({
-            userNumber,
-            origin: window.location.origin,
-          });
-    const currentOrigin = window.location.origin;
-    const dynamicRPIdEnabled =
-      DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent);
-    const filteredCredentials = excludeCredentialsFromOrigins(
-      credentials,
-      cancelledRpIds,
-      currentOrigin
-    );
-    const rpId = dynamicRPIdEnabled
-      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+    credentials: CredentialData[]
+  ): Promise<
+    LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
+  > => {
+    if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
+      const flows = findWebAuthnFlows({
+        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
+        devices: credentials,
+        currentOrigin: window.location.origin,
+        relatedOrigins: relatedDomains(),
+      });
+      this.webAuthFlows = {
+        flows,
+        currentIndex: 0,
+      };
+    }
+    const flowsLength = this.webAuthFlows?.flows.length ?? 0;
+    // We reached the last flow. Start from the beginning.
+    // This might happen if the user cancelled manually in the flow that would have been successful.
+    if (this.webAuthFlows?.currentIndex === flowsLength) {
+      this.webAuthFlows.currentIndex = 0;
+    }
+    const currentFlow = nonNullish(this.webAuthFlows)
+      ? this.webAuthFlows.flows[this.webAuthFlows.currentIndex]
       : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
@@ -445,7 +459,11 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-        MultiWebAuthnIdentity.fromCredentials(credentials, rpId);
+        MultiWebAuthnIdentity.fromCredentials(
+          credentials,
+          currentFlow?.rpId,
+          currentFlow?.useIframe ?? false
+        );
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -454,24 +472,14 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       if (isWebAuthnCancel(e)) {
-        // We only want to cache cancelled rpids if there can be multiple rpids.
-        if (
-          dynamicRPIdEnabled &&
-          !skipCancelledRpIdsStorage &&
-          hasCredentialsFromMultipleOrigins(credentials)
-        ) {
-          try {
-            await addAnchorCancelledRpId({
-              userNumber,
-              origin: currentOrigin,
-              cancelledRpId: rpId,
-            });
-            // We want to user to retry again and a new RP ID will be used.
-            return { kind: "possiblyWrongRPID" };
-          } catch (e: unknown) {
-            console.error("Error adding cancelled RP ID to local storage", e);
-            return { kind: "webAuthnFailed" };
-          }
+        // We only want to show a special error if the user might have to choose different web auth flow.
+        if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
+          // Increase the index to try the next flow.
+          this.webAuthFlows = {
+            flows: this.webAuthFlows.flows,
+            currentIndex: this.webAuthFlows.currentIndex + 1,
+          };
+          return { kind: "possiblyWrongWebAuthnFlow" };
         }
         return { kind: "webAuthnFailed" };
       }
@@ -494,14 +502,9 @@ export class Connection {
       actor
     );
 
-    // We want to show the page to add the current device if
-    // there are cancelled rpids and the user hasn't seen the page in the last week.
-    const oneWeekMillis = 1000 * 60 * 60 * 24 * 7;
-    const weekAgoMillis = Date.now() - oneWeekMillis;
-    const showAddCurrentDevice =
-      cancelledRpIds.size > 0 &&
-      (lastShownAddCurrentDevicePage === undefined ||
-        lastShownAddCurrentDevicePage < weekAgoMillis);
+    // If the index is more than 0, it's because the first one failed.
+    // We should offer to add the current device to the current origin.
+    const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
 
     return {
       kind: "loginSuccess",
@@ -654,11 +657,6 @@ export class Connection {
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
 
-  getConfig = async () => {
-    const actor = await this.createActor();
-    return actor.config();
-  };
-
   fromJwt = async (
     jwt: JWT,
     salt: Salt,
@@ -747,12 +745,21 @@ export class Connection {
       anchor_number,
       actor
     );
+
+  /**
+   * Get previously fetched config, else fetch it
+   * TODO: Discuss with prodsec if this should stay a query or should be update,
+   *       alternatively the config can also be set directly in the html head.
+   */
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.createActor().then((actor) => actor.config());
+    return this.configPromise;
   };
 }
 
 export class AuthenticatedConnection extends Connection {
   private metadataRepository: IdentityMetadataRepository;
-  private configPromise: Promise<InternetIdentityInit> | undefined;
 
   public constructor(
     public canisterId: string,
@@ -1058,14 +1065,6 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
-  };
-
-  // Get previously fetched config, else fetch it
-  // TODO: Discuss with prodsec if this should stay a query or should be update
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.getActor().then((actor) => actor.config());
-    return this.configPromise;
   };
 }
 

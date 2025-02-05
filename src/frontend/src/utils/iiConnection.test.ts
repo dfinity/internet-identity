@@ -8,13 +8,8 @@ import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$src/repositories/identityMetadata";
-import {
-  addAnchorCancelledRpId,
-  getCancelledRpIds,
-  setLastShownAddCurrentDevicePage,
-} from "$src/storage";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
-import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
+import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
 import {
@@ -23,6 +18,7 @@ import {
 } from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
@@ -88,7 +84,7 @@ beforeEach(async () => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
     mockActor
@@ -103,7 +99,7 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
     mockActor
@@ -149,9 +145,10 @@ describe("Connection.login", () => {
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
           static fromCredentials(
             credentials: CredentialData[],
-            rpId: string | undefined
+            rpId: string | undefined,
+            iframe: boolean | undefined
           ) {
-            return new MockMultiWebAuthnIdentity(credentials, rpId);
+            return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
           override sign() {
             if (failSign) {
@@ -161,7 +158,11 @@ describe("Connection.login", () => {
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
         }
-        return MockMultiWebAuthnIdentity.fromCredentials([], undefined);
+        return MockMultiWebAuthnIdentity.fromCredentials(
+          [],
+          undefined,
+          undefined
+        );
       }
     );
   });
@@ -188,7 +189,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          "identity.ic0.app"
+          "identity.ic0.app",
+          true
         );
       }
     });
@@ -210,14 +212,16 @@ describe("Connection.login", () => {
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
 
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(firstLoginResult.kind).toBe("possiblyWrongWebAuthnFlow");
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        // Do not use iframe
+        false
       );
 
       failSign = false;
@@ -236,118 +240,11 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentDeviceCredentialData,
           ]),
-          "identity.ic0.app"
+          "identity.ic0.app",
+          // Use iframe
+          true
         );
       }
-    });
-
-    // Test that the cancelled RP IDs are persisted across browser refrheses
-    it("connection excludes rpId when user cancels after new Conection is created", async () => {
-      // This one would fail because it's not the device the user is using at the moment.
-      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
-      const currentOriginCredentialData =
-        convertToValidCredentialData(currentOriginDevice);
-      const currentDevice: DeviceData = createMockDevice();
-      const currentDeviceCredentialData =
-        convertToValidCredentialData(currentDevice);
-      const mockActor = {
-        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
-      } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      failSign = true;
-      const firstLoginResult = await connection.login(BigInt(12345));
-
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
-      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
-      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          currentOriginCredentialData,
-          currentDeviceCredentialData,
-        ]),
-        undefined
-      );
-
-      failSign = false;
-      const secondLoginResult = await connection.login(BigInt(12345));
-
-      expect(secondLoginResult.kind).toBe("loginSuccess");
-      if (secondLoginResult.kind === "loginSuccess") {
-        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
-        expect(secondLoginResult.connection).toBeInstanceOf(
-          AuthenticatedConnection
-        );
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
-          2,
-          expect.arrayContaining([
-            currentDeviceCredentialData,
-            currentDeviceCredentialData,
-          ]),
-          "identity.ic0.app"
-        );
-      }
-
-      const newConnection = new Connection("aaaaa-aa", mockActor);
-      const thirdLoginResult = await newConnection.login(BigInt(12345));
-
-      expect(thirdLoginResult.kind).toBe("loginSuccess");
-    });
-
-    it("show add current device depends on the last time the anchor was used", async () => {
-      const creationDate = new Date("2025-01-05");
-      vi.useFakeTimers().setSystemTime(creationDate);
-
-      const userNumber = BigInt(12345);
-      // This one would fail because it's not the device the user is using at the moment.
-      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
-      const currentDevice: DeviceData = createMockDevice();
-      const mockActor = {
-        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
-      } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      failSign = true;
-      const firstLoginResult = await connection.login(userNumber);
-
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
-
-      failSign = false;
-      const secondLoginResult = await connection.login(userNumber);
-
-      expect(secondLoginResult.kind).toBe("loginSuccess");
-      if (secondLoginResult.kind === "loginSuccess") {
-        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
-      }
-
-      // This is necessary to set the last page shown timestamp
-      await setLastShownAddCurrentDevicePage(userNumber);
-      const oneDayMillis = 24 * 60 * 60 * 1000;
-      vi.useFakeTimers().advanceTimersByTime(oneDayMillis);
-
-      const newConnection = new Connection("aaaaa-aa", mockActor);
-      const thirdLoginResult = await newConnection.login(userNumber);
-
-      expect(thirdLoginResult.kind).toBe("loginSuccess");
-      if (thirdLoginResult.kind === "loginSuccess") {
-        expect(thirdLoginResult.showAddCurrentDevice).toBe(false);
-      }
-
-      // This is necessary to set the last page shown timestamp
-      await setLastShownAddCurrentDevicePage(userNumber);
-      vi.useFakeTimers().advanceTimersByTime(oneDayMillis * 7 + 1000);
-
-      const anotherConnection = new Connection("aaaaa-aa", mockActor);
-      const fourthLoginResult = await anotherConnection.login(userNumber);
-
-      expect(fourthLoginResult.kind).toBe("loginSuccess");
-      if (fourthLoginResult.kind === "loginSuccess") {
-        expect(fourthLoginResult.showAddCurrentDevice).toBe(true);
-      }
-
-      vi.useRealTimers();
     });
 
     it("connection doesn't exclude rpId if user has only one domain", async () => {
@@ -375,7 +272,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentOriginCredentialData2,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -394,114 +292,10 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
             currentOriginCredentialData2,
           ]),
-          undefined
+          undefined,
+          false
         );
       }
-    });
-
-    describe("Connection.fromWebauthnCredentials", () => {
-      const userNumber = BigInt(12345);
-      const deviceFromCurrentDomain: DeviceData =
-        createMockDevice(currentOrigin);
-      const credentialDataFromCurrentDomain = convertToValidCredentialData(
-        deviceFromCurrentDomain
-      ) as CredentialData;
-      const deviceAnotherDomain: DeviceData = createMockDevice(
-        "htts://identity.ic0.app"
-      );
-      const credentialDataAnotherDomain = convertToValidCredentialData(
-        deviceAnotherDomain
-      ) as CredentialData;
-      const skipCancelledRpIdsStorage = true;
-
-      it("doesn't use the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
-        const cancelledRpId = new URL(currentOrigin).hostname;
-        await addAnchorCancelledRpId({
-          userNumber,
-          origin: currentOrigin,
-          cancelledRpId,
-        });
-        const connection = new Connection("aaaaa-aa", mockActor);
-
-        const loginResult = await connection.fromWebauthnCredentials(
-          userNumber,
-          [credentialDataFromCurrentDomain],
-          skipCancelledRpIdsStorage
-        );
-
-        expect(loginResult.kind).toBe("loginSuccess");
-        if (loginResult.kind === "loginSuccess") {
-          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(
-            1
-          );
-          expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-            [credentialDataFromCurrentDomain],
-            // `undefined` means the current origin which is the one that was cancelled
-            undefined
-          );
-        }
-      });
-
-      it("uses the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
-        const cancelledRpId = new URL(currentOrigin).hostname;
-        await addAnchorCancelledRpId({
-          userNumber,
-          origin: currentOrigin,
-          cancelledRpId,
-        });
-        const connection = new Connection("aaaaa-aa", mockActor);
-
-        failSign = true;
-        const call = () =>
-          connection.fromWebauthnCredentials(
-            userNumber,
-            [credentialDataFromCurrentDomain],
-            !skipCancelledRpIdsStorage
-          );
-
-        // This is because the device is filtered out and then the `findWebAuthnRpId` doesn't receive any device.
-        await expect(call).rejects.toThrowError(
-          new Error(
-            "Not possible. Every registered user has at least one device."
-          )
-        );
-      });
-
-      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is true", async () => {
-        const connection = new Connection("aaaaa-aa", mockActor);
-
-        failSign = true;
-        const loginResult = await connection.fromWebauthnCredentials(
-          userNumber,
-          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
-          skipCancelledRpIdsStorage
-        );
-
-        expect(loginResult.kind).toBe("webAuthnFailed");
-        const { cancelledRpIds } = await getCancelledRpIds({
-          userNumber,
-          origin: currentOrigin,
-        });
-        expect(cancelledRpIds).toEqual(new Set());
-      });
-
-      it("doesn't persist the cancelled RP ID if skipCancelledRpIdsStorage is false", async () => {
-        const connection = new Connection("aaaaa-aa", mockActor);
-
-        failSign = true;
-        const loginResult = await connection.fromWebauthnCredentials(
-          userNumber,
-          [credentialDataFromCurrentDomain, credentialDataAnotherDomain],
-          !skipCancelledRpIdsStorage
-        );
-
-        expect(loginResult.kind).toBe("possiblyWrongRPID");
-        const { cancelledRpIds } = await getCancelledRpIds({
-          userNumber,
-          origin: currentOrigin,
-        });
-        expect(cancelledRpIds).toEqual(new Set([undefined]));
-      });
     });
   });
 
@@ -515,7 +309,7 @@ describe("Connection.login", () => {
       });
     });
 
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
+    it("login returns authenticated connection with expected rpID", async () => {
       const connection = new Connection("aaaaa-aa", mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
@@ -527,7 +321,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          "identity.ic0.app",
+          true
         );
       }
     });
@@ -555,7 +350,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -583,7 +379,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -602,35 +399,8 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
-          undefined
-        );
-      }
-    });
-  });
-
-  describe("domains compatibility flag enabled and browser doesn't support", () => {
-    beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
-      vi.stubGlobal("navigator", {
-        // Does NOT Supports RoR
-        userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-      });
-    });
-
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      const loginResult = await connection.login(BigInt(12345));
-
-      expect(loginResult.kind).toBe("loginSuccess");
-      if (loginResult.kind === "loginSuccess") {
-        expect(loginResult.showAddCurrentDevice).toBe(false);
-        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -658,7 +428,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -686,7 +457,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -705,7 +477,8 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -730,7 +503,8 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
-        undefined
+        undefined,
+        false
       );
     });
   });
@@ -754,8 +528,39 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
-        undefined
+        undefined,
+        false
       );
+    });
+  });
+
+  describe("only pin device is available", () => {
+    it("returns a custom error", async () => {
+      const pinDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { browser_storage_key: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const mockActor = {
+        identity_info: vi.fn().mockImplementation(async () => {
+          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
+          infoResponse = await mockRawMetadata;
+          return { Ok: { metadata: mockRawMetadata } };
+        }),
+        identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
+        lookup: vi.fn().mockResolvedValue([pinDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("pinUserOtherDomain");
     });
   });
 
@@ -774,7 +579,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -811,7 +616,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -848,7 +653,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor
@@ -884,7 +689,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
-        MultiWebAuthnIdentity.fromCredentials([], undefined),
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
         mockActor

@@ -7,12 +7,14 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
+import { webAuthnInIframe } from "$src/flows/iframeWebAuthn";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
-import { DER_COSE_OID, unwrapDER, WebAuthnIdentity } from "@dfinity/identity";
-import { isNullish } from "@dfinity/utils";
+import { DER_COSE_OID, unwrapDER } from "@dfinity/identity";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
@@ -25,9 +27,10 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    */
   public static fromCredentials(
     credentialData: CredentialData[],
-    rpId: string | undefined
+    rpId: string | undefined,
+    iframe: boolean | undefined
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId);
+    return new this(credentialData, rpId, iframe);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -35,7 +38,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   protected constructor(
     readonly credentialData: CredentialData[],
-    readonly rpId: string | undefined
+    readonly rpId: string | undefined,
+    readonly iframe: boolean | undefined
   ) {
     super();
     this._actualIdentity = undefined;
@@ -67,8 +71,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     if (this._actualIdentity) {
       return this._actualIdentity.sign(blob);
     }
-
-    const result = (await navigator.credentials.get({
+    const options: CredentialRequestOptions = {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
@@ -78,14 +81,20 @@ export class MultiWebAuthnIdentity extends SignIdentity {
         userVerification: "discouraged",
         rpId: this.rpId,
       },
-    })) as PublicKeyCredential;
+    };
+    const result = (
+      this.iframe === true && nonNullish(this.rpId)
+        ? await webAuthnInIframe(options)
+        : await navigator.credentials.get(options)
+    ) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
       if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
         this._actualIdentity = new WebAuthnIdentity(
           cd.credentialId,
           unwrapDER(cd.pubkey, DER_COSE_OID),
-          undefined
+          undefined,
+          this.rpId
         );
         break;
       }

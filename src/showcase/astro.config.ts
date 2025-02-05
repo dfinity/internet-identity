@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import path from "path";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 const ROOT = "../..";
 
@@ -18,5 +19,10 @@ export default defineConfig({
         },
       },
     },
+    plugins: [
+      nodePolyfills({
+        include: ["buffer"],
+      }),
+    ],
   },
 });

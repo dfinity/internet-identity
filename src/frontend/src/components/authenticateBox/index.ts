@@ -34,7 +34,8 @@ import {
   InvalidCaller,
   LoginSuccess,
   NoRegistrationFlow,
-  PossiblyWrongRPID,
+  PinUserOtherDomain,
+  PossiblyWrongWebAuthnFlow,
   RateLimitExceeded,
   RegisterNoSpace,
   UnexpectedCall,
@@ -205,7 +206,8 @@ export const authenticateBoxFlow = async <I>({
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   >;
@@ -237,7 +239,8 @@ export const authenticateBoxFlow = async <I>({
       newAnchor: boolean;
       authnMethod: "pin" | "passkey" | "recovery" | "openid";
     })
-  | PossiblyWrongRPID
+  | PossiblyWrongWebAuthnFlow
+  | PinUserOtherDomain
   | FlowError
   | { tag: "canceled" }
   | { tag: "deviceAdded" }
@@ -333,7 +336,8 @@ export const authenticateBoxFlow = async <I>({
         newAnchor: boolean;
         authnMethod: "pin" | "passkey" | "recovery" | "openid";
       })
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
     | FlowError
     | { tag: "canceled" }
     | { tag: "deviceAdded" }
@@ -418,7 +422,11 @@ export type FlowError =
   | RegisterNoSpace;
 
 export const handleLoginFlowResult = async <E>(
-  result: (LoginSuccess & E) | PossiblyWrongRPID | FlowError
+  result:
+    | (LoginSuccess & E)
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
+    | FlowError
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
@@ -427,15 +435,27 @@ export const handleLoginFlowResult = async <E>(
     return result;
   }
 
-  if (result.kind === "possiblyWrongRPID") {
+  if (result.kind === "possiblyWrongWebAuthnFlow") {
     const i18n = new I18n();
     const copy = i18n.i18n(infoToastCopy);
     toast.info(
       infoToastTemplate({
-        title: copy.title_possibly_wrong_rp_id,
+        title: copy.title_possibly_wrong_web_authn_flow,
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
+      })
+    );
+    return undefined;
+  }
+
+  if (result.kind === "pinUserOtherDomain") {
+    const i18n = new I18n();
+    const copy = i18n.i18n(infoToastCopy);
+    toast.info(
+      infoToastTemplate({
+        title: copy.title_pin_another_domain,
         messages: [
-          copy.message_possibly_wrong_rp_id_1,
-          copy.message_possibly_wrong_rp_id_2,
+          copy.message_pin_another_domain_1,
+          copy.message_pin_another_domain_2,
         ],
       })
     );
@@ -761,7 +781,8 @@ const useIdentityFlow = async <I>({
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   >;
@@ -786,7 +807,8 @@ const useIdentityFlow = async <I>({
     })
   | AuthFail
   | WebAuthnFailed
-  | PossiblyWrongRPID
+  | PossiblyWrongWebAuthnFlow
+  | PinUserOtherDomain
   | UnknownUser
   | ApiError
   | BadPin

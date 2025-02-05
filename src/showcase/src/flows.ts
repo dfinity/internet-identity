@@ -48,7 +48,7 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
   constructor() {
     super(
       "12345",
-      MultiWebAuthnIdentity.fromCredentials([], undefined),
+      MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),
       mockActor

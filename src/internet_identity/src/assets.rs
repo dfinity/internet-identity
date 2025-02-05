@@ -14,7 +14,7 @@ use sha2::Digest;
 // used both in init and post_upgrade
 pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
     state::assets_mut(|certified_assets| {
-        let assets = get_static_assets(maybe_related_origins);
+        let assets = get_static_assets(maybe_related_origins.clone());
 
         // Extract integrity hashes for all inlined scripts, from all the HTML files.
         let integrity_hashes = assets
@@ -31,8 +31,10 @@ pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
                 acc
             });
 
-        *certified_assets =
-            CertifiedAssets::certify_assets(assets, &security_headers(integrity_hashes));
+        *certified_assets = CertifiedAssets::certify_assets(
+            assets,
+            &security_headers(integrity_hashes, maybe_related_origins),
+        );
     });
 }
 
