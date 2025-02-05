@@ -79,6 +79,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 /// caller to persist the changes. This allows anchor operations to write to storage only once,
 /// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
 pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
+    //TODO update to use any auth key
     let device = anchor
         .device(current_device_key)
         .unwrap_or_else(|| trap(&format!("bug: device {:?} not found", current_device_key)));
