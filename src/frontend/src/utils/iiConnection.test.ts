@@ -212,7 +212,7 @@ describe("Connection.login", () => {
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
 
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(firstLoginResult.kind).toBe("possiblyWrongWebAuthnFlow");
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
