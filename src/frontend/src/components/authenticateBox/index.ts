@@ -34,7 +34,7 @@ import {
   LoginSuccess,
   NoRegistrationFlow,
   PinUserOtherDomain,
-  PossiblyWrongRPID,
+  PossiblyWrongWebAuthnFlow,
   RateLimitExceeded,
   RegisterNoSpace,
   UnexpectedCall,
@@ -197,7 +197,7 @@ export const authenticateBoxFlow = async <I>({
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
@@ -229,7 +229,7 @@ export const authenticateBoxFlow = async <I>({
       newAnchor: boolean;
       authnMethod: "pin" | "passkey" | "recovery";
     })
-  | PossiblyWrongRPID
+  | PossiblyWrongWebAuthnFlow
   | PinUserOtherDomain
   | FlowError
   | { tag: "canceled" }
@@ -280,7 +280,7 @@ export const authenticateBoxFlow = async <I>({
         newAnchor: boolean;
         authnMethod: "pin" | "passkey" | "recovery";
       })
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | FlowError
     | { tag: "canceled" }
@@ -362,7 +362,7 @@ export type FlowError =
 export const handleLoginFlowResult = async <E>(
   result:
     | (LoginSuccess & E)
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | FlowError
 ): Promise<
@@ -373,15 +373,15 @@ export const handleLoginFlowResult = async <E>(
     return result;
   }
 
-  if (result.kind === "possiblyWrongRPID") {
+  if (result.kind === "possiblyWrongWebAuthnFlow") {
     const i18n = new I18n();
     const copy = i18n.i18n(infoToastCopy);
     toast.info(
       infoToastTemplate({
-        title: copy.title_possibly_wrong_rp_id,
+        title: copy.title_possibly_wrong_web_authn_flow,
         messages: [
-          copy.message_possibly_wrong_rp_id_1,
-          copy.message_possibly_wrong_rp_id_2,
+          copy.message_possibly_wrong_web_authn_flow_1,
+          copy.message_possibly_wrong_web_authn_flow_2,
         ],
       })
     );
@@ -709,7 +709,7 @@ const useIdentityFlow = async <I>({
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
@@ -735,7 +735,7 @@ const useIdentityFlow = async <I>({
     })
   | AuthFail
   | WebAuthnFailed
-  | PossiblyWrongRPID
+  | PossiblyWrongWebAuthnFlow
   | PinUserOtherDomain
   | UnknownUser
   | ApiError

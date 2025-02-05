@@ -131,7 +131,7 @@ export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
-export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
+export type PossiblyWrongWebAuthnFlow = { kind: "possiblyWrongWebAuthnFlow" };
 // The user has PIN identity but in another domain and II can't access it.
 export type PinUserOtherDomain = { kind: "pinUserOtherDomain" };
 export type InvalidAuthnMethod = {
@@ -374,7 +374,7 @@ export class Connection {
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
@@ -423,7 +423,9 @@ export class Connection {
   fromWebauthnCredentials = async (
     userNumber: bigint,
     credentials: CredentialData[]
-  ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
+  ): Promise<
+    LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
+  > => {
     if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
       const flows = findWebAuthnSteps({
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
@@ -473,8 +475,7 @@ export class Connection {
             flows: this.webAuthFlows.flows,
             currentIndex: this.webAuthFlows.currentIndex + 1,
           };
-          // TODO: Change `possiblyWrongRPID` for something more descriptive and change the error message.
-          return { kind: "possiblyWrongRPID" };
+          return { kind: "possiblyWrongWebAuthnFlow" };
         }
         return { kind: "webAuthnFailed" };
       }
