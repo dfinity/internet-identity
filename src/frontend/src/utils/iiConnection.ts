@@ -657,6 +657,17 @@ export class Connection {
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
 
+  /**
+   * Get previously fetched config, else fetch it
+   * TODO: Discuss with prodsec if this should stay a query or should be update,
+   *       alternatively the config can also be set directly in the html head.
+   */
+  getConfig = (): Promise<InternetIdentityInit> => {
+    this.configPromise =
+      this.configPromise ?? this.createActor().then((actor) => actor.config());
+    return this.configPromise;
+  };
+
   fromJwt = async (
     jwt: JWT,
     salt: Salt,
@@ -745,16 +756,6 @@ export class Connection {
       anchor_number,
       actor
     );
-
-  /**
-   * Get previously fetched config, else fetch it
-   * TODO: Discuss with prodsec if this should stay a query or should be update,
-   *       alternatively the config can also be set directly in the html head.
-   */
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.createActor().then((actor) => actor.config());
-    return this.configPromise;
   };
 }
 
