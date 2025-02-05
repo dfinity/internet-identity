@@ -726,18 +726,9 @@ export class Connection {
       signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
     };
 
-    // const transformedDelegation = {
-    //   delegation: new Delegation(
-    //     sessionIdentity.getPublicKey().toDer(),
-    //     signedDelegation.delegation.expiration,
-    //     []
-    //   ),
-    //   signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
-    // };
-
     const chain = DelegationChain.fromDelegations(
       [transformedDelegation],
-      new Uint8Array(user_key).buffer
+      new Uint8Array(user_key)
     );
 
     const jwtSignedIdentity = DelegationIdentity.fromDelegation(
