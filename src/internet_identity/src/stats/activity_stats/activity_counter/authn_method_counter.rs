@@ -17,6 +17,8 @@ pub struct AuthnMethodCounter {
     pub recovery_phrase_counter: u64,
     /// Number of authentications with a browser storage key.
     pub browser_storage_key_counter: u64,
+    /// Number of authentications with an openID Connect key.
+    pub open_id_key_counter: u64,
     /// Number of authentications with a key not fitting any of the above criteria.
     pub other_counter: u64,
 }
@@ -31,6 +33,7 @@ impl ActivityCounter for AuthnMethodCounter {
             webauthn_recovery_counter: 0,
             recovery_phrase_counter: 0,
             browser_storage_key_counter: 0,
+            open_id_key_counter: 0,
             other_counter: 0,
         }
     }
