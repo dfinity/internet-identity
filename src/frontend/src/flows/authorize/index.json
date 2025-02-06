@@ -13,7 +13,7 @@
     "connection_closed": "Connection closed",
     "connection_could_not_be_established": "It seems like the connection with the service could not be established.",
     "wrong_place": "Wrong place",
-    "no_request_received": "Seems you arrived here for authentication, but no service has requested it yet.",
+    "no_request_received": "Seems you arrived here for authentication, but no service has requested it.",
     "go_home": "Home",
 
     "auth_failed": "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
