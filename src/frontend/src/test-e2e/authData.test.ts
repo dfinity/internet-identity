@@ -96,7 +96,7 @@ test("Should show error after manually navigating to authorize url", async () =>
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      "It looks like you arrived here for authentication, but no service has requested authentication."
+      "Seems you arrived here for authentication, but no service has requested it."
     );
   });
 }, 300_000);
