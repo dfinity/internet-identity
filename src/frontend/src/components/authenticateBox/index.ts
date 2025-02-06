@@ -548,18 +548,18 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
           Continue with another device
         </button>
         ${OPENID_AUTHENTICATION.isEnabled()
-          ? `
-          <button
-            @click=${() =>
-              withUserNumber((userNumber) =>
-                useExistingProps.loginOpenIDGoogle(userNumber)
-              )}
-            id="addNewDeviceButton"
-            class="c-button c-button--secondary"
-          >
-            Continue with Google
-          </button>
-          `
+          ? html`
+              <button
+                @click=${() =>
+                  withUserNumber((userNumber) =>
+                    useExistingProps.loginOpenIDGoogle(userNumber)
+                  )}
+                id="addNewDeviceButton"
+                class="c-button c-button--secondary"
+              >
+                Continue with Google
+              </button>
+            `
           : ``}
 
         <ul class="c-link-group">
