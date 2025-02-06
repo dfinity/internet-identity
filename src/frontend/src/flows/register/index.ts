@@ -8,6 +8,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
@@ -127,16 +128,18 @@ export const registerFlow = async ({
   const getGoogleClientId = () =>
     configRef.current?.openid_google[0]?.[0]?.client_id;
 
-  // Select auth method for registering new Identity
-  const authMethodResult = await selectAuthMethod();
+  if (OPENID_AUTHENTICATION.isEnabled()) {
+    // Select auth method for registering new Identity
+    const authMethodResult = await selectAuthMethod();
 
-  switch (authMethodResult) {
-    case "google":
-      return doRegisterWithGoogle(connection, getGoogleClientId());
-    case "canceled":
-      return "canceled";
-    case "passkey":
-      break;
+    switch (authMethodResult) {
+      case "google":
+        return doRegisterWithGoogle(connection, getGoogleClientId());
+      case "canceled":
+        return "canceled";
+      case "passkey":
+        break;
+    }
   }
 
   // We register the device's origin in the current domain.
