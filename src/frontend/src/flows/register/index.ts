@@ -134,7 +134,13 @@ export const registerFlow = async ({
 
     switch (authMethodResult) {
       case "google":
-        return doRegisterWithGoogle(connection, getGoogleClientId());
+        return doRegisterWithGoogle(
+          connection,
+          getGoogleClientId(),
+          flowStart,
+          checkCaptcha,
+          identityRegistrationFinish
+        );
       case "canceled":
         return "canceled";
       case "passkey":
@@ -469,7 +475,38 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
 //TODO: move this somewhere smart
 const doRegisterWithGoogle = async (
   connection: Connection,
-  googleClientId: string | undefined
+  googleClientId: string | undefined,
+
+  identityRegistrationStart: () => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | InvalidCaller
+    | AlreadyInProgress
+    | RateLimitExceeded
+  >,
+  checkCaptcha: (
+    captchaSolution: string
+  ) => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | WrongCaptchaSolution
+  >,
+  identityRegistrationFinish: ({
+    identity,
+    authnMethod,
+  }: {
+    identity: SignIdentity;
+    authnMethod: AuthnMethodData;
+  }) => Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+  >
 ): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" | "openid-google" })
   | ApiError
@@ -499,6 +536,23 @@ const doRegisterWithGoogle = async (
     sessionIdentity.getPrincipal()
   );
 
+  const identityRegistrationStartResponse = await identityRegistrationStart();
+
+  if (
+    identityRegistrationStartResponse.kind !== "registrationFlowStepSuccess"
+  ) {
+    throw new Error(
+      `Registration start failed: ${identityRegistrationStartResponse.kind}`
+    );
+  }
+
+  const { nextStep } = identityRegistrationStartResponse;
+
+  if (nextStep.step === "checkCaptcha") {
+    //TODO
+    return "canceled";
+  }
+
   const jwt = await withLoader(() =>
     requestJWT(googleRequestConfig, {
       mediation: "required",
@@ -506,7 +560,11 @@ const doRegisterWithGoogle = async (
     })
   );
 
-  // TODO: create the identity owo
+  //TODO: replace with new opdnid finish fn
+  const identityRegistrationFinishResponse = await identityRegistrationFinish({
+    identity: sessionIdentity,
+    authnMethod: {},
+  });
 
   const authenticatedConnection = await connection.fromJwt(
     jwt,

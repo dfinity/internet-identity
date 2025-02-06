@@ -190,6 +190,12 @@ pub struct IdRegFinishArg {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct OpenIDIdRegFinishArg {
+    pub jwt: String,
+    pub salt: [u8; 32],
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishResult {
     pub identity_number: IdentityNumber,
 }

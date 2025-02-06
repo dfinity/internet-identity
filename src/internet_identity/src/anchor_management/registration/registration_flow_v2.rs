@@ -4,9 +4,9 @@ use crate::anchor_management::registration::captcha::{
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
-use crate::state;
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
+use crate::{openid, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::caller;
@@ -15,7 +15,7 @@ use internet_identity_interface::internet_identity::types::IdRegFinishError::Ide
 use internet_identity_interface::internet_identity::types::{
     CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage,
     IdRegFinishArg, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError,
-    IdentityNumber, RegistrationFlowNextStep, StaticCaptchaTrigger,
+    IdentityNumber, OpenIDIdRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -176,6 +176,35 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
+pub fn openid_registration_flow_finish(
+    arg: OpenIDIdRegFinishArg,
+) -> Result<IdRegFinishResult, IdRegFinishError> {
+    //TODO
+    let caller = caller();
+    let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
+    else {
+        return Err(IdRegFinishError::NoRegistrationFlow);
+    };
+
+    let RegistrationFlowState::FinishRegistration { .. } = current_state else {
+        return Err(IdRegFinishError::UnexpectedCall {
+            next_step: RegistrationFlowNextStep::from(current_state),
+        });
+    };
+
+    let identity_number = openid_create_identity(&arg)?;
+
+    // flow completed --> remove flow state
+    state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
+
+    // add temp key so the user can keep using the identity used for the registration flow
+    state::with_temp_keys_mut(|temp_keys| {
+        temp_keys.add_temp_key(&arg.authn_method.public_key(), identity_number, caller)
+    });
+
+    Ok(IdRegFinishResult { identity_number })
+}
+
 fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishError> {
     let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
         return Err(IdentityLimitReached);
@@ -187,6 +216,39 @@ fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishEr
     identity
         .add_device(device.clone())
         .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+    activity_bookkeeping(&mut identity, &device.pubkey);
+
+    let identity_number = identity.anchor_number();
+
+    state::storage_borrow_mut(|s| {
+        s.registration_rates.new_registration();
+        s.write(identity)
+    })
+    .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
+
+    let operation = Operation::RegisterAnchor {
+        device: DeviceDataWithoutAlias::from(device),
+    };
+    post_operation_bookkeeping(identity_number, operation);
+
+    Ok(identity_number)
+}
+
+fn openid_create_identity(arg: &OpenIDIdRegFinishArg) -> Result<IdentityNumber, IdRegFinishError> {
+    //TODO
+    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
+        return Err(IdentityLimitReached);
+    };
+    // let device = DeviceWithUsage::try_from(arg.authn_method.clone())
+    //     .map(|device| Device::from(DeviceData::from(device)))
+    //     .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+    let OpenIDIdRegFinishArg { jwt, salt } = arg;
+
+    let openid_credential =
+        openid::verify(jwt, salt).map_err(|err| IdRegFinishError::InvalidAuthnMethod(err))?;
+
+    identity.add_openid_credential(openid_credential);
+
     activity_bookkeeping(&mut identity, &device.pubkey);
 
     let identity_number = identity.anchor_number();
