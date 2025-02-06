@@ -50,6 +50,7 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
+import { supportsWebauthRoR } from "$src/utils/userAgent";
 import {
   OmitParams,
   isCanisterError,
@@ -381,12 +382,14 @@ export const displayManage = async (
     }
 
     const onAddDevice = async () => {
-      const newDeviveOrigin = DOMAIN_COMPATIBILITY.isEnabled()
-        ? getCredentialsOrigin({
-            credentials: devices_,
-            userAgent: navigator.userAgent,
-          })
-        : undefined;
+      const newDeviveOrigin =
+        supportsWebauthRoR(window.navigator.userAgent) &&
+        DOMAIN_COMPATIBILITY.isEnabled()
+          ? getCredentialsOrigin({
+              credentials: devices_,
+              userAgent: navigator.userAgent,
+            })
+          : undefined;
       await addDevice({
         userNumber,
         connection,
@@ -401,6 +404,7 @@ export const displayManage = async (
         return;
       }
       doAdd satisfies "ok";
+      // Recovery phrase doesn't need ROR, this is for consistency reasons.
       const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
         ? getCredentialsOrigin({
             credentials: devices_,
