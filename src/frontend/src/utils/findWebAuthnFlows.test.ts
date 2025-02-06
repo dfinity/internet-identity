@@ -1,9 +1,9 @@
 import { LEGACY_II_URL } from "$src/config";
 import { CredentialData } from "./credential-devices";
+import { findWebAuthnFlows } from "./findWebAuthnFlows";
 import { PROD_DOMAINS } from "./findWebAuthnRpId";
-import { findWebAuthnSteps } from "./findWebAuthnSteps";
 
-describe("findWebAuthnSteps", () => {
+describe("findWebAuthnFlows", () => {
   const currentOrigin = "https://identity.internetcomputer.org";
   const nonCurrentOrigin1 = "https://identity.ic0.app";
   const nonCurrentOrigin1RpId = new URL(nonCurrentOrigin1).hostname;
@@ -20,7 +20,7 @@ describe("findWebAuthnSteps", () => {
   });
 
   it("should return an empty array if no devices are provided", () => {
-    const result = findWebAuthnSteps({
+    const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [],
       currentOrigin: currentOrigin,
@@ -30,7 +30,7 @@ describe("findWebAuthnSteps", () => {
   });
 
   it("should use iframe if the RP ID does not match the current origin", () => {
-    const result = findWebAuthnSteps({
+    const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [createMockCredential(nonCurrentOrigin1)],
       currentOrigin: currentOrigin,
@@ -41,7 +41,7 @@ describe("findWebAuthnSteps", () => {
   });
 
   it("should not use iframe if the RP ID matches the current origin", () => {
-    const result = findWebAuthnSteps({
+    const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
@@ -55,7 +55,7 @@ describe("findWebAuthnSteps", () => {
   });
 
   it("should use ic0.app when origin is undefined", () => {
-    const result = findWebAuthnSteps({
+    const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [
         createMockCredential(undefined),
@@ -69,7 +69,7 @@ describe("findWebAuthnSteps", () => {
   });
 
   it("should handle multiple RP IDs and filter credentials accordingly", () => {
-    const result = findWebAuthnSteps({
+    const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
