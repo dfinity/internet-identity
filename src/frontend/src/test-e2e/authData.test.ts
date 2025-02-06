@@ -75,6 +75,8 @@ test("Should show error after not receiving message for 10 seconds", async () =>
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
     await demoAppView.openIiTab();
+
+    await switchToPopup(browser);
     await browser.pause(10_000);
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
@@ -90,7 +92,7 @@ test("Should show error after manually navigating to authorize url", async () =>
     const demoAppView = new DemoAppView(browser);
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.waitForDisplay();
-    await browser.url(II_URL);
+    await browser.url(II_URL + "#authorize");
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
