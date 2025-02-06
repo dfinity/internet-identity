@@ -190,7 +190,59 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           "identity.ic0.app",
-          undefined
+          true
+        );
+      }
+    });
+
+    it("connection excludes rpId when user cancels", async () => {
+      // This one would fail because it's not the device the user is using at the moment.
+      const currentOriginDevice: DeviceData = createMockDevice(currentOrigin);
+      const currentOriginCredentialData =
+        convertToValidCredentialData(currentOriginDevice);
+      const currentDevice: DeviceData = createMockDevice();
+      const currentDeviceCredentialData =
+        convertToValidCredentialData(currentDevice);
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", mockActor);
+
+      failSign = true;
+      const firstLoginResult = await connection.login(BigInt(12345));
+
+      expect(firstLoginResult.kind).toBe("possiblyWrongWebAuthnFlow");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          currentOriginCredentialData,
+          currentDeviceCredentialData,
+        ]),
+        undefined,
+        // Do not use iframe
+        false
+      );
+
+      failSign = false;
+      const secondLoginResult = await connection.login(BigInt(12345));
+
+      expect(secondLoginResult.kind).toBe("loginSuccess");
+      if (secondLoginResult.kind === "loginSuccess") {
+        expect(secondLoginResult.showAddCurrentDevice).toBe(true);
+        expect(secondLoginResult.connection).toBeInstanceOf(
+          AuthenticatedConnection
+        );
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
+          2,
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentDeviceCredentialData,
+          ]),
+          "identity.ic0.app",
+          // Use iframe
+          true
         );
       }
     });
@@ -221,7 +273,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData2,
         ]),
         undefined,
-        undefined
+        false
       );
 
       failSign = false;
@@ -241,7 +293,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData2,
           ]),
           undefined,
-          undefined
+          false
         );
       }
     });
@@ -257,7 +309,7 @@ describe("Connection.login", () => {
       });
     });
 
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
+    it("login returns authenticated connection with expected rpID", async () => {
       const connection = new Connection("aaaaa-aa", mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
@@ -269,8 +321,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined,
-          undefined
+          "identity.ic0.app",
+          true
         );
       }
     });
@@ -299,7 +351,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           undefined,
-          undefined
+          false
         );
       }
     });
@@ -328,7 +380,7 @@ describe("Connection.login", () => {
           currentDeviceCredentialData,
         ]),
         undefined,
-        undefined
+        false
       );
 
       failSign = false;
@@ -348,36 +400,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
           ]),
           undefined,
-          undefined
-        );
-      }
-    });
-  });
-
-  describe("domains compatibility flag enabled and browser doesn't support", () => {
-    beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
-      vi.stubGlobal("navigator", {
-        // Does NOT Supports RoR
-        userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-      });
-    });
-
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      const loginResult = await connection.login(BigInt(12345));
-
-      expect(loginResult.kind).toBe("loginSuccess");
-      if (loginResult.kind === "loginSuccess") {
-        expect(loginResult.showAddCurrentDevice).toBe(false);
-        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToValidCredentialData(mockDevice)],
-          undefined,
-          undefined
+          false
         );
       }
     });
@@ -406,7 +429,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           undefined,
-          undefined
+          false
         );
       }
     });
@@ -435,7 +458,7 @@ describe("Connection.login", () => {
           currentDeviceCredentialData,
         ]),
         undefined,
-        undefined
+        false
       );
 
       failSign = false;
@@ -455,7 +478,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
           ]),
           undefined,
-          undefined
+          false
         );
       }
     });
@@ -481,7 +504,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
         undefined,
-        undefined
+        false
       );
     });
   });
@@ -506,7 +529,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
         undefined,
-        undefined
+        false
       );
     });
   });

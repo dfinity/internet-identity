@@ -8,7 +8,7 @@ import {
   AuthFail,
   Connection,
   LoginSuccess,
-  PossiblyWrongRPID,
+  PossiblyWrongWebAuthnFlow,
   WebAuthnFailed,
 } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
@@ -54,16 +54,13 @@ export const recoverWithDevice = ({
         }
 
         if (result.kind !== "loginSuccess") {
-          if (result.kind === "possiblyWrongRPID") {
+          if (result.kind === "possiblyWrongWebAuthnFlow") {
             const i18n = new I18n();
             const copy = i18n.i18n(infoToastCopy);
             toast.info(
               infoToastTemplate({
-                title: copy.title_possibly_wrong_rp_id,
-                messages: [
-                  copy.message_possibly_wrong_rp_id_1,
-                  copy.message_possibly_wrong_rp_id_2,
-                ],
+                title: copy.title_possibly_wrong_web_authn_flow,
+                messages: [copy.message_possibly_wrong_web_authn_flow_1],
               })
             );
             return;
@@ -91,7 +88,7 @@ const attemptRecovery = async ({
 }): Promise<
   | LoginSuccess
   | WebAuthnFailed
-  | PossiblyWrongRPID
+  | PossiblyWrongWebAuthnFlow
   | AuthFail
   | { kind: "noRecovery" }
   | { kind: "tooManyRecovery" }

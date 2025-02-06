@@ -4,7 +4,7 @@ import {
   findWebAuthnRpId,
 } from "./findWebAuthnRpId";
 
-export type WebAuthnStep = {
+export type WebAuthnFlow = {
   useIframe: boolean;
   rpId: string | undefined;
 };
@@ -32,14 +32,14 @@ type Parameters = {
  * - At the moment, we only use non-iframe if the RP ID matches the current origin. to avoid bad UX, if the RP ID doesn't match the current origin, the iframe will be used.
  *
  * @param {Parameters} params - The parameters to find the webauthn steps.
- * @returns {WebAuthnStep[]} The ordered steps to try to perform the webauthn authentication.
+ * @returns {WebAuthnFlow[]} The ordered steps to try to perform the webauthn authentication.
  */
-export const findWebAuthnSteps = ({
+export const findWebAuthnFlows = ({
   devices,
   currentOrigin,
   relatedOrigins,
-}: Parameters): WebAuthnStep[] => {
-  const steps: WebAuthnStep[] = [];
+}: Parameters): WebAuthnFlow[] => {
+  const steps: WebAuthnFlow[] = [];
   let filteredCredentials = devices;
   const rpIds = new Set<string | undefined>();
 
