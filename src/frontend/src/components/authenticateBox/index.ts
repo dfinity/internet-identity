@@ -12,6 +12,7 @@ import {
   PinIdentityMaterial,
   reconstructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
 import { idbRetrievePinIdentityMaterial } from "$src/flows/pin/idb";
 import { usePin } from "$src/flows/pin/usePin";
@@ -546,16 +547,20 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         >
           Continue with another device
         </button>
-        <button
-          @click=${() =>
-            withUserNumber((userNumber) =>
-              useExistingProps.loginOpenIDGoogle(userNumber)
-            )}
-          id="addNewDeviceButton"
-          class="c-button c-button--secondary"
-        >
-          Continue with Google
-        </button>
+        ${OPENID_AUTHENTICATION.isEnabled()
+          ? `
+          <button
+            @click=${() =>
+              withUserNumber((userNumber) =>
+                useExistingProps.loginOpenIDGoogle(userNumber)
+              )}
+            id="addNewDeviceButton"
+            class="c-button c-button--secondary"
+          >
+            Continue with Google
+          </button>
+          `
+          : ``}
 
         <ul class="c-link-group">
           <li>
