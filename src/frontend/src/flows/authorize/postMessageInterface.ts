@@ -170,13 +170,13 @@ const waitForRequest = (): Promise<
       () => resolve({ kind: "timeout" }),
       TIMEOUT_WAIT_FOR_REQUEST
     );
-    const messageEventHandler = (evnt: MessageEvent) => {
-      if (evnt.origin === window.location.origin) {
+    const messageEventHandler = (event: MessageEvent) => {
+      if (event.origin === window.location.origin) {
         // Ignore messages from own origin (e.g. from browser extensions)
-        console.warn("Ignoring message from own origin", evnt);
+        console.warn("Ignoring message from own origin", event);
         return;
       }
-      const message: unknown = evnt.data;
+      const message: unknown = event.data;
       const result = AuthRequest.safeParse(message);
 
       if (!result.success) {
@@ -198,7 +198,7 @@ const waitForRequest = (): Promise<
       clearTimeout(timeout);
       window.removeEventListener("message", messageEventHandler);
 
-      resolve({ kind: "received", request: result.data, origin: evnt.origin });
+      resolve({ kind: "received", request: result.data, origin: event.origin });
     };
 
     // Set up an event listener for receiving messages from the client.
