@@ -1,6 +1,7 @@
 import { DeviceData } from "$generated/internet_identity_types";
 import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
+import { createWebAuthnInIframe } from "$src/flows/iframeWebAuthn";
 import { inferPasskeyAlias, loadUAParser } from "$src/flows/register";
 import { setAnchorUsed } from "$src/storage";
 import { authenticatorAttachmentToKeyType } from "$src/utils/authenticatorAttachment";
@@ -14,7 +15,8 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
-import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
+import { CosePublicKey, WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
 import { addDeviceSuccess } from "../addDeviceSuccess";
 
@@ -48,11 +50,37 @@ export const addCurrentDevice = async (
   const rpId = nonNullish(origin) ? new URL(origin).hostname : undefined;
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
-  let newDevice: WebAuthnIdentity;
+  let authenticatorAttachment: AuthenticatorAttachment | undefined;
+  let publicKey: DerEncodedPublicKey;
+  let credentialId: ArrayBuffer;
   try {
-    newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices, undefined, rpId),
-    });
+    if (origin === window.location.origin) {
+      const newDevice = await WebAuthnIdentity.create({
+        publicKey: creationOptions(devices, undefined, rpId),
+      });
+      authenticatorAttachment = newDevice.getAuthenticatorAttachment();
+      publicKey = newDevice.getPublicKey().toDer();
+      credentialId = newDevice.rawId;
+    } else {
+      const credential = await createWebAuthnInIframe({
+        publicKey: creationOptions(devices, undefined, rpId),
+      });
+      if (nonNullish(credential)) {
+        const cosePubKey = CosePublicKey.fromAttestationResponse(
+          credential.response as AuthenticatorAttestationResponse
+        );
+        publicKey = cosePubKey.toDer();
+        authenticatorAttachment =
+          credential.authenticatorAttachment !== null
+            ? (credential.authenticatorAttachment as AuthenticatorAttachment)
+            : undefined;
+        credentialId = credential.rawId;
+      } else {
+        throw new Error(
+          "There was an error creating the credential. Please try again."
+        );
+      }
+    }
   } catch (error: unknown) {
     if (isWebAuthnDuplicateDevice(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Back to manage" });
@@ -67,7 +95,7 @@ export const addCurrentDevice = async (
   }
 
   const deviceName = await inferPasskeyAlias({
-    authenticatorType: newDevice.getAuthenticatorAttachment(),
+    authenticatorType: authenticatorAttachment,
     userAgent: navigator.userAgent,
     uaParser,
   });
@@ -75,14 +103,12 @@ export const addCurrentDevice = async (
     await withLoader(() =>
       connection.add(
         deviceName,
-        authenticatorAttachmentToKeyType(
-          newDevice.getAuthenticatorAttachment()
-        ),
+        authenticatorAttachmentToKeyType(authenticatorAttachment),
         { authentication: null },
-        newDevice.getPublicKey().toDer(),
+        publicKey,
         { unprotected: null },
         origin ?? window.origin,
-        newDevice.rawId
+        credentialId
       )
     );
 

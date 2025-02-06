@@ -14,6 +14,13 @@ interface CredentialRequest {
   };
 }
 
+interface CredentialCreation {
+  ii_credential_creation: {
+    id: string;
+    options: CredentialCreationOptions;
+  };
+}
+
 interface CredentialResponse {
   ii_credential_response: {
     id: string;
@@ -38,6 +45,9 @@ const isCredentialRequest = (data: unknown): data is CredentialRequest =>
 
 const isCredentialResponse = (data: unknown): data is CredentialResponse =>
   typeof data === "object" && data !== null && "ii_credential_response" in data;
+
+const isCredentialCreation = (data: unknown): data is CredentialCreation =>
+  typeof data === "object" && data !== null && "ii_credential_creation" in data;
 
 const requestCredential = (
   options: CredentialRequestOptions,
@@ -75,20 +85,65 @@ const requestCredential = (
     targetWindow.postMessage(request, targetOrigin);
   });
 
+const requestCreation = (
+  options: CredentialCreationOptions,
+  targetWindow: Window,
+  targetOrigin: string
+): Promise<PublicKeyCredential> =>
+  new Promise<PublicKeyCredential>((resolve, reject) => {
+    console.log("in da requestCreation");
+    // Listen for credential response
+    const id = window.crypto.randomUUID();
+    const listener = (event: MessageEvent) => {
+      if (
+        event.source !== targetWindow ||
+        event.origin !== targetOrigin ||
+        !isCredentialResponse(event.data)
+      ) {
+        return;
+      }
+      if ("result" in event.data.ii_credential_response) {
+        resolve({
+          ...event.data.ii_credential_response.result,
+          getClientExtensionResults: () => ({}),
+        } as PublicKeyCredential);
+      }
+      if ("err" in event.data.ii_credential_response) {
+        reject(event.data.ii_credential_response.err);
+      }
+      window.removeEventListener("message", listener);
+    };
+    window.addEventListener("message", listener);
+
+    // Request credential
+    const request: CredentialCreation = {
+      ii_credential_creation: { id, options },
+    };
+    targetWindow.postMessage(request, targetOrigin);
+  });
+
 const handleCredentialRequest = (
   targetWindow: Window,
   targetOrigin: string
 ): void =>
   window.addEventListener("message", async (event: MessageEvent) => {
-    if (
-      event.source === targetWindow &&
-      event.origin === targetOrigin &&
-      isCredentialRequest(event.data)
-    ) {
+    console.log("in da handleCredentialRequest", event);
+    if (event.source === targetWindow && event.origin === targetOrigin) {
       try {
-        const credential = (await navigator.credentials.get(
-          event.data.ii_credential_request.options
-        )) as PublicKeyCredential;
+        let credential: PublicKeyCredential | undefined | null;
+        if (isCredentialRequest(event.data)) {
+          credential = (await navigator.credentials.get(
+            event.data.ii_credential_request.options
+          )) as PublicKeyCredential;
+        } else if (isCredentialCreation(event.data)) {
+          console.log("in da handleCredentialRequest creation");
+          credential = (await navigator.credentials.create(
+            event.data.ii_credential_creation.options
+          )) as PublicKeyCredential;
+        }
+        if (isNullish(credential)) {
+          throw new Error("No credential returned");
+        }
         const response: CredentialResponse = {
           ii_credential_response: {
             id: event.data.ii_credential_request.id,
@@ -118,9 +173,13 @@ const handleCredentialRequest = (
         };
         window.parent.postMessage(response, targetOrigin);
       } catch (error) {
+        console.log("in da handleCredentialRequest error", error);
+        const id = isCredentialRequest(event.data)
+          ? event.data.ii_credential_request.id
+          : event.data.ii_credential_creation.id;
         const response: CredentialResponse = {
           ii_credential_response: {
-            id: event.data.ii_credential_request.id,
+            id,
             error: String(error),
           },
         };
@@ -154,7 +213,7 @@ export const webAuthnInIframeFlow = async (
 
 export const webAuthnInIframe = async (
   options: CredentialRequestOptions
-): Promise<Credential> => {
+): Promise<PublicKeyCredential> => {
   if (isNullish(options.publicKey?.rpId)) {
     throw new Error("RP id is missing");
   }
@@ -187,6 +246,49 @@ export const webAuthnInIframe = async (
 
     // Request credential from iframe
     return await requestCredential(options, iframe.contentWindow, targetOrigin);
+  } finally {
+    iframe.remove();
+  }
+};
+
+export const createWebAuthnInIframe = async (
+  options: CredentialCreationOptions
+): Promise<PublicKeyCredential> => {
+  if (isNullish(options.publicKey) || isNullish(options.publicKey?.rp.id)) {
+    throw new Error("RP id is missing");
+  }
+  console.log("in da createWebAuthnInIframe", options.publicKey.rp.id);
+  const targetOrigin = `https://${options.publicKey.rp.id}`;
+  // Remove the rpId from the options to prevent it from being passed to the iframe
+  options.publicKey.rp.id = undefined;
+
+  // WebAuthn fails in Safari if the iframe does not remain focused.
+  const iframe = document.body.appendChild(document.createElement("iframe"));
+  iframe.style.position = "fixed";
+  iframe.style.top = "0";
+  iframe.style.left = "0";
+  iframe.width = "100%";
+  iframe.height = "100%";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.zIndex = "9999";
+  iframe.allow = "publickey-credentials-create";
+  iframe.src = `${targetOrigin}${WEBAUTHN_IFRAME_PATH}`;
+  iframe.focus();
+
+  try {
+    // Wait for iframe to be loaded and ready
+    if (isNullish(iframe.contentWindow)) {
+      throw new Error("Hidden iframe could not be instantiated");
+    }
+    await new Promise<void>((resolve, reject) => {
+      iframe.onload = () => resolve();
+      iframe.onerror = () => reject(new Error("Unable to load hidden iframe"));
+    });
+    await waitForWindowReadyResponse(iframe.contentWindow, targetOrigin);
+
+    // Request credential from iframe
+    return await requestCreation(options, iframe.contentWindow, targetOrigin);
   } finally {
     iframe.remove();
   }

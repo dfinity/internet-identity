@@ -57,6 +57,22 @@ function _authDataToCose(authData: ArrayBuffer): ArrayBuffer {
 export class CosePublicKey implements PublicKey {
   protected _encodedKey: DerEncodedPublicKey;
 
+  static fromAttestationResponse(
+    response: AuthenticatorAttestationResponse
+  ): CosePublicKey {
+    if (response.attestationObject === undefined) {
+      throw new Error("Was expecting an attestation response.");
+    }
+
+    // Parse the attestationObject as CBOR.
+    const attObject = borc.decodeFirst(
+      new Uint8Array(response.attestationObject)
+    );
+
+    const cose = _authDataToCose(attObject.authData);
+    return new CosePublicKey(cose);
+  }
+
   public constructor(protected _cose: ArrayBuffer) {
     this._encodedKey = _coseToDerEncodedBlob(_cose);
   }

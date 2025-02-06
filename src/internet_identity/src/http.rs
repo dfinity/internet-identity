@@ -80,7 +80,7 @@ pub fn security_headers(
     maybe_related_origins: Option<Vec<String>>,
 ) -> Vec<HeaderField> {
     // Allow related origins to get WebAuthn credentials from one another
-    let public_key_credentials_get = maybe_related_origins
+    let public_key_credentials_get_and_create = maybe_related_origins
         .clone()
         .unwrap_or_default()
         .iter()
@@ -134,7 +134,8 @@ pub fn security_headers(
                  navigation-override=(),\
                  payment=(),\
                  picture-in-picture=(),\
-                 publickey-credentials-get=({public_key_credentials_get}),\
+                 publickey-credentials-get=({public_key_credentials_get_and_create}),\
+                 publickey-credentials-create=({public_key_credentials_get_and_create}),\
                  screen-wake-lock=(),\
                  serial=(),\
                  speaker-selection=(),\
