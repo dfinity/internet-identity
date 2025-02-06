@@ -1,5 +1,9 @@
-import { AuthnMethodData } from "$generated/internet_identity_types";
+import {
+  AuthnMethodData,
+  InternetIdentityInit,
+} from "$generated/internet_identity_types";
 import { withLoader } from "$src/components/loader";
+import { toast } from "$src/components/toast";
 import {
   PinIdentityMaterial,
   constructPinIdentity,
@@ -27,9 +31,14 @@ import {
   UnexpectedCall,
   WrongCaptchaSolution,
 } from "$src/utils/iiConnection";
+import {
+  createAnonymousNonce,
+  createGoogleRequestConfig,
+  requestJWT,
+} from "$src/utils/openID";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
-import { nonNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult } from "lit-html";
 import type { UAParser } from "ua-parser-js";
 import { tempKeyWarningBox } from "../manage/tempKeys";
@@ -37,6 +46,7 @@ import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
+import { selectAuthMethod } from "./selectAuthMethod";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -47,6 +57,7 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
+  connection,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -85,8 +96,9 @@ export const registerFlow = async ({
   registrationAllowed: boolean;
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
+  connection: Connection;
 }): Promise<
-  | (LoginSuccess & { authnMethod: "passkey" | "pin" })
+  | (LoginSuccess & { authnMethod: "passkey" | "pin" | "openid-google" })
   | ApiError
   | NoRegistrationFlow
   | UnexpectedCall
@@ -102,12 +114,31 @@ export const registerFlow = async ({
     result satisfies { tag: "canceled" };
     return "canceled";
   }
-
   // Kick-off the flow start request early, so that we might already
   // have a captcha to show once we get to the CAPTCHA screen
   const flowStart = precomputeFirst(() => identityRegistrationStart());
 
   const displayUserNumber = displayUserNumberWarmup();
+
+  // Get google config early so it's ready just in case
+  const configRef: { current?: InternetIdentityInit } = {};
+  void connection.getConfig().then((config) => (configRef.current = config));
+
+  const getGoogleClientId = () =>
+    configRef.current?.openid_google[0]?.[0]?.client_id;
+
+  // Select auth method for registering new Identity
+  const authMethodResult = await selectAuthMethod();
+
+  switch (authMethodResult) {
+    case "google":
+      return doRegisterWithGoogle(connection, getGoogleClientId());
+    case "canceled":
+      return "canceled";
+    case "passkey":
+      break;
+  }
+
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
@@ -282,6 +313,7 @@ export const getRegisterFlowOpts = async ({
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
+    connection,
   };
 };
 
@@ -429,4 +461,61 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
   } catch (e) {
     console.error(e);
   }
+};
+
+//TODO: move this somewhere smart
+const doRegisterWithGoogle = async (
+  connection: Connection,
+  googleClientId: string | undefined
+): Promise<
+  | (LoginSuccess & { authnMethod: "passkey" | "pin" | "openid-google" })
+  | ApiError
+  | NoRegistrationFlow
+  | UnexpectedCall
+  | RegisterNoSpace
+  | InvalidAuthnMethod
+  | InvalidCaller
+  | AlreadyInProgress
+  | RateLimitExceeded
+  | "canceled"
+> => {
+  if (isNullish(googleClientId)) {
+    toast.error("Google login is unavailable."); // TODO: put into copy / handle errors better
+    return {
+      kind: "apiError",
+      error: Error("Google unavailable"),
+    };
+  }
+
+  const sessionIdentity = await ECDSAKeyIdentity.generate({
+    extractable: false,
+  });
+
+  const googleRequestConfig = createGoogleRequestConfig(googleClientId);
+  const { nonce, salt } = await createAnonymousNonce(
+    sessionIdentity.getPrincipal()
+  );
+
+  const jwt = await withLoader(() =>
+    requestJWT(googleRequestConfig, {
+      mediation: "required",
+      nonce,
+    })
+  );
+
+  // TODO: create the identity owo
+
+  const authenticatedConnection = await connection.fromJwt(
+    jwt,
+    salt,
+    sessionIdentity
+  );
+
+  return {
+    kind: "loginSuccess" as const,
+    connection: authenticatedConnection,
+    userNumber: authenticatedConnection.userNumber,
+    showAddCurrentDevice: false,
+    authnMethod: "openid-google" as const,
+  };
 };

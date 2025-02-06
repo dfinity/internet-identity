@@ -67,7 +67,7 @@ export type AuthResponse =
       kind: "authorize-client-success";
       delegations: Delegation[];
       userPublicKey: Uint8Array;
-      authnMethod: "pin" | "passkey" | "recovery" | "openid";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
     };
 
 /**
@@ -86,7 +86,7 @@ export async function authenticationProtocol({
         kind: "success";
         delegations: Delegation[];
         userPublicKey: Uint8Array;
-        authnMethod: "pin" | "passkey" | "recovery" | "openid";
+        authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
       }
     | { kind: "failure"; text: string }
   >;

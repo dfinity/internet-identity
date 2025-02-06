@@ -97,7 +97,7 @@ export const authenticateBox = async ({
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
-  authnMethod: "pin" | "passkey" | "recovery" | "openid";
+  authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
   showAddCurrentDevice: boolean;
 }> => {
   const promptAuth = async (autoSelectIdentity?: bigint) =>
@@ -238,7 +238,7 @@ export const authenticateBoxFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery" | "openid";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
     })
   | PossiblyWrongWebAuthnFlow
   | PinUserOtherDomain
@@ -258,7 +258,7 @@ export const authenticateBoxFlow = async <I>({
   const doRegister = async (): Promise<
     | (LoginSuccess & {
         newAnchor: true;
-        authnMethod: "pin" | "passkey" | "recovery" | "openid";
+        authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
       })
     | FlowError
     | { tag: "canceled" }
@@ -327,7 +327,7 @@ export const authenticateBoxFlow = async <I>({
       userNumber: authenticatedConnection.userNumber,
       showAddCurrentDevice: false,
       newAnchor: false,
-      authnMethod: "openid" as const,
+      authnMethod: "openid-google" as const,
     };
   };
 
@@ -335,7 +335,7 @@ export const authenticateBoxFlow = async <I>({
   const doPrompt = async (): Promise<
     | (LoginSuccess & {
         newAnchor: boolean;
-        authnMethod: "pin" | "passkey" | "recovery" | "openid";
+        authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
       })
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
@@ -808,7 +808,7 @@ const useIdentityFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery" | "openid";
+      authnMethod: "pin" | "passkey" | "recovery" | "openid-google";
     })
   | AuthFail
   | WebAuthnFailed
