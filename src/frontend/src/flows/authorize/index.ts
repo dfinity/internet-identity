@@ -293,8 +293,28 @@ export const authFlowAuthorize = async (
 
   if (result === "orphan") {
     await displayError({
-      title: copy.invalid_data,
-      message: copy.no_auth_data,
+      title: copy.wrong_place,
+      message: copy.no_request_received,
+      primaryButton: copy.go_home,
+    });
+
+    location.hash = "";
+    return window.location.reload() as never;
+  }
+  if (result === "closed") {
+    await displayError({
+      title: copy.connection_closed,
+      message: copy.connection_could_not_be_established,
+      primaryButton: copy.go_home,
+    });
+
+    location.hash = "";
+    return window.location.reload() as never;
+  }
+  if (result === "invalid") {
+    await displayError({
+      title: copy.invalid_request,
+      message: copy.invalid_authentication_request_received,
       primaryButton: copy.go_home,
     });
 

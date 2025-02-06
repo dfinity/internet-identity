@@ -1,6 +1,6 @@
 import { FLOWS } from "./flows";
 import { addVirtualAuthenticator, runInBrowser, switchToPopup } from "./util";
-import { DemoAppView } from "./views";
+import { DemoAppView, ErrorView } from "./views";
 
 import { II_URL, TEST_APP_NICE_URL } from "./constants";
 
@@ -47,7 +47,7 @@ test("Should allow valid message", async () => {
   });
 }, 300_000);
 
-test("Should ignore invalid data and allow second valid message", async () => {
+test("Should show error for invalid message", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     const demoAppView = new DemoAppView(browser);
@@ -58,23 +58,45 @@ test("Should ignore invalid data and allow second valid message", async () => {
     await browser.switchToWindow((await browser.getWindowHandles())[0]);
     await demoAppView.waitForNthMessage(1); // message 1: authorize-ready
     await demoAppView.sendInvalidData(); // message 2
-    await demoAppView.sendValidMessage(); // message 3
 
     await switchToPopup(browser);
-    await FLOWS.registerNewIdentityAuthenticateView(browser);
-    await browser
-      .$("[data-role=notify-auth-success]")
-      .waitForDisplayed({ timeout: 15_000 });
+    const errorView = new ErrorView(browser);
+    await errorView.waitForDisplay();
+    expect(await errorView.getErrorMessage()).toEqual(
+      "It seems like an invalid authentication request was received."
+    );
+  });
+}, 300_000);
 
-    // switch back to demo app
-    await browser.switchToWindow((await browser.getWindowHandles())[0]);
+test("Should show error after not receiving message for 10 seconds", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(TEST_APP_NICE_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    await demoAppView.openIiTab();
 
-    await demoAppView.waitForNthMessage(4); // message 4: authorize-success
-    const successMessage = await demoAppView.getMessageText(4);
-    expect(successMessage).toContain("authorize-client-success");
+    await switchToPopup(browser);
+    await browser.pause(10_000);
+    const errorView = new ErrorView(browser);
+    await errorView.waitForDisplay();
+    expect(await errorView.getErrorMessage()).toEqual(
+      "It seems like the connection with the service could not be established."
+    );
+  });
+}, 300_000);
 
-    // Internet Identity default value (as opposed to agent-js)
-    const exp = await browser.$("#expiration").getText();
-    expect(Number(exp) / (30 * 60_000_000_000)).toBeCloseTo(1);
+test("Should show error after manually navigating to authorize url", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await addVirtualAuthenticator(browser);
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(TEST_APP_NICE_URL, II_URL);
+    await demoAppView.waitForDisplay();
+    await browser.url(II_URL + "#authorize");
+    const errorView = new ErrorView(browser);
+    await errorView.waitForDisplay();
+    expect(await errorView.getErrorMessage()).toEqual(
+      "Seems you arrived here for authentication, but no service has requested it."
+    );
   });
 }, 300_000);
