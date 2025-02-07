@@ -139,8 +139,6 @@ const verifyCredentials = async ({
     allowPinLogin: true,
   });
 
-  console.log("after da first authResult", authResult);
-
   if ("tag" in authResult) {
     authResult satisfies { tag: "canceled" };
     return "aborted";
@@ -148,6 +146,8 @@ const verifyCredentials = async ({
 
   authResult satisfies { kind: unknown };
 
+  // There are three supported origins. I wanted to give the user a chance to cancel once the correct one and maybe still make it work.
+  // Therefore, the max retries should allow to iterate through all the 3 origins twice.
   const MAX_RETRIES = 5;
   let currentRetry = 0;
   // This is ugly, but I couldn't find a better way to handle the retry without disrupting the whole flow.
@@ -164,13 +164,11 @@ const verifyCredentials = async ({
         messages: [copy.message_possibly_wrong_web_authn_flow_1],
       })
     );
-    console.log(`before da second authResult ${currentRetry}`);
     authResult = await useIdentity({
       userNumber,
       connection,
       allowPinLogin: true,
     });
-    console.log("after da second authResult", authResult);
 
     if ("tag" in authResult) {
       authResult satisfies { tag: "canceled" };
