@@ -5,7 +5,7 @@
       "candid": "src/internet_identity/internet_identity.did",
       "wasm": "internet_identity.wasm.gz",
       "build": "bash -c 'II_DEV_CSP=1 II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build'",
-      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}; openid_google = opt opt record { client_id = \"45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com\" }})",
+      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}; openid_google = opt opt record { client_id = \"45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com\" }; related_origins = opt vec { \"https://identity.internetcomputer.org\"; \"https://identity.ic0.app\" } })",
       "shrink": false
     },
     "test_app": {

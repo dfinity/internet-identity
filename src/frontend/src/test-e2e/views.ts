@@ -520,6 +520,17 @@ export class AuthenticateView extends View {
     await this.browser.$(`[data-anchor-id="${anchor}"]`).waitForDisplayed();
   }
 
+  async pickExistingAnchor(anchor: string): Promise<void> {
+    if (await this.browser.$("#loginButton").isExisting()) {
+      await this.browser.$("#loginButton").click();
+    } else {
+      await this.browser.$('[data-role="more-options"]').click();
+    }
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
+    await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
+    await this.browser.$('[data-action="continue"]').click();
+  }
+
   async expectAnchorInputField(): Promise<void> {
     await this.browser
       .$('[data-role="anchor-input"]')
