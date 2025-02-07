@@ -1,5 +1,4 @@
 import loaderUrl from "$src/components/loader.png";
-import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
 import { compatibilityNotice } from "./flows/compatibilityNotice";
@@ -94,9 +93,9 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
-  // If the build is not "official", show a warning
-  // https://github.com/dfinity/internet-identity#build-features
-  void showWarningIfNecessary(connection);
+  // // If the build is not "official", show a warning
+  // // https://github.com/dfinity/internet-identity#build-features
+  // void showWarningIfNecessary(connection);
 
   return app(connection);
 };
