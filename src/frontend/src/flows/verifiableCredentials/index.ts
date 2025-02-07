@@ -1,9 +1,12 @@
 import { SignedIdAlias } from "$generated/internet_identity_types";
 import { useIdentity } from "$src/components/authenticateBox";
+import { infoToastTemplate } from "$src/components/infoToast";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
+import { toast } from "$src/components/toast";
 import { fetchDelegation } from "$src/flows/authorize/fetchDelegation";
+import { I18n } from "$src/i18n";
 import { getAnchorByPrincipal } from "$src/storage";
 import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
 import { validateDerivationOrigin } from "$src/utils/validateDerivationOrigin";
@@ -18,6 +21,7 @@ import {
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
 import { Principal } from "@dfinity/principal";
+import infoToastCopy from "../../components/infoToast/copy.json";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";
 import { VcVerifiablePresentation, vcProtocol } from "./postMessageInterface";
@@ -129,11 +133,13 @@ const verifyCredentials = async ({
   const userNumber = allowed.userNumber;
 
   // For the rest of the flow we need to be authenticated, so authenticate
-  const authResult = await useIdentity({
+  let authResult = await useIdentity({
     userNumber,
     connection,
     allowPinLogin: true,
   });
+
+  console.log("after da first authResult", authResult);
 
   if ("tag" in authResult) {
     authResult satisfies { tag: "canceled" };
@@ -141,6 +147,38 @@ const verifyCredentials = async ({
   }
 
   authResult satisfies { kind: unknown };
+
+  const MAX_RETRIES = 5;
+  let currentRetry = 0;
+  // This is ugly, but I couldn't find a better way to handle the retry without disrupting the whole flow.
+  while (
+    authResult.kind === "possiblyWrongWebAuthnFlow" &&
+    currentRetry < MAX_RETRIES
+  ) {
+    currentRetry++;
+    const i18n = new I18n();
+    const copy = i18n.i18n(infoToastCopy);
+    toast.info(
+      infoToastTemplate({
+        title: copy.title_trying_again,
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
+      })
+    );
+    console.log(`before da second authResult ${currentRetry}`);
+    authResult = await useIdentity({
+      userNumber,
+      connection,
+      allowPinLogin: true,
+    });
+    console.log("after da second authResult", authResult);
+
+    if ("tag" in authResult) {
+      authResult satisfies { tag: "canceled" };
+      return "aborted";
+    }
+
+    authResult satisfies { kind: unknown };
+  }
 
   if (authResult.kind !== "loginSuccess") {
     return abortedCredentials({ reason: "auth_failed_ii" });
