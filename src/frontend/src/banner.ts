@@ -46,21 +46,13 @@ export const showWarning = (message: TemplateResult): HTMLDivElement => {
 
   const warning = html`
     <style>
-      #pageContent {
-        margin-top: 48px;
-      }
-
       .features-warning-container {
         background: ${razzmatazz};
         color: ${white};
         width: 100%;
-        height: 48px;
         box-sizing: border-box;
         padding: 0.5em 1em;
         text-align: center;
-        position: absolute;
-        top: 0;
-        left: 0;
       }
 
       .features-warning-btn {
@@ -87,6 +79,6 @@ export const showWarning = (message: TemplateResult): HTMLDivElement => {
   `;
 
   render(warning, container);
-  document.body.append(container);
+  document.body.prepend(container);
   return container;
 };
