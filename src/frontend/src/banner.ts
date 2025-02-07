@@ -53,6 +53,9 @@ export const showWarning = (message: TemplateResult): HTMLDivElement => {
         box-sizing: border-box;
         padding: 0.5em 1em;
         text-align: center;
+        position: fixed;
+        top: 0;
+        left: 0;
       }
 
       .features-warning-btn {
@@ -79,6 +82,6 @@ export const showWarning = (message: TemplateResult): HTMLDivElement => {
   `;
 
   render(warning, container);
-  document.body.prepend(container);
+  document.body.append(container);
   return container;
 };
