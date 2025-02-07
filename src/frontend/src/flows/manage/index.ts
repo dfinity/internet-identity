@@ -50,7 +50,7 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { supportsWebauthRoR } from "$src/utils/userAgent";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import {
   OmitParams,
   isCanisterError,
@@ -383,8 +383,7 @@ export const displayManage = async (
 
     const onAddDevice = async () => {
       const newDeviveOrigin =
-        supportsWebauthRoR(window.navigator.userAgent) &&
-        DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices_,
               userAgent: navigator.userAgent,

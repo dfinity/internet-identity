@@ -10,7 +10,7 @@ import { infoScreenTemplate } from "$src/components/infoScreen";
 import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { IdentityMetadata } from "$src/repositories/identityMetadata";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
-import { supportsWebauthRoR } from "$src/utils/userAgent";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import { isNullish } from "@dfinity/utils";
 import { addDevice } from "../addDevice/manage/addDevice";
 import {
@@ -241,8 +241,7 @@ export const recoveryWizard = async (
   });
 
   const originNewDevice =
-    supportsWebauthRoR(window.navigator.userAgent) &&
-    DOMAIN_COMPATIBILITY.isEnabled()
+    userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
       ? getCredentialsOrigin({
           credentials,
           userAgent: navigator.userAgent,
