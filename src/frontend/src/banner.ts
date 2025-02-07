@@ -49,6 +49,7 @@ export const showWarning = (message: TemplateResult): HTMLDivElement => {
       #pageContent {
         margin-top: 48px;
       }
+
       .features-warning-container {
         background: ${razzmatazz};
         color: ${white};
