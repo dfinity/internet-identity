@@ -10,6 +10,7 @@ import { version } from "./version";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
+import { showWarningIfNecessary } from "$src/banner";
 import { Buffer } from "buffer";
 globalThis.Buffer = Buffer;
 
@@ -93,9 +94,9 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId());
 
-  // // If the build is not "official", show a warning
-  // // https://github.com/dfinity/internet-identity#build-features
-  // void showWarningIfNecessary(connection);
+  // If the build is not "official", show a warning
+  // https://github.com/dfinity/internet-identity#build-features
+  void showWarningIfNecessary(connection);
 
   return app(connection);
 };
