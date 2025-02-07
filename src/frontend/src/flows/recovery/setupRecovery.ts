@@ -9,7 +9,7 @@ import {
   creationOptions,
   IC_DERIVATION_PATH,
 } from "$src/utils/iiConnection";
-import { supportsWebauthRoR } from "$src/utils/userAgent";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import { unreachable, unreachableLax } from "$src/utils/utils";
 import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
@@ -34,8 +34,7 @@ export const setupKey = async ({
       const devices =
         devices_ ?? (await connection.lookupAll(connection.userNumber));
       const newDeviceOrigin =
-        supportsWebauthRoR(window.navigator.userAgent) &&
-        DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices,
               userAgent: window.navigator.userAgent,
