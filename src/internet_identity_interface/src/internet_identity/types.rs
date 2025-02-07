@@ -207,6 +207,7 @@ pub struct InternetIdentityInit {
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
+    pub dapps_explorer: Option<Option<DappsExplorerConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -288,4 +289,9 @@ pub enum DeployArchiveResult {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub client_id: String,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct DappsExplorerConfig {
+    // Nothing to configure at this moment
 }

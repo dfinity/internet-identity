@@ -256,11 +256,11 @@
   --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
-  --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
-    var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
+  --rg-brand: hsla(265, 80%, 75%, 1) 10%, hsla(272, 86%, 55%, 1) 40%,
+    hsla(223, 79%, 66%, 1) 50%, hsla(265, 80%, 75%, 1) 90%;
 
-  --rg-brand-full: var(--vc-brand-yellow), var(--vc-brand-orange),
-    var(--vc-brand-pink), var(--vc-brand-purple), var(--vc-brand-blue);
+  --rg-brand-full: hsla(265, 80%, 75%, 1), hsla(272, 86%, 55%, 1),
+    hsla(223, 79%, 66%, 1);
 
   --rg-brand-alt: var(--vc-light-grey), white;
   --rg-button: var(--rc-button), var(--rc-button-pair);
@@ -657,10 +657,10 @@ a:hover,
   width: 100%;
 }
 
-/* 
+/*
   generic typography
   .t-formatted us used as a wrapper around formatted text
-  typically used for text that comes from an outside source like a markdown parser 
+  typically used for text that comes from an outside source like a markdown parser
 */
 .t-formatted {
   font-size: 1.3rem;
@@ -2150,7 +2150,7 @@ by all browsers (FF is missing) */
 
 /*
 * The width of the digits is the result of the gap we want between them and the
-* number of digits we want to display. 
+* number of digits we want to display.
 * 100% is the full width of the container, so we divide it by the number of digits
 * and subtract the gap we want between them.
 */
@@ -3175,6 +3175,16 @@ input[type="checkbox"] {
   }
 }
 
+@keyframes loader-spinner {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
 .c-loader__image {
   width: 64px;
   display: block;
@@ -3182,11 +3192,28 @@ input[type="checkbox"] {
   top: 50%;
   left: 50%;
   user-select: none;
-  animation-name: astrodance;
+  animation-name: spinning-loader;
   animation-duration: 5s;
   animation-iteration-count: infinite;
   animation-timing-function: ease-in-out;
   transform: translate(-50%, -50%);
+}
+
+.c-loader__spinner {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  width: 50px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(farthest-side, #ffffff 94%, #ffffff00) top/8px 8px
+      no-repeat,
+    conic-gradient(#ffffff00 30%, #ffffff);
+  mask: radial-gradient(farthest-side, #00000000 calc(100% - 8px), #000000 0);
+  animation: loader-spinner 1s infinite linear;
 }
 
 .c-loader__link {

@@ -8,6 +8,7 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const DappsExplorerConfig = IDL.Record({});
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -31,6 +32,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'dapps_explorer' : IDL.Opt(IDL.Opt(DappsExplorerConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -576,6 +578,7 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const DappsExplorerConfig = IDL.Record({});
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -599,6 +602,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'dapps_explorer' : IDL.Opt(IDL.Opt(DappsExplorerConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

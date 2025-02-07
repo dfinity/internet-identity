@@ -2,7 +2,6 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
-  InternetIdentityInit,
   OpenIdCredential,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
@@ -194,7 +193,7 @@ const displayManageTemplate = ({
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
-  exploreDapps: () => void;
+  exploreDapps?: () => void;
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
@@ -227,16 +226,18 @@ const displayManageTemplate = ({
         })
       : ""}
     ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
-    <aside class="l-stack">
-      ${dappsTeaser({
-        dapps,
-        click: () => exploreDapps(),
-        copy: {
-          dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Connect to these dapps",
-        },
-      })}
-    </aside>
+    ${exploreDapps
+      ? html` <aside class="l-stack">
+          ${dappsTeaser({
+            dapps,
+            click: () => exploreDapps(),
+            copy: {
+              dapps_explorer: "Dapps explorer",
+              sign_into_dapps: "Connect to these dapps",
+            },
+          })}
+        </aside>`
+      : ""}
     ${logoutSection()}
   </section>`;
 
@@ -355,11 +356,10 @@ export const displayManage = async (
     connection.identity.getPrincipal()
   );
 
-  // Get Google client id from config in background
-  const configRef: { current?: InternetIdentityInit } = {};
-  void connection.getConfig().then((config) => (configRef.current = config));
-  const getGoogleClientId = () =>
-    configRef.current?.openid_google[0]?.[0]?.client_id;
+  // TODO: Waiting on config (query) is fine for now but should be made sync
+  const config = await connection.getConfig();
+  const googleClientId = config.openid_google[0]?.[0]?.client_id;
+  const dappsExplorerEnabled = nonNullish(config.dapps_explorer[0]?.[0]);
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -420,7 +420,6 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
-      const googleClientId = getGoogleClientId();
       if (isNullish(googleClientId)) {
         toast.error(copy.linking_google_accounts_is_unavailable);
         return;
@@ -547,13 +546,15 @@ export const displayManage = async (
         onLinkAccount,
         onUnlinkAccount,
         dapps,
-        exploreDapps: async () => {
-          await dappsExplorer({ dapps });
-          // We know that the user couldn't have changed anything (the user can't delete e.g. delete
-          // a device from the explorer), so we just re-display without reloading devices etc.
-          // the page without
-          display();
-        },
+        exploreDapps: dappsExplorerEnabled
+          ? async () => {
+              await dappsExplorer({ dapps });
+              // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+              // a device from the explorer), so we just re-display without reloading devices etc.
+              // the page without
+              display();
+            }
+          : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
       });

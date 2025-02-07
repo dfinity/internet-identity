@@ -8,9 +8,7 @@ use crate::stats::event_stats::EventKey;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, DappsExplorerConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -34,6 +32,7 @@ pub struct StorablePersistentState {
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
     openid_google: Option<OpenIdConfig>,
+    dapps_explorer: Option<DappsExplorerConfig>,
 }
 
 impl Storable for StorablePersistentState {
@@ -73,6 +72,7 @@ impl From<PersistentState> for StorablePersistentState {
             captcha_config: Some(s.captcha_config),
             related_origins: s.related_origins,
             openid_google: s.openid_google,
+            dapps_explorer: s.dapps_explorer,
         }
     }
 }
@@ -89,6 +89,7 @@ impl From<StorablePersistentState> for PersistentState {
             captcha_config: s.captcha_config.unwrap_or(DEFAULT_CAPTCHA_CONFIG),
             related_origins: s.related_origins,
             openid_google: s.openid_google,
+            dapps_explorer: s.dapps_explorer,
             event_stats_24h_start: s.event_stats_24h_start,
         }
     }
@@ -135,6 +136,7 @@ mod tests {
             }),
             related_origins: None,
             openid_google: None,
+            dapps_explorer: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -155,6 +157,7 @@ mod tests {
             },
             related_origins: None,
             openid_google: None,
+            dapps_explorer: None,
             event_stats_24h_start: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);

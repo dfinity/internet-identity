@@ -1,20 +1,12 @@
 import { ERROR_SUPPORT_URL } from "$src/config";
 import { html, render } from "lit-html";
 
-// Use same import approach as in 'src/frontend/src/flows/dappsExplorer/dapps.ts'
-// this makes the import the same format (url string) in both the build and showcase.
-const loaderUrl = import.meta.glob("./loader.svg", {
-  eager: true,
-  query: "?url",
-  import: "default",
-})["./loader.svg"] as string;
-
 // Duration in milliseconds a user considers as taking forever
 const TAKING_FOREVER = 10000;
 
 const loader = (takingForever = false) =>
   html` <div id="loader" class="c-loader">
-    <img class="c-loader__image" src="${loaderUrl}" alt="loading" />
+    <div class="c-loader__spinner" />
     ${takingForever
       ? html`<a
           href="${ERROR_SUPPORT_URL}"

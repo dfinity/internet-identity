@@ -12,3 +12,13 @@ export const features = {
 export const anyFeatures = (): boolean => {
   return Object.values(features).indexOf(true) >= 0;
 };
+
+// TODO: Same as above without FETCH_ROOT_KEY, temporary solution
+export const dummyFeatures = (): boolean => {
+  return (
+    Object.values({
+      DUMMY_AUTH,
+      DUMMY_CAPTCHA,
+    }).indexOf(true) >= 0
+  );
+};

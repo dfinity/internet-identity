@@ -95,6 +95,7 @@ export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
 export type CredentialId = Uint8Array | number[];
+export type DappsExplorerConfig = {};
 export interface Delegation {
   'pubkey' : PublicKey,
   'targets' : [] | [Array<Principal>],
@@ -207,6 +208,7 @@ export interface InternetIdentityInit {
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
+  'dapps_explorer' : [] | [[] | [DappsExplorerConfig]],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
   'register_rate_limit' : [] | [RateLimitConfig],

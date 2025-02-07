@@ -1,11 +1,17 @@
+import { Connection } from "$src/utils/iiConnection";
 import { html, render, TemplateResult } from "lit-html";
 import { LEGACY_II_URL, OFFICIAL_II_URL } from "./config";
-import { anyFeatures } from "./features";
+import { dummyFeatures } from "./features";
 
 // Show a warning banner if the build is not "official". This happens if either the build
 // is a flavored build, or if the origin is not the official II URL.
-export const showWarningIfNecessary = (): void => {
-  if (anyFeatures()) {
+export const showWarningIfNecessary = async (
+  connection: Connection
+): Promise<void> => {
+  const config = await connection.getConfig();
+  const relatedOrigins = config.related_origins[0] ?? [];
+
+  if (dummyFeatures()) {
     showWarning(html`Test only. Do not use your regular Internet Identity!
       <a
         class="features-warning-btn"
@@ -15,8 +21,10 @@ export const showWarningIfNecessary = (): void => {
         >more</a
       >`);
   } else if (
+    // TODO: Remove these two hardcoded checks once related origins is set
     window.location.origin !== OFFICIAL_II_URL &&
-    window.location.origin !== LEGACY_II_URL
+    window.location.origin !== LEGACY_II_URL &&
+    !relatedOrigins.includes(window.location.origin)
   ) {
     showWarning(html`This is not the official Internet Identity.
       <a
