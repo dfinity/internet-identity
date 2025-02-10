@@ -386,7 +386,6 @@ export const displayManage = async (
         userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices_,
-              userAgent: navigator.userAgent,
             })
           : undefined;
       await addDevice({
@@ -407,7 +406,6 @@ export const displayManage = async (
       const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
         ? getCredentialsOrigin({
             credentials: devices_,
-            userAgent: window.navigator.userAgent,
           })
         : undefined;
       await setupPhrase(

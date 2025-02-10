@@ -27,16 +27,11 @@ describe("credetial-devices test", () => {
     const icIoOriginDevice: Omit<DeviceData, "alias"> = createDevice(
       "https://identity.icp0.io"
     );
-    const userAgentSupportingRoR =
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-    const userAgentNotSupportingRoR =
-      "Mozilla/5.0 (Android 13; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0";
 
-    it("should return a set of origins", () => {
+    it("should return a set of origins or `undefined`", () => {
       expect(
         getCredentialsOrigin({
           credentials: [ic0OriginDevice, icOrgOriginDevice, icIoOriginDevice],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBeUndefined();
 
@@ -47,21 +42,18 @@ describe("credetial-devices test", () => {
             { ...ic0OriginDevice },
             icIoOriginDevice,
           ],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBeUndefined();
 
       expect(
         getCredentialsOrigin({
           credentials: [ic0OriginDevice, { ...ic0OriginDevice }],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
           credentials: [icOrgOriginDevice, { ...icOrgOriginDevice }],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBe("https://identity.internetcomputer.org");
     });
@@ -70,30 +62,18 @@ describe("credetial-devices test", () => {
       expect(
         getCredentialsOrigin({
           credentials: [undefinedOriginDevice],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
           credentials: [undefinedOriginDevice, ic0OriginDevice],
-          userAgent: userAgentSupportingRoR,
         })
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
           credentials: [undefinedOriginDevice, icOrgOriginDevice],
-          userAgent: userAgentSupportingRoR,
-        })
-      ).toBeUndefined();
-    });
-
-    it("returns `undefined` if user doesn't support RoR", () => {
-      expect(
-        getCredentialsOrigin({
-          credentials: [ic0OriginDevice, icOrgOriginDevice, icIoOriginDevice],
-          userAgent: userAgentNotSupportingRoR,
         })
       ).toBeUndefined();
     });
