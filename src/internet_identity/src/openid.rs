@@ -21,6 +21,8 @@ use std::{cell::RefCell, collections::HashMap};
 
 mod google;
 
+const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
 pub type Sub = String;
@@ -62,8 +64,7 @@ impl OpenIdCredential {
     ) -> (UserKey, Timestamp) {
         state::ensure_salt_set().await;
 
-        let session_duration_ns = 30 * MINUTE_NS;
-        let expiration = time().saturating_add(session_duration_ns);
+        let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
         let seed = calculate_delegation_seed(&self.aud, &self.key());
 
         state::signature_map_mut(|sigs| {
@@ -72,7 +73,7 @@ impl OpenIdCredential {
         update_root_hash();
 
         // TODO: we are currently not doing bookkeeping in here.
-        delegation_bookkeeping(frontend, None, session_duration_ns);
+        delegation_bookkeeping(frontend, None, OPENID_SESSION_DURATION_NS);
 
         (
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
