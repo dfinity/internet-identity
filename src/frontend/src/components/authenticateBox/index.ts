@@ -97,7 +97,7 @@ export const authenticateBox = async ({
   userNumber: bigint;
   connection: AuthenticatedConnection;
   newAnchor: boolean;
-  authnMethod: "pin" | "passkey" | "recovery" | "openid";
+  authnMethod: "pin" | "passkey" | "recovery";
   showAddCurrentDevice: boolean;
 }> => {
   const promptAuth = async (autoSelectIdentity?: bigint) =>
@@ -238,7 +238,7 @@ export const authenticateBoxFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery" | "openid";
+      authnMethod: "pin" | "passkey" | "recovery";
     })
   | PossiblyWrongWebAuthnFlow
   | PinUserOtherDomain
@@ -258,7 +258,7 @@ export const authenticateBoxFlow = async <I>({
   const doRegister = async (): Promise<
     | (LoginSuccess & {
         newAnchor: true;
-        authnMethod: "pin" | "passkey" | "recovery" | "openid";
+        authnMethod: "pin" | "passkey" | "recovery";
       })
     | FlowError
     | { tag: "canceled" }
@@ -330,7 +330,7 @@ export const authenticateBoxFlow = async <I>({
       userNumber: authenticatedConnection.userNumber,
       showAddCurrentDevice: false,
       newAnchor: false,
-      authnMethod: "openid" as const,
+      authnMethod: "passkey" as const, // we are returning passkey here because we don't want dapps to be able to block based on openID login
     };
   };
 
@@ -338,7 +338,7 @@ export const authenticateBoxFlow = async <I>({
   const doPrompt = async (): Promise<
     | (LoginSuccess & {
         newAnchor: boolean;
-        authnMethod: "pin" | "passkey" | "recovery" | "openid";
+        authnMethod: "pin" | "passkey" | "recovery";
       })
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
@@ -811,7 +811,7 @@ const useIdentityFlow = async <I>({
 }): Promise<
   | (LoginSuccess & {
       newAnchor: boolean;
-      authnMethod: "pin" | "passkey" | "recovery" | "openid";
+      authnMethod: "pin" | "passkey" | "recovery";
     })
   | AuthFail
   | WebAuthnFailed
