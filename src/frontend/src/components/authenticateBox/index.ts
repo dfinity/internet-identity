@@ -518,7 +518,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       onSubmit: (userNumber: bigint) => void;
       recover: (userNumber?: bigint) => void;
       addDevice: (userNumber?: bigint) => void;
-      loginOpenIDGoogle: (userNumber?: bigint) => void;
+      loginOpenIDGoogle: () => void;
     }) => {
       const anchorInput = mkAnchorInput({
         onSubmit: useExistingProps.onSubmit,
@@ -558,7 +558,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
               <button
                 @click=${() =>
                   withUserNumber((userNumber) =>
-                    useExistingProps.loginOpenIDGoogle(userNumber)
+                    useExistingProps.loginOpenIDGoogle()
                   )}
                 id="addNewDeviceButton"
                 class="c-button c-button--secondary"

@@ -32,7 +32,6 @@ import {
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
 import { withLoader } from "$src/components/loader";
-import { toast } from "$src/components/toast";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$src/featureFlags";
 import { features } from "$src/features";
@@ -692,10 +691,7 @@ export class Connection {
           expiration
         );
         if ("Err" in res) {
-          const errorKeys = Object.keys(res.Err);
-          const errorMessage =
-            errorKeys.length > 0 ? errorKeys[0] : "unknown error";
-          toast.error("Error while fetching delegation: " + errorMessage);
+          console.error(res.Err);
           continue;
         }
 
@@ -909,6 +905,9 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<[PublicKey, bigint] | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
+      console.log(
+        `prepare_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey})`
+      );
       const actor = await this.getActor();
       return await actor.prepare_delegation(
         this.userNumber,
@@ -929,6 +928,9 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<GetDelegationResponse | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
+      console.log(
+        `get_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+      );
       const actor = await this.getActor();
       return await actor.get_delegation(
         this.userNumber,
