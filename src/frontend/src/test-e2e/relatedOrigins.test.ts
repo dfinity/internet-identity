@@ -131,7 +131,7 @@ test("Add devices on related origins with different origin", async () => {
   });
 }, 300_000);
 
-test("Recovery device on related origins", async () => {
+test("Use recovery device on related origins", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Get related origins
     await browser.url(II_URL);
