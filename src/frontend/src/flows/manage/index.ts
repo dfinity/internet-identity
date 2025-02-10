@@ -731,7 +731,6 @@ const domainInfo = (
   }
   const commonOrigin = getCredentialsOrigin({
     credentials: allDevices,
-    userAgent: window.navigator.userAgent,
   });
   if (nonNullish(commonOrigin)) {
     return undefined;
