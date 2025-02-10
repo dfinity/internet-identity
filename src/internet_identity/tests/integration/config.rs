@@ -3,8 +3,8 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, OpenIdConfig,
-    RateLimitConfig,
+    ArchiveConfig, CaptchaConfig, CaptchaTrigger, DappsExplorerConfig, InternetIdentityInit,
+    OpenIdConfig, RateLimitConfig,
 };
 use pocket_ic::CallError;
 
@@ -34,6 +34,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
         }),
         related_origins: None,
         openid_google: Some(None),
+        dapps_explorer: Some(None),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -77,6 +78,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(Some(openid_google)),
+        dapps_explorer: Some(Some(DappsExplorerConfig {})),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -125,6 +127,7 @@ fn should_override_partially() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(openid_google),
+        dapps_explorer: Some(None),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -147,6 +150,7 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: Some(new_captcha.clone()),
         related_origins: None,
         openid_google: None,
+        dapps_explorer: Some(None),
     };
 
     let _ =
@@ -173,6 +177,7 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
         openid_google: Some(openid_google2.clone()),
+        dapps_explorer: Some(None),
     };
 
     let _ =

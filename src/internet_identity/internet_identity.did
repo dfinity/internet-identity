@@ -236,6 +236,9 @@ type CaptchaConfig = record {
     };
 };
 
+// No configuration is available at this moment
+type DappsExplorerConfig = record {};
+
 // Init arguments of II which can be supplied on install and upgrade.
 //
 // Each field is wrapped is `opt` to indicate whether the field should
@@ -266,6 +269,8 @@ type InternetIdentityInit = record {
     related_origins: opt vec text;
     // Configuration for OpenID Google client
     openid_google: opt opt OpenIdConfig;
+    // Configuration for dapps explorer
+    dapps_explorer: opt opt DappsExplorerConfig;
 };
 
 type ChallengeKey = text;

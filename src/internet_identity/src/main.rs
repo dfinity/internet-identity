@@ -353,6 +353,7 @@ fn config() -> InternetIdentityInit {
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
+        dapps_explorer: Some(persistent_state.dapps_explorer.clone()),
     })
 }
 
@@ -441,6 +442,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(openid_google) = arg.openid_google {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_google = openid_google;
+            })
+        }
+        if let Some(dapps_explorer) = arg.dapps_explorer {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.dapps_explorer = dapps_explorer;
             })
         }
     }
