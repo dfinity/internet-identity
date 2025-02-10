@@ -304,6 +304,7 @@
 
   --rs-marketing-block-stack: calc(var(--vs-stack) * 5);
 
+  --rs-toasts-brezel: var(--vs-bezel);
   --rs-toast-body-stack: calc(var(--vs-stack) * 0.5);
   --rs-toast-stack: var(--rs-toast-body-stack);
 
@@ -1417,6 +1418,13 @@ by all browsers (FF is missing) */
   right: 0;
   z-index: var(--z-toasts);
   margin: 0 auto calc(var(--rs-footer-height) + 0.5rem);
+}
+
+@media screen and (max-width: 512px) {
+  .c-toasts {
+    min-width: unset;
+    padding: 0 var(--rs-toasts-brezel);
+  }
 }
 
 .c-toast + .c-toast {
