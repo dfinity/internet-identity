@@ -346,6 +346,9 @@ export const authenticateBoxFlow = async <I>({
     | { tag: "canceled" }
     | { tag: "deviceAdded" }
   > => {
+    const i18n = new I18n();
+    const copy = i18n.i18n(infoToastCopy);
+
     const result = await pages.useExisting();
     if (result.tag === "submit") {
       return doLogin({ userNumber: result.userNumber });
@@ -361,7 +364,7 @@ export const authenticateBoxFlow = async <I>({
 
     if (result.tag === "open_id_google") {
       const loginResult = await doLoginWithGoogle(connection);
-      if (!loginResult) throw toast.error("Could not login with google"); // TODO: get from copy etc
+      if (!loginResult) throw toast.error(copy.failed_to_login_with_google);
       return loginResult;
     }
 
