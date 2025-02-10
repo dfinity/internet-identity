@@ -33,7 +33,7 @@ pub enum OpenIdCredentialRemoveError {
 #[derive(CandidType, Debug)]
 pub struct OpenIdPrepareDelegationResponse {
     pub user_key: UserKey,
-    pub timestamp: Timestamp,
+    pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
 }
 

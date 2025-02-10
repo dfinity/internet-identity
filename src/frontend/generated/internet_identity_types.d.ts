@@ -265,8 +265,8 @@ export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'JwtVerificationFailed' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,
+  'expiration' : Timestamp,
   'anchor_number' : UserNumber,
-  'timestamp' : Timestamp,
 }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };

@@ -830,13 +830,13 @@ mod openid_api {
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        let (user_key, timestamp) = openid_credential
+        let (user_key, expiration) = openid_credential
             .prepare_jwt_delegation(session_key, frontend)
             .await;
 
         Ok(OpenIdPrepareDelegationResponse {
             user_key,
-            timestamp,
+            expiration,
             anchor_number,
         })
     }

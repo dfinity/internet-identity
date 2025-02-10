@@ -347,8 +347,8 @@ export const idlFactory = ({ IDL }) => {
   const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
+    'expiration' : Timestamp,
     'anchor_number' : UserNumber,
-    'timestamp' : Timestamp,
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,

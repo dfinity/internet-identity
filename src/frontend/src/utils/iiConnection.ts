@@ -677,7 +677,7 @@ export class Connection {
       jwt: JWT,
       salt: Salt,
       sessionKey: SessionKey,
-      timestamp: bigint,
+      expiration: bigint,
       actor: ActorSubclass<_SERVICE>,
       maxRetries = 5
     ): Promise<SignedDelegation> => {
@@ -690,7 +690,7 @@ export class Connection {
           jwt,
           salt,
           sessionKey,
-          timestamp
+          expiration
         );
         if ("Err" in res) {
           const errorKeys = Object.keys(res.Err);
@@ -720,10 +720,11 @@ export class Connection {
     if ("Err" in prepareDelegationResponse)
       throw new CanisterError(prepareDelegationResponse.Err);
 
-    const { anchor_number, timestamp, user_key } = prepareDelegationResponse.Ok;
+    const { anchor_number, expiration, user_key } =
+      prepareDelegationResponse.Ok;
 
     const signedDelegation = await withLoader(() =>
-      retryGetJwtDelegation(jwt, salt, sessionKey, timestamp, actor)
+      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor)
     );
 
     const transformedDelegation = {

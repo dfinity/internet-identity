@@ -368,7 +368,7 @@ type OpenIdDelegationError = variant {
 
 type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
-    timestamp : Timestamp;
+    expiration : Timestamp;
     anchor_number : UserNumber;
 };
 
