@@ -98,7 +98,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "122.0.6261.111", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
@@ -512,6 +512,19 @@ export const setDomainCompatibilityFeatureFlag = async (
     // @ts-ignore
     window.__featureFlags.DOMAIN_COMPATIBILITY.set(enabled);
   }, enabled);
+};
+
+export const mockPasskeyExtension = async (
+  browser: WebdriverIO.Browser
+): Promise<void> => {
+  await browser.execute(() => {
+    const create = navigator.credentials.create;
+    const get = navigator.credentials.get;
+    navigator.credentials.create = (...args) =>
+      create.call(navigator.credentials, ...args);
+    navigator.credentials.get = (...args) =>
+      get.call(navigator.credentials, ...args);
+  });
 };
 
 export const createActor = async (

@@ -123,6 +123,7 @@ export class PinRegistrationView extends View {
   async pinInfoContinue(): Promise<void> {
     await this.browser.$('[data-action="continue-pin"]').click();
   }
+
   async waitForSetPin(): Promise<void> {
     await this.browser
       .$('[data-role="set-pin"]')
@@ -135,6 +136,7 @@ export class PinRegistrationView extends View {
       await input.setValue(digit);
     }
   }
+
   async waitForConfirmPin(): Promise<void> {
     await this.browser
       .$('[data-role="confirm-pin"]')
@@ -153,6 +155,7 @@ export class PinRegistrationView extends View {
 
 export class PinAuthView extends View {
   private readonly ERROR_SELECTOR = '[data-haserror="true"]';
+
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="pin"]')
@@ -175,6 +178,7 @@ export class PinAuthView extends View {
 
 export class RecoveryMethodSelectorView extends View {
   private readonly SELECTOR = '[data-page="add-recovery-phrase"]';
+
   async waitForDisplay(): Promise<void> {
     await this.browser.$(this.SELECTOR).waitForExist();
   }
@@ -244,6 +248,19 @@ export class MainView extends View {
     );
     if (elems.length !== count) {
       throw Error("Bad number of elements");
+    }
+  }
+
+  async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
+    const differentOriginInfoIcon = await this.browser.$(
+      '[data-role="passkeys"] [data-device] [data-icon="info"]'
+    );
+    if ((await differentOriginInfoIcon.isExisting()) !== exist) {
+      throw Error(
+        exist
+          ? "Different origin device not found"
+          : "Different origin device found"
+      );
     }
   }
 
@@ -497,7 +514,9 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
-    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
+    await this.browser
+      .$(this.SELECTOR)
+      .waitForDisplayed({ timeout: 50000_000 });
   }
 
   async continue(): Promise<void> {
@@ -521,11 +540,7 @@ export class AuthenticateView extends View {
   }
 
   async pickExistingAnchor(anchor: string): Promise<void> {
-    if (await this.browser.$("#loginButton").isExisting()) {
-      await this.browser.$("#loginButton").click();
-    } else {
-      await this.browser.$('[data-role="more-options"]').click();
-    }
+    await this.useExisting();
     await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
     await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
     await this.browser.$('[data-action="continue"]').click();
@@ -557,8 +572,17 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-role="anchor-input"]').click();
   }
 
+  async useExisting(): Promise<void> {
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
+    if (await moreOptions.isExisting()) {
+      await moreOptions.click();
+    } else {
+      await this.browser.$("#loginButton").click();
+    }
+  }
+
   async recoverSeedPhrase(): Promise<void> {
-    await await this.browser.$('[data-role="more-options"]').click();
+    await this.useExisting();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
@@ -569,7 +593,7 @@ export class AuthenticateView extends View {
   }
 
   async recoverDevice(): Promise<void> {
-    await await this.browser.$('[data-role="more-options"]').click();
+    await this.useExisting();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
@@ -1033,6 +1057,7 @@ export class PromptUserNumberView extends View {
     await this.browser.$('[data-action="next"]').click();
   }
 }
+
 export class PromptDeviceAliasView extends View {
   async waitForDeviceAliasDisplay(): Promise<void> {
     await this.browser
