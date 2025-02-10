@@ -557,9 +557,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
           ? html`
               <button
                 @click=${() =>
-                  withUserNumber((userNumber) =>
-                    useExistingProps.loginOpenIDGoogle()
-                  )}
+                  withUserNumber(() => useExistingProps.loginOpenIDGoogle())}
                 id="addNewDeviceButton"
                 class="c-button c-button--secondary"
               >
