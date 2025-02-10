@@ -43,6 +43,7 @@ import {
 import {
   CanisterError,
   diagnosticInfo,
+  transformSignedDelegation,
   unknownToString,
 } from "$src/utils/utils";
 import {
@@ -50,11 +51,9 @@ import {
   ActorSubclass,
   DerEncodedPublicKey,
   HttpAgent,
-  Signature,
   SignIdentity,
 } from "@dfinity/agent";
 import {
-  Delegation,
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
@@ -727,16 +726,7 @@ export class Connection {
       retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor)
     );
 
-    const transformedDelegation = {
-      delegation: new Delegation(
-        new Uint8Array(signedDelegation.delegation.pubkey),
-        signedDelegation.delegation.expiration,
-        signedDelegation.delegation.targets?.[0]?.map((p) =>
-          Principal.from(p)
-        ) ?? undefined
-      ),
-      signature: new Uint8Array(signedDelegation.signature).buffer as Signature,
-    };
+    const transformedDelegation = transformSignedDelegation(signedDelegation);
 
     const chain = DelegationChain.fromDelegations(
       [transformedDelegation],
