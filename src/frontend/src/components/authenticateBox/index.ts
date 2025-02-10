@@ -292,10 +292,13 @@ export const authenticateBoxFlow = async <I>({
     });
 
   const doLoginWithGoogle = async (connection: Connection) => {
+    const i18n = new I18n();
+    const copy = i18n.i18n(infoToastCopy);
+
     const googleClientId = getGoogleClientId();
 
     if (isNullish(googleClientId)) {
-      toast.error("Google login is unavailable."); // TODO: put into copy / handle errors better
+      toast.error(copy.sign_in_with_google_accounts_is_unavailable);
       return;
     }
 
