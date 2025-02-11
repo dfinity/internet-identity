@@ -13,6 +13,11 @@ import { FLOWS } from "$src/test-e2e/flows";
 import { MainView } from "$src/test-e2e/views";
 import { DEVICE_NAME1, II_URL } from "./constants";
 
+const EXPECTED_RELATED_ORIGINS = [
+  "https://identity.internetcomputer.org",
+  "https://identity.ic0.app",
+];
+
 test("Sign in on related origins", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Get related origins
@@ -21,10 +26,8 @@ test("Sign in on related origins", async () => {
     const config = await actor.config();
     const relatedOrigins = config.related_origins[0] ?? [II_URL];
 
-    // Skip this test if there aren't multiple related origins
-    if (relatedOrigins.length < 2) {
-      return;
-    }
+    // Related origins should be configured to the expected values
+    expect(relatedOrigins).toStrictEqual(EXPECTED_RELATED_ORIGINS);
 
     // Register on main (current) origin
     await addVirtualAuthenticator(browser);
@@ -57,10 +60,8 @@ test("Add devices on related origins with same origin", async () => {
     const config = await actor.config();
     const relatedOrigins = config.related_origins[0] ?? [II_URL];
 
-    // Skip this test if there aren't multiple related origins
-    if (relatedOrigins.length < 2) {
-      return;
-    }
+    // Related origins should be configured to the expected values
+    expect(relatedOrigins).toStrictEqual(EXPECTED_RELATED_ORIGINS);
 
     // Register on main (current) origin
     const signInDevice = await addVirtualAuthenticator(browser);
@@ -104,10 +105,8 @@ test("Add devices on related origins with different origin", async () => {
     const config = await actor.config();
     const relatedOrigins = config.related_origins[0] ?? [II_URL];
 
-    // Skip this test if there aren't multiple related origins
-    if (relatedOrigins.length < 2) {
-      return;
-    }
+    // Related origins should be configured to the expected values
+    expect(relatedOrigins).toStrictEqual(EXPECTED_RELATED_ORIGINS);
 
     // Register on main (current) origin
     const signInDevice = await addVirtualAuthenticator(browser);
@@ -152,10 +151,8 @@ test("Use recovery device on related origins", async () => {
     const config = await actor.config();
     const relatedOrigins = config.related_origins[0] ?? [II_URL];
 
-    // Skip this test if there aren't multiple related origins
-    if (relatedOrigins.length < 2) {
-      return;
-    }
+    // Related origins should be configured to the expected values
+    expect(relatedOrigins).toStrictEqual(EXPECTED_RELATED_ORIGINS);
 
     // Register on main (current) origin
     const signInDevice = await addVirtualAuthenticator(browser);
