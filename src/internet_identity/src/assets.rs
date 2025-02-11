@@ -6,15 +6,17 @@ use crate::state;
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
+use candid::Encode;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
 use serde_json::json;
 use sha2::Digest;
+use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 
 // used both in init and post_upgrade
-pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
+pub fn init_assets(config: &InternetIdentityInit) {
     state::assets_mut(|certified_assets| {
-        let assets = get_static_assets(maybe_related_origins.clone());
+        let assets = get_static_assets(config);
 
         // Extract integrity hashes for all inlined scripts, from all the HTML files.
         let integrity_hashes = assets
@@ -33,25 +35,26 @@ pub fn init_assets(maybe_related_origins: Option<Vec<String>>) {
 
         *certified_assets = CertifiedAssets::certify_assets(
             assets,
-            &security_headers(integrity_hashes, maybe_related_origins),
+            &security_headers(integrity_hashes, config.related_origins.clone()),
         );
     });
 }
 
-// Fix up HTML pages, by injecting canister ID
-fn fixup_html(html: &str) -> String {
+// Fix up HTML pages, by injecting canister ID and canister config
+fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
     let canister_id = api::id();
+    let encoded_config = BASE64.encode(Encode!(&config).unwrap());
     html.replace(
         r#"<script "#,
-        &format!(r#"<script data-canister-id="{canister_id}" "#),
+        &format!(r#"<script data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#),
     )
 }
 
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
-pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asset> {
-    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
+pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
+    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html), config);
 
     // Required to make II available on the identity.internetcomputer.org domain.
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
@@ -62,7 +65,7 @@ pub fn get_static_assets(maybe_related_origins: Option<Vec<String>>) -> Vec<Asse
         content_type: ContentType::OCTETSTREAM,
     });
 
-    if let Some(related_origins) = maybe_related_origins {
+    if let Some(related_origins) = &config.related_origins {
         // Required to share passkeys with the different domains. Maximum of 5 labels.
         // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
         let content = json!({

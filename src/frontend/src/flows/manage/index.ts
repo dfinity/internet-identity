@@ -2,7 +2,6 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
-  InternetIdentityInit,
   OpenIdCredential,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
@@ -355,11 +354,8 @@ export const displayManage = async (
     connection.identity.getPrincipal()
   );
 
-  // Get Google client id from config in background
-  const configRef: { current?: InternetIdentityInit } = {};
-  void connection.getConfig().then((config) => (configRef.current = config));
-  const getGoogleClientId = () =>
-    configRef.current?.openid_google[0]?.[0]?.client_id;
+  const googleClientId =
+    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -417,7 +413,6 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
-      const googleClientId = getGoogleClientId();
       if (isNullish(googleClientId)) {
         toast.error(copy.linking_google_accounts_is_unavailable);
         return;

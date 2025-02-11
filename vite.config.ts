@@ -1,6 +1,6 @@
 import {
   compression,
-  injectCanisterIdPlugin,
+  injectCanisterIdAndConfigPlugin,
   inlineScriptsPlugin,
   minifyHTML,
   replicaForwardPlugin,
@@ -75,7 +75,11 @@ export default defineConfig(({ command, mode }): UserConfig => {
       }),
       [
         ...(mode === "development"
-          ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]
+          ? [
+              injectCanisterIdAndConfigPlugin({
+                canisterName: "internet_identity",
+              }),
+            ]
           : []),
       ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],

@@ -1,5 +1,6 @@
 import {
   DeviceData,
+  InternetIdentityInit,
   MetadataMapV2,
   _SERVICE,
 } from "$generated/internet_identity_types";
@@ -84,6 +85,7 @@ beforeEach(async () => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
+    {} as InternetIdentityInit,
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
@@ -99,6 +101,7 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
+    {} as InternetIdentityInit,
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
@@ -178,7 +181,11 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection with expected rpID", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -207,7 +214,11 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -260,7 +271,11 @@ describe("Connection.login", () => {
           .fn()
           .mockResolvedValue([currentOriginDevice, currentOriginDevice2]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -310,7 +325,11 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection with expected rpID", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -339,7 +358,11 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection without rpID if flag is not enabled", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -367,7 +390,11 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -417,7 +444,11 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection without rpID if flag is not enabled", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -445,7 +476,11 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -498,7 +533,11 @@ describe("Connection.login", () => {
             deviceWithoutCredentialId,
           ]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
       await connection.login(BigInt(12345));
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
@@ -523,7 +562,11 @@ describe("Connection.login", () => {
             deviceInvalidCredentialId,
           ]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
       await connection.login(BigInt(12345));
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
@@ -556,7 +599,11 @@ describe("Connection.login", () => {
         lookup: vi.fn().mockResolvedValue([pinDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
 
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection(
+        "aaaaa-aa",
+        {} as InternetIdentityInit,
+        mockActor
+      );
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -579,6 +626,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
+        {} as InternetIdentityInit,
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
@@ -616,6 +664,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
+        {} as InternetIdentityInit,
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
@@ -653,6 +702,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
+        {} as InternetIdentityInit,
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
@@ -689,6 +739,7 @@ describe("Connection.login", () => {
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
         "aaaaa-aa",
+        {} as InternetIdentityInit,
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
