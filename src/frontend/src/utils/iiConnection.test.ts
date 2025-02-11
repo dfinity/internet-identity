@@ -84,7 +84,6 @@ beforeEach(async () => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
-
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
@@ -100,7 +99,6 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
-
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
@@ -144,7 +142,6 @@ describe("Connection.login", () => {
             };
           },
         } as unknown as WebAuthnIdentity;
-
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
           static fromCredentials(
             credentials: CredentialData[],
@@ -153,7 +150,6 @@ describe("Connection.login", () => {
           ) {
             return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
-
           override sign() {
             if (failSign) {
               throw new DOMException("Error test", "NotAllowedError");
@@ -162,7 +158,6 @@ describe("Connection.login", () => {
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
         }
-
         return MockMultiWebAuthnIdentity.fromCredentials(
           [],
           undefined,
