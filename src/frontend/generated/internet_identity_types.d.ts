@@ -12,6 +12,7 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
+export type AnalyticsConfig = { 'Plausible' : null };
 export interface AnchorCredentials {
   'recovery_phrases' : Array<PublicKey>,
   'credentials' : Array<WebAuthnCredential>,
@@ -207,6 +208,7 @@ export interface InternetIdentityInit {
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
+  'analytics_config' : [] | [[] | [AnalyticsConfig]],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
   'register_rate_limit' : [] | [RateLimitConfig],
