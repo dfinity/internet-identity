@@ -1,6 +1,4 @@
-use crate::delegation::{
-    add_delegation_signature, delegation_bookkeeping, der_encode_canister_sig_key,
-};
+use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
@@ -12,8 +10,8 @@ use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{
-    Delegation, FrontendHostname, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
-    SignedDelegation, Timestamp, UserKey,
+    Delegation, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey, SignedDelegation, Timestamp,
+    UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
