@@ -420,7 +420,7 @@ pub fn collect_assets<A>(
     dir: &Dir,
     html_transformer: Option<fn(&str, Option<&A>) -> String>,
     html_transformer_arg: Option<&A>,
-) -> Vec<Asset>  {
+) -> Vec<Asset> {
     let mut assets = vec![];
 
     // Collect all assets, recursively
@@ -430,10 +430,12 @@ pub fn collect_assets<A>(
     if let Some(html_transformer) = html_transformer {
         for asset in &mut assets {
             if let ContentType::HTML = asset.content_type {
-                asset.content =
-                    html_transformer(std::str::from_utf8(&asset.content).unwrap(), html_transformer_arg)
-                        .as_bytes()
-                        .to_vec();
+                asset.content = html_transformer(
+                    std::str::from_utf8(&asset.content).unwrap(),
+                    html_transformer_arg,
+                )
+                .as_bytes()
+                .to_vec();
             }
         }
     }
