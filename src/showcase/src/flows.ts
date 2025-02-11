@@ -1,7 +1,4 @@
-import {
-  _SERVICE,
-  InternetIdentityInit,
-} from "$generated/internet_identity_types";
+import { _SERVICE } from "$generated/internet_identity_types";
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
@@ -51,13 +48,13 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
   constructor() {
     super(
       "12345",
-      {} as InternetIdentityInit,
       MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),
       mockActor
     );
   }
+
   setShownRecoveryWarningPage = async (): Promise<void> => {
     // Do nothing
   };
@@ -211,7 +208,7 @@ const pageContent: TemplateResult = html`
             const baseUrl = import.meta.env.BASE_URL ?? "/";
             // '/myFlow' or '/internet-identity/myFlow'
             const flowLink = baseUrl + "flows/" + flowName;
-            return html`<aside>
+            return html` <aside>
               <a data-page-name=${flowName} href=${flowLink}>
                 <h2>${flowName}</h2>
               </a>
@@ -229,9 +226,9 @@ const prettyResult = (obj: unknown) => {
   }
 
   if (typeof obj === "object" && obj !== null) {
-    return html`<ul>
+    return html` <ul>
       ${Object.entries(obj).map(
-        ([k, v]) => html`<li><strong class="t-strong">${k}: ${v}</strong></li>`
+        ([k, v]) => html` <li><strong class="t-strong">${k}: ${v}</strong></li>`
       )}
     </ul>`;
   }

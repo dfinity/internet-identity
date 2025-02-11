@@ -394,20 +394,3 @@ export const isCanisterError = <T extends Record<string, unknown>>(
 ): error is CanisterError<T> => {
   return error instanceof CanisterError;
 };
-
-export const toBase64 = (bytes: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)));
-
-export const toBase64URL = (bytes: ArrayBuffer): string =>
-  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-export const fromBase64 = (base64: string): ArrayBuffer =>
-  Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0)).buffer;
-
-export const fromBase64URL = (base64Url: string): ArrayBuffer =>
-  fromBase64(
-    base64Url
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(base64Url.length / 4) * 4, "=")
-  );
