@@ -266,6 +266,8 @@ type InternetIdentityInit = record {
     related_origins: opt vec text;
     // Configuration for OpenID Google client
     openid_google: opt opt OpenIdConfig;
+    // Configuration for Web Analytics
+    analytics_config: opt opt AnalyticsConfig;
 };
 
 type ChallengeKey = text;
@@ -338,6 +340,10 @@ type OpenIdConfig = record {
 };
 
 type OpenIdCredentialKey = record { Iss; Sub };
+
+type AnalyticsConfig = variant {
+    Plausible;
+};
 
 type OpenIdCredential = record {
     iss: Iss;

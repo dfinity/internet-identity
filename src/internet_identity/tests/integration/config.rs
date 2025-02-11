@@ -3,8 +3,7 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, OpenIdConfig,
-    RateLimitConfig,
+    AnalyticsConfig, ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, OpenIdConfig, RateLimitConfig
 };
 use pocket_ic::CallError;
 
@@ -34,6 +33,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
         }),
         related_origins: None,
         openid_google: Some(None),
+        analytics_config: None,
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -77,6 +77,7 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(Some(openid_google)),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -125,6 +126,7 @@ fn should_override_partially() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(openid_google),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -147,6 +149,7 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: Some(new_captcha.clone()),
         related_origins: None,
         openid_google: None,
+        analytics_config: None,
     };
 
     let _ =
@@ -173,6 +176,7 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
         openid_google: Some(openid_google2.clone()),
+        analytics_config: None,
     };
 
     let _ =
@@ -185,6 +189,27 @@ fn should_override_partially() -> Result<(), CallError> {
     };
 
     assert_eq!(api::config(&env, canister_id)?, expected_config_3);
+
+    let config_4 = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: None,
+        openid_google: None,
+        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+    };
+
+    let _ =
+        upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_4.clone()));
+
+    let expected_config_4 = InternetIdentityInit {
+        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+        ..expected_config_3
+    };
+
+    assert_eq!(api::config(&env, canister_id)?, expected_config_4);
 
     Ok(())
 }

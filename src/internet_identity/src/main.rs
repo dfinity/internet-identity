@@ -353,6 +353,7 @@ fn config() -> InternetIdentityInit {
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
+        analytics_config: Some(persistent_state.analytics_config.clone()),
     })
 }
 
@@ -441,6 +442,12 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(openid_google) = arg.openid_google {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_google = openid_google;
+            })
+        }
+        if let Some(analytics_config) = arg.analytics_config {
+            ic_cdk::println!("setting analytics config {:?}", analytics_config);
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.analytics_config = analytics_config;
             })
         }
     }
