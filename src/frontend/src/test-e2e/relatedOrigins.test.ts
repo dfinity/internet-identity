@@ -126,8 +126,11 @@ test("Add devices on related origins with different origin", async () => {
       const additionalDevice = await addVirtualAuthenticator(browser);
       await browser.url(relatedOrigin);
 
-      // Enable feature flag and disable RoR by mimicking a Passkey extension
+      // Enable feature flag
       await setDomainCompatibilityFeatureFlag(browser, true);
+
+      // Disable RoR by mimicking a passkey browser extension,
+      // this enables adding devices in different origins.
       await mimickPasskeyExtension(browser);
 
       // Sign in using seed phrase and register device
