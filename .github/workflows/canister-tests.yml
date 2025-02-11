@@ -524,7 +524,7 @@ jobs:
           # (i.e. capitalize the first letter)
           captcha_variant="Captcha$(tr '[:lower:]' '[:upper:]' <<< ${captcha_flag:0:1})${captcha_flag:1}"
           # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { $captcha_variant }}}})"
+          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { $captcha_variant }}}; related_origins = opt vec { "https://identity.internetcomputer.org"; "https://identity.ic0.app" }})"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
           dfx canister install issuer --wasm demos/vc_issuer/vc_demo_issuer.wasm.gz
 
