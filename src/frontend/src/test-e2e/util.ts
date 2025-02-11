@@ -514,7 +514,11 @@ export const setDomainCompatibilityFeatureFlag = async (
   }, enabled);
 };
 
-export const mockPasskeyExtension = async (
+/**
+ * Monkey patch WebAuthn methods to make them not '[native code]' and
+ * thus detected as a passkey extension which doesn't support RoR.
+ */
+export const mimickPasskeyExtension = async (
   browser: WebdriverIO.Browser
 ): Promise<void> => {
   await browser.execute(() => {

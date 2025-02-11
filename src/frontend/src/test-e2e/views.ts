@@ -514,9 +514,7 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
-    await this.browser
-      .$(this.SELECTOR)
-      .waitForDisplayed({ timeout: 50000_000 });
+    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
   }
 
   async continue(): Promise<void> {
@@ -539,8 +537,8 @@ export class AuthenticateView extends View {
     await this.browser.$(`[data-anchor-id="${anchor}"]`).waitForDisplayed();
   }
 
-  async pickExistingAnchor(anchor: string): Promise<void> {
-    await this.useExisting();
+  async continueWithAnchor(anchor: string): Promise<void> {
+    await this.clickUseExisting();
     await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
     await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
     await this.browser.$('[data-action="continue"]').click();
@@ -572,7 +570,7 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-role="anchor-input"]').click();
   }
 
-  async useExisting(): Promise<void> {
+  async clickUseExisting(): Promise<void> {
     const moreOptions = await this.browser.$('[data-role="more-options"]');
     if (await moreOptions.isExisting()) {
       await moreOptions.click();
@@ -582,7 +580,7 @@ export class AuthenticateView extends View {
   }
 
   async recoverSeedPhrase(): Promise<void> {
-    await this.useExisting();
+    await this.clickUseExisting();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
@@ -593,7 +591,7 @@ export class AuthenticateView extends View {
   }
 
   async recoverDevice(): Promise<void> {
-    await this.useExisting();
+    await this.clickUseExisting();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();

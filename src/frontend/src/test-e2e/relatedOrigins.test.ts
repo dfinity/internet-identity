@@ -1,7 +1,7 @@
 import {
   addVirtualAuthenticator,
   createActor,
-  mockPasskeyExtension,
+  mimickPasskeyExtension,
   removeVirtualAuthenticator,
   runInBrowser,
   setDomainCompatibilityFeatureFlag,
@@ -34,8 +34,11 @@ test("Sign in on related origins", async () => {
 
     // Sign in on each related origin
     for (const relatedOrigin of relatedOrigins) {
+      // Sign out and navigate to different origin
       await mainView.logout();
       await browser.url(relatedOrigin);
+
+      // Enable feature flag and sign in
       await setDomainCompatibilityFeatureFlag(browser, true);
       await FLOWS.loginExistingAuthenticateView(
         userNumber,
@@ -72,10 +75,15 @@ test("Add devices on related origins with same origin", async () => {
 
     // Register device on each related origin
     for (const relatedOrigin of relatedOrigins) {
+      // Sign out and navigate to different origin
       await mainView.logout();
       const additionalDevice = await addVirtualAuthenticator(browser);
       await browser.url(relatedOrigin);
+
+      // Enable feature flag
       await setDomainCompatibilityFeatureFlag(browser, true);
+
+      // Sign in using seed phrase and register device
       await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
       await FLOWS.addFidoDevice(browser);
       await mainView.waitForDisplay();
@@ -114,11 +122,16 @@ test("Add devices on related origins with different origin", async () => {
 
     // Register device on each related origin
     for (const relatedOrigin of relatedOrigins) {
+      // Sign out and navigate to different origin
       await mainView.logout();
       const additionalDevice = await addVirtualAuthenticator(browser);
       await browser.url(relatedOrigin);
+
+      // Enable feature flag and disable RoR by mimicking a Passkey extension
       await setDomainCompatibilityFeatureFlag(browser, true);
-      await mockPasskeyExtension(browser);
+      await mimickPasskeyExtension(browser);
+
+      // Sign in using seed phrase and register device
       await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
       await FLOWS.addFidoDevice(browser);
       await mainView.waitForDisplay();
@@ -157,8 +170,11 @@ test("Use recovery device on related origins", async () => {
 
     // Recover on each related origin
     for (const relatedOrigin of relatedOrigins) {
+      // Sign out and navigate to different origin
       await mainView.logout();
       await browser.url(relatedOrigin);
+
+      // Enable feature flag and recover using device
       await setDomainCompatibilityFeatureFlag(browser, true);
       await FLOWS.recoverUsingDevice(browser, userNumber);
     }

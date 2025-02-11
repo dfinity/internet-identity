@@ -109,7 +109,7 @@ export const FLOWS = {
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
-    await authenticateView.pickExistingAnchor(userNumber);
+    await authenticateView.continueWithAnchor(userNumber);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
