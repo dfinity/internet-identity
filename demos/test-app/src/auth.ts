@@ -117,6 +117,7 @@ const identityFromResponse = ({
   response: AuthResponseSuccess;
 }): DelegationIdentity => {
   const delegations = response.delegations.map(extractDelegation);
+  
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
     response.userPublicKey.buffer
