@@ -9,9 +9,9 @@ use base64::Engine;
 use candid::Encode;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
+use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 use serde_json::json;
 use sha2::Digest;
-use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 
 // used both in init and post_upgrade
 pub fn init_assets(config: &InternetIdentityInit) {
@@ -46,7 +46,9 @@ fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
     html.replace(
         r#"<script "#,
-        &format!(r#"<script data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#),
+        &format!(
+            r#"<script data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
+        ),
     )
 }
 
