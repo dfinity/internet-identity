@@ -1,9 +1,11 @@
 //! Tests related to prepare_delegation, get_delegation and get_principal II canister calls.
 
+use base64::Engine;
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use getrandom;
 use internet_identity_interface::internet_identity::types::GetDelegationResponse;
 use internet_identity_interface::internet_identity::types::OpenIdPrepareDelegationResponse;
 use pocket_ic::CallError;
@@ -19,12 +21,13 @@ fn should_get_valid_jwt_delegation() -> Result<(), CallError> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let pub_session_key = ByteBuf::from("session public key");
     let jwt = jwt();
-    let salt = &[0u8; 32];
+    let principal = principal_1();
+    let (_nonce, salt) = create_anonymous_nonce(principal);
 
     let prepare_response = match api::openid_prepare_delegation(
         &env,
         canister_id,
-        principal_1(),
+        principal,
         &jwt,
         &salt,
         &pub_session_key,
@@ -71,19 +74,26 @@ fn jwt() -> String {
     "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIn0.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0".to_string()
 }
 
-fn salt() -> String {
-    //TODO:
-    // export const createAnonymousNonce = async (
-    //     principal: Principal
-    //   ): Promise<{ nonce: string; salt: Uint8Array }> => {
-    //     const salt = window.crypto.getRandomValues(new Uint8Array(32));
-    //     const bytes = new Uint8Array(32 + principal.toUint8Array().byteLength);
-    //     bytes.set(salt);
-    //     bytes.set(principal.toUint8Array(), 32);
-    //     const nonce = toBase64URL(
-    //       await window.crypto.subtle.digest("SHA-256", bytes)
-    //     );
-    //     return { nonce, salt };
-    //   };
-    todo!();
+fn salt() -> [u8; 32] {
+    let mut salt = [0u8; 32];
+    getrandom::getrandom(&mut salt).expect("Failed to generate random salt");
+    salt
+}
+
+fn create_anonymous_nonce(principal: Principal) -> (Vec<u8>, [u8; 32]) {
+    // Generate random salt
+    let salt = salt();
+
+    // Create bytes array containing salt + principal
+    let mut bytes = Vec::with_capacity(32 + principal.as_slice().len());
+    bytes.extend_from_slice(&salt);
+    bytes.extend_from_slice(principal.as_slice());
+
+    // Calculate SHA-256 hash
+    let hash = ring::digest::digest(&ring::digest::SHA256, &bytes);
+
+    // Convert hash to base64url
+    let nonce = hash.as_ref().to_vec();
+
+    (nonce, salt)
 }
