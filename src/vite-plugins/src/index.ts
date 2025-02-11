@@ -16,6 +16,25 @@ export * from "./utils.js";
  * Inject the canister ID of 'canisterName' as a <script /> tag in index.html for local development. Will process
  * at most 1 script tag.
  */
+export const injectCanisterIdPlugin = ({
+  canisterName,
+}: {
+  canisterName: string;
+}): Plugin => ({
+  name: "inject-canister-id",
+  transformIndexHtml(html): string {
+    const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
+    const canisterId = readCanisterId({ canisterName });
+    return html.replace(rgx, (_match, src) => {
+      return `<script data-canister-id="${canisterId}" type="module" src="${src}"></script>`;
+    });
+  },
+});
+
+/**
+ * Inject the canister ID and config of 'canisterName' as a <script /> tag in index.html for local development. Will process
+ * at most 1 script tag.
+ */
 export const injectCanisterIdAndConfigPlugin = ({
   canisterName,
 }: {
