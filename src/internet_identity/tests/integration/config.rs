@@ -3,7 +3,8 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit, OpenIdConfig, RateLimitConfig
+    AnalyticsConfig, ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit,
+    OpenIdConfig, RateLimitConfig,
 };
 use pocket_ic::CallError;
 
