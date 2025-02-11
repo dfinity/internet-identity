@@ -445,7 +445,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             })
         }
         if let Some(analytics_config) = arg.analytics_config {
-            ic_cdk::println!("setting analytics config {:?}", analytics_config);
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.analytics_config = analytics_config;
             })
