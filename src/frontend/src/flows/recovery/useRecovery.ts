@@ -11,7 +11,7 @@ import {
   IIWebAuthnIdentity,
   LoginSuccess,
 } from "$src/utils/iiConnection";
-import { supportsWebauthRoR } from "$src/utils/userAgent";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import { unknownToString, unreachableLax } from "$src/utils/utils";
 import { constructIdentity } from "$src/utils/webAuthn";
 import {
@@ -132,11 +132,9 @@ const enrollAuthenticator = async ({
     const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
       const newDeviceOrigin =
-        supportsWebauthRoR(window.navigator.userAgent) &&
-        DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices,
-              userAgent: window.navigator.userAgent,
             })
           : undefined;
       const rpId = nonNullish(newDeviceOrigin)

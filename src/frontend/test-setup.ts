@@ -1,5 +1,10 @@
 import { vi } from "vitest";
 
+// Allow agent-js canister call within tests to self-signed certificate URL
+if (process.env.NODE_ENV === "test") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 // We mock the environment variable because jest is not able to load import.meta.env
 vi.mock("./src/environment.ts", () => ({
   BASE_URL: "/",

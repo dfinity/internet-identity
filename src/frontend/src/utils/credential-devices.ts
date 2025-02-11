@@ -1,7 +1,6 @@
 import { DeviceData, DeviceKey } from "$generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$src/constants";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-import { supportsWebauthRoR } from "./userAgent";
 
 export type CredentialId = ArrayBuffer;
 export type CredentialData = {
@@ -44,28 +43,23 @@ export const convertToValidCredentialData = (
  *
  * Therefore, we want to avoid devices registered in multiple origins.
  *
- * First, it checks whether the browser supports ROR.
- * Second, it checks whether all the devices have the same origin.
+ * It checks whether all the devices have the same origin.
  * - If they do, it returns the origin.
  * - If they don't, it returns `undefined`.
  *
+ * This function is commonly used along `userSupportsWebauthRoR` to check for ROR support first.
+ *
  * @param {Object} params
  * @param {DeviceData[]} params.credentials - The devices to check.
- * @param {string} params.userAgent - The user agent string.
  * @returns {string | undefined} The origin to use when adding a new device.
  * - If `undefined` then no common origin was found. Probalby use `window.origin` or `undefined` for RP ID.
  * - If `string` then the origin can be used to add a new device. Remember to use the hostname only for RP ID.
  */
 export const getCredentialsOrigin = ({
   credentials,
-  userAgent,
 }: {
   credentials: Omit<DeviceData, "alias">[];
-  userAgent: string;
 }): string | undefined => {
-  if (!supportsWebauthRoR(userAgent)) {
-    return undefined;
-  }
   const credentialOrigins = new Set(
     credentials.map((c) => c.origin[0] ?? II_LEGACY_ORIGIN)
   );

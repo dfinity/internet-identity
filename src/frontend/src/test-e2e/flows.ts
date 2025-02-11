@@ -102,6 +102,17 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
+  loginExistingAuthenticateView: async (
+    userNumber: string,
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.continueWithAnchor(userNumber);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(deviceName);
+  },
   loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,

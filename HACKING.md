@@ -100,7 +100,7 @@ We have a set of Selenium tests that run through the various flows. To set up a 
 
 1. Start a local replica with `dfx start`
 1. Deploy II and the other test canisters with `dfx deploy --no-wallet`
-1. Start the vite dev server with TLS enabled: `TLS_DEV_SERVER=1 npm run dev`
+1. Start the vite dev server with TLS enabled and hot reloading disabled: `TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev`
 
 To watch the tests run in the browser remove the `headless` option from `src/frontend/src/test-e2e/util.ts`.
 

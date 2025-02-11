@@ -27,8 +27,12 @@ interface CredentialResponse {
           };
         };
       }
+    // We will create a DOMException from this error object
     | {
-        error: string;
+        error: {
+          name: string;
+          message: string;
+        };
       }
   );
 }
@@ -61,8 +65,8 @@ const requestCredential = (
           getClientExtensionResults: () => ({}),
         } as PublicKeyCredential);
       }
-      if ("err" in event.data.ii_credential_response) {
-        reject(event.data.ii_credential_response.err);
+      if ("error" in event.data.ii_credential_response) {
+        reject(event.data.ii_credential_response.error);
       }
       window.removeEventListener("message", listener);
     };
@@ -117,11 +121,15 @@ const handleCredentialRequest = (
           },
         };
         window.parent.postMessage(response, targetOrigin);
-      } catch (error) {
+      } catch (error: unknown) {
         const response: CredentialResponse = {
           ii_credential_response: {
             id: event.data.ii_credential_request.id,
-            error: String(error),
+            // We need to manually copy the error values here since the error instance will be lost in the postMessage
+            error: {
+              name: "NotAllowedError",
+              message: error instanceof Error ? error.message : "Unknown error",
+            },
           },
         };
         window.parent.postMessage(response, targetOrigin);
@@ -187,6 +195,16 @@ export const webAuthnInIframe = async (
 
     // Request credential from iframe
     return await requestCredential(options, iframe.contentWindow, targetOrigin);
+  } catch (e: unknown) {
+    // We need to throw a `DOMException` so that it is properly caught by the caller of this function.
+    if (typeof e === "object" && e !== null && "name" in e && "message" in e) {
+      const message: string =
+        typeof e.message === "string" ? e.message : "Unknown error";
+      const name: string =
+        typeof e.name === "string" ? e.name : "NotAllowedError";
+      throw new DOMException(message, name);
+    }
+    throw new DOMException("NotAllowedError", "Unknown error");
   } finally {
     iframe.remove();
   }
