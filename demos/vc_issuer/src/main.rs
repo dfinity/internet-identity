@@ -619,7 +619,7 @@ pub struct HttpResponse {
     pub body: ByteBuf,
 }
 
-fn fixup_html(html: &str) -> String {
+fn fixup_html(html: &str, _: Option<&()>) -> String {
     let canister_id = api::id();
 
     // the string we are replacing here is inserted by vite during the front-end build
