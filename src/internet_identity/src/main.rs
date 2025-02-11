@@ -27,7 +27,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::ops::Not;
 use storage::{Salt, Storage};
 
 mod anchor_management;
