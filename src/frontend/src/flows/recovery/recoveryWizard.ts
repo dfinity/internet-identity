@@ -244,7 +244,6 @@ export const recoveryWizard = async (
     userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
       ? getCredentialsOrigin({
           credentials,
-          userAgent: navigator.userAgent,
         })
       : undefined;
 
