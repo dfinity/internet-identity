@@ -37,7 +37,6 @@ export const setupKey = async ({
         userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices,
-              userAgent: window.navigator.userAgent,
             })
           : undefined;
       const rpId = nonNullish(newDeviceOrigin)
