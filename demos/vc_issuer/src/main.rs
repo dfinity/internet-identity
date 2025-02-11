@@ -594,7 +594,7 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 pub fn init_assets() {
     ASSETS.with_borrow_mut(|assets| {
         *assets = CertifiedAssets::certify_assets(
-            collect_assets(&ASSET_DIR, Some(fixup_html)),
+            collect_assets(&ASSET_DIR, Some(fixup_html), None),
             &static_headers(),
         );
     });

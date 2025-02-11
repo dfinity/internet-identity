@@ -8,7 +8,6 @@ use ic_certification::{
 use ic_representation_independent_hash::{representation_independent_hash, Value};
 use include_dir::Dir;
 use internet_identity_interface::http_gateway::HeaderField;
-use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sha2::Digest;
@@ -417,11 +416,11 @@ fn response_hash(status_code: u16, headers: &[HeaderField], body_hash: &Hash) ->
 
 /// Collects all assets from the given directory, recursing into subdirectories.
 /// Optionally, a transformer function can be provided to transform the HTML files.
-pub fn collect_assets(
+pub fn collect_assets<A>(
     dir: &Dir,
-    html_transformer: Option<fn(&str, &InternetIdentityInit) -> String>,
-    config: &InternetIdentityInit,
-) -> Vec<Asset> {
+    html_transformer: Option<fn(&str, Option<&A>) -> String>,
+    html_transformer_arg: Option<&A>,
+) -> Vec<Asset>  {
     let mut assets = vec![];
 
     // Collect all assets, recursively
@@ -432,7 +431,7 @@ pub fn collect_assets(
         for asset in &mut assets {
             if let ContentType::HTML = asset.content_type {
                 asset.content =
-                    html_transformer(std::str::from_utf8(&asset.content).unwrap(), config)
+                    html_transformer(std::str::from_utf8(&asset.content).unwrap(), html_transformer_arg)
                         .as_bytes()
                         .to_vec();
             }

@@ -170,7 +170,7 @@ fn post_upgrade() {
 
 /// Collect all the assets from the dist folder.
 fn init_assets(alternative_origins: String) {
-    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
+    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html), None);
     assets.push(Asset {
         url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
         content: alternative_origins.as_bytes().to_vec(),
