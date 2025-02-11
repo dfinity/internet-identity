@@ -55,7 +55,7 @@ pub async fn prepare_delegation(
 }
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(
+pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
     ii_domain: Option<IIDomain>,
     session_duration_ns: u64,
@@ -161,7 +161,7 @@ pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()
 }
 
-fn add_delegation_signature(
+pub fn add_delegation_signature(
     sigs: &mut SignatureMap,
     pk: PublicKey,
     seed: &[u8],

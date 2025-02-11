@@ -18,8 +18,10 @@ use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialAddError;
-use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialRemoveError;
+use internet_identity_interface::internet_identity::types::openid::{
+    OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
+    OpenIdPrepareDelegationResponse,
+};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
     PrepareIdAliasRequest, PreparedIdAlias,
@@ -748,17 +750,19 @@ mod v2_api {
 
 /// API for OpenID credentials
 mod openid_api {
-    use crate::anchor_management::{add_openid_credential, remove_openid_credential};
-    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid;
-    use crate::openid::OpenIdCredentialKey;
-    use crate::storage::anchor::AnchorError;
-    use ic_cdk::caller;
-    use ic_cdk_macros::update;
-    use internet_identity_interface::internet_identity::types::openid::{
-        OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+    use crate::anchor_management::{
+        add_openid_credential, lookup_anchor_with_openid_credential, remove_openid_credential,
     };
-    use internet_identity_interface::internet_identity::types::IdentityNumber;
+    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
+    use crate::openid::{self, OpenIdCredentialKey};
+    use crate::storage::anchor::AnchorError;
+    use crate::{
+        FrontendHostname, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
+    };
+    use ic_cdk::caller;
+    use ic_cdk_macros::{query, update};
+    use internet_identity_interface::internet_identity::types::SignedDelegation;
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -806,6 +810,45 @@ mod openid_api {
                     err => OpenIdCredentialRemoveError::InternalCanisterError(err.to_string()),
                 })
         })
+    }
+
+    //TODO: add tests for this
+    #[update]
+    async fn openid_prepare_delegation(
+        jwt: String,
+        salt: [u8; 32],
+        session_key: SessionKey,
+    ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
+        let openid_credential = openid::verify(&jwt, &salt)
+            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+
+        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
+
+        Ok(OpenIdPrepareDelegationResponse {
+            user_key,
+            expiration,
+            anchor_number,
+        })
+    }
+
+    //TODO: add tests for this
+    #[query]
+    fn openid_get_delegation(
+        jwt: String,
+        salt: [u8; 32],
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> Result<SignedDelegation, OpenIdDelegationError> {
+        let openid_credential = openid::verify(&jwt, &salt)
+            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+
+        match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
+            Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
+            None => Err(OpenIdDelegationError::NoSuchAnchor),
+        }
     }
 }
 

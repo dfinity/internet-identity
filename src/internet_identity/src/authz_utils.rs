@@ -7,7 +7,9 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceKey, IdentityNumber,
+    AnchorNumber,
+    AuthorizationKey::{self, DevicePubKey, OpenIdPubKey},
+    IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
 
@@ -73,30 +75,53 @@ pub fn anchor_operation_with_authz_check<R, E>(
 where
     E: From<IdentityUpdateError>,
 {
-    let (mut anchor, device_key) = check_authorization(anchor_number)
+    let (mut anchor, authorization_key) = check_authorization(anchor_number)
         .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
-    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
-    let result = op(&mut anchor);
+    match authorization_key {
+        DevicePubKey(device_key) => {
+            anchor_management::activity_bookkeeping(&mut anchor, &device_key);
 
-    // write back anchor
-    state::storage_borrow_mut(|storage| storage.write(anchor))
-        .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+            let result = op(&mut anchor);
 
-    match result {
-        Ok((ret, operation)) => {
-            post_operation_bookkeeping(anchor_number, operation);
-            Ok(ret)
+            // write back anchor
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+
+            match result {
+                Ok((ret, operation)) => {
+                    post_operation_bookkeeping(anchor_number, operation);
+                    Ok(ret)
+                }
+                Err(err) => Err(err),
+            }
         }
-        Err(err) => Err(err),
+        OpenIdPubKey(_openid_key) => {
+            // TODO: add bookkeeping
+            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+
+            let result = op(&mut anchor);
+
+            // write back anchor
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+
+            match result {
+                Ok((ret, operation)) => {
+                    post_operation_bookkeeping(anchor_number, operation);
+                    Ok(ret)
+                }
+                Err(err) => Err(err),
+            }
+        }
     }
 }
 
-/// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the device used.
+/// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the public key of the authentication method used (device or openid).
 /// Returns an error if the caller is not authorized.
 pub fn check_authorization(
     anchor_number: AnchorNumber,
-) -> Result<(Anchor, DeviceKey), AuthorizationError> {
+) -> Result<(Anchor, AuthorizationKey), AuthorizationError> {
     let anchor = state::anchor(anchor_number);
     let caller = caller();
 
@@ -108,13 +133,26 @@ pub fn check_authorization(
                     .is_ok()
             })
         {
-            return Ok((anchor.clone(), device.pubkey.clone()));
+            return Ok((
+                anchor.clone(),
+                AuthorizationKey::DevicePubKey(device.pubkey.clone()),
+            ));
+        }
+    }
+    // check openid authorization
+    for credential in anchor.openid_credentials() {
+        //TODO: handle temp keys
+        if caller == credential.principal() {
+            return Ok((
+                anchor.clone(),
+                AuthorizationKey::OpenIdPubKey(credential.public_key()),
+            ));
         }
     }
     Err(AuthorizationError::from(caller))
 }
 
-/// Checks that the caller is authorized to operate on the given anchor_number and updates the device used to
+/// Checks that the caller is authorized to operate on the given anchor_number and updates the authorization method used to
 /// reflect the current activity.
 /// Also updates the aggregated stats on daily and monthly active users.
 /// Returns an error if the caller is not authorized or the anchor cannot be written to stable memory.
@@ -124,11 +162,23 @@ pub fn check_authorization(
 pub fn check_authz_and_record_activity(
     anchor_number: AnchorNumber,
 ) -> Result<Option<IIDomain>, IdentityUpdateError> {
-    let (mut anchor, device_key) =
+    let (mut anchor, authorization_key) =
         check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
-    let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
-    anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-    state::storage_borrow_mut(|storage| storage.write(anchor))
-        .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
-    Ok(maybe_domain)
+
+    match authorization_key {
+        DevicePubKey(device_key) => {
+            let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
+            anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
+            Ok(maybe_domain)
+        }
+        OpenIdPubKey(_openid_key) => {
+            // TODO: add bookkeeping for openid
+            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
+            // state::storage_borrow_mut(|storage| storage.write(anchor))
+            //     .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
+            Ok(None)
+        }
+    }
 }

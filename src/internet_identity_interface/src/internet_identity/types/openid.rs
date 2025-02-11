@@ -1,4 +1,4 @@
-use crate::internet_identity::types::{MetadataEntryV2, Timestamp};
+use crate::internet_identity::types::{AnchorNumber, MetadataEntryV2, Timestamp, UserKey};
 use candid::{CandidType, Deserialize, Principal};
 use std::collections::HashMap;
 
@@ -26,4 +26,18 @@ pub enum OpenIdCredentialRemoveError {
     Unauthorized(Principal),
     OpenIdCredentialNotFound,
     InternalCanisterError(String),
+}
+
+#[derive(CandidType, Debug)]
+pub struct OpenIdPrepareDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(CandidType, Debug)]
+pub enum OpenIdDelegationError {
+    NoSuchAnchor,
+    NoSuchDelegation,
+    JwtVerificationFailed,
 }
