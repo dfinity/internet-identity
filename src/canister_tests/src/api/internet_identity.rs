@@ -84,6 +84,26 @@ pub fn prepare_delegation(
     )
 }
 
+pub fn openid_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+) -> Result<Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>, CallError>
+{
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_prepare_delegation",
+        (jwt, salt, session_key),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn init_salt(env: &PocketIc, canister_id: CanisterId) -> Result<(), CallError> {
     call_candid(
         env,
@@ -109,6 +129,26 @@ pub fn get_delegation(
         sender,
         "get_delegation",
         (anchor_number, frontend_hostname, session_key, timestamp),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn openid_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    expiration: &types::Timestamp,
+) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_get_delegation",
+        (jwt, salt, session_key, expiration),
     )
     .map(|(x,)| x)
 }

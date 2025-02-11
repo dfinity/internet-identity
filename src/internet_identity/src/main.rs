@@ -757,7 +757,7 @@ mod openid_api {
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
-        FrontendHostname, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
     };
     use ic_cdk::caller;

@@ -28,14 +28,14 @@ pub enum OpenIdCredentialRemoveError {
     InternalCanisterError(String),
 }
 
-#[derive(CandidType, Debug)]
+#[derive(CandidType, Debug, Deserialize)]
 pub struct OpenIdPrepareDelegationResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
 }
 
-#[derive(CandidType, Debug)]
+#[derive(CandidType, Debug, Deserialize)]
 pub enum OpenIdDelegationError {
     NoSuchAnchor,
     NoSuchDelegation,
