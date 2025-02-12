@@ -404,7 +404,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     init_assets(related_origins.is_empty().not().then_some(related_origins));
     apply_install_arg(maybe_arg);
     update_root_hash();
-    if let Some(config) = openid_google {
+    if let EnabledOrDisabled(Some(config)) = openid_google {
         openid::setup_google(config);
     }
 }

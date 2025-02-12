@@ -3,8 +3,8 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, ArchiveConfig, CaptchaConfig, CaptchaTrigger, InternetIdentityInit,
-    OpenIdConfig, RateLimitConfig,
+    AnalyticsConfig, ArchiveConfig, CaptchaConfig, CaptchaTrigger, EnabledOrDisabled,
+    InternetIdentityInit, OpenIdConfig, RateLimitConfig,
 };
 use pocket_ic::CallError;
 
@@ -33,8 +33,8 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
             },
         }),
         related_origins: None,
-        openid_google: Some(None),
-        analytics_config: Some(None),
+        openid_google: Some(EnabledOrDisabled::disabled()),
+        analytics_config: Some(EnabledOrDisabled::disabled()),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -77,8 +77,8 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google: Some(Some(openid_google)),
-        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+        openid_google: Some(EnabledOrDisabled::enabled(openid_google)),
+        analytics_config: Some(EnabledOrDisabled::enabled(AnalyticsConfig::Plausible {
             domain: None,
             hash_mode: None,
             track_localhost: None,
@@ -106,9 +106,9 @@ fn should_override_partially() -> Result<(), CallError> {
         "https://identity.icp0.io".to_string(),
     ]
     .to_vec();
-    let openid_google = Some(OpenIdConfig {
+    let openid_google = OpenIdConfig {
         client_id: "https://example.com".into(),
-    });
+    };
     let config = InternetIdentityInit {
         assigned_user_number_range: Some((3456, 798977)),
         archive_config: Some(ArchiveConfig {
@@ -131,8 +131,8 @@ fn should_override_partially() -> Result<(), CallError> {
             },
         }),
         related_origins: Some(related_origins),
-        openid_google: Some(openid_google),
-        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+        openid_google: Some(EnabledOrDisabled::enabled(openid_google)),
+        analytics_config: Some(EnabledOrDisabled::enabled(AnalyticsConfig::Plausible {
             domain: None,
             hash_mode: None,
             track_localhost: None,
@@ -178,7 +178,7 @@ fn should_override_partially() -> Result<(), CallError> {
         "https://identity.ic0.app".to_string(),
     ]
     .to_vec();
-    let openid_google2 = None;
+    let openid_google2 = EnabledOrDisabled::disabled();
     let config_3 = InternetIdentityInit {
         assigned_user_number_range: None,
         archive_config: None,
@@ -209,7 +209,7 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: None,
         openid_google: None,
-        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+        analytics_config: Some(EnabledOrDisabled::enabled(AnalyticsConfig::Plausible {
             domain: Some("internetcomputer.org".to_string()),
             hash_mode: None,
             track_localhost: None,
@@ -221,7 +221,7 @@ fn should_override_partially() -> Result<(), CallError> {
         upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_4.clone()));
 
     let expected_config_4 = InternetIdentityInit {
-        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+        analytics_config: Some(EnabledOrDisabled::enabled(AnalyticsConfig::Plausible {
             domain: Some("internetcomputer.org".to_string()),
             hash_mode: None,
             track_localhost: None,

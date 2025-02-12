@@ -9,7 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, EnabledOrDisabled, FrontendHostname, OpenIdConfig,
+    RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -33,8 +34,8 @@ pub struct StorablePersistentState {
     event_stats_24h_start: Option<EventKey>,
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
-    openid_google: Option<OpenIdConfig>,
-    analytics_config: Option<AnalyticsConfig>,
+    openid_google: EnabledOrDisabled<OpenIdConfig>,
+    analytics_config: EnabledOrDisabled<AnalyticsConfig>,
 }
 
 impl Storable for StorablePersistentState {
@@ -101,7 +102,7 @@ impl From<StorablePersistentState> for PersistentState {
 mod tests {
     use super::*;
     use internet_identity_interface::internet_identity::types::{
-        CaptchaTrigger, StaticCaptchaTrigger,
+        CaptchaTrigger, EnabledOrDisabled, StaticCaptchaTrigger,
     };
     use std::time::Duration;
 
@@ -137,8 +138,8 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             }),
             related_origins: None,
-            openid_google: None,
-            analytics_config: None,
+            openid_google: EnabledOrDisabled::disabled(),
+            analytics_config: EnabledOrDisabled::disabled(),
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -158,9 +159,9 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             },
             related_origins: None,
-            openid_google: None,
+            openid_google: EnabledOrDisabled::disabled(),
             event_stats_24h_start: None,
-            analytics_config: None,
+            analytics_config: EnabledOrDisabled::disabled(),
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }
