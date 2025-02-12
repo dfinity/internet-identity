@@ -339,7 +339,17 @@ export const idlFactory = ({ IDL }) => {
     'OpenIdCredentialNotFound' : IDL.Null,
     'Unauthorized' : IDL.Principal,
   });
+  const OpenIdDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'NoSuchAnchor' : IDL.Null,
+    'JwtVerificationFailed' : IDL.Null,
+  });
   const UserKey = PublicKey;
+  const OpenIdPrepareDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
+  });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
     'relying_party' : FrontendHostname,
@@ -540,6 +550,26 @@ export const idlFactory = ({ IDL }) => {
     'openid_credential_remove' : IDL.Func(
         [IdentityNumber, OpenIdCredentialKey],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialRemoveError })],
+        [],
+      ),
+    'openid_get_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'openid_prepare_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, FrontendHostname],
+        [
+          IDL.Variant({
+            'Ok' : OpenIdPrepareDelegationResponse,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
         [],
       ),
     'prepare_delegation' : IDL.Func(
