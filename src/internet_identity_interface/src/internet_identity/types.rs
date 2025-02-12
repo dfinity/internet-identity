@@ -248,7 +248,14 @@ pub struct CaptchaConfig {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AnalyticsConfig {
-    Plausible,
+    Plausible {
+        // Config params from Plausible NPM package
+        // https://www.npmjs.com/package/plausible-tracker
+        domain: Option<String>,
+        hash_mode: Option<bool>,
+        track_localhost: Option<bool>,
+        api_host: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

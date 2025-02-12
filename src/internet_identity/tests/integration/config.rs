@@ -78,7 +78,12 @@ fn should_retain_config_after_none() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(Some(openid_google)),
-        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+            domain: None,
+            hash_mode: None,
+            track_localhost: None,
+            api_host: None,
+        })),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -127,7 +132,12 @@ fn should_override_partially() -> Result<(), CallError> {
         }),
         related_origins: Some(related_origins),
         openid_google: Some(openid_google),
-        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+            domain: None,
+            hash_mode: None,
+            track_localhost: None,
+            api_host: None,
+        })),
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -199,14 +209,24 @@ fn should_override_partially() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: None,
         openid_google: None,
-        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+            domain: Some("internetcomputer.org".to_string()),
+            hash_mode: None,
+            track_localhost: None,
+            api_host: None,
+        })),
     };
 
     let _ =
         upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_4.clone()));
 
     let expected_config_4 = InternetIdentityInit {
-        analytics_config: Some(Some(AnalyticsConfig::Plausible)),
+        analytics_config: Some(Some(AnalyticsConfig::Plausible {
+            domain: Some("internetcomputer.org".to_string()),
+            hash_mode: None,
+            track_localhost: None,
+            api_host: None,
+        })),
         ..expected_config_3
     };
 

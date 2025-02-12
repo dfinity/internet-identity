@@ -342,7 +342,12 @@ type OpenIdConfig = record {
 type OpenIdCredentialKey = record { Iss; Sub };
 
 type AnalyticsConfig = variant {
-    Plausible;
+    Plausible {
+        domain: opt text,
+        hash_mode: opt bool,
+        track_localhost: opt bool,
+        api_host: opt text,
+    };
 };
 
 type OpenIdCredential = record {
