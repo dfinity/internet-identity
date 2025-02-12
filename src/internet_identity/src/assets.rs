@@ -64,8 +64,8 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
-    // Instead of passing a `html_transformer`, iter of assets and use `fixup_html`
-    // directly so that it has access to the config reference within scope.
+    // Instead of passing a `html_transformer`, iter over assets and use `fixup_html`
+    // directly so that it has access to the `config` reference within scope.
     let mut assets: Vec<Asset> = collect_assets(&ASSET_DIR, None)
         .into_iter()
         .map(|mut asset| {
