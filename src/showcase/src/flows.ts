@@ -15,6 +15,17 @@ import { dummyChallenge } from "./constants";
 import { i18n } from "./i18n";
 import { manageTemplates } from "./templates";
 
+const DEFAULT_INIT: InternetIdentityInit = {
+  analytics_config: [],
+  archive_config: [],
+  assigned_user_number_range: [],
+  canister_creation_cycles_cost: [],
+  captcha_config: [],
+  openid_google: [],
+  register_rate_limit: [],
+  related_origins: [],
+};
+
 const registerSuccessToastTemplate = (result: unknown) => html`
   Identity successfully created!<br />
   <p class="l-stack">
@@ -51,7 +62,7 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
   constructor() {
     super(
       "12345",
-      {} as InternetIdentityInit,
+      DEFAULT_INIT,
       MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),
