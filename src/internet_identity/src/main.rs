@@ -27,7 +27,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::ops::Not;
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -393,19 +392,17 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let related_origins = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.related_origins.clone())
-        .unwrap_or(persistent_state(|storage| storage.related_origins.clone()).unwrap_or(vec![]));
-    let openid_google = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.openid_google.clone())
-        .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
-    init_assets(related_origins.is_empty().not().then_some(related_origins));
+    // Apply arguments
     apply_install_arg(maybe_arg);
+
+    // Get config that possibly has been updated above
+    let config = config();
+
+    // Initiate assets and OpenID providers
+    init_assets(&config);
     update_root_hash();
-    if let Some(config) = openid_google {
-        openid::setup_google(config);
+    if let Some(Some(openid_config)) = config.openid_google {
+        openid::setup_google(openid_config);
     }
 }
 
