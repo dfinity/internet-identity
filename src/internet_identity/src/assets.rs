@@ -43,6 +43,14 @@ pub fn init_assets(config: &InternetIdentityInit) {
 // Fix up HTML pages, by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
     let canister_id = api::id();
+    // Encoding to JSON might cause issues with html character escaping,
+    // base64 avoids all the potential issues around that.
+    //
+    // Also, the serde json implementation will likely generate a different output than
+    // @dfinity/candid (e.g. bigint), which means it won't match the types anymore.
+    //
+    // So to avoid all these issues, we send the raw candid to the frontend,
+    // then the frontend decodes it just like a canister call response.
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
     html.replace(
         r#"<script "#,
@@ -56,6 +64,8 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
+    // Instead of passing a `html_transformer`, iter of assets and use `fixup_html`
+    // directly so that it has access to the config reference within scope.
     let mut assets: Vec<Asset> = collect_assets(&ASSET_DIR, None)
         .into_iter()
         .map(|mut asset| {
