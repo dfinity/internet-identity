@@ -820,7 +820,7 @@ mod openid_api {
         session_key: SessionKey,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential = openid::verify(&jwt, &salt)
-            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+            .map_err(|err| OpenIdDelegationError::JwtVerificationFailed(err))?;
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
@@ -843,7 +843,7 @@ mod openid_api {
         expiration: Timestamp,
     ) -> Result<SignedDelegation, OpenIdDelegationError> {
         let openid_credential = openid::verify(&jwt, &salt)
-            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+            .map_err(|err| OpenIdDelegationError::JwtVerificationFailed(err))?;
 
         match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
             Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),

@@ -1,5 +1,6 @@
 use crate::internet_identity::types::{AnchorNumber, MetadataEntryV2, Timestamp, UserKey};
 use candid::{CandidType, Deserialize, Principal};
+use serde::Serialize;
 use std::collections::HashMap;
 
 /// Types for OpenID credentials, used for OpenID sign in
@@ -35,9 +36,9 @@ pub struct OpenIdPrepareDelegationResponse {
     pub anchor_number: AnchorNumber,
 }
 
-#[derive(CandidType, Debug, Deserialize)]
+#[derive(CandidType, Debug, Deserialize, Serialize)]
 pub enum OpenIdDelegationError {
     NoSuchAnchor,
     NoSuchDelegation,
-    JwtVerificationFailed,
+    JwtVerificationFailed(String),
 }

@@ -54,7 +54,6 @@ regex.workspace = true
 ic-response-verification.workspace = true
 flate2 = "1.0"
 getrandom = "0.2"
-ring = "0.17.8"
 
 
 [features]
