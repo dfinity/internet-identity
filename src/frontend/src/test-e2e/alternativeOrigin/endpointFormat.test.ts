@@ -18,7 +18,6 @@ import {
 } from "../constants";
 
 test("Should not issue delegation when /.well-known/ii-alternative-origins has too many entries", async () => {
-  return;
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -56,7 +55,6 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
 }, 300_000);
 
 test("Should not follow redirect returned by /.well-known/ii-alternative-origins", async () => {
-  return;
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -143,7 +141,6 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
 }, 300_000);
 
 test("Should allow arbitrary URL as derivation origin", async () => {
-  return;
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const authenticatorId1 = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
