@@ -1,4 +1,7 @@
-import { _SERVICE } from "$generated/internet_identity_types";
+import {
+  _SERVICE,
+  InternetIdentityInit,
+} from "$generated/internet_identity_types";
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
@@ -48,6 +51,7 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
   constructor() {
     super(
       "12345",
+      {} as InternetIdentityInit,
       MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),

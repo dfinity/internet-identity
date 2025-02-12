@@ -8,6 +8,10 @@ import { supportsWebAuthn } from "./utils/featureDetection";
 import { Connection } from "./utils/iiConnection";
 import { version } from "./version";
 
+import { init } from "$generated/internet_identity_idl";
+import { InternetIdentityInit } from "$generated/internet_identity_types";
+import { fromBase64 } from "$src/utils/utils";
+import { IDL } from "@dfinity/candid";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
@@ -36,6 +40,42 @@ const readCanisterId = (): string => {
   }
 
   return setupJs.dataset.canisterId;
+};
+
+const readCanisterConfig = (): InternetIdentityInit => {
+  // The backend uses a known element ID so that we can pick up the value from here
+  const setupJs = document.querySelector(
+    "[data-canister-config]"
+  ) as HTMLElement | null;
+  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
+    void displayError({
+      title: "Canister config not set",
+      message:
+        "There was a problem contacting the IC. The host serving this page did not give us the canister config. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
+    }).then(() => {
+      window.location.reload();
+    });
+    throw new Error("canister config is undefined"); // abort further execution of this script
+  }
+
+  try {
+    const [jsonValue] = IDL.decode(
+      [init({ IDL })[0]._type],
+      fromBase64(setupJs.dataset.canisterConfig)
+    );
+    return jsonValue as unknown as InternetIdentityInit;
+  } catch (e) {
+    void displayError({
+      title: "Canister config not valid",
+      message:
+        "There was a problem contacting the IC. The host serving this page did not give us a valid canister config. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
+    }).then(() => {
+      window.location.reload();
+    });
+    throw new Error("canister config is invalid"); // abort further execution of this script
+  }
 };
 
 // Show version information for the curious programmer
@@ -96,7 +136,7 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   }
 
   // Prepare the actor/connection to talk to the canister
-  const connection = new Connection(readCanisterId());
+  const connection = new Connection(readCanisterId(), readCanisterConfig());
 
   return app(connection);
 };
