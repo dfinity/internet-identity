@@ -128,8 +128,8 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
-            openid_google: EnabledOrDisabled::disabled(),
-            analytics_config: EnabledOrDisabled::disabled(),
+            openid_google: EnabledOrDisabled::Disabled,
+            analytics_config: EnabledOrDisabled::Disabled,
             event_stats_24h_start: None,
         }
     }

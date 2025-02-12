@@ -138,8 +138,8 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             }),
             related_origins: None,
-            openid_google: EnabledOrDisabled::disabled(),
-            analytics_config: EnabledOrDisabled::disabled(),
+            openid_google: EnabledOrDisabled::Disabled,
+            analytics_config: EnabledOrDisabled::Disabled,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -159,9 +159,9 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
             },
             related_origins: None,
-            openid_google: EnabledOrDisabled::disabled(),
+            openid_google: EnabledOrDisabled::Disabled,
             event_stats_24h_start: None,
-            analytics_config: EnabledOrDisabled::disabled(),
+            analytics_config: EnabledOrDisabled::Disabled,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

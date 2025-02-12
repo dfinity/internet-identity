@@ -304,38 +304,7 @@ pub struct OpenIdConfig {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct EnabledOrDisabled<T>(pub Option<T>);
-
-impl<T> EnabledOrDisabled<T> {
-    pub fn enabled(value: T) -> Self {
-        Self(Some(value))
-    }
-
-    pub fn disabled() -> Self {
-        Self(None)
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        self.0.is_some()
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        self.0.is_none()
-    }
-
-    pub fn get_enabled(&self) -> Option<&T> {
-        self.0.as_ref()
-    }
-
-    pub fn into_enabled(self) -> Option<T> {
-        self.0
-    }
-}
-
-impl<T> std::ops::Deref for EnabledOrDisabled<T> {
-    type Target = Option<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub enum EnabledOrDisabled<T> {
+    Enabled(T),
+    Disabled,
 }
