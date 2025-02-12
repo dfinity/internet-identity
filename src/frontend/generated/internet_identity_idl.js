@@ -8,6 +8,14 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -31,6 +39,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -576,6 +585,14 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -599,6 +616,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
