@@ -152,13 +152,13 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  private configPromise: Promise<InternetIdentityInit> | undefined;
   private webAuthFlows:
     | { flows: WebAuthnFlow[]; currentIndex: number }
     | undefined;
 
   public constructor(
     readonly canisterId: string,
+    readonly canisterConfig: InternetIdentityInit,
     // Used for testing purposes
     readonly overrideActor?: ActorSubclass<_SERVICE>
   ) {}
@@ -325,6 +325,7 @@ export class Connection {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
           this.canisterId,
+          this.canisterConfig,
           identity,
           delegationIdentity,
           userNumber,
@@ -491,6 +492,7 @@ export class Connection {
 
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
@@ -517,6 +519,7 @@ export class Connection {
 
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
@@ -562,6 +565,7 @@ export class Connection {
       userNumber,
       connection: new AuthenticatedConnection(
         this.canisterId,
+        this.canisterConfig,
         identity,
         delegationIdentity,
         userNumber,
@@ -651,17 +655,6 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
-
-  /**
-   * Get previously fetched config, else fetch it
-   * TODO: Discuss with prodsec if this should stay a query or should be update,
-   *       alternatively the config can also be set directly in the html head.
-   */
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.createActor().then((actor) => actor.config());
-    return this.configPromise;
-  };
 }
 
 export class AuthenticatedConnection extends Connection {
@@ -669,12 +662,13 @@ export class AuthenticatedConnection extends Connection {
 
   public constructor(
     public canisterId: string,
+    public canisterConfig: InternetIdentityInit,
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {
-    super(canisterId);
+    super(canisterId, canisterConfig);
     const metadataGetter = async () => {
       const response = await this.getIdentityInfo();
       if ("Ok" in response) {

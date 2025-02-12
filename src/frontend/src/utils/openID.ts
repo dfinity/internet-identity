@@ -1,5 +1,6 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
 import { REDIRECT_CALLBACK_PATH, redirectInPopup } from "$src/flows/redirect";
+import { toBase64URL } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
@@ -75,12 +76,6 @@ export const isNotSupportedError = (error: unknown) =>
  */
 export const isPermissionError = (error: unknown) =>
   error instanceof Error && error.name === "NetworkError";
-
-const toBase64 = (bytes: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)));
-
-const toBase64URL = (bytes: ArrayBuffer): string =>
-  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 /**
  * Request JWT through redirect flow in a popup

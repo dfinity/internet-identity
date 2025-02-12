@@ -141,7 +141,6 @@ export const webAuthnInIframeFlow = async (
   connection: Connection
 ): Promise<never> => {
   // Establish cross-origin connection with parent window
-  const config = await connection.getConfig();
   const targetOrigin = await waitForWindowReadyRequest(
     window.parent,
     // We only establish a connection for the related origins in the II config,
@@ -149,7 +148,7 @@ export const webAuthnInIframeFlow = async (
     //
     // Additionally, the CSP configuration will block any attempt to render II
     // inside an iframe from domains that are not related origins.
-    config.related_origins[0] ?? []
+    connection.canisterConfig.related_origins[0] ?? []
   );
 
   // Get credential and send to parent window
