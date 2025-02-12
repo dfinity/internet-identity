@@ -322,6 +322,14 @@ impl<T> EnabledOrDisabled<T> {
     pub fn is_disabled(&self) -> bool {
         self.0.is_none()
     }
+
+    pub fn get_enabled(&self) -> Option<&T> {
+        self.0.as_ref()
+    }
+
+    pub fn into_enabled(self) -> Option<T> {
+        self.0
+    }
 }
 
 impl<T> std::ops::Deref for EnabledOrDisabled<T> {
