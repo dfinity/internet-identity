@@ -1,4 +1,8 @@
 import { vcFlow } from "./flows/verifiableCredentials";
 import { createSpa } from "./spa";
+import { analytics } from "./utils/analytics";
 
-void createSpa((connection) => vcFlow({ connection }));
+void createSpa((connection) => {
+  analytics.pageView();
+  return vcFlow({ connection });
+});
