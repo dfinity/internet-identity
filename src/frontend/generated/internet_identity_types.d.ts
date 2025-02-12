@@ -12,7 +12,14 @@ export type AddTentativeDeviceResponse = {
       'device_registration_timeout' : Timestamp,
     }
   };
-export type AnalyticsConfig = { 'Plausible' : null };
+export type AnalyticsConfig = {
+    'Plausible' : {
+      'domain' : [] | [string],
+      'track_localhost' : [] | [boolean],
+      'hash_mode' : [] | [boolean],
+      'api_host' : [] | [string],
+    }
+  };
 export interface AnchorCredentials {
   'recovery_phrases' : Array<PublicKey>,
   'credentials' : Array<WebAuthnCredential>,

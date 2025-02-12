@@ -8,7 +8,14 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
-  const AnalyticsConfig = IDL.Variant({ 'Plausible' : IDL.Null });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -578,7 +585,14 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
-  const AnalyticsConfig = IDL.Variant({ 'Plausible' : IDL.Null });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
