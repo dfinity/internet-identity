@@ -416,11 +416,7 @@ fn response_hash(status_code: u16, headers: &[HeaderField], body_hash: &Hash) ->
 
 /// Collects all assets from the given directory, recursing into subdirectories.
 /// Optionally, a transformer function can be provided to transform the HTML files.
-pub fn collect_assets<A>(
-    dir: &Dir,
-    html_transformer: Option<fn(&str, Option<&A>) -> String>,
-    html_transformer_arg: Option<&A>,
-) -> Vec<Asset> {
+pub fn collect_assets(dir: &Dir, html_transformer: Option<fn(&str) -> String>) -> Vec<Asset> {
     let mut assets = vec![];
 
     // Collect all assets, recursively
@@ -430,12 +426,9 @@ pub fn collect_assets<A>(
     if let Some(html_transformer) = html_transformer {
         for asset in &mut assets {
             if let ContentType::HTML = asset.content_type {
-                asset.content = html_transformer(
-                    std::str::from_utf8(&asset.content).unwrap(),
-                    html_transformer_arg,
-                )
-                .as_bytes()
-                .to_vec();
+                asset.content = html_transformer(std::str::from_utf8(&asset.content).unwrap())
+                    .as_bytes()
+                    .to_vec();
             }
         }
     }

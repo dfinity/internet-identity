@@ -594,7 +594,7 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 pub fn init_assets() {
     ASSETS.with_borrow_mut(|assets| {
         *assets = CertifiedAssets::certify_assets(
-            collect_assets(&ASSET_DIR, Some(fixup_html), None),
+            collect_assets(&ASSET_DIR, Some(fixup_html)),
             &static_headers(),
         );
     });
@@ -619,7 +619,7 @@ pub struct HttpResponse {
     pub body: ByteBuf,
 }
 
-fn fixup_html(html: &str, _: Option<&()>) -> String {
+fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
 
     // the string we are replacing here is inserted by vite during the front-end build

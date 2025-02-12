@@ -149,7 +149,7 @@ fn static_headers() -> Vec<HeaderField> {
 // Assets
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 
-fn fixup_html(html: &str, _: Option<&()>) -> String {
+fn fixup_html(html: &str) -> String {
     let canister_id = api::id();
 
     // the string we are replacing here is inserted by vite during the front-end build
@@ -170,7 +170,7 @@ fn post_upgrade() {
 
 /// Collect all the assets from the dist folder.
 fn init_assets(alternative_origins: String) {
-    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html), None);
+    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
     assets.push(Asset {
         url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
         content: alternative_origins.as_bytes().to_vec(),

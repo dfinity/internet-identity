@@ -41,7 +41,7 @@ pub fn init_assets(config: &InternetIdentityInit) {
 }
 
 // Fix up HTML pages, by injecting canister ID and canister config
-fn fixup_html(html: &str, config: Option<&InternetIdentityInit>) -> String {
+fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
     let canister_id = api::id();
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
     html.replace(
@@ -56,7 +56,17 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
-    let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html), Some(config));
+    let mut assets: Vec<Asset> = collect_assets(&ASSET_DIR, None)
+        .into_iter()
+        .map(|mut asset| {
+            if asset.content_type == ContentType::HTML {
+                asset.content = fixup_html(std::str::from_utf8(&asset.content).unwrap(), config)
+                    .as_bytes()
+                    .to_vec();
+            }
+            asset
+        })
+        .collect();
 
     // Required to make II available on the identity.internetcomputer.org domain.
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
