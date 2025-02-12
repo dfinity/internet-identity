@@ -47,6 +47,8 @@ fn should_get_valid_jwt_delegation() -> Result<(), CallError> {
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(args));
 
+    //TODO: call config to check if instantiated properly
+
     // Mock google certs response
     mock_google_certs_response(&env);
 
