@@ -101,6 +101,16 @@ describe("findWebAuthnRpId", () => {
     );
   });
 
+  test("returns undefined if no related origins", () => {
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.icp0.io"),
+    ];
+    const currentUrl = "https://identity.internetcomputer.org";
+
+    expect(findWebAuthnRpId(currentUrl, devices, [])).toBe(undefined);
+  });
+
   test("returns the least preferred domain if devices are only on that domain", () => {
     const devices: CredentialData[] = [
       mockDeviceData("https://identity.icp0.io"),

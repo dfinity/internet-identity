@@ -88,4 +88,21 @@ describe("findWebAuthnFlows", () => {
       { useIframe: true, rpId: nonCurrentOrigin2RpId },
     ]);
   });
+
+  it("should return undefined flow if no related origins", () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(currentOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(nonCurrentOrigin2),
+        createMockCredential(nonCurrentOrigin2),
+      ],
+      currentOrigin: currentOrigin,
+      relatedOrigins: [],
+    });
+
+    expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
+  });
 });
