@@ -4,7 +4,6 @@ import {
   mimickPasskeyExtension,
   removeVirtualAuthenticator,
   runInBrowser,
-  setDomainCompatibilityFeatureFlag,
 } from "./util";
 
 // Read canister ids from the corresponding dfx files.
@@ -41,8 +40,6 @@ test("Sign in on related origins", async () => {
       await mainView.logout();
       await browser.url(relatedOrigin);
 
-      // Enable feature flag and sign in
-      await setDomainCompatibilityFeatureFlag(browser, true);
       await FLOWS.loginExistingAuthenticateView(
         userNumber,
         DEVICE_NAME1,
@@ -80,9 +77,6 @@ test("Add devices on related origins with same origin", async () => {
       await mainView.logout();
       const additionalDevice = await addVirtualAuthenticator(browser);
       await browser.url(relatedOrigin);
-
-      // Enable feature flag
-      await setDomainCompatibilityFeatureFlag(browser, true);
 
       // Sign in using seed phrase and register device
       await FLOWS.recoverUsingSeedPhrase(browser, seedPhrase);
@@ -125,9 +119,6 @@ test("Add devices on related origins with different origin", async () => {
       await mainView.logout();
       const additionalDevice = await addVirtualAuthenticator(browser);
       await browser.url(relatedOrigin);
-
-      // Enable feature flag
-      await setDomainCompatibilityFeatureFlag(browser, true);
 
       // Disable RoR by mimicking a passkey browser extension,
       // this enables adding devices in different origins.
@@ -174,8 +165,6 @@ test("Use recovery device on related origins", async () => {
       await mainView.logout();
       await browser.url(relatedOrigin);
 
-      // Enable feature flag and recover using device
-      await setDomainCompatibilityFeatureFlag(browser, true);
       await FLOWS.recoverUsingDevice(browser, userNumber);
     }
   });

@@ -503,7 +503,8 @@ describe("Connection.login", () => {
 
   describe("when a device credential id is missing", () => {
     it("connection does not use this device to authenticate", async () => {
-      const deviceWithCredentialId: DeviceData = createMockDevice();
+      const deviceWithCredentialId: DeviceData =
+        createMockDevice(currentOrigin);
       const deviceWithoutCredentialId: DeviceData = createMockDevice();
       deviceWithoutCredentialId.credential_id = [];
       const mockActor = {
@@ -528,7 +529,8 @@ describe("Connection.login", () => {
 
   describe("when device credential id is invalid", () => {
     it("connection does not use this device to authenticate", async () => {
-      const deviceValidCredentialId: DeviceData = createMockDevice();
+      const deviceValidCredentialId: DeviceData =
+        createMockDevice(currentOrigin);
       const deviceInvalidCredentialId: DeviceData = createMockDevice();
       deviceInvalidCredentialId.credential_id = [Uint8Array.from([])];
       const mockActor = {

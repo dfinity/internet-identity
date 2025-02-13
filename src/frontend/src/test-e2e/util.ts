@@ -503,6 +503,7 @@ export const mockFedCM = async (
   }, token);
 };
 
+// TODO: Remove when we remove the domain compatibility feature flag
 export const setDomainCompatibilityFeatureFlag = async (
   browser: WebdriverIO.Browser,
   enabled: boolean
