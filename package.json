@@ -72,6 +72,7 @@
     "idb-keyval": "^6.2.1",
     "lit-html": "^3.2.1",
     "marked": "^11.0.0",
+    "plausible-tracker": "0.3.9",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
     "ua-parser-js": "^1.0.35",
