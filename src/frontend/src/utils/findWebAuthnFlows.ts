@@ -40,9 +40,8 @@ export const findWebAuthnFlows = ({
   relatedOrigins,
 }: Parameters): WebAuthnFlow[] => {
   const steps: WebAuthnFlow[] = [];
-  let filteredCredentials = devices;
+  let filteredCredentials = [...devices];
   const rpIds = new Set<string | undefined>();
-  let previousRpId: string | undefined | "init" = "init";
 
   while (filteredCredentials.length > 0) {
     const rpId = findWebAuthnRpId(
@@ -50,23 +49,35 @@ export const findWebAuthnFlows = ({
       filteredCredentials,
       relatedOrigins
     );
-    // Break if the RP ID is the same as the previous one because it will be an infinite loop.
-    if (rpId === previousRpId) {
-      break;
-    }
+
     // EXCEPTION: At the moment, to avoid bad UX, if the RP ID doesn't match the current origin, the iframe will be used.
     // This is because it's hard to find out whether a user's credentials come from a third party password manager or not.
     // The iframe workaround works for all users.
     const useIframe =
       rpId !== undefined && rpId !== new URL(currentOrigin).hostname;
+
+    const isRepeatedStep = steps.some(
+      (step) => step.rpId === rpId && step.useIframe === useIframe
+    );
+    // Exit when the flow is the same to avoid infinite loops.
+    if (isRepeatedStep) {
+      break;
+    }
+
     steps.push({ useIframe, rpId });
     rpIds.add(rpId);
-    previousRpId = rpId;
     filteredCredentials = excludeCredentialsFromOrigins(
       filteredCredentials,
       rpIds,
       currentOrigin
     );
+  }
+
+  // One that doesn't use any new domain.
+  const defaultStep = { useIframe: false, rpId: undefined };
+  // If there are no steps, add a default step.
+  if (steps.length === 0) {
+    steps.push(defaultStep);
   }
 
   return steps;

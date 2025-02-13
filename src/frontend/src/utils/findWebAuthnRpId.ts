@@ -105,12 +105,15 @@ const getDevicesForDomain = (
  * @param currentUrl - The current URL of the page.
  * @param devices - The list of devices registered for the user.
  * @param relatedDomains - Optional list of domains in order or preference to use as the RP ID.
- * @returns {string | undefined} The RP ID (as hostname without schema) to use for WebAuthn registration.
+ * @returns {string | undefined}
+ * `string` The RP ID (as hostname without schema) to use for WebAuthn registration.
  * `undefined` when the RP ID is the same as the current domain and is not needed.
+ * `undefined` when there are no devices registered for any of the preferred domains.
+ * `undefined` when there are no devices.
+ * `undefined` when the devices domain is not a valid URL.
  *
- * @throws {Error} If devices are not registered for any of the preferred domains.
- * @throws {Error} If no devices exist or the current domain is invalid.
- * @throws {Error} If the current domain is invalid.
+ * `undefined` means to continue with the default flow.
+ * In case of inconsistent state, let the default flow be.
  */
 export const findWebAuthnRpId = (
   currentUrl: string,
@@ -122,25 +125,28 @@ export const findWebAuthnRpId = (
     return undefined;
   }
   if (devices.length === 0) {
-    throw new Error(
-      "Not possible. Every registered user has at least one device."
-    );
-  }
-
-  // Try current domain first if devices exist
-  if (getDevicesForDomain(devices, currentUrl).length > 0) {
     return undefined;
   }
 
-  // Check based on the order of preferred domains if there is no device with the current domain.
-  for (const domain of relatedDomains) {
-    const devicesForDomain = getDevicesForDomain(devices, domain);
-    if (devicesForDomain.length > 0) {
-      return getFirstHostname(devicesForDomain);
+  try {
+    // Try current domain first if devices exist
+    if (getDevicesForDomain(devices, currentUrl).length > 0) {
+      return undefined;
     }
+
+    // Check based on the order of preferred domains if there is no device with the current domain.
+    for (const domain of relatedDomains) {
+      const devicesForDomain = getDevicesForDomain(devices, domain);
+      if (devicesForDomain.length > 0) {
+        return getFirstHostname(devicesForDomain);
+      }
+    }
+  } catch (err: unknown) {
+    // This could happen if the devices domain is not a valid URL.
+    // In that case, let the default flow be.
+    console.error(err);
+    return undefined;
   }
 
-  throw new Error(
-    "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
-  );
+  return undefined;
 };
