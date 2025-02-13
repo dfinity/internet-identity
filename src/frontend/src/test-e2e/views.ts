@@ -239,8 +239,7 @@ export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="identity-management"]')
-      // TODO: Try setting it back to 10_000
-      .waitForDisplayed({ timeout: 30_000 });
+      .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
