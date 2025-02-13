@@ -10,6 +10,7 @@ use canister_tests::framework::*;
 use getrandom;
 use identity_jose::jwk::Jwk;
 use identity_jose::jws::{CompactJwsEncoder, Decoder, JwsHeader};
+use internet_identity_interface::internet_identity::authn_method;
 use internet_identity_interface::internet_identity::types::GetDelegationResponse;
 use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 use internet_identity_interface::internet_identity::types::OpenIdConfig;
@@ -68,7 +69,7 @@ fn can_link_google_account() -> Result<(), CallError> {
     api::openid_credential_add(
         &env,
         canister_id,
-        test_principal(),
+        auth_method.principal(),
         identity_number,
         &jwt,
         &salt,
