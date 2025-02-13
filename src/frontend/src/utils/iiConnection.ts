@@ -680,7 +680,7 @@ export class AuthenticatedConnection extends Connection {
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {
-    super(canisterId, canisterConfig, actor);
+    super(canisterId, canisterConfig);
     const metadataGetter = async () => {
       const response = await this.getIdentityInfo();
       if ("Ok" in response) {
