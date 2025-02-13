@@ -60,14 +60,15 @@ fn can_link_google_account() -> Result<(), CallError> {
     mock_google_certs_response(&env);
 
     let auth_method = test_authn_method();
-    let identity_number = flows::register_anchor_with_device(&env, canister_id, auth_method.into());
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &auth_method);
+    //   let identity_number = flows::register_anchor_with_device(&env, canister_id, auth_method);
 
     let (jwt, salt, _claims) = test_data();
 
     api::openid_credential_add(
         &env,
         canister_id,
-        auth_method.principal(),
+        test_principal(),
         identity_number,
         &jwt,
         &salt,
