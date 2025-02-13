@@ -42,3 +42,8 @@ pub enum OpenIdDelegationError {
     NoSuchDelegation,
     JwtVerificationFailed(String),
 }
+
+pub type OpenIdCredentialKey = (Iss, Sub);
+pub type Iss = String;
+pub type Sub = String;
+pub type Aud = String;
