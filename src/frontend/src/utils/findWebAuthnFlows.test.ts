@@ -1,7 +1,6 @@
 import { LEGACY_II_URL } from "$src/config";
 import { CredentialData } from "./credential-devices";
 import { findWebAuthnFlows } from "./findWebAuthnFlows";
-import { PROD_DOMAINS } from "./findWebAuthnRpId";
 
 describe("findWebAuthnFlows", () => {
   const currentOrigin = "https://identity.internetcomputer.org";
@@ -9,7 +8,11 @@ describe("findWebAuthnFlows", () => {
   const nonCurrentOrigin1RpId = new URL(nonCurrentOrigin1).hostname;
   const nonCurrentOrigin2 = "https://identity.icp0.io";
   const nonCurrentOrigin2RpId = new URL(nonCurrentOrigin2).hostname;
-  const relatedOrigins = PROD_DOMAINS;
+  const relatedOrigins = [
+    "https://identity.ic0.app",
+    "https://identity.internetcomputer.org",
+    "https://identity.icp0.io",
+  ];
 
   const createMockCredential = (
     origin: string | undefined

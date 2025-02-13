@@ -1,34 +1,6 @@
 import { II_LEGACY_ORIGIN } from "$src/constants";
 import { CredentialData } from "./credential-devices";
 
-export const PROD_DOMAINS = [
-  "https://identity.ic0.app",
-  "https://identity.internetcomputer.org",
-  "https://identity.icp0.io",
-];
-export const BETA_DOMAINS = [
-  "https://beta.identity.ic0.app",
-  "https://beta.identity.internetcomputer.org",
-  "https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
-];
-
-/**
- * Returns the related domains ordered by preference.
- *
- * It reads the current URL and returns the set related to the current url.
- */
-export const relatedDomains = (): string[] => {
-  const currentUrl = new URL(window.location.origin);
-  if (PROD_DOMAINS.includes(currentUrl.origin)) {
-    return PROD_DOMAINS;
-  }
-  if (BETA_DOMAINS.includes(currentUrl.origin)) {
-    return BETA_DOMAINS;
-  }
-  // Only beta and prod have related domains.
-  return [];
-};
-
 export const hasCredentialsFromMultipleOrigins = (
   credentials: CredentialData[]
 ): boolean =>

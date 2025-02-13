@@ -63,7 +63,6 @@ import {
   CredentialData,
 } from "./credential-devices";
 import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
-import { relatedDomains } from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -432,7 +431,8 @@ export class Connection {
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
         currentOrigin: window.location.origin,
-        relatedOrigins: relatedDomains(),
+        // Empty array is the same as no related origins.
+        relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
       });
       this.webAuthFlows = {
         flows,
