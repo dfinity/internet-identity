@@ -10,9 +10,10 @@ import { authFlowAuthorize } from "./flows/authorize";
 import { authFlowManage, renderManageWarmup } from "./flows/manage";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
-import { analytics } from "./utils/analytics";
+import { analytics, initAnalytics } from "./utils/analytics";
 
 void createSpa(async (connection) => {
+  initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);
   analytics.pageView();
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
