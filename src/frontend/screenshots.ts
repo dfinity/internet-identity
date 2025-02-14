@@ -97,6 +97,7 @@ async function withChrome<T>(
       "font-render-hinting=none",
       "hide-scrollbars",
       "disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
+      "--no-sandbox",
     ],
     mobileEmulation,
   };
