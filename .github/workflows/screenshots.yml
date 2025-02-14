@@ -39,15 +39,10 @@ jobs:
 
       - name: Modify AppArmor for Chrome
         run: |
-          # Check if AppArmor is enforcing Chrome's profile
-          if sudo aa-status --enabled && sudo aa-status | grep -q "usr.bin.chromium"; then
-            echo "Modifying AppArmor rules for Chrome..."
-            echo "/dev/shm/** rw," | sudo tee -a /etc/apparmor.d/usr.bin.chromium > /dev/null
-            echo "/tmp/** rw," | sudo tee -a /etc/apparmor.d/usr.bin.chromium > /dev/null
-            sudo apparmor_parser -r /etc/apparmor.d/usr.bin.chromium
-          else
-            echo "AppArmor is not enforcing Chromium, skipping modification."
-          fi
+          echo "Adding AppArmor permissions for Chrome..."
+          echo "/dev/shm/** rw," | sudo tee -a /etc/apparmor.d/usr.bin.chromium > /dev/null
+          echo "/tmp/** rw," | sudo tee -a /etc/apparmor.d/usr.bin.chromium > /dev/null
+          sudo apparmor_parser -r /etc/apparmor.d/usr.bin.chromium
 
       - name: Save screenshots
         run: |
