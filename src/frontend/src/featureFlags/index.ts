@@ -17,7 +17,7 @@ export class FeatureFlag {
   constructor(
     storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
     key: string,
-    defaultValue: boolean
+    defaultValue: boolean,
   ) {
     this.#storage = storage;
     this.#key = key;
@@ -52,18 +52,12 @@ export class FeatureFlag {
 const initializedFeatureFlags = Object.fromEntries(
   Object.entries(FEATURE_FLAGS_WITH_DEFAULTS).map(([key, defaultValue]) => [
     key,
-    typeof window !== "undefined"
-      ? new FeatureFlag(
-          window.localStorage,
-          LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-          defaultValue
-        )
-      : ({
-          isEnabled: () => false,
-          set: () => {},
-          reset: () => {},
-        } as unknown as FeatureFlag),
-  ])
+    new FeatureFlag(
+      window.localStorage,
+      LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
+      defaultValue,
+    ),
+  ]),
 );
 
 if (typeof window !== "undefined") {
