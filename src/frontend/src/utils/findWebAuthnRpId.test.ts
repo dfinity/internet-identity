@@ -101,6 +101,16 @@ describe("findWebAuthnRpId", () => {
     );
   });
 
+  test("returns undefined if no related origins", () => {
+    const devices: CredentialData[] = [
+      mockDeviceData("https://identity.ic0.app"),
+      mockDeviceData("https://identity.icp0.io"),
+    ];
+    const currentUrl = "https://identity.internetcomputer.org";
+
+    expect(findWebAuthnRpId(currentUrl, devices, [])).toBe(undefined);
+  });
+
   test("returns the least preferred domain if devices are only on that domain", () => {
     const devices: CredentialData[] = [
       mockDeviceData("https://identity.icp0.io"),
@@ -131,39 +141,29 @@ describe("findWebAuthnRpId", () => {
     );
   });
 
-  test("throws an error if the current domain is invalid", () => {
+  test("returns undefined if the current domain is invalid", () => {
     const devices: CredentialData[] = [
       mockDeviceData("https://identity.ic0.app"),
     ];
     const currentUrl = "not-a-valid-url";
 
-    expect(() =>
-      findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)
-    ).toThrowError("Invalid URL: not-a-valid-url");
+    expect(findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)).toBeUndefined();
   });
 
-  test("throws an error if no devices are registered for the current or preferred domains", () => {
+  test("returns undefined if no devices are registered for the current or preferred domains", () => {
     const devices: CredentialData[] = [
       mockDeviceData("https://otherdomain.com"),
     ];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(() =>
-      findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)
-    ).toThrowError(
-      "Not possible. Devices must be registered for at least one of the following domains: ic0.app, internetcomputer.org, icp0.io"
-    );
+    expect(findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)).toBeUndefined();
   });
 
-  test("throws an error if there are no registered devices", () => {
+  test("returns `undefined` if there are no registered devices", () => {
     const devices: CredentialData[] = [];
     const currentUrl = "https://identity.ic0.app";
 
-    expect(() =>
-      findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)
-    ).toThrowError(
-      "Not possible. Every registered user has at least one device."
-    );
+    expect(findWebAuthnRpId(currentUrl, devices, PROD_DOMAINS)).toBeUndefined();
   });
 });
 
