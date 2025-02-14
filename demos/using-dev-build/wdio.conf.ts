@@ -17,7 +17,12 @@ export const config: WebdriverIO.Config = {
       browserName: "chrome",
       browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": {
-        args: ["headless", "disable-gpu", "disable-dev-shm-usage"],
+        args: [
+          "headless",
+          "disable-gpu",
+          "disable-dev-shm-usage",
+          "--no-sandbox",
+        ],
       },
       acceptInsecureCerts: true,
     },
