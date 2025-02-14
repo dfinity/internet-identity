@@ -60,12 +60,10 @@ const initializedFeatureFlags = Object.fromEntries(
   ]),
 );
 
-if (typeof window !== "undefined") {
-  // Make feature flags configurable from browser console
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  window.__featureFlags = initializedFeatureFlags;
-}
+// Make feature flags configurable from browser console
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+window.__featureFlags = initializedFeatureFlags;
 
 // Export initialized feature flags as named exports
 export const {
