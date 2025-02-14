@@ -1,4 +1,5 @@
 // Feature flags with default values
+
 const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: false,
   OPENID_AUTHENTICATION: false,
@@ -51,18 +52,26 @@ export class FeatureFlag {
 const initializedFeatureFlags = Object.fromEntries(
   Object.entries(FEATURE_FLAGS_WITH_DEFAULTS).map(([key, defaultValue]) => [
     key,
-    new FeatureFlag(
-      window.localStorage,
-      LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-      defaultValue
-    ),
+    typeof window !== "undefined"
+      ? new FeatureFlag(
+          window.localStorage,
+          LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
+          defaultValue
+        )
+      : ({
+          isEnabled: () => false,
+          set: () => {},
+          reset: () => {},
+        } as unknown as FeatureFlag),
   ])
 );
 
-// Make feature flags configurable from browser console
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.__featureFlags = initializedFeatureFlags;
+if (typeof window !== "undefined") {
+  // Make feature flags configurable from browser console
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.__featureFlags = initializedFeatureFlags;
+}
 
 // Export initialized feature flags as named exports
 export const {

@@ -3,6 +3,7 @@ import { html, TemplateResult } from "lit-html";
 import { createRef, Ref, ref } from "lit-html/directives/ref.js";
 import { mkAnchorInput } from "./anchorInput";
 import { mainWindow } from "./mainWindow";
+import "../../lib/CustomInput.svelte";
 
 export const promptUserNumberTemplate = ({
   title,
@@ -21,6 +22,7 @@ export const promptUserNumberTemplate = ({
   const anchorInput = mkAnchorInput({ userNumber, onSubmit });
 
   const defaultMessage = "Please provide an Internet Identity.";
+  const customInputValue = "Hello world!";
   const promptUserNumberSlot = html` <hgroup data-page="prompt-user-number">
       <h1 class="t-title t-title--main">${title}</h1>
       <p class="t-lead">${message ?? defaultMessage}</p>
@@ -43,6 +45,13 @@ export const promptUserNumberTemplate = ({
       >
         Continue
       </button>
+      <!-- Example of rendering Svelte within Lit -->
+      <custom-input
+        value="123"
+        color="blue"
+        .submit=${(value: string) => onSubmit(BigInt(value))}
+        @value=${(event: CustomEvent) => console.log("change", event.detail)}
+      />
     </div>`;
 
   return mainWindow({

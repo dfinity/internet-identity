@@ -1,11 +1,9 @@
 import {
-  compression,
-  injectCanisterIdAndConfigPlugin,
   inlineScriptsPlugin,
-  minifyHTML,
   replicaForwardPlugin,
 } from "@dfinity/internet-identity-vite-plugins";
 import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
+import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
@@ -68,21 +66,22 @@ export default defineConfig(({ command, mode }): UserConfig => {
       },
     },
     plugins: [
+      sveltekit(),
       inlineScriptsPlugin,
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],
       }),
-      [
-        ...(mode === "development"
-          ? [
-              injectCanisterIdAndConfigPlugin({
-                canisterName: "internet_identity",
-              }),
-            ]
-          : []),
-      ],
-      [...(mode === "production" ? [minifyHTML(), compression()] : [])],
+      // [
+      //   ...(mode === "development"
+      //     ? [
+      //         injectCanisterIdAndConfigPlugin({
+      //           canisterName: "internet_identity",
+      //         }),
+      //       ]
+      //     : []),
+      // ],
+      // [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       {
         ...replicaForwardPlugin({
