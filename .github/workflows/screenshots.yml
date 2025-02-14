@@ -31,27 +31,9 @@ jobs:
 
       - name: Setup node
         uses: ./.github/actions/setup-node
-
       - name: Remove old screenshots
         run: rm -v -f screenshots/${{ matrix.device }}/*.png
-
       - run: npm ci
-
-      - name: Modify AppArmor for Chrome
-        run: |
-          sudo cp /etc/apparmor.d/usr.bin.chromium /etc/apparmor.d/usr.bin.chromium.bak
-          sudo sed -i '/}\s*$/i \
-            /dev/shm/** rw, \
-            /tmp/** rw, \
-            owner /run/user/[0-9]*/chromium/** rwk, \
-            /run/user/[0-9]*/chromium/** rwk,' /etc/apparmor.d/usr.bin.chromium
-          sudo apparmor_parser -r /etc/apparmor.d/usr.bin.chromium
-
-      - name: Restart AppArmor
-        run: |
-          sudo systemctl restart apparmor
-          sudo aa-status
-
       - name: Save screenshots
         run: |
           chromedriver --version
