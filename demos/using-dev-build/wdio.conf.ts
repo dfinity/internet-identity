@@ -21,6 +21,8 @@ export const config: WebdriverIO.Config = {
           "headless",
           "disable-gpu",
           "disable-dev-shm-usage",
+          // Required for CI runners using >=Ubuntu 24.04
+          // @see https://github.com/SeleniumHQ/selenium/issues/14609
           "--no-sandbox",
         ],
       },

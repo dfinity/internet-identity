@@ -97,6 +97,8 @@ async function withChrome<T>(
       "font-render-hinting=none",
       "hide-scrollbars",
       "disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
+      // Required for CI runners using >=Ubuntu 24.04
+      // @see https://github.com/SeleniumHQ/selenium/issues/14609
       "--no-sandbox",
     ],
     mobileEmulation,
