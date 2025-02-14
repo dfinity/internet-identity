@@ -16,6 +16,7 @@ dist/
 dist-showcase/
 .env
 lib
+!src/frontend/lib
 
 # Cargo build output
 target/
