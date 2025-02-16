@@ -12,22 +12,16 @@ pub struct SignedIdAlias {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareIdAliasRequest {
-    #[serde(rename = "identity_number")]
     pub identity_number: IdentityNumber,
-    #[serde(rename = "relying_party")]
     pub relying_party: FrontendHostname,
-    #[serde(rename = "issuer")]
     pub issuer: FrontendHostname,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PreparedIdAlias {
-    #[serde(rename = "canister_sig_pk_der")]
     pub canister_sig_pk_der: CanisterSigPublicKeyDer,
-    #[serde(rename = "rp_id_alias_jwt")]
-    pub rp_id_alias_jwt: String,
-    #[serde(rename = "issuer_id_alias_jwt")]
-    pub issuer_id_alias_jwt: String,
+    pub rp_id_alias_signing_input: String,
+    pub issuer_id_alias_signing_input: String,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -44,16 +38,11 @@ pub struct IdAliasCredentials {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetIdAliasRequest {
-    #[serde(rename = "identity_number")]
     pub identity_number: IdentityNumber,
-    #[serde(rename = "relying_party")]
     pub relying_party: FrontendHostname,
-    #[serde(rename = "issuer")]
     pub issuer: FrontendHostname,
-    #[serde(rename = "rp_id_alias_jwt")]
-    pub rp_id_alias_jwt: String,
-    #[serde(rename = "issuer_id_alias_jwt")]
-    pub issuer_id_alias_jwt: String,
+    pub rp_id_alias_signing_input: String,
+    pub issuer_id_alias_signing_input: String,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
