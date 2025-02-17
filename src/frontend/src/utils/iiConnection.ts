@@ -433,7 +433,6 @@ export class Connection {
         currentOrigin: window.location.origin,
         // Empty array is the same as no related origins.
         relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
-        // relatedOrigins: relatedDomains(),
       });
       this.webAuthFlows = {
         flows,
