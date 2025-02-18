@@ -15,14 +15,13 @@ print_help() {
 	Performs or guides the steps in the nns-dapp release SOP checklist.
 
 	To start a new release process, run:
-	  ./release-sop.sh --new
+	  ./release-sop.sh --new --name release-\$(date +%Y-%m-%d)
 
 	To start a new release process on the same day as a previous release, run:
-	  ./release-sop.sh --new --name Release-\$(date +%Y-%m-%d)-v2
+	  ./release-sop.sh --new --name release-\$(date +%Y-%m-%d)-v2
 
-	To continue an existing release process, make sure the release branch is
-	checked out and run:
-	  ./release-sop.sh --continue
+	To continue an existing release process, run:
+	  ./release-sop.sh --continue --name <release-used-on-new>
 
 	EOF
 }
@@ -57,6 +56,7 @@ NOT_MOCKED_COMMANDS=(
   test_release_candidate
   download_proposal_text
   prepare_proposal_argument
+  append_proposal_argument
 )
 
 execute() {
@@ -142,6 +142,7 @@ confirm_cmd() {
   value="$(checklist_get "$cmd")"
   if [ "$value" ]; then
     echo "$cmd: Was already done. Skipping."
+    echo ""
     return
   fi
   (
@@ -232,19 +233,19 @@ sha256() {
 wait_for_release() {
   API_URL="https://api.github.com/repos/dfinity/internet-identity/releases/tags/$TAG_NAME"
 
-  echo "Waiting for release $TAG_NAME in $REPO..."
+  echo "Waiting for release $TAG_NAME in repo..."
 
   while true; do
       RESPONSE=$(curl -s "$API_URL")
 
       # Check if the release exists
       if echo "$RESPONSE" | grep -q '"id":'; then
-          echo "Release $TAG is available!"
-          exit 0
+          echo "Release $TAG_NAME is available!"
+          break;
+      else
+          echo "Release not found. Retrying in 1 minute..."
+          sleep 60
       fi
-
-      echo "Release not found. Retrying in 1 minute..."
-      sleep 60
   done
 }
 
@@ -257,9 +258,9 @@ wait_for_release_text_change() {
 
 wait_for_archive_canister_hash() {
   echo "Go to the release page"
-  echo "Do we need a new archive canister?"
-  echo "Compare the hashes from the last release and if so, update the release page verify command:"
-  echo "./scripts/verify-hash"
+  echo "Compare the hashes of archive canisters from the previous release and this one"
+  echo "If they are different, we need a new canister"
+  echo "Update the release page verify command: \"scripts/verify-hash\""
   echo "Release page: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
 }
 
@@ -277,9 +278,9 @@ request_verification_command() {
 }
 
 deploy_release_candidate() {
-  echo "Deploying II release candidate with no arguments"
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install jqajs-xiaaa-aaaad-aab5q-cai --mode=upgrade --wasm ./internet_identity.wasm.gz
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz
+  echo "Deploying II release candidate with same arguments as prod"
+  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install jqajs-xiaaa-aaaad-aab5q-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
+  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
 }
 
 test_release_candidate() {
@@ -290,7 +291,26 @@ test_release_candidate() {
 }
 
 prepare_proposal_argument() {
-  $SOURCE_DIR/encode-identity-init
+  echo "You need at least the didc from 2024-07-29 https://github.com/dfinity/candid/releases/tag/2024-07-29"
+  didc assist -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}' > args.txt
+}
+
+append_proposal_argument() {
+  # Get the arguments from the file
+  ARGUMENTS=$(cat "args.txt")
+  
+  cat >> proposal.md << EOF
+
+## Argument Verification
+
+Run the following command to verify the upgrade argument hash:
+
+\`\`\`
+didc encode '${ARGUMENTS}' | xxd -r -p | sha256sum
+\`\`\`
+
+The output should match the argument hash.
+EOF
 }
 
 download_proposal_text() {
@@ -355,27 +375,26 @@ tag_proposal() {
 echo Checklist file: "$CHECKLIST_FILE"
 
 record "Start time" date +"%Y-%m-%d %H:%M:%S"
-confirm_cmd git fetch --tags --force
-# PENDING to be added after the script is updated
-record "Release SOP script is newest version" is_release_sop_script_newest_version
-confirm_cmd git tag -f $TAG_NAME
-record "Release commit" git rev-parse $TAG_NAME
-record "New tag pushed" git push origin $TAG_NAME
-record "New release in GH created" confirm_cmd wait_for_release
+# confirm_cmd git fetch --tags --force
+# # PENDING to be added after the script is updated
+# # record "Release SOP script is newest version" is_release_sop_script_newest_version
+# confirm_cmd git tag -f $TAG_NAME
+# record "Release commit" git rev-parse $TAG_NAME
+# record "New tag pushed" git push origin $TAG_NAME
+confirm_cmd wait_for_release
 confirm_manual "Edit release page title and text" wait_for_release_text_change
 confirm_manual "Add archive canister if needed" wait_for_archive_canister_hash
 confirm_cmd download_wasms
 record "II WASM hash" sha256 internet_identity.wasm.gz
 record "Archive WASM hash" sha256 archive.wasm.gz
 confirm_manual "Request Run Verification Command" request_verification_command
-confirm_cmd deploy_release_candidate
-confirm_manual "Test release candidate" test_release_candidate
 confirm_cmd download_proposal_text
 confirm_cmd prepare_proposal_argument
-confirm_manual "Add arguments section" echo "Add the arguments section to the proposal"
+confirm_cmd append_proposal_argument
+confirm_cmd deploy_release_candidate
+confirm_manual "Test release candidate" test_release_candidate
 confirm_cmd dry_run_proposal
 confirm_manual "Review proposal" echo "Review the proposal above"
 confirm_cmd make_proposal
 record "Proposal number" bash -c 'read -p "Enter a proposal number: " num; echo "$num"'
 confirm_cmd tag_proposal
-
