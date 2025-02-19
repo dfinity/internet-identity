@@ -19,7 +19,7 @@ jobs:
       ref: ${{ steps.release.outputs.ref }}
       ii_prod_sha256: ${{ steps.release.outputs.ii_prod_sha256 }}
       archive_sha256: ${{ steps.release.outputs.archive_sha256 }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Get latest release information
         run: |
