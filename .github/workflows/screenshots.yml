@@ -196,6 +196,9 @@ jobs:
           name: e2e-screenshots-base-mobile
           path: ${{ steps.sys.outputs.tmpdir }}/base/mobile/
 
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       # Compare screenshots on head & base and report differences (as step outputs)
       - name: Diff images
         id: diff
