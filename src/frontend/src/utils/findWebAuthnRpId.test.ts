@@ -1,10 +1,20 @@
 import { CredentialData } from "./credential-devices";
 import {
-  BETA_DOMAINS,
-  PROD_DOMAINS,
   excludeCredentialsFromOrigins,
   findWebAuthnRpId,
 } from "./findWebAuthnRpId";
+
+const BETA_DOMAINS = [
+  "https://beta.identity.ic0.app",
+  "https://beta.identity.internetcomputer.org",
+  "https://fgte5-ciaaa-aaaad-aaatq-cai.ic0.app",
+];
+
+const PROD_DOMAINS = [
+  "https://identity.ic0.app",
+  "https://identity.internetcomputer.org",
+  "https://identity.icp0.io",
+];
 
 describe("findWebAuthnRpId", () => {
   const mockDeviceData = (origin?: string): CredentialData => ({

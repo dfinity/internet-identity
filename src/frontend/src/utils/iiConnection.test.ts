@@ -63,7 +63,13 @@ const DEFAULT_INIT: InternetIdentityInit = {
   captcha_config: [],
   openid_google: [],
   register_rate_limit: [],
-  related_origins: [],
+  related_origins: [
+    [
+      "https://identity.ic0.app",
+      "https://identity.internetcomputer.org",
+      "https://identity.icp0.io",
+    ],
+  ],
 };
 
 const mockActor = {
@@ -119,6 +125,7 @@ test("commits changes on identity metadata", async () => {
     mockActor
   );
 
+  expect(infoResponse).toBeUndefined();
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
 
   expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
@@ -208,6 +215,28 @@ describe("Connection.login", () => {
           [convertToValidCredentialData(mockDevice)],
           "identity.ic0.app",
           true
+        );
+      }
+    });
+
+    it("login returns undefined RP ID if no related origins are in the config", async () => {
+      const config: InternetIdentityInit = {
+        ...DEFAULT_INIT,
+        related_origins: [],
+      };
+      const connection = new Connection("aaaaa-aa", config, mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("loginSuccess");
+      if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(loginResult.showAddCurrentDevice).toBe(false);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+          [convertToValidCredentialData(mockDevice)],
+          undefined,
+          false
         );
       }
     });
@@ -566,12 +595,6 @@ describe("Connection.login", () => {
         credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
       };
       const mockActor = {
-        identity_info: vi.fn().mockImplementation(async () => {
-          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-          infoResponse = await mockRawMetadata;
-          return { Ok: { metadata: mockRawMetadata } };
-        }),
-        identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
         lookup: vi.fn().mockResolvedValue([pinDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
 

@@ -18,6 +18,7 @@ void createSpa(async (connection) => {
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor();
   if (nonNullish(addDeviceAnchor)) {
+    analytics.event("page-add-new-device");
     const userNumber = addDeviceAnchor;
     // Register this device (tentatively)
     const registerDeviceResult = await registerTentativeDevice(
@@ -49,15 +50,19 @@ void createSpa(async (connection) => {
 
   // Simple, #-based routing
   if (url.hash === "#authorize") {
+    analytics.event("page-authorize");
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
   } else if (url.pathname === REDIRECT_CALLBACK_PATH) {
+    analytics.event("page-redirect-callback");
     // User was returned here after redirect from a OpenID flow callback
     return callbackFlow();
   } else if (url.hash === WEBAUTHN_IFRAME_PATH) {
+    analytics.event("page-webauthn-iframe");
     // User needs to do cross-origin WebAuthn authentication in an iframe
     return webAuthnInIframeFlow(connection);
   } else {
+    analytics.event("page-manage");
     // The default flow
     return authFlowManage(connection);
   }
