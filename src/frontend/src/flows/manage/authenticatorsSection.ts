@@ -92,7 +92,7 @@ export const authenticatorsSection = ({
           )}</ul>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+              .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
               @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
