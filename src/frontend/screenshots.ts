@@ -97,6 +97,9 @@ async function withChrome<T>(
       "font-render-hinting=none",
       "hide-scrollbars",
       "disable-dev-shm-usage", // disable /dev/shm usage because chrome is prone to crashing otherwise
+      // Required for CI runners using >=Ubuntu 24.04
+      // @see https://github.com/SeleniumHQ/selenium/issues/14609
+      "--no-sandbox",
     ],
     mobileEmulation,
   };
@@ -104,7 +107,7 @@ async function withChrome<T>(
   const browser = await remote({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "122.0.6261.111", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
