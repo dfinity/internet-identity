@@ -30,6 +30,10 @@ import {
   UserNumber,
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
+import {
+  RpIdPickCancelled,
+  RpIdPickSuccess,
+} from "$src/components/authenticateBox";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$src/featureFlags";
 import { features } from "$src/features";
@@ -101,6 +105,10 @@ export type LoginSuccess = {
   connection: AuthenticatedConnection;
   userNumber: bigint;
   showAddCurrentDevice: boolean;
+};
+
+export type LoginCancel = {
+  kind: "loginCancel";
 };
 
 export type RegFlowNextStep =
@@ -369,7 +377,10 @@ export class Connection {
   };
 
   login = async (
-    userNumber: bigint
+    userNumber: bigint,
+    pickRpId?: (
+      rpIds: Array<string | undefined>
+    ) => Promise<RpIdPickSuccess | RpIdPickCancelled>
   ): Promise<
     | LoginSuccess
     | AuthFail
@@ -378,6 +389,7 @@ export class Connection {
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
+    | LoginCancel
   > => {
     let devices: Omit<DeviceData, "alias">[];
     try {
@@ -416,29 +428,65 @@ export class Connection {
       userNumber,
       webAuthnAuthenticators
         .map(convertToValidCredentialData)
-        .filter(nonNullish)
+        .filter(nonNullish),
+      pickRpId
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[]
+    credentials: CredentialData[],
+    pickRpId?: (
+      rpIds: Array<string | undefined>
+    ) => Promise<RpIdPickSuccess | RpIdPickCancelled>
   ): Promise<
-    LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
+    | LoginSuccess
+    | WebAuthnFailed
+    | PossiblyWrongWebAuthnFlow
+    | AuthFail
+    | LoginCancel
   > => {
-    if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
-      const flows = findWebAuthnFlows({
-        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
-        devices: credentials,
-        currentOrigin: window.location.origin,
-        // Empty array is the same as no related origins.
-        relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
-      });
-      this.webAuthFlows = {
-        flows,
-        currentIndex: 0,
-      };
+    if (DOMAIN_COMPATIBILITY.isEnabled()) {
+      // Create flows if not initialized yet
+      if (isNullish(this.webAuthFlows)) {
+        const flows = findWebAuthnFlows({
+          supportsRor: supportsWebauthRoR(window.navigator.userAgent),
+          devices: credentials,
+          currentOrigin: window.location.origin,
+          // Empty array is the same as no related origins.
+          relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
+        });
+        this.webAuthFlows = {
+          flows,
+          currentIndex: 0,
+        };
+      }
+
+      // When there are multiple, let user pick the rp id from discovered flows
+      const uniqueRpIds = Array.from(
+        new Set(this.webAuthFlows.flows.map((flow) => flow.rpId))
+      );
+      if (
+        nonNullish(pickRpId) &&
+        this.webAuthFlows.currentIndex === 0 &&
+        uniqueRpIds.length > 0
+      ) {
+        const result = await pickRpId(uniqueRpIds);
+        if (result.kind === "rpIdPickCancelled") {
+          return { kind: "loginCancel" };
+        }
+        void (result satisfies RpIdPickSuccess);
+
+        const pickedFlows = this.webAuthFlows.flows.filter(
+          (flow) => flow.rpId === result.rpId
+        );
+        const otherFlows = this.webAuthFlows.flows.filter(
+          (flow) => flow.rpId !== result.rpId
+        );
+        this.webAuthFlows.flows = [...pickedFlows, ...otherFlows];
+      }
     }
+
     const flowsLength = this.webAuthFlows?.flows.length ?? 0;
 
     // Better understand which users make it (or don't) all the way.

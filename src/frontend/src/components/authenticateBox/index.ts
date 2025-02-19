@@ -1,7 +1,9 @@
+import { i18n } from "$showcase/i18n";
 import { mkAnchorInput } from "$src/components/anchorInput";
 import { mkAnchorPicker } from "$src/components/anchorPicker";
 import { flowErrorToastTemplate } from "$src/components/authenticateBox/errorToast";
 import { displayError } from "$src/components/displayError";
+import { arrowRight } from "$src/components/icons";
 import { landingPage } from "$src/components/landingPage";
 import { withLoader } from "$src/components/loader";
 import { mainWindow } from "$src/components/mainWindow";
@@ -12,6 +14,7 @@ import {
   reconstructPinIdentity,
 } from "$src/crypto/pinIdentity";
 import { registerTentativeDevice } from "$src/flows/addDevice/welcomeView/registerTentativeDevice";
+import authorizeCopy from "$src/flows/authorize/index.json";
 import { idbRetrievePinIdentityMaterial } from "$src/flows/pin/idb";
 import { usePin } from "$src/flows/pin/usePin";
 import { useRecovery } from "$src/flows/recovery/useRecovery";
@@ -31,6 +34,7 @@ import {
   Connection,
   InvalidAuthnMethod,
   InvalidCaller,
+  LoginCancel,
   LoginSuccess,
   NoRegistrationFlow,
   PinUserOtherDomain,
@@ -365,6 +369,7 @@ export const handleLoginFlowResult = async <E>(
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | FlowError
+    | LoginCancel
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
@@ -397,6 +402,10 @@ export const handleLoginFlowResult = async <E>(
         ],
       })
     );
+    return undefined;
+  }
+
+  if (result.kind === "loginCancel") {
     return undefined;
   }
 
@@ -625,7 +634,52 @@ const loginPasskey = ({
 }: {
   connection: Connection;
   userNumber: bigint;
-}) => connection.login(userNumber);
+}) => connection.login(userNumber, pickRpId);
+
+// Re-uses the anchor selector HTML structure and CSS classes
+export type RpIdPickSuccess = {
+  kind: "rpIdPickSuccess";
+  rpId: string | undefined;
+};
+export type RpIdPickCancelled = { kind: "rpIdPickCancelled" };
+export const pickRpId = (
+  rpIds: Array<string | undefined>
+): Promise<RpIdPickSuccess | RpIdPickCancelled> =>
+  new Promise((resolve) => {
+    const copy = i18n.i18n(authorizeCopy);
+    const slot = html` <header>
+        <h1 class="t-title t-title--main">${copy.multiple_domains}</h1>
+        <p class="t-lead l-stack">${copy.multiple_domains_pick_to_continue}</p>
+      </header>
+      <ul class="c-list c-list--anchors l-stack">
+        ${rpIds.map(
+          (rpId) =>
+            html` <li
+              class="c-list__item c-list__item--vip c-list__item--icon icon-trigger"
+            >
+              <button
+                class="c-list__parcel c-list__parcel--select"
+                @click="${() => resolve({ kind: "picked", rpId })}"
+                tabindex="0"
+                data-rp-id="${rpId}"
+                style="font-size: 18px"
+              >
+                ${rpId ?? window.location.hostname}
+              </button>
+              <i class="c-list__icon c-list__icon--masked">${arrowRight}</i>
+            </li>`
+        )}
+        <li class="c-list__item c-list__item--noFocusStyle">
+          <button
+            class="t-link c-list__parcel c-list__parcel--fullwidth"
+            @click="${() => resolve({ kind: "rpIdPickCancelled" })}"
+          >
+            Cancel
+          </button>
+        </li>
+      </ul>`;
+    page({ slot, useLandingPageTemplate: false });
+  });
 
 const loginPinIdentityMaterial = ({
   connection,
@@ -747,7 +801,8 @@ const useIdentityFlow = async <I>({
   );
 
   const doLoginPasskey = async () => {
-    const result = await withLoader(() => loginPasskey(userNumber));
+    // const result = await withLoader(() => loginPasskey(userNumber));
+    const result = await loginPasskey(userNumber);
     return { newAnchor: false, authnMethod: "passkey", ...result } as const;
   };
 
