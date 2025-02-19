@@ -342,7 +342,7 @@ dry_run_proposal() {
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
 }
 
-dry_run_proposal() {
+make_proposal() {
   # Download again the release tag wasm to check the hash along the latest downloaded before.
   curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
   # Read again the arguments to check the hash along the arg.bin file sent in the proposal.
