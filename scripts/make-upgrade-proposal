@@ -12,7 +12,7 @@ SOURCE_DIR="$(dirname "${BASH_SOURCE[0]}")"
 print_help() {
   cat <<-EOF
 
-	Performs or guides the steps in the nns-dapp release SOP checklist.
+	Performs or guides the steps in the Internet Identity release SOP checklist.
 
 	To start a new release process, run:
 	  ./release-sop.sh --new --name release-\$(date +%Y-%m-%d)
