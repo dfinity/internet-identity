@@ -197,9 +197,13 @@ const displayManageTemplate = ({
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
+  const i18n = new I18n();
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
-  const i18n = new I18n();
+  // Recommend the user to clean up passkeys if there are multiple domains
+  const cleanupRecommended = authenticators.some((authenticator) =>
+    nonNullish(authenticator.rpId)
+  );
 
   const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
@@ -216,6 +220,7 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
       warnNoPasskeys,
+      cleanupRecommended,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
