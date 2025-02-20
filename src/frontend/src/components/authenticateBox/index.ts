@@ -369,7 +369,6 @@ export const handleLoginFlowResult = async <E>(
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | FlowError
-    | LoginCancel
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
@@ -402,10 +401,6 @@ export const handleLoginFlowResult = async <E>(
         ],
       })
     );
-    return undefined;
-  }
-
-  if (result.kind === "loginCancel") {
     return undefined;
   }
 

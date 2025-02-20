@@ -389,7 +389,6 @@ export class Connection {
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
-    | LoginCancel
   > => {
     let devices: Omit<DeviceData, "alias">[];
     try {
@@ -440,11 +439,7 @@ export class Connection {
       rpIds: Array<string | undefined>
     ) => Promise<RpIdPickSuccess | RpIdPickCancelled>
   ): Promise<
-    | LoginSuccess
-    | WebAuthnFailed
-    | PossiblyWrongWebAuthnFlow
-    | AuthFail
-    | LoginCancel
+    LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
     if (DOMAIN_COMPATIBILITY.isEnabled()) {
       // Create flows if not initialized yet
@@ -473,7 +468,7 @@ export class Connection {
       ) {
         const result = await pickRpId(uniqueRpIds);
         if (result.kind === "rpIdPickCancelled") {
-          return { kind: "loginCancel" };
+          return { kind: "webAuthnFailed" };
         }
         void (result satisfies RpIdPickSuccess);
 
