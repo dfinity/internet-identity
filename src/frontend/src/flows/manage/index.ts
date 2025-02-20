@@ -741,7 +741,7 @@ const domainLabel = (
   if (nonNullish(commonOrigin)) {
     return undefined;
   }
-  return device.origin[0] ?? LEGACY_II_URL;
+  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 };
 
 const unknownError = (): Error => {
