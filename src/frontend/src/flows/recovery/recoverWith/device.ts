@@ -7,6 +7,7 @@ import { convertToValidCredentialData } from "$src/utils/credential-devices";
 import {
   AuthFail,
   Connection,
+  LoginCancel,
   LoginSuccess,
   PossiblyWrongWebAuthnFlow,
   WebAuthnFailed,
@@ -53,6 +54,11 @@ export const recoverWithDevice = ({
           return;
         }
 
+        if (result.kind === "loginCancel") {
+          resolve({ tag: "canceled" });
+          return;
+        }
+
         if (result.kind !== "loginSuccess") {
           if (result.kind === "possiblyWrongWebAuthnFlow") {
             const i18n = new I18n();
@@ -90,6 +96,7 @@ const attemptRecovery = async ({
   | WebAuthnFailed
   | PossiblyWrongWebAuthnFlow
   | AuthFail
+  | LoginCancel
   | { kind: "noRecovery" }
   | { kind: "tooManyRecovery" }
 > => {
@@ -112,5 +119,9 @@ const attemptRecovery = async ({
     .map(convertToValidCredentialData)
     .filter(nonNullish);
 
-  return await connection.fromWebauthnCredentials(userNumber, credentialData);
+  return await connection.fromWebauthnCredentials(
+    userNumber,
+    credentialData,
+    undefined
+  );
 };

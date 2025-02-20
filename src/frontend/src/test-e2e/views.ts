@@ -542,6 +542,12 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
     await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
     await this.browser.$('[data-action="continue"]').click();
+
+    // If there are multiple RP ids, always pick the first one
+    const selectRpId = await this.browser.$("[data-rp-id]");
+    if (await selectRpId.isExisting()) {
+      await selectRpId.click();
+    }
   }
 
   async expectAnchorInputField(): Promise<void> {
