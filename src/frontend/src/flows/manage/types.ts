@@ -4,6 +4,7 @@ import { TemplateResult } from "lit-html";
 export type Authenticator = {
   alias: string;
   last_usage: [] | [bigint];
+  rpId?: string;
   rename: () => void;
   remove?: () => void;
   // `warn` is used to show a warning icon when the device was registered in a different oring than current one.

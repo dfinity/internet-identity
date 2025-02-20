@@ -1,4 +1,6 @@
+import { i18n } from "$showcase/i18n";
 import { infoIcon, warningIcon } from "$src/components/icons";
+import copyJson from "$src/flows/manage/authenticatorsSection.json";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -10,6 +12,9 @@ import { Authenticator } from "./types";
 // and we (the frontend) only allow user one recovery device per type (phrase, fob),
 // which leaves room for 8 authenticator devices.
 const MAX_AUTHENTICATORS = 8;
+
+const MANAGE_PASSKEYS_SUPPORT_URL =
+  "https://identitysupport.dfinity.org/hc/en-us/articles/34973858010132";
 
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
@@ -35,11 +40,14 @@ export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
   warnNoPasskeys,
+  cleanupRecommended,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
   warnNoPasskeys: boolean;
+  cleanupRecommended: boolean;
 }): TemplateResult => {
+  const copy = i18n.i18n(copyJson);
   const wrapClasses = [
     "l-stack",
     "c-card",
@@ -104,13 +112,34 @@ export const authenticatorsSection = ({
               <span>Add new Passkey</span>
             </button>
           </div>
-
         </div>
+        ${
+          cleanupRecommended
+            ? html`<div>
+                <p class="l-stack--small">
+                  ${copy.some_passkeys_may_be_outdated_and} ${" "}
+                  <a target="_blank" href="${MANAGE_PASSKEYS_SUPPORT_URL}">
+                    ${copy.safely_cleaning_them_up}
+                  </a>
+                  ${" "} ${copy.can_improve_sign_in}
+                </p>
+              </div>`
+            : undefined
+        }
     </aside>`;
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, last_usage, dupCount, warn, info, remove, rename },
+  authenticator: {
+    alias,
+    last_usage,
+    dupCount,
+    warn,
+    info,
+    remove,
+    rename,
+    rpId,
+  },
   index,
   icon,
 }: {
@@ -160,6 +189,9 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
+        ${nonNullish(rpId)
+          ? html`<div class="t-discreet">${rpId}</div>`
+          : undefined}
         <div>
           ${nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">

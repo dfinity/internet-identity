@@ -197,9 +197,13 @@ const displayManageTemplate = ({
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
+  const i18n = new I18n();
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
-  const i18n = new I18n();
+  // Recommend the user to clean up passkeys if there are multiple domains
+  const cleanupRecommended = authenticators.some((authenticator) =>
+    nonNullish(authenticator.rpId)
+  );
 
   const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
@@ -216,6 +220,7 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
       warnNoPasskeys,
+      cleanupRecommended,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
@@ -647,6 +652,7 @@ export const devicesFromDevicesWithUsage = ({
 
       const authenticator = {
         alias: device.alias,
+        rpId: domainLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         info: domainInfo(device, devices_),
@@ -721,6 +727,16 @@ const domainInfo = (
   device: DeviceData,
   allDevices: DeviceData[]
 ): TemplateResult | undefined => {
+  const label = domainLabel(device, allDevices);
+  if (nonNullish(label)) {
+    return html`This passkey was registered in ${label}`;
+  }
+};
+
+const domainLabel = (
+  device: DeviceData,
+  allDevices: DeviceData[]
+): string | undefined => {
   if (!DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;
   }
@@ -730,8 +746,7 @@ const domainInfo = (
   if (nonNullish(commonOrigin)) {
     return undefined;
   }
-  return html`This passkey was registered in
-  ${device.origin[0] ?? LEGACY_II_URL}`;
+  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 };
 
 const unknownError = (): Error => {
