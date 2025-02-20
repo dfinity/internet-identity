@@ -464,7 +464,7 @@ export class Connection {
       if (
         nonNullish(pickRpId) &&
         this.webAuthFlows.currentIndex === 0 &&
-        uniqueRpIds.length > 0
+        uniqueRpIds.length > 1
       ) {
         const result = await pickRpId(uniqueRpIds);
         if (result.kind === "rpIdPickCancelled") {
