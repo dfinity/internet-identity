@@ -659,7 +659,7 @@ export const pickRpId = (
             >
               <button
                 class="c-list__parcel c-list__parcel--select"
-                @click="${() => resolve({ kind: "picked", rpId })}"
+                @click="${() => resolve({ kind: "rpIdPickSuccess", rpId })}"
                 tabindex="0"
                 data-rp-id="${rpId}"
                 style="font-size: 18px"
@@ -764,6 +764,7 @@ const useIdentityFlow = async <I>({
     | PinUserOtherDomain
     | UnknownUser
     | ApiError
+    | LoginCancel
   >;
   allowPinLogin: boolean;
   verifyPinValidity: (opts: {
@@ -808,7 +809,11 @@ const useIdentityFlow = async <I>({
 
   if (isNullish(pinIdentityMaterial)) {
     // this user number does not have a browser storage identity
-    return doLoginPasskey();
+    const result = await doLoginPasskey();
+    if (result.kind === "loginCancel") {
+      return { tag: "canceled" };
+    }
+    return result;
   }
 
   // Here we ensure the PIN identity is still valid, i.e. the user did not explicitly delete
@@ -824,7 +829,11 @@ const useIdentityFlow = async <I>({
   );
   if (isValid === "expired") {
     // the PIN identity seems to have been expired
-    return doLoginPasskey();
+    const result = await doLoginPasskey();
+    if (result.kind === "loginCancel") {
+      return { tag: "canceled" };
+    }
+    return result;
   }
   isValid satisfies "valid";
 
@@ -857,7 +866,11 @@ const useIdentityFlow = async <I>({
 
   if (result.kind === "passkey") {
     // User still decided to use a passkey
-    return doLoginPasskey();
+    const result = await doLoginPasskey();
+    if (result.kind === "loginCancel") {
+      return { tag: "canceled" };
+    }
+    return result;
   }
 
   result satisfies { kind: "pin" };
