@@ -656,7 +656,7 @@ export const pickRpId = (
                 class="c-list__parcel c-list__parcel--select"
                 @click="${() => resolve({ kind: "rpIdPickSuccess", rpId })}"
                 tabindex="0"
-                data-rp-id="${rpId}"
+                data-rp-id="${rpId ?? window.location.hostname}"
                 style="font-size: 18px"
               >
                 ${rpId ?? window.location.hostname}
