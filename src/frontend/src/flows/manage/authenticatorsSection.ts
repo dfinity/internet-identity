@@ -110,7 +110,16 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, last_usage, dupCount, warn, info, remove, rename },
+  authenticator: {
+    alias,
+    last_usage,
+    dupCount,
+    warn,
+    info,
+    remove,
+    rename,
+    rpId,
+  },
   index,
   icon,
 }: {
@@ -160,6 +169,9 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
+        ${nonNullish(rpId)
+          ? html`<div class="t-discreet">${rpId}</div>`
+          : undefined}
         <div>
           ${nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">
