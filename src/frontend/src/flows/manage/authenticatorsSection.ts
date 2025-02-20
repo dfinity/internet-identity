@@ -14,7 +14,7 @@ import { Authenticator } from "./types";
 const MAX_AUTHENTICATORS = 8;
 
 const MANAGE_PASSKEYS_SUPPORT_URL =
-  "https://identitysupport.dfinity.org/hc/en-us/articles/32301362727188";
+  "https://identitysupport.dfinity.org/hc/en-us/articles/34973858010132";
 
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
