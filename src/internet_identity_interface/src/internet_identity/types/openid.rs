@@ -17,7 +17,7 @@ pub struct OpenIdCredentialData {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum OpenIdCredentialAddError {
     Unauthorized(Principal),
-    JwtVerificationFailed,
+    JwtVerificationFailed(String),
     OpenIdCredentialAlreadyRegistered,
     InternalCanisterError(String),
 }

@@ -783,7 +783,7 @@ mod openid_api {
     ) -> Result<(), OpenIdCredentialAddError> {
         anchor_operation_with_authz_check(identity_number, |anchor| {
             let openid_credential = openid::verify(&jwt, &salt)
-                .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
+                .map_err(|err| OpenIdCredentialAddError::JwtVerificationFailed(err))?;
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
