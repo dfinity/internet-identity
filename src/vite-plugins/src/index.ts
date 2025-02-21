@@ -1,8 +1,5 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { minify } from "html-minifier-terser";
-import { extname } from "path";
 import type { Plugin, ViteDevServer } from "vite";
-import viteCompression from "vite-plugin-compression";
 import {
   forwardToReplica,
   readCanisterConfig,
@@ -54,23 +51,23 @@ export const injectCanisterIdAndConfigPlugin = ({
 /**
  * GZip generated resources e.g. index.js => index.js.gz
  */
-export const compression = (): Plugin =>
-  viteCompression({
-    // II canister only supports one content type per resource. That is why we remove the original file.
-    deleteOriginFile: true,
-    filter: (file: string): boolean =>
-      [".js", ".woff2"].includes(extname(file)),
-  });
+// export const compression = (): Plugin =>
+//   viteCompression({
+//     // II canister only supports one content type per resource. That is why we remove the original file.
+//     deleteOriginFile: true,
+//     filter: (file: string): boolean =>
+//       [".js", ".woff2"].includes(extname(file)),
+//   });
 
 /**
  * Minify HTML
  */
-export const minifyHTML = (): Plugin => ({
-  name: "minify-html",
-  async transformIndexHtml(html): Promise<string> {
-    return minify(html, { collapseWhitespace: true });
-  },
-});
+// export const minifyHTML = (): Plugin => ({
+//   name: "minify-html",
+//   async transformIndexHtml(html): Promise<string> {
+//     return minify(html, { collapseWhitespace: true });
+//   },
+// });
 
 /**
  * Forwards requests to the local replica.
