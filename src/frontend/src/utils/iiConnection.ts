@@ -488,7 +488,7 @@ export class Connection {
     }
 
     const actor = await this.createActor(delegationIdentity);
-
+    console.log(JSON.stringify(identity.getPublicKey(), null, 2));
     const connection = new AuthenticatedConnection(
       this.canisterId,
       identity,
