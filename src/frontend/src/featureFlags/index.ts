@@ -1,4 +1,5 @@
 // Feature flags with default values
+
 const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
@@ -16,7 +17,7 @@ export class FeatureFlag {
   constructor(
     storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
     key: string,
-    defaultValue: boolean
+    defaultValue: boolean,
   ) {
     this.#storage = storage;
     this.#key = key;
@@ -54,9 +55,9 @@ const initializedFeatureFlags = Object.fromEntries(
     new FeatureFlag(
       window.localStorage,
       LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-      defaultValue
+      defaultValue,
     ),
-  ])
+  ]),
 );
 
 // Make feature flags configurable from browser console

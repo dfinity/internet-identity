@@ -70,6 +70,7 @@ import {
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import { goto } from "$app/navigation";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
@@ -138,7 +139,7 @@ export const authFlowManage = async (connection: Connection) => {
   if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
     await registerCurrentDeviceCurrentOrigin(
       userNumber,
-      authenticatedConnection
+      authenticatedConnection,
     );
   }
 
@@ -295,7 +296,7 @@ export const renderManage = async ({
       anchorInfo = await withLoader(() => connection.getAnchorInfo());
     } catch (error: unknown) {
       await displayFailedToListDevices(
-        error instanceof Error ? error : unknownError()
+        error instanceof Error ? error : unknownError(),
       );
       continue;
     }
@@ -311,7 +312,7 @@ export const renderManage = async ({
       connection,
       anchorInfo.devices,
       anchorInfo.openid_credentials[0] ?? [],
-      identityBackground
+      identityBackground,
     );
     connection = newConnection ?? connection;
   }
@@ -321,12 +322,12 @@ export const displayManagePage = renderPage(displayManageTemplate);
 
 function isPinAuthenticated(
   devices_: DeviceData[],
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): boolean {
   const connectionPrincipal = connection.identity.getPrincipal();
   const currentDevice = devices_.find(({ pubkey }) => {
     const devicePrincipal = Principal.selfAuthenticating(
-      new Uint8Array(pubkey)
+      new Uint8Array(pubkey),
     );
     return devicePrincipal.toText() === connectionPrincipal.toText();
   });
@@ -340,7 +341,7 @@ export const displayManage = async (
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
   credentials: OpenIdCredential[],
-  identityBackground: PreLoadImage
+  identityBackground: PreLoadImage,
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -351,7 +352,7 @@ export const displayManage = async (
 
   // Create anonymous nonce and salt for connection principal
   const { nonce, salt } = await createAnonymousNonce(
-    connection.identity.getPrincipal()
+    connection.identity.getPrincipal(),
   );
 
   const googleClientId =
@@ -368,28 +369,29 @@ export const displayManage = async (
 
     if (devices.dupPhrase) {
       toast.error(
-        "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
+        "More than one recovery phrases are registered, which is unexpected. Only one will be shown.",
       );
     }
     if (devices.dupKey) {
       toast.error(
-        "More than one recovery keys are registered, which is unexpected. Only one will be shown."
+        "More than one recovery keys are registered, which is unexpected. Only one will be shown.",
       );
     }
 
     const onAddDevice = async () => {
-      const newDeviveOrigin =
-        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
-          ? getCredentialsOrigin({
-              credentials: devices_,
-            })
-          : undefined;
-      await addDevice({
-        userNumber,
-        connection,
-        origin: newDeviveOrigin ?? window.origin,
-      });
-      resolve();
+      await goto("/add/device");
+      // const newDeviveOrigin =
+      //   userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+      //     ? getCredentialsOrigin({
+      //         credentials: devices_,
+      //       })
+      //     : undefined;
+      // await addDevice({
+      //   userNumber,
+      //   connection,
+      //   origin: newDeviveOrigin ?? window.origin,
+      // });
+      // resolve();
     };
     const addRecoveryPhrase = async () => {
       const doAdd = await addPhrase({ intent: "userInitiated" });
@@ -407,7 +409,7 @@ export const displayManage = async (
       await setupPhrase(
         userNumber,
         connection,
-        newDeviceOrigin ?? window.origin
+        newDeviceOrigin ?? window.origin,
       );
       resolve();
     };
@@ -422,7 +424,7 @@ export const displayManage = async (
           requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
             nonce,
-          })
+          }),
         );
         const { iss, sub } = decodeJWT(jwt);
         if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
@@ -443,7 +445,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "JwtVerificationFailed":
@@ -481,7 +483,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "OpenIdCredentialNotFound":
@@ -670,13 +672,13 @@ export const devicesFromDevicesWithUsage = ({
       pinAuthenticators: [],
       dupPhrase: false,
       dupKey: false,
-    }
+    },
   );
 };
 
 // Show a domain-related warning, if necessary.
 export const domainWarning = (
-  device: DeviceData
+  device: DeviceData,
 ): TemplateResult | undefined => {
   if (DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;
@@ -719,7 +721,7 @@ export const domainWarning = (
 
 const domainInfo = (
   device: DeviceData,
-  allDevices: DeviceData[]
+  allDevices: DeviceData[],
 ): TemplateResult | undefined => {
   if (!DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;

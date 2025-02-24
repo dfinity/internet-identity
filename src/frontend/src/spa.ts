@@ -22,7 +22,7 @@ globalThis.Buffer = Buffer;
  *
  * The canister injects the canister ID as a `data-canister-id` attribute on the script tag, which we then read to figure out where to make the IC calls.
  */
-const readCanisterId = (): string => {
+export const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
     "[data-canister-id]"
@@ -42,7 +42,7 @@ const readCanisterId = (): string => {
   return setupJs.dataset.canisterId;
 };
 
-const readCanisterConfig = (): InternetIdentityInit => {
+export const readCanisterConfig = (): InternetIdentityInit => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
     "[data-canister-config]"
@@ -123,9 +123,6 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   } catch (e) {
     console.warn("Error when printing version information:", e);
   }
-
-  // Preload the loader
-  preloadLoaderImage();
 
   // If the build is not "official", show a warning
   // https://github.com/dfinity/internet-identity#build-features
