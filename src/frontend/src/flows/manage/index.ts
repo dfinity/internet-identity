@@ -209,7 +209,8 @@ const displayManageTemplate = ({
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
-  // Recommend the user to clean up passkeys if there are multiple domains
+  // Recommend the user to clean up passkeys if there are
+  // authenticators registered in multiple domains.
   const cleanupRecommended = authenticators.some((authenticator) =>
     nonNullish(authenticator.rpId)
   );
