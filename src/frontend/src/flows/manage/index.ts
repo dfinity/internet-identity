@@ -226,6 +226,7 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
       warnNoPasskeys,
+      i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({

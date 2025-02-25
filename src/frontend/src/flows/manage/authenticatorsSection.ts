@@ -1,11 +1,9 @@
-import {
-  infoIcon,
-  pulsatingCircleIcon,
-  warningIcon,
-} from "$src/components/icons";
+import { infoIcon, warningIcon } from "$src/components/icons";
+import { I18n } from "$src/i18n";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
+import copyJson from "./deviceSettings.json";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
 
@@ -39,10 +37,12 @@ export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
   warnNoPasskeys,
+  i18n,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
   warnNoPasskeys: boolean;
+  i18n: I18n;
 }): TemplateResult => {
   const wrapClasses = [
     "l-stack",
@@ -92,7 +92,7 @@ export const authenticatorsSection = ({
         <div class="c-action-list">
           <ul>
           ${authenticators.map((authenticator, index) =>
-            authenticatorItem({ authenticator, index })
+            authenticatorItem({ authenticator, index, i18n })
           )}</ul>
           <div class="c-action-list__actions">
             <button
@@ -125,12 +125,15 @@ export const authenticatorItem = ({
     isCurrent,
   },
   index,
+  i18n,
   icon,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
+  i18n: I18n;
   icon?: TemplateResult;
 }) => {
+  const copy = i18n.i18n(copyJson);
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
   ];
@@ -160,7 +163,6 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(info) ? undefined : itemInfo(info)}
       ${isNullish(icon) ? undefined : html`${icon}`}
-      ${isCurrent ? itemCurrentUsage() : undefined}
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
           ${alias}
@@ -175,7 +177,9 @@ export const authenticatorItem = ({
           })}
         </div>
         <div>
-          ${nonNullish(lastUsageFormattedString)
+          ${isCurrent
+            ? html`<div class="t-discreet">${copy.current_device_label}</div>`
+            : nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">
                 Last used: ${lastUsageFormattedString}
               </div>`
@@ -185,12 +189,6 @@ export const authenticatorItem = ({
     </li>
   `;
 };
-
-const itemCurrentUsage = (): TemplateResult => html`<div
-  class="c-action-list__action"
->
-  <span class="c-icon c-icon--ok" tabindex="0">${pulsatingCircleIcon}</span>
-</div>`;
 
 const itemWarning = ({
   warn,

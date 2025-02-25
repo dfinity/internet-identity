@@ -44,6 +44,8 @@
     "reset_use_a": "If you lose access to all your devices and have no other method for accessing your Internet Identity",
 
     "reset_share_q": "Should I share my recovery phrase?",
-    "reset_share_a": "Never! If someone asks for your recovery phrase, they are likely trying to steal access to your accounts"
+    "reset_share_a": "Never! If someone asks for your recovery phrase, they are likely trying to steal access to your accounts",
+
+    "current_device_label": "Current device"
   }
 }
