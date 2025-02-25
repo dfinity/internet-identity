@@ -106,7 +106,12 @@ export const authenticatorsSection = ({
       <div class="c-action-list">
         <ul>
           ${authenticators.map((authenticator, index) =>
-            authenticatorItem({ authenticator, index, i18n, onRemoveDevice })
+            authenticatorItem({
+              authenticator,
+              index,
+              i18n,
+              onRemove: () => onRemoveDevice(authenticator.device),
+            })
           )}</ul>
           <div class="c-action-list__actions">
             <button
@@ -146,7 +151,6 @@ export const authenticatorItem = ({
     dupCount,
     warn,
     info,
-    device,
     rename,
     rpId,
     isCurrent,
@@ -155,13 +159,13 @@ export const authenticatorItem = ({
   index,
   i18n,
   icon,
-  onRemoveDevice,
+  onRemove,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
   i18n: I18n;
   icon?: TemplateResult;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemove: () => void;
 }) => {
   const copy = i18n.i18n(copyJson);
   const settings = [
@@ -172,7 +176,7 @@ export const authenticatorItem = ({
     settings.push({
       action: "remove",
       caption: "Remove",
-      fn: () => onRemoveDevice(device),
+      fn: () => onRemove(),
     });
   }
 

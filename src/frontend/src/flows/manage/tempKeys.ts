@@ -82,7 +82,7 @@ export const tempKeysSection = ({
             authenticator,
             index,
             i18n,
-            onRemoveDevice,
+            onRemove: () => onRemoveDevice(authenticator.device),
             icon: html`<span class="c-icon c-icon--pin"
               >${cypherIcon}<span></span
             ></span>`,
