@@ -64,7 +64,7 @@ describe("devicesFromDevicesWithUsage", () => {
       DOMAIN_COMPATIBILITY.set(true);
     });
 
-    it("returns an info icon on each device if they are not all in the same origin", () => {
+    it("returns an rpId on each device if they are not all in the same origin", () => {
       const devices = [
         createDevice(undefined),
         createDevice("https://identity.ic0.app"),
@@ -79,9 +79,7 @@ describe("devicesFromDevicesWithUsage", () => {
       });
 
       for (const device of expectedDevices.authenticators) {
-        expect(device.info?.strings[0]).toContain(
-          "This passkey was registered in"
-        );
+        expect(device.rpId).toBeDefined();
         expect(device.warn).toBeUndefined();
       }
     });
