@@ -171,7 +171,7 @@ export const authenticatorItem = ({
         </div>
         ${nonNullish(rpId)
           ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
-              <div class="t-discreet">${rpId}</div>
+              <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
               <span class="c-tooltip__message c-card c-card--tight">
                 This passkey was registered in ${rpId}
               </span>
