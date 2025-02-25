@@ -659,9 +659,9 @@ export const devicesFromDevicesWithUsage = ({
 
       const authenticator: Authenticator = {
         alias: device.alias,
+        rpId: rpIdLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
-        info: domainInfo(device, devices_),
         rename: () => renameDevice({ connection, device, reload }),
         remove:
           hasSingleDevice && !hasOtherAuthMethods
@@ -733,10 +733,10 @@ export const domainWarning = (
   }
 };
 
-const domainInfo = (
+const rpIdLabel = (
   device: DeviceData,
   allDevices: DeviceData[]
-): TemplateResult | undefined => {
+): string | undefined => {
   if (!DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;
   }
@@ -746,8 +746,7 @@ const domainInfo = (
   if (nonNullish(commonOrigin)) {
     return undefined;
   }
-  return html`This passkey was registered in
-  ${device.origin[0] ?? LEGACY_II_URL}`;
+  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 };
 
 const unknownError = (): Error => {
