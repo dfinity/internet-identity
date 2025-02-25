@@ -1,9 +1,14 @@
-import { i18n } from "$showcase/i18n";
-import { infoIcon, warningIcon } from "$src/components/icons";
-import copyJson from "$src/flows/manage/authenticatorsSection.json";
+import {
+  infoIcon,
+  pulsatingCircleIcon,
+  warningIcon,
+} from "$src/components/icons";
+import { I18n } from "$src/i18n";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
+import copyJson from "./deviceSettings.json";
+import sectionCopyJson from "$src/flows/manage/authenticatorsSection.json";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
 
@@ -41,13 +46,15 @@ export const authenticatorsSection = ({
   onAddDevice,
   warnNoPasskeys,
   cleanupRecommended,
+  i18n,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
   warnNoPasskeys: boolean;
   cleanupRecommended: boolean;
+  i18n: I18n;
 }): TemplateResult => {
-  const copy = i18n.i18n(copyJson);
+  const copy = i18n.i18n(sectionCopyJson);
   const wrapClasses = [
     "l-stack",
     "c-card",
@@ -96,7 +103,7 @@ export const authenticatorsSection = ({
         <div class="c-action-list">
           <ul>
           ${authenticators.map((authenticator, index) =>
-            authenticatorItem({ authenticator, index })
+            authenticatorItem({ authenticator, index, i18n })
           )}</ul>
           <div class="c-action-list__actions">
             <button
@@ -139,14 +146,18 @@ export const authenticatorItem = ({
     remove,
     rename,
     rpId,
+    isCurrent,
   },
   index,
+  i18n,
   icon,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
+  i18n: I18n;
   icon?: TemplateResult;
 }) => {
+  const copy = i18n.i18n(copyJson);
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
   ];
@@ -190,10 +201,22 @@ export const authenticatorItem = ({
           })}
         </div>
         ${nonNullish(rpId)
-          ? html`<div class="t-discreet">${rpId}</div>`
+          ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
+              <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
+              <span class="c-tooltip__message c-card c-card--tight">
+                ${copy.passkey_registered_in} ${rpId}
+              </span>
+            </div>`
           : undefined}
         <div>
-          ${nonNullish(lastUsageFormattedString)
+          ${isCurrent
+            ? html`<div>
+                <span class="c-icon c-icon--ok c-icon--xs"
+                  >${pulsatingCircleIcon}</span
+                >
+                <span class="t-muted">${copy.current_device_label}</span>
+              </div>`
+            : nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">
                 Last used: ${lastUsageFormattedString}
               </div>`

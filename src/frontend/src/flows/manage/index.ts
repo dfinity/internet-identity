@@ -34,7 +34,11 @@ import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
-import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  bufferEqual,
+} from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
   createAnonymousNonce,
@@ -69,7 +73,13 @@ import {
   unprotectDevice,
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
-import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import {
+  Authenticator,
+  Devices,
+  Protection,
+  RecoveryKey,
+  RecoveryPhrase,
+} from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
@@ -197,13 +207,13 @@ const displayManageTemplate = ({
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
-  const i18n = new I18n();
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
   // Recommend the user to clean up passkeys if there are multiple domains
   const cleanupRecommended = authenticators.some((authenticator) =>
     nonNullish(authenticator.rpId)
   );
+  const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
     <hgroup>
@@ -221,6 +231,7 @@ const displayManageTemplate = ({
       onAddDevice,
       warnNoPasskeys,
       cleanupRecommended,
+      i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
@@ -629,6 +640,7 @@ export const devicesFromDevicesWithUsage = ({
   hasOtherAuthMethods: boolean;
 }): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
+  const currentPublicKey = connection.getSignIdentityPubKey();
 
   return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
@@ -650,17 +662,20 @@ export const devicesFromDevicesWithUsage = ({
         return acc;
       }
 
-      const authenticator = {
+      const authenticator: Authenticator = {
         alias: device.alias,
-        rpId: domainLabel(device, devices_),
+        rpId: rpIdLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
-        info: domainInfo(device, devices_),
         rename: () => renameDevice({ connection, device, reload }),
         remove:
           hasSingleDevice && !hasOtherAuthMethods
             ? undefined
             : () => deleteDevice({ connection, device, reload }),
+        isCurrent: bufferEqual(
+          currentPublicKey,
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+        ),
       };
 
       if ("browser_storage_key" in device.key_type) {
@@ -723,17 +738,7 @@ export const domainWarning = (
   }
 };
 
-const domainInfo = (
-  device: DeviceData,
-  allDevices: DeviceData[]
-): TemplateResult | undefined => {
-  const label = domainLabel(device, allDevices);
-  if (nonNullish(label)) {
-    return html`This passkey was registered in ${label}`;
-  }
-};
-
-const domainLabel = (
+const rpIdLabel = (
   device: DeviceData,
   allDevices: DeviceData[]
 ): string | undefined => {
