@@ -176,7 +176,7 @@ export const authenticatorItem = ({
     settings.push({
       action: "remove",
       caption: "Remove",
-      fn: () => onRemove(),
+      fn: onRemove,
     });
   }
 
