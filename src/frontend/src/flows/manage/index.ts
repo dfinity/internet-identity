@@ -184,6 +184,7 @@ const displayManageTemplate = ({
   userNumber,
   devices: { authenticators, recoveries, pinAuthenticators },
   onAddDevice,
+  onRemoveDevice,
   addRecoveryPhrase,
   addRecoveryKey,
   credentials,
@@ -197,6 +198,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
+  onRemoveDevice: (device: DeviceData) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
   credentials: OpenIdCredential[];
@@ -230,6 +232,7 @@ const displayManageTemplate = ({
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
+      onRemoveDevice,
       warnNoPasskeys,
       cleanupRecommended,
       i18n,
@@ -408,6 +411,11 @@ export const displayManage = async (
       });
       resolve();
     };
+
+    const onRemoveDevice = async (device: DeviceData) => {
+      await deleteDevice({ connection, device, reload: resolve });
+    };
+
     const addRecoveryPhrase = async () => {
       const doAdd = await addPhrase({ intent: "userInitiated" });
       if (doAdd === "cancel") {
@@ -547,6 +555,7 @@ export const displayManage = async (
         userNumber,
         devices,
         onAddDevice,
+        onRemoveDevice,
         addRecoveryPhrase,
         addRecoveryKey: async () => {
           await setupKey({ connection });
@@ -663,20 +672,19 @@ export const devicesFromDevicesWithUsage = ({
         return acc;
       }
 
+      const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
       const authenticator: Authenticator = {
         alias: device.alias,
         rpId: rpIdLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
-        remove:
-          hasSingleDevice && !hasOtherAuthMethods
-            ? undefined
-            : () => deleteDevice({ connection, device, reload }),
+        canBeRemoved,
         isCurrent: bufferEqual(
           currentPublicKey,
           new Uint8Array(device.pubkey).buffer as ArrayBuffer
         ),
+        device,
       };
 
       if ("browser_storage_key" in device.key_type) {

@@ -1,3 +1,4 @@
+import { DeviceData } from "$generated/internet_identity_types";
 import {
   infoIcon,
   pulsatingCircleIcon,
@@ -44,12 +45,14 @@ export const dedupLabels = (
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
+  onRemoveDevice,
   warnNoPasskeys,
   cleanupRecommended,
   i18n,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
+  onRemoveDevice: (device: DeviceData) => void;
   warnNoPasskeys: boolean;
   cleanupRecommended: boolean;
   i18n: I18n;
@@ -103,16 +106,15 @@ export const authenticatorsSection = ({
       <div class="c-action-list">
         <ul>
           ${authenticators.map((authenticator, index) =>
-            authenticatorItem({ authenticator, index, i18n })
-          )}
-        </ul>
-        <div class="c-action-list__actions">
-          <button
-            .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
-            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
-            @click="${() => onAddDevice()}"
-            id="addAdditionalDevice"
-          >
+            authenticatorItem({ authenticator, index, i18n, onRemoveDevice })
+          )}</ul>
+          <div class="c-action-list__actions">
+            <button
+              .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+              @click="${() => onAddDevice()}"
+              id="addAdditionalDevice"
+            >
               <span class="c-tooltip__message c-card c-card--tight"
               >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
@@ -144,27 +146,34 @@ export const authenticatorItem = ({
     dupCount,
     warn,
     info,
-    remove,
+    device,
     rename,
     rpId,
     isCurrent,
+    canBeRemoved,
   },
   index,
   i18n,
   icon,
+  onRemoveDevice,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
   i18n: I18n;
   icon?: TemplateResult;
+  onRemoveDevice: (device: DeviceData) => void;
 }) => {
   const copy = i18n.i18n(copyJson);
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
   ];
 
-  if (nonNullish(remove)) {
-    settings.push({ action: "remove", caption: "Remove", fn: () => remove() });
+  if (canBeRemoved) {
+    settings.push({
+      action: "remove",
+      caption: "Remove",
+      fn: () => onRemoveDevice(device),
+    });
   }
 
   let lastUsageTimeStamp: Date | undefined;
