@@ -647,10 +647,9 @@ export const devicesFromDevicesWithUsage = ({
 
       const authenticator = {
         alias: device.alias,
-        rpId: domainLabel(device, devices_),
+        rpId: rpIdLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
-        info: domainInfo(device, devices_),
         rename: () => renameDevice({ connection, device, reload }),
         remove:
           hasSingleDevice && !hasOtherAuthMethods
@@ -718,17 +717,7 @@ export const domainWarning = (
   }
 };
 
-const domainInfo = (
-  device: DeviceData,
-  allDevices: DeviceData[]
-): TemplateResult | undefined => {
-  const label = domainLabel(device, allDevices);
-  if (nonNullish(label)) {
-    return html`This passkey was registered in ${label}`;
-  }
-};
-
-const domainLabel = (
+const rpIdLabel = (
   device: DeviceData,
   allDevices: DeviceData[]
 ): string | undefined => {
