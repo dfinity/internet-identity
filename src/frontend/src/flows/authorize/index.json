@@ -40,6 +40,6 @@
     "pick_alternative_of": "Choose the Internet Identity that connects to",
     "pick_alternative_of_join": "and",
     "multiple_domains": "Multiple domains",
-    "multiple_domains_pick_to_continue": "Multiple domains found, pick one to continue"
+    "multiple_domains_pick_to_continue": "We found passkeys registered in multiple domains for this identity. In which domain did you register your current device?"
   }
 }
