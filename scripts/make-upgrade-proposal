@@ -86,6 +86,16 @@ execute() {
 
 RELEASE_NAME_PATTERN="^release-[0-9]{4}-[0-9]{2}-[0-9]{2}"
 
+if [ -z "${TAG_NAME+x}" ]; then
+  echo "Must specify TAG_NAME"
+  echo ""
+  echo "Make sure to checkout the latest main branch,"
+  echo "and then create a git release tag: release-yyyy-mm-dd"
+  echo ""
+  echo "Then use the following command to start: TAG_NAME=release-yyyy-mm-dd ./scripts/make_upgrade_proposal --new"
+  exit 1;
+fi
+
 if [ "$IS_NEW_RELEASE" = "true" ]; then
   CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
 
@@ -95,7 +105,7 @@ else
   CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
 
   if [ ! -f "$CHECKLIST_FILE" ]; then
-    echo "Error: Checklist '$FILE' not found!" >&2
+    echo "Error: Checklist '$CHECKLIST_FILE' not found!" >&2
     exit 1
 fi
 fi
@@ -288,6 +298,7 @@ test_release_candidate() {
   echo "Check that the release candidate is deployed and working"
   echo "Beta: https://beta.identity.ic0.app/"
   echo "Dummy relying party: https://l7rua-raaaa-aaaap-ahh6a-cai.icp0.io/"
+  echo "Make sure to check various devices and ask others to also check"
 }
 
 prepare_proposal_argument() {
@@ -335,7 +346,7 @@ dry_run_proposal() {
     --wasm-module-path ./internet_identity.wasm.gz \
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
     --arg arg.bin \
-    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum)" \
+    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
     --use-explicit-action-type \
     --dry-run \
     --summary-file ./proposal.md \
@@ -360,7 +371,7 @@ make_proposal() {
     --wasm-module-path ./internet_identity.wasm.gz \
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
     --arg arg.bin \
-    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum)" \
+    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
     --use-explicit-action-type \
     --summary-file ./proposal.md \
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
