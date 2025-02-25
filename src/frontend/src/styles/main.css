@@ -890,6 +890,11 @@ a:hover,
   fill: var(--vc-brand-purple);
 }
 
+.c-icon--xs {
+  width: 12px;
+  height: 12px;
+}
+
 /* "Flipped" version where the background pops (instead
  * of the icon itself) */
 .c-icon--error__flipped {

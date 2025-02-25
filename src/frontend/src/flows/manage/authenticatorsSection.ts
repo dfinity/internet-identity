@@ -167,7 +167,6 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(info) ? undefined : itemInfo(info)}
       ${isNullish(icon) ? undefined : html`${icon}`}
-      ${isCurrent ? itemCurrentUsage() : undefined}
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
           ${alias}
@@ -183,7 +182,12 @@ export const authenticatorItem = ({
         </div>
         <div>
           ${isCurrent
-            ? html`<div class="t-discreet">${copy.current_device_label}</div>`
+            ? html`<div>
+                <span class="c-icon c-icon--ok c-icon--xs"
+                  >${pulsatingCircleIcon}</span
+                >
+                <span class="t-muted">${copy.current_device_label}</span>
+              </div>`
             : nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">
                 Last used: ${lastUsageFormattedString}
@@ -215,10 +219,4 @@ const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
       >${msg}</span
     ></span
   >
-</div>`;
-
-const itemCurrentUsage = (): TemplateResult => html`<div
-  class="c-action-list__action"
->
-  <span class="c-icon c-icon--ok" tabindex="0">${pulsatingCircleIcon}</span>
 </div>`;
