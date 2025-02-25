@@ -34,7 +34,11 @@ import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
-import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  bufferEqual,
+} from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
   createAnonymousNonce,
@@ -69,7 +73,13 @@ import {
   unprotectDevice,
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
-import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import {
+  Authenticator,
+  Devices,
+  Protection,
+  RecoveryKey,
+  RecoveryPhrase,
+} from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
@@ -624,6 +634,7 @@ export const devicesFromDevicesWithUsage = ({
   hasOtherAuthMethods: boolean;
 }): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
+  const currentPublicKey = connection.getSignIdentityPubKey();
 
   return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
@@ -645,7 +656,7 @@ export const devicesFromDevicesWithUsage = ({
         return acc;
       }
 
-      const authenticator = {
+      const authenticator: Authenticator = {
         alias: device.alias,
         last_usage: device.last_usage,
         warn: domainWarning(device),
@@ -655,6 +666,10 @@ export const devicesFromDevicesWithUsage = ({
           hasSingleDevice && !hasOtherAuthMethods
             ? undefined
             : () => deleteDevice({ connection, device, reload }),
+        isCurrent: bufferEqual(
+          currentPublicKey,
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+        ),
       };
 
       if ("browser_storage_key" in device.key_type) {

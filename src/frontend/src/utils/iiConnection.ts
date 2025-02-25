@@ -984,6 +984,10 @@ export class AuthenticatedConnection extends Connection {
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
   };
+
+  getSignIdentityPubKey = (): DerEncodedPublicKey => {
+    return this.identity.getPublicKey().toDer();
+  };
 }
 
 // The options sent to the browser when creating the credentials.

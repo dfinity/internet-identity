@@ -1,4 +1,8 @@
-import { infoIcon, warningIcon } from "$src/components/icons";
+import {
+  infoIcon,
+  pulsatingCircleIcon,
+  warningIcon,
+} from "$src/components/icons";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -110,7 +114,16 @@ export const authenticatorsSection = ({
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, last_usage, dupCount, warn, info, remove, rename },
+  authenticator: {
+    alias,
+    last_usage,
+    dupCount,
+    warn,
+    info,
+    remove,
+    rename,
+    isCurrent,
+  },
   index,
   icon,
 }: {
@@ -147,6 +160,7 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(info) ? undefined : itemInfo(info)}
       ${isNullish(icon) ? undefined : html`${icon}`}
+      ${isCurrent ? itemCurrentUsage() : undefined}
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
           ${alias}
@@ -171,6 +185,12 @@ export const authenticatorItem = ({
     </li>
   `;
 };
+
+const itemCurrentUsage = (): TemplateResult => html`<div
+  class="c-action-list__action"
+>
+  <span class="c-icon c-icon--ok" tabindex="0">${pulsatingCircleIcon}</span>
+</div>`;
 
 const itemWarning = ({
   warn,
