@@ -11,6 +11,8 @@ export type Authenticator = {
   warn?: TemplateResult;
   // `info` is used to show an info icon of where the device was registered, only when some device has a different origin than the others.
   info?: TemplateResult;
+  // `isCurrent` is true when the public key of the DeviceWithUsage is the same as the one returned by the AuthenticatedConnection instance.
+  isCurrent: boolean;
 };
 
 // A recovery phrase, potentially protected

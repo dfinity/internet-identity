@@ -21,21 +21,28 @@ import Screen from "../layouts/Screen.astro";
         authenticators: [
           {
             alias: "Chrome on iPhone",
+            isCurrent: true,
             remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
             last_usage: [BigInt(Date.now() * 1000000)],
           },
           {
             alias: "Yubikey Blue",
+            isCurrent: false,
             remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
-            last_usage: [BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 7)],
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 7),
+            ],
           },
           {
             alias: "Yubikey Blue",
+            isCurrent: false,
             remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
-            last_usage: [BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)],
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30),
+            ],
             warn: html`Something is rotten in the state of Device`,
           },
         ],

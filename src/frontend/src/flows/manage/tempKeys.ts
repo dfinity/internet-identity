@@ -78,6 +78,7 @@ export const tempKeysSection = ({
           authenticatorItem({
             authenticator,
             index,
+            i18n,
             icon: html`<span class="c-icon c-icon--pin"
               >${cypherIcon}<span></span
             ></span>`,

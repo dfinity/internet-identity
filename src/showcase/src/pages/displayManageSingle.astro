@@ -20,6 +20,7 @@ import Screen from "../layouts/Screen.astro";
         authenticators: [
           {
             alias: "Chrome on iPhone",
+            isCurrent: true,
             rename: () => toast.info("rename"),
             last_usage: [BigInt(Date.now() * 1000000)],
           },

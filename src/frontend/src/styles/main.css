@@ -890,6 +890,11 @@ a:hover,
   fill: var(--vc-brand-purple);
 }
 
+.c-icon--xs {
+  width: 12px;
+  height: 12px;
+}
+
 /* "Flipped" version where the background pops (instead
  * of the icon itself) */
 .c-icon--error__flipped {
@@ -3391,4 +3396,24 @@ input[type="checkbox"] {
 
 .l-stack--none {
   margin-top: 0;
+}
+
+/* Add pulsating animation */
+@keyframes pulsate {
+  0% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.2));
+  }
+  50% {
+    opacity: 0.5;
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4));
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.2));
+  }
+}
+
+.pulsating {
+  animation: pulsate 2s infinite;
 }
