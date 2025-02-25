@@ -227,7 +227,11 @@ const displayManageTemplate = ({
       ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
       : ""}
     ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
+      ? tempKeysSection({
+          authenticators: pinAuthenticators,
+          i18n,
+          onRemoveDevice,
+        })
       : ""}
     ${authenticatorsSection({
       authenticators,
