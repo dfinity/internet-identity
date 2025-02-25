@@ -1,4 +1,8 @@
-import { infoIcon, warningIcon } from "$src/components/icons";
+import {
+  infoIcon,
+  pulsatingCircleIcon,
+  warningIcon,
+} from "$src/components/icons";
 import { I18n } from "$src/i18n";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -163,6 +167,7 @@ export const authenticatorItem = ({
       ${isNullish(warn) ? undefined : itemWarning({ warn })}
       ${isNullish(info) ? undefined : itemInfo(info)}
       ${isNullish(icon) ? undefined : html`${icon}`}
+      ${isCurrent ? itemCurrentUsage() : undefined}
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
           ${alias}
@@ -210,4 +215,10 @@ const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
       >${msg}</span
     ></span
   >
+</div>`;
+
+const itemCurrentUsage = (): TemplateResult => html`<div
+  class="c-action-list__action"
+>
+  <span class="c-icon c-icon--ok" tabindex="0">${pulsatingCircleIcon}</span>
 </div>`;
