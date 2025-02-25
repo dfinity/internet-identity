@@ -209,6 +209,11 @@ const displayManageTemplate = ({
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
+  // Recommend the user to clean up passkeys if there are
+  // authenticators registered in multiple domains.
+  const cleanupRecommended = authenticators.some((authenticator) =>
+    nonNullish(authenticator.rpId)
+  );
   const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
@@ -226,6 +231,7 @@ const displayManageTemplate = ({
       authenticators,
       onAddDevice,
       warnNoPasskeys,
+      cleanupRecommended,
       i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
