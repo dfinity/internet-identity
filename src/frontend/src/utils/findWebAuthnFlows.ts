@@ -1,3 +1,4 @@
+import { II_LEGACY_ORIGIN } from "$src/constants";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
 
@@ -45,8 +46,8 @@ export const findWebAuthnFlows = ({
       devices
         // Device origin to RP ID (hostname)
         .map((device) =>
-          nonNullish(device.origin) && device.origin !== currentOrigin
-            ? new URL(device.origin).hostname
+          device.origin !== currentOrigin
+            ? new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
             : undefined
         )
         // Filter out RP IDs that are not within `relatedRpIds`
@@ -64,6 +65,5 @@ export const findWebAuthnFlows = ({
   if (steps.length === 0) {
     steps.push({ useIframe: false, rpId: undefined });
   }
-
   return steps;
 };
