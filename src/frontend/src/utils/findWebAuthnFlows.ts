@@ -40,8 +40,8 @@ export const findWebAuthnFlows = ({
     (relatedOrigin) => new URL(relatedOrigin).hostname
   );
 
-  // The devices are expected to be ordered by recently used first
-  const deviceRpIds = [
+  // The devices are expected to be ordered by recently used already
+  const orderedDeviceRpIds = [
     ...new Set(
       devices
         // Device origin to RP ID (hostname)
@@ -57,7 +57,7 @@ export const findWebAuthnFlows = ({
   ];
 
   // Create steps from `deviceRpIds`, currently that's one step per RP ID
-  const steps: WebAuthnFlow[] = deviceRpIds.map((rpId) => ({
+  const steps: WebAuthnFlow[] = orderedDeviceRpIds.map((rpId) => ({
     rpId,
     useIframe: nonNullish(rpId) && rpId !== currentRpId,
   }));
