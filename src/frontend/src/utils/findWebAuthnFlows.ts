@@ -46,7 +46,7 @@ export const findWebAuthnFlows = ({
       devices
         // Device origin to RP ID (hostname)
         .map((device) =>
-          device.origin !== currentOrigin
+          device.origin !== currentOrigin && currentOrigin !== II_LEGACY_ORIGIN
             ? new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
             : undefined
         )
