@@ -128,4 +128,25 @@ describe("findWebAuthnFlows", () => {
 
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
   });
+
+  it("should return flows in order of devices (recently used)", () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(nonCurrentOrigin2),
+        createMockCredential(currentOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(nonCurrentOrigin2),
+      ],
+      currentOrigin: currentOrigin,
+      relatedOrigins: [currentOrigin, nonCurrentOrigin1, nonCurrentOrigin2],
+    });
+
+    expect(result).toEqual([
+      { useIframe: true, rpId: nonCurrentOrigin2RpId },
+      { useIframe: false, rpId: undefined },
+      { useIframe: true, rpId: nonCurrentOrigin1RpId },
+    ]);
+  });
 });
