@@ -46,9 +46,10 @@ export const findWebAuthnFlows = ({
       devices
         // Device origin to RP ID (hostname)
         .map((device) =>
-          device.origin !== currentOrigin && currentOrigin !== II_LEGACY_ORIGIN
-            ? new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
-            : undefined
+          device.origin === currentOrigin ||
+          (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
+            ? undefined
+            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
         )
         // Filter out RP IDs that are not within `relatedRpIds`
         .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId))
