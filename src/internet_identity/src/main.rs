@@ -200,13 +200,14 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
         return vec![];
     };
-    anchor
-        .into_devices()
+    let mut devices = anchor.into_devices();
+    devices.sort_by(|a, b| b.last_usage_timestamp.cmp(&a.last_usage_timestamp));
+    devices
         .into_iter()
         .map(DeviceData::from)
         .map(|mut d| {
             // Remove non-public fields.
-            d.alias = "".to_string();
+            d.alias = String::new();
             d.metadata = None;
             d
         })
