@@ -8,13 +8,20 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use getrandom;
+use ic_stable_structures::Storable;
 use identity_jose::jwk::Jwk;
 use identity_jose::jws::{CompactJwsEncoder, Decoder, JwsHeader};
 use internet_identity_interface::internet_identity::authn_method;
+use internet_identity_interface::internet_identity::types::AuthnMethod;
+use internet_identity_interface::internet_identity::types::AuthnMethodData;
+use internet_identity_interface::internet_identity::types::AuthnMethodProtection;
+use internet_identity_interface::internet_identity::types::AuthnMethodPurpose;
+use internet_identity_interface::internet_identity::types::AuthnMethodSecuritySettings;
 use internet_identity_interface::internet_identity::types::GetDelegationResponse;
 use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 use internet_identity_interface::internet_identity::types::OpenIdConfig;
 use internet_identity_interface::internet_identity::types::OpenIdPrepareDelegationResponse;
+use internet_identity_interface::internet_identity::types::PublicKeyAuthn;
 use pocket_ic::common::rest::CanisterHttpReply;
 use pocket_ic::common::rest::CanisterHttpResponse;
 use pocket_ic::common::rest::MockCanisterHttpResponse;
@@ -34,51 +41,48 @@ use crate::v2_api::authn_method_test_helpers::test_authn_method;
 
 /// Verifies that Google Accounts can be added
 /// // TODO: need to create new test data to use with this
-// #[test]
-// fn can_link_google_account() -> Result<(), CallError> {
-//     let env = env();
+#[test]
+fn can_link_google_account() -> Result<(), CallError> {
+    let env = env();
 
-//     let args = InternetIdentityInit {
-//         assigned_user_number_range: None,
-//         archive_config: None,
-//         canister_creation_cycles_cost: None,
-//         register_rate_limit: None,
-//         captcha_config: None,
-//         related_origins: None,
-//         openid_google: Some(Some(OpenIdConfig {
-//             client_id: "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com"
-//                 .into(),
-//         })),
-//     };
-//     // Cycles are needed before installation because of the async HTTP outcalls
-//     let canister_id = install_ii_canister_with_arg_and_cycles(
-//         &env,
-//         II_WASM.clone(),
-//         Some(args),
-//         10_000_000_000_000,
-//     );
+    let args = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: None,
+        openid_google: Some(Some(OpenIdConfig {
+            client_id: CLIENT_ID.to_string(),
+        })),
+    };
+    // Cycles are needed before installation because of the async HTTP outcalls
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
 
-//     // Mock google certs response
-//     mock_google_certs_response(&env);
+    // Mock google certs response
+    mock_google_certs_response(&env);
 
-//     let auth_method = test_authn_method();
-//     let principal = auth_method.principal();
-//     let identity_number = create_identity_with_authn_method(&env, canister_id, &auth_method);
-//     //   let identity_number = flows::register_anchor_with_device(&env, canister_id, auth_method);
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_test_data();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-//     // let (jwt, salt, _claims) = test_data();
-//     let (jwt, salt) = test_jwt(principal, time(&env));
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
 
-//     api::openid_credential_add(
-//         &env,
-//         canister_id,
-//         auth_method.principal(),
-//         identity_number,
-//         &jwt,
-//         &salt,
-//     )?
-//     .map_err(|e| CallError::Reject(format!("{:?}", e)))
-// }
+    api::openid_credential_add(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )?
+    .map_err(|e| CallError::Reject(format!("{:?}", e)))
+}
 
 /// Verifies that valid JWT delegations are issued.
 #[test]
@@ -93,8 +97,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         captcha_config: None,
         related_origins: None,
         openid_google: Some(Some(OpenIdConfig {
-            client_id: "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com"
-                .into(),
+            client_id: CLIENT_ID.to_string(),
         })),
     };
     // Cycles are needed before installation because of the async HTTP outcalls
@@ -113,11 +116,10 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     // Link Google Account to Identity
 
     // Advance to token validity period
-    env.advance_time(Duration::from_secs(116_465_500));
+    let (jwt, salt, _claims, test_time, _test_principal, test_authn_method) = openid_test_data();
+    env.advance_time(Duration::from_secs(test_time / 10_000));
 
     let pub_session_key = ByteBuf::from("session public key");
-    let principal = test_principal();
-    let (jwt, salt, _claims) = test_data();
 
     // Another tick for the asyncness
     env.tick();
@@ -125,7 +127,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     let prepare_response = match api::openid_prepare_delegation(
         &env,
         canister_id,
-        principal,
+        test_authn_method.principal(),
         &jwt,
         &salt,
         &pub_session_key,
@@ -168,69 +170,6 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     Ok(())
 }
 
-// fn salt() -> [u8; 32] {
-//     let mut salt = [0u8; 32];
-//     getrandom::getrandom(&mut salt).expect("Failed to generate random salt");
-//     salt
-// }
-
-// fn create_anonymous_nonce(principal: Principal) -> (String, [u8; 32]) {
-//     // Generate random salt
-//     let salt = salt();
-
-//     // Calculate SHA-256 hash
-//     let mut hasher = Sha256::new();
-//     hasher.update(salt);
-//     hasher.update(principal);
-//     let hash: [u8; 32] = hasher.finalize().into();
-//     let nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
-
-//     (nonce, salt)
-// }
-
-// fn mock_google_oidc_response(nonce: String, time: u64) -> String {
-//     let mut header = JwsHeader::new();
-//     header.set_kid("dd125d5f462fbc6014aedab81ddf3bcedab70847");
-
-//     let time_in_seconds = time / 1_000_000_000;
-
-//     let claims = json!({
-//         "iss": "https://accounts.google.com",
-//         "sub": "123456789",
-//         "aud":  "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com",
-//         "nonce": nonce,
-//         "iat": time_in_seconds,
-//         "email": "test@example.com",
-//     })
-//     .to_string();
-
-//     let encoder =
-//         CompactJwsEncoder::new(claims.as_bytes(), &header).expect("Failed to create encoder");
-//     let signing_input = encoder.signing_input().to_vec();
-//     encoder.into_jws(&signing_input)
-// }
-
-// fn test_jwt(principal: Principal, time: u64) -> (String, [u8; 32]) {
-//     let (nonce, salt) = create_anonymous_nonce(principal);
-//     (mock_google_oidc_response(nonce, time), salt)
-// }
-
-fn test_data() -> (String, [u8; 32], Claims) {
-    // This JWT is for testing purposes, it's already been expired before this commit has been made,
-    // additionally the audience of this JWT is a test Google client registration, not production.
-    let jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRkMTI1ZDVmNDYyZmJjNjAxNGFlZGFiODFkZGYzYmNlZGFiNzA4NDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NTQzMTk5NDYxOS1jYmJmZ3RuN28wcHAwZHBmY2cybDY2YmM0cmNnN3FidS5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjQ1NDMxOTk0NjE5LWNiYmZndG43bzBwcDBkcGZjZzJsNjZiYzRyY2c3cWJ1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTE1MTYwNzE2MzM4ODEzMDA2OTAyIiwiaGQiOiJkZmluaXR5Lm9yZyIsImVtYWlsIjoidGhvbWFzLmdsYWRkaW5lc0BkZmluaXR5Lm9yZyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6ImV0aURhTEdjUmRtNS1yY3FlMFpRVWVNZ3BmcDR2OVRPT1lVUGJoUng3bkkiLCJuYmYiOjE3MzY3OTM4MDIsIm5hbWUiOiJUaG9tYXMgR2xhZGRpbmVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lTTWxja0M1RjZxaGlOWnpfREZtWGp5OTY4LXlPaEhPTjR4TGhRdXVNSDNuQlBXQT1zOTYtYyIsImdpdmVuX25hbWUiOiJUaG9tYXMiLCJmYW1pbHlfbmFtZSI6IkdsYWRkaW5lcyIsImlhdCI6MTczNjc5NDEwMiwiZXhwIjoxNzM2Nzk3NzAyLCJqdGkiOiIwMWM1NmYyMGM1MzFkNDhhYjU0ZDMwY2I4ZmRiNzU0MmM0ZjdmNjg4In0.f47b0HNskm-85sT5XtoRzORnfobK2nzVFG8jTH6eS_qAyu0ojNDqVsBtGN4A7HdjDDCOIMSu-R5e413xuGJIWLadKrLwXmguRFo3SzLrXeja-A-rP-axJsb5QUJZx1mwYd1vUNzLB9bQojU3Na6Hdvq09bMtTwaYdCn8Q9v3RErN-5VUxELmSbSXbf10A-IsS7jtzPjxHV6ueq687Ppeww6Q7AGGFB4t9H8qcDbI1unSdugX3-MfMWJLzVHbVxDgfAcLem1c2iAspvv_D5aPLeJF5HLRR2zg-Jil1BFTOoEPAAPFr1MEsvDMWSTt5jLyuMrnS4jiMGudGGPV4DDDww";
-    let salt: [u8; 32] = [
-        143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83, 81,
-        139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
-    ];
-    let validation_item = Decoder::new()
-        .decode_compact_serialization(jwt.as_bytes(), None)
-        .unwrap();
-    let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
-
-    (jwt.into(), salt, claims)
-}
-
 fn mock_google_certs_response(env: &PocketIc) {
     const MAX_ATTEMPTS: u32 = 10;
     let mut attempts = 0;
@@ -246,7 +185,7 @@ fn mock_google_certs_response(env: &PocketIc) {
             .find(|req| req.url == "https://www.googleapis.com/oauth2/v3/certs")
         {
             // Use the same test certificate data that's used in google.rs
-            let mock_certs = serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#).unwrap().keys;
+            let mock_certs = serde_json::from_str::<Certs>(r#"{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"25f8211713788b6145474b5029b0141bd5b3de9c","n":"0qTcwnqUqJqsyu57JAC4IOAgTuMrccabAKKj5T93F68NoCk4kAax0oJhDArisYpiLrQ__YJJ9HFm3TKkuiPZeb1xqSSXAnIZVo8UigTLQDQLCTq3O-aD5EyQTOhOHWxJBZcpyLO-dZVuOIbv8fNMcXpNCioHVHO04gI_mvaw8ZzbU_j8ZeHSPk4wTBNfmH4l0mYRDhoQHLkZxxvc2V71ppBPYbnX-4t6h7XcuTkLJKBxfrR43G5nNzDuFsIbBnS2fjVLEv_1LYj9G5Q5XwiCFS0BON-oqQNzRWF53nkf91bMm2TaROg21KKJbZqfEjUhCVlMDFmBW-MNv69-C19PZQ","e":"AQAB"},{"kty":"RSA","use":"sig","alg":"RS256","kid":"5d12ab782cb6096285f69e48aea99079bb59cb86","n":"uac7NRcojCutcceWq1nrpLGJjQ7ywvgWsUcb1DWMKJ3KNNHiRzh9jshoi9tmq1zlarJ_h7GQg8iU1qD7SgpVYJmjlKG1MNVRAtuNrNMC0UAnNfG7mBBNorHFndfp-9cLTiMjXSXRzhNqiMvTVKeolRdMB2lH9RzJnwlpXtvUbD7M1pXOlPlMaOy1zxUnHn0uszU5mPRQk79i03BNrAdhwrAUB-ZuMnqpjaUcb9VU3KIwuZNPtsVenLN12sRYpaZ6WBw8Q9q7fAoaJUovM0Go8deC9pJYyxJuHdVo9HP0osyzg3g_rOYi14wmvMBuiDf3F4pTnudAfFyl3d0Mn_i4ZQ","e":"AQAB"},{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}]}"#).unwrap().keys;
 
             let http_response = CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
                 status: 200,
@@ -290,6 +229,82 @@ struct Certs {
     keys: Vec<Jwk>,
 }
 
-fn test_principal() -> Principal {
-    Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap()
+fn openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+    // This JWT is for testing purposes, it's already been expired before this commit has been made,
+    // additionally the audience of this JWT is a test Google client registration, not production.
+    let jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijc2M2Y3YzRjZDI2YTFlYjJiMWIzOWE4OGY0NDM0ZDFmNGQ5YTM2OGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJmQkcxS3IzUWt5Z0dHelNJWG9Pd2p3RF95QjhXS0FfcVJPUlZjMFp0WHlJIiwibmJmIjoxNzQwNTgzNDEyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQwNTgzNzEyLCJleHAiOjE3NDA1ODczMTIsImp0aSI6IjhjNjkzMWE4YmVmZjllOWM3OTRmYjM5ZTkwNTExOTM4MTk4MDgxZDYifQ.PVAbLj1Fv7AUwH16nFiedJkmPOUg1UkPnAkVj6S9MDhpEV467tP7iOxQCx64i0_imTymcjkzH9pcfTsaKpY8fWPrWSWZzDy9S4GygjOQeg13NXg_H23X2-IY_OVHKqtrAibhZZUppvczijqZja7-HmUivoAJIGsMOk1IxbJdalOhE5yQtsYEx4ZBxFemR7CTfMzopsAaRWgPHI7T0MENuiCbkSy_NYQPBzNpmGcKoZoyUbleFUzej8gbkqpoIUVdfwuNtoe_TMjED5eqJxi1Pip85iy4wJTa2RKUTZxUfqVCaTEftVt8U-PV1UgPsxpu0mKS5z5bXylmgclUzcNnmg";
+    let salt: [u8; 32] = [
+        107, 14, 204, 55, 92, 39, 93, 230, 53, 20, 153, 234, 70, 25, 120, 74, 136, 94, 251, 187,
+        238, 96, 97, 180, 255, 135, 20, 149, 143, 27, 159, 83,
+    ];
+    let validation_item = Decoder::new()
+        .decode_compact_serialization(jwt.as_bytes(), None)
+        .unwrap();
+    let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
+    let test_time = 1740583715239;
+    let test_principal = Principal::from_slice(&[
+        211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66,
+        201, 203, 1, 102, 109, 20, 75, 2,
+    ]);
+
+    // This is the public key of the credential used to sign in
+    // You get it with connection.identity.credentialData[0].pubkey
+    // Notably, you don't get it with connection.identity.getPublicKey()
+    // Even though you get the above principal with connection.identity.getPrincipal()
+
+    let test_pubkey = [
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185, 84, 148, 45, 86, 216,
+        171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129, 211, 34, 88, 32, 158,
+        197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38, 255, 65, 92, 234, 229,
+        245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+    ];
+
+    let test_authn_method = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(test_pubkey),
+        }),
+        metadata: Default::default(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    (
+        jwt.into(),
+        salt,
+        claims,
+        test_time,
+        test_principal,
+        test_authn_method,
+    )
 }
+
+static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
+
+/*
+FIFTH TIME'S THE CHARM
+
+nonce
+fBG1Kr3QkygGGzSIXoOwjwD_yB8WKA_qRORVc0ZtXyI
+
+salt
+107, 14, 204, 55, 92, 39, 93, 230, 53, 20, 153, 234, 70, 25, 120, 74, 136, 94, 251, 187, 238, 96, 97, 180, 255, 135, 20, 149, 143, 27, 159, 83,
+
+principal
+211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66, 201, 203, 1, 102, 109, 20, 75, 2,
+
+jwt
+eyJhbGciOiJSUzI1NiIsImtpZCI6Ijc2M2Y3YzRjZDI2YTFlYjJiMWIzOWE4OGY0NDM0ZDFmNGQ5YTM2OGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJmQkcxS3IzUWt5Z0dHelNJWG9Pd2p3RF95QjhXS0FfcVJPUlZjMFp0WHlJIiwibmJmIjoxNzQwNTgzNDEyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQwNTgzNzEyLCJleHAiOjE3NDA1ODczMTIsImp0aSI6IjhjNjkzMWE4YmVmZjllOWM3OTRmYjM5ZTkwNTExOTM4MTk4MDgxZDYifQ.PVAbLj1Fv7AUwH16nFiedJkmPOUg1UkPnAkVj6S9MDhpEV467tP7iOxQCx64i0_imTymcjkzH9pcfTsaKpY8fWPrWSWZzDy9S4GygjOQeg13NXg_H23X2-IY_OVHKqtrAibhZZUppvczijqZja7-HmUivoAJIGsMOk1IxbJdalOhE5yQtsYEx4ZBxFemR7CTfMzopsAaRWgPHI7T0MENuiCbkSy_NYQPBzNpmGcKoZoyUbleFUzej8gbkqpoIUVdfwuNtoe_TMjED5eqJxi1Pip85iy4wJTa2RKUTZxUfqVCaTEftVt8U-PV1UgPsxpu0mKS5z5bXylmgclUzcNnmg
+
+time
+1740583715239
+
+pubkey
+165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185, 84, 148, 45, 86, 216, 171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129, 211, 34, 88, 32, 158, 197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38, 255, 65, 92, 234, 229, 245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+
+pubkey?
+48,94,48,12,6,10,43,6,1,4,1,131,184,67,1,1,3,78,0,165,1,2,3,38,32,1,33,88,32,252,182,240,218,160,61,178,176,17,228,185,84,148,45,86,216,171,120,72,246,212,55,212,167,142,59,227,0,242,182,129,211,34,88,32,158,197,96,131,51,156,176,65,128,29,75,98,163,187,104,38,255,65,92,234,229,245,221,74,40,202,29,83,162,84,177,204
+*/

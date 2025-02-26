@@ -64,7 +64,7 @@ struct Certs {
     keys: Vec<Jwk>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Claims {
     iss: String,
     sub: String,
@@ -307,7 +307,12 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
         return Err(format!("Invalid audience: {}", claims.aud));
     }
     if claims.nonce != expected_nonce {
-        return Err(format!("Invalid nonce: {}", claims.nonce));
+        return Err(format!(
+            "Invalid nonce: {} for caller {}, expected {}",
+            claims.nonce,
+            caller().to_text(),
+            expected_nonce
+        ));
     }
     if now > claims.iat * NANOSECONDS_PER_SECOND + MAX_VALIDITY_WINDOW {
         return Err("JWT is no longer valid".into());
@@ -352,19 +357,22 @@ fn caller() -> Principal {
     ic_cdk::caller()
 }
 
-#[cfg(test)]
-fn caller() -> Principal {
-    TEST_CALLER.get()
-}
+//TODO
+// #[cfg(test)]
+// fn caller() -> Principal {
+//     TEST_CALLER.get()
+// }
 
 #[cfg(not(test))]
 fn time() -> u64 {
     ic_cdk::api::time()
 }
-#[cfg(test)]
-fn time() -> u64 {
-    TEST_TIME.get()
-}
+
+//TODO
+// #[cfg(test)]
+// fn time() -> u64 {
+//     TEST_TIME.get()
+// }
 
 #[test]
 fn should_transform_certs_to_same() {
@@ -589,4 +597,73 @@ fn should_return_error_when_picture_url_too_long() {
         verify_claims(client_id, &claims, &salt),
         Err("Picture URL too long".into())
     );
+}
+
+#[test]
+fn test_test_for_openid() {
+    let jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijc2M2Y3YzRjZDI2YTFlYjJiMWIzOWE4OGY0NDM0ZDFmNGQ5YTM2OGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJmQkcxS3IzUWt5Z0dHelNJWG9Pd2p3RF95QjhXS0FfcVJPUlZjMFp0WHlJIiwibmJmIjoxNzQwNTgzNDEyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQwNTgzNzEyLCJleHAiOjE3NDA1ODczMTIsImp0aSI6IjhjNjkzMWE4YmVmZjllOWM3OTRmYjM5ZTkwNTExOTM4MTk4MDgxZDYifQ.PVAbLj1Fv7AUwH16nFiedJkmPOUg1UkPnAkVj6S9MDhpEV467tP7iOxQCx64i0_imTymcjkzH9pcfTsaKpY8fWPrWSWZzDy9S4GygjOQeg13NXg_H23X2-IY_OVHKqtrAibhZZUppvczijqZja7-HmUivoAJIGsMOk1IxbJdalOhE5yQtsYEx4ZBxFemR7CTfMzopsAaRWgPHI7T0MENuiCbkSy_NYQPBzNpmGcKoZoyUbleFUzej8gbkqpoIUVdfwuNtoe_TMjED5eqJxi1Pip85iy4wJTa2RKUTZxUfqVCaTEftVt8U-PV1UgPsxpu0mKS5z5bXylmgclUzcNnmg";
+    let salt: [u8; 32] = [
+        107, 14, 204, 55, 92, 39, 93, 230, 53, 20, 153, 234, 70, 25, 120, 74, 136, 94, 251, 187,
+        238, 96, 97, 180, 255, 135, 20, 149, 143, 27, 159, 83,
+    ];
+    let validation_item = Decoder::new()
+        .decode_compact_serialization(jwt.as_bytes(), None)
+        .unwrap();
+    let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
+    // let test_time: u64 = 1740583715239;
+    // let test_principal = Principal::from_slice(&[
+    //     211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66,
+    //     201, 203, 1, 102, 109, 20, 75, 2,
+    // ]);
+    // // let test_principal = Principal::from_slice(&[
+    // //     211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66,
+    // //     201, 203, 1, 102, 109, 20, 75, 2,
+    // // ]);
+    // let test_pubkey = [
+    //     165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185,
+    //     84, 148, 45, 86, 216, 171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129,
+    //     211, 34, 88, 32, 158, 197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38,
+    //     255, 65, 92, 234, 229, 245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+    // ];
+
+    // let test_authn_method = AuthnMethodData {
+    //     authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+    //         pubkey: ByteBuf::from(test_pubkey),
+    //     }),
+    //     metadata: Default::default(),
+    //     security_settings: AuthnMethodSecuritySettings {
+    //         protection: AuthnMethodProtection::Unprotected,
+    //         purpose: AuthnMethodPurpose::Authentication,
+    //     },
+    //     last_authentication: None,
+    // };
+
+    // let mock_certs = serde_json::from_str::<Certs>(r#"{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"25f8211713788b6145474b5029b0141bd5b3de9c","n":"0qTcwnqUqJqsyu57JAC4IOAgTuMrccabAKKj5T93F68NoCk4kAax0oJhDArisYpiLrQ__YJJ9HFm3TKkuiPZeb1xqSSXAnIZVo8UigTLQDQLCTq3O-aD5EyQTOhOHWxJBZcpyLO-dZVuOIbv8fNMcXpNCioHVHO04gI_mvaw8ZzbU_j8ZeHSPk4wTBNfmH4l0mYRDhoQHLkZxxvc2V71ppBPYbnX-4t6h7XcuTkLJKBxfrR43G5nNzDuFsIbBnS2fjVLEv_1LYj9G5Q5XwiCFS0BON-oqQNzRWF53nkf91bMm2TaROg21KKJbZqfEjUhCVlMDFmBW-MNv69-C19PZQ","e":"AQAB"},{"kty":"RSA","use":"sig","alg":"RS256","kid":"5d12ab782cb6096285f69e48aea99079bb59cb86","n":"uac7NRcojCutcceWq1nrpLGJjQ7ywvgWsUcb1DWMKJ3KNNHiRzh9jshoi9tmq1zlarJ_h7GQg8iU1qD7SgpVYJmjlKG1MNVRAtuNrNMC0UAnNfG7mBBNorHFndfp-9cLTiMjXSXRzhNqiMvTVKeolRdMB2lH9RzJnwlpXtvUbD7M1pXOlPlMaOy1zxUnHn0uszU5mPRQk79i03BNrAdhwrAUB-ZuMnqpjaUcb9VU3KIwuZNPtsVenLN12sRYpaZ6WBw8Q9q7fAoaJUovM0Go8deC9pJYyxJuHdVo9HP0osyzg3g_rOYi14wmvMBuiDf3F4pTnudAfFyl3d0Mn_i4ZQ","e":"AQAB"},{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}]}"#).unwrap().keys;
+    let client_id =
+        "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com".to_string();
+
+    match verify_claims(&client_id, &claims, &salt) {
+        Ok(_) => (),
+        Err(err) => panic!("{}", err),
+    }
+}
+
+#[cfg(test)]
+// fn caller() -> Principal {
+//     Principal::self_authenticating([
+//         165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185,
+//         84, 148, 45, 86, 216, 171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129,
+//         211, 34, 88, 32, 158, 197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38,
+//         255, 65, 92, 234, 229, 245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+//     ])
+// }
+fn caller() -> Principal {
+    Principal::from_slice(&[
+        211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66,
+        201, 203, 1, 102, 109, 20, 75, 2,
+    ])
+}
+#[cfg(test)]
+fn time() -> u64 {
+    1740583903 * NANOSECONDS_PER_SECOND
 }

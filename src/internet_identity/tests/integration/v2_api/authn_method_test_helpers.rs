@@ -1,3 +1,4 @@
+use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{test_principal, time};
 use ic_cdk::api::management_canister::main::CanisterId;

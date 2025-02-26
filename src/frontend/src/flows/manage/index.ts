@@ -429,13 +429,7 @@ export const displayManage = async (
             nonce,
           })
         );
-        console.log("jwt", jwt);
-        console.log("salt", salt);
-        console.log(
-          "principal",
-          connection.getPrincipal({ origin: window.origin })
-        );
-        console.log("time", Date.now());
+
         const { iss, sub } = decodeJWT(jwt);
         if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
           toast.error(copy.account_already_linked);
