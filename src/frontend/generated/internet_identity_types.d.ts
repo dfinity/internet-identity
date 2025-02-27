@@ -255,7 +255,7 @@ export type OpenIdCredentialAddError = {
   } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
-  { 'JwtVerificationFailed' : string };
+  { 'JwtVerificationFailed' : null };
 export type OpenIdCredentialKey = [Iss, Sub];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |

@@ -331,7 +331,7 @@ export const idlFactory = ({ IDL }) => {
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
-    'JwtVerificationFailed' : IDL.Text,
+    'JwtVerificationFailed' : IDL.Null,
   });
   const OpenIdCredentialKey = IDL.Tuple(Iss, Sub);
   const OpenIdCredentialRemoveError = IDL.Variant({
