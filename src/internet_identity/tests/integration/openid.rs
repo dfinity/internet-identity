@@ -6,7 +6,8 @@ use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, InternetIdentityInit, OpenIdConfig, PublicKeyAuthn,
+    AuthnMethodSecuritySettings, InternetIdentityInit, OpenIdConfig, OpenIdCredentialKey,
+    OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{CallError, PocketIc};
@@ -18,30 +19,9 @@ use std::time::Duration;
 #[test]
 fn can_link_google_account() -> Result<(), CallError> {
     let env = env();
-
-    let args = InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        captcha_config: None,
-        related_origins: None,
-        openid_google: Some(Some(OpenIdConfig {
-            client_id: CLIENT_ID.to_string(),
-        })),
-    };
-    // Cycles are needed before installation because of the async HTTP outcalls
-    let canister_id = install_ii_canister_with_arg_and_cycles(
-        &env,
-        II_WASM.clone(),
-        Some(args),
-        10_000_000_000_000,
-    );
-
-    // Mock google certs response
-    mock_google_certs_response(&env);
-
+    let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_test_data();
+
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
@@ -58,32 +38,64 @@ fn can_link_google_account() -> Result<(), CallError> {
     .map_err(|e| CallError::Reject(format!("{:?}", e)))
 }
 
-/// Verifies that valid JWT delegations are issued.
+/// Verifies that Google Accounts can be removed
+#[test]
+fn can_remove_google_account() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) = openid_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )?
+    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+
+    api::openid_credential_remove(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &claims.into(),
+    )?
+    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+
+    // Try to get delegation based on credential, should fail now
+    // Create session key
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Prepare the delegation
+    match api::openid_prepare_delegation(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+    )? {
+        Ok(_) => panic!("We shouldn't be able to get a delegation here!"),
+        Err(err) => match err {
+            OpenIdDelegationError::NoSuchAnchor => Ok(()),
+            _ => panic!("We should get a NoSuchAnchor error here!"),
+        },
+    }
+}
+
+/// Verifies that valid JWT delegations are issued based on added .
 #[test]
 fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     let env = env();
 
-    let args = InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        captcha_config: None,
-        related_origins: None,
-        openid_google: Some(Some(OpenIdConfig {
-            client_id: CLIENT_ID.to_string(),
-        })),
-    };
-    // Cycles are needed before installation because of the async HTTP outcalls
-    let canister_id = install_ii_canister_with_arg_and_cycles(
-        &env,
-        II_WASM.clone(),
-        Some(args),
-        10_000_000_000_000,
-    );
-
-    // Mock google certs response
-    mock_google_certs_response(&env);
+    let canister_id = setup_canister(&env);
 
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_test_data();
 
@@ -104,11 +116,10 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     )?
     .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
 
+    // Create session key
     let pub_session_key = ByteBuf::from("session public key");
 
-    // Another tick for the asyncness
-    env.tick();
-
+    // Prepare the delegation
     let prepare_response = match api::openid_prepare_delegation(
         &env,
         canister_id,
@@ -126,9 +137,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
-    // Another tick for the delegation
-    env.tick();
-
+    // Get the delegation
     let signed_delegation = match api::openid_get_delegation(
         &env,
         canister_id,
@@ -144,6 +153,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         }
     };
 
+    // Verify the delegation
     verify_delegation(
         &env,
         prepare_response.user_key,
@@ -156,6 +166,59 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         prepare_response.expiration
     );
     Ok(())
+}
+
+static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct Claims {
+    iss: String,
+    sub: String,
+    aud: String,
+    nonce: String,
+    iat: u64,
+    // Optional Google specific claims
+    email: Option<String>,
+    name: Option<String>,
+    picture: Option<String>,
+}
+
+impl Into<OpenIdCredentialKey> for Claims {
+    fn into(self) -> OpenIdCredentialKey {
+        (self.iss, self.sub)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct Certs {
+    keys: Vec<Jwk>,
+}
+
+fn setup_canister(env: &PocketIc) -> Principal {
+    let args = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: None,
+        related_origins: None,
+        openid_google: Some(Some(OpenIdConfig {
+            client_id: CLIENT_ID.to_string(),
+        })),
+    };
+    // Cycles are needed before installation because of the async HTTP outcalls
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+
+    // Mock google certs response
+    mock_google_certs_response(&env);
+
+    canister_id
 }
 
 fn mock_google_certs_response(env: &PocketIc) {
@@ -197,25 +260,6 @@ fn mock_google_certs_response(env: &PocketIc) {
             panic!("No Google cert requests found after {MAX_ATTEMPTS} attempts");
         }
     }
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct Claims {
-    iss: String,
-    sub: String,
-    aud: String,
-    nonce: String,
-    iat: u64,
-    // Optional Google specific claims
-    email: Option<String>,
-    name: Option<String>,
-    picture: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Certs {
-    keys: Vec<Jwk>,
 }
 
 fn openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
@@ -270,5 +314,3 @@ fn openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodD
         test_authn_method,
     )
 }
-
-static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
