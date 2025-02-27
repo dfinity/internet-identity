@@ -1,0 +1,11 @@
+{
+  "en": {
+    "confirm": "Remove Device",
+    "cancel": "Cancel",
+    "title_recovery_device": "Confirm Remove Recovery Device",
+    "title_authenticator_device": "Confirm Remove Device",
+    "label": "Security Warning",
+    "message_authenticator_device": "This is an irreversible action. Confirm that you want to remove the device by entering its name:",
+    "message_recovery_device": "This is an irreversible action. By confirming, you are removing the recovery device."
+  }
+}
