@@ -307,12 +307,7 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
         return Err(format!("Invalid audience: {}", claims.aud));
     }
     if claims.nonce != expected_nonce {
-        return Err(format!(
-            "Invalid nonce: {} for caller {}, expected {}",
-            claims.nonce,
-            caller().to_text(),
-            expected_nonce
-        ));
+        return Err(format!("Invalid nonce: {}", claims.nonce,));
     }
     if now > claims.iat * NANOSECONDS_PER_SECOND + MAX_VALIDITY_WINDOW {
         return Err("JWT is no longer valid".into());
