@@ -5,7 +5,8 @@
     "title_recovery_device": "Confirm Remove Recovery Device",
     "title_authenticator_device": "Confirm Remove Device",
     "label": "Security Warning",
-    "message_authenticator_device": "This is an irreversible action. Confirm that you want to remove the device by entering its name:",
-    "message_recovery_device": "This is an irreversible action. By confirming, you are removing the recovery device."
+    "irreversible_action": "This is an irreversible action.",
+    "message_authenticator_device": "Confirm that you want to remove the device by entering the passkey nickname:",
+    "message_recovery_device": "Please, confirm that you want to remove the recovery device."
   }
 }

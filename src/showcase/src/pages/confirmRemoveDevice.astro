@@ -14,6 +14,8 @@ import Screen from "../layouts/Screen.astro";
       i18n,
       purpose: { authentication: null },
       alias: "test",
+      lastUsedNanoseconds: BigInt(Date.now() - 24 * 3600 * 1000) * 1_000_000n,
+      originRegistered: "https://identity.internetcomputer.org",
     });
   </script>
 </Screen>

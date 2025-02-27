@@ -1,8 +1,11 @@
 import { Purpose } from "$generated/internet_identity_types";
 import { warningLabelIcon } from "$src/components/infoScreen";
 import { mainWindow } from "$src/components/mainWindow";
+import { LEGACY_II_URL } from "$src/config";
 import { DynamicKey, I18n } from "$src/i18n";
 import { renderPage, withRef } from "$src/utils/lit-html";
+import { formatLastUsage } from "$src/utils/time";
+import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import copyJson from "./confirmRemoveDevice.json";
@@ -15,12 +18,16 @@ const confirmRemoveDeviceTemplate = ({
   next,
   cancel,
   alias,
+  lastUsedNanoseconds,
+  originRegistered,
 }: {
   i18n: I18n;
   purpose: Purpose;
   next: () => void;
   cancel: () => void;
   alias: string;
+  lastUsedNanoseconds: bigint | undefined;
+  originRegistered: string | undefined;
 }) => {
   const copy = i18n.i18n(copyJson);
   const mapper: Record<
@@ -37,9 +44,17 @@ const confirmRemoveDeviceTemplate = ({
     },
   };
   const purposeType = Object.keys(purpose)[0] as PurposeType;
-  const mappedCopy = mapper[purposeType];
   const input: Ref<HTMLInputElement> = createRef();
   const confirmButton: Ref<HTMLButtonElement> = createRef();
+  const mappedCopy = mapper[purposeType];
+
+  let lastUsageFormattedString: string | undefined = undefined;
+  if (nonNullish(lastUsedNanoseconds)) {
+    const lastUsageTimeStamp = new Date(
+      Number(lastUsedNanoseconds / BigInt(1000000))
+    );
+    lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
+  }
 
   const slot = html`
     <hgroup data-page="confirm-remove-device-page">
@@ -48,9 +63,15 @@ const confirmRemoveDeviceTemplate = ({
         <h2>${copy.label}</h2>
       </div>
       <h1 class="t-title t-title--main">${mappedCopy.title}</h1>
+      <p class="t-paragraph">${copy.irreversible_action}</p>
+      <ul class="c-list c-list--bulleted">
+        <li>${`Passkey nickname: ${alias}`}</li>
+        <li>${`Last used: ${lastUsageFormattedString}`}</li>
+        <li>${`Registered in: ${originRegistered ?? LEGACY_II_URL}`}</li>
+      </ul>
       <p class="t-paragraph">${mappedCopy.message}</p>
     </hgroup>
-    <div class="l-stack">
+    <div>
       ${purposeType === "authentication"
         ? html`<input
             autofocus
@@ -58,6 +79,7 @@ const confirmRemoveDeviceTemplate = ({
             id="confirmRemoveDevice"
             class="c-input c-input--stack c-input--fullwidth"
             spellcheck="false"
+            .onpaste=${(e: Event) => e.preventDefault()}
             @change=${() =>
               withRef(input, (inputElement) =>
                 withRef(confirmButton, (buttonElement) => {
@@ -104,10 +126,14 @@ export const confirmRemoveDevice = ({
   i18n,
   purpose,
   alias,
+  lastUsedNanoseconds,
+  originRegistered,
 }: {
   i18n: I18n;
   purpose: Purpose;
   alias: string;
+  lastUsedNanoseconds: bigint | undefined;
+  originRegistered: string | undefined;
 }): Promise<"confirmed" | "cancelled"> => {
   return new Promise((resolve) =>
     confirmRemoveDevicePage({
@@ -116,6 +142,8 @@ export const confirmRemoveDevice = ({
       alias,
       next: () => resolve("confirmed"),
       cancel: () => resolve("cancelled"),
+      lastUsedNanoseconds,
+      originRegistered,
     })
   );
 };
