@@ -72,6 +72,8 @@ jobs:
       - name: "Deploy Release Candidate"
         run: |
           wallet="${{ env.wallet_canister_id }}"
+          # Needed to surpass dfx error to use the insecure plaintext identity
+          export DFX_WARNING=-mainnet_plaintext_identity
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --wasm internet_identity_production.wasm.gz \
             ${{ env.ii_canister_id }}
