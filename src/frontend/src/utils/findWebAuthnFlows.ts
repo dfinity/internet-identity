@@ -1,8 +1,6 @@
+import { II_LEGACY_ORIGIN } from "$src/constants";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
-import {
-  excludeCredentialsFromOrigins,
-  findWebAuthnRpId,
-} from "./findWebAuthnRpId";
 
 export type WebAuthnFlow = {
   useIframe: boolean;
@@ -26,9 +24,7 @@ type Parameters = {
  * - Which RP ID to use. This is used for the iframe or for Related Origin Requests.
  *
  * Logic:
- * - To calculate the RP ID, we use the `findWebAuthnRpId` function.
- *   - Calculate the RP ID first with all the credentials.
- *   - For the subsequent RP IDs, the credentials' origin that matches the previous RP ID will be excluded.
+ * - To calculate the RP IDs, we look for all RP IDs within the devices
  * - At the moment, we only use non-iframe if the RP ID matches the current origin. to avoid bad UX, if the RP ID doesn't match the current origin, the iframe will be used.
  *
  * @param {Parameters} params - The parameters to find the webauthn steps.
@@ -39,29 +35,36 @@ export const findWebAuthnFlows = ({
   currentOrigin,
   relatedOrigins,
 }: Parameters): WebAuthnFlow[] => {
-  const steps: WebAuthnFlow[] = [];
-  let filteredCredentials = devices;
-  const rpIds = new Set<string | undefined>();
+  const currentRpId = new URL(currentOrigin).hostname;
+  const relatedRpIds = relatedOrigins.map(
+    (relatedOrigin) => new URL(relatedOrigin).hostname
+  );
 
-  while (filteredCredentials.length > 0) {
-    const rpId = findWebAuthnRpId(
-      currentOrigin,
-      filteredCredentials,
-      relatedOrigins
-    );
-    // EXCEPTION: At the moment, to avoid bad UX, if the RP ID doesn't match the current origin, the iframe will be used.
-    // This is because it's hard to find out whether a user's credentials come from a third party password manager or not.
-    // The iframe workaround works for all users.
-    const useIframe =
-      rpId !== undefined && rpId !== new URL(currentOrigin).hostname;
-    steps.push({ useIframe, rpId });
-    rpIds.add(rpId);
-    filteredCredentials = excludeCredentialsFromOrigins(
-      filteredCredentials,
-      rpIds,
-      currentOrigin
-    );
+  // The devices are expected to be ordered by recently used already
+  const orderedDeviceRpIds = [
+    ...new Set(
+      devices
+        // Device origin to RP ID (hostname)
+        .map((device) =>
+          device.origin === currentOrigin ||
+          (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
+            ? undefined
+            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
+        )
+        // Filter out RP IDs that are not within `relatedRpIds`
+        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId))
+    ),
+  ];
+
+  // Create steps from `deviceRpIds`, currently that's one step per RP ID
+  const steps: WebAuthnFlow[] = orderedDeviceRpIds.map((rpId) => ({
+    rpId,
+    useIframe: nonNullish(rpId) && rpId !== currentRpId,
+  }));
+
+  // If there are no steps, add a default step.
+  if (steps.length === 0) {
+    steps.push({ useIframe: false, rpId: undefined });
   }
-
   return steps;
 };

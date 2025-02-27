@@ -9,6 +9,7 @@ import {
 } from "../util";
 import { AuthenticateView, DemoAppView, ErrorView } from "../views";
 
+import { nonNullish } from "@dfinity/utils";
 import {
   II_URL,
   TEST_APP_CANONICAL_URL,
@@ -124,7 +125,12 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     );
 
     const logs = (await browser.getLogs("browser")) as { message: string }[];
-    expect(logs.at(-1)?.message).toContain(`Failed to load resource`);
+    const errorLog = logs.find(
+      ({ message }) =>
+        message.includes("/.well-known/ii-alternative-origins") &&
+        message.includes("Failed to load resource")
+    );
+    expect(nonNullish(errorLog)).toBeTruthy();
 
     // This works anyway --> fetched using non-raw
     const authenticateView = new AuthenticateView(browser);

@@ -57,12 +57,12 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { analytics } from "./analytics";
 import {
   convertToValidCredentialData,
   CredentialData,
 } from "./credential-devices";
 import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
-import { relatedDomains } from "./findWebAuthnRpId";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -152,13 +152,13 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 }
 
 export class Connection {
-  private configPromise: Promise<InternetIdentityInit> | undefined;
   private webAuthFlows:
     | { flows: WebAuthnFlow[]; currentIndex: number }
     | undefined;
 
   public constructor(
     readonly canisterId: string,
+    readonly canisterConfig: InternetIdentityInit,
     // Used for testing purposes
     readonly overrideActor?: ActorSubclass<_SERVICE>
   ) {}
@@ -325,6 +325,7 @@ export class Connection {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
           this.canisterId,
+          this.canisterConfig,
           identity,
           delegationIdentity,
           userNumber,
@@ -430,7 +431,8 @@ export class Connection {
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
         currentOrigin: window.location.origin,
-        relatedOrigins: relatedDomains(),
+        // Empty array is the same as no related origins.
+        relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
       });
       this.webAuthFlows = {
         flows,
@@ -438,6 +440,10 @@ export class Connection {
       };
     }
     const flowsLength = this.webAuthFlows?.flows.length ?? 0;
+
+    // Better understand which users make it (or don't) all the way.
+    analytics.event("start-webauthn-authentication", { flowsLength });
+
     // We reached the last flow. Start from the beginning.
     // This might happen if the user cancelled manually in the flow that would have been successful.
     if (this.webAuthFlows?.currentIndex === flowsLength) {
@@ -466,7 +472,11 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      // Better understand which users don't make it all the way.
+      analytics.event("failed-webauthn-authentication", { flowsLength });
       if (isWebAuthnCancel(e)) {
+        // Better understand which users don't make it all the way.
+        analytics.event("cancelled-webauthn-authentication", { flowsLength });
         // We only want to show a special error if the user might have to choose different web auth flow.
         if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
           // Increase the index to try the next flow.
@@ -490,6 +500,7 @@ export class Connection {
     const actor = await this.createActor(delegationIdentity);
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
@@ -499,6 +510,9 @@ export class Connection {
     // If the index is more than 0, it's because the first one failed.
     // We should offer to add the current device to the current origin.
     const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
+
+    // Better understand which users make it all the way.
+    analytics.event("successful-webauthn-authentication", { flowsLength });
 
     return {
       kind: "loginSuccess",
@@ -516,6 +530,7 @@ export class Connection {
 
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
@@ -561,6 +576,7 @@ export class Connection {
       userNumber,
       connection: new AuthenticatedConnection(
         this.canisterId,
+        this.canisterConfig,
         identity,
         delegationIdentity,
         userNumber,
@@ -650,17 +666,6 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
-
-  /**
-   * Get previously fetched config, else fetch it
-   * TODO: Discuss with prodsec if this should stay a query or should be update,
-   *       alternatively the config can also be set directly in the html head.
-   */
-  getConfig = (): Promise<InternetIdentityInit> => {
-    this.configPromise =
-      this.configPromise ?? this.createActor().then((actor) => actor.config());
-    return this.configPromise;
-  };
 }
 
 export class AuthenticatedConnection extends Connection {
@@ -668,12 +673,13 @@ export class AuthenticatedConnection extends Connection {
 
   public constructor(
     public canisterId: string,
+    public canisterConfig: InternetIdentityInit,
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {
-    super(canisterId);
+    super(canisterId, canisterConfig);
     const metadataGetter = async () => {
       const response = await this.getIdentityInfo();
       if ("Ok" in response) {
@@ -976,6 +982,10 @@ export class AuthenticatedConnection extends Connection {
       sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
+  };
+
+  getSignIdentityPubKey = (): DerEncodedPublicKey => {
+    return this.identity.getPublicKey().toDer();
   };
 }
 

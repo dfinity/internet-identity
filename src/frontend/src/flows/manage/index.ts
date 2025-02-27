@@ -2,7 +2,6 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
-  InternetIdentityInit,
   OpenIdCredential,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
@@ -35,7 +34,11 @@ import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
 import { getCredentialsOrigin } from "$src/utils/credential-devices";
-import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
+import {
+  AuthenticatedConnection,
+  Connection,
+  bufferEqual,
+} from "$src/utils/iiConnection";
 import { TemplateElement, renderPage } from "$src/utils/lit-html";
 import {
   createAnonymousNonce,
@@ -70,7 +73,13 @@ import {
   unprotectDevice,
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
-import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import {
+  Authenticator,
+  Devices,
+  Protection,
+  RecoveryKey,
+  RecoveryPhrase,
+} from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
@@ -175,6 +184,7 @@ const displayManageTemplate = ({
   userNumber,
   devices: { authenticators, recoveries, pinAuthenticators },
   onAddDevice,
+  onRemoveDevice,
   addRecoveryPhrase,
   addRecoveryKey,
   credentials,
@@ -188,6 +198,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
+  onRemoveDevice: (device: DeviceData) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
   credentials: OpenIdCredential[];
@@ -200,6 +211,11 @@ const displayManageTemplate = ({
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
+  // Recommend the user to clean up passkeys if there are
+  // authenticators registered in multiple domains.
+  const cleanupRecommended = authenticators.some((authenticator) =>
+    nonNullish(authenticator.rpId)
+  );
   const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
@@ -211,12 +227,19 @@ const displayManageTemplate = ({
       ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
       : ""}
     ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
+      ? tempKeysSection({
+          authenticators: pinAuthenticators,
+          i18n,
+          onRemoveDevice,
+        })
       : ""}
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
+      onRemoveDevice,
       warnNoPasskeys,
+      cleanupRecommended,
+      i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
@@ -355,11 +378,8 @@ export const displayManage = async (
     connection.identity.getPrincipal()
   );
 
-  // Get Google client id from config in background
-  const configRef: { current?: InternetIdentityInit } = {};
-  void connection.getConfig().then((config) => (configRef.current = config));
-  const getGoogleClientId = () =>
-    configRef.current?.openid_google[0]?.[0]?.client_id;
+  const googleClientId =
+    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -395,6 +415,11 @@ export const displayManage = async (
       });
       resolve();
     };
+
+    const onRemoveDevice = async (device: DeviceData) => {
+      await deleteDevice({ connection, device, reload: resolve });
+    };
+
     const addRecoveryPhrase = async () => {
       const doAdd = await addPhrase({ intent: "userInitiated" });
       if (doAdd === "cancel") {
@@ -417,7 +442,6 @@ export const displayManage = async (
     };
 
     const onLinkAccount = async () => {
-      const googleClientId = getGoogleClientId();
       if (isNullish(googleClientId)) {
         toast.error(copy.linking_google_accounts_is_unavailable);
         return;
@@ -536,6 +560,7 @@ export const displayManage = async (
         userNumber,
         devices,
         onAddDevice,
+        onRemoveDevice,
         addRecoveryPhrase,
         addRecoveryKey: async () => {
           await setupKey({ connection });
@@ -630,6 +655,7 @@ export const devicesFromDevicesWithUsage = ({
   hasOtherAuthMethods: boolean;
 }): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
+  const currentPublicKey = connection.getSignIdentityPubKey();
 
   return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
@@ -651,16 +677,19 @@ export const devicesFromDevicesWithUsage = ({
         return acc;
       }
 
-      const authenticator = {
+      const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
+      const authenticator: Authenticator = {
         alias: device.alias,
+        rpId: rpIdLabel(device, devices_),
         last_usage: device.last_usage,
         warn: domainWarning(device),
-        info: domainInfo(device, devices_),
         rename: () => renameDevice({ connection, device, reload }),
-        remove:
-          hasSingleDevice && !hasOtherAuthMethods
-            ? undefined
-            : () => deleteDevice({ connection, device, reload }),
+        canBeRemoved,
+        isCurrent: bufferEqual(
+          currentPublicKey,
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+        ),
+        device,
       };
 
       if ("browser_storage_key" in device.key_type) {
@@ -723,10 +752,10 @@ export const domainWarning = (
   }
 };
 
-const domainInfo = (
+const rpIdLabel = (
   device: DeviceData,
   allDevices: DeviceData[]
-): TemplateResult | undefined => {
+): string | undefined => {
   if (!DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;
   }
@@ -736,8 +765,7 @@ const domainInfo = (
   if (nonNullish(commonOrigin)) {
     return undefined;
   }
-  return html`This passkey was registered in
-  ${device.origin[0] ?? LEGACY_II_URL}`;
+  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 };
 
 const unknownError = (): Error => {

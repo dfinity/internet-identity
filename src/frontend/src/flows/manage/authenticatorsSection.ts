@@ -1,7 +1,15 @@
-import { infoIcon, warningIcon } from "$src/components/icons";
+import { DeviceData } from "$generated/internet_identity_types";
+import {
+  infoIcon,
+  pulsatingCircleIcon,
+  warningIcon,
+} from "$src/components/icons";
+import sectionCopyJson from "$src/flows/manage/authenticatorsSection.json";
+import { I18n } from "$src/i18n";
 import { formatLastUsage } from "$src/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
+import copyJson from "./deviceSettings.json";
 import { settingsDropdown } from "./settingsDropdown";
 import { Authenticator } from "./types";
 
@@ -10,6 +18,9 @@ import { Authenticator } from "./types";
 // and we (the frontend) only allow user one recovery device per type (phrase, fob),
 // which leaves room for 8 authenticator devices.
 const MAX_AUTHENTICATORS = 8;
+
+const MANAGE_PASSKEYS_SUPPORT_URL =
+  "https://identitysupport.dfinity.org/hc/en-us/articles/34973858010132";
 
 // A device with extra information about whether another device (earlier in the list)
 // has the same name.
@@ -34,12 +45,19 @@ export const dedupLabels = (
 export const authenticatorsSection = ({
   authenticators: authenticators_,
   onAddDevice,
+  onRemoveDevice,
   warnNoPasskeys,
+  cleanupRecommended,
+  i18n,
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
+  onRemoveDevice: (device: DeviceData) => void;
   warnNoPasskeys: boolean;
+  cleanupRecommended: boolean;
+  i18n: I18n;
 }): TemplateResult => {
+  const copy = i18n.i18n(sectionCopyJson);
   const wrapClasses = [
     "l-stack",
     "c-card",
@@ -67,63 +85,99 @@ export const authenticatorsSection = ({
             `
           : ""
       }
-        <div class="t-title t-title--complications">
-          <h2 class="t-title">Passkeys</h2>
-          <span class="t-title__complication c-tooltip" tabindex="0">
+      <div class="t-title t-title--complications">
+        <h2 class="t-title">Passkeys</h2>
+        <span class="t-title__complication c-tooltip" tabindex="0">
             <span class="c-tooltip__message c-card c-card--tight">
               You can register up to ${MAX_AUTHENTICATORS} passkeys
               (recovery devices excluded)</span>
               (${authenticators.length}/${MAX_AUTHENTICATORS})
             </span>
-          </span>
-        </div>
-        <p
-          class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
-        >${
-          warnNoPasskeys
-            ? "Set up a passkey and securely sign into dapps by unlocking your device."
-            : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
-        }
-        </p>
-        <div class="c-action-list">
-          <ul>
+        </span>
+      </div>
+      <p
+        class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
+      >${
+        warnNoPasskeys
+          ? "Set up a passkey and securely sign into dapps by unlocking your device."
+          : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
+      }
+      </p>
+      <div class="c-action-list">
+        <ul>
           ${authenticators.map((authenticator, index) =>
-            authenticatorItem({ authenticator, index })
+            authenticatorItem({
+              authenticator,
+              index,
+              i18n,
+              onRemove: () => onRemoveDevice(authenticator.device),
+            })
           )}</ul>
           <div class="c-action-list__actions">
             <button
-              ?disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+              .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
               class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
               @click="${() => onAddDevice()}"
               id="addAdditionalDevice"
             >
               <span class="c-tooltip__message c-card c-card--tight"
-                >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
+              >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
               >
-              <span>Add new Passkey</span>
-            </button>
-          </div>
-
+            <span>Add new Passkey</span>
+          </button>
         </div>
+      </div>
+      ${
+        cleanupRecommended
+          ? html`<div>
+              <p class="l-stack--small">
+                ${copy.some_passkeys_may_be_outdated_and} ${" "}
+                <a target="_blank" href="${MANAGE_PASSKEYS_SUPPORT_URL}">
+                  ${copy.safely_cleaning_them_up}
+                </a>
+                ${" "} ${copy.can_improve_sign_in}
+              </p>
+            </div>`
+          : undefined
+      }
     </aside>`;
 };
 
 export const authenticatorItem = ({
-  authenticator: { alias, last_usage, dupCount, warn, info, remove, rename },
+  authenticator: {
+    alias,
+    last_usage,
+    dupCount,
+    warn,
+    info,
+    rename,
+    rpId,
+    isCurrent,
+    canBeRemoved,
+  },
   index,
+  i18n,
   icon,
+  onRemove,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
+  i18n: I18n;
   icon?: TemplateResult;
+  onRemove: () => void;
 }) => {
+  const copy = i18n.i18n(copyJson);
   const settings = [
     { action: "rename", caption: "Rename", fn: () => rename() },
   ];
 
-  if (nonNullish(remove)) {
-    settings.push({ action: "remove", caption: "Remove", fn: () => remove() });
+  if (canBeRemoved) {
+    settings.push({
+      action: "remove",
+      caption: "Remove",
+      fn: onRemove,
+    });
   }
 
   let lastUsageTimeStamp: Date | undefined;
@@ -160,8 +214,23 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
+        ${nonNullish(rpId)
+          ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
+              <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
+              <span class="c-tooltip__message c-card c-card--tight">
+                ${copy.passkey_registered_in} ${rpId}
+              </span>
+            </div>`
+          : undefined}
         <div>
-          ${nonNullish(lastUsageFormattedString)
+          ${isCurrent
+            ? html`<div>
+                <span class="c-icon c-icon--ok c-icon--xs"
+                  >${pulsatingCircleIcon}</span
+                >
+                <span class="t-muted">${copy.current_device_label}</span>
+              </div>`
+            : nonNullish(lastUsageFormattedString)
             ? html`<div class="t-muted">
                 Last used: ${lastUsageFormattedString}
               </div>`

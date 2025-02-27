@@ -1,6 +1,6 @@
 // Feature flags with default values
 const FEATURE_FLAGS_WITH_DEFAULTS = {
-  DOMAIN_COMPATIBILITY: false,
+  DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
   HARDWARE_KEY_TEST: false,
 } as const satisfies Record<string, boolean>;

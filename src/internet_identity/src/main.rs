@@ -29,7 +29,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::ops::Not;
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -203,13 +202,14 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
         return vec![];
     };
-    anchor
-        .into_devices()
+    let mut devices = anchor.into_devices();
+    devices.sort_by(|a, b| b.last_usage_timestamp.cmp(&a.last_usage_timestamp));
+    devices
         .into_iter()
         .map(DeviceData::from)
         .map(|mut d| {
             // Remove non-public fields.
-            d.alias = "".to_string();
+            d.alias = String::new();
             d.metadata = None;
             d
         })
@@ -355,6 +355,7 @@ fn config() -> InternetIdentityInit {
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
+        analytics_config: Some(persistent_state.analytics_config.clone()),
     })
 }
 
@@ -394,19 +395,17 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let related_origins = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.related_origins.clone())
-        .unwrap_or(persistent_state(|storage| storage.related_origins.clone()).unwrap_or(vec![]));
-    let openid_google = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.openid_google.clone())
-        .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
-    init_assets(related_origins.is_empty().not().then_some(related_origins));
+    // Apply arguments
     apply_install_arg(maybe_arg);
+
+    // Get config that possibly has been updated above
+    let config = config();
+
+    // Initiate assets and OpenID providers
+    init_assets(&config);
     update_root_hash();
-    if let Some(config) = openid_google {
-        openid::setup_google(config);
+    if let Some(Some(openid_config)) = config.openid_google {
+        openid::setup_google(openid_config);
     }
 }
 
@@ -443,6 +442,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(openid_google) = arg.openid_google {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_google = openid_google;
+            })
+        }
+        if let Some(analytics_config) = arg.analytics_config {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.analytics_config = analytics_config;
             })
         }
     }

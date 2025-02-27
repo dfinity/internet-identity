@@ -15,9 +15,16 @@ export const config: WebdriverIO.Config = {
   capabilities: [
     {
       browserName: "chrome",
-      browserVersion: "122.0.6261.111", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": {
-        args: ["headless", "disable-gpu", "disable-dev-shm-usage"],
+        args: [
+          "headless",
+          "disable-gpu",
+          "disable-dev-shm-usage",
+          // Required for CI runners using >=Ubuntu 24.04
+          // @see https://github.com/SeleniumHQ/selenium/issues/14609
+          "--no-sandbox",
+        ],
       },
       acceptInsecureCerts: true,
     },

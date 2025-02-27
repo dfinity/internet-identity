@@ -207,6 +207,7 @@ pub struct InternetIdentityInit {
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
+    pub analytics_config: Option<Option<AnalyticsConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -243,6 +244,18 @@ pub struct RateLimitConfig {
 pub struct CaptchaConfig {
     pub max_unsolved_captchas: u64,
     pub captcha_trigger: CaptchaTrigger,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AnalyticsConfig {
+    Plausible {
+        // Config params from Plausible NPM package
+        // https://www.npmjs.com/package/plausible-tracker
+        domain: Option<String>,
+        hash_mode: Option<bool>,
+        track_localhost: Option<bool>,
+        api_host: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

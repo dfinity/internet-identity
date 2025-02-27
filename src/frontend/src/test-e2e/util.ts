@@ -73,6 +73,9 @@ export async function runInBrowser(
       "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
       ...extraChromeOptions,
+      // Required for CI runners using >=Ubuntu 24.04
+      // @see https://github.com/SeleniumHQ/selenium/issues/14609
+      "--no-sandbox",
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
@@ -503,6 +506,7 @@ export const mockFedCM = async (
   }, token);
 };
 
+// TODO: Remove when we remove the domain compatibility feature flag
 export const setDomainCompatibilityFeatureFlag = async (
   browser: WebdriverIO.Browser,
   enabled: boolean

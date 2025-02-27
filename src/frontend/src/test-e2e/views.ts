@@ -252,10 +252,10 @@ export class MainView extends View {
   }
 
   async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
-    const differentOriginInfoIcon = await this.browser.$(
-      '[data-role="passkeys"] [data-device] [data-icon="info"]'
+    const differentOriginRpId = await this.browser.$(
+      '[data-role="passkeys"] [data-device] [data-rpid]'
     );
-    if ((await differentOriginInfoIcon.isExisting()) !== exist) {
+    if ((await differentOriginRpId.isExisting()) !== exist) {
       throw Error(
         exist
           ? "Different origin device not found"

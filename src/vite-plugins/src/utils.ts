@@ -31,6 +31,25 @@ export const readCanisterId = ({
   }
 };
 
+/**
+ * Read a canister config from dfx's local state
+ */
+export const readCanisterConfig = ({
+  canisterName,
+}: {
+  canisterName: string;
+}): string => {
+  const command = `dfx canister call ${canisterName} config --output raw`;
+  try {
+    const stdout = execSync(command);
+    return Buffer.from(stdout.toString().trim(), "hex").toString("base64");
+  } catch (e) {
+    throw Error(
+      `Could not get canister config for '${canisterName}' with command '${command}', was the canister deployed? ${e}`
+    );
+  }
+};
+
 /** Get the http host of a running replica */
 export const getReplicaHost = (): string => {
   const command = `dfx info webserver-port`;

@@ -1,7 +1,6 @@
 import { LEGACY_II_URL } from "$src/config";
 import { CredentialData } from "./credential-devices";
 import { findWebAuthnFlows } from "./findWebAuthnFlows";
-import { PROD_DOMAINS } from "./findWebAuthnRpId";
 
 describe("findWebAuthnFlows", () => {
   const currentOrigin = "https://identity.internetcomputer.org";
@@ -9,7 +8,11 @@ describe("findWebAuthnFlows", () => {
   const nonCurrentOrigin1RpId = new URL(nonCurrentOrigin1).hostname;
   const nonCurrentOrigin2 = "https://identity.icp0.io";
   const nonCurrentOrigin2RpId = new URL(nonCurrentOrigin2).hostname;
-  const relatedOrigins = PROD_DOMAINS;
+  const relatedOrigins = [
+    "https://identity.ic0.app",
+    "https://identity.internetcomputer.org",
+    "https://identity.icp0.io",
+  ];
 
   const createMockCredential = (
     origin: string | undefined
@@ -19,14 +22,14 @@ describe("findWebAuthnFlows", () => {
     origin,
   });
 
-  it("should return an empty array if no devices are provided", () => {
+  it("should return default flow if no devices are provided", () => {
     const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [],
       currentOrigin: currentOrigin,
       relatedOrigins,
     });
-    expect(result).toEqual([]);
+    expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
   });
 
   it("should use iframe if the RP ID does not match the current origin", () => {
@@ -86,6 +89,64 @@ describe("findWebAuthnFlows", () => {
       { useIframe: false, rpId: undefined },
       { useIframe: true, rpId: nonCurrentOrigin1RpId },
       { useIframe: true, rpId: nonCurrentOrigin2RpId },
+    ]);
+  });
+
+  it("should return undefined flow if no related origins", () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(currentOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(nonCurrentOrigin2),
+        createMockCredential(nonCurrentOrigin2),
+      ],
+      currentOrigin: currentOrigin,
+      relatedOrigins: [],
+    });
+
+    expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
+  });
+
+  it("should return default flow for wrong related origins", () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(currentOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(nonCurrentOrigin2),
+        createMockCredential(nonCurrentOrigin2),
+      ],
+      currentOrigin: currentOrigin,
+      relatedOrigins: [
+        "https://not-identity.ic0.app",
+        "https://not-identity.icp0.io",
+      ],
+    });
+
+    expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
+  });
+
+  it("should return flows in order of devices (recently used)", () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(nonCurrentOrigin2),
+        createMockCredential(currentOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(nonCurrentOrigin2),
+      ],
+      currentOrigin: currentOrigin,
+      relatedOrigins: [currentOrigin, nonCurrentOrigin1, nonCurrentOrigin2],
+    });
+
+    expect(result).toEqual([
+      { useIframe: true, rpId: nonCurrentOrigin2RpId },
+      { useIframe: false, rpId: undefined },
+      { useIframe: true, rpId: nonCurrentOrigin1RpId },
     ]);
   });
 });

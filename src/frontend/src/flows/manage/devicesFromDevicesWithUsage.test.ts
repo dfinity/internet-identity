@@ -1,4 +1,4 @@
-import { DeviceWithUsage } from "$generated/internet_identity_types";
+import { DeviceWithUsage, PublicKey } from "$generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
@@ -18,15 +18,21 @@ describe("devicesFromDevicesWithUsage", () => {
     DOMAIN_COMPATIBILITY.reset();
   });
 
-  const mockConnection = {} as unknown as AuthenticatedConnection;
+  const currentDevicePubKey = new Uint8Array([1]);
+  const mockConnection = {
+    getSignIdentityPubKey: () => currentDevicePubKey,
+  } as unknown as AuthenticatedConnection;
 
-  const createDevice = (origin: string | undefined): DeviceWithUsage => ({
+  const createDevice = (
+    origin: string | undefined,
+    pubkey?: PublicKey
+  ): DeviceWithUsage => ({
     alias: "alias",
     last_usage: [],
     metadata: [],
     origin: isNullish(origin) ? [] : [origin],
     protection: { unprotected: null },
-    pubkey: [],
+    pubkey: pubkey ?? [],
     key_type: { platform: null },
     purpose: { authentication: null },
     credential_id: [],
@@ -39,7 +45,7 @@ describe("devicesFromDevicesWithUsage", () => {
 
     it("returns warning icon in the device in different origin als current", () => {
       const devices = [
-        createDevice(undefined),
+        createDevice(undefined, currentDevicePubKey),
         createDevice("https://identity.ic0.app"),
         createDevice("https://identity.internetcomputer.org"),
       ];
@@ -64,9 +70,27 @@ describe("devicesFromDevicesWithUsage", () => {
       DOMAIN_COMPATIBILITY.set(true);
     });
 
-    it("returns an info icon on each device if they are not all in the same origin", () => {
+    it("returns isCurrent as expected", () => {
       const devices = [
-        createDevice(undefined),
+        createDevice(undefined, currentDevicePubKey),
+        createDevice("https://identity.ic0.app"),
+        createDevice("https://identity.internetcomputer.org"),
+      ];
+      const expectedDevices = devicesFromDevicesWithUsage({
+        devices,
+        reload: () => undefined,
+        connection: mockConnection,
+        userNumber: BigInt(12345),
+        hasOtherAuthMethods: false,
+      });
+
+      // We rely on the order of the devices to determine the current device
+      expect(expectedDevices.authenticators[0].isCurrent).toBe(true);
+    });
+
+    it("returns an rpId icon on each device if they are not all in the same origin", () => {
+      const devices = [
+        createDevice(undefined, currentDevicePubKey),
         createDevice("https://identity.ic0.app"),
         createDevice("https://identity.internetcomputer.org"),
       ];
@@ -79,9 +103,7 @@ describe("devicesFromDevicesWithUsage", () => {
       });
 
       for (const device of expectedDevices.authenticators) {
-        expect(device.info?.strings[0]).toContain(
-          "This passkey was registered in"
-        );
+        expect(device.rpId).toBeDefined();
         expect(device.warn).toBeUndefined();
       }
     });
@@ -89,7 +111,7 @@ describe("devicesFromDevicesWithUsage", () => {
     it("returns no info nor warning if all devices are in the same origin", () => {
       const devices = [
         createDevice(undefined),
-        createDevice("https://identity.ic0.app"),
+        createDevice("https://identity.ic0.app", currentDevicePubKey),
       ];
       const expectedDevices = devicesFromDevicesWithUsage({
         devices,
