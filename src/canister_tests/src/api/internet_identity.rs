@@ -390,10 +390,9 @@ pub fn openid_get_delegation(
     session_key: &types::SessionKey,
     expiration: &types::Timestamp,
 ) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, CallError> {
-    call_candid_as(
+    query_candid_as(
         env,
         canister_id,
-        RawEffectivePrincipal::None,
         sender,
         "openid_get_delegation",
         (jwt, salt, session_key, expiration),

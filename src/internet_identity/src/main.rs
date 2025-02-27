@@ -812,7 +812,6 @@ mod openid_api {
         })
     }
 
-    //TODO: add tests for this
     #[update]
     async fn openid_prepare_delegation(
         jwt: String,
@@ -834,7 +833,6 @@ mod openid_api {
         })
     }
 
-    //TODO: add tests for this
     #[query]
     fn openid_get_delegation(
         jwt: String,
