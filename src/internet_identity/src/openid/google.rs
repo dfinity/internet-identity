@@ -198,7 +198,6 @@ async fn fetch_certs() -> Result<Vec<Jwk>, String> {
         .map_err(|(_, err)| err)?;
 
     let body_str = std::str::from_utf8(&response.body).unwrap_or("<invalid UTF-8>");
-    ic_cdk::println!("Response body: {}", body_str);
 
     serde_json::from_slice::<Certs>(response.body.as_slice())
         .map_err(|_| "Invalid JSON".into())
