@@ -184,9 +184,9 @@ struct Claims {
     picture: Option<String>,
 }
 
-impl Into<OpenIdCredentialKey> for Claims {
-    fn into(self) -> OpenIdCredentialKey {
-        (self.iss, self.sub)
+impl From<Claims> for OpenIdCredentialKey {
+    fn from(value: Claims) -> Self {
+        (value.iss, value.sub)
     }
 }
 
@@ -210,14 +210,14 @@ fn setup_canister(env: &PocketIc) -> Principal {
     };
     // Cycles are needed before installation because of the async HTTP outcalls
     let canister_id = install_ii_canister_with_arg_and_cycles(
-        &env,
+        env,
         II_WASM.clone(),
         Some(args),
         10_000_000_000_000,
     );
 
     // Mock google certs response
-    mock_google_certs_response(&env);
+    mock_google_certs_response(env);
 
     canister_id
 }
