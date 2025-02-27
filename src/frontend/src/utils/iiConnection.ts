@@ -78,6 +78,7 @@ export class DummyIdentity
   implements IIWebAuthnIdentity
 {
   public rawId: ArrayBuffer;
+  public aaguid = "00000000-0000-0000-0000-000000000000";
 
   public constructor() {
     const key = Ed25519KeyIdentity.generate(new Uint8Array(32));
@@ -147,6 +148,7 @@ export type { ChallengeResult } from "$generated/internet_identity_types";
  */
 export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
+  aaguid: string;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }
@@ -1017,6 +1019,7 @@ export const creationOptions = (
       userVerification: "preferred",
       authenticatorAttachment,
     },
+    attestation: "direct",
     excludeCredentials: exclude.flatMap((device) =>
       device.credential_id.length === 0
         ? []

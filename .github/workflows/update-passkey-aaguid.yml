@@ -1,0 +1,49 @@
+# A GitHub Actions workflow that regularly creates a pull request to update Passkey AAGUID data
+name: Passkey AAGUID Update
+
+on:
+  schedule:
+    # Check for updates every week
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  aaguid-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+
+      # Run the update
+      - name: Check new Passkey AAGUID file
+        id: update
+        run: ./scripts/update-passkey-aaguid
+
+      # Run the formatter so that the passkey_aaguid_data.json file is formatted
+      - run: npm run format
+
+      # If the Passkey AAGUID data changed, create a PR.
+      # This action creates a PR only if there are changes.
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: src/frontend/src/assets/passkey_aaguid_data.json
+          commit-message: Update Passkey AAGUID
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-passkey-aaguid-update
+          delete-branch: true
+          title:
+            "Update Passkey AAGUID data"
+
+          # Since this is a scheduled job, a failure won't be shown on anyPR status.
+          # To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Passkey AAGUID data update failed"

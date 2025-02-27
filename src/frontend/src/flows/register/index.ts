@@ -157,6 +157,7 @@ export const registerFlow = async ({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
         uaParser,
+        aaguid: identity.aaguid,
       });
       return {
         identity,
@@ -295,11 +296,22 @@ export const inferPasskeyAlias = async ({
   authenticatorType,
   userAgent,
   uaParser: uaParser_,
+  aaguid,
 }: {
   authenticatorType: AuthenticatorType;
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
+  aaguid: string;
 }): Promise<string> => {
+  console.log("aaguid", aaguid);
+  // First lookup if alias can be found in known list
+  // before falling back to user agent implementation.
+  const knownList = (await import("../../assets/passkey_aaguid_data.json"))
+    .default;
+  if (aaguid in knownList) {
+    return knownList[aaguid as keyof typeof knownList];
+  }
+
   const UNNAMED = "Unnamed Passkey";
   const FIDO = "FIDO Passkey";
   const ICLOUD = "iCloud Passkey";

@@ -163,7 +163,7 @@ export class WebAuthnIdentity extends SignIdentity {
       throw new Error("Invalid JSON string.");
     }
 
-    return new this(fromHex(rawId), fromHex(publicKey), undefined, rpId);
+    return new this(fromHex(rawId), fromHex(publicKey), undefined, rpId, "");
   }
 
   /**
@@ -189,11 +189,17 @@ export class WebAuthnIdentity extends SignIdentity {
       new Uint8Array(response.attestationObject)
     );
 
+    const aaguid = [...attObject.authData.slice(37, 53)]
+      .map((byte: number) => byte.toString(16).padStart(2, "0"))
+      .join("")
+      .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+
     return new this(
       creds.rawId,
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
-      credentialCreationOptions?.publicKey?.rp.id
+      credentialCreationOptions?.publicKey?.rp.id,
+      aaguid
     );
   }
 
@@ -203,7 +209,8 @@ export class WebAuthnIdentity extends SignIdentity {
     public readonly rawId: ArrayBuffer,
     cose: ArrayBuffer,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
-    protected rpId: string | undefined
+    protected rpId: string | undefined,
+    public readonly aaguid: string
   ) {
     super();
     this._publicKey = new CosePublicKey(cose);

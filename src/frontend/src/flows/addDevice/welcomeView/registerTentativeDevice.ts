@@ -78,6 +78,7 @@ export const registerTentativeDevice = async (
     authenticatorType: result.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
+    aaguid: result.aaguid,
   });
 
   // Finally, we submit it to the canister
