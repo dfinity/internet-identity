@@ -65,33 +65,46 @@ const confirmRemoveDeviceTemplate = ({
       <h1 class="t-title t-title--main">${mappedCopy.title}</h1>
       <p class="t-paragraph">${copy.irreversible_action}</p>
       <ul class="c-list c-list--bulleted">
-        <li>${`Passkey nickname: ${alias}`}</li>
-        <li>${`Last used: ${lastUsageFormattedString}`}</li>
-        <li>${`Registered in: ${originRegistered ?? LEGACY_II_URL}`}</li>
+        <li>${html`${copy.label_nickname}
+          <span class="t-strong">${alias}</span>`}</li>
+        ${
+          nonNullish(lastUsageFormattedString)
+            ? html`<li>
+                ${copy.label_last_used}
+                <span class="t-strong">${lastUsageFormattedString}</span>
+              </li>`
+            : undefined
+        }
+        <li>${html`${copy.label_origin}
+          <span class="t-strong"
+            >${originRegistered ?? LEGACY_II_URL}</span
+          >`}</strong></li>
       </ul>
       <p class="t-paragraph">${mappedCopy.message}</p>
     </hgroup>
     <div>
-      ${purposeType === "authentication"
-        ? html`<input
-            autofocus
-            ${ref(input)}
-            id="confirmRemoveDevice"
-            class="c-input c-input--stack c-input--fullwidth"
-            spellcheck="false"
-            .onpaste=${(e: Event) => e.preventDefault()}
-            @change=${() =>
-              withRef(input, (inputElement) =>
-                withRef(confirmButton, (buttonElement) => {
-                  if (inputElement.value === alias) {
-                    buttonElement.disabled = false;
-                  } else {
-                    buttonElement.disabled = true;
-                  }
-                })
-              )}
-          />`
-        : undefined}
+      ${
+        purposeType === "authentication"
+          ? html`<input
+              autofocus
+              ${ref(input)}
+              id="confirmRemoveDevice"
+              class="c-input c-input--stack c-input--fullwidth"
+              spellcheck="false"
+              .onpaste=${(e: Event) => e.preventDefault()}
+              @change=${() =>
+                withRef(input, (inputElement) =>
+                  withRef(confirmButton, (buttonElement) => {
+                    if (inputElement.value === alias) {
+                      buttonElement.disabled = false;
+                    } else {
+                      buttonElement.disabled = true;
+                    }
+                  })
+                )}
+            />`
+          : undefined
+      }
     </div>
     <div class="l-stack">
       <button
