@@ -349,7 +349,7 @@ type OpenIdCredential = record {
 
 type OpenIdCredentialAddError = variant {
     Unauthorized : principal;
-    JwtVerificationFailed : text;
+    JwtVerificationFailed;
     OpenIdCredentialAlreadyRegistered;
     InternalCanisterError : text;
 };
