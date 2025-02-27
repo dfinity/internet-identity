@@ -206,6 +206,7 @@ fn setup_canister(env: &PocketIc) -> Principal {
         openid_google: Some(Some(OpenIdConfig {
             client_id: CLIENT_ID.to_string(),
         })),
+        analytics_config: None,
     };
     // Cycles are needed before installation because of the async HTTP outcalls
     let canister_id = install_ii_canister_with_arg_and_cycles(
