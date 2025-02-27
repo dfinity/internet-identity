@@ -94,7 +94,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
           cd.credentialId,
           unwrapDER(cd.pubkey, DER_COSE_OID),
           undefined,
-          this.rpId
+          this.rpId,
+          ""
         );
         break;
       }
