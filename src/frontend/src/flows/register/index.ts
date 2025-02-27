@@ -303,7 +303,6 @@ export const inferPasskeyAlias = async ({
   uaParser: PreloadedUAParser;
   aaguid: string;
 }): Promise<string> => {
-  console.log("aaguid", aaguid);
   // First lookup if alias can be found in known list
   // before falling back to user agent implementation.
   const knownList = (await import("../../assets/passkey_aaguid_data.json"))
