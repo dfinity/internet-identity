@@ -342,7 +342,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
-    'JwtVerificationFailed' : IDL.Text,
+    'JwtVerificationFailed' : IDL.Null,
   });
   const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({

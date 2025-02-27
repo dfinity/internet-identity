@@ -262,7 +262,7 @@ export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
-  { 'JwtVerificationFailed' : string };
+  { 'JwtVerificationFailed' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,
   'expiration' : Timestamp,

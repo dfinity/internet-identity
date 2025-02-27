@@ -362,7 +362,7 @@ type OpenIdCredentialRemoveError = variant {
 
 type OpenIdDelegationError = variant {
     NoSuchAnchor;
-    JwtVerificationFailed : text;
+    JwtVerificationFailed;
     NoSuchDelegation;
 };
 
