@@ -1,3 +1,4 @@
+import { extractAAGUID } from "$src/utils/webAuthn";
 import {
   DER_COSE_OID,
   DerEncodedPublicKey,
@@ -104,7 +105,7 @@ async function _createCredential(
         authenticatorSelection: {
           userVerification: "preferred",
         },
-        attestation: "direct",
+        attestation: "indirect",
         challenge: _createChallengeBuffer(),
         pubKeyCredParams: [
           { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
@@ -163,7 +164,13 @@ export class WebAuthnIdentity extends SignIdentity {
       throw new Error("Invalid JSON string.");
     }
 
-    return new this(fromHex(rawId), fromHex(publicKey), undefined, rpId, "");
+    return new this(
+      fromHex(rawId),
+      fromHex(publicKey),
+      undefined,
+      rpId,
+      undefined
+    );
   }
 
   /**
@@ -189,17 +196,12 @@ export class WebAuthnIdentity extends SignIdentity {
       new Uint8Array(response.attestationObject)
     );
 
-    const aaguid = [...attObject.authData.slice(37, 53)]
-      .map((byte: number) => byte.toString(16).padStart(2, "0"))
-      .join("")
-      .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
-
     return new this(
       creds.rawId,
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
       credentialCreationOptions?.publicKey?.rp.id,
-      aaguid
+      extractAAGUID(attObject.authData)
     );
   }
 
@@ -210,7 +212,7 @@ export class WebAuthnIdentity extends SignIdentity {
     cose: ArrayBuffer,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
     protected rpId: string | undefined,
-    public readonly aaguid: string
+    public readonly aaguid: string | undefined
   ) {
     super();
     this._publicKey = new CosePublicKey(cose);
