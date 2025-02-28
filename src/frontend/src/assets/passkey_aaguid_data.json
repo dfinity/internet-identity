@@ -1,0 +1,16 @@
+{
+  "73bb0cd4-e502-49b8-9c6f-b59445bf720b": "YubiKey 5 FIPS Series",
+  "50a45b0c-80e7-f944-bf29-f552bfa2e048": "ACS FIDO Authenticator",
+  "4599062e-6926-4fe7-9566-9e8fb1aedaa0": "YubiKey 5 Series (Enterprise Profile)",
+  "0acf3011-bc60-f375-fb53-6f05f43154e0": "Nymi FIDO2 Authenticator",
+  "39a5647e-1853-446c-a1f6-a79bae9f5bc7": "IDmelon",
+  "b5397666-4885-aa6b-cebf-e52262a439a2": "Chromium Browser",
+  "4d41190c-7beb-4a84-8018-adf265a6352d": "Thales IDPrime FIDO Bio",
+  "a02167b9-ae71-4ac7-9a07-06432ebb6f1c": "YubiKey 5 Series with Lightning",
+  "70e7c36f-f2f6-9e0d-07a6-bcc243262e6b": "OneKey FIDO2 Bluetooth Authenticator",
+  "973446ca-e21c-9a9b-99f5-9b985a67af0f": "ACS FIDO Authenticator Card",
+  "77010bd7-212a-4fc9-b236-d2ca5e9d4084": "Feitian BioPass FIDO2 Authenticator",
+  "99ed6c29-4573-4847-816d-78ad8f1c75ef": "VeroCard FIDO2 Authenticator",
+  "ee041bce-25e5-4cdb-8f86-897fd6418464": "Feitian ePass FIDO2-NFC Authenticator",
+  "692db549-7ae5-44d5-a1e5-dd20a493b723": "HID Crescendo Key"
+}

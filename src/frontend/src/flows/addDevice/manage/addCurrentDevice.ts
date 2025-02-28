@@ -70,6 +70,7 @@ export const addCurrentDevice = async (
     authenticatorType: newDevice.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
+    aaguid: newDevice.aaguid,
   });
   try {
     await withLoader(() =>

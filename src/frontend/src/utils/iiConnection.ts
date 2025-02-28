@@ -147,6 +147,7 @@ export type { ChallengeResult } from "$generated/internet_identity_types";
  */
 export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
+  aaguid?: string;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }
@@ -1017,6 +1018,7 @@ export const creationOptions = (
       userVerification: "preferred",
       authenticatorAttachment,
     },
+    attestation: "direct",
     excludeCredentials: exclude.flatMap((device) =>
       device.credential_id.length === 0
         ? []

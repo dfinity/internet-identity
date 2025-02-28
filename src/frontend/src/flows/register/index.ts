@@ -27,6 +27,7 @@ import {
   UnexpectedCall,
   WrongCaptchaSolution,
 } from "$src/utils/iiConnection";
+import { lookupAAGUID } from "$src/utils/webAuthn";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
@@ -157,6 +158,7 @@ export const registerFlow = async ({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
         uaParser,
+        aaguid: identity.aaguid,
       });
       return {
         identity,
@@ -295,11 +297,22 @@ export const inferPasskeyAlias = async ({
   authenticatorType,
   userAgent,
   uaParser: uaParser_,
+  aaguid,
 }: {
   authenticatorType: AuthenticatorType;
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
+  aaguid?: string;
 }): Promise<string> => {
+  // First lookup if alias can be found in known list
+  // before falling back to user agent implementation.
+  if (nonNullish(aaguid)) {
+    const knownName = await lookupAAGUID(aaguid);
+    if (nonNullish(knownName)) {
+      return knownName;
+    }
+  }
+
   const UNNAMED = "Unnamed Passkey";
   const FIDO = "FIDO Passkey";
   const ICLOUD = "iCloud Passkey";

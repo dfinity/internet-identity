@@ -1,3 +1,4 @@
+import { extractAAGUID } from "$src/utils/webAuthn";
 import {
   DER_COSE_OID,
   DerEncodedPublicKey,
@@ -163,7 +164,13 @@ export class WebAuthnIdentity extends SignIdentity {
       throw new Error("Invalid JSON string.");
     }
 
-    return new this(fromHex(rawId), fromHex(publicKey), undefined, rpId);
+    return new this(
+      fromHex(rawId),
+      fromHex(publicKey),
+      undefined,
+      rpId,
+      undefined
+    );
   }
 
   /**
@@ -193,7 +200,8 @@ export class WebAuthnIdentity extends SignIdentity {
       creds.rawId,
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
-      credentialCreationOptions?.publicKey?.rp.id
+      credentialCreationOptions?.publicKey?.rp.id,
+      extractAAGUID(attObject.authData)
     );
   }
 
@@ -203,7 +211,8 @@ export class WebAuthnIdentity extends SignIdentity {
     public readonly rawId: ArrayBuffer,
     cose: ArrayBuffer,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
-    protected rpId: string | undefined
+    protected rpId: string | undefined,
+    public readonly aaguid: string | undefined
   ) {
     super();
     this._publicKey = new CosePublicKey(cose);
