@@ -2,7 +2,9 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::BufferedEntry;
-use internet_identity_interface::internet_identity::types::{self, IdentityNumber};
+use internet_identity_interface::internet_identity::types::{
+    self, IdentityNumber, OpenIdCredentialKey,
+};
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
 
@@ -424,7 +426,7 @@ pub fn openid_credential_remove(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    openid_credential_key: &types::OpenIdCredentialKey,
+    openid_credential_key: &OpenIdCredentialKey,
 ) -> Result<Result<(), types::OpenIdCredentialRemoveError>, CallError> {
     call_candid_as(
         env,

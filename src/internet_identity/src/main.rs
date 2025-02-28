@@ -825,10 +825,18 @@ mod openid_api {
         let openid_credential = openid::verify(&jwt, &salt)
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
-        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.clone().into())
+        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
         let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
+
+        // Checking again because the association could've changed during the .await
+        let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        if anchor_number != still_anchor_number {
+            return Err(OpenIdDelegationError::NoSuchAnchor);
+        }
 
         Ok(OpenIdPrepareDelegationResponse {
             user_key,
@@ -847,7 +855,7 @@ mod openid_api {
         let openid_credential = openid::verify(&jwt, &salt)
             .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
-        match lookup_anchor_with_openid_credential(&openid_credential.clone().into()) {
+        match lookup_anchor_with_openid_credential(&openid_credential.key()) {
             Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }

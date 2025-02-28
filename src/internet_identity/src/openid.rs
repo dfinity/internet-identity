@@ -26,12 +26,6 @@ pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
 
-impl From<OpenIdCredential> for OpenIdCredentialKey {
-    fn from(credential: OpenIdCredential) -> Self {
-        (credential.iss, credential.sub)
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, CandidType, Deserialize, Clone)]
 pub struct OpenIdCredential {
     pub iss: Iss,

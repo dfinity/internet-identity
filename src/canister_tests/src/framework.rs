@@ -172,10 +172,10 @@ pub fn install_ii_canister_with_arg_and_cycles(
     arg: Option<InternetIdentityInit>,
     amount: u128,
 ) -> CanisterId {
-    let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
+    let bytes = candid::encode_one(arg).expect("error encoding II installation arg as candid");
     let canister_id = env.create_canister();
     env.add_cycles(canister_id, amount);
-    env.install_canister(canister_id, wasm, byts, None);
+    env.install_canister(canister_id, wasm, bytes, None);
     canister_id
 }
 

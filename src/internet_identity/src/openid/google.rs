@@ -1,6 +1,6 @@
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
-use crate::MINUTE_NS;
+use crate::openid::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
@@ -304,7 +304,7 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
         return Err(format!("Invalid audience: {}", claims.aud));
     }
     if claims.nonce != expected_nonce {
-        return Err(format!("Invalid nonce: {}", claims.nonce,));
+        return Err(format!("Invalid nonce: {}", claims.nonce));
     }
     if now > claims.iat * NANOSECONDS_PER_SECOND + MAX_VALIDITY_WINDOW {
         return Err("JWT is no longer valid".into());

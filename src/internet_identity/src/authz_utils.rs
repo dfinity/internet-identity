@@ -81,39 +81,25 @@ where
     match authorization_key {
         DevicePubKey(device_key) => {
             anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-
-            let result = op(&mut anchor);
-
-            // write back anchor
-            state::storage_borrow_mut(|storage| storage.write(anchor))
-                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
-
-            match result {
-                Ok((ret, operation)) => {
-                    post_operation_bookkeeping(anchor_number, operation);
-                    Ok(ret)
-                }
-                Err(err) => Err(err),
-            }
         }
         OpenIdPubKey(_openid_key) => {
             // TODO: add bookkeeping
             // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-
-            let result = op(&mut anchor);
-
-            // write back anchor
-            state::storage_borrow_mut(|storage| storage.write(anchor))
-                .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
-
-            match result {
-                Ok((ret, operation)) => {
-                    post_operation_bookkeeping(anchor_number, operation);
-                    Ok(ret)
-                }
-                Err(err) => Err(err),
-            }
         }
+    }
+
+    let result = op(&mut anchor);
+
+    // write back anchor
+    state::storage_borrow_mut(|storage| storage.write(anchor))
+        .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
+
+    match result {
+        Ok((ret, operation)) => {
+            post_operation_bookkeeping(anchor_number, operation);
+            Ok(ret)
+        }
+        Err(err) => Err(err),
     }
 }
 

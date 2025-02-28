@@ -65,7 +65,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
         canister_id,
         test_principal,
         identity_number,
-        &claims.into(),
+        &claims.key(),
     )?
     .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
 
@@ -184,9 +184,9 @@ struct Claims {
     picture: Option<String>,
 }
 
-impl From<Claims> for OpenIdCredentialKey {
-    fn from(value: Claims) -> Self {
-        (value.iss, value.sub)
+impl Claims {
+    fn key(&self) -> OpenIdCredentialKey {
+        (self.iss.clone(), self.sub.clone())
     }
 }
 
@@ -197,16 +197,10 @@ struct Certs {
 
 fn setup_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        captcha_config: None,
-        related_origins: None,
         openid_google: Some(Some(OpenIdConfig {
             client_id: CLIENT_ID.to_string(),
         })),
-        analytics_config: None,
+        ..Default::default()
     };
     // Cycles are needed before installation because of the async HTTP outcalls
     let canister_id = install_ii_canister_with_arg_and_cycles(
