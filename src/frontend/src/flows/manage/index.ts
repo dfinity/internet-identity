@@ -679,7 +679,10 @@ export const devicesFromDevicesWithUsage = ({
       const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
       const authenticator: Authenticator = {
         alias: device.alias,
-        rpId: rpIdLabel(device, devices_),
+        rpId: rpIdLabel(
+          device,
+          devices_.filter((device) => "authentication" in device.purpose)
+        ),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
