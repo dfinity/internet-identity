@@ -128,7 +128,7 @@ const infoLabelIcon: TemplateResult = html`
   >
 `;
 
-const warningLabelIcon: TemplateResult = html`
+export const warningLabelIcon: TemplateResult = html`
   <i class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
     >${warningIcon}</i
   >
