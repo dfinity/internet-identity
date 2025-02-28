@@ -25,7 +25,7 @@ const confirmRemoveDeviceTemplate = ({
   purpose: Purpose;
   next: () => void;
   cancel: () => void;
-  alias: string;
+  alias?: string;
   lastUsedNanoseconds: bigint | undefined;
   originRegistered: string | undefined;
 }) => {
@@ -56,6 +56,9 @@ const confirmRemoveDeviceTemplate = ({
     lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
   }
 
+  const showAlias =
+    purposeType === "authentication" && nonNullish(alias) && alias !== "";
+
   const slot = html`
     <hgroup data-page="confirm-remove-device-page">
       <div class="c-card__label c-card__label--hasIcon">
@@ -65,8 +68,13 @@ const confirmRemoveDeviceTemplate = ({
       <h1 class="t-title t-title--main">${mappedCopy.title}</h1>
       <p class="t-paragraph">${copy.irreversible_action}</p>
       <ul class="c-list c-list--bulleted">
-        <li>${html`${copy.label_nickname}
-          <span class="t-strong">${alias}</span>`}</li>
+        ${
+          showAlias
+            ? html`<li>
+                ${copy.label_nickname} <span class="t-strong">${alias}</span>
+              </li>`
+            : undefined
+        }
         ${
           nonNullish(lastUsageFormattedString)
             ? html`<li>
