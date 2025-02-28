@@ -38,6 +38,7 @@ export const constructIdentity = async ({
 
 /**
  * Extract AAGUID from `attestationObject.authData` in `AuthenticatorAttestationResponse`
+ * @see https://www.w3.org/TR/webauthn-2/#sctn-attestation
  * @param authData from which to extract AAGUID
  * @returns AAGUID or undefined
  */
