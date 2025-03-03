@@ -6,49 +6,46 @@ cd "$SCRIPTS_DIR/.."
 
 JSON_FILE="$PWD/src/frontend/src/assets/passkey_aaguid_data.json"
 
+TMP_FIDO=$(mktemp)
+TMP_COMMUNITY=$(mktemp)
+TMP_COMBINED=$(mktemp)
+TMP_BASE64=$(mktemp)
+
 if [[ -f "$JSON_FILE" ]]; then
-    declare -A currentEntries
-    while IFS="= " read -r key value; do
-        currentEntries["$key"]="$value"
-    done < <(jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' "$JSON_FILE")
+    jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' "$JSON_FILE" > "$TMP_COMBINED"
 else
-    declare -A currentEntries=()
+    > "$TMP_COMBINED"
 fi
 
-curl_output=$(curl -sL "https://mds3.fidoalliance.org")
-base64_content=$(echo "$curl_output" | cut -d'.' -f2)
+curl -sL "https://mds3.fidoalliance.org" > "$TMP_FIDO"
+cut -d'.' -f2 "$TMP_FIDO" > "$TMP_BASE64"
 
-padding_needed=$((4 - ${#base64_content} % 4))
+padding_needed=$((4 - $(wc -c < "$TMP_BASE64") % 4))
 if [ $padding_needed -ne 4 ]; then
-    base64_content="${base64_content}$(printf '=%.0s' $(seq 1 $padding_needed))"
+    printf '=%.0s' $(seq 1 $padding_needed) >> "$TMP_BASE64"
 fi
 
-decoded_content=$(echo "$base64_content" | base64 --decode)
+base64 --decode --input="$TMP_BASE64" --output="$TMP_FIDO"
 
-declare -A fidoEntries
-fidoEntries_json=$(echo "$decoded_content" | jq -r '.entries | map(select(.aaguid) | "\(.aaguid)=\(.metadataStatement.description)") | .[]')
-while IFS="= " read -r key value; do
-    fidoEntries["$key"]="$value"
-done <<< "$fidoEntries_json"
+jq -r '.entries | map(select(.aaguid) | "\(.aaguid)=\(.metadataStatement.description)") | .[]' "$TMP_FIDO" > "$TMP_FIDO.tmp"
+mv "$TMP_FIDO.tmp" "$TMP_FIDO"
 
-declare -A communityEntries
-while IFS="= " read -r key value; do
-    communityEntries["$key"]="$value"
-done < <(curl -sL "https://raw.githubusercontent.com/passkeydeveloper/passkey-authenticator-aaguids/main/aaguid.json" | jq -r 'to_entries | map("\(.key)=\(.value.name)") | .[]')
+curl -sL "https://raw.githubusercontent.com/passkeydeveloper/passkey-authenticator-aaguids/main/aaguid.json" | \
+    jq -r 'to_entries | map("\(.key)=\(.value.name)") | .[]' > "$TMP_COMMUNITY"
 
-# Merge entries, with communityEntries overriding fidoEntries and fidoEntries overriding currentEntries
 declare -A combinedEntries
-for key in "${!currentEntries[@]}"; do
-    combinedEntries["$key"]="${currentEntries[$key]}"
-done
 
-for key in "${!fidoEntries[@]}"; do
-    combinedEntries["$key"]="${fidoEntries[$key]}"
-done
+while IFS="= " read -r key value; do
+    combinedEntries["$key"]="$value"
+done < "$TMP_COMBINED"
 
-for key in "${!communityEntries[@]}"; do
-    combinedEntries["$key"]="${communityEntries[$key]}"
-done
+while IFS="= " read -r key value; do
+    combinedEntries["$key"]="$value"
+done < "$TMP_FIDO"
+
+while IFS="= " read -r key value; do
+    combinedEntries["$key"]="$value"
+done < "$TMP_COMMUNITY"
 
 {
     echo "{"
@@ -57,5 +54,7 @@ done
     done | sed '$ s/,$//'
     echo "}"
 } > "$JSON_FILE"
+
+rm -f "$TMP_FIDO" "$TMP_COMMUNITY" "$TMP_COMBINED" "$TMP_BASE64"
 
 echo "Updated $JSON_FILE successfully."
