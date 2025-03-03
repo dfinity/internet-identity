@@ -60,13 +60,14 @@ import {
   shuffleArray,
   unreachable,
 } from "$src/utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
 import { authenticatorsSection } from "./authenticatorsSection";
+import { confirmRemoveDevice } from "./confirmRemoveDevice";
 import {
-  deleteDevice,
   protectDevice,
   renameDevice,
   resetPhrase,
@@ -198,7 +199,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
   credentials: OpenIdCredential[];
@@ -249,7 +250,12 @@ const displayManageTemplate = ({
           hasOtherAuthMethods: authenticators.length > 0,
         })
       : ""}
-    ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    ${recoveryMethodsSection({
+      recoveries,
+      addRecoveryPhrase,
+      addRecoveryKey,
+      onRemoveDevice,
+    })}
     <aside class="l-stack">
       ${dappsTeaser({
         dapps,
@@ -416,8 +422,40 @@ export const displayManage = async (
       resolve();
     };
 
-    const onRemoveDevice = async (device: DeviceData) => {
-      await deleteDevice({ connection, device, reload: resolve });
+    const onRemoveDevice = async (device: DeviceWithUsage) => {
+      const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+        .buffer as DerEncodedPublicKey;
+      const currentDevice = bufferEqual(
+        connection.identity.getPublicKey().toDer(),
+        pubKey
+      );
+      const action = await confirmRemoveDevice({
+        i18n,
+        purpose: device.purpose,
+        lastUsedNanoseconds: device.last_usage[0],
+        originRegistered: device.origin[0],
+        alias: device.alias,
+        currentDevice,
+      });
+      if (action === "cancelled") {
+        // This triggers a spinner which refetches the data.
+        // But this is the UX we alreay have now.
+        // We will improve this UX with the Svelte integration. Not worth improving now.
+        resolve();
+        return;
+      }
+      await withLoader(() => {
+        return Promise.all([connection.remove(device.pubkey)]);
+      });
+
+      if (currentDevice) {
+        // reload the page.
+        // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
+        location.reload();
+        return;
+      } else {
+        resolve();
+      }
     };
 
     const addRecoveryPhrase = async () => {
@@ -591,7 +629,7 @@ export const readRecovery = ({
   reload,
   device,
 }: {
-  device: DeviceData;
+  device: DeviceWithUsage;
   userNumber: bigint;
   connection: AuthenticatedConnection;
   reload: () => void;
@@ -630,7 +668,7 @@ export const readRecovery = ({
     } else {
       return {
         recoveryKey: {
-          remove: () => deleteDevice({ connection, device, reload }),
+          device,
         },
       };
     }
