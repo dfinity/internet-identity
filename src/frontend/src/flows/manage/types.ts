@@ -6,8 +6,8 @@ export type Authenticator = {
   alias: string;
   last_usage: [] | [bigint];
   rename: () => void;
-  // RP ID label shown to user if there are multiple different domains
-  rpIdLabel?: string;
+  // RP ID (shown to user if there are multiple different domains)
+  rpId?: string;
   // Whether this device can be removed (based on same logic as remove)
   canBeRemoved: boolean;
   // `warn` is used to show a warning icon when the device was registered in a different oring than current one.

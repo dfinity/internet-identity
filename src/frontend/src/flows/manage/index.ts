@@ -214,8 +214,7 @@ const displayManageTemplate = ({
   // Recommend the user to clean up passkeys if there are
   // authenticators registered across multiple domains.
   const cleanupRecommended =
-    new Set(authenticators.map((authenticator) => authenticator.rpIdLabel))
-      .size > 1;
+    new Set(authenticators.map((authenticator) => authenticator.rpId)).size > 1;
   const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
@@ -679,7 +678,7 @@ export const devicesFromDevicesWithUsage = ({
       const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
       const authenticator: Authenticator = {
         alias: device.alias,
-        rpIdLabel: rpIdLabel(device),
+        rpId: rpIdFromDevice(device),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
@@ -751,7 +750,7 @@ export const domainWarning = (
   }
 };
 
-const rpIdLabel = (device: DeviceWithUsage) =>
+const rpIdFromDevice = (device: DeviceWithUsage) =>
   new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 
 const unknownError = (): Error => {

@@ -107,25 +107,21 @@ export const authenticatorsSection = ({
         <ul>
           ${authenticators.map((authenticator, index) =>
             authenticatorItem({
-              authenticator: {
-                ...authenticator,
-                // Only show rpId if cleanup is recommended
-                rpIdLabel: cleanupRecommended
-                  ? authenticator.rpIdLabel
-                  : undefined,
-              },
+              authenticator,
               index,
               i18n,
               onRemove: () => onRemoveDevice(authenticator.device),
+              showRpId: cleanupRecommended,
             })
-          )}</ul>
-          <div class="c-action-list__actions">
-            <button
-              .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
-              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
-              @click="${() => onAddDevice()}"
-              id="addAdditionalDevice"
-            >
+          )}
+        </ul>
+        <div class="c-action-list__actions">
+          <button
+            .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+            @click="${() => onAddDevice()}"
+            id="addAdditionalDevice"
+          >
               <span class="c-tooltip__message c-card c-card--tight"
               >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
@@ -136,7 +132,7 @@ export const authenticatorsSection = ({
       </div>
       ${
         cleanupRecommended
-          ? html`<div>
+          ? html` <div>
               <p class="l-stack--small">
                 ${copy.some_passkeys_may_be_outdated_and} ${" "}
                 <a target="_blank" href="${MANAGE_PASSKEYS_SUPPORT_URL}">
@@ -158,7 +154,7 @@ export const authenticatorItem = ({
     warn,
     info,
     rename,
-    rpIdLabel,
+    rpId,
     isCurrent,
     canBeRemoved,
   },
@@ -166,11 +162,13 @@ export const authenticatorItem = ({
   i18n,
   icon,
   onRemove,
+  showRpId,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
   i18n: I18n;
   icon?: TemplateResult;
+  showRpId?: boolean;
   onRemove: () => void;
 }) => {
   const copy = i18n.i18n(copyJson);
@@ -220,26 +218,24 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
-        ${nonNullish(rpIdLabel)
-          ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
-              <div class="t-discreet" data-rpid="${rpIdLabel}">
-                ${rpIdLabel}
-              </div>
+        ${nonNullish(showRpId) && showRpId && nonNullish(rpId)
+          ? html` <div class="c-tooltip" tabindex="0" data-icon="info">
+              <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
               <span class="c-tooltip__message c-card c-card--tight">
-                ${copy.passkey_registered_in} ${rpIdLabel}
+                ${copy.passkey_registered_in} ${rpId}
               </span>
             </div>`
           : undefined}
         <div>
           ${isCurrent
-            ? html`<div>
+            ? html` <div>
                 <span class="c-icon c-icon--ok c-icon--xs"
                   >${pulsatingCircleIcon}</span
                 >
                 <span class="t-muted">${copy.current_device_label}</span>
               </div>`
             : nonNullish(lastUsageFormattedString)
-            ? html`<div class="t-muted">
+            ? html` <div class="t-muted">
                 Last used: ${lastUsageFormattedString}
               </div>`
             : undefined}
@@ -253,7 +249,7 @@ const itemWarning = ({
   warn,
 }: {
   warn: TemplateResult;
-}): TemplateResult => html`<div class="c-action-list__action">
+}): TemplateResult => html` <div class="c-action-list__action">
   <span class="c-tooltip c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
@@ -261,7 +257,7 @@ const itemWarning = ({
   >
 </div>`;
 
-const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
+const itemInfo = (msg: TemplateResult): TemplateResult => html` <div
   class="c-action-list__action"
 >
   <span class="c-tooltip c-icon" tabindex="0" data-icon="info"
