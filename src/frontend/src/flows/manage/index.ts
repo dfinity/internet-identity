@@ -212,10 +212,10 @@ const displayManageTemplate = ({
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
   // Recommend the user to clean up passkeys if there are
-  // authenticators registered in multiple domains.
-  const cleanupRecommended = authenticators.some((authenticator) =>
-    nonNullish(authenticator.rpId)
-  );
+  // authenticators registered across multiple domains.
+  const cleanupRecommended =
+    new Set(authenticators.map((authenticator) => authenticator.rpIdLabel))
+      .size > 1;
   const i18n = new I18n();
 
   const pageContentSlot = html` <section data-role="identity-management">
@@ -679,10 +679,7 @@ export const devicesFromDevicesWithUsage = ({
       const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
       const authenticator: Authenticator = {
         alias: device.alias,
-        rpId: rpIdLabel(
-          device,
-          devices_.filter((device) => "authentication" in device.purpose)
-        ),
+        rpIdLabel: rpIdLabel(device),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
@@ -754,21 +751,8 @@ export const domainWarning = (
   }
 };
 
-const rpIdLabel = (
-  device: DeviceData,
-  allDevices: DeviceData[]
-): string | undefined => {
-  if (!DOMAIN_COMPATIBILITY.isEnabled()) {
-    return undefined;
-  }
-  const commonOrigin = getCredentialsOrigin({
-    credentials: allDevices,
-  });
-  if (nonNullish(commonOrigin)) {
-    return undefined;
-  }
-  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
-};
+const rpIdLabel = (device: DeviceWithUsage) =>
+  new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");

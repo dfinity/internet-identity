@@ -107,7 +107,13 @@ export const authenticatorsSection = ({
         <ul>
           ${authenticators.map((authenticator, index) =>
             authenticatorItem({
-              authenticator,
+              authenticator: {
+                ...authenticator,
+                // Only show rpId if cleanup is recommended
+                rpIdLabel: cleanupRecommended
+                  ? authenticator.rpIdLabel
+                  : undefined,
+              },
               index,
               i18n,
               onRemove: () => onRemoveDevice(authenticator.device),
@@ -152,7 +158,7 @@ export const authenticatorItem = ({
     warn,
     info,
     rename,
-    rpId,
+    rpIdLabel,
     isCurrent,
     canBeRemoved,
   },
@@ -214,11 +220,13 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
-        ${nonNullish(rpId)
+        ${nonNullish(rpIdLabel)
           ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
-              <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
+              <div class="t-discreet" data-rpid="${rpIdLabel}">
+                ${rpIdLabel}
+              </div>
               <span class="c-tooltip__message c-card c-card--tight">
-                ${copy.passkey_registered_in} ${rpId}
+                ${copy.passkey_registered_in} ${rpIdLabel}
               </span>
             </div>`
           : undefined}
