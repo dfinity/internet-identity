@@ -160,10 +160,7 @@ pub fn install_ii_canister_with_arg(
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
-    let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
-    let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, byts, None);
-    canister_id
+    install_ii_canister_with_arg_and_cycles(env, wasm, arg, 0)
 }
 
 pub fn install_ii_canister_with_arg_and_cycles(
