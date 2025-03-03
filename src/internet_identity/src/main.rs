@@ -830,7 +830,7 @@ mod openid_api {
 
         let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
 
-        // Checking again because the association could've changed during the .await
+        // Checking again because the association between anchor number and openid credential could've changed during the .await
         let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
