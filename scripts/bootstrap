@@ -22,13 +22,14 @@ echo "using rust version '$rust_version'"
 # here we set the toolchain to 'none' and rustup will pick up on ./rust-toolchain.toml
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
 
-# Check if the required toolchain is installed; if not, install it
-if ! rustup toolchain list | grep -q "$rust_version"; then
-    run rustup toolchain install "$rust_version"
-fi
+# https://blog.rust-lang.org/2025/03/02/Rustup-1.28.0.html
+run rustup show active-toolchain || rustup toolchain install
+# if ! rustup toolchain list | grep -q "$rust_version"; then
+#     run rustup toolchain install "$rust_version"
+# fi
 
 # Set the default toolchain to the required version
-run rustup default "$rust_version"
+# run rustup default "$rust_version"
 
 echo "looking for ic-wasm 0.8.5"
 if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
