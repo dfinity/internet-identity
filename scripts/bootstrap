@@ -23,7 +23,7 @@ echo "using rust version '$rust_version'"
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
 
 # https://blog.rust-lang.org/2025/03/02/Rustup-1.28.0.html
-# run rustup toolchain install nightly
+# Check if the required toolchain is installed; if not, install it
 if ! rustup toolchain list | grep -q "$rust_version"; then
     run rustup toolchain install "$rust_version"
 fi
