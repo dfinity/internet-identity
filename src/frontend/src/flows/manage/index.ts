@@ -457,6 +457,10 @@ export const displayManage = async (
             nonce,
           })
         );
+
+        console.log("jwt", jwt);
+        console.log("");
+
         const { iss, sub } = decodeJWT(jwt);
         if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
           toast.error(copy.account_already_linked);

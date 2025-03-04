@@ -11,6 +11,7 @@ mod archive_integration;
 mod config;
 mod delegation;
 mod http;
+mod openid;
 mod rollback;
 mod stable_memory;
 mod upgrade;
