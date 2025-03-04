@@ -27,6 +27,11 @@ fn can_link_google_account() -> Result<(), CallError> {
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
 
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        0
+    );
+
     api::openid_credential_add(
         &env,
         canister_id,
@@ -35,7 +40,14 @@ fn can_link_google_account() -> Result<(), CallError> {
         &jwt,
         &salt,
     )?
-    .map_err(|e| CallError::Reject(format!("{:?}", e)))
+    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        1
+    );
+
+    Ok(())
 }
 
 /// Verifies that Google Accounts can be removed
@@ -50,6 +62,11 @@ fn can_remove_google_account() -> Result<(), CallError> {
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
 
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        0
+    );
+
     api::openid_credential_add(
         &env,
         canister_id,
@@ -59,6 +76,11 @@ fn can_remove_google_account() -> Result<(), CallError> {
         &salt,
     )?
     .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        1
+    );
 
     api::openid_credential_remove(
         &env,
@@ -72,6 +94,11 @@ fn can_remove_google_account() -> Result<(), CallError> {
     // Try to get delegation based on credential, should fail now
     // Create session key
     let pub_session_key = ByteBuf::from("session public key");
+
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        0
+    );
 
     // Prepare the delegation
     match api::openid_prepare_delegation(
@@ -90,7 +117,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
     }
 }
 
-/// Verifies that valid JWT delegations are issued based on added .
+/// Verifies that valid JWT delegations are issued based on added credential.
 #[test]
 fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     let env = env();
@@ -308,4 +335,19 @@ fn openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodD
         test_principal,
         test_authn_method,
     )
+}
+
+fn number_of_openid_credentials(
+    env: &PocketIc,
+    canister_id: Principal,
+    sender: Principal,
+    identity_number: u64,
+) -> Result<usize, CallError> {
+    let openid_credentials = api::get_anchor_info(env, canister_id, sender, identity_number)
+        .map_err(|err| CallError::Reject(format!("{:?}", err)))?
+        .openid_credentials
+        .ok_or_else(|| "Could not fetch credentials!")
+        .map_err(|err| CallError::Reject(format!("{:?}", err)))?;
+
+    Ok(openid_credentials.len())
 }
