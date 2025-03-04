@@ -8,7 +8,7 @@ export const identityCard = ({
   userNumber: bigint;
   identityBackground: PreLoadImage;
 }): TemplateResult => {
-  return html` <div class="c-input--id__wrap">
+  return html`<div class="c-input--id__wrap">
     <img src=${identityBackground.getSrc()} class="c-input--id__art" />
     <h2 class="c-input--id__caption">Internet Identity:</h2>
     <output

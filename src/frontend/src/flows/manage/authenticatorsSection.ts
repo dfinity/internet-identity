@@ -1,4 +1,4 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { DeviceWithUsage } from "$generated/internet_identity_types";
 import {
   infoIcon,
   pulsatingCircleIcon,
@@ -52,7 +52,7 @@ export const authenticatorsSection = ({
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   warnNoPasskeys: boolean;
   cleanupRecommended: boolean;
   i18n: I18n;
@@ -111,15 +111,17 @@ export const authenticatorsSection = ({
               index,
               i18n,
               onRemove: () => onRemoveDevice(authenticator.device),
+              showRpId: cleanupRecommended,
             })
-          )}</ul>
-          <div class="c-action-list__actions">
-            <button
-              .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
-              class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
-              @click="${() => onAddDevice()}"
-              id="addAdditionalDevice"
-            >
+          )}
+        </ul>
+        <div class="c-action-list__actions">
+          <button
+            .disabled=${authenticators.length >= MAX_AUTHENTICATORS}
+            class="c-button c-button--primary c-tooltip c-tooltip--onDisabled c-tooltip--left"
+            @click="${() => onAddDevice()}"
+            id="addAdditionalDevice"
+          >
               <span class="c-tooltip__message c-card c-card--tight"
               >You can register up to ${MAX_AUTHENTICATORS} authenticator devices.
                 Remove a device before you can add a new one.</span
@@ -160,11 +162,13 @@ export const authenticatorItem = ({
   i18n,
   icon,
   onRemove,
+  showRpId,
 }: {
   authenticator: DedupAuthenticator;
   index: number;
   i18n: I18n;
   icon?: TemplateResult;
+  showRpId?: boolean;
   onRemove: () => void;
 }) => {
   const copy = i18n.i18n(copyJson);
@@ -214,7 +218,7 @@ export const authenticatorItem = ({
             settings,
           })}
         </div>
-        ${nonNullish(rpId)
+        ${nonNullish(showRpId) && showRpId && nonNullish(rpId)
           ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
               <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
               <span class="c-tooltip__message c-card c-card--tight">

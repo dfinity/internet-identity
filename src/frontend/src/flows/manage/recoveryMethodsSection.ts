@@ -12,8 +12,9 @@ import {
 import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
-import { Devices, RecoveryKey, RecoveryPhrase } from "./types";
+import { Devices, RecoveryPhrase } from "./types";
 
+import { DeviceWithUsage } from "$generated/internet_identity_types";
 import copyJson from "./recoveryMethodsSection.json";
 
 // The list of recovery devices
@@ -21,10 +22,12 @@ export const recoveryMethodsSection = ({
   recoveries: { recoveryPhrase, recoveryKey },
   addRecoveryPhrase,
   addRecoveryKey,
+  onRemoveDevice,
 }: {
   recoveries: Devices["recoveries"];
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
 }): TemplateResult => {
   const i18n = new I18n();
 
@@ -64,7 +67,10 @@ export const recoveryMethodsSection = ({
             : recoveryPhraseItem({ recoveryPhrase, i18n })}
           ${isNullish(recoveryKey)
             ? missingRecovery({ recovery: "key", addRecoveryKey })
-            : recoveryKeyItem({ recoveryKey, i18n })}
+            : recoveryKeyItem({
+                onRemoveDevice: () => onRemoveDevice(recoveryKey.device),
+                i18n,
+              })}
         </ul>
       </div>
     </aside>
@@ -173,16 +179,16 @@ const lock = (): TemplateResult => {
 
 // List a recovery key (non-phrase recovery device)
 export const recoveryKeyItem = ({
-  recoveryKey,
+  onRemoveDevice,
   i18n,
 }: {
-  recoveryKey: RecoveryKey;
+  onRemoveDevice: () => void;
   i18n: I18n;
 }) => {
   const alias = recoveryKeyLabel;
   const id = "recovery-key";
   const settings = [
-    { action: "remove", caption: "Remove", fn: () => recoveryKey.remove() },
+    { action: "remove", caption: "Remove", fn: onRemoveDevice },
   ];
 
   const { recovery_key_enabled } = i18n.i18n(copyJson);

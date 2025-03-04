@@ -22,7 +22,7 @@ const promptDeviceTrustedTemplate = ({
 }) => {
   const copy = i18n.i18n(copyJson);
 
-  const pageContentSlot = html` <article>
+  const pageContentSlot = html`<article>
     ${tentativeDeviceStepper({ step: "activate" })}
     <hgroup>
       <div class="c-card__label">

@@ -223,7 +223,7 @@ pub struct Storage<M: Memory> {
         StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList, ManagedMemory<M>>,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Header {
     magic: [u8; 3],

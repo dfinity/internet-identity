@@ -202,7 +202,7 @@ export const networkIcon = html`
   </svg>
 `;
 
-export const editIcon = html` <svg
+export const editIcon = html`<svg
   width="20"
   height="20"
   viewBox="0 0 20 20"
@@ -350,7 +350,7 @@ export const arrowRight = html`
   </svg>
 `;
 
-export const browserIcon = html` <svg
+export const browserIcon = html`<svg
   xmlns="http://www.w3.org/2000/svg"
   fill="none"
   width="53"
@@ -418,7 +418,7 @@ export const externalLinkIcon = html`<svg
   />
 </svg>`;
 
-export const questionIcon = html` <svg
+export const questionIcon = html`<svg
   viewBox="0 0 24 24"
   xmlns="http://www.w3.org/2000/svg"
 >

@@ -23,7 +23,7 @@ export const mkAnchorPicker = (
     anchorItem({ anchor, pick: props.pick, focus: focus && i === 0 })
   );
 
-  const moreOptions = html` <li class="c-list__item c-list__item--noFocusStyle">
+  const moreOptions = html`<li class="c-list__item c-list__item--noFocusStyle">
     <button
       class="t-link c-list__parcel c-list__parcel--fullwidth"
       @click="${() => props.moreOptions()}"

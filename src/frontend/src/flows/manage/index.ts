@@ -198,7 +198,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
   credentials: OpenIdCredential[];
@@ -212,13 +212,12 @@ const displayManageTemplate = ({
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
   // Recommend the user to clean up passkeys if there are
-  // authenticators registered in multiple domains.
-  const cleanupRecommended = authenticators.some((authenticator) =>
-    nonNullish(authenticator.rpId)
-  );
+  // authenticators registered across multiple domains.
+  const cleanupRecommended =
+    new Set(authenticators.map((authenticator) => authenticator.rpId)).size > 1;
   const i18n = new I18n();
 
-  const pageContentSlot = html` <section data-role="identity-management">
+  const pageContentSlot = html`<section data-role="identity-management">
     <hgroup>
       <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
@@ -249,7 +248,12 @@ const displayManageTemplate = ({
           hasOtherAuthMethods: authenticators.length > 0,
         })
       : ""}
-    ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    ${recoveryMethodsSection({
+      recoveries,
+      addRecoveryPhrase,
+      addRecoveryKey,
+      onRemoveDevice,
+    })}
     <aside class="l-stack">
       ${dappsTeaser({
         dapps,
@@ -416,7 +420,7 @@ export const displayManage = async (
       resolve();
     };
 
-    const onRemoveDevice = async (device: DeviceData) => {
+    const onRemoveDevice = async (device: DeviceWithUsage) => {
       await deleteDevice({ connection, device, reload: resolve });
     };
 
@@ -591,7 +595,7 @@ export const readRecovery = ({
   reload,
   device,
 }: {
-  device: DeviceData;
+  device: DeviceWithUsage;
   userNumber: bigint;
   connection: AuthenticatedConnection;
   reload: () => void;
@@ -630,7 +634,7 @@ export const readRecovery = ({
     } else {
       return {
         recoveryKey: {
-          remove: () => deleteDevice({ connection, device, reload }),
+          device,
         },
       };
     }
@@ -679,7 +683,7 @@ export const devicesFromDevicesWithUsage = ({
       const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
       const authenticator: Authenticator = {
         alias: device.alias,
-        rpId: rpIdLabel(device, devices_),
+        rpId: rpIdFromDevice(device),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
@@ -751,21 +755,8 @@ export const domainWarning = (
   }
 };
 
-const rpIdLabel = (
-  device: DeviceData,
-  allDevices: DeviceData[]
-): string | undefined => {
-  if (!DOMAIN_COMPATIBILITY.isEnabled()) {
-    return undefined;
-  }
-  const commonOrigin = getCredentialsOrigin({
-    credentials: allDevices,
-  });
-  if (nonNullish(commonOrigin)) {
-    return undefined;
-  }
-  return new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
-};
+const rpIdFromDevice = (device: DeviceWithUsage) =>
+  new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");

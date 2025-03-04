@@ -33,7 +33,7 @@ export const toast = {
 // Render or rerender toasts.
 const renderToasts = () => {
   render(
-    html` <div class="c-toasts l-container">
+    html`<div class="c-toasts l-container">
       ${repeat(toastStore, (x) => x, toastTemplate)}
     </div>`,
     document.body
@@ -66,7 +66,7 @@ const toastTemplate = (toast: Toast): TemplateResult => {
     success: checkmarkIcon,
   }[toast.level];
 
-  return html` <div
+  return html`<div
     role="alert"
     class="c-toast ${asyncReplace(
       closing.map((closing) => (closing ? "c-toast--closing" : undefined))
