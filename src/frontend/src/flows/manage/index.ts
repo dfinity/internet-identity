@@ -218,7 +218,7 @@ const displayManageTemplate = ({
   );
   const i18n = new I18n();
 
-  const pageContentSlot = html` <section data-role="identity-management">
+  const pageContentSlot = html`<section data-role="identity-management">
     <hgroup>
       <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>

@@ -13,7 +13,7 @@ const deviceRegistrationDisabledInfoTemplate = ({
   cancel: () => void;
   retry: () => void;
 }) => {
-  const pageContentSlot = html` <article>
+  const pageContentSlot = html`<article>
     <hgroup>
       <h1 class="t-title t-title--main">Add this device as a passkey</h1>
       <p class="t-lead">

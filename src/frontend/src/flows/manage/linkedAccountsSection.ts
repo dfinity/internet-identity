@@ -29,7 +29,7 @@ export const linkedAccountsSection = ({
   const copy = i18n.i18n(copyJson);
   const unlinkAvailable = credentials.length > 1 || hasOtherAuthMethods;
 
-  return html` <aside
+  return html`<aside
     class="l-stack c-card c-card--narrow"
     data-role="linked-accounts"
   >
@@ -104,7 +104,7 @@ export const accountItem = ({
     <li class="c-action-list__item" data-account=${credential.sub}>
       ${
         nonNullish(picture)
-          ? html` <div class="c-action-list__avatar">
+          ? html`<div class="c-action-list__avatar">
               <img src="${picture}" alt="" aria-hidden="true" loading="lazy" />
               <div class="c-action-list__avatar--badge">${googleIcon}</div>
             </div>`
