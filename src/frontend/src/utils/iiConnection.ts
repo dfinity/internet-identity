@@ -498,6 +498,7 @@ export class Connection {
     }
 
     const actor = await this.createActor(delegationIdentity);
+
     const connection = new AuthenticatedConnection(
       this.canisterId,
       this.canisterConfig,
