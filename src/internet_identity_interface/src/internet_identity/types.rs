@@ -21,7 +21,7 @@ pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
-use crate::internet_identity::types::openid::OpenIdCredentialData;
+pub use crate::internet_identity::types::openid::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -301,4 +301,9 @@ pub enum DeployArchiveResult {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub client_id: String,
+}
+
+pub enum AuthorizationKey {
+    DevicePubKey(DeviceKey),
+    OpenIdPubKey(PublicKey),
 }

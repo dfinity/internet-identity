@@ -1,6 +1,6 @@
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
-use crate::MINUTE_NS;
+use crate::openid::MINUTE_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
@@ -358,6 +358,7 @@ fn caller() -> Principal {
 fn time() -> u64 {
     ic_cdk::api::time()
 }
+
 #[cfg(test)]
 fn time() -> u64 {
     TEST_TIME.get()

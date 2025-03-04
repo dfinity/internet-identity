@@ -1,15 +1,25 @@
-use crate::delegation::der_encode_canister_sig_key;
+use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
+use crate::MINUTE_NS;
+use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
+use ic_canister_sig_creation::{
+    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
+};
+use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
+use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{
-    MetadataEntryV2, OpenIdConfig, Timestamp,
+    Delegation, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey, SignedDelegation, Timestamp,
+    UserKey,
 };
+use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 mod google;
+
+const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
@@ -30,9 +40,57 @@ impl OpenIdCredential {
         (self.iss.clone(), self.sub.clone())
     }
     pub fn principal(&self) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key());
-        let public_key = der_encode_canister_sig_key(seed.to_vec());
+        let public_key = self.public_key();
         Principal::self_authenticating(public_key)
+    }
+    pub fn public_key(&self) -> PublicKey {
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        der_encode_canister_sig_key(seed.to_vec()).into()
+    }
+
+    pub async fn prepare_jwt_delegation(&self, session_key: SessionKey) -> (UserKey, Timestamp) {
+        state::ensure_salt_set().await;
+
+        let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
+        let seed = calculate_delegation_seed(&self.aud, &self.key());
+
+        state::signature_map_mut(|sigs| {
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+        });
+        update_root_hash();
+
+        //TODO: bookkeeping needs to be added in separate PR.
+
+        (
+            ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+            expiration,
+        )
+    }
+
+    pub fn get_jwt_delegation(
+        &self,
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> Result<SignedDelegation, OpenIdDelegationError> {
+        state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &calculate_delegation_seed(&self.aud, &self.key()),
+                message: &delegation_signature_msg(&session_key, expiration, None),
+            };
+
+            match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+                Ok(signature) => Ok(SignedDelegation {
+                    delegation: Delegation {
+                        pubkey: session_key,
+                        expiration,
+                        targets: None,
+                    },
+                    signature: ByteBuf::from(signature),
+                }),
+                Err(_) => Err(OpenIdDelegationError::NoSuchDelegation),
+            }
+        })
     }
 }
 
@@ -91,7 +149,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-
     blob.push(client_id.bytes().len() as u8);
     blob.extend(client_id.bytes());
 
@@ -100,7 +157,6 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 
     blob.push(sub.bytes().len() as u8);
     blob.extend(sub.bytes());
-
     let mut hasher = Sha256::new();
     hasher.update(blob);
     hasher.finalize().into()
@@ -110,7 +166,7 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 /// unique between instances for the same `OpenIdCredential`, intentionally isolating the instances.
 #[cfg(not(test))]
 fn salt() -> [u8; 32] {
-    crate::state::salt()
+    state::salt()
 }
 
 /// Skip getting salt from state in tests, instead return a fixed salt

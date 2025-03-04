@@ -53,6 +53,7 @@ hex-literal = "0.4"
 regex.workspace = true
 ic-response-verification.workspace = true
 flate2 = "1.0"
+getrandom = "0.2"
 
 
 [features]
