@@ -13,7 +13,7 @@ const loaderUrl = import.meta.glob("./loader.svg", {
 const TAKING_FOREVER = 10000;
 
 const loader = (takingForever = false) =>
-  html` <div id="loader" class="c-loader">
+  html`<div id="loader" class="c-loader">
     <img class="c-loader__image" src="${loaderUrl}" alt="loading" />
     ${takingForever
       ? html`<a

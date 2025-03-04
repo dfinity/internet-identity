@@ -611,7 +611,7 @@ const page = ({
         dataPage: "authenticate",
       })
     : mainWindow({
-        slot: html` <!-- The title is hidden but used for accessibility -->
+        slot: html`<!-- The title is hidden but used for accessibility -->
           <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
           ${slot}`,
       });
