@@ -20,6 +20,7 @@ const confirmRemoveDeviceTemplate = ({
   alias,
   lastUsedNanoseconds,
   originRegistered,
+  isCurrentDevice,
 }: {
   i18n: I18n;
   purpose: Purpose;
@@ -28,6 +29,7 @@ const confirmRemoveDeviceTemplate = ({
   alias?: string;
   lastUsedNanoseconds: bigint | undefined;
   originRegistered: string | undefined;
+  isCurrentDevice: boolean;
 }) => {
   const copy = i18n.i18n(copyJson);
   const mapper: Record<
@@ -89,6 +91,11 @@ const confirmRemoveDeviceTemplate = ({
           >`}</strong></li>
       </ul>
       <p class="t-paragraph">${mappedCopy.message}</p>
+      ${
+        isCurrentDevice
+          ? html`<p class="t-paragraph">${copy.current_device_warning}</p>`
+          : undefined
+      }
     </hgroup>
     <div>
       ${
@@ -149,12 +156,14 @@ export const confirmRemoveDevice = ({
   alias,
   lastUsedNanoseconds,
   originRegistered,
+  isCurrentDevice,
 }: {
   i18n: I18n;
   purpose: Purpose;
   alias: string;
   lastUsedNanoseconds: bigint | undefined;
   originRegistered: string | undefined;
+  isCurrentDevice: boolean;
 }): Promise<"confirmed" | "cancelled"> => {
   return new Promise((resolve) =>
     confirmRemoveDevicePage({
@@ -165,6 +174,7 @@ export const confirmRemoveDevice = ({
       cancel: () => resolve("cancelled"),
       lastUsedNanoseconds,
       originRegistered,
+      isCurrentDevice,
     })
   );
 };
