@@ -64,7 +64,7 @@ struct Certs {
     keys: Vec<Jwk>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct Claims {
     iss: String,
     sub: String,
