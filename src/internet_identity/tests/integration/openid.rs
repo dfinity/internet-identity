@@ -346,7 +346,7 @@ fn number_of_openid_credentials(
     let openid_credentials = api::get_anchor_info(env, canister_id, sender, identity_number)
         .map_err(|err| CallError::Reject(format!("{:?}", err)))?
         .openid_credentials
-        .ok_or_else(|| "Could not fetch credentials!")
+        .ok_or("Could not fetch credentials!")
         .map_err(|err| CallError::Reject(format!("{:?}", err)))?;
 
     Ok(openid_credentials.len())
