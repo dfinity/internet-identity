@@ -28,6 +28,9 @@ if ! rustup toolchain list | grep -q "$rust_version"; then
     run rustup toolchain install "$rust_version"
 fi
 
+# New changes also don't install targets
+run rustup target add wasm32-unknown-unknown --toolchain
+
 # Set the default toolchain to the required version
 run rustup default "$rust_version"
 
