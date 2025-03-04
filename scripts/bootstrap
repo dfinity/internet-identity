@@ -21,6 +21,7 @@ echo "using rust version '$rust_version'"
 
 # here we set the toolchain to 'none' and rustup will pick up on ./rust-toolchain.toml
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
+# We need to make rustup install the toolchain with `rustup show`.
 rustup show
 
 echo "looking for ic-wasm 0.8.5"
