@@ -21,6 +21,7 @@ echo "using rust version '$rust_version'"
 
 # here we set the toolchain to 'none' and rustup will pick up on ./rust-toolchain.toml
 run curl --fail https://sh.rustup.rs -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
+rustup toolchain install nightly
 
 echo "looking for ic-wasm 0.8.5"
 if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
