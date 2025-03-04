@@ -132,7 +132,7 @@ export const authenticatorsSection = ({
       </div>
       ${
         cleanupRecommended
-          ? html` <div>
+          ? html`<div>
               <p class="l-stack--small">
                 ${copy.some_passkeys_may_be_outdated_and} ${" "}
                 <a target="_blank" href="${MANAGE_PASSKEYS_SUPPORT_URL}">
@@ -219,7 +219,7 @@ export const authenticatorItem = ({
           })}
         </div>
         ${nonNullish(showRpId) && showRpId && nonNullish(rpId)
-          ? html` <div class="c-tooltip" tabindex="0" data-icon="info">
+          ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
               <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
               <span class="c-tooltip__message c-card c-card--tight">
                 ${copy.passkey_registered_in} ${rpId}
@@ -228,14 +228,14 @@ export const authenticatorItem = ({
           : undefined}
         <div>
           ${isCurrent
-            ? html` <div>
+            ? html`<div>
                 <span class="c-icon c-icon--ok c-icon--xs"
                   >${pulsatingCircleIcon}</span
                 >
                 <span class="t-muted">${copy.current_device_label}</span>
               </div>`
             : nonNullish(lastUsageFormattedString)
-            ? html` <div class="t-muted">
+            ? html`<div class="t-muted">
                 Last used: ${lastUsageFormattedString}
               </div>`
             : undefined}
@@ -249,7 +249,7 @@ const itemWarning = ({
   warn,
 }: {
   warn: TemplateResult;
-}): TemplateResult => html` <div class="c-action-list__action">
+}): TemplateResult => html`<div class="c-action-list__action">
   <span class="c-tooltip c-icon c-icon--error" tabindex="0"
     >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
       >${warn}</span
@@ -257,7 +257,7 @@ const itemWarning = ({
   >
 </div>`;
 
-const itemInfo = (msg: TemplateResult): TemplateResult => html` <div
+const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
   class="c-action-list__action"
 >
   <span class="c-tooltip c-icon" tabindex="0" data-icon="info"
