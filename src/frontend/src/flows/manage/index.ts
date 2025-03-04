@@ -198,7 +198,7 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
   credentials: OpenIdCredential[];
@@ -248,7 +248,12 @@ const displayManageTemplate = ({
           hasOtherAuthMethods: authenticators.length > 0,
         })
       : ""}
-    ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    ${recoveryMethodsSection({
+      recoveries,
+      addRecoveryPhrase,
+      addRecoveryKey,
+      onRemoveDevice,
+    })}
     <aside class="l-stack">
       ${dappsTeaser({
         dapps,
@@ -415,7 +420,7 @@ export const displayManage = async (
       resolve();
     };
 
-    const onRemoveDevice = async (device: DeviceData) => {
+    const onRemoveDevice = async (device: DeviceWithUsage) => {
       await deleteDevice({ connection, device, reload: resolve });
     };
 
@@ -590,7 +595,7 @@ export const readRecovery = ({
   reload,
   device,
 }: {
-  device: DeviceData;
+  device: DeviceWithUsage;
   userNumber: bigint;
   connection: AuthenticatedConnection;
   reload: () => void;
@@ -629,7 +634,7 @@ export const readRecovery = ({
     } else {
       return {
         recoveryKey: {
-          remove: () => deleteDevice({ connection, device, reload }),
+          device,
         },
       };
     }

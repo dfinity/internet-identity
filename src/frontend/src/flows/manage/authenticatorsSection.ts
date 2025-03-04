@@ -1,4 +1,4 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { DeviceWithUsage } from "$generated/internet_identity_types";
 import {
   infoIcon,
   pulsatingCircleIcon,
@@ -52,7 +52,7 @@ export const authenticatorsSection = ({
 }: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
-  onRemoveDevice: (device: DeviceData) => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   warnNoPasskeys: boolean;
   cleanupRecommended: boolean;
   i18n: I18n;

@@ -1,4 +1,4 @@
-import { DeviceData } from "$generated/internet_identity_types";
+import { DeviceWithUsage } from "$generated/internet_identity_types";
 import { TemplateResult } from "lit-html";
 
 // A simple authenticator (non-recovery device)
@@ -17,7 +17,7 @@ export type Authenticator = {
   // `isCurrent` is true when the public key of the DeviceWithUsage is the same as the one returned by the AuthenticatedConnection instance.
   isCurrent: boolean;
   // The original device data this authenticator was created from
-  device: DeviceData;
+  device: DeviceWithUsage;
 };
 
 // A recovery phrase, potentially protected
@@ -31,7 +31,7 @@ export type Protection =
 
 // A recovery key, i.e. "external hardware"
 export type RecoveryKey = {
-  remove: () => void;
+  device: DeviceWithUsage;
 };
 
 // The devices an anchor is expected to have
