@@ -56,6 +56,28 @@ export class RenameView extends View {
   }
 }
 
+export class ConfirmRemoveDeviceView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("[data-page='confirm-remove-device-page']")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForAbsence(): Promise<void> {
+    await this.browser
+      .$("[data-page='confirm-remove-device-page']")
+      .waitForExist({ timeout: 10_000, reverse: true });
+  }
+
+  async enterAlias(alias: string): Promise<void> {
+    await this.browser.$("#confirmRemoveDeviceAlias").setValue(alias);
+  }
+
+  async submit(): Promise<void> {
+    await this.browser.$("#confirmRemoveDeviceButton").click();
+  }
+}
+
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
@@ -317,6 +339,11 @@ export class MainView extends View {
   async remove(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "remove" }).click();
+    const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
+    await confirmRemoveDeviceView.waitForDisplay();
+    await confirmRemoveDeviceView.enterAlias(deviceName);
+    await confirmRemoveDeviceView.submit();
+    await confirmRemoveDeviceView.waitForAbsence();
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
