@@ -70,3 +70,27 @@ test("User can register, add device, rename first device, remove the second devi
     await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME2, browser);
   });
 }, 300_000);
+
+test("User can add and remove a recovery device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const firstAuthenticator = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+
+    // Add a recovery device
+    await removeVirtualAuthenticator(browser, firstAuthenticator);
+    await addVirtualAuthenticator(browser);
+    await FLOWS.addRecoveryMechanismDevice(browser);
+
+    // Remove the recovery device
+    await mainView.removeRecovery();
+
+    // Verify the recovery device is removed
+    await mainView.waitForDeviceCount(DEVICE_NAME1, 1);
+
+    await mainView.logout();
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
+  });
+}, 300_000);

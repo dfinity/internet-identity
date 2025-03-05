@@ -437,6 +437,17 @@ export class MainView extends View {
   async addOpenIdCredential(): Promise<void> {
     await this.browser.$("#linkAccount").click();
   }
+
+  async removeRecovery(): Promise<void> {
+    // This comes from `recoveryDeviceKey` in frontend/src/utils/recoveryDevice.ts
+    const deviceName = "Recovery Device";
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "remove" }).click();
+    const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
+    await confirmRemoveDeviceView.waitForDisplay();
+    await confirmRemoveDeviceView.submit();
+    await confirmRemoveDeviceView.waitForAbsence();
+  }
 }
 
 export class AddRemoteDeviceAliasView extends View {
