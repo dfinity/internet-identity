@@ -103,7 +103,7 @@ const confirmRemoveDeviceTemplate = ({
           ? html`<input
               autofocus
               ${ref(input)}
-              id="confirmRemoveDevice"
+              id="confirmRemoveDeviceAlias"
               class="c-input c-input--stack c-input--fullwidth"
               spellcheck="false"
               .onpaste=${(e: Event) => e.preventDefault()}
@@ -126,6 +126,7 @@ const confirmRemoveDeviceTemplate = ({
         .disabled=${purposeType === "authentication"}
         ${ref(confirmButton)}
         @click=${() => next()}
+        id="confirmRemoveDeviceButton"
         data-action="next"
         class="c-button"
       >

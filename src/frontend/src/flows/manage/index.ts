@@ -60,13 +60,14 @@ import {
   shuffleArray,
   unreachable,
 } from "$src/utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
 import { authenticatorsSection } from "./authenticatorsSection";
+import { confirmRemoveDevice } from "./confirmRemoveDevice";
 import {
-  deleteDevice,
   protectDevice,
   renameDevice,
   resetPhrase,
@@ -421,7 +422,39 @@ export const displayManage = async (
     };
 
     const onRemoveDevice = async (device: DeviceWithUsage) => {
-      await deleteDevice({ connection, device, reload: resolve });
+      const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+        .buffer as DerEncodedPublicKey;
+      const isCurrentDevice = bufferEqual(
+        connection.identity.getPublicKey().toDer(),
+        pubKey
+      );
+      const action = await confirmRemoveDevice({
+        i18n,
+        purpose: device.purpose,
+        lastUsedNanoseconds: device.last_usage[0],
+        originRegistered: device.origin[0],
+        alias: device.alias,
+        isCurrentDevice,
+      });
+      if (action === "cancelled") {
+        // This triggers a spinner which refetches the data.
+        // But this is the UX we alreay have now.
+        // We will improve this UX with the Svelte integration. Not worth improving now.
+        resolve();
+        return;
+      }
+      await withLoader(() => {
+        return Promise.all([connection.remove(device.pubkey)]);
+      });
+
+      if (isCurrentDevice) {
+        // reload the page.
+        // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
+        location.reload();
+        return;
+      } else {
+        resolve();
+      }
     };
 
     const addRecoveryPhrase = async () => {
