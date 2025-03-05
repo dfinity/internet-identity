@@ -30,6 +30,7 @@ export const II_URL =
 export const CAPTCHA_ENABLED = process.env.II_CAPTCHA === "enabled" ?? false;
 
 export const DEVICE_NAME1 = "FIDO Passkey";
+export const DEVICE_NAME2 = "TEST Device";
 export const RECOVERY_PHRASE_NAME = "Recovery Phrase";
 
 // Some user agents

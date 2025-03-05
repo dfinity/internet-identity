@@ -1,0 +1,72 @@
+import { FLOWS } from "./flows";
+import {
+  addVirtualAuthenticator,
+  removeVirtualAuthenticator,
+  runInBrowser,
+} from "./util";
+import { AuthenticateView, MainView } from "./views";
+
+// Read canister ids from the corresponding dfx files.
+// This assumes that they have been successfully dfx-deployed
+import { DEVICE_NAME1, DEVICE_NAME2, II_URL } from "./constants";
+
+test("Removing current device logs user out", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const firstAuthenticator = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await removeVirtualAuthenticator(browser, firstAuthenticator);
+    await addVirtualAuthenticator(browser);
+    await FLOWS.addFidoDevice(browser);
+
+    // home
+    await mainView.waitForDisplay();
+    // Expect a second device with the default name
+    await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
+
+    // Remove the newly added device
+    await mainView.remove(DEVICE_NAME1);
+
+    // Verify the user is logged out and back to the home screen
+    const welcomeView = new AuthenticateView(browser);
+    await welcomeView.waitForDisplay();
+
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
+  });
+}, 300_000);
+
+// The renaming is necessary because the first and second devices have the same name
+// and the selector uses the name to find the device, which defaults to the first device.
+// Unfortunately, we can't change the name of the device when adding it.
+// This is something we could improve in the future.
+test("User can register, add device, rename first device, remove the second device", async () => {
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const firstAuthenticator = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await removeVirtualAuthenticator(browser, firstAuthenticator);
+    await addVirtualAuthenticator(browser);
+    await FLOWS.addFidoDevice(browser);
+
+    // home
+    await mainView.waitForDisplay();
+    // Expect a second device with the default name
+    await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
+
+    // Rename the first device
+    await mainView.rename(DEVICE_NAME1, DEVICE_NAME2);
+
+    // Remove the newly added device
+    await mainView.remove(DEVICE_NAME1);
+
+    // Verify the device count is back to 1
+    await mainView.waitForDeviceCount(DEVICE_NAME2, 1);
+
+    await mainView.logout();
+    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME2, browser);
+  });
+}, 300_000);
