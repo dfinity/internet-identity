@@ -448,6 +448,14 @@ export class MainView extends View {
     await confirmRemoveDeviceView.submit();
     await confirmRemoveDeviceView.waitForAbsence();
   }
+
+  async expectRecoveryDevice(exists: boolean): Promise<void> {
+    const recoveryDeviceSelector =
+      '[data-role="recoveries"] [data-device="Recovery Device"]';
+    await this.browser
+      .$(recoveryDeviceSelector)
+      .waitForDisplayed({ timeout: 10_000, reverse: !exists });
+  }
 }
 
 export class AddRemoteDeviceAliasView extends View {

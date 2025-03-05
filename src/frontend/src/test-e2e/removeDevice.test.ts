@@ -14,7 +14,7 @@ test("Removing current device logs user out", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await removeVirtualAuthenticator(browser, firstAuthenticator);
@@ -32,8 +32,6 @@ test("Removing current device logs user out", async () => {
     // Verify the user is logged out and back to the home screen
     const welcomeView = new AuthenticateView(browser);
     await welcomeView.waitForDisplay();
-
-    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
   });
 }, 300_000);
 
@@ -45,7 +43,7 @@ test("User can register, add device, rename first device, remove the second devi
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
     await removeVirtualAuthenticator(browser, firstAuthenticator);
@@ -65,9 +63,6 @@ test("User can register, add device, rename first device, remove the second devi
 
     // Verify the device count is back to 1
     await mainView.waitForDeviceCount(DEVICE_NAME2, 1);
-
-    await mainView.logout();
-    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME2, browser);
   });
 }, 300_000);
 
@@ -75,22 +70,23 @@ test("User can add and remove a recovery device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     const firstAuthenticator = await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    await FLOWS.registerNewIdentityWelcomeView(browser);
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    await mainView.expectRecoveryDevice(false);
 
     // Add a recovery device
     await removeVirtualAuthenticator(browser, firstAuthenticator);
     await addVirtualAuthenticator(browser);
     await FLOWS.addRecoveryMechanismDevice(browser);
 
+    // Verify the recovery device is added
+    await mainView.expectRecoveryDevice(true);
+
     // Remove the recovery device
     await mainView.removeRecovery();
 
     // Verify the recovery device is removed
-    await mainView.waitForDeviceCount(DEVICE_NAME1, 1);
-
-    await mainView.logout();
-    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
+    await mainView.expectRecoveryDevice(false);
   });
 }, 300_000);
