@@ -185,6 +185,7 @@ export const iiFlows: Record<string, () => void> = {
         return "valid";
       },
       registerFlowOpts,
+      connection: mockConnection,
     });
     toast.success(html`
       Authentication complete!<br />

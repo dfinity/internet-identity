@@ -1,8 +1,8 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { FrontendSignedDelegation } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
-import { Delegation } from "./fetchDelegation";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -69,7 +69,7 @@ export type AuthResponse =
     }
   | {
       kind: "authorize-client-success";
-      delegations: Delegation[];
+      delegations: FrontendSignedDelegation[];
       userPublicKey: Uint8Array;
       authnMethod: "pin" | "passkey" | "recovery";
     };
@@ -88,7 +88,7 @@ export async function authenticationProtocol({
   }) => Promise<
     | {
         kind: "success";
-        delegations: Delegation[];
+        delegations: FrontendSignedDelegation[];
         userPublicKey: Uint8Array;
         authnMethod: "pin" | "passkey" | "recovery";
       }

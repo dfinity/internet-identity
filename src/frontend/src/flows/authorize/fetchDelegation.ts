@@ -4,18 +4,11 @@ import {
 } from "$generated/internet_identity_types";
 import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import { unknownToString } from "$src/utils/utils";
-import { Signature } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
-
-export interface Delegation {
-  delegation: {
-    pubkey: Uint8Array;
-    expiration: bigint;
-    targets?: Principal[];
-  };
-  signature: Signature;
-}
+import {
+  transformSignedDelegation,
+  unknownToString,
+  type FrontendSignedDelegation,
+} from "$src/utils/utils";
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the derivation.
@@ -35,7 +28,7 @@ export const fetchDelegation = async ({
   derivationOrigin: string;
   publicKey: Uint8Array;
   maxTimeToLive?: bigint;
-}): Promise<[PublicKey, Delegation] | { error: unknown }> => {
+}): Promise<[PublicKey, FrontendSignedDelegation] | { error: unknown }> => {
   const result = await connection.prepareDelegation(
     derivationOrigin,
     publicKey,
@@ -56,19 +49,7 @@ export const fetchDelegation = async ({
   );
 
   // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
-  return [
-    userKey,
-    {
-      delegation: {
-        pubkey: Uint8Array.from(signed_delegation.delegation.pubkey),
-        expiration: BigInt(signed_delegation.delegation.expiration),
-        targets: undefined,
-      },
-      signature: Uint8Array.from(
-        signed_delegation.signature
-      ) as unknown as Signature,
-    },
-  ];
+  return [userKey, transformSignedDelegation(signed_delegation)];
 };
 
 const retryGetDelegation = async (
