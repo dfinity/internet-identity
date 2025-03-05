@@ -1,5 +1,8 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
+import { SignedDelegation } from "$generated/internet_identity_types";
+import { Signature } from "@dfinity/agent";
+import { Delegation } from "@dfinity/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 export function unknownToString(obj: unknown, def: string): string {
@@ -411,3 +414,24 @@ export const fromBase64URL = (base64Url: string): ArrayBuffer =>
       .replace(/_/g, "/")
       .padEnd(Math.ceil(base64Url.length / 4) * 4, "=")
   );
+
+export interface FrontendSignedDelegation {
+  delegation: Delegation;
+  signature: Signature;
+}
+
+// Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
+export const transformSignedDelegation = (
+  signed_delegation: SignedDelegation
+) => {
+  return {
+    delegation: new Delegation(
+      Uint8Array.from(signed_delegation.delegation.pubkey),
+      signed_delegation.delegation.expiration,
+      undefined
+    ),
+    signature: Uint8Array.from(
+      signed_delegation.signature
+    ) as unknown as Signature,
+  };
+};
