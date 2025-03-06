@@ -14,14 +14,14 @@ import { I18n } from "$src/i18n";
 import { getAnchorIfLastUsed, setKnownPrincipal } from "$src/storage";
 import { Connection } from "$src/utils/iiConnection";
 import { TemplateElement } from "$src/utils/lit-html";
-import { Chan } from "$src/utils/utils";
+import { Chan, FrontendSignedDelegation } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
 import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
-import { Delegation, fetchDelegation } from "./fetchDelegation";
+import { fetchDelegation } from "./fetchDelegation";
 import copyJson from "./index.json";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 
@@ -159,7 +159,7 @@ const authenticate = async (
 ): Promise<
   | {
       kind: "success";
-      delegations: Delegation[];
+      delegations: FrontendSignedDelegation[];
       userPublicKey: Uint8Array;
       authnMethod: "pin" | "passkey" | "recovery";
     }
