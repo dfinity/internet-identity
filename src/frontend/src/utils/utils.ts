@@ -423,7 +423,7 @@ export interface FrontendSignedDelegation {
 // Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
 export const transformSignedDelegation = (
   signed_delegation: SignedDelegation
-) => {
+): FrontendSignedDelegation => {
   return {
     delegation: new Delegation(
       Uint8Array.from(signed_delegation.delegation.pubkey),
