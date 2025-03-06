@@ -3,6 +3,7 @@ import {
   readCanisterId,
 } from "@dfinity/internet-identity-vite-plugins";
 import { defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 const rewriteRoute = (pathAndParams: string): string => {
   let queryParamsString = `?`;
@@ -40,6 +41,7 @@ export default defineConfig(({ command, mode }) => ({
       },
     },
   },
+  plugins: [nodePolyfills({ include: ["buffer"] })],
   server:
     command !== "serve"
       ? undefined

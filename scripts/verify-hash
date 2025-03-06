@@ -100,9 +100,12 @@ fi
 ./scripts/docker-build
 prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
 
+ii_match=false
+archive_match=false
+
 if [ "$prod_build_sha256" == "$expected_ii_hash" ]
 then
-  print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+  ii_match=true
 else
   print_red "sha mismatch: $prod_build_sha256 /= $expected_ii_hash"
   exit 1
@@ -114,11 +117,22 @@ then
   archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
   if [ "$archive_sha256" == "$expected_archive_hash" ]
   then
-    print_green "archive.wasm.gz sha256 matches expected hash $expected_archive_hash"
+    archive_match=true
   else
     print_red "sha mismatch: $archive_sha256 /= $expected_archive_hash"
+    if $ii_match; then
+      print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+    fi
     exit 1
   fi
+fi
+
+if $ii_match; then
+  print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+fi
+
+if $archive_match; then
+  print_green "archive.wasm.gz sha256 matches expected hash $expected_archive_hash"
 fi
 
 print_green "Wasm verification successful!"

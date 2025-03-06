@@ -13,14 +13,9 @@ import {
   LoginSuccess,
 } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
-import {
-  isProtected,
-  isRecoveryDevice,
-  RecoveryPhrase,
-} from "$src/utils/recoveryDevice";
+import { isProtected, RecoveryPhrase } from "$src/utils/recoveryDevice";
 import { unknownToString } from "$src/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
-
 import copyJson from "./deviceSettings.json";
 
 /* Rename the device and return */
@@ -50,58 +45,6 @@ export const renameDevice = async ({
   });
   reload();
   return;
-};
-/* Remove the device and return */
-export const deleteDevice = async ({
-  connection,
-  device,
-  reload,
-}: {
-  connection: AuthenticatedConnection;
-  device: DeviceData;
-  reload: () => void;
-}) => {
-  const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
-    .buffer as DerEncodedPublicKey;
-  const sameDevice = bufferEqual(
-    connection.identity.getPublicKey().toDer(),
-    pubKey
-  );
-
-  // Different confirmation based on the device
-  const confirmationPrompt = [];
-  if (isRecoveryDevice(device)) {
-    confirmationPrompt.push("Remove your Recovery Device");
-    confirmationPrompt.push(
-      "Are you sure you want to remove your recovery device? You will no longer be able to use it to recover your account."
-    );
-  } else {
-    confirmationPrompt.push(
-      `Do you really want to remove the device "${device.alias}"?`
-    );
-  }
-  if (sameDevice) {
-    confirmationPrompt.push(
-      "This will remove your current device and you will be logged out."
-    );
-  }
-  const shouldProceed = confirm(confirmationPrompt.join("\n\n"));
-  if (!shouldProceed) {
-    return;
-  }
-
-  await withLoader(async () => {
-    await connection.remove(device.pubkey);
-  });
-
-  if (sameDevice) {
-    // reload the page.
-    // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
-    location.reload();
-    return;
-  } else {
-    reload();
-  }
 };
 
 /* Resetting */

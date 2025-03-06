@@ -11,7 +11,7 @@ on:
 
 jobs:
   deploy-rc:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       ii_canister_id: jqajs-xiaaa-aaaad-aab5q-cai
       testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai
@@ -72,6 +72,8 @@ jobs:
       - name: "Deploy Release Candidate"
         run: |
           wallet="${{ env.wallet_canister_id }}"
+          # Needed to surpass dfx error to use the insecure plaintext identity
+          export DFX_WARNING=-mainnet_plaintext_identity
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --wasm internet_identity_production.wasm.gz \
             ${{ env.ii_canister_id }}

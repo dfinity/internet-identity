@@ -1,4 +1,7 @@
-import { _SERVICE } from "$generated/internet_identity_types";
+import {
+  _SERVICE,
+  InternetIdentityInit,
+} from "$generated/internet_identity_types";
 import { authenticateBoxFlow } from "$src/components/authenticateBox";
 import { withLoader } from "$src/components/loader";
 import { toast } from "$src/components/toast";
@@ -11,6 +14,17 @@ import { html, render, TemplateResult } from "lit-html";
 import { dummyChallenge } from "./constants";
 import { i18n } from "./i18n";
 import { manageTemplates } from "./templates";
+
+const DEFAULT_INIT: InternetIdentityInit = {
+  analytics_config: [],
+  archive_config: [],
+  assigned_user_number_range: [],
+  canister_creation_cycles_cost: [],
+  captcha_config: [],
+  openid_google: [],
+  register_rate_limit: [],
+  related_origins: [],
+};
 
 const registerSuccessToastTemplate = (result: unknown) => html`
   Identity successfully created!<br />
@@ -48,12 +62,14 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
   constructor() {
     super(
       "12345",
-      MultiWebAuthnIdentity.fromCredentials([], undefined),
+      DEFAULT_INIT,
+      MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),
       mockActor
     );
   }
+
   setShownRecoveryWarningPage = async (): Promise<void> => {
     // Do nothing
   };

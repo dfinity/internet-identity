@@ -1,5 +1,6 @@
 import {
   DeviceData,
+  InternetIdentityInit,
   MetadataMapV2,
   _SERVICE,
 } from "$generated/internet_identity_types";
@@ -9,13 +10,16 @@ import {
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$src/repositories/identityMetadata";
 import { ActorSubclass, DerEncodedPublicKey, Signature } from "@dfinity/agent";
-import { DelegationIdentity, WebAuthnIdentity } from "@dfinity/identity";
+import { DelegationIdentity } from "@dfinity/identity";
+import { IDBFactory } from "fake-indexeddb";
+import { clear as idbClear } from "idb-keyval";
 import {
   CredentialData,
   convertToValidCredentialData,
 } from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
+import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
@@ -51,6 +55,23 @@ const mockIdentityMetadata: IdentityMetadata = {
 // Used to await that the getter has resolved.
 let infoResponse: MetadataMapV2 | null | undefined = null;
 
+const DEFAULT_INIT: InternetIdentityInit = {
+  analytics_config: [],
+  archive_config: [],
+  assigned_user_number_range: [],
+  canister_creation_cycles_cost: [],
+  captcha_config: [],
+  openid_google: [],
+  register_rate_limit: [],
+  related_origins: [
+    [
+      "https://identity.ic0.app",
+      "https://identity.internetcomputer.org",
+      "https://identity.icp0.io",
+    ],
+  ],
+};
+
 const mockActor = {
   identity_info: vi.fn().mockImplementation(async () => {
     // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
@@ -63,7 +84,13 @@ const mockActor = {
 
 const currentOrigin = "https://identity.internetcomputer.org";
 
-beforeEach(() => {
+beforeAll(() => {
+  // Initialize the IndexedDB global
+  global.indexedDB = new IDBFactory();
+});
+
+beforeEach(async () => {
+  await idbClear();
   infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
@@ -75,7 +102,8 @@ beforeEach(() => {
 test("initializes identity metadata repository", async () => {
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    DEFAULT_INIT,
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
     mockActor
@@ -90,12 +118,14 @@ test("commits changes on identity metadata", async () => {
   const userNumber = BigInt(1234);
   const connection = new AuthenticatedConnection(
     "12345",
-    MultiWebAuthnIdentity.fromCredentials([], undefined),
+    DEFAULT_INIT,
+    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
     mockActor
   );
 
+  expect(infoResponse).toBeUndefined();
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
 
   expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
@@ -133,13 +163,16 @@ describe("Connection.login", () => {
             };
           },
         } as unknown as WebAuthnIdentity;
+
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
           static fromCredentials(
             credentials: CredentialData[],
-            rpId: string | undefined
+            rpId: string | undefined,
+            iframe: boolean | undefined
           ) {
-            return new MockMultiWebAuthnIdentity(credentials, rpId);
+            return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
+
           override sign() {
             if (failSign) {
               throw new DOMException("Error test", "NotAllowedError");
@@ -148,7 +181,12 @@ describe("Connection.login", () => {
             return Promise.resolve(new ArrayBuffer(0) as Signature);
           }
         }
-        return MockMultiWebAuthnIdentity.fromCredentials([], undefined);
+
+        return MockMultiWebAuthnIdentity.fromCredentials(
+          [],
+          undefined,
+          undefined
+        );
       }
     );
   });
@@ -164,7 +202,7 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection with expected rpID", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -175,7 +213,30 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          "identity.ic0.app"
+          "identity.ic0.app",
+          true
+        );
+      }
+    });
+
+    it("login returns undefined RP ID if no related origins are in the config", async () => {
+      const config: InternetIdentityInit = {
+        ...DEFAULT_INIT,
+        related_origins: [],
+      };
+      const connection = new Connection("aaaaa-aa", config, mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("loginSuccess");
+      if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(loginResult.showAddCurrentDevice).toBe(false);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+          [convertToValidCredentialData(mockDevice)],
+          undefined,
+          false
         );
       }
     });
@@ -192,19 +253,21 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
 
-      expect(firstLoginResult.kind).toBe("possiblyWrongRPID");
+      expect(firstLoginResult.kind).toBe("possiblyWrongWebAuthnFlow");
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        // Do not use iframe
+        false
       );
 
       failSign = false;
@@ -219,13 +282,13 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
           2,
-          expect.arrayContaining([currentDeviceCredentialData]),
-          "identity.ic0.app"
-        );
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
-          2,
-          expect.not.arrayContaining([currentOriginCredentialData]),
-          "identity.ic0.app"
+          expect.arrayContaining([
+            currentDeviceCredentialData,
+            currentDeviceCredentialData,
+          ]),
+          "identity.ic0.app",
+          // Use iframe
+          true
         );
       }
     });
@@ -243,7 +306,7 @@ describe("Connection.login", () => {
           .fn()
           .mockResolvedValue([currentOriginDevice, currentOriginDevice2]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -255,7 +318,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentOriginCredentialData2,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -274,7 +338,8 @@ describe("Connection.login", () => {
             currentOriginCredentialData,
             currentOriginCredentialData2,
           ]),
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -290,8 +355,8 @@ describe("Connection.login", () => {
       });
     });
 
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+    it("login returns authenticated connection with expected rpID", async () => {
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -302,7 +367,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          "identity.ic0.app",
+          true
         );
       }
     });
@@ -319,7 +385,7 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection without rpID if flag is not enabled", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -330,7 +396,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -346,7 +413,7 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -358,7 +425,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -377,35 +445,8 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
-          undefined
-        );
-      }
-    });
-  });
-
-  describe("domains compatibility flag enabled and browser doesn't support", () => {
-    beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
-      vi.stubGlobal("navigator", {
-        // Does NOT Supports RoR
-        userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-      });
-    });
-
-    it("login returns authenticated connection without rpID if browser doesn't support it", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
-
-      const loginResult = await connection.login(BigInt(12345));
-
-      expect(loginResult.kind).toBe("loginSuccess");
-      if (loginResult.kind === "loginSuccess") {
-        expect(loginResult.showAddCurrentDevice).toBe(false);
-        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
-        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
-          [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -422,7 +463,7 @@ describe("Connection.login", () => {
     });
 
     it("login returns authenticated connection without rpID if flag is not enabled", async () => {
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       const loginResult = await connection.login(BigInt(12345));
 
@@ -433,7 +474,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -449,7 +491,7 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
       failSign = true;
       const firstLoginResult = await connection.login(BigInt(12345));
@@ -461,7 +503,8 @@ describe("Connection.login", () => {
           currentOriginCredentialData,
           currentDeviceCredentialData,
         ]),
-        undefined
+        undefined,
+        false
       );
 
       failSign = false;
@@ -480,7 +523,8 @@ describe("Connection.login", () => {
             currentDeviceCredentialData,
             currentOriginCredentialData,
           ]),
-          undefined
+          undefined,
+          false
         );
       }
     });
@@ -488,7 +532,8 @@ describe("Connection.login", () => {
 
   describe("when a device credential id is missing", () => {
     it("connection does not use this device to authenticate", async () => {
-      const deviceWithCredentialId: DeviceData = createMockDevice();
+      const deviceWithCredentialId: DeviceData =
+        createMockDevice(currentOrigin);
       const deviceWithoutCredentialId: DeviceData = createMockDevice();
       deviceWithoutCredentialId.credential_id = [];
       const mockActor = {
@@ -500,19 +545,21 @@ describe("Connection.login", () => {
             deviceWithoutCredentialId,
           ]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
       await connection.login(BigInt(12345));
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
-        undefined
+        undefined,
+        false
       );
     });
   });
 
   describe("when device credential id is invalid", () => {
     it("connection does not use this device to authenticate", async () => {
-      const deviceValidCredentialId: DeviceData = createMockDevice();
+      const deviceValidCredentialId: DeviceData =
+        createMockDevice(currentOrigin);
       const deviceInvalidCredentialId: DeviceData = createMockDevice();
       deviceInvalidCredentialId.credential_id = [Uint8Array.from([])];
       const mockActor = {
@@ -524,13 +571,198 @@ describe("Connection.login", () => {
             deviceInvalidCredentialId,
           ]),
       } as unknown as ActorSubclass<_SERVICE>;
-      const connection = new Connection("aaaaa-aa", mockActor);
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
       await connection.login(BigInt(12345));
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
+        undefined,
+        false
+      );
+    });
+  });
+
+  describe("only pin device is available", () => {
+    it("returns a custom error", async () => {
+      const pinDevice: DeviceData = {
+        alias: "mockDevice",
+        metadata: [],
+        origin: origin !== undefined ? [origin] : [],
+        protection: { protected: null },
+        pubkey: new Uint8Array(),
+        key_type: { browser_storage_key: null },
+        purpose: { authentication: null },
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+      };
+      const mockActor = {
+        lookup: vi.fn().mockResolvedValue([pinDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("pinUserOtherDomain");
+    });
+  });
+
+  describe("AuthenticatedConnection#add", () => {
+    const alias = "alias";
+    const keyType = { platform: null };
+    const purpose = { authentication: null };
+    const newPublicKey = new ArrayBuffer(0) as DerEncodedPublicKey;
+    const protection = { protected: null };
+
+    it("passes origin if origin less than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        DEFAULT_INIT,
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const origin = "https://identity.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        origin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [origin],
+        metadata: [],
+      });
+    });
+
+    it("doesn't pass origin if origin more than 50 characters", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        DEFAULT_INIT,
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const longOrigin = "https://thisisalongdominathatshouldbe50plus.ic0.app";
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        longOrigin
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("handles no origin being passed", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        DEFAULT_INIT,
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
         undefined
       );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
+    });
+
+    it("passes credential id if present", async () => {
+      const mockActor = {
+        identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
+        add: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const userNumber = BigInt(12345);
+      const connection = new AuthenticatedConnection(
+        "aaaaa-aa",
+        DEFAULT_INIT,
+        MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
+        mockDelegationIdentity,
+        userNumber,
+        mockActor
+      );
+
+      const credentialId = new Uint8Array([1, 2, 3, 4, 5]);
+      await connection.add(
+        alias,
+        keyType,
+        purpose,
+        newPublicKey,
+        protection,
+        undefined,
+        credentialId.buffer
+      );
+
+      expect(mockActor.add).toHaveBeenCalledTimes(1);
+      expect(mockActor.add).toHaveBeenCalledWith(userNumber, {
+        alias,
+        pubkey: Array.from(new Uint8Array(newPublicKey)),
+        credential_id: [Array.from(credentialId)],
+        key_type: keyType,
+        purpose,
+        protection,
+        origin: [],
+        metadata: [],
+      });
     });
   });
 });

@@ -6,7 +6,9 @@ import {
   MainView,
   PinAuthView,
   PinRegistrationView,
-  RecoverView,
+  PromptDeviceAliasView,
+  PromptUserNumberView,
+  RecoverSeedPhraseView,
   RecoveryMethodSelectorView,
   RegisterView,
   WelcomeView,
@@ -100,6 +102,17 @@ export const FLOWS = {
     const mainView = new MainView(browser);
     await mainView.waitForDeviceDisplay(deviceName);
   },
+  loginExistingAuthenticateView: async (
+    userNumber: string,
+    deviceName: string,
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.continueWithAnchor(userNumber);
+    const mainView = new MainView(browser);
+    await mainView.waitForDeviceDisplay(deviceName);
+  },
   loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,
@@ -129,7 +142,7 @@ export const FLOWS = {
   ): Promise<string> => {
     const mainView = new MainView(browser);
     await mainView.waitForDisplay();
-    await mainView.addRecovery();
+    await mainView.addRecoverySeedPhrase();
 
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
     await recoveryMethodSelectorView.waitForSeedPhrase();
@@ -143,6 +156,19 @@ export const FLOWS = {
     await mainView.waitForDisplay();
 
     return seedPhrase;
+  },
+  addRecoveryMechanismDevice: async (
+    browser: WebdriverIO.Browser
+  ): Promise<void> => {
+    const mainView = new MainView(browser);
+    await mainView.waitForDisplay();
+    await mainView.addRecoveryDevice();
+    await mainView.waitForDisplay();
+    await browser.pause(10_000);
+
+    // Wait for the main view to be displayed again to ensure that the recovery
+    // mechanism was added successfully.
+    await mainView.waitForDisplay();
   },
   readSeedPhrase: async (browser: WebdriverIO.Browser): Promise<string> => {
     const recoveryMethodSelectorView = new RecoveryMethodSelectorView(browser);
@@ -175,11 +201,25 @@ export const FLOWS = {
     recoveryPhrase: string
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
-    await authenticateView.recover();
-    const recoveryView = new RecoverView(browser);
+    await authenticateView.recoverSeedPhrase();
+    const recoveryView = new RecoverSeedPhraseView(browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(recoveryPhrase);
     await recoveryView.enterSeedPhraseContinue();
     await recoveryView.skipDeviceEnrollment();
+  },
+  recoverUsingDevice: async (
+    browser: WebdriverIO.Browser,
+    userNumber: string
+  ): Promise<void> => {
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.recoverDevice();
+    const userNumberView = new PromptUserNumberView(browser);
+    await userNumberView.waitForUserNumberDisplay();
+    await userNumberView.enterUserNumber(userNumber);
+    await userNumberView.enterUserNumberContinue();
+    const deviceAliasView = new PromptDeviceAliasView(browser);
+    await deviceAliasView.waitForDeviceAliasDisplay();
+    await deviceAliasView.skipDeviceAlias();
   },
 };

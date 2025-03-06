@@ -19,7 +19,7 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
 import { showVerificationCode } from "./showVerificationCode";
 
@@ -78,6 +78,7 @@ export const registerTentativeDevice = async (
     authenticatorType: result.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
+    aaguid: result.aaguid,
   });
 
   // Finally, we submit it to the canister

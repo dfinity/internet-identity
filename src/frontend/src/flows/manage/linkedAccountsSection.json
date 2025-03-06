@@ -9,6 +9,10 @@
     "link_additional_account": "Link additional account",
     "max_linked_accounts_reached": "You can link up to 100 online accounts. You must unlink an account before you can link another.",
     "unlink": "Unlink",
-    "last_used": "Last used"
+    "last_used": "Last used",
+    "authentication_failed": "Authentication failed",
+    "jwt_signature_invalid": "The account could not be linked due to an invalid signature.",
+    "account_not_found": "The account could not be found.",
+    "linking_google_accounts_is_unavailable": "Linking Google accounts is unavailable. Please try again later."
   }
 }

@@ -1,6 +1,6 @@
 import {
   compression,
-  injectCanisterIdPlugin,
+  injectCanisterIdAndConfigPlugin,
   inlineScriptsPlugin,
   minifyHTML,
   replicaForwardPlugin,
@@ -9,6 +9,7 @@ import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
 import { AliasOptions, UserConfig, defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -27,9 +28,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
     II_DUMMY_AUTH: `${process.env.II_DUMMY_AUTH ?? "0"}`,
     II_DUMMY_CAPTCHA: `${process.env.II_DUMMY_CAPTCHA ?? "0"}`,
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
-    II_OPENID_GOOGLE_CLIENT_ID: `${
-      process.env.II_OPENID_GOOGLE_CLIENT_ID ?? ""
-    }`,
   };
 
   // Path "../../" have to be expressed relative to the "root".
@@ -71,9 +69,17 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       inlineScriptsPlugin,
+      // Needed to support WebAuthnIdentity in this repository due to borc dependency.
+      nodePolyfills({
+        include: ["buffer"],
+      }),
       [
         ...(mode === "development"
-          ? [injectCanisterIdPlugin({ canisterName: "internet_identity" })]
+          ? [
+              injectCanisterIdAndConfigPlugin({
+                canisterName: "internet_identity",
+              }),
+            ]
           : []),
       ],
       [...(mode === "production" ? [minifyHTML(), compression()] : [])],
@@ -117,9 +123,27 @@ export default defineConfig(({ command, mode }): UserConfig => {
       command !== "serve"
         ? {}
         : {
-            https: process.env.TLS_DEV_SERVER === "1",
+            https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
             proxy: {
               "/api": `http://127.0.0.1:${readReplicaPort()}`,
+            },
+            allowedHosts: ["icp-api.io"],
+            cors: {
+              origin: [
+                "https://identity.internetcomputer.org",
+                "https://identity.ic0.app",
+                "https://nice-name.com",
+                "https://nice-issuer-custom-orig.com",
+                "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
+                // Test app
+                "https://bd3sg-teaaa-aaaaa-qaaba-cai.icp0.io",
+                // Test app
+                "https://bd3sg-teaaa-aaaaa-qaaba-cai.ic0.app",
+                // Issuer
+                "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.icp0.io",
+                // Issuer
+                "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.ic0.app",
+              ],
             },
           },
   };

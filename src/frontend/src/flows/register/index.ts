@@ -27,6 +27,7 @@ import {
   UnexpectedCall,
   WrongCaptchaSolution,
 } from "$src/utils/iiConnection";
+import { lookupAAGUID } from "$src/utils/webAuthn";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
@@ -108,8 +109,12 @@ export const registerFlow = async ({
   const flowStart = precomputeFirst(() => identityRegistrationStart());
 
   const displayUserNumber = displayUserNumberWarmup();
+  // We register the device's origin in the current domain.
+  // If we want to change it, we need to change this line.
+  const deviceOrigin = window.location.origin;
   const savePasskeyResult = await savePasskeyOrPin({
     pinAllowed: await pinAllowed(),
+    origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
     return "canceled";
@@ -153,6 +158,7 @@ export const registerFlow = async ({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
         uaParser,
+        aaguid: identity.aaguid,
       });
       return {
         identity,
@@ -161,6 +167,7 @@ export const registerFlow = async ({
           pubKey: identity.getPublicKey().toDer(),
           credentialId: identity.rawId,
           authenticatorAttachment: identity.getAuthenticatorAttachment(),
+          origin: deviceOrigin,
         }),
         authnMethod: "passkey" as const,
       };
@@ -290,11 +297,22 @@ export const inferPasskeyAlias = async ({
   authenticatorType,
   userAgent,
   uaParser: uaParser_,
+  aaguid,
 }: {
   authenticatorType: AuthenticatorType;
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
+  aaguid?: string;
 }): Promise<string> => {
+  // First lookup if alias can be found in known list
+  // before falling back to user agent implementation.
+  if (nonNullish(aaguid)) {
+    const knownName = await lookupAAGUID(aaguid);
+    if (nonNullish(knownName)) {
+      return knownName;
+    }
+  }
+
   const UNNAMED = "Unnamed Passkey";
   const FIDO = "FIDO Passkey";
   const ICLOUD = "iCloud Passkey";

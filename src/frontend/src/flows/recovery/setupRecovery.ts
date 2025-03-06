@@ -1,42 +1,21 @@
 import { DeviceData } from "$generated/internet_identity_types";
-import { displayError } from "$src/components/displayError";
 import { withLoader } from "$src/components/loader";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { generate } from "$src/crypto/mnemonic";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import {
   AuthenticatedConnection,
   creationOptions,
   IC_DERIVATION_PATH,
 } from "$src/utils/iiConnection";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import { unreachable, unreachableLax } from "$src/utils/utils";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
 import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { nonNullish } from "@dfinity/utils";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
 import { displaySeedPhrase } from "./displaySeedPhrase";
-
-export const setupRecovery = async ({
-  userNumber,
-  connection,
-}: {
-  userNumber: bigint;
-  connection: AuthenticatedConnection;
-}): Promise<void> => {
-  // Retry until user explicitly cancels or until a phrase is added successfully
-  for (;;) {
-    const res = await setupPhrase(userNumber, connection);
-    if (res === "ok" || res === "canceled") {
-      return;
-    }
-
-    res satisfies "error";
-    await displayError({
-      title: "Failed to set up recovery",
-      message: "We failed to set up recovery for this Internet Identity.",
-      primaryButton: "Retry",
-    });
-    continue;
-  }
-};
 
 // Set up a recovery device
 export const setupKey = async ({
@@ -54,8 +33,17 @@ export const setupKey = async ({
     await withLoader(async () => {
       const devices =
         devices_ ?? (await connection.lookupAll(connection.userNumber));
+      const newDeviceOrigin =
+        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+          ? getCredentialsOrigin({
+              credentials: devices,
+            })
+          : undefined;
+      const rpId = nonNullish(newDeviceOrigin)
+        ? new URL(newDeviceOrigin).host
+        : undefined;
       const recoverIdentity = await WebAuthnIdentity.create({
-        publicKey: creationOptions(devices, "cross-platform"),
+        publicKey: creationOptions(devices, "cross-platform", rpId),
       });
 
       await connection.add(
@@ -64,6 +52,7 @@ export const setupKey = async ({
         { recovery: null },
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
+        newDeviceOrigin ?? window.location.origin,
         recoverIdentity.rawId
       );
     });
@@ -77,7 +66,8 @@ export const setupKey = async ({
 // Set up a recovery phrase
 export const setupPhrase = async (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
+  origin: string
 ): Promise<"ok" | "error" | "canceled"> => {
   const res = await phraseWizard({
     userNumber,
@@ -89,7 +79,8 @@ export const setupPhrase = async (
           { seed_phrase: null },
           { recovery: null },
           pubkey,
-          { unprotected: null }
+          { unprotected: null },
+          origin
         )
       ),
   });

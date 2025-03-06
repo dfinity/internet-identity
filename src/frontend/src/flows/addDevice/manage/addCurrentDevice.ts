@@ -14,7 +14,8 @@ import {
   isWebAuthnCancel,
   isWebAuthnDuplicateDevice,
 } from "$src/utils/webAuthnErrorUtils";
-import { WebAuthnIdentity } from "@dfinity/identity";
+import { WebAuthnIdentity } from "$src/utils/webAuthnIdentity";
+import { nonNullish } from "@dfinity/utils";
 import { addDeviceSuccess } from "../addDeviceSuccess";
 
 const displayFailedToAddDevice = (error: Error) =>
@@ -27,7 +28,7 @@ const displayFailedToAddDevice = (error: Error) =>
   });
 
 /**
- * Add a new device form the current browser.
+ * Add a new device from the current browser.
  *
  * Used to add a device connected to the browser the user is
  * currently using, like a YubiKey, or FaceID.
@@ -41,14 +42,16 @@ const displayFailedToAddDevice = (error: Error) =>
 export const addCurrentDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  devices: Omit<DeviceData, "alias">[]
+  devices: Omit<DeviceData, "alias">[],
+  origin: string | undefined
 ): Promise<void> => {
+  const rpId = nonNullish(origin) ? new URL(origin).hostname : undefined;
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
   let newDevice: WebAuthnIdentity;
   try {
     newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices),
+      publicKey: creationOptions(devices, undefined, rpId),
     });
   } catch (error: unknown) {
     if (isWebAuthnDuplicateDevice(error)) {
@@ -67,6 +70,7 @@ export const addCurrentDevice = async (
     authenticatorType: newDevice.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
+    aaguid: newDevice.aaguid,
   });
   try {
     await withLoader(() =>
@@ -78,6 +82,7 @@ export const addCurrentDevice = async (
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },
+        origin ?? window.origin,
         newDevice.rawId
       )
     );

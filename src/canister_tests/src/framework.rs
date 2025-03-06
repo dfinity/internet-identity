@@ -160,9 +160,19 @@ pub fn install_ii_canister_with_arg(
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
 ) -> CanisterId {
-    let byts = candid::encode_one(arg).expect("error encoding II installation arg as candid");
+    install_ii_canister_with_arg_and_cycles(env, wasm, arg, 0)
+}
+
+pub fn install_ii_canister_with_arg_and_cycles(
+    env: &PocketIc,
+    wasm: Vec<u8>,
+    arg: Option<InternetIdentityInit>,
+    amount: u128,
+) -> CanisterId {
+    let bytes = candid::encode_one(arg).expect("error encoding II installation arg as candid");
     let canister_id = env.create_canister();
-    env.install_canister(canister_id, wasm, byts, None);
+    env.add_cycles(canister_id, amount);
+    env.install_canister(canister_id, wasm, bytes, None);
     canister_id
 }
 
@@ -366,14 +376,16 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
     }
 }
 
-pub fn verify_security_headers(headers: &[HeaderField]) {
-    let expected_headers = vec![
-        ("X-Frame-Options", "DENY"),
-        ("X-Content-Type-Options", "nosniff"),
-        ("Referrer-Policy", "same-origin"),
-        (
-            "Permissions-Policy",
-            "accelerometer=(),\
+pub fn verify_security_headers(headers: &[HeaderField], related_origins: &Option<Vec<String>>) {
+    let public_key_credentials_get = related_origins
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .fold("self".to_string(), |acc, origin| {
+            acc + " \"" + origin + "\""
+        });
+    let permission_policy = format!(
+        "accelerometer=(),\
 ambient-light-sensor=(),\
 autoplay=(),\
 battery=(),\
@@ -402,7 +414,7 @@ midi=(),\
 navigation-override=(),\
 payment=(),\
 picture-in-picture=(),\
-publickey-credentials-get=(self),\
+publickey-credentials-get=({public_key_credentials_get}),\
 screen-wake-lock=(),\
 serial=(),\
 speaker-selection=(),\
@@ -413,8 +425,13 @@ usb=(),\
 vertical-scroll=(),\
 web-share=(),\
 window-placement=(),\
-xr-spatial-tracking=()",
-        ),
+xr-spatial-tracking=()"
+    );
+    let expected_headers = vec![
+        ("X-Frame-Options", "DENY"),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "same-origin"),
+        ("Permissions-Policy", &permission_policy),
     ];
 
     for (header_name, expected_value) in expected_headers {
@@ -430,7 +447,13 @@ xr-spatial-tracking=()",
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
         .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
-    let rgx = Regex::new(
+    let frame_src = related_origins
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
+
+    let expression = format!(
         "^default-src 'none';\
 connect-src 'self' https:;\
 img-src 'self' data: https://\\*.googleusercontent.com;\
@@ -440,10 +463,11 @@ form-action 'none';\
 style-src 'self' 'unsafe-inline';\
 style-src-elem 'self' 'unsafe-inline';\
 font-src 'self';\
-frame-ancestors 'none';\
-upgrade-insecure-requests;$",
-    )
-    .unwrap();
+frame-ancestors {frame_src};\
+frame-src {frame_src};\
+upgrade-insecure-requests;$"
+    );
+    let rgx = Regex::new(&expression).unwrap();
 
     assert!(
         rgx.is_match(csp),

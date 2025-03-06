@@ -31,7 +31,7 @@ export const settingsDropdown = ({
       : undefined
   );
 
-  return html` <div class="c-action-list__action c-dropdown">
+  return html`<div class="c-action-list__action c-dropdown">
     ${asyncReplace(backdrop)}
     <button
       class="c-dropdown__trigger c-action-list__action"

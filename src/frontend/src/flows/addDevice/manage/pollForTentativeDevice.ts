@@ -133,7 +133,8 @@ type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
 export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  endTimestamp: Timestamp
+  endTimestamp: Timestamp,
+  origin: string
 ): Promise<PollReturn> => {
   const i18n = new I18n();
   const countdown: AsyncCountdown<PollReturn> =
@@ -142,7 +143,7 @@ export const pollForTentativeDevice = async (
   pollForTentativeDevicePage({
     cancel: () => countdown.stop("canceled"),
     useFIDO: () => countdown.stop("use-fido"),
-    origin: window.origin,
+    origin,
     userNumber,
     remaining: countdown.remainingFormattedAsync(),
     i18n,

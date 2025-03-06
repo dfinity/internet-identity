@@ -3,10 +3,10 @@ import { I18n } from "$src/i18n";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 import { renderPage } from "$src/utils/lit-html";
 import { TemplateResult } from "lit-html";
-import copyJson from "./addCurrentDevice.json";
 import { addCurrentDevice } from "./manage/addCurrentDevice";
+import copyJson from "./registerCurrentDeviceCurrentOrigin.json";
 
-const addCurrentDeviceTemplate = ({
+const registerCurrentDeviceCurrentOriginTemplate = ({
   add,
   skip,
   i18n,
@@ -31,25 +31,32 @@ const addCurrentDeviceTemplate = ({
   });
 };
 
-export const addCurrentDevicePage = renderPage(addCurrentDeviceTemplate);
+export const registerCurrentDeviceCurrentOriginPage = renderPage(
+  registerCurrentDeviceCurrentOriginTemplate
+);
 
 // Prompt the user to add the current device (with the current origin).
 // Adding the current device to the current origin improves the UX of the user when they come back to this origin.
-export const addCurrentDeviceScreen = (
+export const registerCurrentDeviceCurrentOrigin = (
   userNumber: bigint,
   connection: AuthenticatedConnection
-): Promise<void> => {
-  return new Promise((resolve) =>
-    addCurrentDevicePage({
+): Promise<void> =>
+  new Promise((resolve) =>
+    registerCurrentDeviceCurrentOriginPage({
       i18n: new I18n(),
       add: async () => {
         const existingDevices = await connection.lookupAuthenticators(
           userNumber
         );
-        await addCurrentDevice(userNumber, connection, existingDevices);
+        // We pass `undefined` as current origin becase we want to add the current device to the current origin.
+        await addCurrentDevice(
+          userNumber,
+          connection,
+          existingDevices,
+          undefined
+        );
         resolve();
       },
       skip: () => resolve(),
     })
   );
-};

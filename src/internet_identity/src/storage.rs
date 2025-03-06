@@ -82,7 +82,7 @@
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
@@ -97,22 +97,28 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use internet_identity_interface::internet_identity::types::*;
-
-use crate::state::PersistentState;
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
+use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
+use crate::storage::storable_anchor_number_list::StorableAnchorNumberList;
+use crate::storage::storable_openid_credential_key::StorableOpenIdCredentialKey;
 use crate::storage::storable_persistent_state::StorablePersistentState;
+use internet_identity_interface::internet_identity::types::*;
 
 pub mod anchor;
 pub mod registration_rates;
 
+pub mod stable_anchor;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
+mod storable_anchor_number_list;
+mod storable_openid_credential_key;
 mod storable_persistent_state;
 #[cfg(test)]
 mod tests;
@@ -135,6 +141,8 @@ const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
 const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
 const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
 const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
+const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
+const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -144,6 +152,9 @@ const REGISTRATION_REFERENCE_RATE_MEMORY_ID: MemoryId =
     MemoryId::new(REGISTRATION_REFERENCE_RATE_MEMORY_INDEX);
 const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
     MemoryId::new(REGISTRATION_CURRENT_RATE_MEMORY_INDEX);
+const STABLE_ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_MEMORY_INDEX);
+const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -203,9 +214,16 @@ pub struct Storage<M: Memory> {
     current_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the reference registration rate memory.
     reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the stable anchor memory.
+    stable_anchor_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    stable_anchor_memory: StableBTreeMap<AnchorNumber, StableAnchor, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
+    lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_anchor_with_openid_credential_memory:
+        StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList, ManagedMemory<M>>,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Header {
     magic: [u8; 3],
@@ -264,6 +282,9 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(REGISTRATION_REFERENCE_RATE_MEMORY_ID);
         let registration_current_rate_memory =
             memory_manager.get(REGISTRATION_CURRENT_RATE_MEMORY_ID);
+        let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
+        let lookup_anchor_with_openid_credential_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -296,6 +317,14 @@ impl<M: Memory + Clone> Storage<M> {
                 stats_aggregations_memory.clone(),
             ),
             event_aggregations: StableBTreeMap::init(stats_aggregations_memory),
+            stable_anchor_memory_wrapper: MemoryWrapper::new(stable_anchor_memory.clone()),
+            stable_anchor_memory: StableBTreeMap::init(stable_anchor_memory),
+            lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_openid_credential_memory.clone(),
+            ),
+            lookup_anchor_with_openid_credential_memory: StableBTreeMap::init(
+                lookup_anchor_with_openid_credential_memory,
+            ),
         }
     }
 
@@ -372,7 +401,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
-        let storable_anchor = StorableAnchor::from(data);
+        let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();
+
+        // Write fixed 4KB anchor
         let buf = storable_anchor.to_bytes();
         if buf.len() > self.header.entry_size as usize {
             return Err(StorageError::EntrySizeLimitExceeded {
@@ -387,11 +418,29 @@ impl<M: Memory + Clone> Storage<M> {
 
         writer.write_all(&buf).expect("memory write failed");
         writer.flush().expect("memory write failed");
+
+        // Write current and read previous unbounded stable structures anchor
+        let previous_stable_anchor = self
+            .stable_anchor_memory
+            .insert(anchor_number, stable_anchor.clone());
+
+        // Update `OpenIdCredential` to `AnchorNumber` lookup map
+        let previous_openid_credentials = previous_stable_anchor
+            .map(|anchor| anchor.openid_credentials)
+            .unwrap_or_default();
+        let current_openid_credentials = stable_anchor.openid_credentials;
+        self.update_lookup_anchors_with_openid_credential(
+            anchor_number,
+            previous_openid_credentials,
+            current_openid_credentials,
+        );
+
         Ok(())
     }
 
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
+        // Read fixed 4KB anchor
         let record_number = self.anchor_number_to_record(anchor_number)?;
         let address = self.record_address(record_number);
 
@@ -399,8 +448,49 @@ impl<M: Memory + Clone> Storage<M> {
         let mut buf = vec![0; self.header.entry_size as usize];
 
         reader.read_exact(&mut buf).expect("failed to read memory");
+
+        // Read unbounded stable structures anchor
         let storable_anchor = StorableAnchor::from_bytes(Cow::Owned(buf));
-        Ok(Anchor::from((anchor_number, storable_anchor)))
+        let stable_anchor = self.stable_anchor_memory.get(&anchor_number);
+        Ok(Anchor::from((
+            anchor_number,
+            storable_anchor,
+            stable_anchor,
+        )))
+    }
+
+    /// Update `Vec<OpenIdCredential>` to `Vec<AnchorNumber>` lookup map
+    fn update_lookup_anchors_with_openid_credential(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Vec<OpenIdCredential>,
+        current: Vec<OpenIdCredential>,
+    ) {
+        let previous_set: BTreeSet<OpenIdCredentialKey> =
+            previous.into_iter().map(|cred| cred.key()).collect();
+        let current_set: BTreeSet<OpenIdCredentialKey> =
+            current.into_iter().map(|cred| cred.key()).collect();
+        let credential_to_be_removed = previous_set.difference(&current_set);
+        let credential_to_be_added = current_set.difference(&previous_set);
+        credential_to_be_removed.cloned().for_each(|key| {
+            self.lookup_anchor_with_openid_credential_memory
+                .remove(&key.into());
+        });
+        credential_to_be_added.cloned().for_each(|key| {
+            self.lookup_anchor_with_openid_credential_memory
+                .insert(key.into(), vec![anchor_number].into());
+        });
+    }
+
+    pub fn lookup_anchor_with_openid_credential(
+        &self,
+        key: &OpenIdCredentialKey,
+    ) -> Option<AnchorNumber> {
+        let anchor_numbers: Vec<AnchorNumber> = self
+            .lookup_anchor_with_openid_credential_memory
+            .get(&key.clone().into())
+            .map(Into::into)?;
+        anchor_numbers.first().copied()
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -556,6 +646,15 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "current_registration_rate".to_string(),
                 self.current_registration_rate_memory_wrapper.size(),
+            ),
+            (
+                "stable_identities".to_string(),
+                self.stable_anchor_memory_wrapper.size(),
+            ),
+            (
+                "lookup_anchor_with_openid_credential".to_string(),
+                self.lookup_anchor_with_openid_credential_memory_wrapper
+                    .size(),
             ),
         ])
     }

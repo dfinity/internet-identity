@@ -8,6 +8,14 @@ export const idlFactory = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -31,6 +39,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -200,12 +209,23 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const Aud = IDL.Text;
+  const Iss = IDL.Text;
+  const Sub = IDL.Text;
+  const OpenIdCredential = IDL.Record({
+    'aud' : Aud,
+    'iss' : Iss,
+    'sub' : Sub,
+    'metadata' : MetadataMapV2,
+    'last_usage_timestamp' : Timestamp,
+  });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
     'expiration' : Timestamp,
   });
   const IdentityAnchorInfo = IDL.Record({
     'devices' : IDL.Vec(DeviceWithUsage),
+    'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
   const FrontendHostname = IDL.Text;
@@ -286,6 +306,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
+    'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
   const IdentityInfoError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -313,7 +334,31 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const JWT = IDL.Text;
+  const Salt = IDL.Vec(IDL.Nat8);
+  const OpenIdCredentialAddError = IDL.Variant({
+    'OpenIdCredentialAlreadyRegistered' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'JwtVerificationFailed' : IDL.Null,
+  });
+  const OpenIdCredentialKey = IDL.Tuple(Iss, Sub);
+  const OpenIdCredentialRemoveError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'OpenIdCredentialNotFound' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+  });
+  const OpenIdDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'NoSuchAnchor' : IDL.Null,
+    'JwtVerificationFailed' : IDL.Null,
+  });
   const UserKey = PublicKey;
+  const OpenIdPrepareDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
+  });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
     'relying_party' : FrontendHostname,
@@ -506,6 +551,36 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'openid_credential_add' : IDL.Func(
+        [IdentityNumber, JWT, Salt],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
+        [],
+      ),
+    'openid_credential_remove' : IDL.Func(
+        [IdentityNumber, OpenIdCredentialKey],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialRemoveError })],
+        [],
+      ),
+    'openid_get_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'openid_prepare_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey],
+        [
+          IDL.Variant({
+            'Ok' : OpenIdPrepareDelegationResponse,
+            'Err' : OpenIdDelegationError,
+          }),
+        ],
+        [],
+      ),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
@@ -540,6 +615,14 @@ export const init = ({ IDL }) => {
     'module_hash' : IDL.Vec(IDL.Nat8),
     'entries_fetch_limit' : IDL.Nat16,
   });
+  const AnalyticsConfig = IDL.Variant({
+    'Plausible' : IDL.Record({
+      'domain' : IDL.Opt(IDL.Text),
+      'track_localhost' : IDL.Opt(IDL.Bool),
+      'hash_mode' : IDL.Opt(IDL.Bool),
+      'api_host' : IDL.Opt(IDL.Text),
+    }),
+  });
   const CaptchaConfig = IDL.Record({
     'max_unsolved_captchas' : IDL.Nat64,
     'captcha_trigger' : IDL.Variant({
@@ -563,6 +646,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
+    'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

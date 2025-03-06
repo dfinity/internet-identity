@@ -34,7 +34,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                     ),
                     ("Content-Length".to_string(), body.len().to_string()),
                 ];
-                headers.append(&mut security_headers(vec![]));
+                headers.append(&mut security_headers(vec![], None));
                 HttpResponse {
                     status_code: 200,
                     headers,
@@ -45,7 +45,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             }
             Err(err) => HttpResponse {
                 status_code: 500,
-                headers: security_headers(vec![]),
+                headers: security_headers(vec![], None),
                 body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                 upgrade: None,
                 streaming_strategy: None,
@@ -61,7 +61,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
             },
             None => HttpResponse {
                 status_code: 404,
-                headers: security_headers(vec![]),
+                headers: security_headers(vec![], None),
                 body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                 upgrade: None,
                 streaming_strategy: None,
@@ -75,13 +75,25 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 /// iFrame policies, etc.).
 ///
 /// Integrity hashes for scripts must be speficied.
-pub fn security_headers(integrity_hashes: Vec<String>) -> Vec<HeaderField> {
+pub fn security_headers(
+    integrity_hashes: Vec<String>,
+    maybe_related_origins: Option<Vec<String>>,
+) -> Vec<HeaderField> {
+    // Allow related origins to get WebAuthn credentials from one another
+    let public_key_credentials_get = maybe_related_origins
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .fold("self".to_string(), |acc, origin| {
+            acc + " \"" + origin + "\""
+        });
+
     vec![
         ("X-Frame-Options".to_string(), "DENY".to_string()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         (
             "Content-Security-Policy".to_string(),
-            content_security_policy_header(integrity_hashes),
+            content_security_policy_header(integrity_hashes, maybe_related_origins),
         ),
         (
             "Strict-Transport-Security".to_string(),
@@ -92,48 +104,50 @@ pub fn security_headers(integrity_hashes: Vec<String>) -> Vec<HeaderField> {
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
         (
             "Permissions-Policy".to_string(),
-            "accelerometer=(),\
-             ambient-light-sensor=(),\
-             autoplay=(),\
-             battery=(),\
-             camera=(),\
-             clipboard-read=(),\
-             clipboard-write=(self),\
-             conversion-measurement=(),\
-             cross-origin-isolated=(),\
-             display-capture=(),\
-             document-domain=(),\
-             encrypted-media=(),\
-             execution-while-not-rendered=(),\
-             execution-while-out-of-viewport=(),\
-             focus-without-user-activation=(),\
-             fullscreen=(),\
-             gamepad=(),\
-             geolocation=(),\
-             gyroscope=(),\
-             hid=(),\
-             idle-detection=(),\
-             interest-cohort=(),\
-             keyboard-map=(),\
-             magnetometer=(),\
-             microphone=(),\
-             midi=(),\
-             navigation-override=(),\
-             payment=(),\
-             picture-in-picture=(),\
-             publickey-credentials-get=(self),\
-             screen-wake-lock=(),\
-             serial=(),\
-             speaker-selection=(),\
-             sync-script=(),\
-             sync-xhr=(self),\
-             trust-token-redemption=(),\
-             usb=(),\
-             vertical-scroll=(),\
-             web-share=(),\
-             window-placement=(),\
-             xr-spatial-tracking=()"
-                .to_string(),
+            format!(
+                "accelerometer=(),\
+                 ambient-light-sensor=(),\
+                 autoplay=(),\
+                 battery=(),\
+                 camera=(),\
+                 clipboard-read=(),\
+                 clipboard-write=(self),\
+                 conversion-measurement=(),\
+                 cross-origin-isolated=(),\
+                 display-capture=(),\
+                 document-domain=(),\
+                 encrypted-media=(),\
+                 execution-while-not-rendered=(),\
+                 execution-while-out-of-viewport=(),\
+                 focus-without-user-activation=(),\
+                 fullscreen=(),\
+                 gamepad=(),\
+                 geolocation=(),\
+                 gyroscope=(),\
+                 hid=(),\
+                 idle-detection=(),\
+                 interest-cohort=(),\
+                 keyboard-map=(),\
+                 magnetometer=(),\
+                 microphone=(),\
+                 midi=(),\
+                 navigation-override=(),\
+                 payment=(),\
+                 picture-in-picture=(),\
+                 publickey-credentials-get=({public_key_credentials_get}),\
+                 screen-wake-lock=(),\
+                 serial=(),\
+                 speaker-selection=(),\
+                 sync-script=(),\
+                 sync-xhr=(self),\
+                 trust-token-redemption=(),\
+                 usb=(),\
+                 vertical-scroll=(),\
+                 web-share=(),\
+                 window-placement=(),\
+                 xr-spatial-tracking=()"
+            )
+            .to_string(),
         ),
     ]
 }
@@ -165,7 +179,10 @@ pub fn security_headers(integrity_hashes: Vec<String>) -> Vec<HeaderField> {
 ///
 /// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
 /// with Safari.
-fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
+fn content_security_policy_header(
+    integrity_hashes: Vec<String>,
+    maybe_related_origins: Option<Vec<String>>,
+) -> String {
     // Always include 'strict-dynamic', but only include integrity hashes if there are some
     // (i.e. by default deny scripts and only allow whitelist)
     let strict_dynamic = if integrity_hashes.is_empty() {
@@ -186,6 +203,13 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
     // Allow connecting via http for development purposes
     #[cfg(feature = "dev_csp")]
     let connect_src = format!("{connect_src} http:");
+
+    // Allow related origins to embed one another
+    let frame_src = maybe_related_origins
+        .unwrap_or_default()
+        .iter()
+        .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
@@ -196,7 +220,8 @@ fn content_security_policy_header(integrity_hashes: Vec<String>) -> String {
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
-         frame-ancestors 'none';"
+         frame-ancestors {frame_src};\
+         frame-src {frame_src};"
     );
     // for the dev build skip upgrading all connections to II to https
     #[cfg(not(feature = "dev_csp"))]

@@ -16,10 +16,12 @@ pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
 
 mod api_v2;
+pub mod openid;
 pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
+pub use crate::internet_identity::types::openid::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -173,6 +175,7 @@ pub struct DeviceRegistrationInfo {
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
+    pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -204,6 +207,7 @@ pub struct InternetIdentityInit {
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
+    pub analytics_config: Option<Option<AnalyticsConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -240,6 +244,18 @@ pub struct RateLimitConfig {
 pub struct CaptchaConfig {
     pub max_unsolved_captchas: u64,
     pub captcha_trigger: CaptchaTrigger,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AnalyticsConfig {
+    Plausible {
+        // Config params from Plausible NPM package
+        // https://www.npmjs.com/package/plausible-tracker
+        domain: Option<String>,
+        hash_mode: Option<bool>,
+        track_localhost: Option<bool>,
+        api_host: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -285,4 +301,9 @@ pub enum DeployArchiveResult {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub client_id: String,
+}
+
+pub enum AuthorizationKey {
+    DevicePubKey(DeviceKey),
+    OpenIdPubKey(PublicKey),
 }

@@ -2,6 +2,9 @@ import {
   DeviceData,
   DeviceWithUsage,
   IdentityAnchorInfo,
+  OpenIdCredential,
+  OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
 } from "$generated/internet_identity_types";
 import identityCardBackground from "$src/assets/identityCardBackground.png";
 import {
@@ -30,12 +33,16 @@ import {
 import { addPhrase, recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$src/flows/recovery/setupRecovery";
 import { I18n } from "$src/i18n";
-import { AuthenticatedConnection, Connection } from "$src/utils/iiConnection";
-import { TemplateElement, renderPage } from "$src/utils/lit-html";
-import { OpenIDCredential } from "$src/utils/mockOpenID";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
 import {
-  GOOGLE_REQUEST_CONFIG,
+  AuthenticatedConnection,
+  Connection,
+  bufferEqual,
+} from "$src/utils/iiConnection";
+import { TemplateElement, renderPage } from "$src/utils/lit-html";
+import {
   createAnonymousNonce,
+  createGoogleRequestConfig,
   decodeJWT,
   isPermissionError,
   requestJWT,
@@ -46,21 +53,34 @@ import {
   isRecoveryDevice,
   isRecoveryPhrase,
 } from "$src/utils/recoveryDevice";
-import { OmitParams, shuffleArray, unreachable } from "$src/utils/utils";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
+import {
+  OmitParams,
+  isCanisterError,
+  shuffleArray,
+  unreachable,
+} from "$src/utils/utils";
+import { DerEncodedPublicKey } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
-import { addCurrentDeviceScreen } from "../addDevice/addCurrentDevice";
+import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
 import { authenticatorsSection } from "./authenticatorsSection";
+import { confirmRemoveDevice } from "./confirmRemoveDevice";
 import {
-  deleteDevice,
   protectDevice,
   renameDevice,
   resetPhrase,
   unprotectDevice,
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
-import { Devices, Protection, RecoveryKey, RecoveryPhrase } from "./types";
+import {
+  Authenticator,
+  Devices,
+  Protection,
+  RecoveryKey,
+  RecoveryPhrase,
+} from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
@@ -127,7 +147,10 @@ export const authFlowManage = async (connection: Connection) => {
   });
 
   if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
-    await addCurrentDeviceScreen(userNumber, authenticatedConnection);
+    await registerCurrentDeviceCurrentOrigin(
+      userNumber,
+      authenticatedConnection
+    );
   }
 
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
@@ -162,6 +185,7 @@ const displayManageTemplate = ({
   userNumber,
   devices: { authenticators, recoveries, pinAuthenticators },
   onAddDevice,
+  onRemoveDevice,
   addRecoveryPhrase,
   addRecoveryKey,
   credentials,
@@ -175,11 +199,12 @@ const displayManageTemplate = ({
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
-  credentials: OpenIDCredential[];
+  credentials: OpenIdCredential[];
   onLinkAccount: () => void;
-  onUnlinkAccount: (credential: OpenIDCredential) => void;
+  onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
   exploreDapps: () => void;
   identityBackground: PreLoadImage;
@@ -187,9 +212,13 @@ const displayManageTemplate = ({
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
+  // Recommend the user to clean up passkeys if there are
+  // authenticators registered across multiple domains.
+  const cleanupRecommended =
+    new Set(authenticators.map((authenticator) => authenticator.rpId)).size > 1;
   const i18n = new I18n();
 
-  const pageContentSlot = html` <section data-role="identity-management">
+  const pageContentSlot = html`<section data-role="identity-management">
     <hgroup>
       <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
     </hgroup>
@@ -198,12 +227,19 @@ const displayManageTemplate = ({
       ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
       : ""}
     ${pinAuthenticators.length > 0
-      ? tempKeysSection({ authenticators: pinAuthenticators, i18n })
+      ? tempKeysSection({
+          authenticators: pinAuthenticators,
+          i18n,
+          onRemoveDevice,
+        })
       : ""}
     ${authenticatorsSection({
       authenticators,
       onAddDevice,
+      onRemoveDevice,
       warnNoPasskeys,
+      cleanupRecommended,
+      i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
@@ -213,7 +249,12 @@ const displayManageTemplate = ({
           hasOtherAuthMethods: authenticators.length > 0,
         })
       : ""}
-    ${recoveryMethodsSection({ recoveries, addRecoveryPhrase, addRecoveryKey })}
+    ${recoveryMethodsSection({
+      recoveries,
+      addRecoveryPhrase,
+      addRecoveryKey,
+      onRemoveDevice,
+    })}
     <aside class="l-stack">
       ${dappsTeaser({
         dapps,
@@ -276,7 +317,7 @@ export const renderManage = async ({
   // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
   // loop forever
   for (;;) {
-    let anchorInfo: IdentityAnchorInfo & { credentials: OpenIDCredential[] };
+    let anchorInfo: IdentityAnchorInfo;
     try {
       // Ignore the `commitMetadata` response, it's not critical for the application.
       void connection.commitMetadata();
@@ -289,7 +330,7 @@ export const renderManage = async ({
     }
     if (anchorInfo.device_registration.length !== 0) {
       // we are actually in a device registration process
-      await addDevice({ userNumber, connection });
+      await addDevice({ userNumber, connection, origin: window.origin });
       continue;
     }
 
@@ -298,7 +339,7 @@ export const renderManage = async ({
       userNumber,
       connection,
       anchorInfo.devices,
-      anchorInfo.credentials,
+      anchorInfo.openid_credentials[0] ?? [],
       identityBackground
     );
     connection = newConnection ?? connection;
@@ -327,7 +368,7 @@ export const displayManage = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
-  credentials: OpenIDCredential[],
+  credentials: OpenIdCredential[],
   identityBackground: PreLoadImage
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
@@ -341,6 +382,9 @@ export const displayManage = async (
   const { nonce, salt } = await createAnonymousNonce(
     connection.identity.getPrincipal()
   );
+
+  const googleClientId =
+    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -363,9 +407,56 @@ export const displayManage = async (
     }
 
     const onAddDevice = async () => {
-      await addDevice({ userNumber, connection });
+      const newDeviveOrigin =
+        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+          ? getCredentialsOrigin({
+              credentials: devices_,
+            })
+          : undefined;
+      await addDevice({
+        userNumber,
+        connection,
+        origin: newDeviveOrigin ?? window.origin,
+      });
       resolve();
     };
+
+    const onRemoveDevice = async (device: DeviceWithUsage) => {
+      const pubKey: DerEncodedPublicKey = new Uint8Array(device.pubkey)
+        .buffer as DerEncodedPublicKey;
+      const isCurrentDevice = bufferEqual(
+        connection.identity.getPublicKey().toDer(),
+        pubKey
+      );
+      const action = await confirmRemoveDevice({
+        i18n,
+        purpose: device.purpose,
+        lastUsedNanoseconds: device.last_usage[0],
+        originRegistered: device.origin[0],
+        alias: device.alias,
+        isCurrentDevice,
+      });
+      if (action === "cancelled") {
+        // This triggers a spinner which refetches the data.
+        // But this is the UX we alreay have now.
+        // We will improve this UX with the Svelte integration. Not worth improving now.
+        resolve();
+        return;
+      }
+      await withLoader(() => {
+        return Promise.all([connection.remove(device.pubkey)]);
+      });
+
+      if (isCurrentDevice) {
+        // reload the page.
+        // do not call "reload", otherwise the management page will try to reload the list of devices which will cause an error
+        location.reload();
+        return;
+      } else {
+        resolve();
+      }
+    };
+
     const addRecoveryPhrase = async () => {
       const doAdd = await addPhrase({ intent: "userInitiated" });
       if (doAdd === "cancel") {
@@ -373,14 +464,28 @@ export const displayManage = async (
         return;
       }
       doAdd satisfies "ok";
-      await setupPhrase(userNumber, connection);
+      // Recovery phrase doesn't need ROR, this is for consistency reasons.
+      const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+        ? getCredentialsOrigin({
+            credentials: devices_,
+          })
+        : undefined;
+      await setupPhrase(
+        userNumber,
+        connection,
+        newDeviceOrigin ?? window.origin
+      );
       resolve();
     };
 
     const onLinkAccount = async () => {
+      if (isNullish(googleClientId)) {
+        toast.error(copy.linking_google_accounts_is_unavailable);
+        return;
+      }
       try {
         const jwt = await withLoader(() =>
-          requestJWT(GOOGLE_REQUEST_CONFIG, {
+          requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
             nonce,
           })
@@ -390,20 +495,75 @@ export const displayManage = async (
           toast.error(copy.account_already_linked);
           return;
         }
-        await connection.addJWT(jwt, salt);
+        await connection.addOpenIdCredential(jwt, salt);
         resolve();
       } catch (error) {
         if (isPermissionError(error)) {
           toast.error(copy.third_party_sign_in_permission_required);
+          return;
         }
+        if (isCanisterError<OpenIdCredentialAddError>(error)) {
+          switch (error.type) {
+            case "Unauthorized":
+              toast.error(copy.authentication_failed);
+              console.error(
+                `Authentication unexpectedly failed: ${error
+                  .value(error.type)
+                  .toText()}`
+              );
+              break;
+            case "JwtVerificationFailed":
+              toast.error(copy.jwt_signature_invalid);
+              break;
+            case "OpenIdCredentialAlreadyRegistered":
+              toast.error(copy.account_already_linked);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
+              break;
+            default: {
+              // Make sure all error cases are covered,
+              // else this will throw a TS error here.
+              const _ = error.type satisfies never;
+            }
+          }
+          return;
+        }
+        throw error;
       }
     };
-    const onUnlinkAccount = async (credential: OpenIDCredential) => {
+    const onUnlinkAccount = async (credential: OpenIdCredential) => {
       if (!confirm(copy.unlink_account_confirmation.toString())) {
         return;
       }
-      await connection.removeJWT(credential.iss, credential.sub);
-      resolve();
+      try {
+        await connection.removeOpenIdCredential(credential.iss, credential.sub);
+        resolve();
+      } catch (error) {
+        if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
+          switch (error.type) {
+            case "Unauthorized":
+              toast.error(copy.authentication_failed);
+              console.error(
+                `Authentication unexpectedly failed: ${error
+                  .value(error.type)
+                  .toText()}`
+              );
+              break;
+            case "OpenIdCredentialNotFound":
+              toast.error(copy.account_not_found);
+              break;
+            case "InternalCanisterError":
+              toast.error(`Unexpected error: ${error.value(error.type)}`);
+              break;
+            default: {
+              // Make sure all error cases are covered,
+              // else this will throw a TS error here.
+              const _ = error.type satisfies never;
+            }
+          }
+        }
+      }
     };
 
     // Function to figure out what temp keys warning should be shown, if any.
@@ -436,6 +596,7 @@ export const displayManage = async (
         userNumber,
         devices,
         onAddDevice,
+        onRemoveDevice,
         addRecoveryPhrase,
         addRecoveryKey: async () => {
           await setupKey({ connection });
@@ -467,7 +628,7 @@ export const readRecovery = ({
   reload,
   device,
 }: {
-  device: DeviceData;
+  device: DeviceWithUsage;
   userNumber: bigint;
   connection: AuthenticatedConnection;
   reload: () => void;
@@ -506,7 +667,7 @@ export const readRecovery = ({
     } else {
       return {
         recoveryKey: {
-          remove: () => deleteDevice({ connection, device, reload }),
+          device,
         },
       };
     }
@@ -515,6 +676,7 @@ export const readRecovery = ({
 
 // Convert devices read from the canister into types that are easier to work with
 // and that better represent what we expect.
+// Exported for testing purposes
 export const devicesFromDevicesWithUsage = ({
   devices: devices_,
   reload,
@@ -529,6 +691,7 @@ export const devicesFromDevicesWithUsage = ({
   hasOtherAuthMethods: boolean;
 }): Devices & { dupPhrase: boolean; dupKey: boolean } => {
   const hasSingleDevice = devices_.length <= 1;
+  const currentPublicKey = connection.getSignIdentityPubKey();
 
   return devices_.reduce<Devices & { dupPhrase: boolean; dupKey: boolean }>(
     (acc, device) => {
@@ -550,15 +713,19 @@ export const devicesFromDevicesWithUsage = ({
         return acc;
       }
 
-      const authenticator = {
+      const canBeRemoved = !(hasSingleDevice && !hasOtherAuthMethods);
+      const authenticator: Authenticator = {
         alias: device.alias,
+        rpId: rpIdFromDevice(device),
         last_usage: device.last_usage,
         warn: domainWarning(device),
         rename: () => renameDevice({ connection, device, reload }),
-        remove:
-          hasSingleDevice && !hasOtherAuthMethods
-            ? undefined
-            : () => deleteDevice({ connection, device, reload }),
+        canBeRemoved,
+        isCurrent: bufferEqual(
+          currentPublicKey,
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+        ),
+        device,
       };
 
       if ("browser_storage_key" in device.key_type) {
@@ -582,6 +749,9 @@ export const devicesFromDevicesWithUsage = ({
 export const domainWarning = (
   device: DeviceData
 ): TemplateResult | undefined => {
+  if (DOMAIN_COMPATIBILITY.isEnabled()) {
+    return undefined;
+  }
   // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
   if (isRecoveryPhrase(device)) {
     return undefined;
@@ -592,28 +762,34 @@ export const domainWarning = (
     device.origin.length === 0 ? undefined : device.origin[0];
 
   // If this is the _old_ II (ic0.app) and no origin was recorded, then we can't infer much and don't show a warning.
-  if (window.origin === LEGACY_II_URL && isNullish(deviceOrigin)) {
+  if (window.location.origin === LEGACY_II_URL && isNullish(deviceOrigin)) {
     return undefined;
   }
 
   // If this is the _old_ II (ic0.app) and the device has an origin that is _not_ ic0.app, then the device was probably migrated and can't be used on ic0.app anymore.
-  if (window.origin === LEGACY_II_URL && deviceOrigin !== window.origin) {
+  if (
+    window.location.origin === LEGACY_II_URL &&
+    deviceOrigin !== window.location.origin
+  ) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
 
   // In general, if this is _not_ the _old_ II, then it's most likely the _new_ II, meaning all devices should have an origin attached.
   if (isNullish(deviceOrigin)) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
 
   // Finally, in general if the device has an origin but this is not _this_ origin, we issue a warning
-  if (deviceOrigin !== window.origin) {
+  if (deviceOrigin !== window.location.origin) {
     return html`This Passkey may not be usable on the current URL
-    (${window.origin})`;
+    (${window.location.origin})`;
   }
 };
+
+const rpIdFromDevice = (device: DeviceWithUsage) =>
+  new URL(device.origin[0] ?? LEGACY_II_URL).hostname;
 
 const unknownError = (): Error => {
   return new Error("Unknown error");

@@ -4,6 +4,7 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::openid::OpenIdCredentialKey;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -17,6 +18,10 @@ use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::openid::{
+    OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
+    OpenIdPrepareDelegationResponse,
+};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
     PrepareIdAliasRequest, PreparedIdAlias,
@@ -24,7 +29,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::ops::Not;
 use storage::{Salt, Storage};
 
 mod anchor_management;
@@ -153,7 +157,7 @@ fn register(
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>(((), anchor_management::add(anchor, device_data)))
+        Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -163,7 +167,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::update(anchor, device_key, device_data),
+            anchor_management::update_device(anchor, device_key, device_data),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -174,7 +178,7 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::replace(anchor_number, anchor, device_key, device_data),
+            anchor_management::replace_device(anchor_number, anchor, device_key, device_data),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -185,7 +189,7 @@ fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
-            anchor_management::remove(anchor_number, anchor, device_key),
+            anchor_management::remove_device(anchor_number, anchor, device_key),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -198,13 +202,14 @@ fn lookup(anchor_number: AnchorNumber) -> Vec<DeviceData> {
     let Ok(anchor) = state::storage_borrow(|storage| storage.read(anchor_number)) else {
         return vec![];
     };
-    anchor
-        .into_devices()
+    let mut devices = anchor.into_devices();
+    devices.sort_by(|a, b| b.last_usage_timestamp.cmp(&a.last_usage_timestamp));
+    devices
         .into_iter()
         .map(DeviceData::from)
         .map(|mut d| {
             // Remove non-public fields.
-            d.alias = "".to_string();
+            d.alias = String::new();
             d.metadata = None;
             d
         })
@@ -350,6 +355,7 @@ fn config() -> InternetIdentityInit {
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
+        analytics_config: Some(persistent_state.analytics_config.clone()),
     })
 }
 
@@ -389,19 +395,17 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
-    let related_origins = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.related_origins.clone())
-        .unwrap_or(persistent_state(|storage| storage.related_origins.clone()).unwrap_or(vec![]));
-    let openid_google = maybe_arg
-        .as_ref()
-        .and_then(|arg| arg.openid_google.clone())
-        .unwrap_or(persistent_state(|storage| storage.openid_google.clone()));
-    init_assets(related_origins.is_empty().not().then_some(related_origins));
+    // Apply arguments
     apply_install_arg(maybe_arg);
+
+    // Get config that possibly has been updated above
+    let config = config();
+
+    // Initiate assets and OpenID providers
+    init_assets(&config);
     update_root_hash();
-    if let Some(config) = openid_google {
-        openid::setup_google(config);
+    if let Some(Some(openid_config)) = config.openid_google {
+        openid::setup_google(openid_config);
     }
 }
 
@@ -438,6 +442,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(openid_google) = arg.openid_google {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_google = openid_google;
+            })
+        }
+        if let Some(analytics_config) = arg.analytics_config {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.analytics_config = analytics_config;
             })
         }
     }
@@ -578,6 +587,7 @@ mod v2_api {
             authn_method_registration: anchor_info
                 .device_registration
                 .map(AuthnMethodRegistration::from),
+            openid_credentials: anchor_info.openid_credentials,
             metadata,
         };
         Ok(identity_info)
@@ -738,6 +748,116 @@ mod v2_api {
             VerifyTentativeDeviceResponse::NoDeviceToVerify => {
                 Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
             }
+        }
+    }
+}
+
+/// API for OpenID credentials
+mod openid_api {
+    use crate::anchor_management::{
+        add_openid_credential, lookup_anchor_with_openid_credential, remove_openid_credential,
+    };
+    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
+    use crate::openid::{self, OpenIdCredentialKey};
+    use crate::storage::anchor::AnchorError;
+    use crate::{
+        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
+    };
+    use ic_cdk::caller;
+    use ic_cdk_macros::{query, update};
+    use internet_identity_interface::internet_identity::types::SignedDelegation;
+
+    impl From<IdentityUpdateError> for OpenIdCredentialAddError {
+        fn from(_: IdentityUpdateError) -> Self {
+            OpenIdCredentialAddError::Unauthorized(caller())
+        }
+    }
+    impl From<IdentityUpdateError> for OpenIdCredentialRemoveError {
+        fn from(_: IdentityUpdateError) -> Self {
+            OpenIdCredentialRemoveError::Unauthorized(caller())
+        }
+    }
+
+    #[update]
+    fn openid_credential_add(
+        identity_number: IdentityNumber,
+        jwt: String,
+        salt: [u8; 32],
+    ) -> Result<(), OpenIdCredentialAddError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            let openid_credential = openid::verify(&jwt, &salt)
+                .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
+            add_openid_credential(anchor, openid_credential)
+                .map(|operation| ((), operation))
+                .map_err(|err| match err {
+                    AnchorError::OpenIdCredentialAlreadyRegistered => {
+                        OpenIdCredentialAddError::OpenIdCredentialAlreadyRegistered
+                    }
+                    err => OpenIdCredentialAddError::InternalCanisterError(err.to_string()),
+                })
+        })
+    }
+
+    #[update]
+    fn openid_credential_remove(
+        identity_number: IdentityNumber,
+        openid_credential_key: OpenIdCredentialKey,
+    ) -> Result<(), OpenIdCredentialRemoveError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            remove_openid_credential(anchor, &openid_credential_key)
+                .map(|operation| ((), operation))
+                .map_err(|err| match err {
+                    AnchorError::OpenIdCredentialNotFound => {
+                        OpenIdCredentialRemoveError::OpenIdCredentialNotFound
+                    }
+                    err => OpenIdCredentialRemoveError::InternalCanisterError(err.to_string()),
+                })
+        })
+    }
+
+    #[update]
+    async fn openid_prepare_delegation(
+        jwt: String,
+        salt: [u8; 32],
+        session_key: SessionKey,
+    ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
+        let openid_credential = openid::verify(&jwt, &salt)
+            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+
+        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
+
+        // Checking again because the association could've changed during the .await
+        let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        if anchor_number != still_anchor_number {
+            return Err(OpenIdDelegationError::NoSuchAnchor);
+        }
+
+        Ok(OpenIdPrepareDelegationResponse {
+            user_key,
+            expiration,
+            anchor_number,
+        })
+    }
+
+    #[query]
+    fn openid_get_delegation(
+        jwt: String,
+        salt: [u8; 32],
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> Result<SignedDelegation, OpenIdDelegationError> {
+        let openid_credential = openid::verify(&jwt, &salt)
+            .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+
+        match lookup_anchor_with_openid_credential(&openid_credential.key()) {
+            Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
+            None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
     }
 }

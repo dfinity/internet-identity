@@ -1,19 +1,6 @@
 import { DeviceData } from "$generated/internet_identity_types";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { domainWarning } from "$src/flows/manage";
-
-function onOrigin(origin: string, fn: () => void) {
-  const oldOrigin = window.origin;
-  Object.defineProperty(window, "origin", {
-    writable: true,
-    value: origin,
-  });
-
-  fn();
-  Object.defineProperty(window, "origin", {
-    writable: true,
-    value: oldOrigin,
-  });
-}
 
 const recoveryPhrase: DeviceData = {
   alias: "Recovery Phrase",
@@ -39,54 +26,78 @@ const authenticator: DeviceData = {
   metadata: [],
 };
 
-test("recovery phrases don't have origin warnings", () => {
-  onOrigin("https://identity.ic0.app", () => {
-    expect(domainWarning(recoveryPhrase)).toBe(undefined);
-    expect(
-      domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
-    ).toBe(undefined);
+describe("recovery phrases don't have origin warnings", () => {
+  describe("on legacy domain", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.stubGlobal("location", {
+        origin: "https://identity.ic0.app",
+      });
+      // domainWarning is used only when DOMAIN_COMPATIBILITY is false
+      DOMAIN_COMPATIBILITY.set(false);
+    });
+
+    it("returns undefined for recovery phrase", () => {
+      expect(domainWarning(recoveryPhrase)).toBe(undefined);
+      expect(
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+      ).toBe(undefined);
+    });
+
+    it("no origin is not warning", () => {
+      expect(domainWarning({ ...authenticator, origin: [] })).toBe(undefined);
+    });
+
+    it("legacy origin in not warning", () => {
+      expect(
+        domainWarning({
+          ...authenticator,
+          origin: ["https://identity.ic0.app"],
+        })
+      ).toBeUndefined();
+    });
+
+    test("bad origin is warning", () => {
+      expect(
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+      ).toBeDefined();
+    });
   });
 
-  onOrigin("https://identity.internetcomputer.org", () => {
-    expect(domainWarning(recoveryPhrase)).toBe(undefined);
-    expect(
-      domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
-    ).toBe(undefined);
-  });
-});
+  describe("on internetcomputer.org", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.stubGlobal("location", {
+        origin: "https://identity.internetcomputer.org",
+      });
+      // domainWarning is used only when DOMAIN_COMPATIBILITY is false
+      DOMAIN_COMPATIBILITY.set(false);
+    });
 
-test("no origin on legacy domain is not warning", () => {
-  onOrigin("https://identity.ic0.app", () => {
-    expect(domainWarning({ ...authenticator, origin: [] })).toBe(undefined);
-  });
-});
+    it("undefined for recovery phrase", () => {
+      expect(domainWarning(recoveryPhrase)).toBe(undefined);
+      expect(
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+      ).toBe(undefined);
+    });
 
-test("bad origin on legacy domain is warning", () => {
-  onOrigin("https://identity.ic0.app", () => {
-    expect(
-      domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
-    ).toBeDefined();
-  });
-});
+    it("no origin is warning", () => {
+      expect(domainWarning({ ...authenticator, origin: [] })).toBeDefined();
+    });
 
-test("no origin on official domain is warning", () => {
-  onOrigin("https://identity.internetcomputer.org", () => {
-    expect(domainWarning({ ...authenticator, origin: [] })).toBeDefined();
-  });
-});
+    it("legacy origin is warning", () => {
+      expect(
+        domainWarning({
+          ...authenticator,
+          origin: ["https://identity.ic0.app"],
+        })
+      ).toBeDefined();
+    });
 
-test("legacy origin on official domain is warning", () => {
-  onOrigin("https://identity.internetcomputer.org", () => {
-    expect(
-      domainWarning({ ...authenticator, origin: ["https://identity.ic0.app"] })
-    ).toBeDefined();
-  });
-});
-
-test("bad origin on official domain is warning", () => {
-  onOrigin("https://identity.internetcomputer.org", () => {
-    expect(
-      domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
-    ).toBeDefined();
+    it("bad origin is warning", () => {
+      expect(
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+      ).toBeDefined();
+    });
   });
 });

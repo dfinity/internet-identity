@@ -108,9 +108,6 @@ test("Should not prompt for PIN after deleting temp key", async () => {
 
     await mainView.waitForDisplay();
     await mainView.remove(DEFAULT_PIN_DEVICE_NAME);
-    await browser.waitUntil(() => browser.isAlertOpen());
-    // this is equivalent to logout as we are deleting the device that was used for authentication
-    await browser.acceptAlert();
 
     // login now happens using the WebAuthn flow
     await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);

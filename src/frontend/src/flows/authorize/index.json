@@ -8,8 +8,12 @@
     "validating_auth_data": "Hang tight, validating the dapp's information",
     "finalizing_auth": "Hang tight, starting your session",
 
-    "invalid_data": "Invalid Data",
-    "no_auth_data": "It looks like you were sent here for authentication, but no service requested authentication.",
+    "invalid_request": "Invalid request",
+    "invalid_authentication_request_received": "It seems like an invalid authentication request was received.",
+    "connection_closed": "Connection closed",
+    "connection_could_not_be_established": "It seems like the connection with the service could not be established.",
+    "wrong_place": "Wrong place",
+    "no_request_received": "Seems you arrived here for authentication, but no service has requested it.",
     "go_home": "Home",
 
     "auth_failed": "Something went wrong during authentication. Authenticating service was notified and you may close this page.",

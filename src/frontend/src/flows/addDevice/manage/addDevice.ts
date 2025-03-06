@@ -16,9 +16,11 @@ import { verifyTentativeDevice } from "./verifyTentativeDevice";
 export const addDevice = async ({
   userNumber,
   connection,
+  origin,
 }: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
+  origin: string;
 }): Promise<void> => {
   // Enter registration mode and get info about the anchor
   const [timestamp, anchorInfo]: [Timestamp, IdentityAnchorInfo] =
@@ -35,7 +37,8 @@ export const addDevice = async ({
     const result = await pollForTentativeDevice(
       userNumber,
       connection,
-      timestamp
+      timestamp,
+      origin
     );
 
     if (result === "timeout") {
@@ -51,7 +54,12 @@ export const addDevice = async ({
       // If the user wants to add a FIDO device then we can (should) exit registration mode
       // (only used for adding extra browsers)
       await withLoader(() => connection.exitDeviceRegistrationMode());
-      await addCurrentDevice(userNumber, connection, anchorInfo.devices);
+      await addCurrentDevice(
+        userNumber,
+        connection,
+        anchorInfo.devices,
+        origin
+      );
       return;
     } else if (result === "canceled") {
       // If the user canceled, disable registration mode and return

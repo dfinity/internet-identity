@@ -4,7 +4,7 @@ import { LEGACY_II_URL } from "$src/config";
 import { html, render } from "lit-html";
 
 const pageContent = (onCancel: () => void) => {
-  const pageContentSlot = html` <hgroup>
+  const pageContentSlot = html`<hgroup>
       <h1 class="t-title t-title--main">Registration Disabled</h1>
     </hgroup>
     <div class="l-stack">

@@ -8,6 +8,7 @@ import { I18n } from "$src/i18n";
 import { unreachable } from "$src/utils/utils";
 import { TemplateResult, html } from "lit-html";
 
+import { DeviceWithUsage } from "$generated/internet_identity_types";
 import { warnBox } from "$src/components/warnBox";
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./tempKeys.json";
@@ -56,14 +57,16 @@ export const tempKeyWarningBox = ({
 export const tempKeysSection = ({
   authenticators: authenticators_,
   i18n,
+  onRemoveDevice,
 }: {
   authenticators: Authenticator[];
   i18n: I18n;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
 }): TemplateResult => {
   const authenticators = dedupLabels(authenticators_);
   const copy = i18n.i18n(copyJson);
 
-  return html` <aside
+  return html`<aside
     class="l-stack c-card c-card--narrow"
     data-role="temp-keys"
   >
@@ -78,6 +81,8 @@ export const tempKeysSection = ({
           authenticatorItem({
             authenticator,
             index,
+            i18n,
+            onRemove: () => onRemoveDevice(authenticator.device),
             icon: html`<span class="c-icon c-icon--pin"
               >${cypherIcon}<span></span
             ></span>`,

@@ -1,6 +1,6 @@
 import { MetadataMapV2 } from "$generated/internet_identity_types";
-import { II_OPENID_GOOGLE_CLIENT_ID } from "$src/environment";
 import { REDIRECT_CALLBACK_PATH, redirectInPopup } from "$src/flows/redirect";
+import { toBase64URL } from "$src/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
@@ -22,11 +22,11 @@ export interface RequestOptions {
   mediation?: CredentialMediationRequirement;
 }
 
-export const GOOGLE_REQUEST_CONFIG: RequestConfig = {
-  clientId: II_OPENID_GOOGLE_CLIENT_ID,
+export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
+  clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
   configURL: "https://accounts.google.com/gsi/fedcm.json",
-};
+});
 
 /**
  * Request JWT with the FedCM API
@@ -76,12 +76,6 @@ export const isNotSupportedError = (error: unknown) =>
  */
 export const isPermissionError = (error: unknown) =>
   error instanceof Error && error.name === "NetworkError";
-
-const toBase64 = (bytes: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)));
-
-const toBase64URL = (bytes: ArrayBuffer): string =>
-  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 /**
  * Request JWT through redirect flow in a popup

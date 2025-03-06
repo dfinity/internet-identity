@@ -5,9 +5,12 @@ import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
 
-import { AnchorCredentials } from "$generated/internet_identity_types";
+import { DeviceData } from "$generated/internet_identity_types";
 import { infoScreenTemplate } from "$src/components/infoScreen";
+import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { IdentityMetadata } from "$src/repositories/identityMetadata";
+import { getCredentialsOrigin } from "$src/utils/credential-devices";
+import { userSupportsWebauthRoR } from "$src/utils/rorSupport";
 import { isNullish } from "@dfinity/utils";
 import { addDevice } from "../addDevice/manage/addDevice";
 import {
@@ -167,7 +170,7 @@ export const addDeviceWarning = ({
  * * User has only one device.
  *
  * @param params {Object}
- * @param params.credentials {AnchorCredentials}
+ * @param params.credentials {Omit<DeviceData, "alias">[]}
  * @param params.identityMetadata {IdentityMetadata | undefined}
  * @param params.pinIdentityMaterial {PinIdentityMaterial | undefined}
  * @param params.nowInMillis {number}
@@ -180,7 +183,7 @@ export const getDevicesStatus = ({
   pinIdentityMaterial,
   nowInMillis,
 }: {
-  credentials: AnchorCredentials;
+  credentials: Omit<DeviceData, "alias">[];
   identityMetadata: IdentityMetadata | undefined;
   pinIdentityMaterial: PinIdentityMaterial | undefined;
   nowInMillis: number;
@@ -193,8 +196,9 @@ export const getDevicesStatus = ({
   const showWarningPageEnabled = isNullish(
     identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
   );
-  const totalDevicesCount =
-    credentials.credentials.length + credentials.recovery_credentials.length;
+  const totalDevicesCount = credentials.filter(
+    ({ key_type }) => !("seed_phrase" in key_type)
+  ).length;
   if (
     totalDevicesCount <= 1 &&
     hasNotSeenRecoveryPageLastWeek &&
@@ -220,7 +224,7 @@ export const recoveryWizard = async (
   const [credentials, identityMetadata, pinIdentityMaterial] = await withLoader(
     () =>
       Promise.all([
-        connection.lookupCredentials(userNumber),
+        connection.lookupAll(userNumber),
         connection.getIdentityMetadata(),
         idbRetrievePinIdentityMaterial({
           userNumber,
@@ -236,6 +240,13 @@ export const recoveryWizard = async (
     nowInMillis,
   });
 
+  const originNewDevice =
+    userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+      ? getCredentialsOrigin({
+          credentials,
+        })
+      : undefined;
+
   if (devicesStatus !== "no-warning") {
     connection.updateIdentityMetadata({
       recoveryPageShownTimestampMillis: nowInMillis,
@@ -244,7 +255,11 @@ export const recoveryWizard = async (
       status: devicesStatus,
     });
     if (userChoice.action === "add-device") {
-      await addDevice({ userNumber, connection });
+      await addDevice({
+        userNumber,
+        connection,
+        origin: originNewDevice ?? window.origin,
+      });
     }
     if (userChoice.action === "do-not-remind") {
       connection.updateIdentityMetadata({

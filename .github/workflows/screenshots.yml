@@ -14,7 +14,7 @@ jobs:
   # Job that starts the showcase and takes a screenshot of every page and
   # saves it in artifacts (both head & base branches)
   screenshots:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         device: ["desktop", "mobile"]
@@ -63,7 +63,7 @@ jobs:
           path: screenshots/${{ matrix.device }}/*.png
 
   notify:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: screenshots
     concurrency: image-dumpster
     # This should never take long, but _in case_ our setup changes inadvertently
@@ -195,6 +195,9 @@ jobs:
         with:
           name: e2e-screenshots-base-mobile
           path: ${{ steps.sys.outputs.tmpdir }}/base/mobile/
+
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
       # Compare screenshots on head & base and report differences (as step outputs)
       - name: Diff images

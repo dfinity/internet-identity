@@ -1,0 +1,16 @@
+{
+  "en": {
+    "confirm": "Remove Device",
+    "cancel": "Cancel",
+    "title_recovery_device": "Confirm Remove Recovery Device",
+    "title_authenticator_device": "Confirm Remove Device",
+    "label": "Security Warning",
+    "irreversible_action": "This is an irreversible action.",
+    "message_authenticator_device": "Confirm that you want to remove the device by entering the passkey nickname:",
+    "message_recovery_device": "Please, confirm that you want to remove the recovery device.",
+    "current_device_warning": "You will be logged out after removing this device.",
+    "label_nickname": "Nickname:",
+    "label_last_used": "Last used:",
+    "label_origin": "Registered in:"
+  }
+}

@@ -56,6 +56,28 @@ export class RenameView extends View {
   }
 }
 
+export class ConfirmRemoveDeviceView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("[data-page='confirm-remove-device-page']")
+      .waitForDisplayed({ timeout: 10_000 });
+  }
+
+  async waitForAbsence(): Promise<void> {
+    await this.browser
+      .$("[data-page='confirm-remove-device-page']")
+      .waitForExist({ timeout: 10_000, reverse: true });
+  }
+
+  async enterAlias(alias: string): Promise<void> {
+    await this.browser.$("#confirmRemoveDeviceAlias").setValue(alias);
+  }
+
+  async submit(): Promise<void> {
+    await this.browser.$("#confirmRemoveDeviceButton").click();
+  }
+}
+
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
@@ -123,6 +145,7 @@ export class PinRegistrationView extends View {
   async pinInfoContinue(): Promise<void> {
     await this.browser.$('[data-action="continue-pin"]').click();
   }
+
   async waitForSetPin(): Promise<void> {
     await this.browser
       .$('[data-role="set-pin"]')
@@ -135,6 +158,7 @@ export class PinRegistrationView extends View {
       await input.setValue(digit);
     }
   }
+
   async waitForConfirmPin(): Promise<void> {
     await this.browser
       .$('[data-role="confirm-pin"]')
@@ -153,6 +177,7 @@ export class PinRegistrationView extends View {
 
 export class PinAuthView extends View {
   private readonly ERROR_SELECTOR = '[data-haserror="true"]';
+
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="pin"]')
@@ -175,6 +200,7 @@ export class PinAuthView extends View {
 
 export class RecoveryMethodSelectorView extends View {
   private readonly SELECTOR = '[data-page="add-recovery-phrase"]';
+
   async waitForDisplay(): Promise<void> {
     await this.browser.$(this.SELECTOR).waitForExist();
   }
@@ -247,6 +273,19 @@ export class MainView extends View {
     }
   }
 
+  async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
+    const differentOriginRpId = await this.browser.$(
+      '[data-role="passkeys"] [data-device] [data-rpid]'
+    );
+    if ((await differentOriginRpId.isExisting()) !== exist) {
+      throw Error(
+        exist
+          ? "Different origin device not found"
+          : "Different origin device found"
+      );
+    }
+  }
+
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`)
@@ -277,10 +316,14 @@ export class MainView extends View {
     await this.browser.$("#logoutButton").click();
   }
 
-  async addRecovery(): Promise<void> {
+  async addRecoverySeedPhrase(): Promise<void> {
     await this.browser.$('[data-action="add-recovery-phrase"]').click();
     await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
+  }
+
+  async addRecoveryDevice(): Promise<void> {
+    await this.browser.$('[data-action="add-recovery-device"]').click();
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
@@ -296,6 +339,11 @@ export class MainView extends View {
   async remove(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "remove" }).click();
+    const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
+    await confirmRemoveDeviceView.waitForDisplay();
+    await confirmRemoveDeviceView.enterAlias(deviceName);
+    await confirmRemoveDeviceView.submit();
+    await confirmRemoveDeviceView.waitForAbsence();
   }
 
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
@@ -304,7 +352,7 @@ export class MainView extends View {
     await this.browser.$('[data-page="protect-phrase-info"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
 
-    const recoveryView = new RecoverView(this.browser);
+    const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
@@ -322,7 +370,7 @@ export class MainView extends View {
     await this.browser.$('[data-page="unprotect-phrase-info"]').waitForExist();
     await this.browser.$('[data-action="next"]').click();
 
-    const recoveryView = new RecoverView(this.browser);
+    const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
     await recoveryView.enterSeedPhrase(seedPhrase);
     await recoveryView.enterSeedPhraseContinue();
@@ -384,6 +432,29 @@ export class MainView extends View {
     return this.browser.$(
       `[data-action="${action}"][data-device="${deviceName}"]`
     );
+  }
+
+  async addOpenIdCredential(): Promise<void> {
+    await this.browser.$("#linkAccount").click();
+  }
+
+  async removeRecovery(): Promise<void> {
+    // This comes from `recoveryDeviceKey` in frontend/src/utils/recoveryDevice.ts
+    const deviceName = "Recovery Device";
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "remove" }).click();
+    const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
+    await confirmRemoveDeviceView.waitForDisplay();
+    await confirmRemoveDeviceView.submit();
+    await confirmRemoveDeviceView.waitForAbsence();
+  }
+
+  async expectRecoveryDevice(exists: boolean): Promise<void> {
+    const recoveryDeviceSelector =
+      '[data-role="recoveries"] [data-device="Recovery Device"]';
+    await this.browser
+      .$(recoveryDeviceSelector)
+      .waitForDisplayed({ timeout: 10_000, reverse: !exists });
   }
 }
 
@@ -512,6 +583,13 @@ export class AuthenticateView extends View {
     await this.browser.$(`[data-anchor-id="${anchor}"]`).waitForDisplayed();
   }
 
+  async continueWithAnchor(anchor: string): Promise<void> {
+    await this.clickUseExisting();
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
+    await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
+    await this.browser.$('[data-action="continue"]').click();
+  }
+
   async expectAnchorInputField(): Promise<void> {
     await this.browser
       .$('[data-role="anchor-input"]')
@@ -538,8 +616,17 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-role="anchor-input"]').click();
   }
 
-  async recover(): Promise<void> {
-    await await this.browser.$('[data-role="more-options"]').click();
+  async clickUseExisting(): Promise<void> {
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
+    if (await moreOptions.isExisting()) {
+      await moreOptions.click();
+    } else {
+      await this.browser.$("#loginButton").click();
+    }
+  }
+
+  async recoverSeedPhrase(): Promise<void> {
+    await this.clickUseExisting();
     await this.browser.$("#recoverButton").waitForDisplayed();
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
@@ -547,6 +634,17 @@ export class AuthenticateView extends View {
       .$('[data-action="recover-with-phrase"]')
       .waitForDisplayed();
     await this.browser.$('[data-action="recover-with-phrase"]').click();
+  }
+
+  async recoverDevice(): Promise<void> {
+    await this.clickUseExisting();
+    await this.browser.$("#recoverButton").waitForDisplayed();
+    await this.browser.$("#recoverButton").scrollIntoView();
+    await this.browser.$("#recoverButton").click();
+    await this.browser
+      .$('[data-action="recover-with-device"]')
+      .waitForDisplayed();
+    await this.browser.$('[data-action="recover-with-device"]').click();
   }
 }
 
@@ -955,7 +1053,7 @@ export class DemoAppView extends View {
   }
 }
 
-export class RecoverView extends View {
+export class RecoverSeedPhraseView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
@@ -983,6 +1081,36 @@ export class RecoverView extends View {
 
   async waitForInvalidSeedPhraseDisplay(): Promise<void> {
     await this.browser.$("p*=Could not use recovery phrase").waitForDisplayed();
+  }
+}
+
+export class PromptUserNumberView extends View {
+  async waitForUserNumberDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="prompt-user-number"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async enterUserNumber(userNumber: string): Promise<void> {
+    // Assume the only input on this screen is the user number input
+    const input = await this.browser.$("input");
+    await input.setValue(userNumber);
+  }
+
+  async enterUserNumberContinue(): Promise<void> {
+    await this.browser.$('[data-action="next"]').click();
+  }
+}
+
+export class PromptDeviceAliasView extends View {
+  async waitForDeviceAliasDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-page="prompt-device-alias"]')
+      .waitForDisplayed({ timeout: 5_000 });
+  }
+
+  async skipDeviceAlias(): Promise<void> {
+    await this.browser.$('[data-action="skip"]').click();
   }
 }
 

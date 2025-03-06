@@ -2,7 +2,9 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::BufferedEntry;
-use internet_identity_interface::internet_identity::types;
+use internet_identity_interface::internet_identity::types::{
+    self, IdentityNumber, OpenIdCredentialKey,
+};
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
 
@@ -359,6 +361,82 @@ pub fn config(
     canister_id: CanisterId,
 ) -> Result<types::InternetIdentityInit, CallError> {
     call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
+}
+
+pub fn openid_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+) -> Result<Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>, CallError>
+{
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_prepare_delegation",
+        (jwt, salt, session_key),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn openid_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    expiration: &types::Timestamp,
+) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, CallError> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "openid_get_delegation",
+        (jwt, salt, session_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn openid_credential_add(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    jwt: &str,
+    salt: &[u8; 32],
+) -> Result<Result<(), types::OpenIdCredentialAddError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_credential_add",
+        (identity_number, jwt, salt),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn openid_credential_remove(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    openid_credential_key: &OpenIdCredentialKey,
+) -> Result<Result<(), types::OpenIdCredentialRemoveError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_credential_remove",
+        (identity_number, openid_credential_key),
+    )
+    .map(|(x,)| x)
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.

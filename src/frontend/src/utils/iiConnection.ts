@@ -16,12 +16,15 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  InternetIdentityInit,
+  JWT,
   KeyType,
   MetadataMapV2,
   PreparedIdAlias,
   PublicKey,
   Purpose,
   RegistrationFlowNextStep,
+  Salt,
   SessionKey,
   Timestamp,
   UserNumber,
@@ -34,8 +37,11 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { JWT, MockOpenID, OpenIDCredential, Salt } from "$src/utils/mockOpenID";
-import { diagnosticInfo, unknownToString } from "$src/utils/utils";
+import {
+  CanisterError,
+  diagnosticInfo,
+  unknownToString,
+} from "$src/utils/utils";
 import {
   Actor,
   ActorSubclass,
@@ -51,16 +57,12 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { analytics } from "./analytics";
 import {
   convertToValidCredentialData,
   CredentialData,
 } from "./credential-devices";
-import {
-  excludeCredentialsFromOrigins,
-  findWebAuthnRpId,
-  hasCredentialsFromMultipleOrigins,
-  relatedDomains,
-} from "./findWebAuthnRpId";
+import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
@@ -129,7 +131,9 @@ export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
-export type PossiblyWrongRPID = { kind: "possiblyWrongRPID" };
+export type PossiblyWrongWebAuthnFlow = { kind: "possiblyWrongWebAuthnFlow" };
+// The user has PIN identity but in another domain and II can't access it.
+export type PinUserOtherDomain = { kind: "pinUserOtherDomain" };
 export type InvalidAuthnMethod = {
   kind: "invalidAuthnMethod";
   message: string;
@@ -143,21 +147,19 @@ export type { ChallengeResult } from "$generated/internet_identity_types";
  */
 export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
+  aaguid?: string;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }
 
 export class Connection {
-  // The rpID is used to get the passkey from the browser's WebAuthn API.
-  // Using different rpIDs allows us to have compatibility across multiple domains.
-  // However, when one RP ID is used and the user cancels, it must be because the user is in a device
-  // registered in another domain. In this case, we must try the other rpID.
-  // Map<userNumber, Set<rpID>>
-  private _cancelledRpIds: Map<bigint, Set<string | undefined>> = new Map();
-  protected _mockOpenID = new MockOpenID();
+  private webAuthFlows:
+    | { flows: WebAuthnFlow[]; currentIndex: number }
+    | undefined;
 
   public constructor(
     readonly canisterId: string,
+    readonly canisterConfig: InternetIdentityInit,
     // Used for testing purposes
     readonly overrideActor?: ActorSubclass<_SERVICE>
   ) {}
@@ -324,6 +326,7 @@ export class Connection {
         kind: "loginSuccess",
         connection: new AuthenticatedConnection(
           this.canisterId,
+          this.canisterConfig,
           identity,
           delegationIdentity,
           userNumber,
@@ -372,7 +375,8 @@ export class Connection {
     | LoginSuccess
     | AuthFail
     | WebAuthnFailed
-    | PossiblyWrongRPID
+    | PossiblyWrongWebAuthnFlow
+    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   > => {
@@ -391,8 +395,18 @@ export class Connection {
       return { kind: "unknownUser", userNumber };
     }
 
+    let webAuthnAuthenticators = devices.filter(
+      ({ key_type }) => !("browser_storage_key" in key_type)
+    );
+
+    // If we reach this point, it's because no PIN identity was found.
+    // Therefore, it's because it was created in another domain.
+    if (webAuthnAuthenticators.length === 0) {
+      return { kind: "pinUserOtherDomain" };
+    }
+
     if (HARDWARE_KEY_TEST.isEnabled()) {
-      devices = devices.filter(
+      webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
           Object.keys(device.key_type)[0] === "cross_platform"
@@ -401,26 +415,43 @@ export class Connection {
 
     return this.fromWebauthnCredentials(
       userNumber,
-      devices.map(convertToValidCredentialData).filter(nonNullish)
+      webAuthnAuthenticators
+        .map(convertToValidCredentialData)
+        .filter(nonNullish)
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
     credentials: CredentialData[]
-  ): Promise<LoginSuccess | WebAuthnFailed | PossiblyWrongRPID | AuthFail> => {
-    const cancelledRpIds = this._cancelledRpIds.get(userNumber) ?? new Set();
-    const currentOrigin = window.location.origin;
-    const dynamicRPIdEnabled =
-      DOMAIN_COMPATIBILITY.isEnabled() &&
-      supportsWebauthRoR(window.navigator.userAgent);
-    const filteredCredentials = excludeCredentialsFromOrigins(
-      credentials,
-      cancelledRpIds,
-      currentOrigin
-    );
-    const rpId = dynamicRPIdEnabled
-      ? findWebAuthnRpId(currentOrigin, filteredCredentials, relatedDomains())
+  ): Promise<
+    LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
+  > => {
+    if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
+      const flows = findWebAuthnFlows({
+        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
+        devices: credentials,
+        currentOrigin: window.location.origin,
+        // Empty array is the same as no related origins.
+        relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
+      });
+      this.webAuthFlows = {
+        flows,
+        currentIndex: 0,
+      };
+    }
+    const flowsLength = this.webAuthFlows?.flows.length ?? 0;
+
+    // Better understand which users make it (or don't) all the way.
+    analytics.event("start-webauthn-authentication", { flowsLength });
+
+    // We reached the last flow. Start from the beginning.
+    // This might happen if the user cancelled manually in the flow that would have been successful.
+    if (this.webAuthFlows?.currentIndex === flowsLength) {
+      this.webAuthFlows.currentIndex = 0;
+    }
+    const currentFlow = nonNullish(this.webAuthFlows)
+      ? this.webAuthFlows.flows[this.webAuthFlows.currentIndex]
       : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
@@ -429,7 +460,12 @@ export class Connection {
      */
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
-      : MultiWebAuthnIdentity.fromCredentials(filteredCredentials, rpId);
+      : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
+        MultiWebAuthnIdentity.fromCredentials(
+          credentials,
+          currentFlow?.rpId,
+          currentFlow?.useIframe ?? false
+        );
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -437,19 +473,19 @@ export class Connection {
     try {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
+      // Better understand which users don't make it all the way.
+      analytics.event("failed-webauthn-authentication", { flowsLength });
       if (isWebAuthnCancel(e)) {
-        // We only want to cache cancelled rpids if there can be multiple rpids.
-        if (
-          dynamicRPIdEnabled &&
-          hasCredentialsFromMultipleOrigins(credentials)
-        ) {
-          if (this._cancelledRpIds.has(userNumber)) {
-            this._cancelledRpIds.get(userNumber)?.add(rpId);
-          } else {
-            this._cancelledRpIds.set(userNumber, new Set([rpId]));
-          }
-          // We want to user to retry again and a new RP ID will be used.
-          return { kind: "possiblyWrongRPID" };
+        // Better understand which users don't make it all the way.
+        analytics.event("cancelled-webauthn-authentication", { flowsLength });
+        // We only want to show a special error if the user might have to choose different web auth flow.
+        if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
+          // Increase the index to try the next flow.
+          this.webAuthFlows = {
+            flows: this.webAuthFlows.flows,
+            currentIndex: this.webAuthFlows.currentIndex + 1,
+          };
+          return { kind: "possiblyWrongWebAuthnFlow" };
         }
         return { kind: "webAuthnFailed" };
       }
@@ -466,17 +502,25 @@ export class Connection {
 
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
       actor
     );
 
+    // If the index is more than 0, it's because the first one failed.
+    // We should offer to add the current device to the current origin.
+    const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
+
+    // Better understand which users make it all the way.
+    analytics.event("successful-webauthn-authentication", { flowsLength });
+
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
-      showAddCurrentDevice: cancelledRpIds.size > 0,
+      showAddCurrentDevice,
     };
   };
   fromIdentity = async (
@@ -488,6 +532,7 @@ export class Connection {
 
     const connection = new AuthenticatedConnection(
       this.canisterId,
+      this.canisterConfig,
       identity,
       delegationIdentity,
       userNumber,
@@ -533,6 +578,7 @@ export class Connection {
       userNumber,
       connection: new AuthenticatedConnection(
         this.canisterId,
+        this.canisterConfig,
         identity,
         delegationIdentity,
         userNumber,
@@ -629,12 +675,13 @@ export class AuthenticatedConnection extends Connection {
 
   public constructor(
     public canisterId: string,
+    public canisterConfig: InternetIdentityInit,
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>
   ) {
-    super(canisterId);
+    super(canisterId, canisterConfig);
     const metadataGetter = async () => {
       const response = await this.getIdentityInfo();
       if ("Ok" in response) {
@@ -674,15 +721,9 @@ export class AuthenticatedConnection extends Connection {
     return this.actor;
   }
 
-  getAnchorInfo = async (): Promise<
-    IdentityAnchorInfo & { credentials: OpenIDCredential[] }
-  > => {
+  getAnchorInfo = async (): Promise<IdentityAnchorInfo> => {
     const actor = await this.getActor();
-    const anchorInfo = await actor.get_anchor_info(this.userNumber);
-    const mockedAnchorInfo = await this._mockOpenID.get_anchor_info(
-      this.userNumber
-    );
-    return { ...anchorInfo, ...mockedAnchorInfo };
+    return actor.get_anchor_info(this.userNumber);
   };
 
   getPrincipal = async ({
@@ -719,9 +760,14 @@ export class AuthenticatedConnection extends Connection {
     purpose: Purpose,
     newPublicKey: DerEncodedPublicKey,
     protection: DeviceData["protection"],
+    origin: string | undefined,
     credentialId?: ArrayBuffer
   ): Promise<void> => {
     const actor = await this.getActor();
+    // The canister only allow for 50 characters, so for long domains we don't attach an origin
+    // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
+    const sanitizedOrigin =
+      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
     return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -731,7 +777,7 @@ export class AuthenticatedConnection extends Connection {
       key_type: keyType,
       purpose,
       protection,
-      origin: readDeviceOrigin(),
+      origin: sanitizedOrigin === undefined ? [] : [sanitizedOrigin],
       metadata: [],
     });
   };
@@ -925,27 +971,25 @@ export class AuthenticatedConnection extends Connection {
     return { error: "internal_error" };
   };
 
-  addJWT = async (jwt: JWT, salt: Salt): Promise<void> => {
-    await this._mockOpenID.add_jwt(this.userNumber, jwt, salt);
+  addOpenIdCredential = async (jwt: JWT, salt: Salt): Promise<void> => {
+    const actor = await this.getActor();
+    const res = await actor.openid_credential_add(this.userNumber, jwt, salt);
+    if ("Err" in res) throw new CanisterError(res.Err);
   };
 
-  removeJWT = async (iss: string, sub: string): Promise<void> => {
-    await this._mockOpenID.remove_jwt(this.userNumber, iss, sub);
+  removeOpenIdCredential = async (iss: string, sub: string): Promise<void> => {
+    const actor = await this.getActor();
+    const res = await actor.openid_credential_remove(this.userNumber, [
+      iss,
+      sub,
+    ]);
+    if ("Err" in res) throw new CanisterError(res.Err);
+  };
+
+  getSignIdentityPubKey = (): DerEncodedPublicKey => {
+    return this.identity.getPublicKey().toDer();
   };
 }
-
-// Reads the "origin" used to infer what domain a FIDO device is available on.
-// The canister only allow for 50 characters, so for long domains we don't attach an origin
-// (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
-//
-// The return type is odd but that's what our didc version expects.
-export const readDeviceOrigin = (): [] | [string] => {
-  if (isNullish(window?.origin) || window.origin.length > 50) {
-    return [];
-  }
-
-  return [window.origin];
-};
 
 // The options sent to the browser when creating the credentials.
 // Credentials (key pair) creation is signed with a private key that is unique per device
@@ -966,13 +1010,15 @@ export const readDeviceOrigin = (): [] | [string] => {
 //  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
 export const creationOptions = (
   exclude: Omit<DeviceData, "alias">[] = [],
-  authenticatorAttachment?: AuthenticatorAttachment
+  authenticatorAttachment?: AuthenticatorAttachment,
+  rpId?: string
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
       userVerification: "preferred",
       authenticatorAttachment,
     },
+    attestation: "direct",
     excludeCredentials: exclude.flatMap((device) =>
       device.credential_id.length === 0
         ? []
@@ -996,6 +1042,7 @@ export const creationOptions = (
     ],
     rp: {
       name: "Internet Identity Service",
+      id: rpId,
     },
     user: {
       id: window.crypto.getRandomValues(new Uint8Array(16)),

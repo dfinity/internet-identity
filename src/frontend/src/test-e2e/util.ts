@@ -1,4 +1,7 @@
+import { idlFactory as internet_identity_idl } from "$generated/internet_identity_idl";
+import { _SERVICE } from "$generated/internet_identity_types";
 import { randomString, wrapError } from "$src/utils/utils";
+import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fs from "fs";
@@ -70,6 +73,9 @@ export async function runInBrowser(
       "--host-resolver-rules=MAP * localhost:5173",
       ...(nonNullish(userAgent) ? [`--user-agent=${userAgent}`] : []),
       ...extraChromeOptions,
+      // Required for CI runners using >=Ubuntu 24.04
+      // @see https://github.com/SeleniumHQ/selenium/issues/14609
+      "--no-sandbox",
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
@@ -95,7 +101,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "122.0.6261.111", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
@@ -463,3 +469,85 @@ export async function wipeStorage(browser: WebdriverIO.Browser): Promise<void> {
     await indexedDB.deleteDatabase("keyval-store");
   });
 }
+
+export const setOpenIdFeatureFlag = async (
+  browser: WebdriverIO.Browser,
+  enabled: boolean
+): Promise<void> => {
+  await browser.execute((enabled) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__featureFlags.OPENID_AUTHENTICATION.set(enabled);
+  }, enabled);
+};
+
+export const mockFedCM = async (
+  browser: WebdriverIO.Browser,
+  token: string
+): Promise<void> => {
+  await browser.execute((token) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__credentialsGet = navigator.credentials.get;
+    navigator.credentials.get = (options) => {
+      if (options && "identity" in options) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        navigator.credentials.get = window.__credentialsGet;
+        return Promise.resolve({
+          type: "identity",
+          token,
+        } as unknown as Credential);
+      }
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      return window.__credentialsGet(options);
+    };
+  }, token);
+};
+
+// TODO: Remove when we remove the domain compatibility feature flag
+export const setDomainCompatibilityFeatureFlag = async (
+  browser: WebdriverIO.Browser,
+  enabled: boolean
+): Promise<void> => {
+  await browser.execute((enabled) => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__featureFlags.DOMAIN_COMPATIBILITY.set(enabled);
+  }, enabled);
+};
+
+/**
+ * Monkey patch WebAuthn methods to make them not '[native code]' and
+ * thus detected as a passkey extension which doesn't support RoR.
+ */
+export const mimickPasskeyExtension = async (
+  browser: WebdriverIO.Browser
+): Promise<void> => {
+  await browser.execute(() => {
+    const create = navigator.credentials.create;
+    const get = navigator.credentials.get;
+    navigator.credentials.create = (...args) =>
+      create.call(navigator.credentials, ...args);
+    navigator.credentials.get = (...args) =>
+      get.call(navigator.credentials, ...args);
+  });
+};
+
+export const createActor = async (
+  browser: WebdriverIO.Browser
+): Promise<ActorSubclass<_SERVICE>> => {
+  const script = await browser.$("[data-canister-id]");
+  const canisterId = await script.getAttribute("data-canister-id");
+  const agent = await HttpAgent.create({
+    // Always go through vite dev server and fetch the root key
+    host: "https://localhost:5173",
+    shouldFetchRootKey: true,
+    verifyQuerySignatures: false,
+  });
+  return Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent,
+    canisterId,
+  });
+};
