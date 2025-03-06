@@ -132,6 +132,7 @@ export type AlreadyInProgress = { kind: "alreadyInProgress" };
 export type ApiError = { kind: "apiError"; error: Error };
 export type RegisterNoSpace = { kind: "registerNoSpace" };
 export type MissingGoogleClientId = { kind: "missingGoogleClientId" };
+export type GoogleLoginFailed = { kind: "googleLoginFailed" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };

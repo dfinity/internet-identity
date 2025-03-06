@@ -30,6 +30,7 @@ import {
   AuthenticatedConnection,
   BadPin,
   Connection,
+  GoogleLoginFailed,
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
@@ -369,7 +370,8 @@ export const authenticateBoxFlow = async <I>({
 
     if (result.tag === "open_id_google") {
       const loginResult = await doLoginWithGoogle(connection);
-      if (!loginResult) throw toast.error(copy.failed_to_login_with_google);
+      if (isNullish(loginResult))
+        return { kind: "googleLoginFailed" } as FlowError;
       return loginResult;
     }
 
@@ -432,7 +434,8 @@ export type FlowError =
   | UnexpectedCall
   | InvalidAuthnMethod
   | RegisterNoSpace
-  | MissingGoogleClientId;
+  | MissingGoogleClientId
+  | GoogleLoginFailed;
 
 export const handleLoginFlowResult = async <E>(
   result:
