@@ -33,6 +33,7 @@ import {
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
+  MissingGoogleClientId,
   NoRegistrationFlow,
   PinUserOtherDomain,
   PossiblyWrongWebAuthnFlow,
@@ -287,7 +288,15 @@ export const authenticateBoxFlow = async <I>({
       allowPinLogin,
     });
 
-  const doLoginWithGoogle = async (connection: Connection) => {
+  const doLoginWithGoogle = async (
+    connection: Connection
+  ): Promise<
+    | (LoginSuccess & {
+        newAnchor: false;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
+    | FlowError
+  > => {
     const i18n = new I18n();
     const copy = i18n.i18n(infoToastCopy);
 
@@ -295,7 +304,7 @@ export const authenticateBoxFlow = async <I>({
 
     if (isNullish(googleClientId)) {
       toast.error(copy.sign_in_with_google_accounts_is_unavailable);
-      return;
+      return { kind: "missingGoogleClientId" } as FlowError;
     }
 
     const sessionIdentity = await ECDSAKeyIdentity.generate({
@@ -422,7 +431,8 @@ export type FlowError =
   | NoRegistrationFlow
   | UnexpectedCall
   | InvalidAuthnMethod
-  | RegisterNoSpace;
+  | RegisterNoSpace
+  | MissingGoogleClientId;
 
 export const handleLoginFlowResult = async <E>(
   result:
