@@ -21,12 +21,13 @@ test("Removing current device logs user out", async () => {
     await addVirtualAuthenticator(browser);
     await FLOWS.addFidoDevice(browser);
 
-    // home
+    // Manage page
     await mainView.waitForDisplay();
-    // Expect a second device with the default name
+    // Both devices have the same name.
     await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
 
-    // Remove the newly added device
+    // Remove the device used when registering.
+    // Both devices have the same name.
     await mainView.remove(DEVICE_NAME1);
 
     // Verify the user is logged out and back to the home screen
@@ -50,15 +51,15 @@ test("User can register, add device, rename first device, remove the second devi
     await addVirtualAuthenticator(browser);
     await FLOWS.addFidoDevice(browser);
 
-    // home
+    // Manage page
     await mainView.waitForDisplay();
-    // Expect a second device with the default name
+    // Both devices have the same name.
     await mainView.waitForDeviceCount(DEVICE_NAME1, 2);
 
-    // Rename the first device
+    // Rename the device used when registering.
     await mainView.rename(DEVICE_NAME1, DEVICE_NAME2);
 
-    // Remove the newly added device
+    // Remove the device added after registering.
     await mainView.remove(DEVICE_NAME1);
 
     // Verify the device count is back to 1
