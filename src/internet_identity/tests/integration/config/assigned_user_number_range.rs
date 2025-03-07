@@ -126,7 +126,7 @@ fn should_retain_anchor_on_user_range_start_increase() {
         create_identity_with_authn_method(&env, canister_id, &authn_method),
         1000
     );
-    assert_eq!(
+    assert!(
         upgrade_ii_canister_with_arg(
             &env,
             canister_id,
@@ -136,8 +136,7 @@ fn should_retain_anchor_on_user_range_start_increase() {
                 ..Default::default()
             }),
         )
-        .is_err(),
-        true
+        .is_err()
     );
 }
 
@@ -163,7 +162,7 @@ fn should_retain_anchor_on_user_range_end_decrease() {
         create_identity_with_authn_method(&env, canister_id, &authn_method),
         1001
     );
-    assert_eq!(
+    assert!(
         upgrade_ii_canister_with_arg(
             &env,
             canister_id,
@@ -173,7 +172,6 @@ fn should_retain_anchor_on_user_range_end_decrease() {
                 ..Default::default()
             }),
         )
-        .is_err(),
-        true
+        .is_err()
     );
 }
