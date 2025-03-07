@@ -74,7 +74,7 @@ export class ConfirmRemoveDeviceView extends View {
   }
 
   async submit(): Promise<void> {
-    await this.browser.$("#confirmRemoveDeviceButton").click();
+    await this.browser.$("#confirmRemoveDeviceButton:not([disabled])").click();
   }
 }
 
