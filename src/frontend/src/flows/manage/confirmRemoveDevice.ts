@@ -107,7 +107,7 @@ const confirmRemoveDeviceTemplate = ({
               class="c-input c-input--stack c-input--fullwidth"
               spellcheck="false"
               .onpaste=${(e: Event) => e.preventDefault()}
-              @change=${() =>
+              @input=${() =>
                 withRef(input, (inputElement) =>
                   withRef(confirmButton, (buttonElement) => {
                     if (inputElement.value === alias) {
