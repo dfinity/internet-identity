@@ -1,5 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
+import { analytics } from "$src/utils/analytics";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";
@@ -116,6 +117,7 @@ export async function authenticationProtocol({
   onProgress("waiting");
 
   const requestResult = await waitForRequest();
+  analytics.event("authorize-client-request-received");
   if (requestResult.kind === "timeout") {
     return "closed";
   }
@@ -123,6 +125,11 @@ export async function authenticationProtocol({
     return "invalid";
   }
   void (requestResult.kind satisfies "received");
+  const requesetOrigin =
+    requestResult.request.derivationOrigin ?? requestResult.origin;
+  analytics.event("authorize-client-request-valid", {
+    origin: requesetOrigin,
+  });
 
   const authContext = {
     authRequest: requestResult.request,
@@ -132,6 +139,7 @@ export async function authenticationProtocol({
   onProgress("validating");
 
   const authenticateResult = await authenticate(authContext);
+  analytics.event("authorize-client-authenticate");
 
   if (authenticateResult.kind === "failure") {
     window.opener.postMessage({
@@ -141,6 +149,9 @@ export async function authenticationProtocol({
     return "failure";
   }
   void (authenticateResult.kind satisfies "success");
+  analytics.event("authorize-client-authenticate-success", {
+    origin: requesetOrigin,
+  });
 
   window.opener.postMessage(
     {
