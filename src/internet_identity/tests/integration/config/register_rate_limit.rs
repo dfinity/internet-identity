@@ -2,7 +2,6 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
-use internet_identity_interface::internet_identity::types::AnalyticsConfig::Plausible;
 use internet_identity_interface::internet_identity::types::{InternetIdentityInit, OpenIdConfig};
 
 #[test]
@@ -11,8 +10,8 @@ fn should_init_default() {
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
     assert_eq!(
-        api::config(&env, canister_id).unwrap().analytics_config,
-        Some(None)
+        api::config(&env, canister_id).unwrap().related_origins,
+        None
     );
 }
 
@@ -21,25 +20,22 @@ fn should_init_config() {
     let env = env();
     let configs = vec![
         InternetIdentityInit {
-            analytics_config: Some(None),
+            related_origins: None,
             ..Default::default()
         },
         InternetIdentityInit {
-            analytics_config: Some(Some(Plausible {
-                domain: None,
-                hash_mode: None,
-                track_localhost: None,
-                api_host: None,
-            })),
+            related_origins: Some(vec![]),
             ..Default::default()
         },
         InternetIdentityInit {
-            analytics_config: Some(Some(Plausible {
-                domain: Some("https://example1.com".into()),
-                hash_mode: Some(true),
-                track_localhost: Some(true),
-                api_host: Some("https://example2.com".into()),
-            })),
+            related_origins: Some(vec!["https://example.com".into()]),
+            ..Default::default()
+        },
+        InternetIdentityInit {
+            related_origins: Some(vec![
+                "https://example1.com".into(),
+                "https://example2.com".into(),
+            ]),
             ..Default::default()
         },
     ];
@@ -47,8 +43,8 @@ fn should_init_config() {
     for config in configs {
         let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
         assert_eq!(
-            api::config(&env, canister_id).unwrap().analytics_config,
-            config.analytics_config
+            api::config(&env, canister_id).unwrap().related_origins,
+            config.related_origins
         );
     }
 }
@@ -57,21 +53,16 @@ fn should_init_config() {
 fn should_enable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        analytics_config: Some(Some(Plausible {
-            domain: Some("https://example1.com".into()),
-            hash_mode: Some(true),
-            track_localhost: Some(true),
-            api_host: Some("https://example2.com".into()),
-        })),
+        related_origins: None,
         ..Default::default()
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(None);
+    config.related_origins = Some(vec!["https://example.com".into()]);
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
+        api::config(&env, canister_id).unwrap().related_origins,
+        config.related_origins
     );
 }
 
@@ -79,21 +70,16 @@ fn should_enable_config() {
 fn should_disable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(None),
+        related_origins: Some(vec!["https://example.com".into()]),
         ..Default::default()
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(Some(Plausible {
-        domain: Some("https://example1.com".into()),
-        hash_mode: Some(true),
-        track_localhost: Some(true),
-        api_host: Some("https://example2.com".into()),
-    }));
+    config.related_origins = Some(vec![]);
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
+        api::config(&env, canister_id).unwrap().related_origins,
+        config.related_origins
     );
 }
 
@@ -101,26 +87,19 @@ fn should_disable_config() {
 fn should_update_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        analytics_config: Some(Some(Plausible {
-            domain: None,
-            hash_mode: None,
-            track_localhost: None,
-            api_host: None,
-        })),
+        related_origins: Some(vec!["https://example.com".into()]),
         ..Default::default()
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(Some(Plausible {
-        domain: Some("https://example1.com".into()),
-        hash_mode: Some(true),
-        track_localhost: Some(true),
-        api_host: Some("https://example2.com".into()),
-    }));
+    config.related_origins = Some(vec![
+        "https://example1.com".into(),
+        "https://example2.com".into(),
+    ]);
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
+        api::config(&env, canister_id).unwrap().related_origins,
+        config.related_origins
     );
 }
 
@@ -129,25 +108,22 @@ fn should_retain_config() {
     let env = env();
     let configs = vec![
         InternetIdentityInit {
-            analytics_config: Some(None),
+            related_origins: None,
             ..Default::default()
         },
         InternetIdentityInit {
-            analytics_config: Some(Some(Plausible {
-                domain: None,
-                hash_mode: None,
-                track_localhost: None,
-                api_host: None,
-            })),
+            related_origins: Some(vec![]),
             ..Default::default()
         },
         InternetIdentityInit {
-            analytics_config: Some(Some(Plausible {
-                domain: Some("https://example1.com".into()),
-                hash_mode: Some(true),
-                track_localhost: Some(true),
-                api_host: Some("https://example2.com".into()),
-            })),
+            related_origins: Some(vec!["https://example.com".into()]),
+            ..Default::default()
+        },
+        InternetIdentityInit {
+            related_origins: Some(vec![
+                "https://example1.com".into(),
+                "https://example2.com".into(),
+            ]),
             ..Default::default()
         },
     ];
@@ -170,10 +146,8 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id)
-                .unwrap()
-                .analytics_config,
-            config.analytics_config
+            api::config(&env, canister_id).unwrap().related_origins,
+            config.related_origins
         );
     }
 }

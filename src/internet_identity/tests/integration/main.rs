@@ -9,7 +9,6 @@ mod aggregation_stats;
 mod anchor_management;
 mod archive_integration;
 mod config;
-mod config_new;
 mod delegation;
 mod http;
 mod openid;
