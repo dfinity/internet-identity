@@ -125,10 +125,10 @@ export async function authenticationProtocol({
     return "invalid";
   }
   void (requestResult.kind satisfies "received");
-  const requesetOrigin =
+  const requestOrigin =
     requestResult.request.derivationOrigin ?? requestResult.origin;
   analytics.event("authorize-client-request-valid", {
-    origin: requesetOrigin,
+    origin: requestOrigin,
   });
 
   const authContext = {
@@ -150,7 +150,7 @@ export async function authenticationProtocol({
   }
   void (authenticateResult.kind satisfies "success");
   analytics.event("authorize-client-authenticate-success", {
-    origin: requesetOrigin,
+    origin: requestOrigin,
   });
 
   window.opener.postMessage(
