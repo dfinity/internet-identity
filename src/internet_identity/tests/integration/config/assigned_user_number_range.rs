@@ -126,18 +126,16 @@ fn should_retain_anchor_on_user_range_start_increase() {
         create_identity_with_authn_method(&env, canister_id, &authn_method),
         1000
     );
-    assert!(
-        upgrade_ii_canister_with_arg(
-            &env,
-            canister_id,
-            II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((1001, 7_569_744)),
-                ..Default::default()
-            }),
-        )
-        .is_err()
-    );
+    assert!(upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            assigned_user_number_range: Some((1001, 7_569_744)),
+            ..Default::default()
+        }),
+    )
+    .is_err());
 }
 
 #[test]
@@ -162,16 +160,14 @@ fn should_retain_anchor_on_user_range_end_decrease() {
         create_identity_with_authn_method(&env, canister_id, &authn_method),
         1001
     );
-    assert!(
-        upgrade_ii_canister_with_arg(
-            &env,
-            canister_id,
-            II_WASM.clone(),
-            Some(InternetIdentityInit {
-                assigned_user_number_range: Some((1000, 1001)),
-                ..Default::default()
-            }),
-        )
-        .is_err()
-    );
+    assert!(upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            assigned_user_number_range: Some((1000, 1001)),
+            ..Default::default()
+        }),
+    )
+    .is_err());
 }
