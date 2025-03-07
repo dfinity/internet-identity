@@ -1,3 +1,10 @@
+mod assigned_user_number_range;
+mod archive_config;
+mod related_origins;
+mod openid_google;
+mod analytics_config;
+mod captcha_config;
+
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
