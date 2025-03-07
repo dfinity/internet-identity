@@ -1,9 +1,9 @@
-mod assigned_user_number_range;
-mod archive_config;
-mod related_origins;
-mod openid_google;
 mod analytics_config;
+mod archive_config;
+mod assigned_user_number_range;
 mod captcha_config;
+mod openid_google;
+mod related_origins;
 
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{

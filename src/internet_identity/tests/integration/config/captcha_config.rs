@@ -3,7 +3,9 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::CaptchaTrigger::{Dynamic, Static};
-use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::{CaptchaDisabled, CaptchaEnabled};
+use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::{
+    CaptchaDisabled, CaptchaEnabled,
+};
 use internet_identity_interface::internet_identity::types::{
     CaptchaConfig, InternetIdentityInit, OpenIdConfig,
 };
