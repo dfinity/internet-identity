@@ -56,15 +56,16 @@ fn should_update_config() {
         assigned_user_number_range: Some((3456, 798_977)),
         ..Default::default()
     };
+    let updated_value = Some((10000, 67_116_816));
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.assigned_user_number_range = Some((10000, 67_116_816));
+    config.assigned_user_number_range = updated_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id)
             .unwrap()
             .assigned_user_number_range,
-        config.assigned_user_number_range
+        updated_value
     );
 }
 

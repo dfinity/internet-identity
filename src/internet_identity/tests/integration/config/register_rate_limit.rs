@@ -56,13 +56,14 @@ fn should_enable_config() {
         related_origins: None,
         ..Default::default()
     };
+    let enabled_value = Some(vec!["https://example.com".into()]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.related_origins = Some(vec!["https://example.com".into()]);
+    config.related_origins = enabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().related_origins,
-        config.related_origins
+        enabled_value
     );
 }
 
@@ -73,13 +74,14 @@ fn should_disable_config() {
         related_origins: Some(vec!["https://example.com".into()]),
         ..Default::default()
     };
+    let disabled_value = Some(vec![]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.related_origins = Some(vec![]);
+    config.related_origins = disabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().related_origins,
-        config.related_origins
+        disabled_value
     );
 }
 
@@ -90,16 +92,17 @@ fn should_update_config() {
         related_origins: Some(vec!["https://example.com".into()]),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.related_origins = Some(vec![
+    let updated_value = Some(vec![
         "https://example1.com".into(),
         "https://example2.com".into(),
     ]);
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.related_origins = updated_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().related_origins,
-        config.related_origins
+        updated_value
     );
 }
 

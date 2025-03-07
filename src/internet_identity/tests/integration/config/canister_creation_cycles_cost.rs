@@ -61,15 +61,16 @@ fn should_update_config() {
         canister_creation_cycles_cost: Some(123),
         ..Default::default()
     };
+    let updated_value = Some(456);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.canister_creation_cycles_cost = Some(456);
+    config.canister_creation_cycles_cost = updated_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id)
             .unwrap()
             .canister_creation_cycles_cost,
-        config.canister_creation_cycles_cost
+        updated_value
     );
 }
 

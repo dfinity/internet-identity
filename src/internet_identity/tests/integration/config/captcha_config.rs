@@ -74,16 +74,17 @@ fn should_enable_config() {
         }),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.captcha_config = Some(CaptchaConfig {
+    let enabled_value = Some(CaptchaConfig {
         max_unsolved_captchas: 300,
         captcha_trigger: Static(CaptchaEnabled),
     });
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.captcha_config = enabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().captcha_config,
-        config.captcha_config
+        enabled_value
     );
 }
 
@@ -97,16 +98,17 @@ fn should_disable_config() {
         }),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.captcha_config = Some(CaptchaConfig {
+    let disabled_value = Some(CaptchaConfig {
         max_unsolved_captchas: 300,
         captcha_trigger: Static(CaptchaDisabled),
     });
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.captcha_config = disabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().captcha_config,
-        config.captcha_config
+        disabled_value
     );
 }
 
@@ -120,9 +122,7 @@ fn should_update_config() {
         }),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.captcha_config = Some(CaptchaConfig {
+    let updated_value = Some(CaptchaConfig {
         max_unsolved_captchas: 788,
         captcha_trigger: Dynamic {
             threshold_pct: 12,
@@ -130,10 +130,13 @@ fn should_update_config() {
             reference_rate_sampling_interval_s: 9999,
         },
     });
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.captcha_config = updated_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().captcha_config,
-        config.captcha_config
+        updated_value
     );
 }
 

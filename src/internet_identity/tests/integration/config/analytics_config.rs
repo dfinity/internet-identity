@@ -57,6 +57,29 @@ fn should_init_config() {
 fn should_enable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
+        analytics_config: Some(None),
+        ..Default::default()
+    };
+    let enabled_value = Some(Some(Plausible {
+        domain: Some("https://example1.com".into()),
+        hash_mode: Some(true),
+        track_localhost: Some(true),
+        api_host: Some("https://example2.com".into()),
+    }));
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.analytics_config = enabled_value.clone();
+    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
+    assert_eq!(
+        api::config(&env, canister_id).unwrap().analytics_config,
+        enabled_value
+    );
+}
+
+#[test]
+fn should_disable_config() {
+    let env = env();
+    let mut config = InternetIdentityInit {
         analytics_config: Some(Some(Plausible {
             domain: Some("https://example1.com".into()),
             hash_mode: Some(true),
@@ -65,35 +88,14 @@ fn should_enable_config() {
         })),
         ..Default::default()
     };
+    let disabled_value = Some(None);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(None);
+    config.analytics_config = disabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
-    );
-}
-
-#[test]
-fn should_disable_config() {
-    let env = env();
-    let mut config = InternetIdentityInit {
-        openid_google: Some(None),
-        ..Default::default()
-    };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(Some(Plausible {
-        domain: Some("https://example1.com".into()),
-        hash_mode: Some(true),
-        track_localhost: Some(true),
-        api_host: Some("https://example2.com".into()),
-    }));
-    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
-    assert_eq!(
-        api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
+        disabled_value
     );
 }
 
@@ -109,18 +111,19 @@ fn should_update_config() {
         })),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.analytics_config = Some(Some(Plausible {
+    let updated_value = Some(Some(Plausible {
         domain: Some("https://example1.com".into()),
         hash_mode: Some(true),
         track_localhost: Some(true),
         api_host: Some("https://example2.com".into()),
     }));
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.analytics_config = updated_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().analytics_config,
-        config.analytics_config
+        updated_value
     );
 }
 

@@ -47,15 +47,16 @@ fn should_enable_config() {
         openid_google: Some(None),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = Some(Some(OpenIdConfig {
+    let enabled_value = Some(Some(OpenIdConfig {
         client_id: "https://example.com".into(),
     }));
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.openid_google = enabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().openid_google,
-        config.openid_google
+        enabled_value
     );
 }
 
@@ -68,13 +69,14 @@ fn should_disable_config() {
         })),
         ..Default::default()
     };
+    let disabled_value = Some(None);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = Some(None);
+    config.openid_google = disabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().openid_google,
-        config.openid_google
+        disabled_value
     );
 }
 
@@ -87,15 +89,16 @@ fn should_update_config() {
         })),
         ..Default::default()
     };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = Some(Some(OpenIdConfig {
+    let updated_value = Some(Some(OpenIdConfig {
         client_id: "https://example2.com".into(),
     }));
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    config.openid_google = updated_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().openid_google,
-        config.openid_google
+        updated_value
     );
 }
 
