@@ -29,10 +29,6 @@ fn should_init_config() {
     let env = env();
     let configs = vec![
         InternetIdentityInit {
-            captcha_config: None,
-            ..Default::default()
-        },
-        InternetIdentityInit {
             captcha_config: Some(CaptchaConfig {
                 max_unsolved_captchas: 200,
                 captcha_trigger: Static(CaptchaEnabled),
