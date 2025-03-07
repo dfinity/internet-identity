@@ -111,7 +111,7 @@ fn should_retain_config() {
 #[test]
 fn should_retain_anchor_on_user_range_start_increase() {
     let env = env();
-    let mut config = InternetIdentityInit {
+    let config = InternetIdentityInit {
         assigned_user_number_range: Some((1000, 7_569_744)),
         captcha_config: Some(CaptchaConfig {
             max_unsolved_captchas: 100,
@@ -120,7 +120,7 @@ fn should_retain_anchor_on_user_range_start_increase() {
         ..Default::default()
     };
 
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
     let authn_method = test_authn_method();
     assert_eq!(
         create_identity_with_authn_method(&env, canister_id, &authn_method),
@@ -143,7 +143,7 @@ fn should_retain_anchor_on_user_range_start_increase() {
 #[test]
 fn should_retain_anchor_on_user_range_end_decrease() {
     let env = env();
-    let mut config = InternetIdentityInit {
+    let config = InternetIdentityInit {
         assigned_user_number_range: Some((1000, 7_569_744)),
         captcha_config: Some(CaptchaConfig {
             max_unsolved_captchas: 100,
@@ -152,7 +152,7 @@ fn should_retain_anchor_on_user_range_end_decrease() {
         ..Default::default()
     };
 
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
     let authn_method = test_authn_method();
     assert_eq!(
         create_identity_with_authn_method(&env, canister_id, &authn_method),
