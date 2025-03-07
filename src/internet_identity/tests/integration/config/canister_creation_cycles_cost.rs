@@ -66,7 +66,9 @@ fn should_update_config() {
     config.canister_creation_cycles_cost = Some(456);
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().canister_creation_cycles_cost,
+        api::config(&env, canister_id)
+            .unwrap()
+            .canister_creation_cycles_cost,
         config.canister_creation_cycles_cost
     );
 }
@@ -103,7 +105,9 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().canister_creation_cycles_cost,
+            api::config(&env, canister_id)
+                .unwrap()
+                .canister_creation_cycles_cost,
             config.canister_creation_cycles_cost
         );
     }

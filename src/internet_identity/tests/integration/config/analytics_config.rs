@@ -170,9 +170,7 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id)
-                .unwrap()
-                .analytics_config,
+            api::config(&env, canister_id).unwrap().analytics_config,
             config.analytics_config
         );
     }
