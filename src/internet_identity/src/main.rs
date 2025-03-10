@@ -356,6 +356,7 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
         analytics_config: Some(persistent_state.analytics_config.clone()),
+        fetch_root_key: persistent_state.fetch_root_key,
     })
 }
 
@@ -447,6 +448,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(analytics_config) = arg.analytics_config {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.analytics_config = analytics_config;
+            })
+        }
+        if let Some(fetch_root_key) = arg.fetch_root_key {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.fetch_root_key = Some(fetch_root_key);
             })
         }
     }

@@ -35,6 +35,7 @@ pub struct StorablePersistentState {
     related_origins: Option<Vec<String>>,
     openid_google: Option<OpenIdConfig>,
     analytics_config: Option<AnalyticsConfig>,
+    fetch_root_key: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -75,6 +76,7 @@ impl From<PersistentState> for StorablePersistentState {
             related_origins: s.related_origins,
             openid_google: s.openid_google,
             analytics_config: s.analytics_config,
+            fetch_root_key: s.fetch_root_key,
         }
     }
 }
@@ -93,6 +95,7 @@ impl From<StorablePersistentState> for PersistentState {
             openid_google: s.openid_google,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
+            fetch_root_key: s.fetch_root_key,
         }
     }
 }
@@ -139,6 +142,7 @@ mod tests {
             related_origins: None,
             openid_google: None,
             analytics_config: None,
+            fetch_root_key: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -161,6 +165,7 @@ mod tests {
             openid_google: None,
             event_stats_24h_start: None,
             analytics_config: None,
+            fetch_root_key: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

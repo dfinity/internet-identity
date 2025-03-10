@@ -74,7 +74,7 @@ export class ConfirmRemoveDeviceView extends View {
   }
 
   async submit(): Promise<void> {
-    await this.browser.$("#confirmRemoveDeviceButton").click();
+    await this.browser.$("#confirmRemoveDeviceButton:not([disabled])").click();
   }
 }
 
@@ -436,6 +436,25 @@ export class MainView extends View {
 
   async addOpenIdCredential(): Promise<void> {
     await this.browser.$("#linkAccount").click();
+  }
+
+  async removeRecovery(): Promise<void> {
+    // This comes from `recoveryDeviceKey` in frontend/src/utils/recoveryDevice.ts
+    const deviceName = "Recovery Device";
+    await this.openDeviceActions({ deviceName });
+    await this.deviceAction({ deviceName, action: "remove" }).click();
+    const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
+    await confirmRemoveDeviceView.waitForDisplay();
+    await confirmRemoveDeviceView.submit();
+    await confirmRemoveDeviceView.waitForAbsence();
+  }
+
+  async expectRecoveryDevice(exists: boolean): Promise<void> {
+    const recoveryDeviceSelector =
+      '[data-role="recoveries"] [data-device="Recovery Device"]';
+    await this.browser
+      .$(recoveryDeviceSelector)
+      .waitForDisplayed({ timeout: 10_000, reverse: !exists });
   }
 }
 

@@ -70,6 +70,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
       "https://identity.icp0.io",
     ],
   ],
+  fetch_root_key: [],
 };
 
 const mockActor = {
