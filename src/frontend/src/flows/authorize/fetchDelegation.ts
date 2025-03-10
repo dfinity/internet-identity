@@ -4,11 +4,8 @@ import {
 } from "$generated/internet_identity_types";
 import { toast } from "$src/components/toast";
 import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import {
-  transformSignedDelegation,
-  unknownToString,
-  type FrontendSignedDelegation,
-} from "$src/utils/utils";
+import { transformSignedDelegation, unknownToString } from "$src/utils/utils";
+import type { SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the derivation.
