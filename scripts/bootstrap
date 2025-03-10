@@ -20,7 +20,7 @@ rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:spa
 echo "using rust version '$rust_version'"
 
 # here we set the toolchain to 'none' and rustup will pick up on ./rust-toolchain.toml
-run curl --fail https://raw.githubusercontent.com/rust-lang/rustup/refs/tags/1.28.0/rustup-init.sh -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
+run curl --fail https://raw.githubusercontent.com/rust-lang/rustup/refs/tags/1.28.1/rustup-init.sh -sSf | run sh -s -- -y --default-toolchain "none" --no-modify-path
 
 # https://blog.rust-lang.org/2025/03/02/Rustup-1.28.0.html
 # Install required toolchain
