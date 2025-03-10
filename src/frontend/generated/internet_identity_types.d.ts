@@ -217,6 +217,7 @@ export interface InternetIdentityInit {
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
+  'dapps_explorer' : [] | [boolean],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
   'register_rate_limit' : [] | [RateLimitConfig],
