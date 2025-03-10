@@ -9,10 +9,7 @@ fn should_init_default() {
     let env = env();
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
-    assert_eq!(
-        api::config(&env, canister_id).unwrap().fetch_root_key,
-        None
-    );
+    assert_eq!(api::config(&env, canister_id).unwrap().fetch_root_key, None);
 }
 
 #[test]
