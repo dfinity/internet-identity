@@ -71,6 +71,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
     ],
   ],
   fetch_root_key: [],
+  dapps_explorer: [],
 };
 
 const mockActor = {
