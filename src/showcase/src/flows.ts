@@ -24,6 +24,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   openid_google: [],
   register_rate_limit: [],
   related_origins: [],
+  fetch_root_key: [],
 };
 
 const registerSuccessToastTemplate = (result: unknown) => html`
