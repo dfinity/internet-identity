@@ -437,6 +437,13 @@ export class MainView extends View {
   async addOpenIdCredential(): Promise<void> {
     await this.browser.$("#linkAccount").click();
   }
+
+  async getLinkedAccounts(): Promise<string[]> {
+    const emailElements = await this.browser.$$(
+      'aside[data-role="linked-accounts"] ul li span.c-tooltip__message.c-card.c-card--tight.t-nowrap'
+    );
+    return Promise.all(emailElements.map((element) => element.getText()));
+  }
 }
 
 export class AddRemoteDeviceAliasView extends View {
