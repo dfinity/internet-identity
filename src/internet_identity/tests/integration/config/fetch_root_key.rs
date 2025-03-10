@@ -67,7 +67,7 @@ fn should_disable_config() {
     let disabled_value = Some(false);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.fetch_root_key = disabled_value.clone();
+    config.fetch_root_key = disabled_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().fetch_root_key,
@@ -85,7 +85,7 @@ fn should_update_config() {
     let updated_value = Some(true);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.fetch_root_key = updated_value.clone();
+    config.fetch_root_key = updated_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().fetch_root_key,
