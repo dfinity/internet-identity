@@ -211,6 +211,7 @@ export type IdentityMetadataReplaceError = {
   };
 export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
+  'fetch_root_key' : [] | [boolean],
   'openid_google' : [] | [[] | [OpenIdConfig]],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],

@@ -208,6 +208,7 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
+    pub fetch_root_key: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

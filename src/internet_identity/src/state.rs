@@ -114,6 +114,7 @@ pub struct PersistentState {
     // If it is `none`, then the 24h window starts from the newest entry in the event_data
     // BTreeMap minus 24h.
     pub event_stats_24h_start: Option<EventKey>,
+    pub fetch_root_key: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -131,6 +132,7 @@ impl Default for PersistentState {
             openid_google: None,
             analytics_config: None,
             event_stats_24h_start: None,
+            fetch_root_key: None,
         }
     }
 }
