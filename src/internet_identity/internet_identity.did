@@ -271,7 +271,7 @@ type InternetIdentityInit = record {
     // Configuration to fetch root key or not from frontend assets
     fetch_root_key : opt bool;
     // Configuration to show dapps explorer or not
-    dapps_explorer : opt bool;
+    enable_dapps_explorer : opt bool;
 };
 
 type ChallengeKey = text;
