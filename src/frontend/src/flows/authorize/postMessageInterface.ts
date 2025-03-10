@@ -1,6 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
-import { FrontendSignedDelegation } from "$src/utils/utils";
+import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 
