@@ -52,7 +52,7 @@ fn should_enable_config() {
     let enabled_value = Some(true);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.fetch_root_key = enabled_value.clone();
+    config.fetch_root_key = enabled_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
         api::config(&env, canister_id).unwrap().fetch_root_key,
