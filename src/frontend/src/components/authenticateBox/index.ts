@@ -352,9 +352,6 @@ export const authenticateBoxFlow = async <I>({
     | { tag: "canceled" }
     | { tag: "deviceAdded" }
   > => {
-    const i18n = new I18n();
-    const copy = i18n.i18n(infoToastCopy);
-
     const result = await pages.useExisting();
     if (result.tag === "submit") {
       return doLogin({ userNumber: result.userNumber });
