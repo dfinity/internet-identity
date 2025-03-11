@@ -146,7 +146,10 @@ export async function authenticationProtocol({
     analytics.event("authorize-client-authenticate");
   } catch (error: unknown) {
     console.error("Unexpected error during authentication", error);
-    authenticateResult = { kind: "failure" as const, text: "There was an unexpected error, please try again." };
+    authenticateResult = {
+      kind: "failure" as const,
+      text: "There was an unexpected error, please try again.",
+    };
   }
 
   if (authenticateResult.kind === "failure") {

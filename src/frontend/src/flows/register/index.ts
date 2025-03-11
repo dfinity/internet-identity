@@ -8,6 +8,7 @@ import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
+import { analytics } from "$src/utils/analytics";
 import {
   passkeyAuthnMethodData,
   pinAuthnMethodData,
@@ -38,7 +39,6 @@ import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
-import { analytics } from "$src/utils/analytics";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
