@@ -8,6 +8,7 @@ import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
+import { analytics } from "$src/utils/analytics";
 import {
   passkeyAuthnMethodData,
   pinAuthnMethodData,
@@ -127,6 +128,7 @@ export const registerFlow = async ({
       }
 
       pinResult.tag satisfies "ok";
+      analytics.event("registration-pin");
 
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
@@ -154,6 +156,8 @@ export const registerFlow = async ({
       if (identity === undefined) {
         return "canceled";
       }
+
+      analytics.event("registration-passkey");
       const alias = await inferPasskeyAlias({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
@@ -194,19 +198,23 @@ export const registerFlow = async ({
 
   const startResult = await flowStart();
   if (startResult.kind !== "registrationFlowStepSuccess") {
+    analytics.event("registration-start-error");
     return startResult;
   }
   startResult satisfies RegistrationFlowStepSuccess;
 
   if (startResult.nextStep.step === "checkCaptcha") {
+    analytics.event("registration-captcha");
     const captchaResult = await promptCaptcha({
       captcha_png_base64: startResult.nextStep.captcha_png_base64,
       checkCaptcha,
     });
     if (captchaResult === "canceled") {
+      analytics.event("registration-captcha-cancelled");
       return "canceled";
     }
     if (captchaResult.kind !== "registrationFlowStepSuccess") {
+      analytics.event("registration-captcha-error");
       return captchaResult;
     }
     captchaResult satisfies RegistrationFlowStepSuccess;
@@ -220,9 +228,11 @@ export const registerFlow = async ({
   );
 
   if (result.kind !== "loginSuccess") {
+    analytics.event("registration-final-error");
     return result;
   }
   result.kind satisfies "loginSuccess";
+  analytics.event("registration-final-success");
 
   const userNumber = result.userNumber;
   await finalizeIdentity?.(userNumber);
