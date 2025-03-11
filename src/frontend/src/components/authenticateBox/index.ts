@@ -372,8 +372,7 @@ export const authenticateBoxFlow = async <I>({
 
     if (result.tag === "open_id_google") {
       const loginResult = await doLoginWithGoogle(connection);
-      if (isNullish(loginResult))
-        return { kind: "googleLoginFailed" } as FlowError;
+      if (isNullish(loginResult)) return { kind: "googleLoginFailed" };
       return loginResult;
     }
 
