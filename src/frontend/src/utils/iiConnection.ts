@@ -26,10 +26,12 @@ import {
   RegistrationFlowNextStep,
   Salt,
   SessionKey,
+  SignedDelegation,
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
 } from "$generated/internet_identity_types";
+import { withLoader } from "$src/components/loader";
 import { fromMnemonicWithoutValidation } from "$src/crypto/ed25519";
 import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$src/featureFlags";
 import { features } from "$src/features";
@@ -40,6 +42,7 @@ import {
 import {
   CanisterError,
   diagnosticInfo,
+  transformSignedDelegation,
   unknownToString,
 } from "$src/utils/utils";
 import {
@@ -128,6 +131,8 @@ export type RateLimitExceeded = { kind: "rateLimitExceeded" };
 export type AlreadyInProgress = { kind: "alreadyInProgress" };
 export type ApiError = { kind: "apiError"; error: Error };
 export type RegisterNoSpace = { kind: "registerNoSpace" };
+export type MissingGoogleClientId = { kind: "missingGoogleClientId" };
+export type GoogleLoginFailed = { kind: "googleLoginFailed" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
@@ -674,6 +679,85 @@ export class Connection {
       }
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
+  };
+
+  fromJwt = async (
+    jwt: JWT,
+    salt: Salt,
+    sessionIdentity: SignIdentity
+  ): Promise<AuthenticatedConnection> => {
+    const retryGetJwtDelegation = async (
+      jwt: JWT,
+      salt: Salt,
+      sessionKey: SessionKey,
+      expiration: bigint,
+      actor: ActorSubclass<_SERVICE>,
+      maxRetries = 5
+    ): Promise<SignedDelegation> => {
+      for (let i = 0; i < maxRetries; i++) {
+        // Linear backoff
+        await new Promise((resolve) => {
+          setInterval(resolve, 1000 * i);
+        });
+        const res = await actor.openid_get_delegation(
+          jwt,
+          salt,
+          sessionKey,
+          expiration
+        );
+        if ("Err" in res) {
+          console.error(res.Err);
+          continue;
+        }
+
+        return res.Ok;
+      }
+      throw new Error(
+        `Failed to retrieve a delegation after ${maxRetries} retries.`
+      );
+    };
+
+    let actor = await this.createActor(sessionIdentity);
+    const sessionKey = new Uint8Array(sessionIdentity.getPublicKey().toDer());
+
+    const prepareDelegationResponse = await actor.openid_prepare_delegation(
+      jwt,
+      salt,
+      sessionKey
+    );
+
+    if ("Err" in prepareDelegationResponse)
+      throw new CanisterError(prepareDelegationResponse.Err);
+
+    const { anchor_number, expiration, user_key } =
+      prepareDelegationResponse.Ok;
+
+    const signedDelegation = await withLoader(() =>
+      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor)
+    );
+
+    const transformedDelegation = transformSignedDelegation(signedDelegation);
+
+    const chain = DelegationChain.fromDelegations(
+      [transformedDelegation],
+      new Uint8Array(user_key)
+    );
+
+    const jwtSignedIdentity = DelegationIdentity.fromDelegation(
+      sessionIdentity,
+      chain
+    );
+
+    actor = await this.createActor(jwtSignedIdentity);
+
+    return new AuthenticatedConnection(
+      this.canisterId,
+      this.canisterConfig,
+      sessionIdentity,
+      jwtSignedIdentity,
+      anchor_number,
+      actor
+    );
   };
 }
 
