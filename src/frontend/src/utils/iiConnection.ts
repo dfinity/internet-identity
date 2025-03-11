@@ -645,7 +645,7 @@ export class Connection {
     }
 
     const shouldFetchRootKey =
-      features.FETCH_ROOT_KEY || Boolean(this.canisterConfig.fetch_root_key[0]);
+      features.FETCH_ROOT_KEY || (this.canisterConfig.fetch_root_key[0] ?? false);
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
