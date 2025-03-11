@@ -4,6 +4,7 @@ import { analytics } from "$src/utils/analytics";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";
+import { trackWindowClose, removeWindowCloseTracker } from "$src/utils/trackWindowClose";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -142,6 +143,7 @@ export async function authenticationProtocol({
   // This should not fail, but there is a big drop-off in the funnel here.
   // It most probably means users closing the window, but we should investigate.
   try {
+    trackWindowClose(() => analytics.event("user-closed-window"));
     authenticateResult = await authenticate(authContext);
     analytics.event("authorize-client-authenticate");
   } catch (error: unknown) {
@@ -150,6 +152,8 @@ export async function authenticationProtocol({
       kind: "failure" as const,
       text: "There was an unexpected error, please try again.",
     };
+  } finally {
+    removeWindowCloseTracker();
   }
 
   if (authenticateResult.kind === "failure") {
