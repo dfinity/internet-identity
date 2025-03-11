@@ -8,10 +8,10 @@ let windowCloseListener: (() => void) | null = null;
  */
 export function trackWindowClose(callback: () => void): void {
   if (windowCloseListener) {
-    window.removeEventListener('beforeunload', windowCloseListener);
+    window.removeEventListener("beforeunload", windowCloseListener);
   }
   windowCloseListener = callback;
-  window.addEventListener('beforeunload', windowCloseListener);
+  window.addEventListener("beforeunload", windowCloseListener);
 }
 
 /**
@@ -19,7 +19,7 @@ export function trackWindowClose(callback: () => void): void {
  */
 export function removeWindowCloseTracker(): void {
   if (windowCloseListener) {
-    window.removeEventListener('beforeunload', windowCloseListener);
+    window.removeEventListener("beforeunload", windowCloseListener);
     windowCloseListener = null;
   }
 }
