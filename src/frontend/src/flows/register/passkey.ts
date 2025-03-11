@@ -14,6 +14,7 @@ import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 
 import copyJson from "./passkey.json";
+import { analytics } from "$src/utils/analytics";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
@@ -111,6 +112,7 @@ export const savePasskeyOrPin = async ({
         cancel: () => resolve("canceled"),
         scrollToTop: true,
         constructPasskey: async () => {
+          analytics.event("construct-passkey");
           try {
             const rpId =
               origin === window.location.origin
@@ -119,8 +121,10 @@ export const savePasskeyOrPin = async ({
             const identity = await withLoader(() =>
               constructIdentity({ rpId })
             );
+            analytics.event("construct-passkey-success");
             resolve(identity);
           } catch (e) {
+            analytics.event("construct-passkey-error");
             toast.error(errorMessage(e));
           }
         },

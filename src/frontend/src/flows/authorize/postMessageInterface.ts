@@ -138,10 +138,22 @@ export async function authenticationProtocol({
 
   onProgress("validating");
 
-  const authenticateResult = await authenticate(authContext);
-  analytics.event("authorize-client-authenticate");
+  let authenticateResult;
+  // This should not fail, but there is a big drop-off in the funnel here.
+  // It most probably means users closing the window, but we should investigate.
+  try {
+    authenticateResult = await authenticate(authContext);
+    analytics.event("authorize-client-authenticate");
+  } catch (error: unknown) {
+    console.error("Unexpected error during authentication", error);
+    authenticateResult = { kind: "failure" as const, text: "There was an unexpected error, please try again." };
+  }
 
   if (authenticateResult.kind === "failure") {
+    analytics.event("authorize-client-authenticate-error", {
+      origin: requestOrigin,
+      failureReason: authenticateResult.text,
+    });
     window.opener.postMessage({
       kind: "authorize-client-failure",
       text: authenticateResult.text,
