@@ -64,7 +64,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";
 import infoToastCopy from "../infoToast/copy.json";
-
+import authnTemplatesCopy from "./authnTemplatesCopy.json";
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
@@ -530,6 +530,9 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       addDevice: (userNumber?: bigint) => void;
       loginOpenIDGoogle: () => void;
     }) => {
+      const i18n = new I18n();
+      const copy = i18n.i18n(authnTemplatesCopy);
+
       const anchorInput = mkAnchorInput({
         onSubmit: useExistingProps.onSubmit,
       });
@@ -550,7 +553,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
             @click=${() => anchorInput.submit()}
             class="c-button"
           >
-            Continue
+            ${copy.continue}
           </button>
         </div>
         <button
@@ -561,7 +564,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
           id="addNewDeviceButton"
           class="c-button c-button--secondary"
         >
-          Continue with another device
+          ${copy.continue_with_another_device}
         </button>
         ${OPENID_AUTHENTICATION.isEnabled()
           ? html`
@@ -571,7 +574,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
                 id="addNewDeviceButton"
                 class="c-button c-button--secondary"
               >
-                Continue with Google
+                ${copy.continue_with_google}
               </button>
             `
           : ``}
@@ -583,7 +586,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
               id="registerButton"
               class="t-link"
             >
-              Create New
+              ${copy.create_new}
             </button>
           </li>
           <li>
@@ -594,7 +597,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
                 )}"
               id="recoverButton"
               class="t-link"
-              >Lost Access?</a
+              >${copy.lost_access}</a
             >
           </li>
         </ul>`;
