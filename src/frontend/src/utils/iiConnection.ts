@@ -643,11 +643,14 @@ export class Connection {
     if (this.overrideActor !== undefined) {
       return this.overrideActor;
     }
+
+    const shouldFetchRootKey =
+      features.FETCH_ROOT_KEY ||
+      (this.canisterConfig.fetch_root_key[0] ?? false);
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
-      // Only fetch the root key when we're not in prod
-      shouldFetchRootKey: features.FETCH_ROOT_KEY,
+      shouldFetchRootKey,
     });
 
     return Actor.createActor<_SERVICE>(internet_identity_idl, {

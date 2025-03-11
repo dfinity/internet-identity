@@ -115,6 +115,7 @@ pub struct PersistentState {
     // BTreeMap minus 24h.
     pub event_stats_24h_start: Option<EventKey>,
     pub fetch_root_key: Option<bool>,
+    pub enable_dapps_explorer: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -133,6 +134,7 @@ impl Default for PersistentState {
             analytics_config: None,
             event_stats_24h_start: None,
             fetch_root_key: None,
+            enable_dapps_explorer: None,
         }
     }
 }

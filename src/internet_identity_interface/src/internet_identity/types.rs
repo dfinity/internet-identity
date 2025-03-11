@@ -209,6 +209,7 @@ pub struct InternetIdentityInit {
     pub openid_google: Option<Option<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub fetch_root_key: Option<bool>,
+    pub enable_dapps_explorer: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
