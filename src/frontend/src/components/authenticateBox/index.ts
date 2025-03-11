@@ -530,7 +530,6 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       addDevice: (userNumber?: bigint) => void;
       loginOpenIDGoogle: () => void;
     }) => {
-      const i18n = new I18n();
       const copy = i18n.i18n(authnTemplatesCopy);
 
       const anchorInput = mkAnchorInput({
