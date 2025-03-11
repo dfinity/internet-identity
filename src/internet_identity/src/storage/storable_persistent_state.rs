@@ -36,6 +36,7 @@ pub struct StorablePersistentState {
     openid_google: Option<OpenIdConfig>,
     analytics_config: Option<AnalyticsConfig>,
     fetch_root_key: Option<bool>,
+    enable_dapps_explorer: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -77,6 +78,7 @@ impl From<PersistentState> for StorablePersistentState {
             openid_google: s.openid_google,
             analytics_config: s.analytics_config,
             fetch_root_key: s.fetch_root_key,
+            enable_dapps_explorer: s.enable_dapps_explorer,
         }
     }
 }
@@ -96,6 +98,7 @@ impl From<StorablePersistentState> for PersistentState {
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
             fetch_root_key: s.fetch_root_key,
+            enable_dapps_explorer: s.enable_dapps_explorer,
         }
     }
 }
@@ -143,6 +146,7 @@ mod tests {
             openid_google: None,
             analytics_config: None,
             fetch_root_key: None,
+            enable_dapps_explorer: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -166,6 +170,7 @@ mod tests {
             event_stats_24h_start: None,
             analytics_config: None,
             fetch_root_key: None,
+            enable_dapps_explorer: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }
