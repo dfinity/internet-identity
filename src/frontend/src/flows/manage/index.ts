@@ -206,7 +206,7 @@ const displayManageTemplate = ({
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
-  exploreDapps: () => void;
+  exploreDapps?: () => void;
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
 }): TemplateResult => {
@@ -255,16 +255,18 @@ const displayManageTemplate = ({
       addRecoveryKey,
       onRemoveDevice,
     })}
-    <aside class="l-stack">
-      ${dappsTeaser({
-        dapps,
-        click: () => exploreDapps(),
-        copy: {
-          dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Connect to these dapps",
-        },
-      })}
-    </aside>
+    ${nonNullish(exploreDapps)
+      ? html`<aside class="l-stack">
+          ${dappsTeaser({
+            dapps,
+            click: () => exploreDapps(),
+            copy: {
+              dapps_explorer: "Dapps explorer",
+              sign_into_dapps: "Connect to these dapps",
+            },
+          })}
+        </aside>`
+      : undefined}
     ${logoutSection()}
   </section>`;
 
@@ -591,6 +593,16 @@ export const displayManage = async (
       return undefined;
     };
 
+    const dappsExplorerEnabled: boolean =
+      connection.canisterConfig.enable_dapps_explorer[0] ?? false;
+    const onExplorDapps = async () => {
+      await dappsExplorer({ dapps });
+      // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+      // a device from the explorer), so we just re-display without reloading devices etc.
+      // the page without
+      display();
+    };
+
     const display = () =>
       displayManagePage({
         userNumber,
@@ -606,13 +618,7 @@ export const displayManage = async (
         onLinkAccount,
         onUnlinkAccount,
         dapps,
-        exploreDapps: async () => {
-          await dappsExplorer({ dapps });
-          // We know that the user couldn't have changed anything (the user can't delete e.g. delete
-          // a device from the explorer), so we just re-display without reloading devices etc.
-          // the page without
-          display();
-        },
+        exploreDapps: dappsExplorerEnabled ? onExplorDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
       });
