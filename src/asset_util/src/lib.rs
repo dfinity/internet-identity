@@ -529,12 +529,7 @@ fn filepath_to_urlpaths(file_path: String) -> Vec<String> {
         if elements.is_empty() && last == "index.html" {
             // The special case of the root index.html, which we serve
             // on both "/" and "/index.html"
-            vec![
-                "".to_string(),
-                "index.html".to_string(),
-                // Also serve on /callback to handle callback URL flows
-                "callback".to_string(),
-            ]
+            vec!["".to_string(), "index.html".to_string()]
         } else if last == "index.html" {
             // An index.html in a subpath
             let page = elements.join("/").to_string();
@@ -595,11 +590,7 @@ fn test_filepath_urlpaths() {
 
     assert_gen_paths(
         "index.html".to_string(),
-        vec![
-            "/".to_string(),
-            "/index.html".to_string(),
-            "/callback".to_string(),
-        ],
+        vec!["/".to_string(), "/index.html".to_string()],
     );
 
     assert_gen_paths(
