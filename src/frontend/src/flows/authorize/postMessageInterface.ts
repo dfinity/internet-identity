@@ -1,10 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
 import { analytics } from "$src/utils/analytics";
-import {
-  removeWindowSessionTracker,
-  trackWindowSession,
-} from "$src/utils/trackWindowSession";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";

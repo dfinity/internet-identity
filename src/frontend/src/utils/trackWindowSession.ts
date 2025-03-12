@@ -8,7 +8,13 @@ let visibilityChangeListener: (() => void) | null = null;
  * @param params.onLeaveSession - The function to call when the window is hidden.
  * @param params.onEnterSession - The function to call when the window becomes visible.
  */
-export function trackWindowSession({ onLeaveSession, onEnterSession }: { onLeaveSession: () => void, onEnterSession: () => void }): void {
+export function trackWindowSession({
+  onLeaveSession,
+  onEnterSession,
+}: {
+  onLeaveSession: () => void;
+  onEnterSession: () => void;
+}): void {
   if (visibilityChangeListener) {
     document.removeEventListener("visibilitychange", visibilityChangeListener);
   }
