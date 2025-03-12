@@ -695,6 +695,8 @@ jobs:
       - name: "Deploy test app"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          # Needed to surpass dfx error to use the insecure plaintext identity
+          export DFX_WARNING=-mainnet_plaintext_identity
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --wasm ./test_app.wasm \
             vt36r-2qaaa-aaaad-aad5a-cai
@@ -708,6 +710,8 @@ jobs:
       - name: "Deploy Issuer"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
+          # Needed to surpass dfx error to use the insecure plaintext identity
+          export DFX_WARNING=-mainnet_plaintext_identity
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --wasm vc_demo_issuer.wasm.gz \
             v2yvn-myaaa-aaaad-aad4q-cai
