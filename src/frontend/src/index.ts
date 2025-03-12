@@ -3,7 +3,6 @@ import {
   WEBAUTHN_IFRAME_PATH,
   webAuthnInIframeFlow,
 } from "$src/flows/iframeWebAuthn";
-import { REDIRECT_CALLBACK_PATH, callbackFlow } from "$src/flows/redirect";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "./flows/addDevice/welcomeView/registerTentativeDevice";
 import { authFlowAuthorize } from "./flows/authorize";
@@ -53,10 +52,6 @@ void createSpa(async (connection) => {
     analytics.event("page-authorize");
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
-  } else if (url.pathname === REDIRECT_CALLBACK_PATH) {
-    analytics.event("page-redirect-callback");
-    // User was returned here after redirect from a OpenID flow callback
-    return callbackFlow();
   } else if (url.hash === WEBAUTHN_IFRAME_PATH) {
     analytics.event("page-webauthn-iframe");
     // User needs to do cross-origin WebAuthn authentication in an iframe

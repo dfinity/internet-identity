@@ -436,96 +436,108 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     let index_html =
         String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
 
-    // Find the SPA URL in the HTML
-    let spa_url = {
+    // Find all cacheable.js URLs in the HTML
+    let spa_urls: Vec<String> = {
+        let mut urls = Vec::new();
+        let mut search_start = 0;
         let spa_suffix = "cacheable.js";
-        let spa_end = index_html
-            .find(spa_suffix)
-            .expect("Could not find cacheable.js in HTML");
-        let prefix_start = index_html[..spa_end]
-            .rfind('/')
-            .expect("Could not find starting / for spa URL");
 
-        index_html[prefix_start..spa_end + spa_suffix.len()].to_string()
+        while let Some(spa_end) = index_html[search_start..].find(spa_suffix) {
+            let absolute_end = search_start + spa_end;
+            if let Some(prefix_start) = index_html[..absolute_end].rfind('/') {
+                urls.push(index_html[prefix_start..absolute_end + spa_suffix.len()].to_string());
+            }
+            search_start = absolute_end + spa_suffix.len();
+        }
+        urls
     };
 
-    // Get SPA file
-    let spa_request = HttpRequest {
-        method: "GET".to_string(),
-        url: spa_url,
-        headers: vec![],
-        body: ByteBuf::new(),
-        certificate_version: Some(CERTIFICATION_VERSION),
-    };
+    // Try each SPA file until we find the icon
+    let mut found_icon = false;
+    for spa_url in spa_urls {
+        // Get SPA file
+        let spa_request = HttpRequest {
+            method: "GET".to_string(),
+            url: spa_url,
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(CERTIFICATION_VERSION),
+        };
 
-    let spa_response = http_request(&env, canister_id, &spa_request)?;
+        let spa_response = http_request(&env, canister_id, &spa_request)?;
 
-    assert_eq!(spa_response.status_code, 200);
-    assert!(spa_response.headers.contains(&(
-        "Cache-Control".to_string(),
-        "public, max-age=31536000".to_string()
-    )));
+        assert_eq!(spa_response.status_code, 200);
+        assert!(spa_response.headers.contains(&(
+            "Cache-Control".to_string(),
+            "public, max-age=31536000".to_string()
+        )));
 
-    let spa_result = verify_response_certification(
-        &env,
-        canister_id,
-        spa_request,
-        spa_response.clone(),
-        CERTIFICATION_VERSION,
-    );
-    assert_eq!(spa_result.verification_version, CERTIFICATION_VERSION);
+        let spa_result = verify_response_certification(
+            &env,
+            canister_id,
+            spa_request,
+            spa_response.clone(),
+            CERTIFICATION_VERSION,
+        );
+        assert_eq!(spa_result.verification_version, CERTIFICATION_VERSION);
 
-    let spa_bytes = spa_response.body.into_vec();
+        let spa_bytes = spa_response.body.into_vec();
 
-    // Decompress the SPA bytes
-    let mut decoder = GzDecoder::new(&spa_bytes[..]);
-    let mut spa_body = String::new();
-    decoder.read_to_string(&mut spa_body).unwrap();
+        // Decompress the SPA bytes
+        let mut decoder = GzDecoder::new(&spa_bytes[..]);
+        let mut spa_body = String::new();
+        decoder.read_to_string(&mut spa_body).unwrap();
 
-    // Find the icon URL in the HTML
-    let icon_url = spa_body
-        .lines()
-        .find(|line| line.contains(ICON_NAME))
-        .and_then(|line| {
-            if let Some(url_start) = line.find(&format!("\"/{ICON_NAME}")) {
-                if let Some(url_end) = line[url_start..].find(&format!("{ICON_SUFFIX}\"")) {
-                    let url = line[url_start..url_start + url_end + 5]
-                        .trim_matches(|c| c == '"' || c == '/');
-                    Some(format!("/{}", url))
+        // Try to find the icon URL in this SPA file
+        if let Some(icon_url) = spa_body
+            .lines()
+            .find(|line| line.contains(ICON_NAME))
+            .and_then(|line| {
+                if let Some(url_start) = line.find(&format!("\"/{ICON_NAME}")) {
+                    if let Some(url_end) = line[url_start..].find(&format!("{ICON_SUFFIX}\"")) {
+                        let url = line[url_start..url_start + url_end + 5]
+                            .trim_matches(|c| c == '"' || c == '/');
+                        Some(format!("/{}", url))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
-            } else {
-                None
-            }
-        })
-        .expect("Could not find icon URL in HTML");
+            })
+        {
+            // Found the icon, test it
+            let icon_request = HttpRequest {
+                method: "GET".to_string(),
+                url: icon_url,
+                headers: vec![],
+                body: ByteBuf::new(),
+                certificate_version: Some(CERTIFICATION_VERSION),
+            };
 
-    let icon_request = HttpRequest {
-        method: "GET".to_string(),
-        url: icon_url,
-        headers: vec![],
-        body: ByteBuf::new(),
-        certificate_version: Some(CERTIFICATION_VERSION),
-    };
+            let icon_response = http_request(&env, canister_id, &icon_request)?;
 
-    let icon_response = http_request(&env, canister_id, &icon_request)?;
+            assert_eq!(icon_response.status_code, 200);
+            assert!(icon_response.headers.contains(&(
+                "Cache-Control".to_string(),
+                "public, max-age=31536000".to_string()
+            )));
 
-    assert_eq!(icon_response.status_code, 200);
-    assert!(icon_response.headers.contains(&(
-        "Cache-Control".to_string(),
-        "public, max-age=31536000".to_string()
-    )));
+            let icon_result = verify_response_certification(
+                &env,
+                canister_id,
+                icon_request,
+                icon_response,
+                CERTIFICATION_VERSION,
+            );
+            assert_eq!(icon_result.verification_version, CERTIFICATION_VERSION);
 
-    let icon_result = verify_response_certification(
-        &env,
-        canister_id,
-        icon_request,
-        icon_response,
-        CERTIFICATION_VERSION,
-    );
-    assert_eq!(icon_result.verification_version, CERTIFICATION_VERSION);
+            found_icon = true;
+            break;
+        }
+    }
 
+    assert!(found_icon, "Icon not found in any cacheable.js file");
     Ok(())
 }
 
