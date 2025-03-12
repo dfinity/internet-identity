@@ -433,14 +433,15 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     let index_response = http_request(&env, canister_id, &index_request)?;
 
     // Convert body to string
-    let index_html = String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
-    
+    let index_html =
+        String::from_utf8(index_response.body.into_vec()).expect("Failed to parse HTML");
+
     // Find all cacheable.js URLs in the HTML
     let spa_urls: Vec<String> = {
         let mut urls = Vec::new();
         let mut search_start = 0;
         let spa_suffix = "cacheable.js";
-        
+
         while let Some(spa_end) = index_html[search_start..].find(spa_suffix) {
             let absolute_end = search_start + spa_end;
             if let Some(prefix_start) = index_html[..absolute_end].rfind('/') {
