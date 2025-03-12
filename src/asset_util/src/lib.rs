@@ -20,7 +20,6 @@ pub const LABEL_ASSETS_V1: &str = "http_assets";
 pub const LABEL_ASSETS_V2: &str = "http_expr";
 pub const STATUS_CODE_PSEUDO_HEADER: &str = ":ic-cert-status";
 pub const EXACT_MATCH_TERMINATOR: &str = "<$>";
-pub const WILDCARD_TERMINATOR: &str = "<*>";
 pub const IC_CERTIFICATE_EXPRESSION: &str =
     "default_certification(ValidationArgs{certification:Certification{no_request_certification: Empty{},\
     response_certification:ResponseCertification{response_header_exclusions:ResponseHeaderList{headers:[]}}}})";
