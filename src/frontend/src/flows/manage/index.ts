@@ -380,9 +380,9 @@ export const displayManage = async (
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
 
-  // Create anonymous nonce and salt for connection principal
+  // Create anonymous nonce and salt for calling principal from connection
   const { nonce, salt } = await createAnonymousNonce(
-    connection.identity.getPrincipal()
+    connection.delegationIdentity.getPrincipal()
   );
 
   const googleClientId =
