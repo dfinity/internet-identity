@@ -595,7 +595,7 @@ export const displayManage = async (
 
     const dappsExplorerEnabled: boolean =
       connection.canisterConfig.enable_dapps_explorer[0] ?? false;
-    const onExplorDapps = async () => {
+    const onExploreDapps = async () => {
       await dappsExplorer({ dapps });
       // We know that the user couldn't have changed anything (the user can't delete e.g. delete
       // a device from the explorer), so we just re-display without reloading devices etc.
@@ -618,7 +618,7 @@ export const displayManage = async (
         onLinkAccount,
         onUnlinkAccount,
         dapps,
-        exploreDapps: dappsExplorerEnabled ? onExplorDapps : undefined,
+        exploreDapps: dappsExplorerEnabled ? onExploreDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
       });
