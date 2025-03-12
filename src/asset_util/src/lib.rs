@@ -595,7 +595,11 @@ fn test_filepath_urlpaths() {
 
     assert_gen_paths(
         "index.html".to_string(),
-        vec!["/".to_string(), "/index.html".to_string()],
+        vec![
+            "/".to_string(),
+            "/index.html".to_string(),
+            "/callback".to_string(),
+        ],
     );
 
     assert_gen_paths(
