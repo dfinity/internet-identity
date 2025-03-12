@@ -2,9 +2,9 @@
 // applications that want to authenticate the user using Internet Identity
 import { analytics } from "$src/utils/analytics";
 import {
-  removeWindowCloseTracker,
-  trackWindowClose,
-} from "$src/utils/trackWindowClose";
+  removeWindowSessionTracker,
+  trackWindowSession,
+} from "$src/utils/trackWindowSession";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
 import { Delegation } from "./fetchDelegation";
@@ -146,7 +146,6 @@ export async function authenticationProtocol({
   // This should not fail, but there is a big drop-off in the funnel here.
   // It most probably means users closing the window, but we should investigate.
   try {
-    trackWindowClose(() => analytics.event("user-closed-window"));
     authenticateResult = await authenticate(authContext);
     analytics.event("authorize-client-authenticate");
   } catch (error: unknown) {
@@ -155,8 +154,6 @@ export async function authenticationProtocol({
       kind: "failure" as const,
       text: "There was an unexpected error, please try again.",
     };
-  } finally {
-    removeWindowCloseTracker();
   }
 
   if (authenticateResult.kind === "failure") {
