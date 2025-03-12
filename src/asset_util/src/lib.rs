@@ -20,6 +20,7 @@ pub const LABEL_ASSETS_V1: &str = "http_assets";
 pub const LABEL_ASSETS_V2: &str = "http_expr";
 pub const STATUS_CODE_PSEUDO_HEADER: &str = ":ic-cert-status";
 pub const EXACT_MATCH_TERMINATOR: &str = "<$>";
+pub const WILDCARD_TERMINATOR: &str = "<*>";
 pub const IC_CERTIFICATE_EXPRESSION: &str =
     "default_certification(ValidationArgs{certification:Certification{no_request_certification: Empty{},\
     response_certification:ResponseCertification{response_header_exclusions:ResponseHeaderList{headers:[]}}}})";
@@ -529,7 +530,12 @@ fn filepath_to_urlpaths(file_path: String) -> Vec<String> {
         if elements.is_empty() && last == "index.html" {
             // The special case of the root index.html, which we serve
             // on both "/" and "/index.html"
-            vec!["".to_string(), "index.html".to_string()]
+            vec![
+                "".to_string(),
+                "index.html".to_string(),
+                // Also serve on /callback to handle callback URL flows
+                "callback".to_string(),
+            ]
         } else if last == "index.html" {
             // An index.html in a subpath
             let page = elements.join("/").to_string();
