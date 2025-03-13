@@ -127,16 +127,16 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
   // Preload the loader
   preloadLoaderImage();
 
+  // Prepare the actor/connection to talk to the canister
+  const connection = new Connection(readCanisterId(), readCanisterConfig());
+
   // If the build is not "official", show a warning
   // https://github.com/dfinity/internet-identity#build-features
-  showWarningIfNecessary();
+  showWarningIfNecessary(connection.canisterConfig);
 
   if (!supportsWebAuthn()) {
     return compatibilityNotice();
   }
-
-  // Prepare the actor/connection to talk to the canister
-  const connection = new Connection(readCanisterId(), readCanisterConfig());
 
   return app(connection);
 };
