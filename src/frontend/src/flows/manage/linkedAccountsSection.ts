@@ -46,7 +46,6 @@ export const linkedAccountsSection = ({
             credential,
             index,
             unlink: onUnlinkAccount,
-            unlinkAvailable,
           })
         )}
       </ul>
@@ -73,14 +72,12 @@ export const linkedAccountsSection = ({
 
 export const accountItem = ({
   credential,
-  index,
+  index = 0,
   unlink,
-  unlinkAvailable,
 }: {
   credential: OpenIdCredential;
-  index: number;
-  unlink: (credential: OpenIdCredential) => void;
-  unlinkAvailable: boolean;
+  index?: number;
+  unlink?: (credential: OpenIdCredential) => void;
 }) => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -88,7 +85,7 @@ export const accountItem = ({
     {
       action: "unlink",
       caption: copy.unlink.toString(),
-      fn: () => unlink(credential),
+      fn: () => unlink?.(credential),
     },
   ];
 
@@ -119,7 +116,7 @@ export const accountItem = ({
             </span>
           </div>
           ${
-            unlinkAvailable
+            nonNullish(unlink)
               ? settingsDropdown({
                   alias: credential.sub,
                   id: `account-${index}`,
