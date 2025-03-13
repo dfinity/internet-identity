@@ -45,7 +45,7 @@ export const linkedAccountsSection = ({
           accountItem({
             credential,
             index,
-            unlink: onUnlinkAccount,
+            unlink: unlinkAvailable ? onUnlinkAccount : undefined,
           })
         )}
       </ul>
