@@ -11,11 +11,10 @@ use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
+use internet_identity_interface::internet_identity::authn_method;
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage,
-    IdRegFinishArg, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError,
-    IdentityNumber, RegistrationFlowNextStep, StaticCaptchaTrigger,
+    AuthnMethod, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishData, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber, PublicKey, RegistrationFlowNextStep, StaticCaptchaTrigger, WebAuthn
 };
 
 impl RegistrationFlowState {
@@ -168,10 +167,15 @@ pub fn identity_registration_finish(
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
 
-    // add temp key so the user can keep using the identity used for the registration flow
-    state::with_temp_keys_mut(|temp_keys| {
-        temp_keys.add_temp_key(&arg.authn_method.public_key(), identity_number, caller)
-    });
+    match arg.data {
+        IdRegFinishData::AuthnMethodData(authn_method) => {
+                // add temp key so the user can keep using the identity used for the registration flow
+            state::with_temp_keys_mut(|temp_keys| {
+                temp_keys.add_temp_key(&authn_method.public_key(), identity_number, caller)
+            });
+        }
+        IdRegFinishData::OpenIdCredentialData(_) => {}
+    }
 
     Ok(IdRegFinishResult { identity_number })
 }
@@ -180,6 +184,14 @@ fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishEr
     let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
         return Err(IdentityLimitReached);
     };
+
+    // match arg.authn_method.authn_method {
+    //     OpenId(open_id_data) => {
+    //         todo!()
+    //     }
+    //     WebAuthn(data) | PublicKey(data) => {}
+    // }
+
     let device = DeviceWithUsage::try_from(arg.authn_method.clone())
         .map(|device| Device::from(DeviceData::from(device)))
         .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
