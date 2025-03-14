@@ -23,6 +23,7 @@ import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { confirmUnlinkAccount } from "$src/flows/manage/confirmUnlinkAccount";
 import { linkedAccountsSection } from "$src/flows/manage/linkedAccountsSection";
 import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import {
@@ -538,12 +539,27 @@ export const displayManage = async (
       }
     };
     const onUnlinkAccount = async (credential: OpenIdCredential) => {
-      if (!confirm(copy.unlink_account_confirmation.toString())) {
+      const isCurrentCredential =
+        nonNullish(connection.credential) &&
+        credential.iss === connection.credential.iss &&
+        credential.sub === connection.credential.sub;
+      const action = await confirmUnlinkAccount({
+        i18n,
+        credential,
+        isCurrentCredential,
+      });
+      if (action === "cancelled") {
+        resolve();
         return;
       }
       try {
         await connection.removeOpenIdCredential(credential.iss, credential.sub);
-        resolve();
+        if (isCurrentCredential) {
+          location.reload(); // Reload page to go back to sign in
+          return;
+        } else {
+          resolve();
+        }
       } catch (error) {
         if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
           switch (error.type) {

@@ -1,7 +1,6 @@
 {
   "en": {
     "account_already_linked": "This account has already been linked",
-    "unlink_account_confirmation": "Do you want to unlink this account?",
     "third_party_sign_in_permission_required": "You need to enable the \"Third-party sign-in\" browser permission for this site",
     "link_your_account_to_hold_assets_and_sign_into_dapps": "Link your online account to hold assets and securely sign into dapps.",
     "use_your_accounts_to_hold_assets_and_sign_into_dapps": "Use your online accounts to hold assets and securely sign into dapps.",
