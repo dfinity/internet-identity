@@ -329,7 +329,6 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'InvalidAuthnMethod' : IDL.Text,
     'IdentityLimitReached' : IDL.Null,
-    'JwtVerificationFailed' : IDL.Text,
     'StorageError' : IDL.Text,
   });
   const IdRegStartError = IDL.Variant({

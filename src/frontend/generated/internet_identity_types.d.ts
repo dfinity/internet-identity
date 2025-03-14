@@ -176,7 +176,6 @@ export type IdRegFinishError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'InvalidAuthnMethod' : string } |
   { 'IdentityLimitReached' : null } |
-  { 'JwtVerificationFailed' : string } |
   { 'StorageError' : string };
 export interface IdRegFinishResult { 'identity_number' : bigint }
 export interface IdRegNextStepResult { 'next_step' : RegistrationFlowNextStep }
