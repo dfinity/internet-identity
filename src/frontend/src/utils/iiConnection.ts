@@ -6,7 +6,6 @@ import {
   _SERVICE,
   AddTentativeDeviceResponse,
   AnchorCredentials,
-  AuthnMethodData,
   DeviceData,
   DeviceKey,
   FrontendHostname,
@@ -16,6 +15,7 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  IdRegAuthnData,
   InternetIdentityInit,
   JWT,
   KeyType,
@@ -293,11 +293,11 @@ export class Connection {
   identity_registration_finish = async ({
     tempIdentity,
     identity,
-    authnMethod,
+    authnData,
   }: {
     tempIdentity: SignIdentity;
     identity: SignIdentity;
-    authnMethod: AuthnMethodData;
+    authnData: IdRegAuthnData;
   }): Promise<
     | LoginSuccess
     | ApiError
@@ -312,7 +312,7 @@ export class Connection {
     let finishResponse;
     try {
       finishResponse = await actor.identity_registration_finish({
-        authn_method: authnMethod,
+        authn_data: authnData,
       });
     } catch (error: unknown) {
       if (error instanceof Error) {

@@ -42,7 +42,7 @@ pub fn identity_registration_finish(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    authn_method: &AuthnMethodData,
+    authn_data: &IdRegAuthnData,
 ) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
     call_candid_as(
         env,
@@ -51,7 +51,7 @@ pub fn identity_registration_finish(
         sender,
         "identity_registration_finish",
         (IdRegFinishArg {
-            authn_method: authn_method.clone(),
+            authn_data: authn_data.clone(),
         },),
     )
     .map(|(x,)| x)

@@ -171,11 +171,14 @@ export interface IdAliasCredentials {
   'rp_id_alias_credential' : SignedIdAlias,
   'issuer_id_alias_credential' : SignedIdAlias,
 }
-export interface IdRegFinishArg { 'authn_method' : AuthnMethodData }
+export type IdRegAuthnData = { 'PubkeyAuthn' : AuthnMethodData } |
+  { 'OpenID' : OpenIdRegistrationData };
+export interface IdRegFinishArg { 'authn_data' : IdRegAuthnData }
 export type IdRegFinishError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'InvalidAuthnMethod' : string } |
   { 'IdentityLimitReached' : null } |
+  { 'JwtVerificationFailed' : string } |
   { 'StorageError' : string };
 export interface IdRegFinishResult { 'identity_number' : bigint }
 export interface IdRegNextStepResult { 'next_step' : RegistrationFlowNextStep }
@@ -279,6 +282,7 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+export interface OpenIdRegistrationData { 'jwt' : JWT, 'salt' : Salt }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {

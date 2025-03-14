@@ -453,6 +453,11 @@ type AuthnMethodData = record {
     last_authentication : opt Timestamp;
 };
 
+type OpenIdRegistrationData = record {
+    jwt: JWT;
+    salt: Salt;
+};
+
 // Extra information about registration status for new authentication methods
 type AuthnMethodRegistrationInfo = record {
     // If present, the user has registered a new authentication method. This
@@ -642,7 +647,12 @@ type CheckCaptchaError = variant {
 };
 
 type IdRegFinishArg = record {
-    authn_method : AuthnMethodData;
+    authn_data : IdRegAuthnData;
+};
+
+type IdRegAuthnData = variant {
+    PubkeyAuthn : AuthnMethodData;
+    OpenID : OpenIdRegistrationData;
 };
 
 type IdRegFinishResult = record {
@@ -662,6 +672,8 @@ type IdRegFinishError = variant {
     InvalidAuthnMethod : text;
     // Error while persisting the new identity.
     StorageError : text;
+    // Error verifying Jwt
+    JwtVerificationFailed : text;
 };
 
 service : (opt InternetIdentityInit) -> {

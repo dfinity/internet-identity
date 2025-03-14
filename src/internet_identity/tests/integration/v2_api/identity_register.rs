@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::IdentityInfoError::Un
 use internet_identity_interface::internet_identity::types::{
     CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegFinishError, IdRegStartError,
     InternetIdentityInit, MetadataEntryV2, RateLimitConfig, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    StaticCaptchaTrigger, IdRegAuthnData
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
@@ -57,7 +57,7 @@ fn should_transition_flow_principal_to_temp_key() {
         .expect("check_captcha failed");
 
     let identity_nr =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &IdRegAuthnData::PubkeyAuthn(authn_method.clone()))
             .expect("API call failed")
             .expect("registration finish failed")
             .identity_number;
@@ -95,7 +95,7 @@ fn should_not_exceed_configured_identity_range() {
         .expect("check_captcha failed");
 
     let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &IdRegAuthnData::PubkeyAuthn(authn_method.clone()))
             .expect("API call failed");
     assert!(matches!(
         result,
@@ -223,7 +223,7 @@ fn should_fail_on_invalid_metadata() {
         .expect("check_captcha failed");
 
     let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &IdRegAuthnData::PubkeyAuthn(authn_method.clone()))
             .expect("API call failed");
     assert!(matches!(
         result,

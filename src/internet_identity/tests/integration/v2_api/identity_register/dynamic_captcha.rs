@@ -5,7 +5,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
     arg_with_dynamic_captcha, env, install_ii_canister_with_arg, test_principal, II_WASM,
 };
-use internet_identity_interface::internet_identity::types::RegistrationFlowNextStep;
+use internet_identity_interface::internet_identity::types::{RegistrationFlowNextStep, IdRegAuthnData};
 use std::time::Duration;
 
 #[test]
@@ -22,7 +22,7 @@ fn should_not_require_captcha_below_threshold_rate() {
 
     assert!(matches!(result.next_step, RegistrationFlowNextStep::Finish));
 
-    api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+    api_v2::identity_registration_finish(&env, canister_id, flow_principal, &IdRegAuthnData::PubkeyAuthn(authn_method.clone()))
         .expect("API call failed")
         .expect("registration finish failed");
 }
@@ -50,7 +50,7 @@ fn should_require_captcha_above_threshold_rate() {
 
         assert!(matches!(result.next_step, RegistrationFlowNextStep::Finish));
 
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
+        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &IdRegAuthnData::PubkeyAuthn(authn_method.clone()))
             .expect("API call failed")
             .expect("registration finish failed");
         env.advance_time(Duration::from_secs(1));

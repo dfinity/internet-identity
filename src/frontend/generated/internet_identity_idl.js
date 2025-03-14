@@ -322,13 +322,21 @@ export const idlFactory = ({ IDL }) => {
       'space_available' : IDL.Nat64,
     }),
   });
-  const IdRegFinishArg = IDL.Record({ 'authn_method' : AuthnMethodData });
+  const JWT = IDL.Text;
+  const Salt = IDL.Vec(IDL.Nat8);
+  const OpenIdRegistrationData = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
+  const IdRegAuthnData = IDL.Variant({
+    'PubkeyAuthn' : AuthnMethodData,
+    'OpenID' : OpenIdRegistrationData,
+  });
+  const IdRegFinishArg = IDL.Record({ 'authn_data' : IdRegAuthnData });
   const IdRegFinishResult = IDL.Record({ 'identity_number' : IDL.Nat64 });
   const IdRegFinishError = IDL.Variant({
     'NoRegistrationFlow' : IDL.Null,
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'InvalidAuthnMethod' : IDL.Text,
     'IdentityLimitReached' : IDL.Null,
+    'JwtVerificationFailed' : IDL.Text,
     'StorageError' : IDL.Text,
   });
   const IdRegStartError = IDL.Variant({
@@ -336,8 +344,6 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
-  const JWT = IDL.Text;
-  const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,

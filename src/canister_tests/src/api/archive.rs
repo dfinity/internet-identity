@@ -84,6 +84,8 @@ pub mod compat {
         AddOpenIdCredential { iss: String },
         #[serde(rename = "remove_openid_credential")]
         RemoveOpenIdCredential { iss: String },
+        #[serde(rename = "register_with_openid_credential")]
+        RegisterWithOpenIdCredential { iss: String },
     }
 
     impl From<Operation> for CompatOperation {
@@ -107,6 +109,9 @@ pub mod compat {
                 }
                 Operation::RemoveOpenIdCredential { iss } => {
                     CompatOperation::RemoveOpenIdCredential { iss }
+                }
+                Operation::RegisterWithOpenIdCredential { iss } => {
+                    CompatOperation::RegisterWithOpenIdCredential { iss }
                 }
                 Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")

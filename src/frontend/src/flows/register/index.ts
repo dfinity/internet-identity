@@ -1,4 +1,7 @@
-import { AuthnMethodData } from "$generated/internet_identity_types";
+import {
+  AuthnMethodData,
+  IdRegAuthnData,
+} from "$generated/internet_identity_types";
 import { withLoader } from "$src/components/loader";
 import {
   PinIdentityMaterial,
@@ -68,10 +71,10 @@ export const registerFlow = async ({
   >;
   identityRegistrationFinish: ({
     identity,
-    authnMethod,
+    authnData,
   }: {
     identity: SignIdentity;
-    authnMethod: AuthnMethodData;
+    authnData: IdRegAuthnData;
   }) => Promise<
     | LoginSuccess
     | ApiError
@@ -222,7 +225,9 @@ export const registerFlow = async ({
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
-      authnMethod: authnMethodData,
+      authnData: {
+        PubkeyAuthn: authnMethodData,
+      },
       identity,
     })
   );
@@ -286,11 +291,11 @@ export const getRegisterFlowOpts = async ({
       await connection.identity_registration_start({ tempIdentity }),
     checkCaptcha: async (captchaSolution) =>
       await connection.check_captcha({ tempIdentity, captchaSolution }),
-    identityRegistrationFinish: async ({ identity, authnMethod }) =>
+    identityRegistrationFinish: async ({ identity, authnData }) =>
       await connection.identity_registration_finish({
         tempIdentity,
         identity,
-        authnMethod,
+        authnData,
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,

@@ -186,14 +186,21 @@ pub enum CheckCaptchaError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishArg {
-    pub data: IdRegFinishData
+    pub authn_data: IdRegAuthnData
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum IdRegFinishData {
-    AuthnMethodData(AuthnMethodData),
-    OpenIdCredentialData(OpenIdCredentialData)
+pub enum IdRegAuthnData {
+    PubkeyAuthn(AuthnMethodData),
+    OpenID(OpenIdRegistrationData)
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct OpenIdRegistrationData {
+    pub jwt: String,
+    pub salt: [u8; 32]
+}
+
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishResult {
@@ -207,4 +214,5 @@ pub enum IdRegFinishError {
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
+    JwtVerificationFailed(String)
 }

@@ -1,5 +1,5 @@
 use crate::internet_identity::types::{
-    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey, Purpose, Timestamp,
+    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, OpenIdCredentialData, PublicKey, Purpose, Timestamp
 };
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_cdk::api::management_canister::main::{CanisterStatusType, QueryStats};
@@ -36,6 +36,8 @@ pub enum Operation {
     AddOpenIdCredential { iss: String },
     #[serde(rename = "remove_openid_credential")]
     RemoveOpenIdCredential { iss: String },
+    #[serde(rename = "register_with_openid_credential")] //TODO: confirm this name
+    RegisterWithOpenIdCredential { iss: String }, //TODO: confirm data we need here
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
