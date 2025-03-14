@@ -72,7 +72,7 @@ pub fn create_identity_with_authn_method(
             .expect("check_captcha failed");
     }
 
-    api_v2::identity_registration_finish(env, canister_id, flow_principal, &authn_method)
+    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method)
         .expect("API call failed")
         .expect("registration finish failed")
         .identity_number
