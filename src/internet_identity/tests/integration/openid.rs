@@ -1,11 +1,15 @@
 //! Tests related to openid_credential_add, openid_credential_remove, openid_prepare_delegation and openid_get_delegation
 
-use crate::v2_api::authn_method_test_helpers::{create_identity_with_authn_method, create_identity_with_openid_credential};
+use crate::v2_api::authn_method_test_helpers::{
+    create_identity_with_authn_method, create_identity_with_openid_credential,
+};
 use candid::Principal;
 use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings, InternetIdentityInit, OpenIdConfig, OpenIdCredentialData, OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, InternetIdentityInit, OpenIdConfig, OpenIdCredentialData,
+    OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{CallError, PocketIc};
@@ -205,12 +209,12 @@ fn can_register_with_google() -> Result<(), CallError> {
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
 
-
     // Create identity (this will panic if it doesn't work)
     // the test principal here is from webauthn
     // this is a bit of a hack as in practice it would be a temporary frontend keypair
     // but it is not relevant for the purposes of this test, as we just need some principal that verifies with the nonce
-    let _identity_number = create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
+    let _identity_number =
+        create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
 
     Ok(())
 }
