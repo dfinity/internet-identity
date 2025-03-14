@@ -1,5 +1,5 @@
 use crate::internet_identity::types::{
-    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, OpenIdCredentialData, PublicKey, Purpose, Timestamp
+    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey, Purpose, Timestamp
 };
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_cdk::api::management_canister::main::{CanisterStatusType, QueryStats};
