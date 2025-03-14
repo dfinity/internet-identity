@@ -881,6 +881,7 @@ jobs:
           NEW_RELEASE_TAG: ${{ github.ref_name }}
         run: |
           echo "II release: $PREVIOUS_RELEASE_TAG -> $NEW_RELEASE_TAG"
+          # PREVIOUS_RELEASE_TAG is the latest release in releases page.
           sed -i "s|$PREVIOUS_RELEASE_TAG|$NEW_RELEASE_TAG|g" ./README.md
           cat ./README.md
 
