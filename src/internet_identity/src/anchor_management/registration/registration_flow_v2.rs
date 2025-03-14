@@ -13,7 +13,9 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger
+    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData, DeviceData,
+    DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError,
+    IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -170,7 +172,11 @@ pub fn identity_registration_finish(
         CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
             // add temp key so the user can keep using the identity used for the registration flow
             state::with_temp_keys_mut(|temp_keys| {
-                temp_keys.add_temp_key(&id_reg_finish_arg.authn_method.public_key(), identity_number, caller)
+                temp_keys.add_temp_key(
+                    &id_reg_finish_arg.authn_method.public_key(),
+                    identity_number,
+                    caller,
+                )
             });
         }
         CreateIdentityData::OpenID(_) => {}
