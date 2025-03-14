@@ -13,6 +13,7 @@
     "authentication_failed": "Authentication failed",
     "jwt_signature_invalid": "The account could not be linked due to an invalid signature.",
     "account_not_found": "The account could not be found.",
-    "linking_google_accounts_is_unavailable": "Linking Google accounts is unavailable. Please try again later."
+    "linking_google_accounts_is_unavailable": "Linking Google accounts is unavailable. Please try again later.",
+    "current_account_label": "Current account"
   }
 }

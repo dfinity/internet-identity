@@ -195,6 +195,7 @@ const displayManageTemplate = ({
   exploreDapps,
   identityBackground,
   tempKeysWarning,
+  currentCredential,
 }: {
   userNumber: bigint;
   devices: Devices;
@@ -209,6 +210,7 @@ const displayManageTemplate = ({
   exploreDapps?: () => void;
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
+  currentCredential?: Pick<OpenIdCredential, "iss" | "sub">;
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
@@ -247,6 +249,7 @@ const displayManageTemplate = ({
           onLinkAccount,
           onUnlinkAccount,
           hasOtherAuthMethods: authenticators.length > 0,
+          currentCredential,
         })
       : ""}
     ${recoveryMethodsSection({
@@ -621,6 +624,7 @@ export const displayManage = async (
         exploreDapps: dappsExplorerEnabled ? onExploreDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
+        currentCredential: connection.credential,
       });
 
     display();

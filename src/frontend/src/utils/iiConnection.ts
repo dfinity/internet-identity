@@ -20,6 +20,7 @@ import {
   JWT,
   KeyType,
   MetadataMapV2,
+  OpenIdCredential,
   PreparedIdAlias,
   PublicKey,
   Purpose,
@@ -39,6 +40,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
+import { decodeJWT } from "$src/utils/openID";
 import {
   CanisterError,
   diagnosticInfo,
@@ -756,7 +758,8 @@ export class Connection {
       sessionIdentity,
       jwtSignedIdentity,
       anchor_number,
-      actor
+      actor,
+      decodeJWT(jwt)
     );
   };
 }
@@ -770,7 +773,8 @@ export class AuthenticatedConnection extends Connection {
     public identity: SignIdentity,
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
-    public actor?: ActorSubclass<_SERVICE>
+    public actor?: ActorSubclass<_SERVICE>,
+    public credential?: Pick<OpenIdCredential, "iss" | "sub">
   ) {
     super(canisterId, canisterConfig);
     const metadataGetter = async () => {
