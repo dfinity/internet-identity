@@ -52,6 +52,9 @@ type Operation = variant {
     remove_openid_credential : record {
         iss : text;
     };
+    register_anchor_with_openid_credential : record {
+        iss : text;
+    };
 };
 
 type Entry = record {

@@ -453,6 +453,11 @@ type AuthnMethodData = record {
     last_authentication : opt Timestamp;
 };
 
+type OpenIDRegFinishArg = record {
+    jwt: JWT;
+    salt: Salt;
+};
+
 // Extra information about registration status for new authentication methods
 type AuthnMethodRegistrationInfo = record {
     // If present, the user has registered a new authentication method. This
@@ -772,6 +777,7 @@ service : (opt InternetIdentityInit) -> {
 
     // OpenID credentials protocol
     // =========================
+    openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
