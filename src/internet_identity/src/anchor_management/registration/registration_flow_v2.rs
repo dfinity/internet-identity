@@ -13,10 +13,7 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, DeviceData, DeviceWithUsage,
-    IdRegAuthnData, IdRegFinishArg, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult,
-    IdRegStartError, IdentityNumber, OpenIdRegistrationData, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger
 };
 
 impl RegistrationFlowState {
@@ -150,7 +147,7 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
 }
 
 pub fn identity_registration_finish(
-    arg: IdRegFinishArg,
+    arg: CreateIdentityData,
 ) -> Result<IdRegFinishResult, IdRegFinishError> {
     let caller = caller();
     let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
@@ -169,27 +166,27 @@ pub fn identity_registration_finish(
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
 
-    match arg.authn_data {
-        IdRegAuthnData::PubkeyAuthn(authn_method) => {
+    match arg {
+        CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
             // add temp key so the user can keep using the identity used for the registration flow
             state::with_temp_keys_mut(|temp_keys| {
-                temp_keys.add_temp_key(&authn_method.public_key(), identity_number, caller)
+                temp_keys.add_temp_key(&id_reg_finish_arg.authn_method.public_key(), identity_number, caller)
             });
         }
-        IdRegAuthnData::OpenID(_) => {}
+        CreateIdentityData::OpenID(_) => {}
     }
 
     Ok(IdRegFinishResult { identity_number })
 }
 
-fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishError> {
+fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
     let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
         return Err(IdentityLimitReached);
     };
 
-    let operation = match &arg.authn_data {
-        IdRegAuthnData::PubkeyAuthn(authn_method_data) => {
-            let device = DeviceWithUsage::try_from(authn_method_data.clone())
+    let operation = match &arg {
+        CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
+            let device = DeviceWithUsage::try_from(id_reg_finish_arg.authn_method.clone())
                 .map(|device| Device::from(DeviceData::from(device)))
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
@@ -202,8 +199,8 @@ fn create_identity(arg: &IdRegFinishArg) -> Result<IdentityNumber, IdRegFinishEr
                 device: DeviceDataWithoutAlias::from(device),
             }
         }
-        IdRegAuthnData::OpenID(openid_registration_data) => {
-            let OpenIdRegistrationData { jwt, salt } = openid_registration_data;
+        CreateIdentityData::OpenID(openid_registration_data) => {
+            let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
             let open_id_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::JwtVerificationFailed)?;
 

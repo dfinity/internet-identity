@@ -3,9 +3,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{test_principal, time};
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, IdRegAuthnData, IdentityNumber, MetadataEntryV2,
-    OpenIdRegistrationData, PublicKeyAuthn, RegistrationFlowNextStep, WebAuthn,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings, IdentityNumber, MetadataEntryV2, OpenIDRegFinishArg, PublicKeyAuthn, RegistrationFlowNextStep, WebAuthn
 };
 use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
@@ -76,7 +74,7 @@ pub fn create_identity_with_authn_method(
         env,
         canister_id,
         flow_principal,
-        &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+        &authn_method,
     )
     .expect("API call failed")
     .expect("registration finish failed")
@@ -123,18 +121,12 @@ pub fn create_identity_with_openid_credential(
             .expect("check_captcha failed");
     }
 
-    api_v2::identity_registration_finish(
-        env,
-        canister_id,
-        flow_principal,
-        &IdRegAuthnData::OpenID(OpenIdRegistrationData {
-            jwt: jwt.to_owned(),
-            salt: *salt,
-        }),
-    )
-    .expect("API call failed")
-    .expect("registration finish failed")
-    .identity_number
+    api_v2::openid_identity_registration_finish(env, canister_id, flow_principal, &OpenIDRegFinishArg {
+        jwt: jwt.to_owned(), salt: *salt
+    })
+        .expect("API call failed")
+        .expect("registration finish failed")
+        .identity_number
 }
 
 pub fn sample_pubkey_authn_method(i: u8) -> AuthnMethodData {

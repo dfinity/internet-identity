@@ -574,7 +574,7 @@ mod v2_api {
     fn identity_registration_finish(
         arg: IdRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        registration::registration_flow_v2::identity_registration_finish(arg)
+        registration::registration_flow_v2::identity_registration_finish(CreateIdentityData::PubkeyAuthn(arg))
     }
 
     #[update]
@@ -767,7 +767,7 @@ mod v2_api {
 /// API for OpenID credentials
 mod openid_api {
     use crate::anchor_management::{
-        add_openid_credential, lookup_anchor_with_openid_credential, remove_openid_credential,
+        add_openid_credential, lookup_anchor_with_openid_credential, registration, remove_openid_credential
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
     use crate::openid::{self, OpenIdCredentialKey};
@@ -778,7 +778,7 @@ mod openid_api {
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
-    use internet_identity_interface::internet_identity::types::SignedDelegation;
+    use internet_identity_interface::internet_identity::types::{CreateIdentityData, IdRegFinishError, IdRegFinishResult, OpenIDRegFinishArg, SignedDelegation};
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -789,6 +789,13 @@ mod openid_api {
         fn from(_: IdentityUpdateError) -> Self {
             OpenIdCredentialRemoveError::Unauthorized(caller())
         }
+    }
+
+    #[update]
+    fn openid_identity_registration_finish(
+        arg: OpenIDRegFinishArg,
+    ) -> Result<IdRegFinishResult, IdRegFinishError> {
+        registration::registration_flow_v2::identity_registration_finish(CreateIdentityData::OpenID(arg))
     }
 
     #[update]

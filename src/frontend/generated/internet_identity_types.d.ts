@@ -171,9 +171,7 @@ export interface IdAliasCredentials {
   'rp_id_alias_credential' : SignedIdAlias,
   'issuer_id_alias_credential' : SignedIdAlias,
 }
-export type IdRegAuthnData = { 'PubkeyAuthn' : AuthnMethodData } |
-  { 'OpenID' : OpenIdRegistrationData };
-export interface IdRegFinishArg { 'authn_data' : IdRegAuthnData }
+export interface IdRegFinishArg { 'authn_method' : AuthnMethodData }
 export type IdRegFinishError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'InvalidAuthnMethod' : string } |
@@ -256,6 +254,7 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface OpenIDRegFinishArg { 'jwt' : JWT, 'salt' : Salt }
 export interface OpenIdConfig { 'client_id' : string }
 export interface OpenIdCredential {
   'aud' : Aud,
@@ -282,7 +281,6 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
-export interface OpenIdRegistrationData { 'jwt' : JWT, 'salt' : Salt }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
@@ -465,6 +463,11 @@ export interface _SERVICE {
     [JWT, Salt, SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : OpenIdDelegationError }
+  >,
+  'openid_identity_registration_finish' : ActorMethod<
+    [OpenIDRegFinishArg],
+    { 'Ok' : IdRegFinishResult } |
+      { 'Err' : IdRegFinishError }
   >,
   'openid_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey],

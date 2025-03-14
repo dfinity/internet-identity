@@ -11,7 +11,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegAuthnData, IdRegFinishError,
+    CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegFinishError,
     IdRegStartError, InternetIdentityInit, MetadataEntryV2, RateLimitConfig,
     RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
@@ -60,7 +60,7 @@ fn should_transition_flow_principal_to_temp_key() {
         &env,
         canister_id,
         flow_principal,
-        &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+        &authn_method,
     )
     .expect("API call failed")
     .expect("registration finish failed")
@@ -102,7 +102,7 @@ fn should_not_exceed_configured_identity_range() {
         &env,
         canister_id,
         flow_principal,
-        &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+        &authn_method,
     )
     .expect("API call failed");
     assert!(matches!(
@@ -234,7 +234,7 @@ fn should_fail_on_invalid_metadata() {
         &env,
         canister_id,
         flow_principal,
-        &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+        &authn_method,
     )
     .expect("API call failed");
     assert!(matches!(

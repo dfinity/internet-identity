@@ -453,7 +453,7 @@ type AuthnMethodData = record {
     last_authentication : opt Timestamp;
 };
 
-type OpenIdRegistrationData = record {
+type OpenIDRegFinishArg = record {
     jwt: JWT;
     salt: Salt;
 };
@@ -647,12 +647,7 @@ type CheckCaptchaError = variant {
 };
 
 type IdRegFinishArg = record {
-    authn_data : IdRegAuthnData;
-};
-
-type IdRegAuthnData = variant {
-    PubkeyAuthn : AuthnMethodData;
-    OpenID : OpenIdRegistrationData;
+    authn_method : AuthnMethodData;
 };
 
 type IdRegFinishResult = record {
@@ -784,6 +779,7 @@ service : (opt InternetIdentityInit) -> {
 
     // OpenID credentials protocol
     // =========================
+    openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });

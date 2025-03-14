@@ -322,14 +322,7 @@ export const idlFactory = ({ IDL }) => {
       'space_available' : IDL.Nat64,
     }),
   });
-  const JWT = IDL.Text;
-  const Salt = IDL.Vec(IDL.Nat8);
-  const OpenIdRegistrationData = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
-  const IdRegAuthnData = IDL.Variant({
-    'PubkeyAuthn' : AuthnMethodData,
-    'OpenID' : OpenIdRegistrationData,
-  });
-  const IdRegFinishArg = IDL.Record({ 'authn_data' : IdRegAuthnData });
+  const IdRegFinishArg = IDL.Record({ 'authn_method' : AuthnMethodData });
   const IdRegFinishResult = IDL.Record({ 'identity_number' : IDL.Nat64 });
   const IdRegFinishError = IDL.Variant({
     'NoRegistrationFlow' : IDL.Null,
@@ -344,6 +337,8 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const JWT = IDL.Text;
+  const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -361,6 +356,7 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchAnchor' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
   });
+  const OpenIDRegFinishArg = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
   const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
@@ -578,6 +574,11 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         ['query'],
+      ),
+    'openid_identity_registration_finish' : IDL.Func(
+        [OpenIDRegFinishArg],
+        [IDL.Variant({ 'Ok' : IdRegFinishResult, 'Err' : IdRegFinishError })],
+        [],
       ),
     'openid_prepare_delegation' : IDL.Func(
         [JWT, Salt, SessionKey],

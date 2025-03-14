@@ -6,7 +6,7 @@ use canister_tests::framework::{
     arg_with_dynamic_captcha, env, install_ii_canister_with_arg, test_principal, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    IdRegAuthnData, RegistrationFlowNextStep,
+     RegistrationFlowNextStep,
 };
 use std::time::Duration;
 
@@ -28,7 +28,7 @@ fn should_not_require_captcha_below_threshold_rate() {
         &env,
         canister_id,
         flow_principal,
-        &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+        &authn_method.clone(),
     )
     .expect("API call failed")
     .expect("registration finish failed");
@@ -61,7 +61,7 @@ fn should_require_captcha_above_threshold_rate() {
             &env,
             canister_id,
             flow_principal,
-            &IdRegAuthnData::PubkeyAuthn(authn_method.clone()),
+            &authn_method
         )
         .expect("API call failed")
         .expect("registration finish failed");
