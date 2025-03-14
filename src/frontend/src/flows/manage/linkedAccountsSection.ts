@@ -1,5 +1,5 @@
 import { OpenIdCredential } from "$generated/internet_identity_types";
-import { googleIcon } from "$src/components/icons";
+import { googleIcon, pulsatingCircleIcon } from "$src/components/icons";
 import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import { I18n } from "$src/i18n";
 import { getMetadataString } from "$src/utils/openID";
@@ -19,11 +19,13 @@ export const linkedAccountsSection = ({
   onLinkAccount,
   onUnlinkAccount,
   hasOtherAuthMethods,
+  currentCredential,
 }: {
   credentials: OpenIdCredential[];
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
   hasOtherAuthMethods: boolean;
+  currentCredential?: Pick<OpenIdCredential, "iss" | "sub">;
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -46,6 +48,10 @@ export const linkedAccountsSection = ({
             credential,
             index,
             unlink: unlinkAvailable ? onUnlinkAccount : undefined,
+            isCurrent:
+              nonNullish(currentCredential) &&
+              credential.iss === currentCredential.iss &&
+              credential.sub === currentCredential.sub,
           })
         )}
       </ul>
@@ -74,10 +80,12 @@ export const accountItem = ({
   credential,
   index = 0,
   unlink,
+  isCurrent,
 }: {
   credential: OpenIdCredential;
   index?: number;
   unlink?: (credential: OpenIdCredential) => void;
+  isCurrent?: boolean;
 }) => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -126,9 +134,18 @@ export const accountItem = ({
           }
         </div>
         <div>
-          <div class="t-muted">
-            ${copy.last_used}: ${lastUsageFormattedString}
-          </div>
+          ${
+            nonNullish(isCurrent) && isCurrent
+              ? html`<div>
+                  <span class="c-icon c-icon--ok c-icon--xs"
+                    >${pulsatingCircleIcon}</span
+                  >
+                  <span class="t-muted">${copy.current_account_label}</span>
+                </div>`
+              : html`<div class="t-muted">
+                  ${copy.last_used}: ${lastUsageFormattedString}
+                </div>`
+          }
         </div>
       </div>
     </li>
