@@ -1,5 +1,5 @@
 import { OpenIdCredential } from "$generated/internet_identity_types";
-import { googleIcon } from "$src/components/icons";
+import { googleIcon, pulsatingCircleIcon } from "$src/components/icons";
 import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import { I18n } from "$src/i18n";
 import { getMetadataString } from "$src/utils/openID";
@@ -19,11 +19,13 @@ export const linkedAccountsSection = ({
   onLinkAccount,
   onUnlinkAccount,
   hasOtherAuthMethods,
+  currentCredential,
 }: {
   credentials: OpenIdCredential[];
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
   hasOtherAuthMethods: boolean;
+  currentCredential?: Pick<OpenIdCredential, "iss" | "sub">;
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -45,8 +47,11 @@ export const linkedAccountsSection = ({
           accountItem({
             credential,
             index,
-            unlink: onUnlinkAccount,
-            unlinkAvailable,
+            unlink: unlinkAvailable ? onUnlinkAccount : undefined,
+            isCurrent:
+              nonNullish(currentCredential) &&
+              credential.iss === currentCredential.iss &&
+              credential.sub === currentCredential.sub,
           })
         )}
       </ul>
@@ -73,14 +78,14 @@ export const linkedAccountsSection = ({
 
 export const accountItem = ({
   credential,
-  index,
+  index = 0,
   unlink,
-  unlinkAvailable,
+  isCurrent,
 }: {
   credential: OpenIdCredential;
-  index: number;
-  unlink: (credential: OpenIdCredential) => void;
-  unlinkAvailable: boolean;
+  index?: number;
+  unlink?: (credential: OpenIdCredential) => void;
+  isCurrent?: boolean;
 }) => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -88,7 +93,7 @@ export const accountItem = ({
     {
       action: "unlink",
       caption: copy.unlink.toString(),
-      fn: () => unlink(credential),
+      fn: () => unlink?.(credential),
     },
   ];
 
@@ -119,7 +124,7 @@ export const accountItem = ({
             </span>
           </div>
           ${
-            unlinkAvailable
+            nonNullish(unlink)
               ? settingsDropdown({
                   alias: credential.sub,
                   id: `account-${index}`,
@@ -129,9 +134,18 @@ export const accountItem = ({
           }
         </div>
         <div>
-          <div class="t-muted">
-            ${copy.last_used}: ${lastUsageFormattedString}
-          </div>
+          ${
+            nonNullish(isCurrent) && isCurrent
+              ? html`<div>
+                  <span class="c-icon c-icon--ok c-icon--xs"
+                    >${pulsatingCircleIcon}</span
+                  >
+                  <span class="t-muted">${copy.current_account_label}</span>
+                </div>`
+              : html`<div class="t-muted">
+                  ${copy.last_used}: ${lastUsageFormattedString}
+                </div>`
+          }
         </div>
       </div>
     </li>

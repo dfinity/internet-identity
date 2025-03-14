@@ -23,6 +23,7 @@ import { addDevice } from "$src/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$src/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$src/flows/dappsExplorer/dapps";
 import { dappsHeader, dappsTeaser } from "$src/flows/dappsExplorer/teaser";
+import { confirmUnlinkAccount } from "$src/flows/manage/confirmUnlinkAccount";
 import { linkedAccountsSection } from "$src/flows/manage/linkedAccountsSection";
 import copyJson from "$src/flows/manage/linkedAccountsSection.json";
 import {
@@ -195,6 +196,7 @@ const displayManageTemplate = ({
   exploreDapps,
   identityBackground,
   tempKeysWarning,
+  currentCredential,
 }: {
   userNumber: bigint;
   devices: Devices;
@@ -206,9 +208,10 @@ const displayManageTemplate = ({
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
-  exploreDapps: () => void;
+  exploreDapps?: () => void;
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
+  currentCredential?: Pick<OpenIdCredential, "iss" | "sub">;
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
@@ -247,6 +250,7 @@ const displayManageTemplate = ({
           onLinkAccount,
           onUnlinkAccount,
           hasOtherAuthMethods: authenticators.length > 0,
+          currentCredential,
         })
       : ""}
     ${recoveryMethodsSection({
@@ -255,16 +259,18 @@ const displayManageTemplate = ({
       addRecoveryKey,
       onRemoveDevice,
     })}
-    <aside class="l-stack">
-      ${dappsTeaser({
-        dapps,
-        click: () => exploreDapps(),
-        copy: {
-          dapps_explorer: "Dapps explorer",
-          sign_into_dapps: "Connect to these dapps",
-        },
-      })}
-    </aside>
+    ${nonNullish(exploreDapps)
+      ? html`<aside class="l-stack">
+          ${dappsTeaser({
+            dapps,
+            click: () => exploreDapps(),
+            copy: {
+              dapps_explorer: "Dapps explorer",
+              sign_into_dapps: "Connect to these dapps",
+            },
+          })}
+        </aside>`
+      : undefined}
     ${logoutSection()}
   </section>`;
 
@@ -378,9 +384,9 @@ export const displayManage = async (
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
 
-  // Create anonymous nonce and salt for connection principal
+  // Create anonymous nonce and salt for calling principal from connection
   const { nonce, salt } = await createAnonymousNonce(
-    connection.identity.getPrincipal()
+    connection.delegationIdentity.getPrincipal()
   );
 
   const googleClientId =
@@ -533,12 +539,27 @@ export const displayManage = async (
       }
     };
     const onUnlinkAccount = async (credential: OpenIdCredential) => {
-      if (!confirm(copy.unlink_account_confirmation.toString())) {
+      const isCurrentCredential =
+        nonNullish(connection.credential) &&
+        credential.iss === connection.credential.iss &&
+        credential.sub === connection.credential.sub;
+      const action = await confirmUnlinkAccount({
+        i18n,
+        credential,
+        isCurrentCredential,
+      });
+      if (action === "cancelled") {
+        resolve();
         return;
       }
       try {
         await connection.removeOpenIdCredential(credential.iss, credential.sub);
-        resolve();
+        if (isCurrentCredential) {
+          location.reload(); // Reload page to go back to sign in
+          return;
+        } else {
+          resolve();
+        }
       } catch (error) {
         if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
           switch (error.type) {
@@ -591,6 +612,16 @@ export const displayManage = async (
       return undefined;
     };
 
+    const dappsExplorerEnabled: boolean =
+      connection.canisterConfig.enable_dapps_explorer[0] ?? false;
+    const onExploreDapps = async () => {
+      await dappsExplorer({ dapps });
+      // We know that the user couldn't have changed anything (the user can't delete e.g. delete
+      // a device from the explorer), so we just re-display without reloading devices etc.
+      // the page without
+      display();
+    };
+
     const display = () =>
       displayManagePage({
         userNumber,
@@ -606,15 +637,10 @@ export const displayManage = async (
         onLinkAccount,
         onUnlinkAccount,
         dapps,
-        exploreDapps: async () => {
-          await dappsExplorer({ dapps });
-          // We know that the user couldn't have changed anything (the user can't delete e.g. delete
-          // a device from the explorer), so we just re-display without reloading devices etc.
-          // the page without
-          display();
-        },
+        exploreDapps: dappsExplorerEnabled ? onExploreDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
+        currentCredential: connection.credential,
       });
 
     display();

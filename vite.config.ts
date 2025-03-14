@@ -52,6 +52,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
           "src/frontend/index.html",
           "src/frontend/faq.html",
           "src/frontend/vc-flow/index.html",
+          "src/frontend/callback/index.html",
         ],
         output: {
           entryFileNames: `[name].js`,

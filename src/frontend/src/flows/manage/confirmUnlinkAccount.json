@@ -1,0 +1,10 @@
+{
+  "en": {
+    "confirm": "Unlink Account",
+    "cancel": "Cancel",
+    "title": "Confirm Unlink Account",
+    "label": "Security Warning",
+    "message": "Please, confirm that you want to unlink the following account:",
+    "current_credential_warning": "You will be logged out after unlinking this account."
+  }
+}
