@@ -1,10 +1,12 @@
+import { InternetIdentityInit } from "$generated/internet_identity_types";
 import { html, render, TemplateResult } from "lit-html";
-import { LEGACY_II_URL, OFFICIAL_II_URL } from "./config";
+import { OFFICIAL_II_URL } from "./config";
 import { anyFeatures } from "./features";
+import { isOfficialOrigin } from "./utils/domainUtils";
 
 // Show a warning banner if the build is not "official". This happens if either the build
-// is a flavored build, or if the origin is not the official II URL.
-export const showWarningIfNecessary = (): void => {
+// is a flavored build, or if the origin is not in the list of related origins from the canister config.
+export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
   if (anyFeatures()) {
     showWarning(html`Test only. Do not use your regular Internet Identity!
       <a
@@ -14,10 +16,7 @@ export const showWarningIfNecessary = (): void => {
         href="https://github.com/dfinity/internet-identity#build-features"
         >more</a
       >`);
-  } else if (
-    window.location.origin !== OFFICIAL_II_URL &&
-    window.location.origin !== LEGACY_II_URL
-  ) {
+  } else if (!isOfficialOrigin(window.location.origin, config)) {
     showWarning(html`This is not the official Internet Identity.
       <a
         class="features-warning-btn"
