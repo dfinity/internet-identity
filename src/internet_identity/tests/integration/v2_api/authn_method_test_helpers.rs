@@ -108,7 +108,7 @@ pub fn create_identity_with_authn_methods(
 pub fn create_identity_with_openid_credential(
     env: &PocketIc,
     canister_id: CanisterId,
-    jwt: &String,
+    jwt: &str,
     salt: &[u8; 32],
     flow_principal: Principal,
 ) -> IdentityNumber {
@@ -123,18 +123,12 @@ pub fn create_identity_with_openid_credential(
             .expect("check_captcha failed");
     }
 
-    api_v2::identity_registration_finish(
-        env,
-        canister_id,
-        flow_principal,
-        &IdRegAuthnData::OpenID(OpenIdRegistrationData {
-            jwt: jwt.clone(),
-            salt: salt.clone(),
-        }),
-    )
-    .expect("API call failed")
-    .expect("registration finish failed")
-    .identity_number
+    api_v2::identity_registration_finish(env, canister_id, flow_principal, &IdRegAuthnData::OpenID(OpenIdRegistrationData {
+        jwt: jwt.to_owned(), salt: *salt
+    }))
+        .expect("API call failed")
+        .expect("registration finish failed")
+        .identity_number
 }
 
 pub fn sample_pubkey_authn_method(i: u8) -> AuthnMethodData {
