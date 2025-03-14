@@ -207,7 +207,6 @@ pub enum IdRegFinishError {
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
-    JwtVerificationFailed(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

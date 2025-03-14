@@ -208,7 +208,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
         CreateIdentityData::OpenID(openid_registration_data) => {
             let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
             let open_id_credential =
-                openid::verify(jwt, salt).map_err(IdRegFinishError::JwtVerificationFailed)?;
+                openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
             identity
                 .add_openid_credential(open_id_credential.clone())
