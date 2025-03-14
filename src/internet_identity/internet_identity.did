@@ -667,8 +667,6 @@ type IdRegFinishError = variant {
     InvalidAuthnMethod : text;
     // Error while persisting the new identity.
     StorageError : text;
-    // Error verifying Jwt
-    JwtVerificationFailed : text;
 };
 
 service : (opt InternetIdentityInit) -> {
