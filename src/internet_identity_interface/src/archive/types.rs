@@ -36,8 +36,8 @@ pub enum Operation {
     AddOpenIdCredential { iss: String },
     #[serde(rename = "remove_openid_credential")]
     RemoveOpenIdCredential { iss: String },
-    #[serde(rename = "register_with_openid_credential")] //TODO: confirm this name
-    RegisterWithOpenIdCredential { iss: String }, //TODO: confirm data we need here
+    #[serde(rename = "register_anchor_with_openid_credential")]
+    RegisterAnchorWithOpenIdCredential { iss: String },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

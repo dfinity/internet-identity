@@ -215,7 +215,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             //TODO: add bookkeeping
 
-            Operation::RegisterWithOpenIdCredential {
+            Operation::RegisterAnchorWithOpenIdCredential {
                 iss: open_id_credential.iss.clone(),
             }
         }

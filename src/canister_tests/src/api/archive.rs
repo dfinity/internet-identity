@@ -110,7 +110,7 @@ pub mod compat {
                 Operation::RemoveOpenIdCredential { iss } => {
                     CompatOperation::RemoveOpenIdCredential { iss }
                 }
-                Operation::RegisterWithOpenIdCredential { iss } => {
+                Operation::RegisterAnchorWithOpenIdCredential { iss } => {
                     CompatOperation::RegisterWithOpenIdCredential { iss }
                 }
                 Operation::IdentityMetadataReplace { .. } => {
