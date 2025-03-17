@@ -45,7 +45,9 @@ const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
-const MAX_VALIDITY_WINDOW: u64 = 5 * MINUTE_NS; // Same as ingress expiry
+// As the JWT is also used for registration, which may include longer user interaction,
+// we are using 10 minutes to also account for potential clock offsets.
+const MAX_VALIDITY_WINDOW: u64 = 10 * MINUTE_NS; // Same as ingress expiry
 
 // Maximum length of the email claim in the Google JWT, in practice we expect Google to already
 // validate the email on their end for a sane maximum length. This is an additional sanity check.
