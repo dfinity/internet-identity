@@ -398,7 +398,7 @@ export class Connection {
     const googleClientId = getGoogleClientId();
     const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
 
-    if (!googleClientId) return { kind: "missingGoogleClientId" };
+    if (isNullish(googleClientId)) return { kind: "missingGoogleClientId" };
 
     const googleRequestConfig = createGoogleRequestConfig(googleClientId);
 
