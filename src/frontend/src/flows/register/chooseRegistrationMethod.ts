@@ -54,7 +54,7 @@ export const chooseRegistrationMethodPage = renderPage(
   chooseRegistrationMethodTemplate
 );
 
-export const chooseRegistrationMethod = async (): Promise<
+export const chooseRegistrationMethod = (): Promise<
   "google" | "passkey" | "canceled"
 > => {
   return new Promise((resolve) => {

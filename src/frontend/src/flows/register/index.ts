@@ -131,7 +131,12 @@ export const registerFlow = async ({
   const registrationMethodResult = await chooseRegistrationMethod();
 
   if (registrationMethodResult === "google") {
-    const flowStartResult = await flowStart();
+    const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
+    if (_startResult === "canceled") {
+      return "canceled";
+    } else if (_startResult.kind !== "registrationFlowStepSuccess") {
+      return _startResult;
+    }
 
     const openIdResult = await openIdRegistrationFinish();
 
@@ -142,7 +147,6 @@ export const registerFlow = async ({
         authnMethod: "passkey", //TODO decide if we want to add openid here
       };
     } else {
-      console.log(openIdResult); //TODO: currently throws no registration flow
       return "canceled";
     }
   } else if (registrationMethodResult) {
@@ -232,28 +236,9 @@ export const registerFlow = async ({
     authnMethod: "pin" | "passkey";
   } = result_;
 
-  const startResult = await flowStart();
-  if (startResult.kind !== "registrationFlowStepSuccess") {
-    analytics.event("registration-start-error");
-    return startResult;
-  }
-  startResult satisfies RegistrationFlowStepSuccess;
-
-  if (startResult.nextStep.step === "checkCaptcha") {
-    analytics.event("registration-captcha");
-    const captchaResult = await promptCaptcha({
-      captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      checkCaptcha,
-    });
-    if (captchaResult === "canceled") {
-      analytics.event("registration-captcha-cancelled");
-      return "canceled";
-    }
-    if (captchaResult.kind !== "registrationFlowStepSuccess") {
-      analytics.event("registration-captcha-error");
-      return captchaResult;
-    }
-    captchaResult satisfies RegistrationFlowStepSuccess;
+  const startResult = await captchaIfNecessary(flowStart, checkCaptcha);
+  if (startResult === "canceled") {
+    return "canceled";
   }
 
   const result = await withLoader(() =>
@@ -497,3 +482,63 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
     console.error(e);
   }
 };
+
+/**
+ * Handles the captcha verification step if required by the registration flow
+ * @returns The registration flow step result or "canceled" if the user canceled
+ */
+async function captchaIfNecessary(
+  flowStart: () => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | InvalidCaller
+    | AlreadyInProgress
+    | RateLimitExceeded
+  >,
+  checkCaptcha: (
+    captchaSolution: string
+  ) => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | WrongCaptchaSolution
+  >
+): Promise<
+  | RegistrationFlowStepSuccess
+  | ApiError
+  | InvalidCaller
+  | AlreadyInProgress
+  | RateLimitExceeded
+  | NoRegistrationFlow
+  | UnexpectedCall
+  | "canceled"
+> {
+  const startResult = await flowStart();
+  if (startResult.kind !== "registrationFlowStepSuccess") {
+    analytics.event("registration-start-error");
+    return startResult;
+  }
+  startResult satisfies RegistrationFlowStepSuccess;
+
+  if (startResult.nextStep.step === "checkCaptcha") {
+    analytics.event("registration-captcha");
+    const captchaResult = await promptCaptcha({
+      captcha_png_base64: startResult.nextStep.captcha_png_base64,
+      checkCaptcha,
+    });
+    if (captchaResult === "canceled") {
+      analytics.event("registration-captcha-cancelled");
+      return "canceled";
+    }
+    if (captchaResult.kind !== "registrationFlowStepSuccess") {
+      analytics.event("registration-captcha-error");
+      return captchaResult;
+    }
+    captchaResult satisfies RegistrationFlowStepSuccess;
+    return captchaResult;
+  }
+
+  // If no captcha was needed, return the original success result
+  return startResult;
+}
