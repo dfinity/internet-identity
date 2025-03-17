@@ -149,7 +149,7 @@ export const registerFlow = async ({
     } else {
       return "canceled";
     }
-  } else if (registrationMethodResult) {
+  } else if (registrationMethodResult === "canceled") {
     return "canceled";
   }
 
