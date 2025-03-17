@@ -113,6 +113,16 @@ const registerFlowOpts: RegisterFlowOpts = {
       showAddCurrentDevice: false,
     };
   },
+  openIdRegistrationFinish: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    return {
+      kind: "loginSuccess",
+      userNumber: BigInt(12356),
+      connection: mockConnection,
+      showAddCurrentDevice: false,
+    };
+  },
   registrationAllowed: true,
   storePinIdentity: () => {
     toast.info("PIN identity was stored");

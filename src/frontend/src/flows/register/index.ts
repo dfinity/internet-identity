@@ -21,6 +21,7 @@ import {
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
+  MissingGoogleClientId,
   NoRegistrationFlow,
   RateLimitExceeded,
   RegisterNoSpace,
@@ -37,6 +38,7 @@ import type { UAParser } from "ua-parser-js";
 import { tempKeyWarningBox } from "../manage/tempKeys";
 import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
+import { chooseRegistrationMethod } from "./chooseRegistrationMethod";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyOrPin } from "./passkey";
 
@@ -45,6 +47,7 @@ export const registerFlow = async ({
   identityRegistrationStart,
   checkCaptcha,
   identityRegistrationFinish,
+  openIdRegistrationFinish,
   storePinIdentity,
   registrationAllowed,
   pinAllowed,
@@ -80,6 +83,15 @@ export const registerFlow = async ({
     | RegisterNoSpace
     | InvalidAuthnMethod
   >;
+  openIdRegistrationFinish: () => Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+    | MissingGoogleClientId
+  >;
   storePinIdentity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: PinIdentityMaterial;
@@ -97,6 +109,7 @@ export const registerFlow = async ({
   | InvalidCaller
   | AlreadyInProgress
   | RateLimitExceeded
+  | MissingGoogleClientId
   | "canceled"
 > => {
   if (!registrationAllowed) {
@@ -113,6 +126,29 @@ export const registerFlow = async ({
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
+
+  // Prompt the user whether they want to use
+  const registrationMethodResult = await chooseRegistrationMethod();
+
+  if (registrationMethodResult === "google") {
+    const flowStartResult = await flowStart();
+
+    const openIdResult = await openIdRegistrationFinish();
+
+    if (openIdResult.kind === "loginSuccess") {
+      analytics.event("registration-passkey");
+      return {
+        ...openIdResult,
+        authnMethod: "passkey", //TODO decide if we want to add openid here
+      };
+    } else {
+      console.log(openIdResult); //TODO: currently throws no registration flow
+      return "canceled";
+    }
+  } else if (registrationMethodResult) {
+    return "canceled";
+  }
+
   const savePasskeyResult = await savePasskeyOrPin({
     pinAllowed: await pinAllowed(),
     origin: deviceOrigin,
@@ -267,6 +303,9 @@ export const getRegisterFlowOpts = async ({
   const tempIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
+  const getGoogleClientId = () =>
+    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
+
   return {
     /** Check that the current origin is not the explicit canister id or a raw url.
      *  Explanation why we need to do this:
@@ -292,6 +331,11 @@ export const getRegisterFlowOpts = async ({
         identity,
         authnMethod,
       }),
+    openIdRegistrationFinish: async () =>
+      await connection.openid_identity_registration_finish(
+        getGoogleClientId,
+        tempIdentity
+      ),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
   };
