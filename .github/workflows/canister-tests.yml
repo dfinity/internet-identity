@@ -888,6 +888,7 @@ jobs:
 
       # This action creates a PR only if there are changes.
       - name: Create Pull Request
+        if: startsWith(github.ref, 'refs/tags/release-')
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
         with:
           token: ${{ steps.app-token.outputs.token }}
