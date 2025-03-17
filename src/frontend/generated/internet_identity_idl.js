@@ -355,6 +355,7 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchAnchor' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
   });
+  const OpenIDRegFinishArg = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
   const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
@@ -572,6 +573,11 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         ['query'],
+      ),
+    'openid_identity_registration_finish' : IDL.Func(
+        [OpenIDRegFinishArg],
+        [IDL.Variant({ 'Ok' : IdRegFinishResult, 'Err' : IdRegFinishError })],
+        [],
       ),
     'openid_prepare_delegation' : IDL.Func(
         [JWT, Salt, SessionKey],

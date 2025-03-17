@@ -190,6 +190,12 @@ pub struct IdRegFinishArg {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct OpenIDRegFinishArg {
+    pub jwt: String,
+    pub salt: [u8; 32],
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishResult {
     pub identity_number: IdentityNumber,
 }
@@ -201,4 +207,10 @@ pub enum IdRegFinishError {
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum CreateIdentityData {
+    PubkeyAuthn(IdRegFinishArg),
+    OpenID(OpenIDRegFinishArg),
 }

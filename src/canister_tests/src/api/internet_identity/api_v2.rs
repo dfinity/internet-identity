@@ -57,6 +57,23 @@ pub fn identity_registration_finish(
     .map(|(x,)| x)
 }
 
+pub fn openid_identity_registration_finish(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    openid_arg: &OpenIDRegFinishArg,
+) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_identity_registration_finish",
+        (openid_arg.clone(),),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn identity_authn_info(
     env: &PocketIc,
     canister_id: CanisterId,
