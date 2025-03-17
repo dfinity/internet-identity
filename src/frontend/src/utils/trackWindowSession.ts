@@ -25,18 +25,15 @@ export function trackWindowSession({
     }
   };
 
-  // Store the index when adding the listener
-  const index = visibilityChangeListeners.push(listener) - 1;
+  // Add the listener to the array
+  visibilityChangeListeners.push(listener);
   document.addEventListener("visibilitychange", listener);
 
   // Return cleanup function
   return () => {
-    // Use the stored index directly instead of indexOf
-    if (
-      index >= 0 &&
-      index < visibilityChangeListeners.length &&
-      visibilityChangeListeners[index] === listener
-    ) {
+    // Use indexOf to find and remove the listener
+    const index = visibilityChangeListeners.indexOf(listener);
+    if (index !== -1) {
       visibilityChangeListeners.splice(index, 1);
     }
     document.removeEventListener("visibilitychange", listener);

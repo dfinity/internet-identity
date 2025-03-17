@@ -82,7 +82,7 @@ describe("trackWindowSession", () => {
     expect(onLeaveSession2).toHaveBeenCalledTimes(2); // Count should increase to 2
   });
 
-  it("should support multiple listeners that can be independently removed", () => {
+  it("should support multiple listeners that can be independently removed and added", () => {
     // Create three sets of listeners
     const onLeaveSession1 = vi.fn();
     const onEnterSession1 = vi.fn();
@@ -112,28 +112,46 @@ describe("trackWindowSession", () => {
     expect(onEnterSession2).toHaveBeenCalledTimes(1);
     expect(onEnterSession3).toHaveBeenCalledTimes(1);
 
-    // Remove the middle listener
+    // Remove the third listener first
     cleanup2();
 
-    // Test that only listeners 1 and 3 respond
+    const onLeaveSession4 = vi.fn();
+    const onEnterSession4 = vi.fn();
+    const cleanup4 = trackWindowSession({
+      onLeaveSession: onLeaveSession4,
+      onEnterSession: onEnterSession4,
+    });
+
+    // Test that only listeners 1 and 2 respond
     mockVisibilityState("visible");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(onEnterSession1).toHaveBeenCalledTimes(2);
     expect(onEnterSession2).toHaveBeenCalledTimes(1); // Should remain at 1
     expect(onEnterSession3).toHaveBeenCalledTimes(2);
+    expect(onEnterSession4).toHaveBeenCalledTimes(1); // New listener should respond
 
     // Remove the first listener
     cleanup1();
 
-    // Test that only listener 3 responds
+    // Test that only listener 2 responds
     mockVisibilityState("visible");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(onEnterSession1).toHaveBeenCalledTimes(2); // Should remain at 2
-    expect(onEnterSession2).toHaveBeenCalledTimes(1); // Should remain at 1
+    expect(onEnterSession2).toHaveBeenCalledTimes(1); // Still 1
     expect(onEnterSession3).toHaveBeenCalledTimes(3);
+    expect(onEnterSession4).toHaveBeenCalledTimes(2);
 
-    // Remove the last listener
     cleanup3();
+
+    mockVisibilityState("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(onEnterSession1).toHaveBeenCalledTimes(2); // Still 2
+    expect(onEnterSession2).toHaveBeenCalledTimes(1); // Still 1
+    expect(onEnterSession3).toHaveBeenCalledTimes(3); // Should remain at 3
+    expect(onEnterSession4).toHaveBeenCalledTimes(3);
+
+    // Remove the last remaining listener
+    cleanup4();
 
     // Test that no listeners respond
     mockVisibilityState("visible");
@@ -141,5 +159,6 @@ describe("trackWindowSession", () => {
     expect(onEnterSession1).toHaveBeenCalledTimes(2); // Still 2
     expect(onEnterSession2).toHaveBeenCalledTimes(1); // Still 1
     expect(onEnterSession3).toHaveBeenCalledTimes(3); // Still 3
+    expect(onEnterSession4).toHaveBeenCalledTimes(3); // Still 3
   });
 });
