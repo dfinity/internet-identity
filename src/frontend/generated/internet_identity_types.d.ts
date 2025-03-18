@@ -253,6 +253,7 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface OpenIDRegFinishArg { 'jwt' : JWT, 'salt' : Salt }
 export interface OpenIdConfig { 'client_id' : string }
 export interface OpenIdCredential {
   'aud' : Aud,
@@ -461,6 +462,11 @@ export interface _SERVICE {
     [JWT, Salt, SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : OpenIdDelegationError }
+  >,
+  'openid_identity_registration_finish' : ActorMethod<
+    [OpenIDRegFinishArg],
+    { 'Ok' : IdRegFinishResult } |
+      { 'Err' : IdRegFinishError }
   >,
   'openid_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey],
