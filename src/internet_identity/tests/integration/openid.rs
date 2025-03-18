@@ -210,9 +210,10 @@ fn can_register_with_google() -> Result<(), CallError> {
     env.advance_time(time_to_advance);
 
     // Create identity (this will panic if it doesn't work)
-    // the test principal here is from webauthn
-    // this is a bit of a hack as in practice it would be a temporary frontend keypair
-    // but it is not relevant for the purposes of this test, as we just need some principal that verifies with the nonce
+    // the test principal here is technically from webauthn, while in practice it would be a temporary random frontend keypair
+    // however, this makes no functional difference. we just need a principal and salt together with a jwt
+    // which contains a signed nonce derived from said principal and salt.
+
     let _identity_number =
         create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
 

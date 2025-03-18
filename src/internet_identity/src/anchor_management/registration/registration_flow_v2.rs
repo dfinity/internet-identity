@@ -179,6 +179,10 @@ pub fn identity_registration_finish(
                 )
             });
         }
+        // we don't need temp keys for OpenId
+        // temp keys are only needed because we cannot create an identity out of the
+        // AuthenticatorAttestationResponse we get when we create a WebAuthn credential on the frontend
+        // since this problem doesn't exist with OIDC, we don't need a temp key
         CreateIdentityData::OpenID(_) => {}
     }
 
@@ -220,7 +224,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             }
         }
     };
-
+      
     let identity_number = identity.anchor_number();
 
     state::storage_borrow_mut(|s| {

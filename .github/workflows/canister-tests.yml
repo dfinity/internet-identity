@@ -867,7 +867,7 @@ jobs:
         with:
           app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
           private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
-    
+
       # Checkout project
       - name: Checkout
         uses: actions/checkout@v4
@@ -876,6 +876,7 @@ jobs:
 
         # Bump the version in the download links and create A Pull Request
       - name: Update README
+        if: startsWith(github.ref, 'refs/tags/release-')
         env:
           PREVIOUS_RELEASE_TAG: ${{ steps.latest-release-tag.outputs.result }}
           NEW_RELEASE_TAG: ${{ github.ref_name }}
@@ -887,6 +888,7 @@ jobs:
 
       # This action creates a PR only if there are changes.
       - name: Create Pull Request
+        if: startsWith(github.ref, 'refs/tags/release-')
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
         with:
           token: ${{ steps.app-token.outputs.token }}
