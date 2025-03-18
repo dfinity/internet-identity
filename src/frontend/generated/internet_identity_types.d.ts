@@ -213,6 +213,7 @@ export type IdentityNumber = bigint;
 export interface InternetIdentityInit {
   'fetch_root_key' : [] | [boolean],
   'openid_google' : [] | [[] | [OpenIdConfig]],
+  'is_production' : [] | [boolean],
   'enable_dapps_explorer' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'archive_config' : [] | [ArchiveConfig],
