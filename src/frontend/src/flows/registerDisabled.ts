@@ -1,14 +1,13 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { warnBox } from "$src/components/warnBox";
-import { LEGACY_II_URL } from "$src/config";
 import { html, render } from "lit-html";
 
 const pageContent = ({
   onCancel,
-  allowedOrigins = [LEGACY_II_URL],
+  allowedOrigins,
 }: {
   onCancel: () => void;
-  allowedOrigins?: string[];
+  allowedOrigins: string[];
 }) => {
   const pageContentSlot = html`<hgroup>
       <h1 class="t-title t-title--main">Registration Disabled</h1>
@@ -60,11 +59,11 @@ const pageContent = ({
 
 /**
  * Shows the register disabled page with a list of allowed origins
- * @param allowedOrigins Optional list of allowed origins. If not provided, defaults to LEGACY_II_URL
+ * @param allowedOrigins Optional list of allowed origins
  * @returns Promise resolved when the user clicks cancel
  */
 export const registerDisabled = (
-  allowedOrigins?: string[]
+  allowedOrigins: string[]
 ): Promise<{ tag: "canceled" }> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
