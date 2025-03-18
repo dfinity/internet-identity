@@ -8,7 +8,8 @@ jobs:
   notify-slack:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Slack notification
+      - uses: actions/checkout@v4
+      - name: Send Slack notification on PR review requested
         uses: ./.github/actions/slack
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_PRIVATE_IDENTITY_WEBHOOK_URL }}
