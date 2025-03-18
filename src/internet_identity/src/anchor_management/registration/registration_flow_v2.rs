@@ -224,7 +224,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             }
         }
     };
-      
+
     let identity_number = identity.anchor_number();
 
     state::storage_borrow_mut(|s| {
