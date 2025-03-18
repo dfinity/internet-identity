@@ -37,6 +37,7 @@ pub struct StorablePersistentState {
     analytics_config: Option<AnalyticsConfig>,
     fetch_root_key: Option<bool>,
     enable_dapps_explorer: Option<bool>,
+    is_production: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -79,6 +80,7 @@ impl From<PersistentState> for StorablePersistentState {
             analytics_config: s.analytics_config,
             fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
+            is_production: s.is_production,
         }
     }
 }
@@ -99,6 +101,7 @@ impl From<StorablePersistentState> for PersistentState {
             event_stats_24h_start: s.event_stats_24h_start,
             fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
+            is_production: s.is_production,
         }
     }
 }
@@ -147,6 +150,7 @@ mod tests {
             analytics_config: None,
             fetch_root_key: None,
             enable_dapps_explorer: None,
+            is_production: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -171,6 +175,7 @@ mod tests {
             analytics_config: None,
             fetch_root_key: None,
             enable_dapps_explorer: None,
+            is_production: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }
