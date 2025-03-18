@@ -113,7 +113,10 @@ const registerFlowOpts: RegisterFlowOpts = {
       showAddCurrentDevice: false,
     };
   },
-  registrationAllowed: true,
+  registrationAllowed: {
+    isAllowed: true,
+    allowedOrigins: ["https://idenitty.ic0.app"] as string[],
+  },
   storePinIdentity: () => {
     toast.info("PIN identity was stored");
     return Promise.resolve();
