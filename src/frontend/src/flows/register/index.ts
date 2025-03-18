@@ -4,6 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { anyFeatures } from "$src/features";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
@@ -268,10 +269,10 @@ export const getRegisterFlowOpts = async ({
   const tempIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
-  const registrationAllowed = isRegistrationAllowed(
-    connection.canisterConfig,
-    window.location.origin
-  );
+  const registrationAllowed =
+    // Allow registration in DEV mode
+    anyFeatures() ||
+    isRegistrationAllowed(connection.canisterConfig, window.location.origin);
   const allowedOrigins = connection.canisterConfig.related_origins[0] || [];
   return {
     registrationAllowed: { isAllowed: registrationAllowed, allowedOrigins },
