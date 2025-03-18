@@ -273,6 +273,9 @@ type InternetIdentityInit = record {
     fetch_root_key : opt bool;
     // Configuration to show dapps explorer or not
     enable_dapps_explorer : opt bool;
+    // Configuration to set the canister as production mode.
+    // For now, this is used only to show or hide the banner.
+    is_production : opt bool;
 };
 
 type ChallengeKey = text;

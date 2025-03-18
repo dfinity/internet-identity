@@ -210,6 +210,7 @@ pub struct InternetIdentityInit {
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
+    pub is_production: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
