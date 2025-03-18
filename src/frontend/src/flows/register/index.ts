@@ -4,6 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
@@ -52,6 +53,7 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
+  connection,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -99,6 +101,7 @@ export const registerFlow = async ({
   registrationAllowed: boolean;
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
+  connection: Connection;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -128,7 +131,18 @@ export const registerFlow = async ({
   const deviceOrigin = window.location.origin;
 
   // Prompt the user whether they want to use
-  const registrationMethodResult = await chooseRegistrationMethod();
+  // for now, this is behind a feature flag -
+  // in addition to only being shown if google is configured
+  let registrationMethodResult: "google" | "passkey" | "canceled";
+
+  if (
+    OPENID_AUTHENTICATION.isEnabled() &&
+    (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0
+  ) {
+    registrationMethodResult = await chooseRegistrationMethod();
+  } else {
+    registrationMethodResult = "passkey";
+  }
 
   if (registrationMethodResult === "google") {
     const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
@@ -323,6 +337,7 @@ export const getRegisterFlowOpts = async ({
       ),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
+    connection,
   };
 };
 
