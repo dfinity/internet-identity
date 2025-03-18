@@ -14,6 +14,6 @@ jobs:
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_PRIVATE_IDENTITY_WEBHOOK_URL }}
           MESSAGE: |
-            New PR ready for review: [${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }}).
+            New PR ready for review: <${{ github.event.pull_request.html_url }}|${{ github.event.pull_request.title }}>.
 
             Reviewer: <@${{ github.event.requested_reviewer.login == 'LXIF' && 'U07QU4DNV5Y' || github.event.requested_reviewer.login == 'sea-snake' && 'U07QU79GX0T' || github.event.requested_reviewer.login == 'lmuntaner' && 'U02TEQHKV35' || 'unknown' }}>
