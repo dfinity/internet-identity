@@ -4,6 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { anyFeatures } from "$src/features";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
@@ -28,6 +29,7 @@ import {
   UnexpectedCall,
   WrongCaptchaSolution,
 } from "$src/utils/iiConnection";
+import { isRegistrationAllowed } from "$src/utils/isRegistrationAllowed";
 import { lookupAAGUID } from "$src/utils/webAuthn";
 import { SignIdentity } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
@@ -84,7 +86,7 @@ export const registerFlow = async ({
     userNumber: bigint;
     pinIdentityMaterial: PinIdentityMaterial;
   }) => Promise<void>;
-  registrationAllowed: boolean;
+  registrationAllowed: { isAllowed: boolean; allowedOrigins: string[] };
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
 }): Promise<
@@ -99,8 +101,8 @@ export const registerFlow = async ({
   | RateLimitExceeded
   | "canceled"
 > => {
-  if (!registrationAllowed) {
-    const result = await registerDisabled();
+  if (!registrationAllowed.isAllowed) {
+    const result = await registerDisabled(registrationAllowed.allowedOrigins);
     result satisfies { tag: "canceled" };
     return "canceled";
   }
@@ -267,15 +269,13 @@ export const getRegisterFlowOpts = async ({
   const tempIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
+  const registrationAllowed =
+    // Allow registration in DEV mode
+    anyFeatures() ||
+    isRegistrationAllowed(connection.canisterConfig, window.location.origin);
+  const allowedOrigins = connection.canisterConfig.related_origins[0] || [];
   return {
-    /** Check that the current origin is not the explicit canister id or a raw url.
-     *  Explanation why we need to do this:
-     *  https://forum.dfinity.org/t/internet-identity-deprecation-of-account-creation-on-all-origins-other-than-https-identity-ic0-app/9694
-     **/
-    registrationAllowed:
-      !/(^https:\/\/rdmx6-jaaaa-aaaaa-aaadq-cai\.ic0\.app$)|(.+\.raw\..+)/.test(
-        window.origin
-      ),
+    registrationAllowed: { isAllowed: registrationAllowed, allowedOrigins },
     pinAllowed: () =>
       // If pin auth is disallowed by the authenticating dapp then abort, otherwise check
       // if pin auth is allowed for the user agent

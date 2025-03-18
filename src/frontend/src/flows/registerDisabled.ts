@@ -1,9 +1,14 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { warnBox } from "$src/components/warnBox";
-import { LEGACY_II_URL } from "$src/config";
 import { html, render } from "lit-html";
 
-const pageContent = (onCancel: () => void) => {
+const pageContent = ({
+  onCancel,
+  allowedOrigins,
+}: {
+  onCancel: () => void;
+  allowedOrigins: string[];
+}) => {
   const pageContentSlot = html`<hgroup>
       <h1 class="t-title t-title--main">Registration Disabled</h1>
     </hgroup>
@@ -13,7 +18,20 @@ const pageContent = (onCancel: () => void) => {
         message: html`<p class="t-paragraph t-lead">
             To keep you safe, we disabled registration from this address. If you
             want to securely create a new Internet Identity, visit:
-            <a class="t-link" href=${LEGACY_II_URL}>${LEGACY_II_URL}</a>.
+            ${allowedOrigins.length === 1
+              ? html`<a class="t-link" href=${allowedOrigins[0]}
+                    >${allowedOrigins[0]}</a
+                  >.`
+              : html`
+                  <ul>
+                    ${allowedOrigins.map(
+                      (origin) =>
+                        html`<li>
+                          <a class="t-link" href=${origin}>${origin}</a>
+                        </li>`
+                    )}
+                  </ul>
+                `}
           </p>
           <p class="t-paragraph">
             If you were redirected here by another website, please inform the
@@ -39,12 +57,22 @@ const pageContent = (onCancel: () => void) => {
   });
 };
 
-export const registerDisabled = (): Promise<{ tag: "canceled" }> => {
+/**
+ * Shows the register disabled page with a list of allowed origins
+ * @param allowedOrigins Optional list of allowed origins
+ * @returns Promise resolved when the user clicks cancel
+ */
+export const registerDisabled = (
+  allowedOrigins: string[]
+): Promise<{ tag: "canceled" }> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
     render(
-      pageContent(() => {
-        resolve({ tag: "canceled" });
+      pageContent({
+        onCancel: () => {
+          resolve({ tag: "canceled" });
+        },
+        allowedOrigins,
       }),
       container
     );
