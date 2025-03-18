@@ -26,6 +26,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   related_origins: [],
   fetch_root_key: [],
   enable_dapps_explorer: [],
+  is_production: [],
 };
 
 const registerSuccessToastTemplate = (result: unknown) => html`
