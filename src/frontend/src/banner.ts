@@ -2,11 +2,12 @@ import { InternetIdentityInit } from "$generated/internet_identity_types";
 import { html, render, TemplateResult } from "lit-html";
 import { OFFICIAL_II_URL } from "./config";
 import { anyFeatures } from "./features";
-import { isOfficialOrigin } from "./utils/domainUtils";
 
 // Show a warning banner if the build is not "official". This happens if either the build
-// is a flavored build, or if the origin is not in the list of related origins from the canister config.
+// is a flavored build, or if the is_production flag is not set to true.
 export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
+  const isProduction: boolean = config.is_production[0] ?? false;
+  const firstUrl: string = config.related_origins[0]?.[0] ?? OFFICIAL_II_URL;
   if (anyFeatures()) {
     showWarning(html`Test only. Do not use your regular Internet Identity!
       <a
@@ -16,18 +17,19 @@ export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
         href="https://github.com/dfinity/internet-identity#build-features"
         >more</a
       >`);
-  } else if (!isOfficialOrigin(window.location.origin, config)) {
+  } else if (!isProduction) {
     showWarning(html`This is not the official Internet Identity.
       <a
         class="features-warning-btn"
         target="_blank"
         rel="noopener noreferrer"
-        href=${OFFICIAL_II_URL}
+        href=${firstUrl}
         >go to official</a
       >`);
   }
 };
 
+// Exported to be used in the showcase
 export const showWarning = (message: TemplateResult): HTMLDivElement => {
   const container = document.createElement("div");
   container.className = "features-warning-container";
