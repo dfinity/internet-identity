@@ -1,0 +1,9 @@
+{
+  "en": {
+    "create_internet_identity": "Create Internet Identity",
+    "to_continue": "to continue",
+    "continue_with_google": "Continue with Google",
+    "continue_with_passkey": "Continue with Passkey",
+    "cancel": "Cancel"
+  }
+}
