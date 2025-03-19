@@ -1,6 +1,7 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
 import { mount, renderPage } from "$src/utils/lit-html";
+import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import copyJson from "./chooseRegistrationMethod.json";
 
@@ -19,7 +20,9 @@ export const chooseRegistrationMethodTemplate = ({
   const copy = i18n.i18n(copyJson);
 
   const slot = html`
-    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+    <hgroup
+      ${isNullish(scrollToTop) ? mount(() => window.scrollTo(0, 0)) : undefined}
+    >
       <h1 class="t-title t-title--main">${copy.create_internet_identity}</h1>
       <p class="t-paragraph">${copy.to_continue}</p>
     </hgroup>
