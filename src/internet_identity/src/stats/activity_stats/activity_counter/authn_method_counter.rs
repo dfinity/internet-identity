@@ -20,7 +20,7 @@ pub struct AuthnMethodCounter {
     /// Number of authentications with a browser storage key.
     pub browser_storage_key_counter: u64,
     /// Number of authentications with an OpenID credential.
-    pub openid_credential_auth_counter: u64,
+    pub openid_credential_auth_counter: Option<u64>,
     /// Number of authentications with a key not fitting any of the above criteria.
     pub other_counter: u64,
 }
@@ -35,7 +35,7 @@ impl ActivityCounter for AuthnMethodCounter {
             webauthn_recovery_counter: 0,
             recovery_phrase_counter: 0,
             browser_storage_key_counter: 0,
-            openid_credential_auth_counter: 0,
+            openid_credential_auth_counter: Some(0),
             other_counter: 0,
         }
     }
@@ -91,7 +91,8 @@ impl ActivityCounter for AuthnMethodCounter {
                 }
             }
             AuthorizationKey::OpenIdCredentialKey(_) => {
-                self.openid_credential_auth_counter += 1;
+                self.openid_credential_auth_counter =
+                    Some(self.openid_credential_auth_counter.unwrap_or(0) + 1);
             }
         }
     }
