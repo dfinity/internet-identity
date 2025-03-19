@@ -40,7 +40,12 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { decodeJWT } from "$src/utils/openID";
+import {
+  createAnonymousNonce,
+  createGoogleRequestConfig,
+  decodeJWT,
+  requestJWT,
+} from "$src/utils/openID";
 import {
   CanisterError,
   diagnosticInfo,
@@ -339,6 +344,94 @@ export class Connection {
           userNumber,
           actor
         ),
+        userNumber,
+        showAddCurrentDevice: false,
+      };
+    }
+
+    if ("Err" in finishResponse) {
+      const err = finishResponse.Err;
+      if ("InvalidAuthnMethod" in err) {
+        return {
+          kind: "invalidAuthnMethod",
+          message: err.InvalidAuthnMethod,
+        };
+      }
+      if ("UnexpectedCall" in err) {
+        return {
+          kind: "unexpectedCall",
+          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
+        };
+      }
+      if ("NoRegistrationFlow" in err) {
+        return { kind: "noRegistrationFlow" };
+      }
+      if ("IdentityLimitReached" in err) {
+        return { kind: "registerNoSpace" };
+      }
+      if ("StorageError" in err) {
+        // this is unrecoverable, so we can just map it to a generic API error
+        return {
+          kind: "apiError",
+          error: new Error("StorageError: " + err.StorageError),
+        };
+      }
+    }
+    console.error("unexpected check_captcha response", finishResponse);
+    throw Error("unexpected check_captcha response");
+  };
+
+  openid_identity_registration_finish = async (
+    getGoogleClientId: () => string | undefined,
+    identity: SignIdentity
+  ): Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+    | MissingGoogleClientId
+  > => {
+    const delegationIdentity = await this.requestFEDelegation(identity);
+    const actor = await this.createActor(delegationIdentity);
+    const googleClientId = getGoogleClientId();
+    const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
+
+    if (isNullish(googleClientId)) return { kind: "missingGoogleClientId" };
+
+    const googleRequestConfig = createGoogleRequestConfig(googleClientId);
+
+    const jwt = await withLoader(() =>
+      requestJWT(googleRequestConfig, {
+        mediation: "required",
+        nonce,
+      })
+    );
+
+    let finishResponse;
+    try {
+      finishResponse = await actor.openid_identity_registration_finish({
+        jwt,
+        salt,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
+    }
+
+    if ("Ok" in finishResponse) {
+      const userNumber = finishResponse.Ok.identity_number;
+
+      return {
+        kind: "loginSuccess",
+        connection: await this.fromJwt(jwt, salt, identity),
         userNumber,
         showAddCurrentDevice: false,
       };
