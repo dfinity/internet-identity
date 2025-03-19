@@ -26,6 +26,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   related_origins: [],
   fetch_root_key: [],
   enable_dapps_explorer: [],
+  is_production: [],
 };
 
 const registerSuccessToastTemplate = (result: unknown) => html`
@@ -113,6 +114,16 @@ const registerFlowOpts: RegisterFlowOpts = {
       showAddCurrentDevice: false,
     };
   },
+  openIdRegistrationFinish: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    return {
+      kind: "loginSuccess",
+      userNumber: BigInt(12356),
+      connection: mockConnection,
+      showAddCurrentDevice: false,
+    };
+  },
   registrationAllowed: {
     isAllowed: true,
     allowedOrigins: ["https://identity.ic0.app"] as string[],
@@ -123,6 +134,7 @@ const registerFlowOpts: RegisterFlowOpts = {
   },
   pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
+  connection: mockConnection,
 } as const;
 
 export const iiFlows: Record<string, () => void> = {
