@@ -116,6 +116,7 @@ pub struct PersistentState {
     pub event_stats_24h_start: Option<EventKey>,
     pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
+    pub is_production: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -135,6 +136,7 @@ impl Default for PersistentState {
             event_stats_24h_start: None,
             fetch_root_key: None,
             enable_dapps_explorer: None,
+            is_production: None,
         }
     }
 }
