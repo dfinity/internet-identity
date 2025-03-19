@@ -17,6 +17,7 @@ describe("isRegistrationAllowed", () => {
       register_rate_limit: [],
       analytics_config: [],
       openid_google: [],
+      is_production: [],
     };
   };
 
