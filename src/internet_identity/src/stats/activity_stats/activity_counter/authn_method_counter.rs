@@ -26,11 +26,6 @@ pub struct AuthnMethodCounter {
     pub other_counter: u64,
 }
 
-pub enum AuthnMethod {
-    Device(Device),
-    OpenIdCredential(OpenIdCredential),
-}
-
 impl ActivityCounter for AuthnMethodCounter {
     type CountingContext<'a> = (&'a Anchor, &'a AuthorizationKey);
 
