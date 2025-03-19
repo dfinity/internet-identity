@@ -16,6 +16,7 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  IdRegFinishError,
   InternetIdentityInit,
   JWT,
   KeyType,
@@ -349,36 +350,7 @@ export class Connection {
       };
     }
 
-    if ("Err" in finishResponse) {
-      const err = finishResponse.Err;
-      if ("InvalidAuthnMethod" in err) {
-        return {
-          kind: "invalidAuthnMethod",
-          message: err.InvalidAuthnMethod,
-        };
-      }
-      if ("UnexpectedCall" in err) {
-        return {
-          kind: "unexpectedCall",
-          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
-        };
-      }
-      if ("NoRegistrationFlow" in err) {
-        return { kind: "noRegistrationFlow" };
-      }
-      if ("IdentityLimitReached" in err) {
-        return { kind: "registerNoSpace" };
-      }
-      if ("StorageError" in err) {
-        // this is unrecoverable, so we can just map it to a generic API error
-        return {
-          kind: "apiError",
-          error: new Error("StorageError: " + err.StorageError),
-        };
-      }
-    }
-    console.error("unexpected check_captcha response", finishResponse);
-    throw Error("unexpected check_captcha response");
+    return this.handleIdentityFinishErrors(finishResponse);
   };
 
   openid_identity_registration_finish = async (
@@ -437,6 +409,17 @@ export class Connection {
       };
     }
 
+    return this.handleIdentityFinishErrors(finishResponse);
+  };
+
+  private handleIdentityFinishErrors(finishResponse: {
+    Err: IdRegFinishError;
+  }):
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod {
     if ("Err" in finishResponse) {
       const err = finishResponse.Err;
       if ("InvalidAuthnMethod" in err) {
@@ -467,7 +450,7 @@ export class Connection {
     }
     console.error("unexpected check_captcha response", finishResponse);
     throw Error("unexpected check_captcha response");
-  };
+  }
 
   login = async (
     userNumber: bigint
