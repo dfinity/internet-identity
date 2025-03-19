@@ -275,13 +275,15 @@ impl Anchor {
 
     /// Returns the timestamp of the last known activity, if any.
     pub fn last_activity(&self) -> Option<Timestamp> {
-        let mut timestamps: Vec<Option<Timestamp>> = self
-            .devices
+        self.devices
             .iter()
-            .map(|d| d.last_usage_timestamp)
-            .collect();
-        timestamps.sort_unstable();
-        timestamps.pop().unwrap_or_default()
+            .filter_map(|d| d.last_usage_timestamp)
+            .chain(
+                self.openid_credentials
+                    .iter()
+                    .map(|c| c.last_usage_timestamp),
+            )
+            .max()
     }
 
     /// Returns information about the domains this anchor was active on since the given timestamp.
@@ -336,6 +338,16 @@ impl Anchor {
         }
     }
 
+    /// Returns a reference to the OpenID credential given the key.
+    pub fn openid_credential(
+        &self,
+        openid_credential_key: &OpenIdCredentialKey,
+    ) -> Option<&OpenIdCredential> {
+        self.openid_credentials()
+            .iter()
+            .find(|e| &e.key() == openid_credential_key)
+    }
+
     /// Returns a reference to the list of OpenID credentials.
     pub fn openid_credentials(&self) -> &Vec<OpenIdCredential> {
         &self.openid_credentials
@@ -377,6 +389,19 @@ impl Anchor {
     ) -> Result<(), AnchorError> {
         let index = self.openid_credential_index(&openid_credential.key())?;
         self.openid_credentials[index] = openid_credential;
+        Ok(())
+    }
+
+    pub fn set_openid_credential_usage_timestamp(
+        &mut self,
+        key: &OpenIdCredentialKey,
+        timestamp: Timestamp,
+    ) -> Result<(), AnchorError> {
+        let Some(openid_credential) = self.openid_credentials.iter_mut().find(|c| &c.key() == key)
+        else {
+            return Err(AnchorError::OpenIdCredentialNotFound);
+        };
+        openid_credential.last_usage_timestamp = timestamp;
         Ok(())
     }
 

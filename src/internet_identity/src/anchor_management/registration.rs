@@ -96,7 +96,10 @@ pub fn register(
             anchor_number
         ))
     });
-    activity_bookkeeping(&mut anchor, &device.pubkey);
+    activity_bookkeeping(
+        &mut anchor,
+        &AuthorizationKey::DeviceKey(device.pubkey.clone()),
+    );
 
     // write anchor to stable memory
     state::storage_borrow_mut(|storage| {

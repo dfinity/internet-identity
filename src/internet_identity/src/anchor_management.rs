@@ -9,7 +9,7 @@ use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
+    AnchorNumber, AuthorizationKey, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
     IdentityAnchorInfo, MetadataEntry,
 };
 use state::storage_borrow;
@@ -72,20 +72,23 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 }
 
 /// Handles all the bookkeeping required on anchor activity:
-/// * Records anchor & device activity within aggregated activity stats
+/// * Records anchor, device and credential activity within aggregated activity stats
 /// * Updates the last usage timestamp
 ///
 /// Note: modifies the anchor but not does not write to storage. It is the responsibility of the
 /// caller to persist the changes. This allows anchor operations to write to storage only once,
 /// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
-pub fn activity_bookkeeping(anchor: &mut Anchor, current_device_key: &DeviceKey) {
-    let device = anchor
-        .device(current_device_key)
-        .unwrap_or_else(|| trap(&format!("bug: device {:?} not found", current_device_key)));
-    activity_stats::update_activity_stats(anchor, device);
-    anchor
-        .set_device_usage_timestamp(current_device_key, time())
-        .expect("unable to update last usage timestamp");
+pub fn activity_bookkeeping(anchor: &mut Anchor, current_authorization_key: &AuthorizationKey) {
+    match current_authorization_key {
+        AuthorizationKey::DeviceKey(device_key) => {
+            anchor.set_device_usage_timestamp(device_key, time())
+        }
+        AuthorizationKey::OpenIdCredentialKey(openid_credential_key) => {
+            anchor.set_openid_credential_usage_timestamp(openid_credential_key, time())
+        }
+    }
+    .expect("unable to update last usage timestamp");
+    activity_stats::update_activity_stats(anchor, current_authorization_key);
 }
 
 /// Handles all the bookkeeping required after a successful anchor operation:

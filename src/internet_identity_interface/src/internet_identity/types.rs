@@ -307,6 +307,6 @@ pub struct OpenIdConfig {
 }
 
 pub enum AuthorizationKey {
-    DevicePubKey(DeviceKey),
-    OpenIdPubKey(PublicKey),
+    DeviceKey(DeviceKey),
+    OpenIdCredentialKey(OpenIdCredentialKey),
 }

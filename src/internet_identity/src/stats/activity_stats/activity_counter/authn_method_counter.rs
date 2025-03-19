@@ -1,7 +1,10 @@
+use crate::openid::OpenIdCredential;
 use crate::stats::activity_stats::activity_counter::ActivityCounter;
-use crate::storage::anchor::Device;
+use crate::storage::anchor::{Anchor, Device};
 use candid::{CandidType, Deserialize};
-use internet_identity_interface::internet_identity::types::{KeyType, Purpose, Timestamp};
+use internet_identity_interface::internet_identity::types::{
+    AuthorizationKey, KeyType, Purpose, Timestamp,
+};
 
 /// Counter for authentications with different methods.
 ///
@@ -17,12 +20,19 @@ pub struct AuthnMethodCounter {
     pub recovery_phrase_counter: u64,
     /// Number of authentications with a browser storage key.
     pub browser_storage_key_counter: u64,
+    /// Number of authentications with an OpenID credential.
+    pub openid_credential_auth_counter: u64,
     /// Number of authentications with a key not fitting any of the above criteria.
     pub other_counter: u64,
 }
 
+pub enum AuthnMethod {
+    Device(Device),
+    OpenIdCredential(OpenIdCredential),
+}
+
 impl ActivityCounter for AuthnMethodCounter {
-    type CountingContext<'a> = &'a Device;
+    type CountingContext<'a> = (&'a Anchor, &'a AuthorizationKey);
 
     fn new(start_timestamp: Timestamp) -> Self {
         Self {
@@ -31,6 +41,7 @@ impl ActivityCounter for AuthnMethodCounter {
             webauthn_recovery_counter: 0,
             recovery_phrase_counter: 0,
             browser_storage_key_counter: 0,
+            openid_credential_auth_counter: 0,
             other_counter: 0,
         }
     }
@@ -39,33 +50,54 @@ impl ActivityCounter for AuthnMethodCounter {
         self.start_timestamp
     }
 
-    /// Increases the counter for the corresponding authn_method of the provided devce, if there was
-    /// no activity before.
+    /// Increases the counter for the corresponding authn_method of the provided authorization,
+    /// if there was no activity before.
     ///
-    /// Only called if `current_domain` corresponds to an II domain.
-    fn count_event(&mut self, device: &Self::CountingContext<'_>) {
+    /// Counter only increases for devices where the domain is an II domain.
+    fn count_event(&mut self, (anchor, authorization_key): &Self::CountingContext<'_>) {
+        let last_usage_timestamp = match authorization_key {
+            AuthorizationKey::DeviceKey(device_key) => anchor
+                .device(device_key)
+                .and_then(|d| d.last_usage_timestamp),
+            AuthorizationKey::OpenIdCredentialKey(openid_credential_key) => anchor
+                .openid_credential(openid_credential_key)
+                .map(|c| c.last_usage_timestamp),
+        };
+
         // only count authentications on devices that have not already been counted
         // i.e. the last usage timestamp is before the start of the window
-        if let Some(timestamp) = device.last_usage_timestamp {
+        if let Some(timestamp) = last_usage_timestamp {
             if timestamp >= self.start_timestamp {
                 return;
             }
         }
 
-        match device.key_type {
-            KeyType::SeedPhrase => self.recovery_phrase_counter += 1,
-            KeyType::BrowserStorageKey => self.browser_storage_key_counter += 1,
-            KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown => {
-                if device.credential_id.is_none() {
-                    // if the credential id is not set, it is not WebAuthn
-                    self.other_counter += 1;
-                    return;
-                }
+        match authorization_key {
+            AuthorizationKey::DeviceKey(device_key) => {
+                if let Some(device) = anchor.device(device_key) {
+                    // Only increase counter if device has an II domain
+                    if device.ii_domain().is_some() {
+                        match device.key_type {
+                            KeyType::SeedPhrase => self.recovery_phrase_counter += 1,
+                            KeyType::BrowserStorageKey => self.browser_storage_key_counter += 1,
+                            KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown => {
+                                if device.credential_id.is_none() {
+                                    // if the credential id is not set, it is not WebAuthn
+                                    self.other_counter += 1;
+                                    return;
+                                }
 
-                match device.purpose {
-                    Purpose::Authentication => self.webauthn_auth_counter += 1,
-                    Purpose::Recovery => self.webauthn_recovery_counter += 1,
+                                match device.purpose {
+                                    Purpose::Authentication => self.webauthn_auth_counter += 1,
+                                    Purpose::Recovery => self.webauthn_recovery_counter += 1,
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+            AuthorizationKey::OpenIdCredentialKey(_) => {
+                self.openid_credential_auth_counter += 1;
             }
         }
     }

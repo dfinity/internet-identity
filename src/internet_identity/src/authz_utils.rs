@@ -7,9 +7,7 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber,
-    AuthorizationKey::{self, DevicePubKey, OpenIdPubKey},
-    IdentityNumber,
+    AnchorNumber, AuthorizationKey, IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
 
@@ -78,15 +76,7 @@ where
     let (mut anchor, authorization_key) = check_authorization(anchor_number)
         .map_err(|err| E::from(IdentityUpdateError::from(err)))?;
 
-    match authorization_key {
-        DevicePubKey(device_key) => {
-            anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-        }
-        OpenIdPubKey(_openid_key) => {
-            // TODO: add bookkeeping
-            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-        }
-    }
+    anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
 
     let result = op(&mut anchor);
 
@@ -111,6 +101,7 @@ pub fn check_authorization(
     let anchor = state::anchor(anchor_number);
     let caller = caller();
 
+    // First check device (passkey or recovery) authorization
     for device in anchor.devices() {
         if caller == Principal::self_authenticating(&device.pubkey)
             || state::with_temp_keys_mut(|temp_keys| {
@@ -121,20 +112,20 @@ pub fn check_authorization(
         {
             return Ok((
                 anchor.clone(),
-                AuthorizationKey::DevicePubKey(device.pubkey.clone()),
+                AuthorizationKey::DeviceKey(device.pubkey.clone()),
             ));
         }
     }
-    // check openid authorization
+    // Else check OpenID authorization
     for credential in anchor.openid_credentials() {
-        //TODO: handle temp keys
         if caller == credential.principal() {
             return Ok((
                 anchor.clone(),
-                AuthorizationKey::OpenIdPubKey(credential.public_key()),
+                AuthorizationKey::OpenIdCredentialKey(credential.key()),
             ));
         }
     }
+
     Err(AuthorizationError::from(caller))
 }
 
@@ -151,20 +142,12 @@ pub fn check_authz_and_record_activity(
     let (mut anchor, authorization_key) =
         check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
 
-    match authorization_key {
-        DevicePubKey(device_key) => {
-            let maybe_domain = anchor.device(&device_key).unwrap().ii_domain();
-            anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-            state::storage_borrow_mut(|storage| storage.write(anchor))
-                .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
-            Ok(maybe_domain)
-        }
-        OpenIdPubKey(_openid_key) => {
-            // TODO: add bookkeeping for openid
-            // anchor_management::activity_bookkeeping(&mut anchor, &device_key);
-            // state::storage_borrow_mut(|storage| storage.write(anchor))
-            //     .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
-            Ok(None)
-        }
-    }
+    let maybe_domain = match &authorization_key {
+        AuthorizationKey::DeviceKey(device_key) => anchor.device(device_key).unwrap().ii_domain(),
+        _ => None,
+    };
+    anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+    state::storage_borrow_mut(|storage| storage.write(anchor))
+        .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
+    Ok(maybe_domain)
 }
