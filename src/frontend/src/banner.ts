@@ -7,6 +7,7 @@ import { anyFeatures } from "./features";
 // is a flavored build, or if the is_production flag is not set to true.
 export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
   const isProduction: boolean = config.is_production[0] ?? false;
+  const firstUrl: string = config.related_origins[0]?.[0] ?? OFFICIAL_II_URL;
   if (anyFeatures()) {
     showWarning(html`Test only. Do not use your regular Internet Identity!
       <a
@@ -22,7 +23,7 @@ export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
         class="features-warning-btn"
         target="_blank"
         rel="noopener noreferrer"
-        href=${config.related_origins[0] ?? OFFICIAL_II_URL}
+        href=${firstUrl}
         >go to official</a
       >`);
   }
