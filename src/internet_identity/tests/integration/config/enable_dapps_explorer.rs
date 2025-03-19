@@ -9,7 +9,12 @@ fn should_init_default() {
     let env = env();
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
-    assert_eq!(api::config(&env, canister_id).unwrap().enable_dapps_explorer, None);
+    assert_eq!(
+        api::config(&env, canister_id)
+            .unwrap()
+            .enable_dapps_explorer,
+        None
+    );
 }
 
 #[test]
@@ -33,7 +38,9 @@ fn should_init_config() {
     for config in configs {
         let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
         assert_eq!(
-            api::config(&env, canister_id).unwrap().enable_dapps_explorer,
+            api::config(&env, canister_id)
+                .unwrap()
+                .enable_dapps_explorer,
             config.enable_dapps_explorer
         );
     }
@@ -52,7 +59,9 @@ fn should_enable_config() {
     config.enable_dapps_explorer = enabled_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().enable_dapps_explorer,
+        api::config(&env, canister_id)
+            .unwrap()
+            .enable_dapps_explorer,
         enabled_value
     );
 }
@@ -70,7 +79,9 @@ fn should_disable_config() {
     config.enable_dapps_explorer = disabled_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().enable_dapps_explorer,
+        api::config(&env, canister_id)
+            .unwrap()
+            .enable_dapps_explorer,
         disabled_value
     );
 }
@@ -88,7 +99,9 @@ fn should_update_config() {
     config.enable_dapps_explorer = updated_value;
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().enable_dapps_explorer,
+        api::config(&env, canister_id)
+            .unwrap()
+            .enable_dapps_explorer,
         updated_value
     );
 }
@@ -129,7 +142,9 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().enable_dapps_explorer,
+            api::config(&env, canister_id)
+                .unwrap()
+                .enable_dapps_explorer,
             config.enable_dapps_explorer
         );
     }
