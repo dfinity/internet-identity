@@ -1,6 +1,5 @@
-use crate::openid::OpenIdCredential;
 use crate::stats::activity_stats::activity_counter::ActivityCounter;
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::Anchor;
 use candid::{CandidType, Deserialize};
 use internet_identity_interface::internet_identity::types::{
     AuthorizationKey, KeyType, Purpose, Timestamp,
