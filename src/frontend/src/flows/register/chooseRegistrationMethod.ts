@@ -1,43 +1,46 @@
 import { mainWindow } from "$src/components/mainWindow";
 import { I18n } from "$src/i18n";
-import { renderPage } from "$src/utils/lit-html";
-import { html, TemplateResult } from "lit-html";
+import { mount, renderPage } from "$src/utils/lit-html";
+import { TemplateResult, html } from "lit-html";
 import copyJson from "./chooseRegistrationMethod.json";
 
 export const chooseRegistrationMethodTemplate = ({
   chosenRegistrationMethod,
   i18n,
   cancel,
+  scrollToTop,
 }: {
   chosenRegistrationMethod: (method: "google" | "passkey") => void;
   i18n: I18n;
   cancel: () => void;
+  /* put the page into view */
+  scrollToTop?: boolean;
 }): TemplateResult => {
   const copy = i18n.i18n(copyJson);
 
   const slot = html`
-    <hgroup>
-      <h1 class="t-title t-title--main">Choose your Method</h1>
-      <p class="t-paragraph">To create your Identity</p>
+    <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
+      <h1 class="t-title t-title--main">${copy.create_internet_identity}</h1>
+      <p class="t-paragraph">${copy.to_continue}</p>
     </hgroup>
     <button
       @click=${() => chosenRegistrationMethod("passkey")}
-      data-action="choose-passkey"
+      data-action="construct-passkey-identity"
       class="c-button l-stack"
     >
       ${copy.continue_with_passkey}
     </button>
     <button
       @click=${() => chosenRegistrationMethod("google")}
-      data-action="choose-google"
-      class="c-button l-stack"
+      data-action="construct-google-identity"
+      class="c-button c-button--secondary"
     >
       ${copy.continue_with_google}
     </button>
     <button
       @click=${() => cancel()}
       data-action="cancel"
-      class="c-button c-button--textOnly"
+      class="c-button l-stack c-button--textOnly"
     >
       ${copy.cancel}
     </button>
@@ -45,7 +48,7 @@ export const chooseRegistrationMethodTemplate = ({
 
   return mainWindow({
     showFooter: false,
-    showLogo: false,
+    showLogo: true,
     slot,
   });
 };

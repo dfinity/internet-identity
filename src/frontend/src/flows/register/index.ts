@@ -157,7 +157,7 @@ export const registerFlow = async ({
     const openIdResult = await openIdRegistrationFinish();
 
     if (openIdResult.kind === "loginSuccess") {
-      analytics.event("registration-passkey");
+      analytics.event("registration-openid");
       return {
         ...openIdResult,
         authnMethod: "passkey", //TODO decide if we want to add openid here
