@@ -7,7 +7,6 @@ import { caretDownIcon } from "$src/components/icons";
 import { withLoader } from "$src/components/loader";
 import { showMessage } from "$src/components/message";
 import { showSpinner } from "$src/components/spinner";
-import { DOMAIN_COMPATIBILITY } from "$src/featureFlags";
 import { getDapps } from "$src/flows/dappsExplorer/dapps";
 import { recoveryWizard } from "$src/flows/recovery/recoveryWizard";
 import { I18n } from "$src/i18n";
@@ -21,7 +20,6 @@ import { nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { validateDerivationOrigin } from "../../utils/validateDerivationOrigin";
-import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";
 import { fetchDelegation } from "./fetchDelegation";
 import copyJson from "./index.json";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";
@@ -214,12 +212,15 @@ const authenticate = async (
     autoSelectionIdentity: autoSelectionIdentity,
   });
 
-  if (authSuccess.showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
-    await registerCurrentDeviceCurrentOrigin(
-      authSuccess.userNumber,
-      authSuccess.connection
-    );
-  }
+  // TODO: Remove if we see more problems logging in.
+  // The reason to remove this is that two power users (Björn and Jan) were confused with this screen.
+  // If technical power users are confused, then normal users will also be confused.
+  // if (authSuccess.showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
+  //   await registerCurrentDeviceCurrentOrigin(
+  //     authSuccess.userNumber,
+  //     authSuccess.connection
+  //   );
+  // }
 
   // at this point, derivationOrigin is either validated or undefined
   const derivationOrigin =
