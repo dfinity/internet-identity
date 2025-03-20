@@ -154,6 +154,13 @@ export const savePasskeyPinOrOpenID = async ({
       });
     });
   }
+  try {
+    const identity = await withLoader(() => constructIdentity({}));
+    return identity;
+  } catch (e) {
+    toast.error(errorMessage(e));
+    return undefined;
+  }
 };
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error

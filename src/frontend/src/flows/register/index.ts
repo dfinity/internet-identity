@@ -122,7 +122,7 @@ export const registerFlow = async ({
     pinAllowed: await pinAllowed(),
     googleAllowed:
       OPENID_AUTHENTICATION.isEnabled() &&
-      (await (connection.canisterConfig?.openid_google?.[0]?.length ?? 0)) > 0,
+      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
