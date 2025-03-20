@@ -41,7 +41,7 @@ const savePasskeyTemplate = ({
       data-action="construct-pin-identity"
       class="c-button c-button--secondary"
     >
-      ${copy.without_passkey}
+      ${copy.with_pin}
     </button>
   `;
 

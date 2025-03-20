@@ -3,7 +3,7 @@
     "select": "Select",
     "cancel": "Cancel",
     "save_passkey": "Create Passkey",
-    "without_passkey": "Continue without Passkey",
+    "with_pin": "Continue witht PIN",
     "openid_google": "Continue with Google",
     "and_complete_prompts": "and complete the prompts that pop-up on your device",
 
