@@ -302,7 +302,7 @@ fn persistent_state_metrics(
         monthly_stats_doc: "The number of unique authentication methods used in the last completed 30-day collection window on II domains.",
     };
     labelled_activity_metrics(w, stats, labels, |counter, encoder| {
-        encoder
+        let mut labeled = encoder
             .value(
                 &[("type", "webauthn_auth")],
                 counter.webauthn_auth_counter as f64,
@@ -319,11 +319,13 @@ fn persistent_state_metrics(
                 &[("type", "browser_storage_key")],
                 counter.browser_storage_key_counter as f64,
             )?
-            .value(
-                &[("type", "openid_credential")],
-                counter.openid_credential_auth_counter.unwrap_or(0) as f64,
-            )?
             .value(&[("type", "other")], counter.other_counter as f64)?;
+        if let Some(openid_counter) = &counter.openid_credential_auth_counter {
+            for (issuer, count) in openid_counter {
+                labeled =
+                    labeled.value(&[("type", "openid"), ("issuer", issuer)], *count as f64)?;
+            }
+        }
         Ok(())
     })?;
     Ok(())
