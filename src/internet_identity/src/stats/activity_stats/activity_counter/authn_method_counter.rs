@@ -36,7 +36,7 @@ impl ActivityCounter for AuthnMethodCounter {
             webauthn_recovery_counter: 0,
             recovery_phrase_counter: 0,
             browser_storage_key_counter: 0,
-            openid_credential_auth_counter: Some(HashMap::default()),
+            openid_credential_auth_counter: Some(HashMap::new()),
             other_counter: 0,
         }
     }
