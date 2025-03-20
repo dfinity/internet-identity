@@ -67,4 +67,4 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Rust update failed"
+          MESSAGE: "Rust update failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
