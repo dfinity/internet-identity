@@ -122,34 +122,38 @@ export const savePasskeyPinOrOpenID = async ({
   origin: string;
   googleAllowed: boolean;
 }): Promise<IIWebAuthnIdentity | "pin" | "canceled" | undefined> => {
-  return new Promise((resolve) => {
-    return savePasskeyPage({
-      i18n: new I18n(),
-      cancel: () => resolve("canceled"),
-      scrollToTop: true,
-      constructPasskey: async () => {
-        analytics.event("construct-passkey");
-        try {
-          const rpId =
-            origin === window.location.origin
-              ? undefined
-              : new URL(origin).hostname;
-          const identity = await withLoader(() => constructIdentity({ rpId }));
-          analytics.event("construct-passkey-success");
-          resolve(identity);
-        } catch (e) {
-          analytics.event("construct-passkey-error");
-          toast.error(errorMessage(e));
-        }
-      },
-      constructPin: pinAllowed ? () => resolve("pin") : undefined,
-      constructOpenIdGoogle: googleAllowed
-        ? () => {
-            // TODO: (in separate PR)
+  if (pinAllowed || googleAllowed) {
+    return new Promise((resolve) => {
+      return savePasskeyPage({
+        i18n: new I18n(),
+        cancel: () => resolve("canceled"),
+        scrollToTop: true,
+        constructPasskey: async () => {
+          analytics.event("construct-passkey");
+          try {
+            const rpId =
+              origin === window.location.origin
+                ? undefined
+                : new URL(origin).hostname;
+            const identity = await withLoader(() =>
+              constructIdentity({ rpId })
+            );
+            analytics.event("construct-passkey-success");
+            resolve(identity);
+          } catch (e) {
+            analytics.event("construct-passkey-error");
+            toast.error(errorMessage(e));
           }
-        : undefined,
+        },
+        constructPin: pinAllowed ? () => resolve("pin") : undefined,
+        constructOpenIdGoogle: googleAllowed
+          ? () => {
+              // TODO: (in separate PR)
+            }
+          : undefined,
+      });
     });
-  });
+  }
 };
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error
