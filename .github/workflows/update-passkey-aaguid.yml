@@ -56,5 +56,5 @@ jobs:
         uses: ./.github/actions/slack
         if: ${{ failure() }}
         with:
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          message: "Passkey AAGUID data update failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Passkey AAGUID data update failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
