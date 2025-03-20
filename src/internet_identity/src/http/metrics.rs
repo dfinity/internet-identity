@@ -319,6 +319,10 @@ fn persistent_state_metrics(
                 &[("type", "browser_storage_key")],
                 counter.browser_storage_key_counter as f64,
             )?
+            .value(
+                &[("type", "openid_credential")],
+                counter.openid_credential_auth_counter.unwrap_or(0) as f64,
+            )?
             .value(&[("type", "other")], counter.other_counter as f64)?;
         Ok(())
     })?;

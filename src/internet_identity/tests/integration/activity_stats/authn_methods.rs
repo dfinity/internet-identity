@@ -19,12 +19,13 @@ use AuthnMethodProtection::Unprotected;
 const DAY_SECONDS: u64 = 24 * 60 * 60;
 const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
 
-const AUTHN_METHOD_TYPES: [&str; 5] = [
+const AUTHN_METHOD_TYPES: [&str; 6] = [
     "other",
     "webauthn_auth",
     "webauthn_recovery",
     "recovery_phrase",
     "browser_storage_key",
+    "openid_credential",
 ];
 
 /// Tests that daily active authn_methods are counted correctly.

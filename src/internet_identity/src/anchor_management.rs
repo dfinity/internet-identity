@@ -79,6 +79,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 /// caller to persist the changes. This allows anchor operations to write to storage only once,
 /// combining the modifications for bookkeeping reasons (made here) with other changes to the anchor.
 pub fn activity_bookkeeping(anchor: &mut Anchor, current_authorization_key: &AuthorizationKey) {
+    activity_stats::update_activity_stats(anchor, current_authorization_key);
     match current_authorization_key {
         AuthorizationKey::DeviceKey(device_key) => {
             anchor.set_device_usage_timestamp(device_key, time())
@@ -88,7 +89,6 @@ pub fn activity_bookkeeping(anchor: &mut Anchor, current_authorization_key: &Aut
         }
     }
     .expect("unable to update last usage timestamp");
-    activity_stats::update_activity_stats(anchor, current_authorization_key);
 }
 
 /// Handles all the bookkeeping required after a successful anchor operation:
