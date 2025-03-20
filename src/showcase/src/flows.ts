@@ -124,6 +124,7 @@ const registerFlowOpts: RegisterFlowOpts = {
   },
   pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
+  connection: mockConnection,
 } as const;
 
 export const iiFlows: Record<string, () => void> = {

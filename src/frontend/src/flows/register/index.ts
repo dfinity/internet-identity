@@ -4,6 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { anyFeatures } from "$src/features";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
@@ -40,7 +41,7 @@ import { tempKeyWarningBox } from "../manage/tempKeys";
 import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
-import { savePasskeyOrPin } from "./passkey";
+import { savePasskeyPinOrOpenID } from "./passkey";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -51,6 +52,7 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
+  connection,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -89,6 +91,7 @@ export const registerFlow = async ({
   registrationAllowed: { isAllowed: boolean; allowedOrigins: string[] };
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
+  connection: Connection;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -115,8 +118,11 @@ export const registerFlow = async ({
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
-  const savePasskeyResult = await savePasskeyOrPin({
+  const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
+    googleAllowed:
+      OPENID_AUTHENTICATION.isEnabled() &&
+      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
@@ -294,6 +300,7 @@ export const getRegisterFlowOpts = async ({
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
+    connection,
   };
 };
 

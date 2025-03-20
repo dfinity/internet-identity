@@ -21,12 +21,14 @@ import copyJson from "./passkey.json";
 const savePasskeyTemplate = ({
   constructPasskey,
   constructPin,
+  constructOpenIdGoogle,
   i18n,
   cancel,
   scrollToTop = false,
 }: {
   constructPasskey: () => void;
   constructPin?: () => void;
+  constructOpenIdGoogle?: () => void;
   i18n: I18n;
   cancel: () => void;
   /* put the page into view */
@@ -40,6 +42,16 @@ const savePasskeyTemplate = ({
       class="c-button c-button--secondary"
     >
       ${copy.without_passkey}
+    </button>
+  `;
+
+  const createOpenIdButton = (constructOpenIdGoogle: () => void) => html`
+    <button
+      @click=${() => constructOpenIdGoogle()}
+      data-action="construct-openid-identity"
+      class="c-button c-button--secondary"
+    >
+      ${copy.openid_google}
     </button>
   `;
 
@@ -59,6 +71,9 @@ const savePasskeyTemplate = ({
     >
       ${copy.save_passkey}
     </button>
+    ${nonNullish(constructOpenIdGoogle)
+      ? createOpenIdButton(constructOpenIdGoogle)
+      : ""}
     ${nonNullish(constructPin) ? createPinButton(constructPin) : ""}
     <button
       @click=${() => cancel()}
@@ -98,47 +113,43 @@ const savePasskeyTemplate = ({
 export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
 // Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
-export const savePasskeyOrPin = async ({
+export const savePasskeyPinOrOpenID = async ({
   pinAllowed,
   origin,
+  googleAllowed,
 }: {
   pinAllowed: boolean;
   origin: string;
+  googleAllowed: boolean;
 }): Promise<IIWebAuthnIdentity | "pin" | "canceled" | undefined> => {
-  if (pinAllowed) {
-    return new Promise((resolve) => {
-      return savePasskeyPage({
-        i18n: new I18n(),
-        cancel: () => resolve("canceled"),
-        scrollToTop: true,
-        constructPasskey: async () => {
-          analytics.event("construct-passkey");
-          try {
-            const rpId =
-              origin === window.location.origin
-                ? undefined
-                : new URL(origin).hostname;
-            const identity = await withLoader(() =>
-              constructIdentity({ rpId })
-            );
-            analytics.event("construct-passkey-success");
-            resolve(identity);
-          } catch (e) {
-            analytics.event("construct-passkey-error");
-            toast.error(errorMessage(e));
+  return new Promise((resolve) => {
+    return savePasskeyPage({
+      i18n: new I18n(),
+      cancel: () => resolve("canceled"),
+      scrollToTop: true,
+      constructPasskey: async () => {
+        analytics.event("construct-passkey");
+        try {
+          const rpId =
+            origin === window.location.origin
+              ? undefined
+              : new URL(origin).hostname;
+          const identity = await withLoader(() => constructIdentity({ rpId }));
+          analytics.event("construct-passkey-success");
+          resolve(identity);
+        } catch (e) {
+          analytics.event("construct-passkey-error");
+          toast.error(errorMessage(e));
+        }
+      },
+      constructPin: pinAllowed ? () => resolve("pin") : undefined,
+      constructOpenIdGoogle: googleAllowed
+        ? () => {
+            // TODO: (in separate PR)
           }
-        },
-        constructPin: pinAllowed ? () => resolve("pin") : undefined,
-      });
+        : undefined,
     });
-  }
-  try {
-    const identity = await withLoader(() => constructIdentity({}));
-    return identity;
-  } catch (e) {
-    toast.error(errorMessage(e));
-    return undefined;
-  }
+  });
 };
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error
