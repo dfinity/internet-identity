@@ -114,16 +114,6 @@ const registerFlowOpts: RegisterFlowOpts = {
       showAddCurrentDevice: false,
     };
   },
-  openIdRegistrationFinish: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    return {
-      kind: "loginSuccess",
-      userNumber: BigInt(12356),
-      connection: mockConnection,
-      showAddCurrentDevice: false,
-    };
-  },
   registrationAllowed: {
     isAllowed: true,
     allowedOrigins: ["https://identity.ic0.app"] as string[],

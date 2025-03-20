@@ -23,7 +23,6 @@ import {
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
-  MissingGoogleClientId,
   NoRegistrationFlow,
   RateLimitExceeded,
   RegisterNoSpace,
@@ -41,16 +40,14 @@ import type { UAParser } from "ua-parser-js";
 import { tempKeyWarningBox } from "../manage/tempKeys";
 import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
-import { chooseRegistrationMethod } from "./chooseRegistrationMethod";
 import { displayUserNumberWarmup } from "./finish";
-import { savePasskeyOrPin } from "./passkey";
+import { savePasskeyPinOrOpenID } from "./passkey";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
   identityRegistrationStart,
   checkCaptcha,
   identityRegistrationFinish,
-  openIdRegistrationFinish,
   storePinIdentity,
   registrationAllowed,
   pinAllowed,
@@ -87,15 +84,6 @@ export const registerFlow = async ({
     | RegisterNoSpace
     | InvalidAuthnMethod
   >;
-  openIdRegistrationFinish: () => Promise<
-    | LoginSuccess
-    | ApiError
-    | NoRegistrationFlow
-    | UnexpectedCall
-    | RegisterNoSpace
-    | InvalidAuthnMethod
-    | MissingGoogleClientId
-  >;
   storePinIdentity: (opts: {
     userNumber: bigint;
     pinIdentityMaterial: PinIdentityMaterial;
@@ -114,7 +102,6 @@ export const registerFlow = async ({
   | InvalidCaller
   | AlreadyInProgress
   | RateLimitExceeded
-  | MissingGoogleClientId
   | "canceled"
 > => {
   if (!registrationAllowed.isAllowed) {
@@ -131,46 +118,11 @@ export const registerFlow = async ({
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
-
-  // Prompt the user whether they want to use
-  // for now, this is behind a feature flag -
-  // in addition to only being shown if google is configured
-  let registrationMethodResult: "google" | "passkey" | "canceled";
-
-  if (
-    OPENID_AUTHENTICATION.isEnabled() &&
-    (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0
-  ) {
-    registrationMethodResult = await chooseRegistrationMethod();
-  } else {
-    registrationMethodResult = "passkey";
-  }
-
-  if (registrationMethodResult === "google") {
-    const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
-    if (_startResult === "canceled") {
-      return "canceled";
-    } else if (_startResult.kind !== "registrationFlowStepSuccess") {
-      return _startResult;
-    }
-
-    const openIdResult = await openIdRegistrationFinish();
-
-    if (openIdResult.kind === "loginSuccess") {
-      analytics.event("registration-openid");
-      return {
-        ...openIdResult,
-        authnMethod: "passkey", //TODO decide if we want to add openid here
-      };
-    } else {
-      return "canceled";
-    }
-  } else if (registrationMethodResult === "canceled") {
-    return "canceled";
-  }
-
-  const savePasskeyResult = await savePasskeyOrPin({
+  const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
+    googleAllowed:
+      OPENID_AUTHENTICATION.isEnabled() &&
+      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
@@ -252,9 +204,28 @@ export const registerFlow = async ({
     authnMethod: "pin" | "passkey";
   } = result_;
 
-  const startResult = await captchaIfNecessary(flowStart, checkCaptcha);
-  if (startResult === "canceled") {
-    return "canceled";
+  const startResult = await flowStart();
+  if (startResult.kind !== "registrationFlowStepSuccess") {
+    analytics.event("registration-start-error");
+    return startResult;
+  }
+  startResult satisfies RegistrationFlowStepSuccess;
+
+  if (startResult.nextStep.step === "checkCaptcha") {
+    analytics.event("registration-captcha");
+    const captchaResult = await promptCaptcha({
+      captcha_png_base64: startResult.nextStep.captcha_png_base64,
+      checkCaptcha,
+    });
+    if (captchaResult === "canceled") {
+      analytics.event("registration-captcha-cancelled");
+      return "canceled";
+    }
+    if (captchaResult.kind !== "registrationFlowStepSuccess") {
+      analytics.event("registration-captcha-error");
+      return captchaResult;
+    }
+    captchaResult satisfies RegistrationFlowStepSuccess;
   }
 
   const result = await withLoader(() =>
@@ -304,9 +275,6 @@ export const getRegisterFlowOpts = async ({
   const tempIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
-  const getGoogleClientId = () =>
-    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
-
   const registrationAllowed =
     // Allow registration in DEV mode
     anyFeatures() ||
@@ -330,11 +298,6 @@ export const getRegisterFlowOpts = async ({
         identity,
         authnMethod,
       }),
-    openIdRegistrationFinish: async () =>
-      await connection.openid_identity_registration_finish(
-        getGoogleClientId,
-        tempIdentity
-      ),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
     connection,
@@ -497,63 +460,3 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
     console.error(e);
   }
 };
-
-/**
- * Handles the captcha verification step if required by the registration flow
- * @returns The registration flow step result or "canceled" if the user canceled
- */
-async function captchaIfNecessary(
-  flowStart: () => Promise<
-    | RegistrationFlowStepSuccess
-    | ApiError
-    | InvalidCaller
-    | AlreadyInProgress
-    | RateLimitExceeded
-  >,
-  checkCaptcha: (
-    captchaSolution: string
-  ) => Promise<
-    | RegistrationFlowStepSuccess
-    | ApiError
-    | NoRegistrationFlow
-    | UnexpectedCall
-    | WrongCaptchaSolution
-  >
-): Promise<
-  | RegistrationFlowStepSuccess
-  | ApiError
-  | InvalidCaller
-  | AlreadyInProgress
-  | RateLimitExceeded
-  | NoRegistrationFlow
-  | UnexpectedCall
-  | "canceled"
-> {
-  const startResult = await flowStart();
-  if (startResult.kind !== "registrationFlowStepSuccess") {
-    analytics.event("registration-start-error");
-    return startResult;
-  }
-  startResult satisfies RegistrationFlowStepSuccess;
-
-  if (startResult.nextStep.step === "checkCaptcha") {
-    analytics.event("registration-captcha");
-    const captchaResult = await promptCaptcha({
-      captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      checkCaptcha,
-    });
-    if (captchaResult === "canceled") {
-      analytics.event("registration-captcha-cancelled");
-      return "canceled";
-    }
-    if (captchaResult.kind !== "registrationFlowStepSuccess") {
-      analytics.event("registration-captcha-error");
-      return captchaResult;
-    }
-    captchaResult satisfies RegistrationFlowStepSuccess;
-    return captchaResult;
-  }
-
-  // If no captcha was needed, return the original success result
-  return startResult;
-}
