@@ -388,7 +388,12 @@ impl Anchor {
         openid_credential: OpenIdCredential,
     ) -> Result<(), AnchorError> {
         let index = self.openid_credential_index(&openid_credential.key())?;
-        self.openid_credentials[index] = openid_credential;
+        self.openid_credentials[index] = OpenIdCredential {
+            // Don't update last usage timestamp, below `set_openid_credential_usage_timestamp`
+            // method should be used instead to update the timestamp explicitly.
+            last_usage_timestamp: self.openid_credentials[index].last_usage_timestamp,
+            ..openid_credential
+        };
         Ok(())
     }
 
