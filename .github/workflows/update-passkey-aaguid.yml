@@ -57,4 +57,4 @@ jobs:
         if: ${{ failure() }}
         with:
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          message: "Passkey AAGUID data update failed"
+          message: "Passkey AAGUID data update failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -58,4 +58,4 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "didc update failed"
+          MESSAGE: "didc update failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
