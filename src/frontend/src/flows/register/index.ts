@@ -158,6 +158,9 @@ export const registerFlow = async ({
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
         authnMethod: "pin" as const,
       };
+    } else if (savePasskeyResult === "google") {
+      // TODO: implemented in another PR, we cancel here
+      return "canceled";
     } else {
       const identity = savePasskeyResult;
       // TODO: Return something meaningful if getting the passkey identity fails
@@ -201,7 +204,7 @@ export const registerFlow = async ({
     authnMethodData: AuthnMethodData;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
-    authnMethod: "pin" | "passkey";
+    authnMethod: "pin" | "passkey" | "google";
   } = result_;
 
   const startResult = await flowStart();

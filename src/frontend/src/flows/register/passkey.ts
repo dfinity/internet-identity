@@ -121,7 +121,7 @@ export const savePasskeyPinOrOpenID = async ({
   pinAllowed: boolean;
   origin: string;
   googleAllowed: boolean;
-}): Promise<IIWebAuthnIdentity | "pin" | "canceled" | undefined> => {
+}): Promise<IIWebAuthnIdentity | "pin" | "canceled" | "google" | undefined> => {
   if (pinAllowed || googleAllowed) {
     return new Promise((resolve) => {
       return savePasskeyPage({
@@ -147,9 +147,7 @@ export const savePasskeyPinOrOpenID = async ({
         },
         constructPin: pinAllowed ? () => resolve("pin") : undefined,
         constructOpenIdGoogle: googleAllowed
-          ? () => {
-              // TODO: (in separate PR)
-            }
+          ? () => resolve("google")
           : undefined,
       });
     });
