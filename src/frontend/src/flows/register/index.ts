@@ -23,6 +23,7 @@ import {
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
+  MissingGoogleClientId,
   NoRegistrationFlow,
   RateLimitExceeded,
   RegisterNoSpace,
@@ -53,6 +54,7 @@ export const registerFlow = async ({
   pinAllowed,
   uaParser,
   googleAllowed,
+  openidIdentityRegistrationFinish,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -92,6 +94,15 @@ export const registerFlow = async ({
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
   googleAllowed: boolean;
+  openidIdentityRegistrationFinish: () => Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+    | MissingGoogleClientId
+  >;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -157,8 +168,24 @@ export const registerFlow = async ({
         authnMethod: "pin" as const,
       };
     } else if (savePasskeyResult === "google") {
-      // TODO: implemented in another PR, we cancel here
-      return "canceled";
+      const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
+      if (_startResult === "canceled") {
+        return "canceled";
+      } else if (_startResult.kind !== "registrationFlowStepSuccess") {
+        return _startResult;
+      }
+
+      const openIdResult = await openidIdentityRegistrationFinish();
+
+      if (openIdResult.kind === "loginSuccess") {
+        analytics.event("registration-openid");
+        return {
+          ...openIdResult,
+          authnMethod: "google",
+        };
+      } else {
+        return "canceled";
+      }
     } else {
       const identity = savePasskeyResult;
       // TODO: Return something meaningful if getting the passkey identity fails
@@ -189,6 +216,24 @@ export const registerFlow = async ({
 
   if (result_ === "canceled") {
     return "canceled";
+  } else if (
+    // if we have successfully authenticated with google
+    // the reason we have to return earlier is we don't actually
+    // get any authnMethodData - jwt etc is
+    "kind" in result_ &&
+    result_.kind === "loginSuccess" &&
+    result_.authnMethod === "google"
+  ) {
+    analytics.event("registration-final-success");
+    // for now we switch to passkey here so dapps don't know it's google
+    return { ...result_, authnMethod: "passkey" as const };
+  } else if ("kind" in result_ && result_.kind === "loginSuccess") {
+    // this branch is needed for typescript
+    return { ...result_, authnMethod: "passkey" as const };
+  } else if ("kind" in result_) {
+    // if openid returned some error
+    analytics.event("registration-final-error");
+    return result_;
   }
 
   const {
@@ -205,29 +250,11 @@ export const registerFlow = async ({
     authnMethod: "pin" | "passkey" | "google";
   } = result_;
 
-  const startResult = await flowStart();
-  if (startResult.kind !== "registrationFlowStepSuccess") {
-    analytics.event("registration-start-error");
-    return startResult;
-  }
-  startResult satisfies RegistrationFlowStepSuccess;
-
-  if (startResult.nextStep.step === "checkCaptcha") {
-    analytics.event("registration-captcha");
-    const captchaResult = await promptCaptcha({
-      captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      checkCaptcha,
-    });
-    if (captchaResult === "canceled") {
-      analytics.event("registration-captcha-cancelled");
-      return "canceled";
-    }
-    if (captchaResult.kind !== "registrationFlowStepSuccess") {
-      analytics.event("registration-captcha-error");
-      return captchaResult;
-    }
-    captchaResult satisfies RegistrationFlowStepSuccess;
-  }
+  const startOrCaptchaResult = await captchaIfNecessary(
+    flowStart,
+    checkCaptcha
+  );
+  if (startOrCaptchaResult === "canceled") return "canceled";
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
@@ -267,9 +294,11 @@ export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 export const getRegisterFlowOpts = async ({
   connection,
   allowPinRegistration,
+  getGoogleClientId,
 }: {
   connection: Connection;
   allowPinRegistration: boolean;
+  getGoogleClientId: () => string | undefined;
 }): Promise<RegisterFlowOpts> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
@@ -304,6 +333,11 @@ export const getRegisterFlowOpts = async ({
     googleAllowed:
       OPENID_AUTHENTICATION.isEnabled() &&
       (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
+    openidIdentityRegistrationFinish: () =>
+      connection.openid_identity_registration_finish(
+        getGoogleClientId,
+        tempIdentity
+      ),
   };
 };
 
@@ -463,3 +497,63 @@ export const loadUAParser = async (): Promise<typeof UAParser | undefined> => {
     console.error(e);
   }
 };
+
+/**
+ * Handles the captcha verification step if required by the registration flow
+ * @returns The registration flow step result or "canceled" if the user canceled
+ */
+async function captchaIfNecessary(
+  flowStart: () => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | InvalidCaller
+    | AlreadyInProgress
+    | RateLimitExceeded
+  >,
+  checkCaptcha: (
+    captchaSolution: string
+  ) => Promise<
+    | RegistrationFlowStepSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | WrongCaptchaSolution
+  >
+): Promise<
+  | RegistrationFlowStepSuccess
+  | ApiError
+  | InvalidCaller
+  | AlreadyInProgress
+  | RateLimitExceeded
+  | NoRegistrationFlow
+  | UnexpectedCall
+  | "canceled"
+> {
+  const startResult = await flowStart();
+  if (startResult.kind !== "registrationFlowStepSuccess") {
+    analytics.event("registration-start-error");
+    return startResult;
+  }
+  startResult satisfies RegistrationFlowStepSuccess;
+
+  if (startResult.nextStep.step === "checkCaptcha") {
+    analytics.event("registration-captcha");
+    const captchaResult = await promptCaptcha({
+      captcha_png_base64: startResult.nextStep.captcha_png_base64,
+      checkCaptcha,
+    });
+    if (captchaResult === "canceled") {
+      analytics.event("registration-captcha-cancelled");
+      return "canceled";
+    }
+    if (captchaResult.kind !== "registrationFlowStepSuccess") {
+      analytics.event("registration-captcha-error");
+      return captchaResult;
+    }
+    captchaResult satisfies RegistrationFlowStepSuccess;
+    return captchaResult;
+  }
+
+  // If no captcha was needed, return the original success result
+  return startResult;
+}

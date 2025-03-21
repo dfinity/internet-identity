@@ -125,6 +125,16 @@ const registerFlowOpts: RegisterFlowOpts = {
   pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
   googleAllowed: true,
+  openidIdentityRegistrationFinish: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return {
+      kind: "loginSuccess",
+      userNumber: BigInt(12356),
+      connection: mockConnection,
+      showAddCurrentDevice: false,
+      authnMethod: "google",
+    };
+  },
 } as const;
 
 export const iiFlows: Record<string, () => void> = {
