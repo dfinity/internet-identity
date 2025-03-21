@@ -52,7 +52,7 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
-  connection,
+  googleAllowed,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -91,7 +91,7 @@ export const registerFlow = async ({
   registrationAllowed: { isAllowed: boolean; allowedOrigins: string[] };
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
-  connection: Connection;
+  googleAllowed: boolean;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -120,9 +120,7 @@ export const registerFlow = async ({
   const deviceOrigin = window.location.origin;
   const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
-    googleAllowed:
-      OPENID_AUTHENTICATION.isEnabled() &&
-      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
+    googleAllowed,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
@@ -303,7 +301,9 @@ export const getRegisterFlowOpts = async ({
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
-    connection,
+    googleAllowed:
+      OPENID_AUTHENTICATION.isEnabled() &&
+      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
   };
 };
 
