@@ -13,7 +13,7 @@ export class Funnel<T extends { [K in keyof T]: string }> {
 
   init(): void {
     analytics.event("start-" + this.name);
-    
+
     // Start window session tracking
     this.cleanupSession = trackWindowSession({
       onEnterSession: () => {

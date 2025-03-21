@@ -25,7 +25,7 @@ enum LoginEvents {
   ExistingUserPasskeySuccess = "login-existing-user-passkey-success",
   ExistingUserOpenId = "login-existing-user-openid",
   ExistingUserOpenIdSuccess = "login-existing-user-openid-success",
-  RecoveryStart = "login-recovery-start"
+  RecoveryStart = "login-recovery-start",
 }
 
 describe("Funnel", () => {
@@ -65,7 +65,9 @@ describe("Funnel", () => {
 
   it("trigger() - tracks new registration start event", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-new-registration-start");
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-new-registration-start"
+    );
   });
 
   it("trigger() - tracks complete passkey login flow", () => {
@@ -76,7 +78,9 @@ describe("Funnel", () => {
     expect(analytics.event).toHaveBeenCalledWith("login-existing-user-passkey");
 
     funnel.trigger(LoginEvents.ExistingUserPasskeySuccess);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-passkey-success");
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-passkey-success"
+    );
   });
 
   it("trigger() - tracks complete OpenID login flow", () => {
@@ -87,7 +91,9 @@ describe("Funnel", () => {
     expect(analytics.event).toHaveBeenCalledWith("login-existing-user-openid");
 
     funnel.trigger(LoginEvents.ExistingUserOpenIdSuccess);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-openid-success");
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-openid-success"
+    );
   });
 
   it("trigger() - tracks recovery start event", () => {
