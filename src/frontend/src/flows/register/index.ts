@@ -4,6 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$src/crypto/pinIdentity";
+import { OPENID_AUTHENTICATION } from "$src/featureFlags";
 import { anyFeatures } from "$src/features";
 import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
@@ -40,7 +41,7 @@ import { tempKeyWarningBox } from "../manage/tempKeys";
 import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
-import { savePasskeyOrPin } from "./passkey";
+import { savePasskeyPinOrOpenID } from "./passkey";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -51,6 +52,7 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
+  googleAllowed,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -89,6 +91,7 @@ export const registerFlow = async ({
   registrationAllowed: { isAllowed: boolean; allowedOrigins: string[] };
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
+  googleAllowed: boolean;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -115,8 +118,9 @@ export const registerFlow = async ({
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
-  const savePasskeyResult = await savePasskeyOrPin({
+  const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
+    googleAllowed,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
@@ -152,6 +156,9 @@ export const registerFlow = async ({
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
         authnMethod: "pin" as const,
       };
+    } else if (savePasskeyResult === "google") {
+      // TODO: implemented in another PR, we cancel here
+      return "canceled";
     } else {
       const identity = savePasskeyResult;
       // TODO: Return something meaningful if getting the passkey identity fails
@@ -195,7 +202,7 @@ export const registerFlow = async ({
     authnMethodData: AuthnMethodData;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
-    authnMethod: "pin" | "passkey";
+    authnMethod: "pin" | "passkey" | "google";
   } = result_;
 
   const startResult = await flowStart();
@@ -294,6 +301,9 @@ export const getRegisterFlowOpts = async ({
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
+    googleAllowed:
+      OPENID_AUTHENTICATION.isEnabled() &&
+      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
   };
 };
 

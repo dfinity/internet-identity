@@ -124,6 +124,7 @@ const registerFlowOpts: RegisterFlowOpts = {
   },
   pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
+  googleAllowed: true,
 } as const;
 
 export const iiFlows: Record<string, () => void> = {

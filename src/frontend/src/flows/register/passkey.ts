@@ -21,12 +21,14 @@ import copyJson from "./passkey.json";
 const savePasskeyTemplate = ({
   constructPasskey,
   constructPin,
+  constructOpenIdGoogle,
   i18n,
   cancel,
   scrollToTop = false,
 }: {
   constructPasskey: () => void;
   constructPin?: () => void;
+  constructOpenIdGoogle?: () => void;
   i18n: I18n;
   cancel: () => void;
   /* put the page into view */
@@ -39,7 +41,17 @@ const savePasskeyTemplate = ({
       data-action="construct-pin-identity"
       class="c-button c-button--secondary"
     >
-      ${copy.without_passkey}
+      ${copy.with_pin}
+    </button>
+  `;
+
+  const createOpenIdButton = (constructOpenIdGoogle: () => void) => html`
+    <button
+      @click=${() => constructOpenIdGoogle()}
+      data-action="construct-openid-identity"
+      class="c-button c-button--secondary"
+    >
+      ${copy.openid_google}
     </button>
   `;
 
@@ -59,6 +71,9 @@ const savePasskeyTemplate = ({
     >
       ${copy.save_passkey}
     </button>
+    ${nonNullish(constructOpenIdGoogle)
+      ? createOpenIdButton(constructOpenIdGoogle)
+      : ""}
     ${nonNullish(constructPin) ? createPinButton(constructPin) : ""}
     <button
       @click=${() => cancel()}
@@ -98,14 +113,16 @@ const savePasskeyTemplate = ({
 export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
 // Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
-export const savePasskeyOrPin = async ({
+export const savePasskeyPinOrOpenID = async ({
   pinAllowed,
   origin,
+  googleAllowed,
 }: {
   pinAllowed: boolean;
   origin: string;
-}): Promise<IIWebAuthnIdentity | "pin" | "canceled" | undefined> => {
-  if (pinAllowed) {
+  googleAllowed: boolean;
+}): Promise<IIWebAuthnIdentity | "pin" | "canceled" | "google" | undefined> => {
+  if (pinAllowed || googleAllowed) {
     return new Promise((resolve) => {
       return savePasskeyPage({
         i18n: new I18n(),
@@ -129,6 +146,9 @@ export const savePasskeyOrPin = async ({
           }
         },
         constructPin: pinAllowed ? () => resolve("pin") : undefined,
+        constructOpenIdGoogle: googleAllowed
+          ? () => resolve("google")
+          : undefined,
       });
     });
   }
