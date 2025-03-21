@@ -39,13 +39,11 @@ impl OpenIdCredential {
     pub fn key(&self) -> OpenIdCredentialKey {
         (self.iss.clone(), self.sub.clone())
     }
+
     pub fn principal(&self) -> Principal {
-        let public_key = self.public_key();
-        Principal::self_authenticating(public_key)
-    }
-    pub fn public_key(&self) -> PublicKey {
         let seed = calculate_delegation_seed(&self.aud, &self.key());
-        der_encode_canister_sig_key(seed.to_vec()).into()
+        let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
+        Principal::self_authenticating(public_key)
     }
 
     pub async fn prepare_jwt_delegation(&self, session_key: SessionKey) -> (UserKey, Timestamp) {
@@ -58,8 +56,6 @@ impl OpenIdCredential {
             add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
         });
         update_root_hash();
-
-        //TODO: bookkeeping needs to be added in separate PR.
 
         (
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),

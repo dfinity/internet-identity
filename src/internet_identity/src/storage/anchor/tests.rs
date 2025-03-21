@@ -2,7 +2,8 @@ use crate::openid::OpenIdCredential;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, Purpose, Timestamp,
+    AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, MetadataEntryV2, Purpose,
+    Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -548,7 +549,10 @@ fn should_update_openid_credential() {
     let openid_credential_0 = openid_credential(0);
     let openid_credential_1 = openid_credential(1);
     let mut openid_credential_1_updated = openid_credential_1.clone();
-    openid_credential_1_updated.last_usage_timestamp += 1;
+    openid_credential_1_updated.metadata = HashMap::from([(
+        "name".to_string(),
+        MetadataEntryV2::String("Updated Name".to_string()),
+    )]);
     let openid_credential_2 = openid_credential(2);
 
     // Check if correct OpenID credential is updated

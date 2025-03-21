@@ -1,9 +1,10 @@
+use super::super::storage::anchor::Device;
 use crate::state;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActivityContext;
 use crate::stats::activity_stats::activity_counter::ActivityCounter;
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::Anchor;
 use candid::{CandidType, Deserialize};
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{AuthorizationKey, Timestamp};
 
 pub mod activity_counter;
 mod maintenance;
@@ -82,27 +83,29 @@ pub struct OngoingActivityStats<T: ActivityCounter> {
     pub monthly_events: Vec<T>,
 }
 
-pub fn update_activity_stats(anchor: &Anchor, current_device: &Device) {
+pub fn update_activity_stats(anchor: &Anchor, current_authorization_key: &AuthorizationKey) {
     state::persistent_state_mut(|persistent_state| {
         // Active anchor stats across all domains
         persistent_state
             .active_anchor_stats
             .update_counters(&anchor.last_activity());
 
-        // Active anchor stats, II domains only
-        if let Some(domain) = current_device.ii_domain() {
-            let context = DomainActivityContext {
-                anchor,
-                current_domain: domain,
-            };
-            persistent_state
-                .domain_active_anchor_stats
-                .update_counters(&context);
-
-            // Active authn methods stats, II domains only
-            persistent_state
-                .active_authn_method_stats
-                .update_counters(&current_device);
+        // Anchor device activity across II domains
+        if let AuthorizationKey::DeviceKey(device_key) = current_authorization_key {
+            if let Some(domain) = anchor.device(device_key).and_then(Device::ii_domain) {
+                let context = DomainActivityContext {
+                    anchor,
+                    current_domain: domain,
+                };
+                persistent_state
+                    .domain_active_anchor_stats
+                    .update_counters(&context);
+            }
         }
-    })
+
+        // Authentication stats
+        persistent_state
+            .active_authn_method_stats
+            .update_counters(&(anchor, current_authorization_key));
+    });
 }
