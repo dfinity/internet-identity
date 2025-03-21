@@ -214,17 +214,13 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             let open_id_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
-            let add_credential_operation =
+            let _add_credential_operation =
                 anchor_management::add_openid_credential(&mut identity, open_id_credential.clone())
                     .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             //TODO: add activity bookkeeping
 
-            let Operation::AddOpenIdCredential { iss } = add_credential_operation else {
-                unreachable!()
-            };
-
-            Operation::RegisterAnchorWithOpenIdCredential { iss }
+            Operation::RegisterAnchorWithOpenIdCredential { iss: open_id_credential.iss }
         }
     };
 
