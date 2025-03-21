@@ -789,7 +789,7 @@ vi.mock("$src/utils/openID", () => ({
 }));
 
 vi.mock("$src/components/loader", () => ({
-  withLoader: (fn: () => Promise<any>) => fn(),
+  withLoader: <T>(fn: () => Promise<T>) => fn(),
 }));
 
 describe("openid_identity_registration_finish", () => {
@@ -798,8 +798,7 @@ describe("openid_identity_registration_finish", () => {
     getPublicKey: () => ({
       toDer: () => new Uint8Array([1, 2, 3]).buffer,
     }),
-    sign: (blob: ArrayBuffer) =>
-      Promise.resolve(new Uint8Array([4, 5, 6]).buffer),
+    sign: () => Promise.resolve(new Uint8Array([4, 5, 6]).buffer),
   } as unknown as SignIdentity;
 
   beforeEach(() => {
