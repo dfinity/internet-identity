@@ -220,7 +220,9 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
 
             //TODO: add activity bookkeeping
 
-            Operation::RegisterAnchorWithOpenIdCredential { iss: open_id_credential.iss }
+            Operation::RegisterAnchorWithOpenIdCredential {
+                iss: open_id_credential.iss,
+            }
         }
     };
 
