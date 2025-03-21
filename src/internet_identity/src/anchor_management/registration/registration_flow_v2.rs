@@ -5,7 +5,7 @@ use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{self, activity_bookkeeping, post_operation_bookkeeping};
 use crate::state::flow_states::RegistrationFlowState;
-use crate::storage::anchor::{self, Device};
+use crate::storage::anchor::Device;
 use crate::{openid, state};
 use candid::Principal;
 use ic_cdk::api::time;
