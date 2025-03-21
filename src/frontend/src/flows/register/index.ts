@@ -224,6 +224,7 @@ export const registerFlow = async ({
     result_.kind === "loginSuccess" &&
     result_.authnMethod === "google"
   ) {
+    analytics.event("registration-final-success");
     // for now we switch to passkey here so dapps don't know it's google
     return { ...result_, authnMethod: "passkey" as const };
   } else if ("kind" in result_ && result_.kind === "loginSuccess") {
@@ -231,6 +232,7 @@ export const registerFlow = async ({
     return { ...result_, authnMethod: "passkey" as const };
   } else if ("kind" in result_) {
     // if openid returned some error
+    analytics.event("registration-final-error");
     return result_;
   }
 
@@ -248,29 +250,11 @@ export const registerFlow = async ({
     authnMethod: "pin" | "passkey" | "google";
   } = result_;
 
-  const startResult = await flowStart();
-  if (startResult.kind !== "registrationFlowStepSuccess") {
-    analytics.event("registration-start-error");
-    return startResult;
-  }
-  startResult satisfies RegistrationFlowStepSuccess;
-
-  if (startResult.nextStep.step === "checkCaptcha") {
-    analytics.event("registration-captcha");
-    const captchaResult = await promptCaptcha({
-      captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      checkCaptcha,
-    });
-    if (captchaResult === "canceled") {
-      analytics.event("registration-captcha-cancelled");
-      return "canceled";
-    }
-    if (captchaResult.kind !== "registrationFlowStepSuccess") {
-      analytics.event("registration-captcha-error");
-      return captchaResult;
-    }
-    captchaResult satisfies RegistrationFlowStepSuccess;
-  }
+  const startOrCaptchaResult = await captchaIfNecessary(
+    flowStart,
+    checkCaptcha
+  );
+  if (startOrCaptchaResult === "canceled") return "canceled";
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
