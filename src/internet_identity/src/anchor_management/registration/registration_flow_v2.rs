@@ -3,7 +3,7 @@ use crate::anchor_management::registration::captcha::{
 };
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
-use crate::anchor_management::{self, activity_bookkeeping, post_operation_bookkeeping};
+use crate::anchor_management::{add_openid_credential, activity_bookkeeping, post_operation_bookkeeping};
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
 use crate::{openid, state};
@@ -214,7 +214,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             let open_id_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
-                anchor_management::add_openid_credential(&mut identity, open_id_credential.clone())
+                add_openid_credential(&mut identity, open_id_credential.clone())
                     .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             //TODO: add activity bookkeeping
