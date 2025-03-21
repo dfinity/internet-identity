@@ -113,6 +113,7 @@ export const registerFlow = async ({
   | InvalidCaller
   | AlreadyInProgress
   | RateLimitExceeded
+  | MissingGoogleClientId
   | "canceled"
 > => {
   if (!registrationAllowed.isAllowed) {
@@ -184,7 +185,7 @@ export const registerFlow = async ({
           authnMethod: "google",
         };
       } else {
-        return "canceled";
+        return openIdResult;
       }
     } else {
       const identity = savePasskeyResult;
