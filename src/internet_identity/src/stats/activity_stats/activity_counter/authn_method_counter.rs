@@ -62,7 +62,7 @@ impl ActivityCounter for AuthnMethodCounter {
         // only count authentications on devices that have not already been counted
         // i.e. the last usage timestamp is before the start of the window
         if let Some(timestamp) = last_usage_timestamp {
-            if timestamp > self.start_timestamp {
+            if timestamp >= self.start_timestamp {
                 return;
             }
         }
