@@ -4,7 +4,6 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::openid::OpenIdCredentialKey;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -776,13 +775,13 @@ mod v2_api {
 mod openid_api {
     use crate::anchor_management::{
         add_openid_credential, lookup_anchor_with_openid_credential, registration,
-        remove_openid_credential,
+        remove_openid_credential, update_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
-        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
     };
     use ic_cdk::caller;
@@ -860,6 +859,14 @@ mod openid_api {
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
+        // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
+        let mut anchor = state::anchor(anchor_number);
+        update_openid_credential(&mut anchor, openid_credential.clone())
+            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+        state::storage_borrow_mut(|storage| storage.write(anchor))
+            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
         let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
 

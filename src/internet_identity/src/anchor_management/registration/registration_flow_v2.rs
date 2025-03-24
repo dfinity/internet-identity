@@ -15,9 +15,10 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData, DeviceData,
-    DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError,
-    IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger,
+    AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
+    DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult,
+    IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep,
+    StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -205,7 +206,10 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-            activity_bookkeeping(&mut identity, &device.pubkey);
+            activity_bookkeeping(
+                &mut identity,
+                &AuthorizationKey::DeviceKey(device.pubkey.clone()),
+            );
 
             Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),
@@ -213,16 +217,18 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
             let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
-            let open_id_credential =
+            let openid_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
-            add_openid_credential(&mut identity, open_id_credential.clone())
+            add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-
-            //TODO: add activity bookkeeping
+            activity_bookkeeping(
+                &mut identity,
+                &AuthorizationKey::OpenIdCredentialKey(openid_credential.key()),
+            );
 
             Operation::RegisterAnchorWithOpenIdCredential {
-                iss: open_id_credential.iss,
+                iss: openid_credential.iss,
             }
         }
     };
