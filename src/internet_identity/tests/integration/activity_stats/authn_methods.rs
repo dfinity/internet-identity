@@ -1,14 +1,16 @@
+use crate::openid;
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, create_identity_with_openid_credential, test_authn_method,
 };
+use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
-    assert_labelled_metric, assert_metric, env, get_metrics, install_ii_canister,
+    assert_labelled_metric, assert_metric, env, get_metrics, install_ii_canister, time,
     upgrade_ii_canister, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn,
+    AuthnMethodSecuritySettings, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
@@ -240,6 +242,47 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
     );
 
     Ok(())
+}
+
+/// Tests that active OpenID authn_methods are counted correctly.
+#[test]
+fn should_report_active_openid_authn_methods() {
+    // Create II instance that mocks Google certs
+    let env = env();
+    let canister_id = openid::setup_canister(&env);
+    api::init_salt(&env, canister_id).unwrap();
+
+    // OpenID test data and fetch Google certs (mock)
+    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
+        openid::openid_test_data();
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    // Ensure stats are initially absent
+    assert!(
+        !get_metrics(&env, canister_id).contains("internet_identity_daily_active_authn_methods")
+    );
+
+    // Create account with Google OpenID
+    create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
+
+    // Check daily stats, some activity is required first to update the stats
+    env.advance_time(Duration::from_secs(DAY_SECONDS));
+    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_daily_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",
+        1f64,
+    );
+
+    // Check monthly stats, some activity is required first to update the stats
+    env.advance_time(Duration::from_secs(MONTH_SECONDS - DAY_SECONDS));
+    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_monthly_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",
+        1f64,
+    );
 }
 
 fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {

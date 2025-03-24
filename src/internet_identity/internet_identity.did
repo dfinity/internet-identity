@@ -362,7 +362,7 @@ type OpenIdCredential = record {
     iss : Iss;
     sub : Sub;
     aud : Aud;
-    last_usage_timestamp : Timestamp;
+    last_usage_timestamp : opt Timestamp;
     metadata : MetadataMapV2;
 };
 

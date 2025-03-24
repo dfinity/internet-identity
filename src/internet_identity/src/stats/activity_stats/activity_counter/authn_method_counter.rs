@@ -56,13 +56,13 @@ impl ActivityCounter for AuthnMethodCounter {
                 .and_then(|d| d.last_usage_timestamp),
             AuthorizationKey::OpenIdCredentialKey(openid_credential_key) => anchor
                 .openid_credential(openid_credential_key)
-                .map(|c| c.last_usage_timestamp),
+                .and_then(|c| c.last_usage_timestamp),
         };
 
         // only count authentications on devices that have not already been counted
         // i.e. the last usage timestamp is before the start of the window
         if let Some(timestamp) = last_usage_timestamp {
-            if timestamp >= self.start_timestamp {
+            if timestamp > self.start_timestamp {
                 return;
             }
         }
@@ -93,7 +93,9 @@ impl ActivityCounter for AuthnMethodCounter {
             }
             AuthorizationKey::OpenIdCredentialKey((iss, _)) => {
                 if let Some(map) = &mut self.openid_credential_auth_counter {
-                    map.insert(iss.clone(), map.get(iss).unwrap_or(&0) + 1);
+                    map.entry(iss.clone())
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
                 }
             }
         }

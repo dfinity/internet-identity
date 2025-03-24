@@ -10,7 +10,10 @@ pub struct OpenIdCredentialData {
     pub iss: String,
     pub sub: String,
     pub aud: String,
-    pub last_usage_timestamp: Timestamp,
+    // Must be optional to differentiate between linked anchor and used anchor,
+    // it's not possible to keep track of registrations in bookkeeping
+    // authn method stats if this value is already set to any value.
+    pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
 }
 

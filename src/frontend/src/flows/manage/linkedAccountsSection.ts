@@ -97,10 +97,10 @@ export const accountItem = ({
     },
   ];
 
-  const lastUsageTimeStamp = new Date(
-    Number(credential.last_usage_timestamp / BigInt(1000000))
-  );
-  const lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
+  const lastUsageTimeStamp = credential.last_usage_timestamp[0];
+  const lastUsageFormattedString = nonNullish(lastUsageTimeStamp)
+    ? formatLastUsage(new Date(Number(lastUsageTimeStamp / BigInt(1000000))))
+    : undefined;
   const name = getMetadataString(credential.metadata, "name");
   const email = getMetadataString(credential.metadata, "email");
   const picture = getMetadataString(credential.metadata, "picture");
@@ -142,9 +142,11 @@ export const accountItem = ({
                   >
                   <span class="t-muted">${copy.current_account_label}</span>
                 </div>`
-              : html`<div class="t-muted">
+              : nonNullish(lastUsageFormattedString)
+              ? html`<div class="t-muted">
                   ${copy.last_used}: ${lastUsageFormattedString}
                 </div>`
+              : ""
           }
         </div>
       </div>
