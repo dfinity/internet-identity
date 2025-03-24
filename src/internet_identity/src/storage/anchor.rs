@@ -391,6 +391,12 @@ impl Anchor {
         self.openid_credentials[index] = OpenIdCredential {
             // Don't update last usage timestamp, below `set_openid_credential_usage_timestamp`
             // method should be used instead to update the timestamp explicitly.
+            //
+            // This is to make sure that only bookkeeping updates the last usage timestamp at the
+            // correct moment. If the timestamp is updated at the wrong moment, the activity stats
+            // implementation will likely break and report incorrect OpenID credential usage.
+            //
+            // This is in line with the behavior of last usage timestamp in devices.
             last_usage_timestamp: self.openid_credentials[index].last_usage_timestamp,
             ..openid_credential
         };

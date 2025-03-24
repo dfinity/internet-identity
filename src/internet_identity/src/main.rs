@@ -860,7 +860,8 @@ mod openid_api {
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        // Update anchor with latest OpenID credential from JWT so latest metadata is stored
+        // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
+        // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
         let mut anchor = state::anchor(anchor_number);
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
