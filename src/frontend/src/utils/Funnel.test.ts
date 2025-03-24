@@ -18,15 +18,15 @@ const mockVisibilityState = (state: "hidden" | "visible") => {
   });
 };
 
-enum LoginEvents {
-  NewRegistrationStart = "login-new-registration-start",
-  ExistingUserStart = "login-existing-user-start",
-  ExistingUserPasskey = "login-existing-user-passkey",
-  ExistingUserPasskeySuccess = "login-existing-user-passkey-success",
-  ExistingUserOpenId = "login-existing-user-openid",
-  ExistingUserOpenIdSuccess = "login-existing-user-openid-success",
-  RecoveryStart = "login-recovery-start",
-}
+const LoginEvents = {
+  NewRegistrationStart: "login-new-registration-start",
+  ExistingUserStart: "login-existing-user-start",
+  ExistingUserPasskey: "login-existing-user-passkey",
+  ExistingUserPasskeySuccess: "login-existing-user-passkey-success",
+  ExistingUserOpenId: "login-existing-user-openid",
+  ExistingUserOpenIdSuccess: "login-existing-user-openid-success",
+  RecoveryStart: "login-recovery-start",
+} as const;
 
 describe("Funnel", () => {
   let funnel: Funnel<typeof LoginEvents>;

@@ -1,7 +1,7 @@
 import { analytics } from "./analytics";
 import { trackWindowSession } from "./trackWindowSession";
 
-export class Funnel<T extends { [K in keyof T]: string }> {
+export class Funnel<T extends Record<string, string>> {
   #name: string;
   #cleanupSession?: () => void;
 
