@@ -2,6 +2,7 @@ use crate::openid;
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_openid_credential, test_authn_method,
 };
+use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
@@ -264,7 +265,28 @@ fn should_report_active_openid_authn_methods() {
     );
 
     // Create account with Google OpenID
-    create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
+    let identity_number =
+        create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
+
+    // Get OpenID delegation principal
+    let delegation_principal = Principal::self_authenticating(
+        api::openid_prepare_delegation(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &ByteBuf::from([0u8; 32]),
+        )
+        .unwrap()
+        .unwrap()
+        .user_key,
+    );
+
+    // Repeated activity within the same period should not increase the counter
+    api_v2::identity_info(&env, canister_id, delegation_principal, identity_number)
+        .unwrap()
+        .unwrap();
 
     // Check daily stats, some activity is required first to update the stats
     env.advance_time(Duration::from_secs(DAY_SECONDS));
