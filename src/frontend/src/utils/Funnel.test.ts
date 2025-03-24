@@ -32,7 +32,7 @@ describe("Funnel", () => {
   let funnel: Funnel<typeof LoginEvents>;
 
   beforeEach(() => {
-    funnel = new Funnel("login", LoginEvents);
+    funnel = new Funnel("login");
     vi.clearAllMocks();
   });
 
