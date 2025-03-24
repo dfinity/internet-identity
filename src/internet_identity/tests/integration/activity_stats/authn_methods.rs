@@ -256,8 +256,7 @@ fn should_report_active_openid_authn_methods() {
     // OpenID test data and fetch Google certs (mock)
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
         openid::openid_test_data();
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    env.advance_time(Duration::from_millis(test_time) - Duration::from_nanos(time(&env)));
 
     // Ensure stats are initially absent
     assert!(
