@@ -102,6 +102,9 @@ export const authenticateBox = async ({
   authnMethod: "pin" | "passkey" | "recovery";
   showAddCurrentDevice: boolean;
 }> => {
+  const getGoogleClientId = () =>
+    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
+
   const promptAuth = async (autoSelectIdentity?: bigint) =>
     authenticateBoxFlow<PinIdentityMaterial>({
       i18n,
@@ -114,6 +117,7 @@ export const authenticateBox = async ({
       registerFlowOpts: await getRegisterFlowOpts({
         connection,
         allowPinRegistration,
+        getGoogleClientId,
       }),
       verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
         pinIdentityAuthenticatorValidity({

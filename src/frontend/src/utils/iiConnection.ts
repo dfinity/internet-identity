@@ -16,6 +16,7 @@ import {
   IdentityInfo,
   IdentityInfoError,
   IdentityMetadataReplaceError,
+  IdRegFinishError,
   InternetIdentityInit,
   JWT,
   KeyType,
@@ -40,7 +41,12 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$src/repositories/identityMetadata";
-import { decodeJWT } from "$src/utils/openID";
+import {
+  createAnonymousNonce,
+  createGoogleRequestConfig,
+  decodeJWT,
+  requestJWT,
+} from "$src/utils/openID";
 import {
   CanisterError,
   diagnosticInfo,
@@ -344,6 +350,76 @@ export class Connection {
       };
     }
 
+    return this.handleIdentityFinishErrors(finishResponse);
+  };
+
+  openid_identity_registration_finish = async (
+    getGoogleClientId: () => string | undefined,
+    identity: SignIdentity
+  ): Promise<
+    | LoginSuccess
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod
+    | MissingGoogleClientId
+  > => {
+    const delegationIdentity = await this.requestFEDelegation(identity);
+    const actor = await this.createActor(delegationIdentity);
+    const googleClientId = getGoogleClientId();
+    const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
+
+    if (isNullish(googleClientId)) return { kind: "missingGoogleClientId" };
+
+    const googleRequestConfig = createGoogleRequestConfig(googleClientId);
+
+    const jwt = await withLoader(() =>
+      requestJWT(googleRequestConfig, {
+        mediation: "required",
+        nonce,
+      })
+    );
+
+    let finishResponse;
+    try {
+      finishResponse = await actor.openid_identity_registration_finish({
+        jwt,
+        salt,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        return { kind: "apiError", error };
+      } else {
+        return {
+          kind: "apiError",
+          error: new Error("Unknown error when registering"),
+        };
+      }
+    }
+
+    if ("Ok" in finishResponse) {
+      const userNumber = finishResponse.Ok.identity_number;
+
+      return {
+        kind: "loginSuccess",
+        connection: await this.fromJwt(jwt, salt, identity),
+        userNumber,
+        showAddCurrentDevice: false,
+      };
+    }
+
+    return this.handleIdentityFinishErrors(finishResponse);
+  };
+
+  private handleIdentityFinishErrors(finishResponse: {
+    Err: IdRegFinishError;
+  }):
+    | ApiError
+    | NoRegistrationFlow
+    | UnexpectedCall
+    | RegisterNoSpace
+    | InvalidAuthnMethod {
     if ("Err" in finishResponse) {
       const err = finishResponse.Err;
       if ("InvalidAuthnMethod" in err) {
@@ -374,7 +450,7 @@ export class Connection {
     }
     console.error("unexpected check_captcha response", finishResponse);
     throw Error("unexpected check_captcha response");
-  };
+  }
 
   login = async (
     userNumber: bigint

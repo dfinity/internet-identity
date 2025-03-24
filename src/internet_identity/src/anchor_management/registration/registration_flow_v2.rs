@@ -3,7 +3,9 @@ use crate::anchor_management::registration::captcha::{
 };
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
-use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
+use crate::anchor_management::{
+    activity_bookkeeping, add_openid_credential, post_operation_bookkeeping,
+};
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
 use crate::{openid, state};
@@ -218,8 +220,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             let openid_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
-            identity
-                .add_openid_credential(openid_credential.clone())
+            add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             activity_bookkeeping(
                 &mut identity,
@@ -227,7 +228,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             );
 
             Operation::RegisterAnchorWithOpenIdCredential {
-                iss: openid_credential.iss.clone(),
+                iss: openid_credential.iss,
             }
         }
     };
