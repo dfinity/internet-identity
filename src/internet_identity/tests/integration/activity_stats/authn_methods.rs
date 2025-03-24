@@ -11,7 +11,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
+    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn,
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
