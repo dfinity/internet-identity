@@ -643,7 +643,7 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         iss: "https://example.com".into(),
         sub: n.to_string(),
         aud: "example-aud".into(),
-        last_usage_timestamp: n.into(),
+        last_usage_timestamp: Some(n.into()),
         metadata: HashMap::default(),
     }
 }

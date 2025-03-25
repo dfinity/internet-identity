@@ -246,7 +246,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
         iss: "https://example.com".into(),
         sub: "example-sub".into(),
         aud: "example-aud".into(),
-        last_usage_timestamp: 0,
+        last_usage_timestamp: None,
         metadata: HashMap::default(),
     };
 

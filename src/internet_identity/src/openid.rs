@@ -31,7 +31,7 @@ pub struct OpenIdCredential {
     pub iss: Iss,
     pub sub: Sub,
     pub aud: Aud,
-    pub last_usage_timestamp: Timestamp,
+    pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
 }
 
@@ -192,7 +192,7 @@ impl ExampleProvider {
             iss: self.issuer().into(),
             sub: "example-sub".into(),
             aud: "example-aud".into(),
-            last_usage_timestamp: 0,
+            last_usage_timestamp: None,
             metadata: HashMap::new(),
         }
     }

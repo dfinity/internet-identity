@@ -220,7 +220,7 @@ export const idlFactory = ({ IDL }) => {
     'iss' : Iss,
     'sub' : Sub,
     'metadata' : MetadataMapV2,
-    'last_usage_timestamp' : Timestamp,
+    'last_usage_timestamp' : IDL.Opt(Timestamp),
   });
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),

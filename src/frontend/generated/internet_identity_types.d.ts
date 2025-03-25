@@ -261,7 +261,7 @@ export interface OpenIdCredential {
   'iss' : Iss,
   'sub' : Sub,
   'metadata' : MetadataMapV2,
-  'last_usage_timestamp' : Timestamp,
+  'last_usage_timestamp' : [] | [Timestamp],
 }
 export type OpenIdCredentialAddError = {
     'OpenIdCredentialAlreadyRegistered' : null

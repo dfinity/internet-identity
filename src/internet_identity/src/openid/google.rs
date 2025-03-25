@@ -124,7 +124,7 @@ impl OpenIdProvider for Provider {
             iss: claims.iss,
             sub: claims.sub,
             aud: claims.aud,
-            last_usage_timestamp: time(),
+            last_usage_timestamp: None,
             metadata,
         })
     }
@@ -412,7 +412,7 @@ fn should_return_credential() {
         iss: claims.iss,
         sub: claims.sub,
         aud: claims.aud,
-        last_usage_timestamp: time(),
+        last_usage_timestamp: None,
         metadata: HashMap::from([
             (
                 "email".into(),

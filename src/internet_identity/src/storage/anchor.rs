@@ -281,7 +281,7 @@ impl Anchor {
             .chain(
                 self.openid_credentials
                     .iter()
-                    .map(|c| c.last_usage_timestamp),
+                    .filter_map(|c| c.last_usage_timestamp),
             )
             .max()
     }
@@ -412,7 +412,7 @@ impl Anchor {
         else {
             return Err(AnchorError::OpenIdCredentialNotFound);
         };
-        openid_credential.last_usage_timestamp = timestamp;
+        openid_credential.last_usage_timestamp = Some(timestamp);
         Ok(())
     }
 
