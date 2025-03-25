@@ -246,6 +246,7 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
 }
 
 /// Tests that active OpenID authn_methods are counted correctly.
+/// TODO: ID-155 Create OpenID mock data on-demand and use this instead in unit/integration tests
 #[test]
 fn should_report_active_openid_authn_methods() {
     // Create II instance that mocks Google certs
