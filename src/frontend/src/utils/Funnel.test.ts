@@ -105,12 +105,38 @@ describe("Funnel", () => {
     funnel.init();
     funnel.close();
 
+    expect(analytics.event).toHaveBeenCalledTimes(2); // the start-login and end-login events
+
     // After closing, window events should not trigger analytics
     mockVisibilityState("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
     mockVisibilityState("visible");
     document.dispatchEvent(new Event("visibilitychange"));
 
-    expect(analytics.event).toHaveBeenCalledTimes(1); // Only the initial start-login event
+    expect(analytics.event).toHaveBeenCalledTimes(2); // same as before
+  });
+
+  it("close() - tracks duration since init", () => {
+    vi.useFakeTimers();
+
+    funnel.init();
+    expect(analytics.event).toHaveBeenCalledWith("start-login");
+    expect(analytics.event).toHaveBeenCalledTimes(1);
+
+    // Advance time by 5 seconds
+    vi.advanceTimersByTime(5000);
+
+    funnel.close();
+    expect(analytics.event).toHaveBeenCalledTimes(2);
+    expect(analytics.event).toHaveBeenCalledWith("end-login", {
+      "duration-login": 5,
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("close() - does nothing if init was not called", () => {
+    funnel.close();
+    expect(analytics.event).not.toHaveBeenCalled();
   });
 });
