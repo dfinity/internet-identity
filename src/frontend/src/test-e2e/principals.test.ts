@@ -36,7 +36,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL)
+      originToRelyingPartyId(II_URL),
     );
     let authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -49,7 +49,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-      "certified"
+      "certified",
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -60,7 +60,7 @@ test("Should issue the same principal to nice url and canonical url", async () =
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL)
+      originToRelyingPartyId(II_URL),
     );
     authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -79,7 +79,7 @@ test("Should issue the same principal to dapps on legacy & official domains", as
     const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
     const credentials = await getWebAuthnCredentials(
       browser,
-      registrationAuthenticator
+      registrationAuthenticator,
     );
     expect(credentials).toHaveLength(1);
 
@@ -95,7 +95,7 @@ test("Should issue the same principal to dapps on legacy & official domains", as
         browser,
         authzAuthenticator,
         credentials[0],
-        originToRelyingPartyId(II_URL)
+        originToRelyingPartyId(II_URL),
       );
       const authenticateView = new AuthenticateView(browser);
       await authenticateView.waitForDisplay();

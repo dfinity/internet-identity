@@ -21,7 +21,7 @@ export const promptCaptchaTemplate = <T>({
   cancel: () => void;
   captcha_png_base64: string;
   checkCaptcha: (
-    solution: string
+    solution: string,
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
   onContinue: (result: Exclude<T, WrongCaptchaSolution>) => void;
   i18n: I18n;
@@ -74,12 +74,12 @@ export const promptCaptchaTemplate = <T>({
         prompting: Chan.unchanged,
         bad: copy.incorrect,
         verifying: undefined,
-      }[status]),
+      })[status],
     def: undefined,
   });
 
   const hasError = errorText.map((errorText) =>
-    nonNullish(errorText) ? "has-error" : ""
+    nonNullish(errorText) ? "has-error" : "",
   );
 
   // The "next" button behavior
@@ -91,7 +91,7 @@ export const promptCaptchaTemplate = <T>({
             e.stopPropagation();
             doVerify();
           }
-        : undefined
+        : undefined,
   );
 
   const nextDisabled: Chan<boolean> = next.map(isNullish);
@@ -162,7 +162,7 @@ export const promptCaptchaTemplate = <T>({
             ${ref(input)}
             id="captchaInput"
             class="c-input c-input--stack c-input--fullwidth ${asyncReplace(
-              hasError
+              hasError,
             )}"
             autocapitalize="none"
             spellcheck="false"
@@ -202,10 +202,10 @@ type TemplateProps<T> = Parameters<typeof promptCaptchaTemplate<T>>[0];
 
 export function promptCaptchaPage<T>(
   props: TemplateProps<T>,
-  container?: HTMLElement
+  container?: HTMLElement,
 ): void {
   return renderPage<(props: TemplateProps<T>) => TemplateResult>(
-    promptCaptchaTemplate
+    promptCaptchaTemplate,
   )(props, container);
 }
 
@@ -215,7 +215,7 @@ export const promptCaptcha = <T>({
 }: {
   captcha_png_base64: string;
   checkCaptcha: (
-    solution: string
+    solution: string,
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
 }): Promise<Exclude<T, WrongCaptchaSolution> | "canceled"> => {
   return new Promise((resolve) => {
@@ -233,7 +233,7 @@ export const promptCaptcha = <T>({
 };
 
 const isBadCaptchaResult = <T>(
-  res: Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution
+  res: Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution,
 ): res is WrongCaptchaSolution => {
   return (
     nonNullish(res) &&

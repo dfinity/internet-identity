@@ -126,7 +126,7 @@ export const resetPhrase = async ({
 
   const sameDevice = bufferEqual(
     connection.identity.getPublicKey().toDer(),
-    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey
+    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey,
   );
 
   // The connection used in the replace op
@@ -134,7 +134,7 @@ export const resetPhrase = async ({
   const opConnection = isProtected(device)
     ? await deviceConnection(
         connection,
-        "Please input your recovery phrase to reset it."
+        "Please input your recovery phrase to reset it.",
       )
     : connection;
   if (opConnection === null) {
@@ -147,7 +147,7 @@ export const resetPhrase = async ({
       opConnection.replace(device.pubkey, {
         ...device,
         pubkey: Array.from(new Uint8Array(pubkey)),
-      })
+      }),
     );
 
   const res = await phraseWizard({
@@ -260,7 +260,7 @@ export const protectDevice = async ({
   // with the device.
   const newConnection = await deviceConnection(
     connection,
-    "Please input your recovery phrase to lock it."
+    "Please input your recovery phrase to lock it.",
   );
 
   // if null then user canceled so we just redraw the manage page
@@ -321,7 +321,7 @@ const unprotectDeviceInfo = (): Promise<"ok" | "cancel"> => {
 export const unprotectDevice = async (
   connection: AuthenticatedConnection,
   device: DeviceData & RecoveryPhrase,
-  back: () => void
+  back: () => void,
 ) => {
   const confirmed = await unprotectDeviceInfo();
   if (confirmed === "cancel") {
@@ -334,7 +334,7 @@ export const unprotectDevice = async (
   // NOTE: we do need to be authenticated with the device in order to unprotect it
   const newConnection = await deviceConnection(
     connection,
-    "Please input your recovery phrase to unlock it."
+    "Please input your recovery phrase to unlock it.",
   );
 
   await withLoader(async () => {
@@ -353,7 +353,7 @@ export const unprotectDevice = async (
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   connection: Connection,
-  recoveryPhraseMessage: string
+  recoveryPhraseMessage: string,
 ): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await recoverWithPhrase({

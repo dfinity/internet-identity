@@ -43,7 +43,7 @@ test("Sign in on related origins", async () => {
       await FLOWS.loginExistingAuthenticateView(
         userNumber,
         DEVICE_NAME1,
-        browser
+        browser,
       );
     }
   });

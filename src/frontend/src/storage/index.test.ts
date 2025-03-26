@@ -33,8 +33,8 @@ test(
     async () => {
       expect(await getAnchors()).toStrictEqual([BigInt(123456)]);
     },
-    { localStorage: { before: { userNumber: "123456" } } }
-  )
+    { localStorage: { before: { userNumber: "123456" } } },
+  ),
 );
 
 test(
@@ -50,8 +50,8 @@ test(
           expect(storage["userNumber"]).toBe("123456");
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -73,8 +73,8 @@ test(
           expect(anchors["123456"]).toBeDefined();
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -100,8 +100,8 @@ test(
           expect(anchorsV4["123456"]).toBeDefined();
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -109,7 +109,7 @@ test(
   withStorage(async () => {
     await setAnchorUsed(BigInt(10000));
     expect(await getAnchors()).toStrictEqual([BigInt(10000)]);
-  })
+  }),
 );
 
 test(
@@ -121,7 +121,7 @@ test(
     expect(await getAnchors()).toContain(BigInt(10000));
     expect(await getAnchors()).toContain(BigInt(10001));
     expect(await getAnchors()).toContain(BigInt(10003));
-  })
+  }),
 );
 
 test(
@@ -143,8 +143,8 @@ test(
           },
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -168,7 +168,7 @@ test(
             hasher: await crypto.subtle.generateKey(
               { name: "HMAC", hash: "SHA-512" },
               false /* not extractable */,
-              ["sign"] /* only used to "sign" (e.g. produce a digest ) */
+              ["sign"] /* only used to "sign" (e.g. produce a digest ) */,
             ),
           },
         },
@@ -182,8 +182,8 @@ test(
           expect(storageV4.anchors["10003"]).toBeDefined();
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -206,8 +206,8 @@ test(
           expect(storageV3.anchors["10003"]).toBeDefined();
         },
       },
-    }
-  )
+    },
+  ),
 );
 
 test(
@@ -219,7 +219,7 @@ test(
     }
     anchors.sort();
     expect(await getAnchors()).toStrictEqual(anchors);
-  })
+  }),
 );
 
 test(
@@ -229,7 +229,7 @@ test(
       await setAnchorUsed(BigInt(i));
     }
     expect((await getAnchors()).length).toStrictEqual(MAX_SAVED_ANCHORS);
-  })
+  }),
 );
 
 test(
@@ -244,7 +244,7 @@ test(
     });
 
     expect(await getAnchorByPrincipal({ principal })).toBe(BigInt(10000));
-  })
+  }),
 );
 
 test(
@@ -261,7 +261,7 @@ test(
     expect(await getAnchors()).not.toContain(BigInt(10000));
     expect(await getAnchors()).not.toContain(BigInt(203000));
     vi.useRealTimers();
-  })
+  }),
 );
 
 test(
@@ -269,13 +269,13 @@ test(
   withStorage(async () => {
     const userNumber = BigInt(10000);
     const principal = Principal.fromText(
-      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe",
     );
     const oldPrincipal = Principal.fromText(
-      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae",
     );
     const veryOldPrincipal = Principal.fromText(
-      "t6s4t-dzahw-w2cqi-csimw-vn4xf-fjte4-doj3g-gyjxt-6v2uk-cjeft-eae"
+      "t6s4t-dzahw-w2cqi-csimw-vn4xf-fjte4-doj3g-gyjxt-6v2uk-cjeft-eae",
     );
     const origin = "https://origin.com";
     vi.useFakeTimers().setSystemTime(new Date(0));
@@ -294,7 +294,7 @@ test(
       await setKnownPrincipal({
         userNumber,
         principal: Principal.fromUint8Array(
-          window.crypto.getRandomValues(new Uint8Array(29))
+          window.crypto.getRandomValues(new Uint8Array(29)),
         ),
         origin: `https://new${i}.com`,
       });
@@ -303,14 +303,14 @@ test(
     vi.useFakeTimers().setSystemTime(new Date(date));
     await setKnownPrincipal({ userNumber, principal, origin });
     expect(
-      await getAnchorByPrincipal({ principal: veryOldPrincipal })
+      await getAnchorByPrincipal({ principal: veryOldPrincipal }),
     ).not.toBeDefined();
     expect(
-      await getAnchorByPrincipal({ principal: oldPrincipal })
+      await getAnchorByPrincipal({ principal: oldPrincipal }),
     ).not.toBeDefined();
     expect(await getAnchorByPrincipal({ principal })).toBeDefined();
     vi.useRealTimers();
-  })
+  }),
 );
 
 test(
@@ -325,9 +325,9 @@ test(
     });
 
     expect(await getAnchorIfLastUsed({ principal, origin })).toBe(
-      BigInt(10000)
+      BigInt(10000),
     );
-  })
+  }),
 );
 
 test(
@@ -335,7 +335,7 @@ test(
   withStorage(async () => {
     const origin = "https://example.com";
     const oldPrincipal = Principal.fromText(
-      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe",
     );
     vi.useFakeTimers().setSystemTime(new Date(0));
     const oldIdentity = BigInt(10000);
@@ -347,7 +347,7 @@ test(
 
     vi.useFakeTimers().setSystemTime(new Date(1));
     const mostRecentPrincipal = Principal.fromText(
-      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae",
     );
     const mostRecentIdentity = BigInt(10001);
     await setKnownPrincipal({
@@ -357,13 +357,13 @@ test(
     });
 
     expect(
-      await getAnchorIfLastUsed({ principal: oldPrincipal, origin })
+      await getAnchorIfLastUsed({ principal: oldPrincipal, origin }),
     ).not.toBeDefined();
     // most recent principal still works
     expect(
-      await getAnchorIfLastUsed({ principal: mostRecentPrincipal, origin })
+      await getAnchorIfLastUsed({ principal: mostRecentPrincipal, origin }),
     ).toBe(mostRecentIdentity);
-  })
+  }),
 );
 
 test(
@@ -372,7 +372,7 @@ test(
     const origin1 = "https://example1.com";
     const origin2 = "https://example2.com";
     const principal1 = Principal.fromText(
-      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe",
     );
     vi.useFakeTimers().setSystemTime(new Date(0));
     const identity1 = BigInt(10000);
@@ -384,7 +384,7 @@ test(
 
     vi.useFakeTimers().setSystemTime(new Date(1));
     const principal2 = Principal.fromText(
-      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae"
+      "lrf2i-zba54-pygwt-tbi75-zvlz4-7gfhh-ylcrq-2zh73-6brgn-45jy5-cae",
     );
     const identity2 = BigInt(10001);
     await setKnownPrincipal({
@@ -394,12 +394,12 @@ test(
     });
 
     expect(
-      await getAnchorIfLastUsed({ principal: principal1, origin: origin1 })
+      await getAnchorIfLastUsed({ principal: principal1, origin: origin1 }),
     ).toBe(identity1);
     expect(
-      await getAnchorIfLastUsed({ principal: principal2, origin: origin2 })
+      await getAnchorIfLastUsed({ principal: principal2, origin: origin2 }),
     ).toBe(identity2);
-  })
+  }),
 );
 
 test(
@@ -407,11 +407,11 @@ test(
   withStorage(async () => {
     const origin = "https://example.com";
     const principal = Principal.fromText(
-      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe"
+      "hawxh-fq2bo-p5sh7-mmgol-l3vtr-f72w2-q335t-dcbni-2n25p-xhusp-fqe",
     );
 
     expect(await getAnchorIfLastUsed({ principal, origin })).not.toBeDefined();
-  })
+  }),
 );
 
 /** Test storage usage. Storage is cleared after the callback has returned.
@@ -431,7 +431,7 @@ function withStorage(
       before?: IndexedDB;
       after?: IndexedDB | ((storage: IndexedDB) => void);
     };
-  }
+  },
 ): () => Promise<void> {
   return async () => {
     localStorage.clear();

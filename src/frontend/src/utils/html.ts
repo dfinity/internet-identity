@@ -11,14 +11,14 @@ type Marked = typeof markedTypes;
 export const targetBlankLinkRenderer = (
   href: string | null | undefined,
   title: string | null | undefined,
-  text: string
+  text: string,
 ): string =>
   `<a${
     href === null || href === undefined
       ? ""
       : ` target="_blank" rel="noopener noreferrer" href="${href}"`
   }${title === null || title === undefined ? "" : ` title="${title}"`}>${
-    text.length === 0 ? href ?? title : text
+    text.length === 0 ? (href ?? title) : text
   }</a>`;
 
 /**
@@ -28,7 +28,7 @@ export const targetBlankLinkRenderer = (
 export const imageToLinkRenderer = (
   src: string | null | undefined,
   title: string | null | undefined,
-  alt: string
+  alt: string,
 ): string => {
   if (src === undefined || src === null || src?.length === 0) {
     return alt;

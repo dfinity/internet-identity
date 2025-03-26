@@ -59,7 +59,7 @@ const usePinTemplate = <T>({
 
 export const usePinPage = <T>(
   props: Parameters<typeof usePinTemplate<T>>[0],
-  container?: HTMLElement
+  container?: HTMLElement,
 ) => renderPage(usePinTemplate<T>)(props, container);
 
 export const usePin = <T>({
@@ -77,6 +77,6 @@ export const usePin = <T>({
       onContinue: (result: T) => resolve({ kind: "pin", result }),
       cancel: () => resolve({ kind: "canceled" }),
       scrollToTop: true,
-    })
+    }),
   );
 };

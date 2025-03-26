@@ -61,7 +61,7 @@ const deviceRegistrationDisabledInfoTemplate = ({
 };
 
 export const deviceRegistrationDisabledInfoPage = renderPage(
-  deviceRegistrationDisabledInfoTemplate
+  deviceRegistrationDisabledInfoTemplate,
 );
 
 /**
@@ -69,7 +69,7 @@ export const deviceRegistrationDisabledInfoPage = renderPage(
  * It shows instructions to the user on how to continue.
  */
 export const deviceRegistrationDisabledInfo = (
-  userNumber: bigint
+  userNumber: bigint,
 ): Promise<"canceled" | "retry"> => {
   return new Promise((resolve) =>
     deviceRegistrationDisabledInfoPage({
@@ -77,6 +77,6 @@ export const deviceRegistrationDisabledInfo = (
       origin: window.origin,
       cancel: () => resolve("canceled"),
       retry: () => resolve("retry"),
-    })
+    }),
   );
 };

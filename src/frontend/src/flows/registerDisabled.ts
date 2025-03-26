@@ -28,7 +28,7 @@ const pageContent = ({
                       (origin) =>
                         html`<li>
                           <a class="t-link" href=${origin}>${origin}</a>
-                        </li>`
+                        </li>`,
                     )}
                   </ul>
                 `}
@@ -63,7 +63,7 @@ const pageContent = ({
  * @returns Promise resolved when the user clicks cancel
  */
 export const registerDisabled = (
-  allowedOrigins: string[]
+  allowedOrigins: string[],
 ): Promise<{ tag: "canceled" }> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
@@ -74,7 +74,7 @@ export const registerDisabled = (
         },
         allowedOrigins,
       }),
-      container
+      container,
     );
   });
 };

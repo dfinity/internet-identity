@@ -50,7 +50,7 @@ test("Should validateDelegationAndGetPrincipal", () => {
     DELEGATION_CHAIN_JSON,
     EXPIRATION - BigInt(42),
     II_CANISTER_ID,
-    ROOT_PUBLIC_KEY_RAW
+    ROOT_PUBLIC_KEY_RAW,
   );
   expect(principal).toEqual(USER_PRINCIPAL_ID);
 });
@@ -62,7 +62,7 @@ test("Should fail validateDelegationAndGetPrincipal with wrong challenge", () =>
       DELEGATION_CHAIN_JSON,
       EXPIRATION - BigInt(42),
       II_CANISTER_ID,
-      ROOT_PUBLIC_KEY_RAW
+      ROOT_PUBLIC_KEY_RAW,
     );
   expect(call).toThrow(expect.stringContaining("does not match the challenge"));
 });
@@ -85,10 +85,10 @@ test("Should fail validateDelegationAndGetPrincipal with wrong delegation chain"
       WRONG_DELEGATION_CHAIN_JSON,
       EXPIRATION - BigInt(42),
       II_CANISTER_ID,
-      ROOT_PUBLIC_KEY_RAW
+      ROOT_PUBLIC_KEY_RAW,
     );
   expect(call).toThrow(
-    expect.stringContaining("Error parsing delegation_chain")
+    expect.stringContaining("Error parsing delegation_chain"),
   );
 });
 
@@ -99,7 +99,7 @@ test("Should fail validateDelegationAndGetPrincipal with expired delegation", ()
       DELEGATION_CHAIN_JSON,
       EXPIRATION + BigInt(42), // past expiration
       II_CANISTER_ID,
-      ROOT_PUBLIC_KEY_RAW
+      ROOT_PUBLIC_KEY_RAW,
     );
   expect(call).toThrow(expect.stringContaining("delegation expired"));
 });
@@ -111,10 +111,10 @@ test("Should fail validateDelegationAndGetPrincipal with wrong II canister id", 
       DELEGATION_CHAIN_JSON,
       EXPIRATION - BigInt(42),
       "jqajs-xiaaa-aaaad-aab5q-cai", // wrong canister id
-      ROOT_PUBLIC_KEY_RAW
+      ROOT_PUBLIC_KEY_RAW,
     );
   expect(call).toThrow(
-    expect.stringContaining("does not match II canister id")
+    expect.stringContaining("does not match II canister id"),
   );
 });
 
@@ -127,9 +127,11 @@ test("Should fail validateDelegationAndGetPrincipal with wrong IC root public ke
       DELEGATION_CHAIN_JSON,
       EXPIRATION - BigInt(42),
       II_CANISTER_ID,
-      BAD_ROOT_PK
+      BAD_ROOT_PK,
     );
   expect(call).toThrow(
-    expect.stringContaining("Invalid canister signature: invalid BLS signature")
+    expect.stringContaining(
+      "Invalid canister signature: invalid BLS signature",
+    ),
   );
 });
