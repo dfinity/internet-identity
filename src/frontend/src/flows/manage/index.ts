@@ -6,7 +6,7 @@ import {
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
 } from "$generated/internet_identity_types";
-import identityCardBackground from "$src/assets/identityCardBackground.png";
+import identityCardBackground from "$src/assets/identityCardBackground.png?url";
 import {
   AuthnTemplates,
   authenticateBox,
@@ -150,7 +150,7 @@ export const authFlowManage = async (connection: Connection) => {
   if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
     await registerCurrentDeviceCurrentOrigin(
       userNumber,
-      authenticatedConnection
+      authenticatedConnection,
     );
   }
 
@@ -330,7 +330,7 @@ export const renderManage = async ({
       anchorInfo = await withLoader(() => connection.getAnchorInfo());
     } catch (error: unknown) {
       await displayFailedToListDevices(
-        error instanceof Error ? error : unknownError()
+        error instanceof Error ? error : unknownError(),
       );
       continue;
     }
@@ -346,7 +346,7 @@ export const renderManage = async ({
       connection,
       anchorInfo.devices,
       anchorInfo.openid_credentials[0] ?? [],
-      identityBackground
+      identityBackground,
     );
     connection = newConnection ?? connection;
   }
@@ -356,12 +356,12 @@ export const displayManagePage = renderPage(displayManageTemplate);
 
 function isPinAuthenticated(
   devices_: DeviceData[],
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): boolean {
   const connectionPrincipal = connection.identity.getPrincipal();
   const currentDevice = devices_.find(({ pubkey }) => {
     const devicePrincipal = Principal.selfAuthenticating(
-      new Uint8Array(pubkey)
+      new Uint8Array(pubkey),
     );
     return devicePrincipal.toText() === connectionPrincipal.toText();
   });
@@ -375,7 +375,7 @@ export const displayManage = async (
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
   credentials: OpenIdCredential[],
-  identityBackground: PreLoadImage
+  identityBackground: PreLoadImage,
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -386,7 +386,7 @@ export const displayManage = async (
 
   // Create anonymous nonce and salt for calling principal from connection
   const { nonce, salt } = await createAnonymousNonce(
-    connection.delegationIdentity.getPrincipal()
+    connection.delegationIdentity.getPrincipal(),
   );
 
   const googleClientId =
@@ -403,12 +403,12 @@ export const displayManage = async (
 
     if (devices.dupPhrase) {
       toast.error(
-        "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
+        "More than one recovery phrases are registered, which is unexpected. Only one will be shown.",
       );
     }
     if (devices.dupKey) {
       toast.error(
-        "More than one recovery keys are registered, which is unexpected. Only one will be shown."
+        "More than one recovery keys are registered, which is unexpected. Only one will be shown.",
       );
     }
 
@@ -432,7 +432,7 @@ export const displayManage = async (
         .buffer as DerEncodedPublicKey;
       const isCurrentDevice = bufferEqual(
         connection.identity.getPublicKey().toDer(),
-        pubKey
+        pubKey,
       );
       const action = await confirmRemoveDevice({
         i18n,
@@ -479,7 +479,7 @@ export const displayManage = async (
       await setupPhrase(
         userNumber,
         connection,
-        newDeviceOrigin ?? window.origin
+        newDeviceOrigin ?? window.origin,
       );
       resolve();
     };
@@ -494,7 +494,7 @@ export const displayManage = async (
           requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
             nonce,
-          })
+          }),
         );
         const { iss, sub } = decodeJWT(jwt);
         if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
@@ -515,7 +515,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "JwtVerificationFailed":
@@ -530,7 +530,7 @@ export const displayManage = async (
             default: {
               // Make sure all error cases are covered,
               // else this will throw a TS error here.
-              const _ = error.type satisfies never;
+              void (error.type satisfies never);
             }
           }
           return;
@@ -568,7 +568,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "OpenIdCredentialNotFound":
@@ -580,7 +580,7 @@ export const displayManage = async (
             default: {
               // Make sure all error cases are covered,
               // else this will throw a TS error here.
-              const _ = error.type satisfies never;
+              void (error.type satisfies never);
             }
           }
         }
@@ -749,7 +749,7 @@ export const devicesFromDevicesWithUsage = ({
         canBeRemoved,
         isCurrent: bufferEqual(
           currentPublicKey,
-          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer,
         ),
         device,
       };
@@ -767,13 +767,13 @@ export const devicesFromDevicesWithUsage = ({
       pinAuthenticators: [],
       dupPhrase: false,
       dupKey: false,
-    }
+    },
   );
 };
 
 // Show a domain-related warning, if necessary.
 export const domainWarning = (
-  device: DeviceData
+  device: DeviceData,
 ): TemplateResult | undefined => {
   if (DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;

@@ -23,13 +23,18 @@ import Screen from "../layouts/Screen.astro";
             isCurrent: true,
             rename: () => toast.info("rename"),
             last_usage: [BigInt(Date.now() * 1000000)],
-          },
+            canBeRemoved: false,
+            device: true as unknown as any
+          }
         ],
         recoveries: {},
-        pinAuthenticators: [],
+        pinAuthenticators: []
       },
       onAddDevice: () => {
         toast.info("add device requested");
+      },
+      onRemoveDevice: () => {
+        toast.info("remove device requested");
       },
       addRecoveryPhrase: () => {
         toast.info("add recovery phrase");
@@ -47,7 +52,7 @@ import Screen from "../layouts/Screen.astro";
       dapps,
       exploreDapps: () => {
         toast.info("explore dapps");
-      },
+      }
     });
   </script>
 </Screen>

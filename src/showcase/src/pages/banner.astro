@@ -7,11 +7,12 @@ import Screen from "../layouts/Screen.astro";
     import { toast } from "$src/components/toast";
     import { manage } from "../templates";
     import { showWarning } from "$src/banner";
+    import { html } from "lit-html";
 
     manage.firstTime({
       useExisting: () => toast.info("Asked for existing"),
-      register: () => toast.info("Asked for registration"),
+      register: () => toast.info("Asked for registration")
     });
-    showWarning("This is a test page, be very careful!");
+    showWarning(html`This is a test page, be very careful!`);
   </script>
 </Screen>

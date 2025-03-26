@@ -6,11 +6,13 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$src/components/toast";
     import { userNumber, iiLegacyOrigin } from "../constants";
-    import { deviceRegistrationDisabledInfoPage } from "$src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+    import {
+      deviceRegistrationDisabledInfoPage
+    } from "$src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 
     deviceRegistrationDisabledInfoPage({
       userNumber,
-      iiUrl: iiLegacyOrigin,
+      origin: iiLegacyOrigin,
       retry: () => toast.info("retry"),
       cancel: () => toast.info("canceled")
     });
