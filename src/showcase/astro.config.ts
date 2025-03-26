@@ -1,4 +1,3 @@
-// @ts-expect-error Ignore
 import { defineConfig } from "astro/config";
 import path from "path";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
