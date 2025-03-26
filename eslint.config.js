@@ -33,6 +33,24 @@ export default ts.config(
     },
   },
   {
+    rules: {
+      "@typescript-eslint/strict-boolean-expressions": [
+        2,
+        { allowString: false, allowNumber: false },
+      ],
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+      "require-await": ["error"],
+      "@typescript-eslint/no-floating-promises": ["error"],
+    },
+  },
+  {
     ignores: ["src/frontend/generated/*"],
   },
 );
