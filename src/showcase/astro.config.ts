@@ -1,4 +1,4 @@
-import { defineConfig } from "astro/config";
+import { defineConfig } from "astro/dist/config";
 import path from "path";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 

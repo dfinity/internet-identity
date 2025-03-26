@@ -1,0 +1,7 @@
+{
+  "extends": ["../../.svelte-kit/tsconfig.json", "../../tsconfig.json"],
+  "include": ["types", "src"],
+  "compilerOptions": {
+    "baseUrl": "../.."
+  }
+}

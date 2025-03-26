@@ -1,6 +1,6 @@
 {
-  "extends": "../../tsconfig.json",
-  "include": ["../frontend/src", "src"],
+  "extends": ["astro/tsconfigs/base", "../../tsconfig.json"],
+  "include": [".astro/types.d.ts", "../frontend/src", "src"],
   "compilerOptions": {
     "baseUrl": "../.."
   }
