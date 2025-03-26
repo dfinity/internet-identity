@@ -265,16 +265,16 @@ export class MainView extends View {
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
-    const elems = await this.browser.$$(
+    const elems = this.browser.$$(
       `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`,
     );
-    if (elems.length !== count) {
+    if ((await elems.length) !== count) {
       throw Error("Bad number of elements");
     }
   }
 
   async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
-    const differentOriginRpId = await this.browser.$(
+    const differentOriginRpId = this.browser.$(
       '[data-role="passkeys"] [data-device] [data-rpid]',
     );
     if ((await differentOriginRpId.isExisting()) !== exist) {
