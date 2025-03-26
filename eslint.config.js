@@ -33,6 +33,13 @@ export default ts.config(
     },
   },
   {
+    languageOptions: {
+      parserOptions: {
+        project: ["./tsconfig.json"],
+      },
+    },
+  },
+  {
     rules: {
       "@typescript-eslint/strict-boolean-expressions": [
         2,
