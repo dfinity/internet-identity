@@ -45,7 +45,7 @@
     "@types/node": "*",
     "@types/ua-parser-js": "^0.7.36",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
-    "@wdio/globals": "^8.41.0",
+    "@wdio/globals": "^9.12.1",
     "astro": "^5.5.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -65,7 +65,7 @@
     "vite": "^6.0.0",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.0.9",
-    "webdriverio": "^8.41.0"
+    "webdriverio": "^9.12.1"
   },
   "dependencies": {
     "@dfinity/agent": "^2.1.2",
