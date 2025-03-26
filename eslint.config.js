@@ -33,6 +33,6 @@ export default ts.config(
     },
   },
   {
-    ignorePatterns: ["src/frontend/generated/*"],
+    ignores: ["src/frontend/generated/*"],
   },
 );

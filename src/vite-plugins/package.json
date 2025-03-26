@@ -3,7 +3,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc --build --verbose",
+    "build": "tsc --build",
     "check": "tsc --noEmit",
     "postinstall": "npm run build"
   },
