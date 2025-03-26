@@ -58,6 +58,6 @@ export default ts.config(
     },
   },
   {
-    ignores: ["src/frontend/generated/*"],
+    ignores: ["src/frontend/generated/*", "src/showcase/.astro/*"],
   },
 );

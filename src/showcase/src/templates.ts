@@ -29,13 +29,13 @@ const authzTemplatesKnownAlt = authnTemplateAuthorize({
   derivationOrigin: "http://fgte8-ciaaa-aaaad-aaatq-cai.ic0.app",
   i18n,
 
-  knownDapp: dapps.find((dapp: any) => dapp.name === "NNS Dapp"),
+  knownDapp: dapps.find((dapp) => dapp.name === "NNS Dapp"),
 });
 
 const authzTemplatesKnown = authnTemplateAuthorize({
   origin: "https://oc.app",
   i18n,
-  knownDapp: dapps.find((dapp: any) => dapp.name === "OpenChat"),
+  knownDapp: dapps.find((dapp) => dapp.name === "OpenChat"),
 });
 
 export const authz = authnPages(i18n, { ...authnCnfg, ...authzTemplates });

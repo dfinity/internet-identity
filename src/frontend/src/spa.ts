@@ -66,7 +66,7 @@ const readCanisterConfig = (): InternetIdentityInit => {
       fromBase64(setupJs.dataset.canisterConfig),
     );
     return jsonValue as unknown as InternetIdentityInit;
-  } catch (e) {
+  } catch {
     void displayError({
       title: "Canister config not valid",
       message:
