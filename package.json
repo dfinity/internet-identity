@@ -52,6 +52,7 @@
     "eslint-plugin-svelte": "^2.46.1",
     "fake-indexeddb": "^4.0.2",
     "globals": "^15.14.0",
+    "jsdom": "^26.0.0",
     "lit-analyzer": "^2.0.2",
     "prettier": "3.5.1",
     "prettier-plugin-organize-imports": "^3.2.2",
@@ -63,7 +64,7 @@
     "typescript-eslint": "^8.20.0",
     "vite": "^6.0.0",
     "vite-plugin-node-polyfills": "^0.23.0",
-    "vitest": "^1.6.1",
+    "vitest": "^3.0.9",
     "webdriverio": "^8.41.0"
   },
   "dependencies": {
