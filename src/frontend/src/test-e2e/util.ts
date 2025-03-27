@@ -49,9 +49,6 @@ async function remoteRetry(
   );
 }
 
-// Re-use browser instance, instead of creating a new one for every test
-let browser: WebdriverIO.Browser | undefined = undefined;
-
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
@@ -103,15 +100,13 @@ export async function runInBrowser(
     );
   }
 
-  if (isNullish(browser)) {
-    browser = await remoteRetry({
-      capabilities: {
-        browserName: "chrome",
-        browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
-        "goog:chromeOptions": chromeOptions,
-      },
-    });
-  }
+  const browser = await remoteRetry({
+    capabilities: {
+      browserName: "chrome",
+      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      "goog:chromeOptions": chromeOptions,
+    },
+  });
 
   // setup test suite
   await addCustomCommands(browser);
