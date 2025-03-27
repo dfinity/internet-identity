@@ -33,7 +33,7 @@ async function remoteRetry(
   opts: Parameters<typeof remote>[0],
 ): ReturnType<typeof remote> {
   let lastErr;
-  const MAX_RETRIES = 5;
+  const MAX_RETRIES = 10;
 
   for (let i = 0; i < MAX_RETRIES; i++) {
     try {
@@ -103,7 +103,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
