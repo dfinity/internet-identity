@@ -466,7 +466,7 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: [ "1_6", "2_6", "3_6", "4_6", "5_6", "6_6" ]
+        shard: [ "1_1" ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 

@@ -33,7 +33,7 @@ async function remoteRetry(
   opts: Parameters<typeof remote>[0],
 ): ReturnType<typeof remote> {
   let lastErr;
-  const MAX_RETRIES = 10;
+  const MAX_RETRIES = 5;
 
   for (let i = 0; i < MAX_RETRIES; i++) {
     try {
