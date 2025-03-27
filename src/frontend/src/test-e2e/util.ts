@@ -140,6 +140,13 @@ export async function runInBrowser(
     throw e;
   } finally {
     try {
+      // Cleanup any pending virtual authenticator
+      if (nonNullish(registeredVirtualAuthenticatorId)) {
+        await removeVirtualAuthenticator(
+          browser,
+          registeredVirtualAuthenticatorId,
+        );
+      }
       await browser.deleteSession();
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
@@ -348,16 +355,28 @@ export async function addCustomCommands(
   );
 }
 
+let registeredVirtualAuthenticatorId: string | undefined = undefined;
+
 export async function addVirtualAuthenticator(
   browser: WebdriverIO.Browser,
 ): Promise<string> {
-  return await browser.addVirtualWebAuth("ctap2", "usb", true, true);
+  const authenticatorId = await browser.addVirtualWebAuth(
+    "ctap2",
+    "usb",
+    true,
+    true,
+  );
+  registeredVirtualAuthenticatorId = authenticatorId;
+  return authenticatorId;
 }
 
 export async function removeVirtualAuthenticator(
   browser: WebdriverIO.Browser,
   authenticatorId: string,
 ): Promise<void> {
+  if (authenticatorId === registeredVirtualAuthenticatorId) {
+    registeredVirtualAuthenticatorId = undefined;
+  }
   return await browser.removeVirtualWebAuth(authenticatorId);
 }
 
