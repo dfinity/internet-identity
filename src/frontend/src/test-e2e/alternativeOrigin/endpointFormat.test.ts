@@ -118,10 +118,12 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
 
     // Selenium has _no_ connectivity to the raw url
     // We want accessing raw urls to fail because it would be a security issue on mainnet
-    const statusCode = await browser.execute(() =>
-      fetch(`${TEST_APP_CANONICAL_URL_RAW}/.well-known/ii-alternative-origins`)
-        .then((res) => res.status)
-        .catch(() => 500),
+    const statusCode = await browser.execute(
+      (urlRaw) =>
+        fetch(`${urlRaw}/.well-known/ii-alternative-origins`)
+          .then((res) => res.status)
+          .catch(() => 500),
+      TEST_APP_CANONICAL_URL_RAW,
     );
     expect(statusCode).toEqual(500);
 
