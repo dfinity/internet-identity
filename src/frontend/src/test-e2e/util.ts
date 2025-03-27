@@ -49,6 +49,8 @@ async function remoteRetry(
   );
 }
 
+let previousBrowser: WebdriverIO.Browser;
+
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
@@ -100,6 +102,9 @@ export async function runInBrowser(
     );
   }
 
+  if (nonNullish(previousBrowser)) {
+    await previousBrowser.deleteSession();
+  }
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -107,6 +112,7 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
   });
+  previousBrowser = browser;
 
   // setup test suite
   await addCustomCommands(browser);
