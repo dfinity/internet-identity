@@ -65,7 +65,7 @@
     "vite": "^6.0.0",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.0.9",
-    "webdriverio": "^9.12.1"
+    "webdriverio": "^8.41.0"
   },
   "dependencies": {
     "@dfinity/agent": "^2.1.2",

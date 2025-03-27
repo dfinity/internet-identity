@@ -49,8 +49,6 @@ async function remoteRetry(
   );
 }
 
-let previousBrowser: WebdriverIO.Browser;
-
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
@@ -102,13 +100,6 @@ export async function runInBrowser(
     );
   }
 
-  if (nonNullish(previousBrowser)) {
-    try {
-      await previousBrowser.deleteSession();
-    } catch {
-      // Ignore, this is cleanup to make sure session is closed, if it isn't.
-    }
-  }
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -116,7 +107,6 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
   });
-  previousBrowser = browser;
 
   // setup test suite
   await addCustomCommands(browser);
@@ -151,7 +141,6 @@ export async function runInBrowser(
   } finally {
     try {
       await browser.deleteSession();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
