@@ -106,6 +106,7 @@ export async function runInBrowser(
       browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
+    cacheDir: "./chrome-cache",
   });
 
   // setup test suite
