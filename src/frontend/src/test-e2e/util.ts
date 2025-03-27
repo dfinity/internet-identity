@@ -11,6 +11,7 @@ import * as fsasync from "fs/promises";
 import { command } from "webdriver";
 import { remote } from "webdriverio";
 import { WebAuthnCredential } from "../../test-setup";
+import path from "path";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -106,7 +107,7 @@ export async function runInBrowser(
       browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
-    cacheDir: "~/.chrome-cache",
+    cacheDir: path.resolve(__dirname, "./.chrome-cache"),
   });
 
   // setup test suite
