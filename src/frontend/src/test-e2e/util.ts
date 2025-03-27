@@ -141,12 +141,12 @@ export async function runInBrowser(
   } finally {
     try {
       // Cleanup any pending virtual authenticator
-      if (nonNullish(registeredVirtualAuthenticatorId)) {
-        await removeVirtualAuthenticator(
-          browser,
-          registeredVirtualAuthenticatorId,
-        );
-      }
+      // if (nonNullish(registeredVirtualAuthenticatorId)) {
+      //   await removeVirtualAuthenticator(
+      //     browser,
+      //     registeredVirtualAuthenticatorId,
+      //   );
+      // }
       await browser.deleteSession();
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
