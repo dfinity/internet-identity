@@ -2,7 +2,7 @@ import { idlFactory as internet_identity_idl } from "$generated/internet_identit
 import { _SERVICE } from "$generated/internet_identity_types";
 import { randomString, wrapError } from "$src/utils/utils";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
-import { nonNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 
 // @ts-expect-error Ignore
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
@@ -48,6 +48,9 @@ async function remoteRetry(
     `Could not start browser after ${MAX_RETRIES} retries: ${lastErr}`,
   );
 }
+
+// Re-use browser instance, instead of creating a new one for every test
+let browser: WebdriverIO.Browser | undefined = undefined;
 
 export async function runInBrowser(
   test: (
@@ -100,13 +103,15 @@ export async function runInBrowser(
     );
   }
 
-  const browser = await remoteRetry({
-    capabilities: {
-      browserName: "chrome",
-      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
-      "goog:chromeOptions": chromeOptions,
-    },
-  });
+  if (isNullish(browser)) {
+    browser = await remoteRetry({
+      capabilities: {
+        browserName: "chrome",
+        browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+        "goog:chromeOptions": chromeOptions,
+      },
+    });
+  }
 
   // setup test suite
   await addCustomCommands(browser);
