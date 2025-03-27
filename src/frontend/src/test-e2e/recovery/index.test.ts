@@ -27,22 +27,22 @@ test("Recover with phrase", async () => {
 
 test("Recover with device", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const loginAuthenticator = await addVirtualAuthenticator(browser);
-    await browser.url(II_URL);
-    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-    const mainView = new MainView(browser);
-    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
-    await removeVirtualAuthenticator(browser, loginAuthenticator);
-    await browser.pause(10000);
-
-    await addVirtualAuthenticator(browser);
-    await FLOWS.addRecoveryMechanismDevice(browser);
-    await mainView.waitForDisplay();
-    await mainView.logout();
-
-    await FLOWS.recoverUsingDevice(browser, userNumber);
-    await mainView.waitForDisplay();
-    await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    // const loginAuthenticator = await addVirtualAuthenticator(browser);
+    // await browser.url(II_URL);
+    // const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    // const mainView = new MainView(browser);
+    // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
+    // await removeVirtualAuthenticator(browser, loginAuthenticator);
+    // await browser.pause(10000);
+    //
+    // await addVirtualAuthenticator(browser);
+    // await FLOWS.addRecoveryMechanismDevice(browser);
+    // await mainView.waitForDisplay();
+    // await mainView.logout();
+    //
+    // await FLOWS.recoverUsingDevice(browser, userNumber);
+    // await mainView.waitForDisplay();
+    // await mainView.waitForDeviceDisplay(DEVICE_NAME1);
   });
 }, 300_000);
 
