@@ -146,6 +146,7 @@ export async function runInBrowser(
   } finally {
     try {
       await browser.deleteSession();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
