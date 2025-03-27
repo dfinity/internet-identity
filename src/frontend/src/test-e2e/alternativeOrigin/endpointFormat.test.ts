@@ -8,8 +8,6 @@ import {
   switchToPopup,
 } from "../util";
 import { AuthenticateView, DemoAppView, ErrorView } from "../views";
-
-import { nonNullish } from "@dfinity/utils";
 import {
   II_URL,
   TEST_APP_CANONICAL_URL,
