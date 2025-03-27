@@ -103,7 +103,11 @@ export async function runInBrowser(
   }
 
   if (nonNullish(previousBrowser)) {
-    await previousBrowser.deleteSession();
+    try {
+      await previousBrowser.deleteSession();
+    } catch {
+      // Ignore, this is cleanup to make sure session is closed, if it isn't.
+    }
   }
   const browser = await remoteRetry({
     capabilities: {
