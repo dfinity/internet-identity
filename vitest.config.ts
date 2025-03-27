@@ -22,7 +22,7 @@ export default defineConfig(
       setupFiles: "./src/frontend/test-setup.ts",
       poolOptions: {
         threads: {
-          useAtomics: true,
+          singleThread: true,
         },
       },
     },
