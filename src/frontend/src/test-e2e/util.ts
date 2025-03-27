@@ -2,7 +2,7 @@ import { idlFactory as internet_identity_idl } from "$generated/internet_identit
 import { _SERVICE } from "$generated/internet_identity_types";
 import { randomString, wrapError } from "$src/utils/utils";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
-import { isNullish, nonNullish } from "@dfinity/utils";
+import { nonNullish } from "@dfinity/utils";
 
 // @ts-expect-error Ignore
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
