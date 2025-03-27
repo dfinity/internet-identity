@@ -149,7 +149,9 @@ export async function runInBrowser(
       //     registeredVirtualAuthenticatorId,
       //   );
       // }
-      await browser.deleteSession();
+      await browser.deleteSession({
+        shutdownDriver: false,
+      });
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
