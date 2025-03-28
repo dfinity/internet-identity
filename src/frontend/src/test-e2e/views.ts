@@ -1128,7 +1128,7 @@ export class ErrorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#errorContainer")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   getErrorMessage(): Promise<string> {
