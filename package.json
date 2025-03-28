@@ -45,6 +45,7 @@
     "@types/node": "*",
     "@types/ua-parser-js": "^0.7.36",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
+    "@vitest/browser": "^3.0.9",
     "@wdio/globals": "^9.12.1",
     "astro": "^5.5.4",
     "eslint": "^9.18.0",
