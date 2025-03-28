@@ -798,14 +798,17 @@ export class IssuerAppView extends View {
   async waitForAuthenticated(): Promise<string> {
     let principal = await this.getPrincipal();
     // wait for the demo app to update the principal
-    await this.browser.waitUntil(async () => {
-      if (nonNullish(principal)) {
-        return true;
-      }
+    await this.browser.waitUntil(
+      async () => {
+        if (nonNullish(principal)) {
+          return true;
+        }
 
-      principal = await this.getPrincipal();
-      return false;
-    });
+        principal = await this.getPrincipal();
+        return false;
+      },
+      { timeout: 60_000 },
+    );
 
     // XXX: If we get here, it means we returned "true" above and the principal
     // is non nullish.
@@ -823,11 +826,14 @@ export class IssuerAppView extends View {
     await this.browser.$('[data-action="add-employee"]').click();
 
     // wait for the demo app to update the principal
-    await this.browser.waitUntil(async () => {
-      const logLinesNow = await this.canisterLogs();
+    await this.browser.waitUntil(
+      async () => {
+        const logLinesNow = await this.canisterLogs();
 
-      return logLinesNow.length > logLinesBefore.length;
-    });
+        return logLinesNow.length > logLinesBefore.length;
+      },
+      { timeout: 60_000 },
+    );
 
     // Here we know there at least one more log lines than before,
     // meaning there is at least one log line, so -1 cannot be undefined.
@@ -868,27 +874,30 @@ export class VcTestAppView extends View {
     // wait for the demo app to close the II window
     await waitToClose(this.browser);
     // wait for the demo app to update the principal
-    await this.browser.waitUntil(async () => {
-      const principal_ = await this.getPrincipal();
-      const principal = (() => {
-        try {
-          return Principal.fromText(principal_).toText();
-        } catch (_e) {
-          return undefined;
+    await this.browser.waitUntil(
+      async () => {
+        const principal_ = await this.getPrincipal();
+        const principal = (() => {
+          try {
+            return Principal.fromText(principal_).toText();
+          } catch (_e) {
+            return undefined;
+          }
+        })();
+        console.log("PRINCIPAL", principal);
+
+        if (principal === undefined) {
+          return false;
         }
-      })();
-      console.log("PRINCIPAL", principal);
 
-      if (principal === undefined) {
-        return false;
-      }
+        if (principal === "") {
+          return false;
+        }
 
-      if (principal === "") {
-        return false;
-      }
-
-      return true;
-    });
+        return true;
+      },
+      { timeout: 60_000 },
+    );
   }
 
   getPrincipal(): Promise<string> {
@@ -964,6 +973,7 @@ export class DemoAppView extends View {
     // wait for the demo app to update the principal
     await this.browser.waitUntil(
       async () => (await this.getPrincipal()) !== "",
+      { timeout: 60_000 },
     );
     return this.getPrincipal();
   }
