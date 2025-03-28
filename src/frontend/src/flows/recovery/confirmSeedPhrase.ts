@@ -251,7 +251,6 @@ export const confirmSeedPhrase = ({
   return new Promise((resolve) => {
     const i18n = new I18n();
     const words = phrase.split(" ");
-    // eslint-disable-next-line
     const userNumberWord = words.shift()!; // Extract first word (anchor) to show independently
     confirmSeedPhrasePage({
       userNumberWord,
