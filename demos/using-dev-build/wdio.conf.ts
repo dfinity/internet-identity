@@ -29,7 +29,6 @@ export const config: WebdriverIO.Config = {
       acceptInsecureCerts: true,
     },
   ],
-
   logLevel: "info",
 
   framework: "mocha",
