@@ -6,7 +6,7 @@ import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";
 let tracker: undefined | ReturnType<typeof Plausible>;
 
 const convertToPlausibleConfig = (
-  config: AnalyticsConfig | undefined,
+  config: AnalyticsConfig | undefined
 ): PlausibleInitOptions | undefined => {
   if (isNullish(config)) {
     return;
@@ -25,7 +25,7 @@ const convertToPlausibleConfig = (
 
 const removeUndefinedFields = (obj: Record<string, unknown | undefined>) => {
   return Object.fromEntries(
-    Object.entries(obj).filter(([_, value]) => value !== undefined),
+    Object.entries(obj).filter(([_, value]) => value !== undefined)
   );
 };
 

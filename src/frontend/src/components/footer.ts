@@ -16,15 +16,14 @@ export const navigationLink = ({
   url: string;
   classes: string;
   rel?: string;
-}): TemplateResult =>
-  html`<a
-    id="${id}"
-    class="${classes}"
-    href="${url}"
-    target="_blank"
-    rel=${ifDefined(rel)}
-    >${icon} ${labelText}</a
-  >`;
+}): TemplateResult => html`<a
+  id="${id}"
+  class="${classes}"
+  href="${url}"
+  target="_blank"
+  rel=${ifDefined(rel)}
+  >${icon} ${labelText}</a
+>`;
 
 export const footer = html`<footer class="l-footer c-footer">
   <div class="c-footer--inner">

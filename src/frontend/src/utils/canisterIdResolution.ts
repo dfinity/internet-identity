@@ -18,8 +18,8 @@ export const resolveCanisterId = ({
     console.error(
       `Failed to parse origin '${origin}' as URL: ${unknownToString(
         error,
-        "unknown error",
-      )}`,
+        "unknown error"
+      )}`
     );
     return Promise.resolve("not_found");
   }
@@ -34,7 +34,7 @@ export const resolveCanisterId = ({
 };
 
 const parseCanisterIdFromHostname = (
-  hostname: string,
+  hostname: string
 ): Principal | undefined => {
   const wellKnownDomains = [
     "ic0.app",
@@ -55,7 +55,7 @@ const parseCanisterIdFromHostname = (
         return Principal.fromText(canisterId); // make sure the inferred part is actually a canister id, throws if not
       } catch {
         console.info(
-          `Unable to infer canister id from hostname '${hostname}', falling back to BN lookup.}`,
+          `Unable to infer canister id from hostname '${hostname}', falling back to BN lookup.}`
         );
       }
     }
@@ -79,13 +79,13 @@ const lookupCanister = async ({
         method: "HEAD",
         // do not send cookies or other credentials
         credentials: "omit",
-      },
+      }
     );
 
     const headerValue = response.headers.get(HEADER_NAME);
     if (isNullish(headerValue)) {
       console.error(
-        `Canister ID header '${HEADER_NAME}' was not set on origin ${origin}`,
+        `Canister ID header '${HEADER_NAME}' was not set on origin ${origin}`
       );
 
       return "not_found";
@@ -96,8 +96,8 @@ const lookupCanister = async ({
     console.error(
       `Failed to resolve canister ID from origin '${origin}': ${unknownToString(
         error,
-        "unknown error",
-      )}`,
+        "unknown error"
+      )}`
     );
 
     return "not_found";

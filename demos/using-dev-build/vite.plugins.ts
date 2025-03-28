@@ -20,7 +20,7 @@ export const readCanisterIds = (): Record<string, string> => {
     };
 
     const config: Record<string, Details> = JSON.parse(
-      readFileSync(canisterIdsJsonFile, "utf-8"),
+      readFileSync(canisterIdsJsonFile, "utf-8")
     );
 
     return Object.entries(config).reduce((acc, current: [string, Details]) => {

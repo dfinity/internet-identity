@@ -19,7 +19,7 @@ describe("formatLastUsage", () => {
       `today at ${timestamp.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "numeric",
-      })}`,
+      })}`
     );
   });
 
@@ -29,7 +29,7 @@ describe("formatLastUsage", () => {
       `today at ${timestamp.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "numeric",
-      })}`,
+      })}`
     );
   });
 

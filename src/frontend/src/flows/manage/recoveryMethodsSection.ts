@@ -87,7 +87,7 @@ export const missingRecovery = (
     | {
         recovery: "key";
         addRecoveryKey: () => void;
-      },
+      }
 ) => {
   const { icon, iconClass, recoveryName, message, fn, action } =
     args.recovery === "phrase"

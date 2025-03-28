@@ -11,5 +11,5 @@ export default defineConfig(
       globals: true /* globals like 'test' and 'describe' */,
       watch: false,
     },
-  }),
+  })
 );

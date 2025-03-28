@@ -81,7 +81,7 @@ const displaySeedPhraseTemplate = ({
                   style="--index: '${i + 1}';"
                 >
                   <i>${word}</i>
-                </li>`,
+                </li>`
             )}
           </ol>
           <i
@@ -111,7 +111,7 @@ const displaySeedPhraseTemplate = ({
             withRef(continueButton, (continueButton) =>
               withRef(checkbox, (checkbox) => {
                 continueButton.disabled = !checkbox.checked;
-              }),
+              })
             )}
         />
         <label for="ack-checkbox" class="t-strong"
@@ -158,6 +158,7 @@ export const displaySeedPhrase = ({
 }): Promise<"ok" | "canceled"> => {
   const i18n = new I18n();
   const words = seedPhrase.split(" ");
+  // eslint-disable-next-line
   const userNumberWord = words.shift()!; // Extract first word (anchor) to show independently
   return new Promise((resolve) =>
     displaySeedPhrasePage({
@@ -168,6 +169,6 @@ export const displaySeedPhrase = ({
       cancel: () => resolve("canceled"),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
       i18n,
-    }),
+    })
   );
 };

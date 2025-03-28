@@ -11,10 +11,10 @@ describe("pin identity", () => {
     });
 
     expect(reconstructed.getPrincipal().toText()).toBe(
-      identity.getPrincipal().toText(),
+      identity.getPrincipal().toText()
     );
     expect(new Uint8Array(reconstructed.getPublicKey().toDer())).toStrictEqual(
-      new Uint8Array(identity.getPublicKey().toDer()),
+      new Uint8Array(identity.getPublicKey().toDer())
     );
   }, 30000 /* large timeout (in millis) because the crypto ops are heavy */);
 });

@@ -10,7 +10,7 @@ export function generate(): string {
   crypto.getRandomValues(entropy);
   return entropyToMnemonic(
     toHexString(entropy.buffer),
-    RECOVERYPHRASE_WORDLIST,
+    RECOVERYPHRASE_WORDLIST
   );
 }
 

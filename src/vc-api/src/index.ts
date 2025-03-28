@@ -1,7 +1,7 @@
 import { Principal } from "@dfinity/principal";
 import { isNullish } from "@dfinity/utils";
 import { z } from "zod";
-import { type ArgumentValue } from "./generated/vc_issuer_types";
+import { ArgumentValue } from "./generated/vc_issuer_types";
 
 export type * from "./generated/vc_issuer_types";
 
@@ -29,7 +29,7 @@ const zodCredentialSpec = z
   .object({
     credentialType: z.string(),
     arguments: z.optional(
-      z.record(z.string(), z.union([z.string(), z.number()])),
+      z.record(z.string(), z.union([z.string(), z.number()]))
     ),
   })
   /* Transform to make the type easier to use:
@@ -47,7 +47,7 @@ const zodCredentialSpec = z
 
 /* Convert the JSON map/record into what the did spec expects */
 const fixupArgs = (
-  arg: Record<string, string | number>,
+  arg: Record<string, string | number>
 ): Array<[string, ArgumentValue]> => {
   return Object.entries(arg).map(([k, v]) => [
     k,

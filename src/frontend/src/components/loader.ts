@@ -32,7 +32,7 @@ const startLoader = (showCheckOngoingIssues?: boolean) => {
 
   const takingForeverTimeout = setTimeout(
     () => render(loader(true), container),
-    TAKING_FOREVER,
+    TAKING_FOREVER
   );
 
   return () => {
@@ -43,7 +43,7 @@ const startLoader = (showCheckOngoingIssues?: boolean) => {
 
 export const withLoader = async <A>(
   action: () => Promise<A>,
-  showCheckOngoingIssues?: boolean,
+  showCheckOngoingIssues?: boolean
 ): Promise<A> => {
   const endLoader = startLoader(showCheckOngoingIssues);
   try {

@@ -8,6 +8,8 @@ import {
   switchToPopup,
 } from "../util";
 import { AuthenticateView, DemoAppView, ErrorView } from "../views";
+
+import { nonNullish } from "@dfinity/utils";
 import {
   II_URL,
   TEST_APP_CANONICAL_URL,
@@ -28,7 +30,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       '{"alternativeOrigins":["https://a0.com", "https://a1.com", "https://a2.com", "https://a3.com", "https://a4.com", "https://a5.com", "https://a6.com", "https://a7.com", "https://a8.com", "https://a9.com", "https://a10.com"]}',
-      "certified",
+      "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -39,15 +41,15 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`,
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      `Resource ${TEST_APP_CANONICAL_URL}/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed.`,
+      `Resource ${TEST_APP_CANONICAL_URL}/.well-known/ii-alternative-origins has too many entries: To prevent misuse at most 10 alternative origins are allowed.`
     );
   });
 }, 300_000);
@@ -65,7 +67,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       '{"alternativeOrigins":["https://evil.com"]}',
-      "redirect",
+      "redirect"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -76,15 +78,15 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`,
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      `An error occurred while validating the derivationOrigin "${TEST_APP_CANONICAL_URL}": Failed to fetch`,
+      `An error occurred while validating the derivationOrigin "${TEST_APP_CANONICAL_URL}": Failed to fetch`
     );
   });
 }, 300_000);
@@ -102,7 +104,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-      "certified",
+      "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL_RAW);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -113,19 +115,22 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
 
     // Selenium has _no_ connectivity to the raw url
     // We want accessing raw urls to fail because it would be a security issue on mainnet
-    const statusCode = await browser.execute(
-      (urlRaw) =>
-        fetch(`${urlRaw}/.well-known/ii-alternative-origins`)
-          .then((res) => res.status)
-          .catch(() => 500),
-      TEST_APP_CANONICAL_URL_RAW,
+    await browser.execute(
+      `try{await fetch("${TEST_APP_CANONICAL_URL_RAW}/.well-known/ii-alternative-origins")}catch(e){e.message}`
     );
-    expect(statusCode).toEqual(500);
+
+    const logs = (await browser.getLogs("browser")) as { message: string }[];
+    const errorLog = logs.find(
+      ({ message }) =>
+        message.includes("/.well-known/ii-alternative-origins") &&
+        message.includes("Failed to load resource")
+    );
+    expect(nonNullish(errorLog)).toBeTruthy();
 
     // This works anyway --> fetched using non-raw
     const authenticateView = new AuthenticateView(browser);
@@ -148,7 +153,7 @@ test("Should allow arbitrary URL as derivation origin", async () => {
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_CANONICAL_URL}"]}`,
-      "certified",
+      "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_NICE_URL);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -159,7 +164,7 @@ test("Should allow arbitrary URL as derivation origin", async () => {
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();

@@ -32,7 +32,7 @@ const recoverWithPhraseTemplate = <T>({
   const numWords = RECOVERYPHRASE_WORDCOUNT;
   const wordRefs: Ref<HTMLInputElement>[] = Array.from(
     { length: numWords },
-    () => createRef(),
+    () => createRef()
   );
 
   const userNumberInput = createRef<HTMLInputElement>();
@@ -112,7 +112,7 @@ const recoverWithPhraseTemplate = <T>({
               assignTo: wordRef,
               index: `${i + 1}`,
               validityType: "word",
-            }),
+            })
           )}
         </ol>
       </div>
@@ -159,14 +159,14 @@ const reportValidity = ({ element }: { element: HTMLInputElement }): State => {
       word === ""
         ? "Word cannot be empty"
         : !wordlists.english.includes(word)
-          ? "This is not a word that is associated with recovery phrases. Try again."
-          : undefined,
+        ? "This is not a word that is associated with recovery phrases. Try again."
+        : undefined,
     number: (word: string) =>
       word === ""
         ? "User number cannot be empty"
         : !/^\d+$/.test(word)
-          ? "Enter your Internet Identity here. This is a number and contains no other characters."
-          : undefined,
+        ? "Enter your Internet Identity here. This is a number and contains no other characters."
+        : undefined,
   }[validityType](word);
   if (nonNullish(reason)) {
     element.setCustomValidity(reason);
@@ -205,7 +205,7 @@ export const wordTemplate = ({
       ({
         pending: "c-list--recovery-word__attention",
         incorrect: "c-list--recovery-word__incorrect",
-      })[s],
+      }[s])
   );
 
   // The icon to show (when warning of a bad word)
@@ -219,7 +219,7 @@ export const wordTemplate = ({
           class="c-list--recovery-word__icon"
           >${warningIcon}</i
         >`,
-      })[s],
+      }[s])
   );
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
 
@@ -307,7 +307,7 @@ type TemplateProps<T> = Parameters<typeof recoverWithPhraseTemplate<T>>[0];
 
 export const recoverWithPhrasePage = <T>(
   props: TemplateProps<T>,
-  container?: HTMLElement,
+  container?: HTMLElement
 ) => renderPage(recoverWithPhraseTemplate<T>)(props, container);
 
 export const recoverWithPhrase = ({
@@ -322,7 +322,7 @@ export const recoverWithPhrase = ({
       confirm: (result) => resolve(result),
       verify: async ({ userNumber, words }) => {
         const result = await withLoader(() =>
-          connection.fromSeedPhrase(userNumber, words.join(" ")),
+          connection.fromSeedPhrase(userNumber, words.join(" "))
         );
         if (result.kind !== "loginSuccess") {
           const msg = {

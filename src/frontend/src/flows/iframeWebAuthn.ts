@@ -46,7 +46,7 @@ const isCredentialResponse = (data: unknown): data is CredentialResponse =>
 const requestCredential = (
   options: CredentialRequestOptions,
   targetWindow: Window,
-  targetOrigin: string,
+  targetOrigin: string
 ): Promise<PublicKeyCredential> =>
   new Promise<PublicKeyCredential>((resolve, reject) => {
     // Listen for credential response
@@ -81,7 +81,7 @@ const requestCredential = (
 
 const handleCredentialRequest = (
   targetWindow: Window,
-  targetOrigin: string,
+  targetOrigin: string
 ): void =>
   window.addEventListener("message", async (event: MessageEvent) => {
     if (
@@ -91,7 +91,7 @@ const handleCredentialRequest = (
     ) {
       try {
         const credential = (await navigator.credentials.get(
-          event.data.ii_credential_request.options,
+          event.data.ii_credential_request.options
         )) as PublicKeyCredential;
         const response: CredentialResponse = {
           ii_credential_response: {
@@ -138,7 +138,7 @@ const handleCredentialRequest = (
   });
 
 export const webAuthnInIframeFlow = async (
-  connection: Connection,
+  connection: Connection
 ): Promise<never> => {
   // Establish cross-origin connection with parent window
   const targetOrigin = await waitForWindowReadyRequest(
@@ -148,7 +148,7 @@ export const webAuthnInIframeFlow = async (
     //
     // Additionally, the CSP configuration will block any attempt to render II
     // inside an iframe from domains that are not related origins.
-    connection.canisterConfig.related_origins[0] ?? [],
+    connection.canisterConfig.related_origins[0] ?? []
   );
 
   // Get credential and send to parent window
@@ -160,7 +160,7 @@ export const webAuthnInIframeFlow = async (
 };
 
 export const webAuthnInIframe = async (
-  options: CredentialRequestOptions,
+  options: CredentialRequestOptions
 ): Promise<Credential> => {
   if (isNullish(options.publicKey?.rpId)) {
     throw new Error("RP id is missing");

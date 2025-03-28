@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { isNullish } from "@dfinity/utils";
-// @ts-expect-error Ignore
+// @ts-expect-error TODO: Fix this error
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import { existsSync, mkdirSync } from "fs";
 import { remote } from "webdriverio";

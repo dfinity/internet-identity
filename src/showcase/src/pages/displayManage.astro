@@ -22,48 +22,41 @@ import Screen from "../layouts/Screen.astro";
           {
             alias: "Chrome on iPhone",
             isCurrent: true,
+            remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
             last_usage: [BigInt(Date.now() * 1000000)],
-            canBeRemoved: false,
-            // TODO: Fix by adding actual dummy device data
-            device: true as unknown as any
           },
           {
             alias: "Yubikey Blue",
             isCurrent: false,
+            remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
             last_usage: [
-              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 7)
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 7),
             ],
-            canBeRemoved: false,
-            device: true as unknown as any
           },
           {
             alias: "Yubikey Blue",
             isCurrent: false,
+            remove: () => toast.info("remove"),
             rename: () => toast.info("rename"),
             last_usage: [
-              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30),
             ],
             warn: html`Something is rotten in the state of Device`,
-            canBeRemoved: false,
-            device: true as unknown as any
-          }
+          },
         ],
         recoveries: {
           recoveryPhrase: {
             isProtected: true,
             unprotect: () => toast.info("unprotect"),
-            reset: () => toast.info("reset")
-          }
+            reset: () => toast.info("reset"),
+          },
         },
-        pinAuthenticators: []
+        pinAuthenticators: [],
       },
       onAddDevice: () => {
         toast.info("add device requested");
-      },
-      onRemoveDevice: () => {
-        toast.info("remove device requested");
       },
       addRecoveryPhrase: () => {
         toast.info("add recovery phrase");
@@ -81,7 +74,7 @@ import Screen from "../layouts/Screen.astro";
       dapps,
       exploreDapps: () => {
         toast.info("explore dapps");
-      }
+      },
     });
   </script>
 </Screen>

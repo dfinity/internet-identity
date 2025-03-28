@@ -1,5 +1,5 @@
 declare namespace globalThis {
-  void any;
+  any;
 }
 
 declare module "kjua";

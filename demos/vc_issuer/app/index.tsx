@@ -14,7 +14,7 @@ import "./main.css";
 const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
-    "[data-canister-id]",
+    "[data-canister-id]"
   ) as HTMLElement | null;
   if (!setupJs || setupJs.dataset.canisterId === undefined) {
     throw new Error("canisterId is undefined"); // abort further execution of this script
@@ -42,7 +42,7 @@ const App = () => {
 
   // The derivation origin to use for authentication
   const [derivationOrigin, setDerivationOrigin] = useState<string | undefined>(
-    undefined,
+    undefined
   );
 
   // The principal, set during auth
@@ -185,5 +185,5 @@ const App = () => {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 );

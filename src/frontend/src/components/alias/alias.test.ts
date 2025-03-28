@@ -14,7 +14,7 @@ test("can be canceled", () => {
       cancel,
       i18n: new I18n(),
     },
-    document.body,
+    document.body
   );
 
   const elem = document.querySelector("#pickAliasCancel") as HTMLElement;
@@ -35,7 +35,7 @@ test("can be picked", () => {
       cancel,
       i18n: new I18n(),
     },
-    document.body,
+    document.body
   );
 
   const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
@@ -60,7 +60,7 @@ test("alias can contain special characters", () => {
       cancel,
       i18n: new I18n(),
     },
-    document.body,
+    document.body
   );
 
   const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
@@ -85,7 +85,7 @@ test("alias should be trimmed", () => {
       cancel,
       i18n: new I18n(),
     },
-    document.body,
+    document.body
   );
 
   const input = document.querySelector("#pickAliasInput") as HTMLInputElement;
@@ -110,7 +110,7 @@ test("alias must not be whitespace only", () => {
       cancel,
       i18n: new I18n(),
     },
-    document.body,
+    document.body
   );
 
   const input = document.querySelector("#pickAliasInput") as HTMLInputElement;

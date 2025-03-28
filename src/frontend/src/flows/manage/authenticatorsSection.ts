@@ -28,7 +28,7 @@ export type DedupAuthenticator = Authenticator & { dupCount?: number };
 
 // Deduplicate devices with same (duplicated) aliases
 export const dedupLabels = (
-  authenticators: Authenticator[],
+  authenticators: Authenticator[]
 ): DedupAuthenticator[] => {
   return authenticators.reduce<Authenticator[]>((acc, authenticator) => {
     const _authenticator: DedupAuthenticator = { ...authenticator };
@@ -112,7 +112,7 @@ export const authenticatorsSection = ({
               i18n,
               onRemove: () => onRemoveDevice(authenticator.device),
               showRpId: cleanupRecommended,
-            }),
+            })
           )}
         </ul>
         <div class="c-action-list__actions">
@@ -235,30 +235,34 @@ export const authenticatorItem = ({
                 <span class="t-muted">${copy.current_device_label}</span>
               </div>`
             : nonNullish(lastUsageFormattedString)
-              ? html`<div class="t-muted">
-                  Last used: ${lastUsageFormattedString}
-                </div>`
-              : undefined}
+            ? html`<div class="t-muted">
+                Last used: ${lastUsageFormattedString}
+              </div>`
+            : undefined}
         </div>
       </div>
     </li>
   `;
 };
 
-const itemWarning = ({ warn }: { warn: TemplateResult }): TemplateResult =>
-  html`<div class="c-action-list__action">
-    <span class="c-tooltip c-icon c-icon--error" tabindex="0"
-      >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
-        >${warn}</span
-      ></span
-    >
-  </div>`;
+const itemWarning = ({
+  warn,
+}: {
+  warn: TemplateResult;
+}): TemplateResult => html`<div class="c-action-list__action">
+  <span class="c-tooltip c-icon c-icon--error" tabindex="0"
+    >${warningIcon}<span class="c-tooltip__message c-card c-card--tight"
+      >${warn}</span
+    ></span
+  >
+</div>`;
 
-const itemInfo = (msg: TemplateResult): TemplateResult =>
-  html`<div class="c-action-list__action">
-    <span class="c-tooltip c-icon" tabindex="0" data-icon="info"
-      >${infoIcon}<span class="c-tooltip__message c-card c-card--tight"
-        >${msg}</span
-      ></span
-    >
-  </div>`;
+const itemInfo = (msg: TemplateResult): TemplateResult => html`<div
+  class="c-action-list__action"
+>
+  <span class="c-tooltip c-icon" tabindex="0" data-icon="info"
+    >${infoIcon}<span class="c-tooltip__message c-card c-card--tight"
+      >${msg}</span
+    ></span
+  >
+</div>`;

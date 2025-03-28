@@ -14,7 +14,7 @@ import DOMPurify from "dompurify";
 
 import copyJson from "./allowCredentials.json";
 
-import unknownDappLogo from "$src/assets/unknowndapp.png?url";
+import unknownDappLogo from "$src/assets/unknowndapp.png";
 
 /*
  * Get the dapp that corresponds to the origin, or create a new one if it's
@@ -194,6 +194,6 @@ export const allowCredentials = ({
       onAllow: (userNumber) => resolve({ tag: "allowed", userNumber }),
       onCancel: () => resolve({ tag: "canceled" }),
       scrollToTop: true,
-    }),
+    })
   );
 };

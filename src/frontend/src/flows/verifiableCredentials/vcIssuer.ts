@@ -20,7 +20,7 @@ export class VcIssuer {
 
   // Create an actor representing the backend
   createActor = async (
-    identity?: Identity,
+    identity?: Identity
   ): Promise<ActorSubclass<_SERVICE>> => {
     const agent = await HttpAgent.create({
       host: inferHost(),
@@ -53,7 +53,7 @@ export class VcIssuer {
 
     if ("Err" in result) {
       console.error(
-        "Could not prepare credential: " + JSON.stringify(result.Err),
+        "Could not prepare credential: " + JSON.stringify(result.Err)
       );
       return "error";
     }
@@ -128,7 +128,7 @@ export class VcIssuer {
     if ("Err" in result) {
       console.error(
         "Could not get derivation origin (issuer error)",
-        JSON.stringify(result.Err),
+        JSON.stringify(result.Err)
       );
       return { kind: "error" };
     }

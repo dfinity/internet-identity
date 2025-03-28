@@ -62,7 +62,7 @@ export const promptDeviceTrustedPage = renderPage(promptDeviceTrustedTemplate);
  * Page to prompt the user whether they trust the current device.
  */
 export const promptDeviceTrusted = (
-  props: Pick<PromptDeviceTrustedTemplateProps, "userNumber">,
+  props: Pick<PromptDeviceTrustedTemplateProps, "userNumber">
 ): Promise<"confirmed" | "canceled"> => {
   return new Promise((resolve) =>
     promptDeviceTrustedPage({
@@ -70,6 +70,6 @@ export const promptDeviceTrusted = (
       confirm: () => resolve("confirmed"),
       cancel: () => resolve("canceled"),
       i18n: new I18n(),
-    }),
+    })
   );
 };

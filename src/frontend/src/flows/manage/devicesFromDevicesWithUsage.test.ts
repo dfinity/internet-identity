@@ -25,7 +25,7 @@ describe("devicesFromDevicesWithUsage", () => {
 
   const createDevice = (
     origin: string | undefined,
-    pubkey?: PublicKey,
+    pubkey?: PublicKey
   ): DeviceWithUsage => ({
     alias: "alias",
     last_usage: [],
@@ -60,7 +60,7 @@ describe("devicesFromDevicesWithUsage", () => {
       expect(expectedDevices.authenticators[0].warn).toBeUndefined();
       expect(expectedDevices.authenticators[1].warn).toBeUndefined();
       expect(expectedDevices.authenticators[2].warn?.strings[0]).toContain(
-        "This Passkey may not be usable on the current URL",
+        "This Passkey may not be usable on the current URL"
       );
     });
   });

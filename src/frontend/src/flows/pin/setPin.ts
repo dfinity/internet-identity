@@ -83,7 +83,7 @@ export const setPin = (): Promise<
       cancel: () => resolve({ tag: "canceled" }),
       focus: true,
       scrollToTop: true,
-    }),
+    })
   );
 };
 

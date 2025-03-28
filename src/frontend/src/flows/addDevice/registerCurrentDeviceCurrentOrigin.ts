@@ -32,30 +32,31 @@ const registerCurrentDeviceCurrentOriginTemplate = ({
 };
 
 export const registerCurrentDeviceCurrentOriginPage = renderPage(
-  registerCurrentDeviceCurrentOriginTemplate,
+  registerCurrentDeviceCurrentOriginTemplate
 );
 
 // Prompt the user to add the current device (with the current origin).
 // Adding the current device to the current origin improves the UX of the user when they come back to this origin.
 export const registerCurrentDeviceCurrentOrigin = (
   userNumber: bigint,
-  connection: AuthenticatedConnection,
+  connection: AuthenticatedConnection
 ): Promise<void> =>
   new Promise((resolve) =>
     registerCurrentDeviceCurrentOriginPage({
       i18n: new I18n(),
       add: async () => {
-        const existingDevices =
-          await connection.lookupAuthenticators(userNumber);
+        const existingDevices = await connection.lookupAuthenticators(
+          userNumber
+        );
         // We pass `undefined` as current origin becase we want to add the current device to the current origin.
         await addCurrentDevice(
           userNumber,
           connection,
           existingDevices,
-          undefined,
+          undefined
         );
         resolve();
       },
       skip: () => resolve(),
-    }),
+    })
   );

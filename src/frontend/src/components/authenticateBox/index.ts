@@ -179,8 +179,8 @@ const pinIdentityAuthenticatorValidity = async ({
   const hasAuthenticator = authenticators.some((authenticator) =>
     bufferEqual(
       new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
-      pinPubkeyDer,
-    ),
+      pinPubkeyDer
+    )
   );
 
   return hasAuthenticator ? "valid" : "expired";
@@ -205,10 +205,10 @@ export const authenticateBoxFlow = async <I>({
   i18n: I18n;
   templates: AuthnTemplates;
   addDevice: (
-    userNumber?: bigint,
+    userNumber?: bigint
   ) => Promise<{ tag: "deviceAdded" } | { tag: "canceled" }>;
   loginPasskey: (
-    userNumber: bigint,
+    userNumber: bigint
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -299,7 +299,7 @@ export const authenticateBoxFlow = async <I>({
     });
 
   const doLoginWithGoogle = async (
-    connection: Connection,
+    connection: Connection
   ): Promise<
     | (LoginSuccess & {
         newAnchor: false;
@@ -323,20 +323,20 @@ export const authenticateBoxFlow = async <I>({
 
     const googleRequestConfig = createGoogleRequestConfig(googleClientId);
     const { nonce, salt } = await createAnonymousNonce(
-      sessionIdentity.getPrincipal(),
+      sessionIdentity.getPrincipal()
     );
 
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
         nonce,
-      }),
+      })
     );
 
     const authenticatedConnection = await connection.fromJwt(
       jwt,
       salt,
-      sessionIdentity,
+      sessionIdentity
     );
 
     return {
@@ -447,7 +447,7 @@ export const handleLoginFlowResult = async <E>(
     | (LoginSuccess & E)
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
-    | FlowError,
+    | FlowError
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
@@ -463,7 +463,7 @@ export const handleLoginFlowResult = async <E>(
       infoToastTemplate({
         title: copy.title_possibly_wrong_web_authn_flow,
         messages: [copy.message_possibly_wrong_web_authn_flow_1],
-      }),
+      })
     );
     return undefined;
   }
@@ -478,7 +478,7 @@ export const handleLoginFlowResult = async <E>(
           copy.message_pin_another_domain_1,
           copy.message_pin_another_domain_2,
         ],
-      }),
+      })
     );
     return undefined;
   }
@@ -542,7 +542,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       const withUserNumber = (f: (arg: bigint | undefined) => void) => {
         const value = withRef(
           anchorInput.userNumberInput,
-          (input) => input.value,
+          (input) => input.value
         );
 
         // XXX: we work around parseUserNumber returning "null" by defaulting to "undefined"
@@ -562,7 +562,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         <button
           @click=${() =>
             withUserNumber((userNumber) =>
-              useExistingProps.addDevice(userNumber),
+              useExistingProps.addDevice(userNumber)
             )}
           id="addNewDeviceButton"
           class="c-button c-button--secondary"
@@ -596,7 +596,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
             <a
               @click="${() =>
                 withUserNumber((userNumber) =>
-                  useExistingProps.recover(userNumber),
+                  useExistingProps.recover(userNumber)
                 )}"
               id="recoverButton"
               class="t-link"
@@ -650,7 +650,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
         pages.firstTime({
           useExisting: () => resolve({ tag: "use_existing" }),
           register: () => resolve({ tag: "register" }),
-        }),
+        })
       ),
     useExisting: () =>
       new Promise<
@@ -669,7 +669,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
           loginOpenIDGoogle: () => resolve({ tag: "open_id_google" }),
-        }),
+        })
       ),
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
@@ -759,7 +759,7 @@ const loginPinIdentityMaterial = ({
 // Register this device as a new device with the anchor
 const asNewDevice = async (
   connection: Connection,
-  prefilledUserNumber?: bigint,
+  prefilledUserNumber?: bigint
 ): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Prompt the user for an anchor and provide additional information about the flow.
   // If the user number is already known, it is prefilled in the screen.
@@ -777,11 +777,11 @@ const asNewDevice = async (
 
 // Helper to convert PIN identity material to a Der public-key
 const pinIdentityToDerPubkey = async (
-  pinIdentity: PinIdentityMaterial,
+  pinIdentity: PinIdentityMaterial
 ): Promise<DerEncodedPublicKey> => {
   return (await crypto.subtle.exportKey(
     "spki",
-    pinIdentity.publicKey,
+    pinIdentity.publicKey
   )) as DerEncodedPublicKey;
 };
 
@@ -801,7 +801,7 @@ const useIdentityFlow = async <I>({
     userNumber: bigint;
   }) => Promise<I | undefined>;
   loginPasskey: (
-    userNumber: bigint,
+    userNumber: bigint
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -843,7 +843,7 @@ const useIdentityFlow = async <I>({
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
       userNumber,
-    }),
+    })
   );
 
   const doLoginPasskey = async () => {
@@ -865,7 +865,7 @@ const useIdentityFlow = async <I>({
     verifyPinValidity({
       pinIdentityMaterial,
       userNumber,
-    }),
+    })
   );
   if (isValid === "expired") {
     // the PIN identity seems to have been expired

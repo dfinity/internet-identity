@@ -13,7 +13,7 @@ describe("addDeviceSuccess", () => {
         deviceAlias: "Test device alias",
         onContinue,
       },
-      document.body,
+      document.body
     );
 
     document.querySelector<HTMLButtonElement>('[data-action="next"]')?.click();

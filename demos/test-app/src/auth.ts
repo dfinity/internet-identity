@@ -67,7 +67,7 @@ export const authWithII = async ({
 
   // Send the request to II
   const sessionPublicKey: Uint8Array = new Uint8Array(
-    sessionIdentity.getPublicKey().toDer(),
+    sessionIdentity.getPublicKey().toDer()
   );
 
   const request = {
@@ -120,12 +120,12 @@ const identityFromResponse = ({
 
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
-    response.userPublicKey.buffer,
+    response.userPublicKey.buffer
   );
 
   const identity = DelegationIdentity.fromDelegation(
     sessionIdentity,
-    delegationChain,
+    delegationChain
   );
 
   return identity;
@@ -137,12 +137,12 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
   : "argument is not an array";
 
 export const extractDelegation = (
-  signedDelegation: ElementOf<AuthResponseSuccess["delegations"]>,
+  signedDelegation: ElementOf<AuthResponseSuccess["delegations"]>
 ): SignedDelegation => ({
   delegation: new Delegation(
     signedDelegation.delegation.pubkey,
     signedDelegation.delegation.expiration,
-    signedDelegation.delegation.targets,
+    signedDelegation.delegation.targets
   ),
   signature: signedDelegation.signature
     .buffer as Signature /* brand type for agent-js */,

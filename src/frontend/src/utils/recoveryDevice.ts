@@ -18,25 +18,25 @@ export const recoveryPhraseLabel = "Recovery Phrase";
 export const recoveryKeyLabel = "Recovery Device";
 
 export const isRecoveryDevice = (
-  device: Pick<DeviceData, "purpose">,
+  device: Pick<DeviceData, "purpose">
 ): device is RecoveryDevice => "recovery" in device.purpose;
 
 // Whether the user has a recovery phrase or not
 export const hasRecoveryPhrase = (
-  devices: Pick<DeviceData, "key_type">[],
+  devices: Pick<DeviceData, "key_type">[]
 ): boolean => devices.some(isRecoveryPhrase);
 
 // Whether the user has a recovery key (i.e. recovery but not phrase) or not
 export const hasRecoveryKey = (
-  devices: Pick<DeviceData, "key_type" | "purpose">[],
+  devices: Pick<DeviceData, "key_type" | "purpose">[]
 ): boolean =>
   devices.some(
-    (device) => isRecoveryDevice(device) && !isRecoveryPhrase(device),
+    (device) => isRecoveryDevice(device) && !isRecoveryPhrase(device)
   );
 
 export const isProtected = (device: DeviceData): boolean =>
   "protected" in device.protection;
 
 export const isRecoveryPhrase = (
-  device: Pick<DeviceData, "key_type">,
+  device: Pick<DeviceData, "key_type">
 ): device is RecoveryPhrase => "seed_phrase" in device.key_type;

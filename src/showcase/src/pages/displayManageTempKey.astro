@@ -24,17 +24,11 @@ import Screen from "../layouts/Screen.astro";
             alias: "Chrome on iPhone",
             isCurrent: false,
             rename: () => toast.info("rename"),
-            canBeRemoved: false,
-            last_usage: [],
-            // TODO: Replace with mock device
-            device: true as unknown as any
-          }
-        ]
+            remove: () => toast.info("remove"),
+          },
+        ],
       },
       onAddDevice: () => {
-        toast.info("add device requested");
-      },
-      onRemoveDevice: () => {
         toast.info("add device requested");
       },
       addRecoveryPhrase: () => {
@@ -56,8 +50,8 @@ import Screen from "../layouts/Screen.astro";
       },
       tempKeysWarning: {
         tag: "add_recovery",
-        action: () => toast.info("add recovery phrase")
-      }
+        action: () => toast.info("add recovery phrase"),
+      },
     });
   </script>
 </Screen>

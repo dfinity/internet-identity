@@ -50,7 +50,7 @@ export const AuthRequest = z.object({
         // Temporary work around for clients that use 'number' instead of 'bigint'
         // https://github.com/dfinity/internet-identity/issues/1050
         console.warn(
-          "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future",
+          "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future"
         );
         return BigInt(val);
       }
@@ -175,7 +175,7 @@ export async function authenticationProtocol({
       userPublicKey: authenticateResult.userPublicKey,
       authnMethod: authenticateResult.authnMethod,
     } satisfies AuthResponse,
-    authContext.requestOrigin,
+    authContext.requestOrigin
   );
 
   return "success";
@@ -194,7 +194,7 @@ const waitForRequest = (): Promise<
   return new Promise((resolve) => {
     const timeout = setTimeout(
       () => resolve({ kind: "timeout" }),
-      TIMEOUT_WAIT_FOR_REQUEST,
+      TIMEOUT_WAIT_FOR_REQUEST
     );
     const messageEventHandler = (event: MessageEvent) => {
       if (event.origin === window.location.origin) {

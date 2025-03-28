@@ -55,7 +55,7 @@ describe("pin input", () => {
     }
 
     expect(onSubmit).toHaveBeenCalledWith(
-      Array(pinInput_.pinLength).fill("a").join(""),
+      Array(pinInput_.pinLength).fill("a").join("")
     );
   });
 
@@ -83,7 +83,7 @@ describe("pin input", () => {
     }
 
     const noneHasFocus = getAllInputs().every(
-      (input) => input !== document.activeElement,
+      (input) => input !== document.activeElement
     );
 
     expect(noneHasFocus).toBeTruthy();
@@ -94,7 +94,7 @@ describe("pin input", () => {
       pinInputId({
         onSubmit: () => {},
       }).template,
-      document.body,
+      document.body
     );
 
     const [first, second] = getAllInputs();
@@ -115,7 +115,7 @@ describe("pin input", () => {
       pinInputId({
         onSubmit: noop,
       }).template,
-      document.body,
+      document.body
     );
     const input = getAllInputs()[2];
     dispatchInput(input, "a");
@@ -146,7 +146,7 @@ describe("pin input", () => {
 
     // Check that no input is focused
     const noneHasFocus = getAllInputs().every(
-      (input) => input !== document.activeElement,
+      (input) => input !== document.activeElement
     );
     expect(noneHasFocus).toBeTruthy();
   });
