@@ -49,7 +49,7 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Release build check failed (could not get release): https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MESSAGE: "Release build check failed (could not get release): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # Perform the clean build (non-docker), using the release as checkout
   clean-build:
@@ -75,7 +75,7 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Release build check failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MESSAGE: "Release build check failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # Verify the hash using the verify-hash script, using the release as checkout.
   # This runs the build using docker and should work on all platforms.
@@ -103,4 +103,4 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Verify hash check failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MESSAGE: "Verify hash check failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
