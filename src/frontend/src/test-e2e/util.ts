@@ -2,7 +2,7 @@ import { idlFactory as internet_identity_idl } from "$generated/internet_identit
 import { _SERVICE } from "$generated/internet_identity_types";
 import { randomString, wrapError } from "$src/utils/utils";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
-import { isNullish, nonNullish } from "@dfinity/utils";
+import { nonNullish } from "@dfinity/utils";
 
 // @ts-expect-error Ignore
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
@@ -11,7 +11,6 @@ import * as fsasync from "fs/promises";
 import { command } from "webdriver";
 import { remote } from "webdriverio";
 import { WebAuthnCredential } from "../../test-setup";
-import path from "path";
 
 // mobile resolution is used when env variable SCREEN=mobile is set
 const MOBILE_SCREEN: ScreenConfiguration = {
@@ -49,8 +48,6 @@ async function remoteRetry(
     `Could not start browser after ${MAX_RETRIES} retries: ${lastErr}`,
   );
 }
-
-let browser: WebdriverIO.Browser | undefined;
 
 export async function runInBrowser(
   test: (
@@ -103,19 +100,13 @@ export async function runInBrowser(
     );
   }
 
-  const capabilities = {
-    browserName: "chrome",
-    browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
-    "goog:chromeOptions": chromeOptions,
-  };
-  if (isNullish(browser)) {
-    browser = await remoteRetry({
-      capabilities,
-      cacheDir: path.resolve(__dirname, "./.chrome-cache"),
-    });
-  } else {
-    await browser.reloadSession(capabilities);
-  }
+  const browser = await remoteRetry({
+    capabilities: {
+      browserName: "chrome",
+      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      "goog:chromeOptions": chromeOptions,
+    },
+  });
 
   // setup test suite
   await addCustomCommands(browser);
@@ -149,16 +140,7 @@ export async function runInBrowser(
     throw e;
   } finally {
     try {
-      // Cleanup any pending virtual authenticator
-      // if (nonNullish(registeredVirtualAuthenticatorId)) {
-      //   await removeVirtualAuthenticator(
-      //     browser,
-      //     registeredVirtualAuthenticatorId,
-      //   );
-      // }
-      await browser.deleteSession({
-        shutdownDriver: false,
-      });
+      await browser.deleteSession();
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
@@ -366,8 +348,6 @@ export async function addCustomCommands(
   );
 }
 
-let registeredVirtualAuthenticatorId: string | undefined = undefined;
-
 export async function addVirtualAuthenticator(
   browser: WebdriverIO.Browser,
 ): Promise<string> {
@@ -377,7 +357,6 @@ export async function addVirtualAuthenticator(
     true,
     true,
   );
-  registeredVirtualAuthenticatorId = authenticatorId;
   return authenticatorId;
 }
 
@@ -385,9 +364,6 @@ export async function removeVirtualAuthenticator(
   browser: WebdriverIO.Browser,
   authenticatorId: string,
 ): Promise<void> {
-  if (authenticatorId === registeredVirtualAuthenticatorId) {
-    registeredVirtualAuthenticatorId = undefined;
-  }
   return await browser.removeVirtualWebAuth(authenticatorId);
 }
 

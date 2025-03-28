@@ -22,7 +22,11 @@ export default defineConfig(
       setupFiles: "./src/frontend/test-setup.ts",
       poolOptions: {
         threads: {
-          singleThread: true,
+          // minThreads defaults to number of CPUs. But we want to run e2e tests
+          // sequentially, and maxThreads must never be lower than minThreads.
+          // Therefore, we adjust it here to have the flexibility to set the max
+          // to one for the e2e tests only.
+          minThreads: 1,
         },
       },
     },

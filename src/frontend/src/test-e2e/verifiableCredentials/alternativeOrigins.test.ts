@@ -1,5 +1,5 @@
 import { runInBrowser } from "$src/test-e2e/util";
-// import { DemoAppView } from "$src/test-e2e/views";
+import { DemoAppView } from "$src/test-e2e/views";
 
 import {
   II_URL,
@@ -8,7 +8,7 @@ import {
   ISSUER_CUSTOM_ORIGIN_NICE_URL,
   KNOWN_TEST_DAPP,
   TEST_APP_CANONICAL_URL,
-  // TEST_APP_NICE_URL,
+  TEST_APP_NICE_URL,
 } from "$src/test-e2e/constants";
 
 import { beforeEach } from "vitest";
@@ -29,112 +29,112 @@ beforeEach(async () => {
 });
 
 test("Can issue credential with alternative RP derivation origin", async () => {
-  // await runInBrowser(async (browser: WebdriverIO.Browser) => {
-  //   await browser.url(II_URL);
-  //   const authConfig = await register["webauthn"](browser);
-  //
-  //   // Add user as employee on the issuer
-  //   await registerWithIssuer({
-  //     browser,
-  //     issuer: ISSUER_APP_URL,
-  //     authConfig,
-  //   });
-  //
-  //   // Authenticate to RP without alt origins
-  //   const vcTestApp = await authenticateToRelyingParty({
-  //     browser,
-  //     issuer: ISSUER_APP_URL,
-  //     authConfig,
-  //     relyingParty: TEST_APP_CANONICAL_URL,
-  //   });
-  //   const principalRP = await vcTestApp.getPrincipal();
-  //
-  //   // Do the VC flow without alt origins
-  //   const { alias: alias_ } = await getVCPresentation({
-  //     vcTestApp,
-  //     browser,
-  //     authConfig,
-  //     relyingParty: TEST_APP_CANONICAL_URL,
-  //     issuer: ISSUER_APP_URL,
-  //   });
-  //   const alias = JSON.parse(alias_);
-  //
-  //   // Set up alternative origin for RP VC flow
-  //   const demoAppView = new DemoAppView(browser);
-  //   await demoAppView.updateAlternativeOrigins(
-  //     `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-  //     "certified",
-  //   );
-  //
-  //   // Authenticate to RP WITH alt origins
-  //   const vcTestAppAlt = await authenticateToRelyingParty({
-  //     browser,
-  //     issuer: ISSUER_APP_URL,
-  //     authConfig,
-  //     relyingParty: TEST_APP_NICE_URL,
-  //     derivationOrigin: TEST_APP_CANONICAL_URL,
-  //   });
-  //   const principalRPAlt = await vcTestAppAlt.getPrincipal();
-  //   expect(principalRPAlt).toBe(principalRP);
-  //
-  //   // Do the VC flow WITH alt origins
-  //   const { alias: aliasAlt_ } = await getVCPresentation({
-  //     vcTestApp: vcTestAppAlt,
-  //     browser,
-  //     authConfig,
-  //     relyingParty: TEST_APP_NICE_URL,
-  //     issuer: ISSUER_APP_URL,
-  //     knownDapps: [KNOWN_TEST_DAPP],
-  //   });
-  //
-  //   const aliasAlt = JSON.parse(aliasAlt_);
-  //   expect(aliasAlt.sub).toBe(alias.sub);
-  // });
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const authConfig = await register["webauthn"](browser);
+
+    // Add user as employee on the issuer
+    await registerWithIssuer({
+      browser,
+      issuer: ISSUER_APP_URL,
+      authConfig,
+    });
+
+    // Authenticate to RP without alt origins
+    const vcTestApp = await authenticateToRelyingParty({
+      browser,
+      issuer: ISSUER_APP_URL,
+      authConfig,
+      relyingParty: TEST_APP_CANONICAL_URL,
+    });
+    const principalRP = await vcTestApp.getPrincipal();
+
+    // Do the VC flow without alt origins
+    const { alias: alias_ } = await getVCPresentation({
+      vcTestApp,
+      browser,
+      authConfig,
+      relyingParty: TEST_APP_CANONICAL_URL,
+      issuer: ISSUER_APP_URL,
+    });
+    const alias = JSON.parse(alias_);
+
+    // Set up alternative origin for RP VC flow
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.updateAlternativeOrigins(
+      `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
+      "certified",
+    );
+
+    // Authenticate to RP WITH alt origins
+    const vcTestAppAlt = await authenticateToRelyingParty({
+      browser,
+      issuer: ISSUER_APP_URL,
+      authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      derivationOrigin: TEST_APP_CANONICAL_URL,
+    });
+    const principalRPAlt = await vcTestAppAlt.getPrincipal();
+    expect(principalRPAlt).toBe(principalRP);
+
+    // Do the VC flow WITH alt origins
+    const { alias: aliasAlt_ } = await getVCPresentation({
+      vcTestApp: vcTestAppAlt,
+      browser,
+      authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      issuer: ISSUER_APP_URL,
+      knownDapps: [KNOWN_TEST_DAPP],
+    });
+
+    const aliasAlt = JSON.parse(aliasAlt_);
+    expect(aliasAlt.sub).toBe(alias.sub);
+  });
 }, 300_000);
 
 test("Cannot issue credential with bad alternative RP derivation origin", async () => {
-  // await runInBrowser(async (browser: WebdriverIO.Browser) => {
-  //   await browser.url(II_URL);
-  //   const authConfig = await register["webauthn"](browser);
-  //
-  //   // 1. Set up alternative origin for RP
-  //   const demoAppView = new DemoAppView(browser);
-  //   await demoAppView.open(TEST_APP_NICE_URL, II_URL);
-  //   await demoAppView.updateAlternativeOrigins(
-  //     `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-  //     "certified",
-  //   );
-  //
-  //   // 2. Do the flow WITH alt origins RESET
-  //   const vcTestAppAlt = await authenticateToRelyingParty({
-  //     browser,
-  //     issuer: ISSUER_APP_URL,
-  //     authConfig,
-  //     relyingParty: TEST_APP_NICE_URL,
-  //     derivationOrigin: TEST_APP_CANONICAL_URL,
-  //   });
-  //
-  //   // 3. Reset alternative origins
-  //   await demoAppView.resetAlternativeOrigins();
-  //
-  //   // 4. Do the flow WITH alt origins RESET
-  //   const result = await getVCPresentation_({
-  //     vcTestApp: vcTestAppAlt,
-  //     browser,
-  //     authConfig,
-  //     relyingParty: TEST_APP_NICE_URL,
-  //     issuer: ISSUER_APP_URL,
-  //     knownDapps: [KNOWN_TEST_DAPP],
-  //   });
-  //
-  //   expect(result.result).toBe("aborted");
-  //   if (!("reason" in result)) {
-  //     throw new Error(
-  //       "Expected VC result to be aborted, got: " + JSON.stringify(result),
-  //     );
-  //   }
-  //   expect(result.reason).toBe("bad_derivation_origin_rp");
-  // });
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    await browser.url(II_URL);
+    const authConfig = await register["webauthn"](browser);
+
+    // 1. Set up alternative origin for RP
+    const demoAppView = new DemoAppView(browser);
+    await demoAppView.open(TEST_APP_NICE_URL, II_URL);
+    await demoAppView.updateAlternativeOrigins(
+      `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
+      "certified",
+    );
+
+    // 2. Do the flow WITH alt origins RESET
+    const vcTestAppAlt = await authenticateToRelyingParty({
+      browser,
+      issuer: ISSUER_APP_URL,
+      authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      derivationOrigin: TEST_APP_CANONICAL_URL,
+    });
+
+    // 3. Reset alternative origins
+    await demoAppView.resetAlternativeOrigins();
+
+    // 4. Do the flow WITH alt origins RESET
+    const result = await getVCPresentation_({
+      vcTestApp: vcTestAppAlt,
+      browser,
+      authConfig,
+      relyingParty: TEST_APP_NICE_URL,
+      issuer: ISSUER_APP_URL,
+      knownDapps: [KNOWN_TEST_DAPP],
+    });
+
+    expect(result.result).toBe("aborted");
+    if (!("reason" in result)) {
+      throw new Error(
+        "Expected VC result to be aborted, got: " + JSON.stringify(result),
+      );
+    }
+    expect(result.reason).toBe("bad_derivation_origin_rp");
+  });
 }, 300_000);
 
 test("Can issue credential with alternative issuer derivation origin", async () => {
