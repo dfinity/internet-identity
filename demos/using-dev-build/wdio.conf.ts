@@ -46,6 +46,24 @@ export const config: WebdriverIO.Config = {
       }
     }
   },
+  // Add better error handling
+  onPrepare: function () {
+    // Clean temp files that might cause ETXTBSY
+    if (process.platform !== "win32") {
+      try {
+        require("child_process").execSync(
+          "rm -rf /tmp/.org.chromium.Chromium*",
+          { stdio: "ignore" }
+        );
+        require("child_process").execSync("rm -rf /tmp/.com.google.Chrome*", {
+          stdio: "ignore",
+        });
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+  },
+
   logLevel: "info",
 
   framework: "mocha",

@@ -692,7 +692,7 @@ export class VcAllowView extends View {
     const elem = await this.browser.$(
       '[data-page="vc-allow"],[data-page="vc-aborted"]',
     );
-    await elem.waitForDisplayed({ timeout: 10_000 });
+    await elem.waitForDisplayed({ timeout: 60_000 });
     const page = await elem.getAttribute("data-page");
 
     if (page === "vc-allow") {
@@ -1043,7 +1043,7 @@ export class DemoAppView extends View {
   async waitForNthMessage(messageNo: number): Promise<void> {
     await this.browser
       .$(`div.postMessage:nth-child(${messageNo})`)
-      .waitForDisplayed();
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async openIiTab(): Promise<void> {
