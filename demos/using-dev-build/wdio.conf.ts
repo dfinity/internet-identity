@@ -3,6 +3,10 @@ export const config: WebdriverIO.Config = {
 
   waitforTimeout: 10_000,
 
+  // Add retry mechanism
+  connectionRetryTimeout: 120000,
+  connectionRetryCount: 3,
+
   autoCompileOpts: {
     autoCompile: true,
     tsNodeOpts: {
@@ -29,6 +33,19 @@ export const config: WebdriverIO.Config = {
       acceptInsecureCerts: true,
     },
   ],
+  // Add before hook for cleanup
+  beforeSession: function () {
+    // Clean up any existing Chrome processes
+    if (process.platform !== "win32") {
+      try {
+        require("child_process").execSync("pkill -f chrome", {
+          stdio: "ignore",
+        });
+      } catch (e) {
+        // Ignore errors if no chrome processes exist
+      }
+    }
+  },
   logLevel: "info",
 
   framework: "mocha",
