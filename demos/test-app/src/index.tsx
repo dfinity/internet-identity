@@ -215,7 +215,6 @@ const readCanisterId = (): string => {
 };
 
 const init = async () => {
-  await updateAlternativeOriginsView();
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
     // The default max TTL setin the @dfinity/auth-client library
@@ -349,6 +348,7 @@ const init = async () => {
     await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
     await updateAlternativeOriginsView();
   };
+  await updateAlternativeOriginsView();
 };
 
 init();
