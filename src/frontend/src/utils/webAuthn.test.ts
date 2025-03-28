@@ -29,7 +29,7 @@ describe("webauthn", () => {
 
     it("should return valid AAGUID", () => {
       expect(extractAAGUID(authData)).toBe(
-        "fbfc3007-154e-4ecc-8c0b-6e020557d7bd", // iCloud Keychain
+        "fbfc3007-154e-4ecc-8c0b-6e020557d7bd" // iCloud Keychain
       );
     });
 
@@ -49,7 +49,7 @@ describe("webauthn", () => {
 
     it("should return expected value", async () => {
       expect(await lookupAAGUID("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")).toBe(
-        "iCloud Keychain",
+        "iCloud Keychain"
       );
     });
   });

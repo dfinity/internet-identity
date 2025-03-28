@@ -84,7 +84,7 @@ const verifyCredentials = async ({
     validateDerivationOrigin({
       requestOrigin: rpOrigin_,
       derivationOrigin: rpDerivationOrigin,
-    }),
+    })
   );
   if (validRpDerivationOrigin.result === "invalid") {
     return abortedCredentials({ reason: "bad_derivation_origin_rp" });
@@ -98,7 +98,7 @@ const verifyCredentials = async ({
     {
       vcIssuer,
       issuerOrigin,
-    },
+    }
   );
 
   if (issuerDerivationOriginResult.kind === "error") {
@@ -162,7 +162,7 @@ const verifyCredentials = async ({
       infoToastTemplate({
         title: copy.title_trying_again,
         messages: [copy.message_possibly_wrong_web_authn_flow_1],
-      }),
+      })
     );
     authResult = await useIdentity({
       userNumber,
@@ -187,7 +187,7 @@ const verifyCredentials = async ({
   const computedP_RP = await withLoader(() =>
     authenticatedConnection.getPrincipal({
       origin: rpOrigin,
-    }),
+    })
   );
   if (computedP_RP.compareTo(givenP_RP) !== "eq") {
     console.error("Principal did not match that expected by RP");
@@ -330,7 +330,7 @@ const getValidatedIssuerDerivationOrigin = async ({
   });
   if (validationResult.result === "invalid") {
     console.error(
-      `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`,
+      `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`
     );
     return { kind: "error", err: "invalid_derivation_origin_issuer" };
   }
@@ -423,13 +423,13 @@ const authenticateForIssuer = async ({
     delegation: new Delegation(
       parsed_signed_delegation.delegation.pubkey,
       parsed_signed_delegation.delegation.expiration,
-      parsed_signed_delegation.delegation.targets,
+      parsed_signed_delegation.delegation.targets
     ),
     signature: parsed_signed_delegation.signature,
   };
   const delegations = DelegationChain.fromDelegations(
     [degs],
-    Uint8Array.from(userKey),
+    Uint8Array.from(userKey)
   );
   return { ok: DelegationIdentity.fromDelegation(tempIdentity, delegations) };
 };

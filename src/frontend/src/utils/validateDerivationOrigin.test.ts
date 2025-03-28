@@ -134,7 +134,7 @@ test("should fetch alternative origins file using non-raw URL", async () => {
   expect(result).toEqual({ result: "valid" });
   expect(fetchMock).toHaveBeenLastCalledWith(
     `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
-    FETCH_OPTS,
+    FETCH_OPTS
   );
 });
 

@@ -29,11 +29,11 @@ declare global {
         protocol: string,
         transport: string,
         hasResidentKey: boolean,
-        isUserConsenting: boolean,
+        isUserConsenting: boolean
       ) => Promise<string>;
       removeVirtualWebAuth: (authenticatorId: string) => Promise<void>;
       getWebauthnCredentials: (
-        authenticatorId: string,
+        authenticatorId: string
       ) => Promise<WebAuthnCredential[]>;
       addWebauthnCredential: (
         authenticatorId: string,
@@ -43,7 +43,7 @@ declare global {
         privateKey: string,
         signCount: number,
         userHandle?: string,
-        largeBlob?: string,
+        largeBlob?: string
       ) => Promise<void>;
     }
   }

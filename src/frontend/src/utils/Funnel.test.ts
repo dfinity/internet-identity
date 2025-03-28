@@ -50,7 +50,7 @@ describe("Funnel", () => {
     mockVisibilityState("visible");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
-      "start-login-window-session-enter",
+      "start-login-window-session-enter"
     );
   });
 
@@ -59,14 +59,14 @@ describe("Funnel", () => {
     mockVisibilityState("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
-      "start-login-window-session-leave",
+      "start-login-window-session-leave"
     );
   });
 
   it("trigger() - tracks new registration start event", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart);
     expect(analytics.event).toHaveBeenCalledWith(
-      "login-new-registration-start",
+      "login-new-registration-start"
     );
   });
 
@@ -79,7 +79,7 @@ describe("Funnel", () => {
 
     funnel.trigger(LoginEvents.ExistingUserPasskeySuccess);
     expect(analytics.event).toHaveBeenCalledWith(
-      "login-existing-user-passkey-success",
+      "login-existing-user-passkey-success"
     );
   });
 
@@ -92,7 +92,7 @@ describe("Funnel", () => {
 
     funnel.trigger(LoginEvents.ExistingUserOpenIdSuccess);
     expect(analytics.event).toHaveBeenCalledWith(
-      "login-existing-user-openid-success",
+      "login-existing-user-openid-success"
     );
   });
 

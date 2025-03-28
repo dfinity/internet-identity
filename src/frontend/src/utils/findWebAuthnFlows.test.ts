@@ -15,7 +15,7 @@ describe("findWebAuthnFlows", () => {
   ];
 
   const createMockCredential = (
-    origin: string | undefined,
+    origin: string | undefined
   ): CredentialData => ({
     pubkey: new ArrayBuffer(32),
     credentialId: new ArrayBuffer(16),

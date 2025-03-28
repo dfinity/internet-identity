@@ -72,28 +72,28 @@ test("derive Ed25519 via SLIP 0010", async () => {
 
       const identity = await ed25519.fromSeedWithSlip0010(
         new Uint8Array(seedBlob),
-        testVector.derivationPath,
+        testVector.derivationPath
       );
 
       const keyPair = identity.getKeyPair();
       expect(keyPair.secretKey.slice(0, 32)).toEqual(
-        new Uint8Array(expectedPrivateKey),
+        new Uint8Array(expectedPrivateKey)
       );
       expect(keyPair.publicKey.toDer()).toEqual(
-        Ed25519PublicKey.fromRaw(expectedPublicKey).toDer(),
+        Ed25519PublicKey.fromRaw(expectedPublicKey).toDer()
       );
-    }),
+    })
   );
 });
 
 test("Can derive identity from invalid mnemonic", async () => {
   await expect(
-    ed25519.fromMnemonicWithoutValidation(""),
+    ed25519.fromMnemonicWithoutValidation("")
   ).resolves.not.toThrow();
   await expect(
-    ed25519.fromMnemonicWithoutValidation("g4rb4g3"),
+    ed25519.fromMnemonicWithoutValidation("g4rb4g3")
   ).resolves.not.toThrow();
   await expect(
-    ed25519.fromMnemonicWithoutValidation("basket actual"),
+    ed25519.fromMnemonicWithoutValidation("basket actual")
   ).resolves.not.toThrow();
 });

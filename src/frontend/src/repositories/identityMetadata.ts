@@ -41,12 +41,12 @@ const updateMetadataMapV2 = ({
 }): MetadataMapV2 => {
   // Convert the partialIdentityMetadata into the format of MetadataMapV2
   const identityMetadataEntries: MetadataMapV2 = Object.entries(
-    partialIdentityMetadata,
+    partialIdentityMetadata
   ).map(([key, value]) => {
     if (typeof value === "number") {
       return [key, { String: value.toString() }] as [
         string,
-        { String: string },
+        { String: string }
       ];
     }
     return [key, { String: value as string }] as [string, { String: string }];
@@ -55,7 +55,7 @@ const updateMetadataMapV2 = ({
   // Update or add entries in metadataMap
   const updatedMetadataMap: MetadataMapV2 = metadataMap.map(([key, value]) => {
     const updatedEntry = identityMetadataEntries.find(
-      ([identityKey]) => identityKey === key,
+      ([identityKey]) => identityKey === key
     );
     return updatedEntry ? updatedEntry : [key, value];
   });
@@ -127,7 +127,7 @@ export class IdentityMetadataRepository {
     } catch (e) {
       console.warn(
         "Failed to load identity metadata: ",
-        unknownToString(e, "unknown error"),
+        unknownToString(e, "unknown error")
       );
     }
     return undefined;
@@ -150,13 +150,13 @@ export class IdentityMetadataRepository {
         updateMetadataMapV2({
           metadataMap: metadataMap,
           partialIdentityMetadata: partialMetadata,
-        }),
+        })
       );
       this.updatedMetadata = true;
     } catch (e) {
       console.warn(
         "Error updating identity metadata: ",
-        unknownToString(e, "unknown error"),
+        unknownToString(e, "unknown error")
       );
     }
   };
@@ -178,7 +178,7 @@ export class IdentityMetadataRepository {
       } catch (error) {
         console.warn(
           "Error committing identity metadata: ",
-          unknownToString(error, "unknown error"),
+          unknownToString(error, "unknown error")
         );
         return false;
       }

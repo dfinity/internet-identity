@@ -53,7 +53,7 @@ export const setupKey = async ({
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
         newDeviceOrigin ?? window.location.origin,
-        recoverIdentity.rawId,
+        recoverIdentity.rawId
       );
     });
   } catch (error: unknown) {
@@ -67,7 +67,7 @@ export const setupKey = async ({
 export const setupPhrase = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  origin: string,
+  origin: string
 ): Promise<"ok" | "error" | "canceled"> => {
   const res = await phraseWizard({
     userNumber,
@@ -80,8 +80,8 @@ export const setupPhrase = async (
           { recovery: null },
           pubkey,
           { unprotected: null },
-          origin,
-        ),
+          origin
+        )
       ),
   });
 
@@ -108,7 +108,7 @@ export const phraseWizard = async ({
   const seedPhrase = generate().trim();
   const recoverIdentity = await fromMnemonicWithoutValidation(
     seedPhrase,
-    IC_DERIVATION_PATH,
+    IC_DERIVATION_PATH
   );
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;

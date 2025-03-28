@@ -82,6 +82,6 @@ export const abortedCredentials = ({
       reason,
       onAcknowledge: () => resolve("aborted"),
       scrollToTop: true,
-    }),
+    })
   );
 };

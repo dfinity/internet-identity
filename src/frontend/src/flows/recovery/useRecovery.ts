@@ -28,7 +28,7 @@ import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
-  connection: Connection,
+  connection: Connection
 ): Promise<LoginSuccess | { tag: "canceled" }> => {
   const res = await promptRecovery();
 
@@ -182,7 +182,7 @@ const enrollAuthenticator = async ({
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
       newDeviceOrigin ?? window.location.origin,
-      newDevice.rawId,
+      newDevice.rawId
     );
   } catch (error: unknown) {
     await displayError({

@@ -26,7 +26,7 @@ test("Should prompt for passkey auth immediately when supplying known auto-selec
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
 
     // Passkey interaction completes automatically with virtual authenticator
@@ -41,8 +41,9 @@ test("Should prompt for passkey auth immediately when supplying known auto-selec
 
 test("Should require user interaction when supplying unknown auto-select principal", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { demoAppView, credentials, userNumber } =
-      await registerAndSignIn(browser);
+    const { demoAppView, credentials, userNumber } = await registerAndSignIn(
+      browser
+    );
     const exp1 = await browser.$("#expiration").getText();
 
     // authenticate again, but this time with an unknown principal
@@ -56,7 +57,7 @@ test("Should require user interaction when supplying unknown auto-select princip
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
 
     const authView = new AuthenticateView(browser);
@@ -76,8 +77,9 @@ test("Should require user interaction when supplying unknown auto-select princip
 
 test("Should require user interaction when supplying not most recent auto-select principal", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { demoAppView, credentials, userNumber } =
-      await registerAndSignIn(browser);
+    const { demoAppView, credentials, userNumber } = await registerAndSignIn(
+      browser
+    );
     const principal = await demoAppView.waitForAuthenticated();
 
     // register a second identity
@@ -95,7 +97,7 @@ test("Should require user interaction when supplying not most recent auto-select
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
 
     const authView = new AuthenticateView(browser);

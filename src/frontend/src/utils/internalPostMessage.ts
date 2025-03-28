@@ -27,7 +27,7 @@ const isReadyResponse = (data: unknown): data is ReadyResponse =>
  */
 export const waitForWindowReadyResponse = (
   targetWindow: Window,
-  targetOrigin: string,
+  targetOrigin: string
 ): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     const id = window.crypto.randomUUID();
@@ -50,9 +50,9 @@ export const waitForWindowReadyResponse = (
           {
             ii_ready_request: id,
           } as ReadyRequest,
-          targetOrigin,
+          targetOrigin
         ),
-      READY_INTERVAL,
+      READY_INTERVAL
     );
     const timeout = setTimeout(() => {
       clearInterval(interval);
@@ -68,7 +68,7 @@ export const waitForWindowReadyResponse = (
  */
 export const waitForWindowReadyRequest = (
   targetWindow: Window,
-  targetOrigins: string[],
+  targetOrigins: string[]
 ): Promise<string> =>
   new Promise<string>((resolve) => {
     const listener = (event: MessageEvent) => {
@@ -81,7 +81,7 @@ export const waitForWindowReadyRequest = (
       window.removeEventListener("message", listener);
       targetWindow.postMessage(
         { ii_ready_response: event.data.ii_ready_request } as ReadyResponse,
-        event.origin,
+        event.origin
       );
       resolve(event.origin);
     };

@@ -59,7 +59,7 @@ export const validateDerivationOrigin = async ({
         },
         // do not send cookies or other credentials
         credentials: "omit",
-      },
+      }
     );
 
     if (response.status !== 200) {
@@ -102,7 +102,7 @@ export const validateDerivationOrigin = async ({
     return {
       result: "invalid",
       message: `An error occurred while validating the derivationOrigin "${derivationOrigin}": ${wrapError(
-        e,
+        e
       )}`,
     };
   }

@@ -70,21 +70,20 @@ const marqueeList = (dapps: KnownDapp[]): TemplateResult => {
   >
     ${rows.map((rowDapps, i) => {
       const rowContent = rowDapps.map(
-        ({ logoSrc, name }) =>
-          html`<div class="c-marquee__item">
-            <div class="c-marquee__image-container">
-              <img
-                src=${logoSrc}
-                alt="${name}"
-                class="c-marquee__image c-marquee__image--loading"
-                @load=${(e: Event) => {
-                  const img = e.target as HTMLImageElement;
-                  img.classList.remove("c-marquee__image--loading");
-                  img.classList.add("c-marquee__image--loaded");
-                }}
-              />
-            </div>
-          </div>`,
+        ({ logoSrc, name }) => html`<div class="c-marquee__item">
+          <div class="c-marquee__image-container">
+            <img
+              src=${logoSrc}
+              alt="${name}"
+              class="c-marquee__image c-marquee__image--loading"
+              @load=${(e: Event) => {
+                const img = e.target as HTMLImageElement;
+                img.classList.remove("c-marquee__image--loading");
+                img.classList.add("c-marquee__image--loaded");
+              }}
+            />
+          </div>
+        </div>`
       );
 
       return html`<div class="c-marquee__row" style="--rowIndex: ${i}">
@@ -116,5 +115,5 @@ const chunkArray = <T>({
   chunkSize: number;
 }): T[][] =>
   Array.from(new Array(Math.ceil(arr.length / chunkSize)), (_, index) =>
-    arr.slice(index * chunkSize, index * chunkSize + chunkSize),
+    arr.slice(index * chunkSize, index * chunkSize + chunkSize)
   );

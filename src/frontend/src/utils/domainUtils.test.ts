@@ -5,7 +5,7 @@ import { isOfficialOrigin } from "./domainUtils";
 describe("isOfficialOrigin", () => {
   // Base mock config with all required fields - requires explicit related_origins parameter
   const createBaseMockConfig = (
-    related_origins: string[],
+    related_origins: string[]
   ): InternetIdentityInit => ({
     related_origins: [related_origins],
     fetch_root_key: [false],
@@ -36,11 +36,11 @@ describe("isOfficialOrigin", () => {
 
   it("should return true if origin is in the related origins list", () => {
     expect(
-      isOfficialOrigin("https://identity.internetcomputer.org", mockConfig),
+      isOfficialOrigin("https://identity.internetcomputer.org", mockConfig)
     ).toBe(true);
     expect(isOfficialOrigin("https://identity.ic0.app", mockConfig)).toBe(true);
     expect(
-      isOfficialOrigin("https://test.internetcomputer.org", mockConfig),
+      isOfficialOrigin("https://test.internetcomputer.org", mockConfig)
     ).toBe(true);
     expect(isOfficialOrigin("http://localhost:8080", mockConfig)).toBe(true);
   });
@@ -48,38 +48,35 @@ describe("isOfficialOrigin", () => {
   it("should return false if origin is not in the related origins list", () => {
     expect(isOfficialOrigin("https://example.com", mockConfig)).toBe(false);
     expect(isOfficialOrigin("https://identity.example.org", mockConfig)).toBe(
-      false,
+      false
     );
   });
 
   it("should compare origins correctly, ignoring path and query params", () => {
     // Same origin but with paths should still match
     expect(
-      isOfficialOrigin(
-        "https://identity.internetcomputer.org/path",
-        mockConfig,
-      ),
+      isOfficialOrigin("https://identity.internetcomputer.org/path", mockConfig)
     ).toBe(true);
     expect(
-      isOfficialOrigin("https://identity.ic0.app/path/to/resource", mockConfig),
+      isOfficialOrigin("https://identity.ic0.app/path/to/resource", mockConfig)
     ).toBe(true);
     expect(
       isOfficialOrigin(
         "https://identity.internetcomputer.org?query=param",
-        mockConfig,
-      ),
+        mockConfig
+      )
     ).toBe(true);
   });
 
   it("should handle empty related origins", () => {
     expect(
-      isOfficialOrigin("https://identity.internetcomputer.org", emptyConfig),
+      isOfficialOrigin("https://identity.internetcomputer.org", emptyConfig)
     ).toBe(false);
   });
 
   it("should handle null related origins", () => {
     expect(
-      isOfficialOrigin("https://identity.internetcomputer.org", nullConfig),
+      isOfficialOrigin("https://identity.internetcomputer.org", nullConfig)
     ).toBe(false);
   });
 
@@ -100,7 +97,7 @@ describe("isOfficialOrigin", () => {
 
     // Should still work with valid URLs and skip the invalid one
     expect(
-      isOfficialOrigin("https://identity.internetcomputer.org", invalidConfig),
+      isOfficialOrigin("https://identity.internetcomputer.org", invalidConfig)
     ).toBe(true);
 
     // Restore console.error
@@ -110,27 +107,24 @@ describe("isOfficialOrigin", () => {
   it("should handle URLs with different protocols", () => {
     // Different protocol should not match
     expect(
-      isOfficialOrigin("http://identity.internetcomputer.org", mockConfig),
+      isOfficialOrigin("http://identity.internetcomputer.org", mockConfig)
     ).toBe(false);
   });
 
   it("should handle subdomains correctly", () => {
     // Subdomain should be treated as a different origin
     expect(
-      isOfficialOrigin("https://sub.identity.internetcomputer.org", mockConfig),
+      isOfficialOrigin("https://sub.identity.internetcomputer.org", mockConfig)
     ).toBe(false);
     expect(isOfficialOrigin("https://sub.identity.ic0.app", mockConfig)).toBe(
-      false,
+      false
     );
   });
 
   it("should handle ports correctly", () => {
     // Different port should be treated as a different origin
     expect(
-      isOfficialOrigin(
-        "https://identity.internetcomputer.org:8080",
-        mockConfig,
-      ),
+      isOfficialOrigin("https://identity.internetcomputer.org:8080", mockConfig)
     ).toBe(false);
 
     // Test with a config that includes a port
@@ -142,11 +136,11 @@ describe("isOfficialOrigin", () => {
     expect(
       isOfficialOrigin(
         "https://identity.internetcomputer.org:8080",
-        configWithPort,
-      ),
+        configWithPort
+      )
     ).toBe(true);
     expect(
-      isOfficialOrigin("https://identity.internetcomputer.org", configWithPort),
+      isOfficialOrigin("https://identity.internetcomputer.org", configWithPort)
     ).toBe(true);
   });
 });

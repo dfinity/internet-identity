@@ -5,13 +5,13 @@ test("add device link looks as expected", () => {
     addDeviceLink({
       userNumber: BigInt(10000),
       origin: "https://identity.ic0.app",
-    }),
+    })
   ).toBe("https://identity.ic0.app/?action=add-passkey&ii=10000");
   expect(
     addDeviceLink({
       userNumber: BigInt(10000),
       origin: "https://identity.internetcomputer.org",
-    }),
+    })
   ).toBe("https://identity.internetcomputer.org/?action=add-passkey&ii=10000");
 });
 

@@ -81,7 +81,7 @@ test("getDevicesStatus returns 'pin-only' for user with pin and has seen recover
       },
       pinIdentityMaterial,
       nowInMillis,
-    }),
+    })
   ).toBe("pin-only");
 });
 
@@ -94,7 +94,7 @@ test("getDevicesStatus returns 'one-device' for user with one passkey and has se
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("one-device");
 });
 
@@ -105,7 +105,7 @@ test("getDevicesStatus returns true for user with one passkey and empty identity
       identityMetadata: {},
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("one-device");
 });
 
@@ -118,7 +118,7 @@ test("getDevicesStatus returns 'one-device' for user with one recovery device an
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("one-device");
 });
 
@@ -131,7 +131,7 @@ test("getDevicesStatus returns 'one-device' for user with one device and a recov
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("one-device");
 });
 
@@ -145,7 +145,7 @@ test("getDevicesStatus returns 'no-warning' for user with pin that has disabled 
       },
       pinIdentityMaterial,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });
 
@@ -159,7 +159,7 @@ test("getDevicesStatus returns 'no-warning' for user with one device that has di
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });
 
@@ -172,7 +172,7 @@ test("getDevicesStatus returns 'no-warning' for user with two devices", () => {
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });
 
@@ -185,7 +185,7 @@ test("getDevicesStatus returns 'no-warning' for user with one normal device and 
       },
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });
 
@@ -196,7 +196,7 @@ test("getDevicesStatus returns 'no-warning' for user with more than two devices 
       identityMetadata: {},
       pinIdentityMaterial: undefined,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });
 
@@ -209,6 +209,6 @@ test("getDevicesStatus returns 'no-warning' for user with pin and has seen recov
       },
       pinIdentityMaterial,
       nowInMillis,
-    }),
+    })
   ).toBe("no-warning");
 });

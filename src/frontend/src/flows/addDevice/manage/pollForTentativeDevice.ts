@@ -65,7 +65,7 @@ const pollForTentativeDeviceTemplate = ({
         ${mount((container) =>
           container instanceof HTMLElement
             ? displayQR({ link, container })
-            : undefined,
+            : undefined
         )}
       ></div>
     </div>
@@ -120,7 +120,7 @@ const pollForTentativeDeviceTemplate = ({
 };
 
 export const pollForTentativeDevicePage = renderPage(
-  pollForTentativeDeviceTemplate,
+  pollForTentativeDeviceTemplate
 );
 
 type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
@@ -134,7 +134,7 @@ export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp,
-  origin: string,
+  origin: string
 ): Promise<PollReturn> => {
   const i18n = new I18n();
   const countdown: AsyncCountdown<PollReturn> =
@@ -152,7 +152,7 @@ export const pollForTentativeDevice = async (
   // Poll repeatedly
   void (async () => {
     const result = await poll(userNumber, connection, () =>
-      countdown.hasStopped(),
+      countdown.hasStopped()
     );
     countdown.stop(result);
   })();
@@ -165,7 +165,7 @@ export const pollForTentativeDevice = async (
 const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  shouldStop: () => boolean,
+  shouldStop: () => boolean
 ): Promise<DeviceData | "use-fido"> =>
   // eslint-disable-next-line no-async-promise-executor
   new Promise(async (resolve) => {
@@ -211,7 +211,7 @@ const displayQR = async ({
 
   // Retrieve a fitting color CSS (defaults to black if for some reason none is set)
   const fill: string = getComputedStyle(
-    document.documentElement,
+    document.documentElement
   ).getPropertyValue("currentColor");
 
   // Create the QR code
@@ -223,6 +223,6 @@ const displayQR = async ({
       ecLevel: "M", // Medium error correction
       size: 256, // in pixels
     },
-    container,
+    container
   );
 };

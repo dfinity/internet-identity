@@ -88,7 +88,7 @@ const clarifyError: {
 };
 
 export const flowErrorToastTemplate = <K extends FlowError["kind"]>(
-  flowError: KindToError<K> & { kind: K },
+  flowError: KindToError<K> & { kind: K }
 ): TemplateResult => {
   const props = clarifyError[flowError.kind](flowError);
   const detailSlot = nonNullish(props.detail)

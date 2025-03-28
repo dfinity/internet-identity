@@ -7,7 +7,7 @@ import {
 
 const expectLeadingUserNumberToBe = (
   received: string,
-  expected: number | null,
+  expected: number | null
 ) => {
   const parsed = parseRecoveryPhrase(received);
   const lun =
@@ -53,10 +53,10 @@ test("Word list is parsed correctly", () => {
 const expectWarningsInclude = (
   userNumber: number,
   input: string,
-  warning: Warning,
+  warning: Warning
 ) => {
   expect(getWarnings(BigInt(userNumber), input)).toEqual(
-    expect.arrayContaining([warning]),
+    expect.arrayContaining([warning])
   );
 };
 
@@ -101,6 +101,6 @@ test("Warnings are correctly generated", () => {
 
   expectNoWarnings(
     10001,
-    "10001 trust dad oak bright arrow pipe omit provide material donkey hole worry parade test paper fix clutch state range census dust fan hurry almost",
+    "10001 trust dad oak bright arrow pipe omit provide material donkey hole worry parade test paper fix clutch state range census dust fan hurry almost"
   );
 });

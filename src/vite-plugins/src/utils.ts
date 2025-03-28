@@ -26,7 +26,7 @@ export const readCanisterId = ({
     return stdout.toString().trim();
   } catch (e) {
     throw Error(
-      `Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`,
+      `Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`
     );
   }
 };
@@ -45,7 +45,7 @@ export const readCanisterConfig = ({
     return Buffer.from(stdout.toString().trim(), "hex").toString("base64");
   } catch (e) {
     throw Error(
-      `Could not get canister config for '${canisterName}' with command '${command}', was the canister deployed? ${e}`,
+      `Could not get canister config for '${canisterName}' with command '${command}', was the canister deployed? ${e}`
     );
   }
 };
@@ -59,7 +59,7 @@ export const getReplicaHost = (): string => {
     return `http://127.0.0.1:${port}`;
   } catch (e) {
     throw Error(
-      `Could not get replica port '${command}', is the replica running? ${e}`,
+      `Could not get replica port '${command}', is the replica running? ${e}`
     );
   }
 };
@@ -77,7 +77,7 @@ export const forwardToReplica = async ({
   replicaOrigin: string;
 }) => {
   console.log(
-    `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`,
+    `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`
   );
 
   // Start by crafting the new request with the original request's headers
@@ -125,7 +125,7 @@ export const forwardToReplica = async ({
 
 // Convert a header value to a string
 const homogenizeHeaderValue = (
-  header: string | string[] | undefined,
+  header: string | string[] | undefined
 ): string => {
   if (header === undefined) {
     return "";

@@ -22,7 +22,7 @@ void createSpa(async (connection) => {
     // Register this device (tentatively)
     const registerDeviceResult = await registerTentativeDevice(
       addDeviceAnchor,
-      connection,
+      connection
     );
     if (registerDeviceResult.tag === "canceled") {
       // Adding a device was canceled, fall back into default flow

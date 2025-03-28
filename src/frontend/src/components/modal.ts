@@ -61,5 +61,5 @@ export const formModal = ({ slot }: { slot: TemplateResult }): Promise<void> =>
           </div>
         </form>
       `,
-    }),
+    })
   );

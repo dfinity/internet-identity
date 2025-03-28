@@ -12,7 +12,7 @@ export const callbackFlow = (): Promise<never> => {
     () =>
       new Promise<never>((_) => {
         /* halt */
-      }),
+      })
   );
 };
 
@@ -39,7 +39,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
   const redirectWindow = window.open(
     url,
     "_blank",
-    `width=${width},height=${height},left=${left},top=${top}`,
+    `width=${width},height=${height},left=${left},top=${top}`
   );
   return callbackPromise;
 };

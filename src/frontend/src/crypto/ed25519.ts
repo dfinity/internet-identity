@@ -13,7 +13,7 @@ const HARDENED = 0x80000000;
  */
 export async function fromSeedWithSlip0010(
   masterSeed: Uint8Array,
-  derivationPath: number[] = [],
+  derivationPath: number[] = []
 ): Promise<Ed25519KeyIdentity> {
   let [slipSeed, chainCode] = await generateMasterKey(masterSeed);
 
@@ -21,7 +21,7 @@ export async function fromSeedWithSlip0010(
     [slipSeed, chainCode] = await derive(
       slipSeed,
       chainCode,
-      derivationPath[i] | HARDENED,
+      derivationPath[i] | HARDENED
     );
   }
 
@@ -41,14 +41,14 @@ export async function fromSeedWithSlip0010(
  */
 export function fromMnemonicWithoutValidation(
   mnemonic: string,
-  derivationPath: number[] = [],
+  derivationPath: number[] = []
 ): Promise<Ed25519KeyIdentity> {
   const seed = mnemonicToSeedSync(mnemonic);
   return fromSeedWithSlip0010(seed, derivationPath);
 }
 
 async function generateMasterKey(
-  seed: Uint8Array,
+  seed: Uint8Array
 ): Promise<[Uint8Array, Uint8Array]> {
   const data = new TextEncoder().encode("ed25519 seed");
   const key = await window.crypto.subtle.importKey(
@@ -59,7 +59,7 @@ async function generateMasterKey(
       hash: { name: "SHA-512" },
     },
     false,
-    ["sign"],
+    ["sign"]
   );
   const h = await window.crypto.subtle.sign("HMAC", key, seed);
   const slipSeed = new Uint8Array(h.slice(0, 32));
@@ -70,7 +70,7 @@ async function generateMasterKey(
 async function derive(
   parentKey: Uint8Array,
   parentChaincode: Uint8Array,
-  i: number,
+  i: number
 ): Promise<[Uint8Array, Uint8Array]> {
   // From the spec: Data = 0x00 || ser256(kpar) || ser32(i)
   const data = new Uint8Array([0, ...parentKey, ...toBigEndianArray(i)]);
@@ -82,7 +82,7 @@ async function derive(
       hash: { name: "SHA-512" },
     },
     false,
-    ["sign"],
+    ["sign"]
   );
 
   const h = await window.crypto.subtle.sign("HMAC", key, data);

@@ -21,7 +21,7 @@ test("user number is set", () => {
       },
       message: "",
     },
-    document.body,
+    document.body
   );
 
   document.querySelectorAll("input")[0].value = "12345";

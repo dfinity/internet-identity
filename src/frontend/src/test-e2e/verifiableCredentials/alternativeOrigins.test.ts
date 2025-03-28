@@ -63,7 +63,7 @@ test("Can issue credential with alternative RP derivation origin", async () => {
     const demoAppView = new DemoAppView(browser);
     await demoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-      "certified",
+      "certified"
     );
 
     // Authenticate to RP WITH alt origins
@@ -102,7 +102,7 @@ test("Cannot issue credential with bad alternative RP derivation origin", async 
     await demoAppView.open(TEST_APP_NICE_URL, II_URL);
     await demoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-      "certified",
+      "certified"
     );
 
     // 2. Do the flow WITH alt origins RESET
@@ -130,7 +130,7 @@ test("Cannot issue credential with bad alternative RP derivation origin", async 
     expect(result.result).toBe("aborted");
     if (!("reason" in result)) {
       throw new Error(
-        "Expected VC result to be aborted, got: " + JSON.stringify(result),
+        "Expected VC result to be aborted, got: " + JSON.stringify(result)
       );
     }
     expect(result.reason).toBe("bad_derivation_origin_rp");
@@ -253,7 +253,7 @@ test("Cannot issue credential with bad alternative issuer derivation origin", as
     expect(result.result).toBe("aborted");
     if (!("reason" in result)) {
       throw new Error(
-        "Expected VC result to be aborted, got: " + JSON.stringify(result),
+        "Expected VC result to be aborted, got: " + JSON.stringify(result)
       );
     }
     expect(result.reason).toBe("invalid_derivation_origin_issuer");

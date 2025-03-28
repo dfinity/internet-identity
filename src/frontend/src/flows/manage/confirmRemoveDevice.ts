@@ -53,7 +53,7 @@ const confirmRemoveDeviceTemplate = ({
   let lastUsageFormattedString: string | undefined = undefined;
   if (nonNullish(lastUsedNanoseconds)) {
     const lastUsageTimeStamp = new Date(
-      Number(lastUsedNanoseconds / BigInt(1000000)),
+      Number(lastUsedNanoseconds / BigInt(1000000))
     );
     lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
   }
@@ -115,7 +115,7 @@ const confirmRemoveDeviceTemplate = ({
                     } else {
                       buttonElement.disabled = true;
                     }
-                  }),
+                  })
                 )}
             />`
           : undefined
@@ -176,6 +176,6 @@ export const confirmRemoveDevice = ({
       lastUsedNanoseconds,
       originRegistered,
       isCurrentDevice,
-    }),
+    })
   );
 };

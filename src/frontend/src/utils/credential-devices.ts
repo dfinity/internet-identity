@@ -13,7 +13,7 @@ const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
   new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
 
 export const convertToValidCredentialData = (
-  device: Omit<DeviceData, "alias">,
+  device: Omit<DeviceData, "alias">
 ): CredentialData | undefined => {
   // In certain cases, e.g. Chrome on Windows 10, an invalid credential id is
   // not ignored but instead will result in a WebAuthn error that prevents a
@@ -61,7 +61,7 @@ export const getCredentialsOrigin = ({
   credentials: Omit<DeviceData, "alias">[];
 }): string | undefined => {
   const credentialOrigins = new Set(
-    credentials.map((c) => c.origin[0] ?? II_LEGACY_ORIGIN),
+    credentials.map((c) => c.origin[0] ?? II_LEGACY_ORIGIN)
   );
   if (credentialOrigins.size === 1) {
     return credentialOrigins.values().next().value;

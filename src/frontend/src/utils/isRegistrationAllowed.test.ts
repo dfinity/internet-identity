@@ -4,7 +4,7 @@ import { isRegistrationAllowed } from "./isRegistrationAllowed";
 
 describe("isRegistrationAllowed", () => {
   const createConfig = (
-    relatedOrigins: string[] | null = null,
+    relatedOrigins: string[] | null = null
   ): InternetIdentityInit => {
     return {
       fetch_root_key: [],
