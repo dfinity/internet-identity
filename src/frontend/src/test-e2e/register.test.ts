@@ -87,7 +87,7 @@ test("Register first then log into client application", async () => {
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL)
+      originToRelyingPartyId(II_URL),
     );
 
     const authenticateView = new AuthenticateView(browser);

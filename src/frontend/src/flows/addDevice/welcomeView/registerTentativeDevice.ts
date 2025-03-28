@@ -39,7 +39,7 @@ import { showVerificationCode } from "./showVerificationCode";
  */
 export const registerTentativeDevice = async (
   userNumber: bigint,
-  connection: Connection
+  connection: Connection,
 ): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
@@ -52,7 +52,7 @@ export const registerTentativeDevice = async (
 
   // Then, we create local WebAuthn credentials for the device
   const result = await withLoader(() =>
-    createDevice({ userNumber, connection })
+    createDevice({ userNumber, connection }),
   );
 
   if (result instanceof Error) {
@@ -88,7 +88,7 @@ export const registerTentativeDevice = async (
       protection: { unprotected: null },
       pubkey: Array.from(new Uint8Array(result.getPublicKey().toDer())),
       key_type: authenticatorAttachmentToKeyType(
-        result.getAuthenticatorAttachment()
+        result.getAuthenticatorAttachment(),
       ),
       purpose: { authentication: null },
       credential_id: [Array.from(new Uint8Array(result.rawId))],
@@ -112,7 +112,7 @@ export const registerTentativeDevice = async (
     connection,
     device.alias,
     addResponse.added_tentatively,
-    device.credential_id[0]
+    device.credential_id[0],
   );
 
   if (verificationCodeResult === "canceled") {
@@ -137,9 +137,8 @@ const createDevice = async ({
   userNumber: bigint;
   connection: Connection;
 }): Promise<WebAuthnIdentity | Error> => {
-  const existingAuthenticators = await connection.lookupAuthenticators(
-    userNumber
-  );
+  const existingAuthenticators =
+    await connection.lookupAuthenticators(userNumber);
   try {
     return await WebAuthnIdentity.create({
       publicKey: creationOptions(existingAuthenticators),
@@ -171,7 +170,7 @@ export const addTentativeDevice = async ({
   // Try to add the device tentatively, retrying if necessary
   for (;;) {
     const result = await withLoader(() =>
-      connection.addTentativeDevice(userNumber, device)
+      connection.addTentativeDevice(userNumber, device),
     );
 
     if ("another_device_tentatively_added" in result) {

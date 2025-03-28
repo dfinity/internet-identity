@@ -62,7 +62,7 @@ export const addDeviceSuccess = (
   props: Pick<
     AddDeviceSuccessTemplateProps,
     "userNumber" | "deviceAlias" | "stepper"
-  >
+  >,
 ): Promise<void> =>
   new Promise<void>((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
@@ -72,6 +72,6 @@ export const addDeviceSuccess = (
         onContinue: resolve,
         i18n: new I18n(),
       }),
-      container
+      container,
     );
   });

@@ -136,7 +136,7 @@ export const savePasskeyPinOrOpenID = async ({
                 ? undefined
                 : new URL(origin).hostname;
             const identity = await withLoader(() =>
-              constructIdentity({ rpId })
+              constructIdentity({ rpId }),
             );
             analytics.event("construct-passkey-success");
             resolve(identity);

@@ -64,7 +64,7 @@ export const registerFlow = async ({
     | RateLimitExceeded
   >;
   checkCaptcha: (
-    captchaSolution: string
+    captchaSolution: string,
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
@@ -151,7 +151,7 @@ export const registerFlow = async ({
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
       const { identity, pinIdentityMaterial } = await withLoader(() =>
-        constructPinIdentity(pinResult)
+        constructPinIdentity(pinResult),
       );
       const alias = await inferPinAlias({
         userAgent: navigator.userAgent,
@@ -253,7 +253,7 @@ export const registerFlow = async ({
 
   const startOrCaptchaResult = await captchaIfNecessary(
     flowStart,
-    checkCaptcha
+    checkCaptcha,
   );
   if (startOrCaptchaResult === "canceled") return "canceled";
 
@@ -261,7 +261,7 @@ export const registerFlow = async ({
     identityRegistrationFinish({
       authnMethod: authnMethodData,
       identity,
-    })
+    }),
   );
 
   if (result.kind !== "loginSuccess") {
@@ -281,7 +281,10 @@ export const registerFlow = async ({
   // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
   // This way, dropping of at that point does not negatively impact UX with additional nagging.
   await withLoader(() =>
-    Promise.all([result.connection.commitMetadata(), setAnchorUsed(userNumber)])
+    Promise.all([
+      result.connection.commitMetadata(),
+      setAnchorUsed(userNumber),
+    ]),
   );
   await displayUserNumber({
     userNumber,
@@ -337,7 +340,7 @@ export const getRegisterFlowOpts = async ({
     openidIdentityRegistrationFinish: () =>
       connection.openid_identity_registration_finish(
         getGoogleClientId,
-        tempIdentity
+        tempIdentity,
       ),
   };
 };
@@ -512,14 +515,14 @@ async function captchaIfNecessary(
     | RateLimitExceeded
   >,
   checkCaptcha: (
-    captchaSolution: string
+    captchaSolution: string,
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
     | NoRegistrationFlow
     | UnexpectedCall
     | WrongCaptchaSolution
-  >
+  >,
 ): Promise<
   | RegistrationFlowStepSuccess
   | ApiError

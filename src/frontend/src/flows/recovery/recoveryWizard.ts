@@ -86,7 +86,7 @@ export const addPhrase = ({
       cancel: () => resolve("cancel"),
       scrollToTop: true,
       intent,
-    })
+    }),
   );
 };
 
@@ -150,7 +150,7 @@ export const addDeviceWarning = ({
       remindLater: () => resolve({ action: "remind-later" }),
       doNotRemindAgain: () => resolve({ action: "do-not-remind" }),
       status,
-    })
+    }),
   );
 };
 
@@ -194,10 +194,10 @@ export const getDevicesStatus = ({
     (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
     oneWeekAgoTimestamp;
   const showWarningPageEnabled = isNullish(
-    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
+    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis,
   );
   const totalDevicesCount = credentials.filter(
-    ({ key_type }) => !("seed_phrase" in key_type)
+    ({ key_type }) => !("seed_phrase" in key_type),
   ).length;
   if (
     totalDevicesCount <= 1 &&
@@ -217,7 +217,7 @@ export const getDevicesStatus = ({
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
@@ -229,7 +229,7 @@ export const recoveryWizard = async (
         idbRetrievePinIdentityMaterial({
           userNumber,
         }),
-      ])
+      ]),
   );
   const nowInMillis = Date.now();
 

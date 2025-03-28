@@ -1,6 +1,6 @@
 const browsers = ["chrome", "firefox", "safari", "edge"] as const;
 // Infer the type from the array
-type Browsers = typeof browsers[number];
+type Browsers = (typeof browsers)[number];
 
 type BrowserVersions = {
   [K in Browsers]?: number;
@@ -18,7 +18,7 @@ type BrowserVersions = {
  */
 export const checkRequiredBrowserVersion = (
   userAgent: string,
-  versions: BrowserVersions
+  versions: BrowserVersions,
 ): boolean => {
   const browserMatches: Record<Browsers, RegExp> = {
     chrome: /Chrome\/(\d+)/,

@@ -31,7 +31,7 @@ test("pick saved anchor", async () => {
   // Tick once, otherwise element isn't focused yet
   await tick();
   const elem = document.querySelector(
-    '[data-anchor-id="10000"]'
+    '[data-anchor-id="10000"]',
   ) as HTMLElement;
   elem.click();
   expect(picked).toBe(BigInt(10000));

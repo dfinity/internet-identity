@@ -174,6 +174,6 @@ describe("User Agent Tests", () => {
         const supportsRoR = supportsWebauthRoR(userAgent);
         expect(supportsRoR).toBe(expectedSupportRoR);
       });
-    }
+    },
   );
 });

@@ -56,7 +56,7 @@ test("Add remote device", async () => {
     await mainView.addAdditionalDevice();
 
     const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-      browser
+      browser,
     );
     const addDeviceLink = await addRemoteDeviceInstructionsView.addDeviceLink();
 
@@ -69,7 +69,7 @@ test("Add remote device", async () => {
       await promptDeviceTrustedView.confirmTrusted();
 
       const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
-        browser2
+        browser2,
       );
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
@@ -146,7 +146,7 @@ test("Add remote device starting on new device", async () => {
       await focusBrowser(browser2);
       await notInRegistrationModeView.retry();
       const verificationCodeView = new AddRemoteDeviceVerificationCodeView(
-        browser2
+        browser2,
       );
       await verificationCodeView.waitForDisplay();
       const code = await verificationCodeView.getVerificationCode();
