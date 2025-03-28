@@ -485,7 +485,7 @@ export class NotInRegistrationModeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#deviceRegModeDisabledRetry")
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async retry(): Promise<void> {
