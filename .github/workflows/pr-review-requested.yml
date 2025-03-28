@@ -16,4 +16,3 @@ jobs:
           WEBHOOK_URL: ${{ secrets.SLACK_PRIVATE_IDENTITY_WEBHOOK_URL }}
           MESSAGE: |
             <@${{ github.event.requested_reviewer.login == 'LXIF' && 'U07QU4DNV5Y' || github.event.requested_reviewer.login == 'sea-snake' && 'U07QU79GX0T' || github.event.requested_reviewer.login == 'lmuntaner' && 'U02TEQHKV35' }}>: New PR ready for review: <${{ github.event.pull_request.html_url }}|${{ github.event.pull_request.title }}>.
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
