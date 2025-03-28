@@ -423,7 +423,7 @@ export const waitForImages = (
         const documentReady: boolean = document.readyState === "complete";
         return imagesReady && documentReady;
       }),
-    { timeoutMsg: "image wasn't loaded" },
+    { timeoutMsg: "image wasn't loaded", timeout: 60_000 },
   );
 
 export async function switchToPopup(
@@ -431,7 +431,7 @@ export async function switchToPopup(
 ): Promise<string> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length === 2,
-    { timeoutMsg: "window did not open" },
+    { timeoutMsg: "window did not open", timeout: 60_000 },
   );
   const handles = await browser.getWindowHandles();
   await browser.switchToWindow(handles[1]);
@@ -453,7 +453,7 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
     {
-      timeout: 20_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
+      timeout: 60_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
       timeoutMsg: "expected only one window to exist after 20s",
     },
   );

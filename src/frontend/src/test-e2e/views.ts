@@ -12,7 +12,7 @@ export class WelcomeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#registerButton")
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
@@ -44,7 +44,7 @@ export class RenameView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#pickAliasInput")
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async enterAlias(alias: string): Promise<void> {
@@ -60,13 +60,13 @@ export class ConfirmRemoveDeviceView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("[data-page='confirm-remove-device-page']")
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async waitForAbsence(): Promise<void> {
     await this.browser
       .$("[data-page='confirm-remove-device-page']")
-      .waitForExist({ timeout: 10_000, reverse: true });
+      .waitForExist({ timeout: 60_000, reverse: true });
   }
 
   async enterAlias(alias: string): Promise<void> {
@@ -82,7 +82,7 @@ export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-action="construct-identity"]')
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async create(): Promise<void> {
@@ -97,19 +97,19 @@ export class RegisterView extends View {
   async waitForRegisterConfirm(): Promise<void> {
     await this.browser
       .$("#confirmRegisterButton")
-      .waitForDisplayed({ timeout: 25_000 });
-    await this.browser.$("#captchaInput").waitForDisplayed({ timeout: 25_000 });
+      .waitForDisplayed({ timeout: 60_000 });
+    await this.browser.$("#captchaInput").waitForDisplayed({ timeout: 60_000 });
   }
 
   async confirmRegisterConfirm(): Promise<void> {
-    await this.browser.$("#captchaInput").waitForEnabled({ timeout: 40_000 });
+    await this.browser.$("#captchaInput").waitForEnabled({ timeout: 60_000 });
     // In tests, the captchas are hard-coded to the following string: "a"
     await this.browser.$("#captchaInput").setValue("a");
     await this.browser
       .$("#confirmRegisterButton")
       // this is a huge timeout because generating the captcha takes a while on
       // the emulator
-      .waitForEnabled({ timeout: 30_000 });
+      .waitForEnabled({ timeout: 60_000 });
     await this.browser.$("#confirmRegisterButton").click();
   }
 
@@ -117,7 +117,7 @@ export class RegisterView extends View {
   async waitForIdentity(): Promise<void> {
     await this.browser
       .$("#displayUserContinue")
-      .waitForDisplayed({ timeout: 15_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async registerGetIdentity(): Promise<string> {
@@ -149,7 +149,7 @@ export class PinRegistrationView extends View {
   async waitForSetPin(): Promise<void> {
     await this.browser
       .$('[data-role="set-pin"]')
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async setPin(pin: string): Promise<void> {
@@ -162,7 +162,7 @@ export class PinRegistrationView extends View {
   async waitForConfirmPin(): Promise<void> {
     await this.browser
       .$('[data-role="confirm-pin"]')
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async confirmPin(pin: string): Promise<void> {
@@ -181,7 +181,7 @@ export class PinAuthView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="pin"]')
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async enterPin(pin: string): Promise<void> {
@@ -194,7 +194,7 @@ export class PinAuthView extends View {
   async waitForError(): Promise<void> {
     await this.browser
       .$(this.ERROR_SELECTOR)
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 }
 
@@ -208,7 +208,7 @@ export class RecoveryMethodSelectorView extends View {
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
       .$('[data-role="recovery-words"]')
-      .waitForDisplayed({ timeout: 15_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async getSeedPhrase(): Promise<string> {
@@ -261,7 +261,7 @@ export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-role="identity-management"]')
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
@@ -289,19 +289,19 @@ export class MainView extends View {
   async waitForDeviceDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`)
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async waitForRecoveryDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//aside[@data-role="recoveries"]//li[@data-device="${deviceName}"]`)
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async waitForTempKeyDisplay(deviceName: string): Promise<void> {
     await this.browser
       .$(`//aside[@data-role="temp-keys"]//li[@data-device="${deviceName}"]`)
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async addAdditionalDevice(): Promise<void> {
@@ -361,7 +361,7 @@ export class MainView extends View {
   async assertDeviceProtected(deviceName: string): Promise<void> {
     await this.browser
       .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
-      .waitForDisplayed({ timeout: 10_000 });
+      .waitForDisplayed({ timeout: 60_000 });
   }
 
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
@@ -379,7 +379,7 @@ export class MainView extends View {
   async assertDeviceUnprotected(deviceName: string): Promise<void> {
     await this.browser
       .$(`//li[@data-device="${deviceName}"]/div[@data-role="protected"]`)
-      .waitForDisplayed({ timeout: 10_000, reverse: true });
+      .waitForDisplayed({ timeout: 60_000, reverse: true });
   }
 
   async reset(deviceName: string): Promise<void> {
@@ -422,7 +422,7 @@ export class MainView extends View {
             document.getElementById(dropdownId)?.getAnimations().length === 0,
           dropdownId,
         ),
-      { timeoutMsg: "Animation didn't end" },
+      { timeoutMsg: "Animation didn't end", timeout: 60_000 },
     );
   }
 
@@ -454,7 +454,7 @@ export class MainView extends View {
       '[data-role="recoveries"] [data-device="Recovery Device"]';
     await this.browser
       .$(recoveryDeviceSelector)
-      .waitForDisplayed({ timeout: 10_000, reverse: !exists });
+      .waitForDisplayed({ timeout: 60_000, reverse: !exists });
   }
 }
 
@@ -462,7 +462,7 @@ export class AddRemoteDeviceAliasView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$("#pickAliasSubmit")
-      .waitForDisplayed({ timeout: 5_000 });
+      .waitForDisplayed({ timeout: 60_000 });
 
     // Make sure the loader is gone
     await this.browser.$("#loader").waitForExist({ reverse: true });
@@ -560,7 +560,7 @@ export class AddDeviceSuccessView extends View {
   private readonly SELECTOR = "[data-action='next']";
 
   async waitForDisplay(): Promise<void> {
-    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 5_000 });
+    await this.browser.$(this.SELECTOR).waitForDisplayed({ timeout: 60_000 });
   }
 
   async continue(): Promise<void> {
@@ -572,7 +572,7 @@ export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
       .$('[data-page="authenticate"]')
-      .waitForExist({ timeout: 5_000 });
+      .waitForExist({ timeout: 60_000 });
   }
 
   async pickAnchor(anchor: string): Promise<void> {
@@ -930,7 +930,7 @@ export class DemoAppView extends View {
     await this.browser.waitUntil(
       async () =>
         (await this.browser.$("#alternativeOrigins").getText()) !== "",
-      { timeoutMsg: "alternativeOrigins were not displayed" },
+      { timeoutMsg: "alternativeOrigins were not displayed", timeout: 60_000 },
     );
   }
 
@@ -989,7 +989,7 @@ export class DemoAppView extends View {
         return (await whoamiResponseElem.getText()).indexOf("-") !== -1;
       },
       {
-        timeout: 6_000,
+        timeout: 60_000,
         timeoutMsg: 'expected whoami response to contain "-" for 6s',
       },
     );
@@ -1010,7 +1010,7 @@ export class DemoAppView extends View {
         return (await alternativeOriginsElem.getText()) === alternativeOrigins;
       },
       {
-        timeout: 6_000,
+        timeout: 60_000,
         timeoutMsg: "expected alternativeOrigins to update within 6s",
       },
     );

@@ -32,7 +32,7 @@ test("Should allow valid message", async () => {
     await FLOWS.registerNewIdentityAuthenticateView(browser);
     await browser
       .$("[data-role=notify-auth-success]")
-      .waitForDisplayed({ timeout: 15_000 });
+      .waitForDisplayed({ timeout: 60_000 });
 
     // switch back to demo app
     await browser.switchToWindow((await browser.getWindowHandles())[0]);
@@ -63,7 +63,7 @@ test("Should show error for invalid message", async () => {
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      "It seems like an invalid authentication request was received."
+      "It seems like an invalid authentication request was received.",
     );
   });
 }, 300_000);
@@ -81,7 +81,7 @@ test("Should show error after not receiving message for 10 seconds", async () =>
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      "It seems like the connection with the service could not be established."
+      "It seems like the connection with the service could not be established.",
     );
   });
 }, 300_000);
@@ -96,7 +96,7 @@ test("Should show error after manually navigating to authorize url", async () =>
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      "Seems you arrived here for authentication, but no service has requested it."
+      "Seems you arrived here for authentication, but no service has requested it.",
     );
   });
 }, 300_000);

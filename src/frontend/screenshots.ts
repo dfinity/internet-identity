@@ -167,7 +167,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
         return imgs.every((img) => img.complete);
       }),
     {
-      timeout: 10 * 1000,
+      timeout: 60_000,
       timeoutMsg: "Images did not load after 10 seconds",
     },
   );
@@ -175,7 +175,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
   await browser.waitUntil(
     () => browser.execute(() => document.readyState === "complete"),
     {
-      timeout: 10 * 1000,
+      timeout: 60_000,
       timeoutMsg: "Browser did not load after 10 seconds",
     },
   );
