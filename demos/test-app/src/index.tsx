@@ -21,58 +21,58 @@ import "./main.css";
 const signInBtn = document.getElementById("signinBtn") as HTMLButtonElement;
 const whoamiBtn = document.getElementById("whoamiBtn") as HTMLButtonElement;
 const updateAlternativeOriginsBtn = document.getElementById(
-  "updateNewAlternativeOrigins"
+  "updateNewAlternativeOrigins",
 ) as HTMLButtonElement;
 const openIiWindowBtn = document.getElementById(
-  "openIiWindowBtn"
+  "openIiWindowBtn",
 ) as HTMLButtonElement;
 const closeIiWindowBtn = document.getElementById(
-  "closeIIWindowBtn"
+  "closeIIWindowBtn",
 ) as HTMLButtonElement;
 const invalidDataBtn = document.getElementById(
-  "invalidDataBtn"
+  "invalidDataBtn",
 ) as HTMLButtonElement;
 const incompleteMessageBtn = document.getElementById(
-  "incompleteMessageBtn"
+  "incompleteMessageBtn",
 ) as HTMLButtonElement;
 const validMessageBtn = document.getElementById(
-  "validMessageBtn"
+  "validMessageBtn",
 ) as HTMLButtonElement;
 const customMessageEl = document.getElementById(
-  "customMessage"
+  "customMessage",
 ) as HTMLInputElement;
 const customMessageBtn = document.getElementById(
-  "customMessageBtn"
+  "customMessageBtn",
 ) as HTMLButtonElement;
 const messagesEl = document.getElementById("messages") as HTMLElement;
 const hostUrlEl = document.getElementById("hostUrl") as HTMLInputElement;
 const whoAmIResponseEl = document.getElementById(
-  "whoamiResponse"
+  "whoamiResponse",
 ) as HTMLDivElement;
 const alternativeOriginsEl = document.getElementById(
-  "alternativeOrigins"
+  "alternativeOrigins",
 ) as HTMLDivElement;
 const newAlternativeOriginsEl = document.getElementById(
-  "newAlternativeOrigins"
+  "newAlternativeOrigins",
 ) as HTMLInputElement;
 const principalEl = document.getElementById("principal") as HTMLDivElement;
 const authnMethodEl = document.querySelector(
-  '[data-role="authn-method"]'
+  '[data-role="authn-method"]',
 ) as HTMLDivElement;
 const delegationEl = document.getElementById("delegation") as HTMLPreElement;
 const expirationEl = document.getElementById("expiration") as HTMLDivElement;
 const iiUrlEl = document.getElementById("iiUrl") as HTMLInputElement;
 const maxTimeToLiveEl = document.getElementById(
-  "maxTimeToLive"
+  "maxTimeToLive",
 ) as HTMLInputElement;
 const derivationOriginEl = document.getElementById(
-  "derivationOrigin"
+  "derivationOrigin",
 ) as HTMLInputElement;
 const autoSelectionPrincipalEl = document.getElementById(
-  "autoSelectionPrincipal"
+  "autoSelectionPrincipal",
 ) as HTMLInputElement;
 const allowPinAuthenticationEl = document.getElementById(
-  "allowPinAuthentication"
+  "allowPinAuthentication",
 ) as HTMLInputElement;
 
 let iiProtocolTestWindow: Window | undefined;
@@ -112,7 +112,7 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
     update_alternative_origins: IDL.Func(
       [IDL.Text, AlternativeOriginsMode],
       [],
-      []
+      [],
     ),
     whoami: IDL.Func([], [IDL.Principal], ["query"]),
   });
@@ -135,7 +135,7 @@ const updateDelegationView = ({
     delegationEl.innerText = JSON.stringify(
       identity.getDelegation().toJSON(),
       undefined,
-      2
+      2,
     );
 
     // cannot use Math.min, as we deal with bigint here
@@ -171,7 +171,7 @@ function addMessageElement({
   messageTitle.classList.add("postMessage-title");
   const messageContent = document.createElement("div");
   messageContent.innerText = JSON.stringify(message, (_, v) =>
-    typeof v === "bigint" ? v.toString() : v
+    typeof v === "bigint" ? v.toString() : v,
   );
   if (ty === "received") {
     messageTitle.innerText = "Message Received";
@@ -199,12 +199,12 @@ window.addEventListener("message", (event) => {
   const delegations = event.data.delegations.map(extractDelegation);
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
-    event.data.userPublicKey.buffer
+    event.data.userPublicKey.buffer,
   );
   updateDelegationView({
     identity: DelegationIdentity.fromDelegation(
       getLocalIdentity(),
-      delegationChain
+      delegationChain,
     ),
   });
 });
@@ -215,7 +215,6 @@ const readCanisterId = (): string => {
 };
 
 const init = async () => {
-  await updateAlternativeOriginsView();
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
     // The default max TTL setin the @dfinity/auth-client library
@@ -302,7 +301,7 @@ const init = async () => {
     const validMessage = {
       kind: "authorize-client",
       sessionPublicKey: new Uint8Array(
-        getLocalIdentity().getPublicKey().toDer()
+        getLocalIdentity().getPublicKey().toDer(),
       ),
       derivationOrigin,
       maxTimeToLive,
@@ -331,7 +330,7 @@ const init = async () => {
     });
     const modeSelection = (
       document.querySelector(
-        'input[name="alternativeOriginsMode"]:checked'
+        'input[name="alternativeOriginsMode"]:checked',
       ) as HTMLInputElement
     ).value;
     let mode:
@@ -349,6 +348,7 @@ const init = async () => {
     await actor.update_alternative_origins(newAlternativeOriginsEl.value, mode);
     await updateAlternativeOriginsView();
   };
+  await updateAlternativeOriginsView();
 };
 
 init();
@@ -430,7 +430,7 @@ function handleFlowReady(evnt: MessageEvent) {
 
   if (opts === undefined) {
     return showError(
-      "Unexpected: received OK from IDP but this test app is not ready"
+      "Unexpected: received OK from IDP but this test app is not ready",
     );
   }
 
@@ -491,7 +491,7 @@ function handleFlowFinished(evnt: MessageEvent) {
     const ver = decodeJwt(verifiablePresentation) as any;
     const creds = ver.vp.verifiableCredential;
     const [alias, credential] = creds.map((cred: string) =>
-      JSON.stringify(decodeJwt(cred), null, 2)
+      JSON.stringify(decodeJwt(cred), null, 2),
     );
 
     setLatestPresentation({ alias, credential });
@@ -504,7 +504,7 @@ function handleFlowFinished(evnt: MessageEvent) {
 const App = () => {
   // The URL used for connecting to the issuer
   const [issuerUrl, setIssuerUrl] = useState<string>(
-    "http://issuer.localhost:5173"
+    "http://issuer.localhost:5173",
   );
 
   const [issuerCanisterId, setIssuerCanisterId] = useState<string>("");
@@ -607,5 +607,5 @@ const App = () => {
 ReactDOM.createRoot(document.getElementById("root-vc-flow")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
