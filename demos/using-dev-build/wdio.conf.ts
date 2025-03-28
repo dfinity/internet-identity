@@ -4,8 +4,8 @@ export const config: WebdriverIO.Config = {
   waitforTimeout: 60_000,
 
   // Add retry mechanism
-  connectionRetryTimeout: 120000,
-  connectionRetryCount: 3,
+  connectionRetryTimeout: 180000,
+  connectionRetryCount: 5,
 
   autoCompileOpts: {
     autoCompile: true,
@@ -28,6 +28,21 @@ export const config: WebdriverIO.Config = {
           // Required for CI runners using >=Ubuntu 24.04
           // @see https://github.com/SeleniumHQ/selenium/issues/14609
           "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--window-size=1920,1080",
+          "--disable-extensions",
+          "--disable-background-networking",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-client-side-phishing-detection",
+          "--disable-default-apps",
+          "--disable-hang-monitor",
+          "--disable-prompt-on-repost",
+          "--disable-sync",
+          "--metrics-recording-only",
+          "--no-first-run",
+          "--password-store=basic",
+          "--use-mock-keychain",
         ],
       },
       acceptInsecureCerts: true,

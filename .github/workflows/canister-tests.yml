@@ -481,9 +481,8 @@ jobs:
       # Setup shared memory for Chrome
       - name: Setup shared memory
         run: |
-          sudo rm -rf /dev/shm
-          sudo mkdir /dev/shm
-          sudo mount -t tmpfs -o rw,nosuid,nodev,noexec,relatime,size=512M tmpfs /dev/shm
+          # Instead of removing /dev/shm, just increase its size
+          sudo mount -o remount,size=512M /dev/shm
           sudo chmod 1777 /dev/shm
 
       # npm ci is a slow operation that mostly involves downloading packages, so we run
