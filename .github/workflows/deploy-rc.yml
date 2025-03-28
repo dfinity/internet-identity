@@ -96,4 +96,4 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "RC deployment failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}""
+          MESSAGE: "RC deployment failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

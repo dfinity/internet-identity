@@ -49,7 +49,7 @@ jobs:
         if: ${{ failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Release build check failed (could not get release): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}""
+          MESSAGE: "Release build check failed (could not get release): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # Perform the clean build (non-docker), using the release as checkout
   clean-build:
