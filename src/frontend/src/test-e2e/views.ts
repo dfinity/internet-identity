@@ -410,6 +410,7 @@ export class MainView extends View {
     const dropdownTrigger = await this.browser.$(
       `[data-action="open-settings"][data-device="${deviceName}"]`,
     );
+    await dropdownTrigger.waitForDisplayed();
     const dropdownId = await dropdownTrigger.getAttribute("aria-controls");
     await dropdownTrigger.click();
 
@@ -1021,7 +1022,7 @@ export class DemoAppView extends View {
       },
       {
         timeout: 60_000,
-        timeoutMsg: "expected alternativeOrigins to update within 6s",
+        timeoutMsg: "expected alternativeOrigins to update within 60s",
       },
     );
     return await alternativeOriginsElem.getText();

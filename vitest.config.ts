@@ -26,7 +26,8 @@ export default defineConfig(
           // sequentially, and maxThreads must never be lower than minThreads.
           // Therefore, we adjust it here to have the flexibility to set the max
           // to one for the e2e tests only.
-          minThreads: 1,
+          // minThreads: 1,
+          singleThread: true,
         },
       },
     },

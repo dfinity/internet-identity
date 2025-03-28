@@ -466,25 +466,17 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        # shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
+        shard: ["1_1"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
     env:
       # Suffix used for tagging artifacts
-      # artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}-${{ matrix.shard }}
-      artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}
+      artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}-${{ matrix.shard }}
 
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
-
-      # Setup shared memory for Chrome
-      - name: Setup shared memory
-        run: |
-          # Instead of removing /dev/shm, just increase its size
-          sudo mount -o remount,size=512M /dev/shm
-          sudo chmod 1777 /dev/shm
 
       # npm ci is a slow operation that mostly involves downloading packages, so we run
       # it in the background while we set up the replica
@@ -559,8 +551,8 @@ jobs:
             SCREEN=${{ matrix.device }} \
             II_E2E_CHROME_OPTS="--headless" \
             II_CAPTCHA=${{ matrix.settings.captcha }} \
-            npm run test:e2e
-      # npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+            npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+
       - name: Stop dfx
         if: ${{ always() }}
         run: dfx stop
