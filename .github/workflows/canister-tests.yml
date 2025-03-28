@@ -466,13 +466,14 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
+        # shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
     env:
       # Suffix used for tagging artifacts
-      artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}-${{ matrix.shard }}
+      # artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}-${{ matrix.shard }}
+      artifact_suffix: ${{ contains(matrix.settings.domain, 'internetcomputer') && 'current' || 'legacy' }}-${{ matrix.device }}-captcha_${{ matrix.settings.captcha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -558,8 +559,8 @@ jobs:
             SCREEN=${{ matrix.device }} \
             II_E2E_CHROME_OPTS="--headless" \
             II_CAPTCHA=${{ matrix.settings.captcha }} \
-            npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
-
+            npm run test:e2e
+      # npm run test:e2e -- --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
       - name: Stop dfx
         if: ${{ always() }}
         run: dfx stop
