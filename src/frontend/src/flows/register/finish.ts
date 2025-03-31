@@ -1,4 +1,4 @@
-import identityCardBackground from "$src/assets/identityCardBackground.png";
+import identityCardBackground from "$src/assets/identityCardBackground.png?url";
 import { checkmarkIcon, copyIcon } from "$src/components/icons";
 import { identityCard } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
