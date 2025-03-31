@@ -145,34 +145,34 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
 }, 300_000);
 
 test("Should allow arbitrary URL as derivation origin", async () => {
-  // await runInBrowser(async (browser: WebdriverIO.Browser) => {
-  //   const authenticatorId1 = await addVirtualAuthenticator(browser);
-  //   await browser.url(II_URL);
-  //   const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
-  //   const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
-  //   expect(credentials).toHaveLength(1);
-  //
-  //   const niceDemoAppView = new DemoAppView(browser);
-  //   await niceDemoAppView.open(TEST_APP_CANONICAL_URL, II_URL);
-  //   await niceDemoAppView.waitForDisplay();
-  //   await niceDemoAppView.updateAlternativeOrigins(
-  //     `{"alternativeOrigins":["${TEST_APP_CANONICAL_URL}"]}`,
-  //     "certified"
-  //   );
-  //   await niceDemoAppView.setDerivationOrigin(TEST_APP_NICE_URL);
-  //   expect(await niceDemoAppView.getPrincipal()).toBe("");
-  //   await niceDemoAppView.signin();
-  //
-  //   const authenticatorId3 = await switchToPopup(browser);
-  //   await addWebAuthnCredential(
-  //     browser,
-  //     authenticatorId3,
-  //     credentials[0],
-  //     originToRelyingPartyId(II_URL)
-  //   );
-  //   const authenticateView = new AuthenticateView(browser);
-  //   await authenticateView.waitForDisplay();
-  //   await authenticateView.pickAnchor(userNumber);
-  //   await niceDemoAppView.waitForAuthenticated();
-  // });
+  await runInBrowser(async (browser: WebdriverIO.Browser) => {
+    const authenticatorId1 = await addVirtualAuthenticator(browser);
+    await browser.url(II_URL);
+    const userNumber = await FLOWS.registerNewIdentityWelcomeView(browser);
+    const credentials = await getWebAuthnCredentials(browser, authenticatorId1);
+    expect(credentials).toHaveLength(1);
+
+    const niceDemoAppView = new DemoAppView(browser);
+    await niceDemoAppView.open(TEST_APP_CANONICAL_URL, II_URL);
+    await niceDemoAppView.waitForDisplay();
+    await niceDemoAppView.updateAlternativeOrigins(
+      `{"alternativeOrigins":["${TEST_APP_CANONICAL_URL}"]}`,
+      "certified",
+    );
+    await niceDemoAppView.setDerivationOrigin(TEST_APP_NICE_URL);
+    expect(await niceDemoAppView.getPrincipal()).toBe("");
+    await niceDemoAppView.signin();
+
+    const authenticatorId3 = await switchToPopup(browser);
+    await addWebAuthnCredential(
+      browser,
+      authenticatorId3,
+      credentials[0],
+      originToRelyingPartyId(II_URL),
+    );
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
+    await authenticateView.pickAnchor(userNumber);
+    await niceDemoAppView.waitForAuthenticated();
+  });
 }, 300_000);
