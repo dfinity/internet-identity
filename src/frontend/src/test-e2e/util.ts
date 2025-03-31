@@ -76,7 +76,7 @@ export async function runInBrowser(
       ...extraChromeOptions,
       // Required for CI runners using >=Ubuntu 24.04
       // @see https://github.com/SeleniumHQ/selenium/issues/14609
-      "--no-sandbox"
+      "--no-sandbox",
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
@@ -85,22 +85,19 @@ export async function runInBrowser(
     prefs: {
       "profile.content_settings.exceptions.clipboard": {
         "*": { last_modified: Date.now(), setting: 1 }
-      }
+      },
     },
   };
 
   if (runConfig.screenConfiguration.screenType === "mobile") {
     chromeOptions.mobileEmulation = {
-      deviceMetrics: runConfig.screenConfiguration.deviceMetrics
+      deviceMetrics: runConfig.screenConfiguration.deviceMetrics,
     };
   } else {
     chromeOptions.args?.push(
       `--window-size=${runConfig.screenConfiguration.windowSize}`
     );
   }
-  const testName =
-    expect.getState().currentTestName?.replace(/\W/g, "_") ??
-    `unknown-${randomString()}`;
   
   const browser = await remoteRetry({
     capabilities: {
@@ -117,6 +114,9 @@ export async function runInBrowser(
     // run test
     await test(browser, runConfig);
   } catch (e) {
+    const testName =
+      expect.getState().currentTestName?.replace(/\W/g, "_") ??
+      `unknown-${randomString()}`;
     if (!fs.existsSync("test-failures")) {
       fs.mkdirSync("test-failures");
     }
@@ -204,27 +204,27 @@ export async function addCustomCommands(
           name: "protocol",
           type: "string",
           description: "The protocol the Virtual Authenticator speaks",
-          required: true
+          required: true,
         },
         {
           name: "transport",
           type: "string",
           description: "The AuthenticatorTransport simulated",
-          required: true
+          required: true,
         },
         {
           name: "hasResidentKey",
           type: "boolean",
           description:
             "If set to true the authenticator will support client-side discoverable credentials",
-          required: true
+          required: true,
         },
         {
           name: "isUserConsenting",
           type: "boolean",
           description:
             "Determines the result of all user consent authorization gestures",
-          required: true
+          required: true,
         }
       ]
     })
@@ -244,7 +244,7 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true
+            required: true,
           },
         ],
         parameters: []
@@ -267,7 +267,7 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true
+            required: true,
           },
         ],
         parameters: []
@@ -290,7 +290,7 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true
+            required: true,
           },
         ],
         parameters: [
@@ -298,50 +298,50 @@ export async function addCustomCommands(
             name: "rpId",
             type: "string",
             description: "The relying party ID the credential is scoped to.",
-            required: true
+            required: true,
           },
           {
             name: "credentialId",
             type: "string",
             description: "The credential ID encoded using Base64url encoding",
-            required: true
+            required: true,
           },
           {
             name: "isResidentCredential",
             type: "boolean",
             description:
               "If set to true, a client-side discoverable credential is created. If set to false, a server-side credential is created instead.",
-            required: true
+            required: true,
           },
           {
             name: "privateKey",
             type: "string",
             description:
               "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url encoding.",
-            required: true
+            required: true,
           },
           {
             name: "signCount",
             type: "number",
             description:
               "The initial value for a signature counter associated to the public key credential source.",
-            required: true
+            required: true,
           },
           {
             name: "userHandle",
             type: "string",
             description:
               "The userHandle associated to the credential encoded using Base64url encoding.",
-            required: false
+            required: false,
           },
           {
             name: "largeBlob",
             type: "string",
             description:
               "The large, per-credential blob associated to the public key credential source, encoded using Base64url encoding.",
-            required: false
-          }
-        ]
+            required: false,
+          },
+        ],
       }
     )
   );
@@ -423,7 +423,7 @@ export const waitForImages = (
         const documentReady: boolean = document.readyState === "complete";
         return imagesReady && documentReady;
       }),
-    { timeoutMsg: "image wasn't loaded", timeout: 60_000 }
+    { timeoutMsg: "image wasn't loaded", timeout: 60_000 },
   );
 
 export async function switchToPopup(
@@ -431,7 +431,7 @@ export async function switchToPopup(
 ): Promise<string> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length === 2,
-    { timeoutMsg: "window did not open", timeout: 60_000 }
+    { timeoutMsg: "window did not open", timeout: 60_000 },
   );
   const handles = await browser.getWindowHandles();
   await browser.switchToWindow(handles[1]);
