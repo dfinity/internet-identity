@@ -84,7 +84,7 @@ export async function runInBrowser(
     // https://stackoverflow.com/questions/53669639/enable-clipboard-in-automated-tests-with-protractor-and-webdriver
     prefs: {
       "profile.content_settings.exceptions.clipboard": {
-        "*": { last_modified: Date.now(), setting: 1 }
+        "*": { last_modified: Date.now(), setting: 1 },
       },
     },
   };
@@ -98,12 +98,11 @@ export async function runInBrowser(
       `--window-size=${runConfig.screenConfiguration.windowSize}`
     );
   }
-  
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
       browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
-      "goog:chromeOptions": chromeOptions
+      "goog:chromeOptions": chromeOptions,
     },
   });
 
