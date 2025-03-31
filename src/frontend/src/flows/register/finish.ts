@@ -15,12 +15,12 @@ import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 export const displayUserNumberTemplate = ({
-                                            onContinue,
-                                            userNumber,
-                                            identityBackground,
-                                            marketingIntroSlot,
-                                            scrollToTop = false,
-                                          }: {
+  onContinue,
+  userNumber,
+  identityBackground,
+  marketingIntroSlot,
+  scrollToTop = false,
+}: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: PreLoadImage;
@@ -30,10 +30,10 @@ export const displayUserNumberTemplate = ({
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
-    <hgroup
+<hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-    >
+  >
 
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
@@ -49,36 +49,36 @@ export const displayUserNumberTemplate = ({
           identityBackground,
         }) satisfies TemplateElement
       }
-      <button
-        ${ref(userNumberCopy)}
-        aria-label="Copy phrase to clipboard""
-      title="Copy phrase to clipboard"
-      tabindex="0"
-      class="c-button__icon"
-        @click=${async () => {
-        try {
-          await navigator.clipboard.writeText(userNumber.toString());
-          withRef(userNumberCopy, (elem) => {
-            elem.classList.add("is-copied");
-          });
-        } catch (e: unknown) {
-          toast.error("Unable to copy Internet Identity");
-          console.error("Unable to copy Internet Identity", e);
-        }
-      }}
-      >
-      <span>Copy</span>
-      ${copyIcon}
-      ${checkmarkIcon}
-      </button>
+        <button
+          ${ref(userNumberCopy)}
+          aria-label="Copy phrase to clipboard""
+          title="Copy phrase to clipboard"
+          tabindex="0"
+          class="c-button__icon"
+          @click=${async () => {
+            try {
+              await navigator.clipboard.writeText(userNumber.toString());
+              withRef(userNumberCopy, (elem) => {
+                elem.classList.add("is-copied");
+              });
+            } catch (e: unknown) {
+              toast.error("Unable to copy Internet Identity");
+              console.error("Unable to copy Internet Identity", e);
+            }
+          }}
+          >
+            <span>Copy</span>
+            ${copyIcon}
+            ${checkmarkIcon}
+          </button>
     </div>
-    <button
-      @click=${() => onContinue()}
-      id="displayUserContinue"
-      class="c-button l-stack"
-    >
-      I saved it, continue
-    </button>
+      <button
+        @click=${() => onContinue()}
+        id="displayUserContinue"
+        class="c-button l-stack"
+      >
+        I saved it, continue
+      </button>
     <section class="c-marketing-block">
       ${marketingIntroSlot}
       <aside class="l-stack">
@@ -87,7 +87,7 @@ export const displayUserNumberTemplate = ({
       </aside>
     </section>
 
-  `;
+    `;
 
   return mainWindow({
     showLogo: false,
@@ -110,10 +110,10 @@ export const displayUserNumberWarmup = (): OmitParams<
 };
 
 export const displayUserNumber = ({
-                                    userNumber,
-                                    identityBackground,
-                                    marketingIntroSlot,
-                                  }: {
+  userNumber,
+  identityBackground,
+  marketingIntroSlot,
+}: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
   marketingIntroSlot?: TemplateResult;

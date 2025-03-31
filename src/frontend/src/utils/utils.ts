@@ -352,7 +352,7 @@ export function shuffleArray<T>(array_: T[]): T[] {
 //
 // eslint-disable-next-line
 export type OmitParams<T extends (arg: any) => any, A extends string> = (
-  a: Omit<Parameters<T>[0], A>,
+  a: Omit<Parameters<T>[0], A>
 ) => ReturnType<T>;
 
 // Zip two arrays together
