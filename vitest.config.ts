@@ -27,8 +27,13 @@ export default defineConfig(
           // Therefore, we adjust it here to have the flexibility to set the max
           // to one for the e2e tests only.
           minThreads: 1,
+          maxThreads: 1,
+          singleThread: true,
           useAtomics: true,
         },
+      },
+      sequence: {
+        concurrent: false,
       },
     },
   }),
