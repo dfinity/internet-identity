@@ -243,11 +243,8 @@ const init = async () => {
         autoSelectionPrincipal,
       });
       delegationIdentity = result.identity;
-      if (delegationIdentity === undefined) {
-        return showError("No identity");
-      }
       updateDelegationView({
-        identity: delegationIdentity as DelegationIdentity,
+        identity: delegationIdentity,
         authnMethod: result.authnMethod,
       });
     } catch (e) {
