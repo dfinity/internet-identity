@@ -98,6 +98,7 @@ export async function runInBrowser(
       `--window-size=${runConfig.screenConfiguration.windowSize}`
     );
   }
+
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -224,8 +225,8 @@ export async function addCustomCommands(
           description:
             "Determines the result of all user consent authorization gestures",
           required: true,
-        }
-      ]
+        },
+      ],
     })
   );
 
@@ -246,7 +247,7 @@ export async function addCustomCommands(
             required: true,
           },
         ],
-        parameters: []
+        parameters: [],
       }
     )
   );
@@ -269,7 +270,7 @@ export async function addCustomCommands(
             required: true,
           },
         ],
-        parameters: []
+        parameters: [],
       }
     )
   );
@@ -422,7 +423,7 @@ export const waitForImages = (
         const documentReady: boolean = document.readyState === "complete";
         return imagesReady && documentReady;
       }),
-    { timeoutMsg: "image wasn't loaded", timeout: 60_000 },
+    { timeoutMsg: "image wasn't loaded" },
   );
 
 export async function switchToPopup(
@@ -430,7 +431,7 @@ export async function switchToPopup(
 ): Promise<string> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length === 2,
-    { timeoutMsg: "window did not open", timeout: 60_000 },
+    { timeoutMsg: "window did not open" },
   );
   const handles = await browser.getWindowHandles();
   await browser.switchToWindow(handles[1]);
@@ -452,8 +453,8 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
     {
-      timeout: 60_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
-      timeoutMsg: "expected only one window to exist after 60s"
+      timeout: 20_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
+      timeoutMsg: "expected only one window to exist after 20s"
     }
   );
   const handles = await browser.getWindowHandles();
@@ -472,7 +473,7 @@ export async function wipeStorage(browser: WebdriverIO.Browser): Promise<void> {
 
 export const setOpenIdFeatureFlag = async (
   browser: WebdriverIO.Browser,
-  enabled: boolean,
+  enabled: boolean
 ): Promise<void> => {
   await browser.execute((enabled) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -496,7 +497,7 @@ export const mockFedCM = async (
         navigator.credentials.get = window.__credentialsGet;
         return Promise.resolve({
           type: "identity",
-          token
+          token,
         } as unknown as Credential);
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -544,10 +545,10 @@ export const createActor = async (
     // Always go through vite dev server and fetch the root key
     host: "https://localhost:5173",
     shouldFetchRootKey: true,
-    verifyQuerySignatures: false
+    verifyQuerySignatures: false,
   });
   return Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent,
-    canisterId
+    canisterId,
   });
 };
