@@ -15,7 +15,6 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": false,
     "types": ["node", "vite/client", "vitest/globals"],
     "paths": {
       "$generated": ["./src/frontend/generated"],
