@@ -907,7 +907,7 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/') && failure() }}
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          MESSAGE: "Release creation failed: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MESSAGE: "Release creation failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # A native, fast cached build. We use the produced test assets to run the canister & e2e tests.
   # The asset's checksum is compared against that of the (slower) docker build.
