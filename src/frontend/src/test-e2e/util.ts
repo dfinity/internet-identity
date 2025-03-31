@@ -48,6 +48,19 @@ async function remoteRetry(
   );
 }
 
+const logs: string[] = [];
+const logit = (value: string) => {
+  logs.push(value);
+  console.log(
+    "------------------------------------------------------------------------------------------------------",
+  );
+  console.log(`count: ${logs.length}`);
+  console.log(logs.join("\n"));
+  console.log(
+    "------------------------------------------------------------------------------------------------------",
+  );
+};
+
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
@@ -99,6 +112,8 @@ export async function runInBrowser(
     );
   }
 
+  const id = Math.random().toString(36).substr(2);
+  logit(`1. starting browser ${id}`);
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -106,14 +121,17 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
   });
+  logit(`2. browser started ${id}`);
 
   // setup test suite
   await addCustomCommands(browser);
 
   try {
     // run test
+    logit(`3. test started ${id}`);
     await test(browser, runConfig);
   } catch (e) {
+    logit(`3.1 test failed ${id}`);
     const testName =
       expect.getState().currentTestName?.replace(/\W/g, "_") ??
       `unknown-${randomString()}`;
@@ -138,8 +156,10 @@ export async function runInBrowser(
     );
     throw e;
   } finally {
+    logit(`4. test ended ${id}`);
     try {
       await browser.deleteSession();
+      logit(`5. browser closed ${id}`);
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
