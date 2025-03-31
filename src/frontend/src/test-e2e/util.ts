@@ -48,25 +48,12 @@ async function remoteRetry(
   );
 }
 
-const logs: string[] = [];
-const logit = (value: string) => {
-  logs.push(value);
-  console.log(
-    "------------------------------------------------------------------------------------------------------",
-  );
-  console.log(`count: ${logs.length}`);
-  console.log(logs.join("\n"));
-  console.log(
-    "------------------------------------------------------------------------------------------------------",
-  );
-};
-
 export async function runInBrowser(
   test: (
     browser: WebdriverIO.Browser,
-    runConfig: RunConfiguration,
+    runConfig: RunConfiguration
   ) => Promise<void>,
-  userAgent?: string,
+  userAgent?: string
 ): Promise<void> {
   // parse run configuration from environment variables
   const runConfig = parseRunConfiguration();
@@ -89,7 +76,7 @@ export async function runInBrowser(
       ...extraChromeOptions,
       // Required for CI runners using >=Ubuntu 24.04
       // @see https://github.com/SeleniumHQ/selenium/issues/14609
-      "--no-sandbox",
+      "--no-sandbox"
     ],
 
     // Disables permission prompt for clipboard, needed for tests using the clipboard (without this,
@@ -97,70 +84,62 @@ export async function runInBrowser(
     // https://stackoverflow.com/questions/53669639/enable-clipboard-in-automated-tests-with-protractor-and-webdriver
     prefs: {
       "profile.content_settings.exceptions.clipboard": {
-        "*": { last_modified: Date.now(), setting: 1 },
-      },
+        "*": { last_modified: Date.now(), setting: 1 }
+      }
     },
   };
 
   if (runConfig.screenConfiguration.screenType === "mobile") {
     chromeOptions.mobileEmulation = {
-      deviceMetrics: runConfig.screenConfiguration.deviceMetrics,
+      deviceMetrics: runConfig.screenConfiguration.deviceMetrics
     };
   } else {
     chromeOptions.args?.push(
-      `--window-size=${runConfig.screenConfiguration.windowSize}`,
+      `--window-size=${runConfig.screenConfiguration.windowSize}`
     );
   }
   const testName =
     expect.getState().currentTestName?.replace(/\W/g, "_") ??
     `unknown-${randomString()}`;
-
-  const testNameAsIs = expect.getState().currentTestName;
-  logit(`1. starting browser ${testNameAsIs}`);
+  
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
       browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
-      "goog:chromeOptions": chromeOptions,
+      "goog:chromeOptions": chromeOptions
     },
   });
-  logit(`2. browser started ${testNameAsIs}`);
 
   // setup test suite
   await addCustomCommands(browser);
 
   try {
     // run test
-    logit(`3. test started ${testNameAsIs}`);
     await test(browser, runConfig);
   } catch (e) {
-    logit(`3.1 test failed ${testNameAsIs}`);
-
     if (!fs.existsSync("test-failures")) {
       fs.mkdirSync("test-failures");
     }
     await fsasync.writeFile(
       `test-failures/${testName}.html`,
-      await browser.getPageSource(),
+      await browser.getPageSource()
     );
     const browserLogs = await browser.getLogs("browser");
     const printableLogs = browserLogs.reduce(
       (accumulator, entry) => accumulator + "\n" + JSON.stringify(entry),
-      "",
+      ""
     );
 
     await fsasync.writeFile(`test-failures/${testName}.log`, printableLogs);
     await browser.saveScreenshot(`test-failures/${testName}.png`);
     console.error(e);
     console.log(
-      "An error occurred during e2e test execution. WebDriver logs can be found in the wdio.log file and an error information (screenshot, console logs, page source) was saved in the test-failures folder. On Github Actions you can find the log and screenshots under 'Artifacts'.",
+      "An error occurred during e2e test execution. WebDriver logs can be found in the wdio.log file and an error information (screenshot, console logs, page source) was saved in the test-failures folder. On Github Actions you can find the log and screenshots under 'Artifacts'."
     );
     throw e;
   } finally {
-    logit(`4. test ended ${testNameAsIs}`);
     try {
       await browser.deleteSession();
-      logit(`5. browser closed ${testNameAsIs}`);
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
@@ -194,7 +173,7 @@ function parseScreen(): ScreenConfiguration {
       return DESKTOP_SCREEN;
     default:
       console.log(
-        `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`,
+        `Using default screen 'desktop'. Unknown screen type provided by SCREEN env variable: '${process.env.SCREEN}'`
       );
       return DESKTOP_SCREEN;
   }
@@ -211,7 +190,7 @@ function parseRunConfiguration(): RunConfiguration {
  * @param browser browser to add the commands to
  */
 export async function addCustomCommands(
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<void> {
   await browser.addCommand(
     "addVirtualWebAuth",
@@ -225,30 +204,30 @@ export async function addCustomCommands(
           name: "protocol",
           type: "string",
           description: "The protocol the Virtual Authenticator speaks",
-          required: true,
+          required: true
         },
         {
           name: "transport",
           type: "string",
           description: "The AuthenticatorTransport simulated",
-          required: true,
+          required: true
         },
         {
           name: "hasResidentKey",
           type: "boolean",
           description:
             "If set to true the authenticator will support client-side discoverable credentials",
-          required: true,
+          required: true
         },
         {
           name: "isUserConsenting",
           type: "boolean",
           description:
             "Determines the result of all user consent authorization gestures",
-          required: true,
-        },
-      ],
-    }),
+          required: true
+        }
+      ]
+    })
   );
 
   await browser.addCommand(
@@ -265,12 +244,12 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true,
+            required: true
           },
         ],
-        parameters: [],
-      },
-    ),
+        parameters: []
+      }
+    )
   );
 
   // This retrieves previously created credentials, see https://www.w3.org/TR/webauthn-2/#sctn-automation-get-credentials
@@ -288,12 +267,12 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true,
+            required: true
           },
         ],
-        parameters: [],
-      },
-    ),
+        parameters: []
+      }
+    )
   );
 
   // This adds a previously created credential, see https://www.w3.org/TR/webauthn-2/#sctn-automation-add-credential
@@ -311,7 +290,7 @@ export async function addCustomCommands(
             name: "authenticatorId",
             type: "string",
             description: "The id of the authenticator to remove",
-            required: true,
+            required: true
           },
         ],
         parameters: [
@@ -319,71 +298,71 @@ export async function addCustomCommands(
             name: "rpId",
             type: "string",
             description: "The relying party ID the credential is scoped to.",
-            required: true,
+            required: true
           },
           {
             name: "credentialId",
             type: "string",
             description: "The credential ID encoded using Base64url encoding",
-            required: true,
+            required: true
           },
           {
             name: "isResidentCredential",
             type: "boolean",
             description:
               "If set to true, a client-side discoverable credential is created. If set to false, a server-side credential is created instead.",
-            required: true,
+            required: true
           },
           {
             name: "privateKey",
             type: "string",
             description:
               "An asymmetric key package containing a single private key per [RFC5958], encoded using Base64url encoding.",
-            required: true,
+            required: true
           },
           {
             name: "signCount",
             type: "number",
             description:
               "The initial value for a signature counter associated to the public key credential source.",
-            required: true,
+            required: true
           },
           {
             name: "userHandle",
             type: "string",
             description:
               "The userHandle associated to the credential encoded using Base64url encoding.",
-            required: false,
+            required: false
           },
           {
             name: "largeBlob",
             type: "string",
             description:
               "The large, per-credential blob associated to the public key credential source, encoded using Base64url encoding.",
-            required: false,
-          },
-        ],
-      },
-    ),
+            required: false
+          }
+        ]
+      }
+    )
   );
 }
 
 export async function addVirtualAuthenticator(
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<string> {
   return await browser.addVirtualWebAuth("ctap2", "usb", true, true);
 }
 
 export async function removeVirtualAuthenticator(
   browser: WebdriverIO.Browser,
-  authenticatorId: string,
+  authenticatorId: string
 ): Promise<void> {
   return await browser.removeVirtualWebAuth(authenticatorId);
 }
 
 export async function getWebAuthnCredentials(
   browser: WebdriverIO.Browser,
-  authId: string,
+  authId: string
 ): Promise<WebAuthnCredential[]> {
   return await browser.getWebauthnCredentials(authId);
 }
@@ -392,7 +371,7 @@ export async function addWebAuthnCredential(
   browser: WebdriverIO.Browser,
   authId: string,
   credential: WebAuthnCredential,
-  rpId: string,
+  rpId: string
 ): Promise<void> {
   return await browser.addWebauthnCredential(
     authId,
@@ -400,7 +379,7 @@ export async function addWebAuthnCredential(
     credential.credentialId,
     credential.isResidentCredential,
     credential.privateKey,
-    credential.signCount,
+    credential.signCount
   );
 }
 
@@ -410,7 +389,7 @@ export function originToRelyingPartyId(origin: string): string {
 
 // Inspired by https://stackoverflow.com/a/66919695/946226
 export async function waitForFonts(
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<void> {
   for (let i = 0; i <= 50; i++) {
     if ((await browser.execute("return document.fonts.status;")) == "loaded") {
@@ -420,13 +399,13 @@ export async function waitForFonts(
   }
   console.log(
     "Odd, document.font.status never reached state loaded, stuck at",
-    await browser.execute("return document.fonts.status;"),
+    await browser.execute("return document.fonts.status;")
   );
 }
 
 // Inspired by https://github.com/dfinity/nns-dapp/blob/0449da36fd20eb9bb5d712d78aea8879cb51ec8e/e2e-tests/common/waitForImages.ts
 export const waitForImages = (
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<true | void> =>
   // Wait for all images to be "complete", i.e. loaded
   browser.waitUntil(
@@ -444,15 +423,15 @@ export const waitForImages = (
         const documentReady: boolean = document.readyState === "complete";
         return imagesReady && documentReady;
       }),
-    { timeoutMsg: "image wasn't loaded", timeout: 60_000 },
+    { timeoutMsg: "image wasn't loaded", timeout: 60_000 }
   );
 
 export async function switchToPopup(
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<string> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length === 2,
-    { timeoutMsg: "window did not open", timeout: 60_000 },
+    { timeoutMsg: "window did not open", timeout: 60_000 }
   );
   const handles = await browser.getWindowHandles();
   await browser.switchToWindow(handles[1]);
@@ -465,7 +444,7 @@ export async function switchToPopup(
  * @param browser to switch to.
  */
 export async function focusBrowser(
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<void> {
   await browser.switchToWindow((await browser.getWindowHandles())[0]);
 }
@@ -475,8 +454,8 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
     async () => (await browser.getWindowHandles()).length == 1,
     {
       timeout: 60_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
-      timeoutMsg: "expected only one window to exist after 60s",
-    },
+      timeoutMsg: "expected only one window to exist after 60s"
+    }
   );
   const handles = await browser.getWindowHandles();
   expect(handles.length).toBe(1);
@@ -505,7 +484,7 @@ export const setOpenIdFeatureFlag = async (
 
 export const mockFedCM = async (
   browser: WebdriverIO.Browser,
-  token: string,
+  token: string
 ): Promise<void> => {
   await browser.execute((token) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -518,7 +497,7 @@ export const mockFedCM = async (
         navigator.credentials.get = window.__credentialsGet;
         return Promise.resolve({
           type: "identity",
-          token,
+          token
         } as unknown as Credential);
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -531,7 +510,7 @@ export const mockFedCM = async (
 // TODO: Remove when we remove the domain compatibility feature flag
 export const setDomainCompatibilityFeatureFlag = async (
   browser: WebdriverIO.Browser,
-  enabled: boolean,
+  enabled: boolean
 ): Promise<void> => {
   await browser.execute((enabled) => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -545,7 +524,7 @@ export const setDomainCompatibilityFeatureFlag = async (
  * thus detected as a passkey extension which doesn't support RoR.
  */
 export const mimickPasskeyExtension = async (
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<void> => {
   await browser.execute(() => {
     const create = navigator.credentials.create;
@@ -558,7 +537,7 @@ export const mimickPasskeyExtension = async (
 };
 
 export const createActor = async (
-  browser: WebdriverIO.Browser,
+  browser: WebdriverIO.Browser
 ): Promise<ActorSubclass<_SERVICE>> => {
   const script = await browser.$("[data-canister-id]");
   const canisterId = await script.getAttribute("data-canister-id");
@@ -566,10 +545,10 @@ export const createActor = async (
     // Always go through vite dev server and fetch the root key
     host: "https://localhost:5173",
     shouldFetchRootKey: true,
-    verifyQuerySignatures: false,
+    verifyQuerySignatures: false
   });
   return Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent,
-    canisterId,
+    canisterId
   });
 };
