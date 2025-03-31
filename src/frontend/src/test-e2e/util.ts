@@ -111,9 +111,11 @@ export async function runInBrowser(
       `--window-size=${runConfig.screenConfiguration.windowSize}`,
     );
   }
+  const testName =
+    expect.getState().currentTestName?.replace(/\W/g, "_") ??
+    `unknown-${randomString()}`;
 
-  const id = Math.random().toString(36).substr(2);
-  logit(`1. starting browser ${id}`);
+  logit(`1. starting browser ${testName}`);
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -121,20 +123,18 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
   });
-  logit(`2. browser started ${id}`);
+  logit(`2. browser started ${testName}`);
 
   // setup test suite
   await addCustomCommands(browser);
 
   try {
     // run test
-    logit(`3. test started ${id}`);
+    logit(`3. test started ${testName}`);
     await test(browser, runConfig);
   } catch (e) {
-    logit(`3.1 test failed ${id}`);
-    const testName =
-      expect.getState().currentTestName?.replace(/\W/g, "_") ??
-      `unknown-${randomString()}`;
+    logit(`3.1 test failed ${testName}`);
+
     if (!fs.existsSync("test-failures")) {
       fs.mkdirSync("test-failures");
     }
@@ -156,10 +156,10 @@ export async function runInBrowser(
     );
     throw e;
   } finally {
-    logit(`4. test ended ${id}`);
+    logit(`4. test ended ${testName}`);
     try {
       await browser.deleteSession();
-      logit(`5. browser closed ${id}`);
+      logit(`5. browser closed ${testName}`);
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
