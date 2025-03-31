@@ -6,7 +6,7 @@ import {
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
 } from "$generated/internet_identity_types";
-import identityCardBackground from "$src/assets/identityCardBackground.png";
+import identityCardBackground from "$src/assets/identityCardBackground.png?url";
 import {
   AuthnTemplates,
   authenticateBox,

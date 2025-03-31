@@ -268,7 +268,7 @@ export class MainView extends View {
     const elems = await this.browser.$$(
       `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
     );
-    if (elems.length !== count) {
+    if ((await elems.length) !== count) {
       throw Error("Bad number of elements");
     }
   }
@@ -873,7 +873,7 @@ export class VcTestAppView extends View {
       const principal = (() => {
         try {
           return Principal.fromText(principal_).toText();
-        } catch (e) {
+        } catch {
           return undefined;
         }
       })();

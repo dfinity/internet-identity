@@ -3,6 +3,7 @@ import { _SERVICE } from "$generated/internet_identity_types";
 import { randomString, wrapError } from "$src/utils/utils";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { nonNullish } from "@dfinity/utils";
+// @ts-expect-error TODO: Fix this error
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import * as fs from "fs";
 import * as fsasync from "fs/promises";
@@ -101,7 +102,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });

@@ -1,8 +1,7 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { minify } from "html-minifier-terser";
-import { extname } from "path";
 import type { Plugin, ViteDevServer } from "vite";
-import viteCompression from "vite-plugin-compression";
+import viteCompression from "vite-plugin-compression2";
 import {
   forwardToReplica,
   readCanisterConfig,
@@ -57,9 +56,9 @@ export const injectCanisterIdAndConfigPlugin = ({
 export const compression = (): Plugin =>
   viteCompression({
     // II canister only supports one content type per resource. That is why we remove the original file.
-    deleteOriginFile: true,
-    filter: (file: string): boolean =>
-      [".js", ".woff2"].includes(extname(file)),
+    algorithm: "gzip",
+    deleteOriginalAssets: true,
+    include: /\.(js|woff2)$/
   });
 
 /**

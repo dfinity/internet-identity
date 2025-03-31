@@ -6,9 +6,10 @@ import {
   replicaForwardPlugin,
 } from "@dfinity/internet-identity-vite-plugins";
 import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
+// import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { resolve } from "path";
-import { AliasOptions, UserConfig, defineConfig } from "vite";
+import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export const aliasConfig: AliasOptions = {
@@ -69,6 +70,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
       },
     },
     plugins: [
+      // sveltekit(), TODO: Enable this once II renders within Svelte
       inlineScriptsPlugin,
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({

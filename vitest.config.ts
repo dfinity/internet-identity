@@ -20,15 +20,17 @@ export default defineConfig(
       globals: true,
       watch: false,
       setupFiles: "./src/frontend/test-setup.ts",
-      poolOptions: {
-        threads: {
-          // minThreads defaults to number of CPUs. But we want to run e2e tests
-          // sequentially, and maxThreads must never be lower than minThreads.
-          // Therefore, we adjust it here to have the flexibility to set the max
-          // to one for the e2e tests only.
-          minThreads: 1,
-        },
+      // Make sure that our browser e2e tests run one by one:
+      // - `sequence.concurrent: false` within each test file
+      // - `fileParallelism: false` across test files
+      //
+      // This makes sure that WebdriverIO won't start more than one browser
+      // instance at the same time, which would result in the following error:
+      // `Could not start browser after 5 retries: Error: spawn ETXTBSY`
+      sequence: {
+        concurrent: false,
       },
+      fileParallelism: false,
     },
-  })
+  }),
 );

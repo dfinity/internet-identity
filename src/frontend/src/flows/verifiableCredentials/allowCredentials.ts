@@ -14,7 +14,7 @@ import DOMPurify from "dompurify";
 
 import copyJson from "./allowCredentials.json";
 
-import unknownDappLogo from "$src/assets/unknowndapp.png";
+import unknownDappLogo from "$src/assets/unknowndapp.png?url";
 
 /*
  * Get the dapp that corresponds to the origin, or create a new one if it's

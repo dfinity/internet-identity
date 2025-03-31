@@ -1,4 +1,4 @@
-import loaderUrl from "$src/components/loader.png";
+import loaderUrl from "$src/components/loader.png?url";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "./components/displayError";
 import { anyFeatures, features } from "./features";
@@ -65,7 +65,7 @@ const readCanisterConfig = (): InternetIdentityInit => {
       fromBase64(setupJs.dataset.canisterConfig)
     );
     return jsonValue as unknown as InternetIdentityInit;
-  } catch (e) {
+  } catch {
     void displayError({
       title: "Canister config not valid",
       message:

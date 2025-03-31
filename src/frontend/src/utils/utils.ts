@@ -228,7 +228,6 @@ export class Chan<A> implements AsyncIterable<A> {
     while (true) {
       // Yield the buffer first
       while (this.buffer.length >= 1) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         yield this.buffer.shift()!;
       }
 

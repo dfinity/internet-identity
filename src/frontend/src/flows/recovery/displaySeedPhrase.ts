@@ -158,7 +158,6 @@ export const displaySeedPhrase = ({
 }): Promise<"ok" | "canceled"> => {
   const i18n = new I18n();
   const words = seedPhrase.split(" ");
-  // eslint-disable-next-line
   const userNumberWord = words.shift()!; // Extract first word (anchor) to show independently
   return new Promise((resolve) =>
     displaySeedPhrasePage({

@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": ["node", "vite/client", "vitest/globals"],
