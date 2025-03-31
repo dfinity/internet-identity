@@ -1058,4 +1058,3 @@ jobs:
         run: npm run --workspace ./src/sig-verifier-js build
       - name: Run sig-verifier tests
         run: npm run --workspace ./src/sig-verifier-js test
-        
