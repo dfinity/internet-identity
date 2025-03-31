@@ -115,7 +115,8 @@ export async function runInBrowser(
     expect.getState().currentTestName?.replace(/\W/g, "_") ??
     `unknown-${randomString()}`;
 
-  logit(`1. starting browser ${testName}`);
+  const testNameAsIs = expect.getState().currentTestName;
+  logit(`1. starting browser ${testNameAsIs}`);
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
@@ -123,17 +124,17 @@ export async function runInBrowser(
       "goog:chromeOptions": chromeOptions,
     },
   });
-  logit(`2. browser started ${testName}`);
+  logit(`2. browser started ${testNameAsIs}`);
 
   // setup test suite
   await addCustomCommands(browser);
 
   try {
     // run test
-    logit(`3. test started ${testName}`);
+    logit(`3. test started ${testNameAsIs}`);
     await test(browser, runConfig);
   } catch (e) {
-    logit(`3.1 test failed ${testName}`);
+    logit(`3.1 test failed ${testNameAsIs}`);
 
     if (!fs.existsSync("test-failures")) {
       fs.mkdirSync("test-failures");
@@ -156,10 +157,10 @@ export async function runInBrowser(
     );
     throw e;
   } finally {
-    logit(`4. test ended ${testName}`);
+    logit(`4. test ended ${testNameAsIs}`);
     try {
       await browser.deleteSession();
-      logit(`5. browser closed ${testName}`);
+      logit(`5. browser closed ${testNameAsIs}`);
     } catch (e) {
       console.error("error occurred during session cleanup: " + wrapError(e));
     }
