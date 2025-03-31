@@ -873,7 +873,7 @@ export class VcTestAppView extends View {
       const principal = (() => {
         try {
           return Principal.fromText(principal_).toText();
-        } catch (e) {
+        } catch {
           return undefined;
         }
       })();
