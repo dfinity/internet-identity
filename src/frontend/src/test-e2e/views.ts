@@ -268,7 +268,7 @@ export class MainView extends View {
     const elems = await this.browser.$$(
       `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
     );
-    if (elems.length !== count) {
+    if ((await elems.length) !== count) {
       throw Error("Bad number of elements");
     }
   }
@@ -398,8 +398,8 @@ export class MainView extends View {
 
   // Open the device settings/actions dropdown
   async openDeviceActions({
-                            deviceName,
-                          }: {
+    deviceName,
+  }: {
     deviceName: string;
   }): Promise<void> {
     // Ensure the settings dropdown is in view
@@ -733,9 +733,9 @@ export class VcAllowView extends View {
 
 export class IssuerAppView extends View {
   async open({
-               issuerAppUrl,
-               iiUrl,
-             }: {
+    issuerAppUrl,
+    iiUrl,
+  }: {
     issuerAppUrl: string;
     iiUrl: string;
   }): Promise<void> {
@@ -754,8 +754,8 @@ export class IssuerAppView extends View {
   }
 
   async setDerivationOrigin({
-                              derivationOrigin,
-                            }: {
+    derivationOrigin,
+  }: {
     derivationOrigin: string;
   }): Promise<void> {
     const derivationOriginInput = await this.browser.$(
