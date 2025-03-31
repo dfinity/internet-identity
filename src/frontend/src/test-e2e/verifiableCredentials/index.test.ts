@@ -76,7 +76,7 @@ const testConfigs: Array<{
 
 testConfigs.forEach(({ relyingParty, issuer, authType, iiUrl }) => {
   const testSuffix = `RP: ${getDomain(relyingParty)}, ISS: ${getDomain(
-    issuer,
+    issuer
   )}, auth: ${authType}`;
 
   test(
@@ -121,10 +121,10 @@ testConfigs.forEach(({ relyingParty, issuer, authType, iiUrl }) => {
           const aliasObj = JSON.parse(alias);
           expect(aliasObj.sub).toBe(`did:icp:${principalRP}`);
         },
-        authType === "pin" ? APPLE_USER_AGENT : undefined,
+        authType === "pin" ? APPLE_USER_AGENT : undefined
       );
     },
-    300_000,
+    300_000
   );
 });
 
