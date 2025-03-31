@@ -1,7 +1,7 @@
 export const config: WebdriverIO.Config = {
   baseUrl: process.env.II_DAPP_URL || "http://localhost:5173",
 
-  waitforTimeout: 60_000,
+  waitforTimeout: 10_000,
 
   autoCompileOpts: {
     autoCompile: true,

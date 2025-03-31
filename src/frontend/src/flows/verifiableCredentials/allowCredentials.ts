@@ -194,6 +194,6 @@ export const allowCredentials = ({
       onAllow: (userNumber) => resolve({ tag: "allowed", userNumber }),
       onCancel: () => resolve({ tag: "canceled" }),
       scrollToTop: true,
-    }),
+    })
   );
 };

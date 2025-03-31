@@ -81,7 +81,7 @@ const displaySeedPhraseTemplate = ({
                   style="--index: '${i + 1}';"
                 >
                   <i>${word}</i>
-                </li>`,
+                </li>`
             )}
           </ol>
           <i
@@ -111,7 +111,7 @@ const displaySeedPhraseTemplate = ({
             withRef(continueButton, (continueButton) =>
               withRef(checkbox, (checkbox) => {
                 continueButton.disabled = !checkbox.checked;
-              }),
+              })
             )}
         />
         <label for="ack-checkbox" class="t-strong"
@@ -168,6 +168,6 @@ export const displaySeedPhrase = ({
       cancel: () => resolve("canceled"),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
       i18n,
-    }),
+    })
   );
 };

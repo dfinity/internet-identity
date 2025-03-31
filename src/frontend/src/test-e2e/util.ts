@@ -29,7 +29,7 @@ const DESKTOP_SCREEN: ScreenConfiguration = {
 // webdriverio sometimes fails to fetch the latest chrome (due to network errors?) and does not
 // retry. So we do the retrying on our side.
 async function remoteRetry(
-  opts: Parameters<typeof remote>[0],
+  opts: Parameters<typeof remote>[0]
 ): ReturnType<typeof remote> {
   let lastErr;
   const MAX_RETRIES = 5;
@@ -44,7 +44,7 @@ async function remoteRetry(
   }
 
   throw new Error(
-    `Could not start browser after ${MAX_RETRIES} retries: ${lastErr}`,
+    `Could not start browser after ${MAX_RETRIES} retries: ${lastErr}`
   );
 }
 

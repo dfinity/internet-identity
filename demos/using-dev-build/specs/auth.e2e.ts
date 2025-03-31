@@ -18,7 +18,7 @@ describe("authentication", () => {
           (await title.getText()) === "You’ve created an Internet Identity!"
         );
       },
-      { timeout: 60_000 }
+      { timeout: 20_000 }
     );
   });
 });

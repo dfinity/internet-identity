@@ -1,4 +1,4 @@
-import identityCardBackground from "$src/assets/identityCardBackground.png?url";
+import identityCardBackground from "$src/assets/identityCardBackground.png";
 import { checkmarkIcon, copyIcon } from "$src/components/icons";
 import { identityCard } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
@@ -15,12 +15,12 @@ import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 export const displayUserNumberTemplate = ({
-  onContinue,
-  userNumber,
-  identityBackground,
-  marketingIntroSlot,
-  scrollToTop = false,
-}: {
+                                            onContinue,
+                                            userNumber,
+                                            identityBackground,
+                                            marketingIntroSlot,
+                                            scrollToTop = false,
+                                          }: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: PreLoadImage;
@@ -42,7 +42,7 @@ export const displayUserNumberTemplate = ({
         Save this number by taking a screenshot or writing it down.
       </p>
     </hgroup>
-    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id">
+    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id" >
       ${
         identityCard({
           userNumber,
@@ -56,16 +56,16 @@ export const displayUserNumberTemplate = ({
       tabindex="0"
       class="c-button__icon"
         @click=${async () => {
-          try {
-            await navigator.clipboard.writeText(userNumber.toString());
-            withRef(userNumberCopy, (elem) => {
-              elem.classList.add("is-copied");
-            });
-          } catch (e: unknown) {
-            toast.error("Unable to copy Internet Identity");
-            console.error("Unable to copy Internet Identity", e);
-          }
-        }}
+        try {
+          await navigator.clipboard.writeText(userNumber.toString());
+          withRef(userNumberCopy, (elem) => {
+            elem.classList.add("is-copied");
+          });
+        } catch (e: unknown) {
+          toast.error("Unable to copy Internet Identity");
+          console.error("Unable to copy Internet Identity", e);
+        }
+      }}
       >
       <span>Copy</span>
       ${copyIcon}
@@ -83,8 +83,7 @@ export const displayUserNumberTemplate = ({
       ${marketingIntroSlot}
       <aside class="l-stack">
         <h3 class="t-title">Why is it important to save this number?</h3>
-        <p class="t-paragraph">This number is unique but not secret. If you lose this number, you will lose access to
-          all of the accounts that you created with it</p>
+        <p class="t-paragraph">This number is unique but not secret. If you lose this number, you will lose access to all of the accounts that you created with it</p>
       </aside>
     </section>
 
@@ -111,10 +110,10 @@ export const displayUserNumberWarmup = (): OmitParams<
 };
 
 export const displayUserNumber = ({
-  userNumber,
-  identityBackground,
-  marketingIntroSlot,
-}: {
+                                    userNumber,
+                                    identityBackground,
+                                    marketingIntroSlot,
+                                  }: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
   marketingIntroSlot?: TemplateResult;
@@ -126,6 +125,6 @@ export const displayUserNumber = ({
       identityBackground,
       marketingIntroSlot,
       scrollToTop: true,
-    }),
+    })
   );
 };

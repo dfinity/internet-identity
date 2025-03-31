@@ -104,7 +104,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_NICE_URL}"]}`,
-      "certified",
+      "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_CANONICAL_URL_RAW);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -115,7 +115,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
       browser,
       authenticatorId2,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
 
     // Selenium has _no_ connectivity to the raw url
@@ -132,7 +132,7 @@ test("Should fetch /.well-known/ii-alternative-origins using the non-raw url", a
     const errorLog = logs.find(
       ({ message }) =>
         message.includes("/.well-known/ii-alternative-origins") &&
-        message.includes("Failed to load resource"),
+        message.includes("Failed to load resource")
     );
     expect(nonNullish(errorLog)).toBeTruthy();
 
@@ -157,7 +157,7 @@ test("Should allow arbitrary URL as derivation origin", async () => {
     await niceDemoAppView.waitForDisplay();
     await niceDemoAppView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${TEST_APP_CANONICAL_URL}"]}`,
-      "certified",
+      "certified"
     );
     await niceDemoAppView.setDerivationOrigin(TEST_APP_NICE_URL);
     expect(await niceDemoAppView.getPrincipal()).toBe("");
@@ -168,7 +168,7 @@ test("Should allow arbitrary URL as derivation origin", async () => {
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL),
+      originToRelyingPartyId(II_URL)
     );
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
