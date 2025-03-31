@@ -28,7 +28,7 @@ export const addDevice = async ({
       Promise.all([
         connection.enterDeviceRegistrationMode(),
         connection.getAnchorInfo(),
-      ])
+      ]),
     );
 
   let tentativeDevice = anchorInfo.device_registration[0]?.tentative_device[0];
@@ -38,7 +38,7 @@ export const addDevice = async ({
       userNumber,
       connection,
       timestamp,
-      origin
+      origin,
     );
 
     if (result === "timeout") {
@@ -58,7 +58,7 @@ export const addDevice = async ({
         userNumber,
         connection,
         anchorInfo.devices,
-        origin
+        origin,
       );
       return;
     } else if (result === "canceled") {

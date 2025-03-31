@@ -90,11 +90,11 @@ const confirmSeedPhraseTemplate = ({
                   words.every(
                     (word) =>
                       // If the word is not one that needs checking, then ok
-                      !word.check || checkExpected(word.elem)
-                  )
+                      !word.check || checkExpected(word.elem),
+                  ),
                 ),
               i,
-            })
+            }),
           )}
         </ol>
       </div>
@@ -185,7 +185,7 @@ const nudgeWord = ({
         pending: "c-list--recovery-word__attention",
         correct: "c-list--recovery-word__correct",
         incorrect: "c-list--recovery-word__incorrect",
-      }[s])
+      })[s],
   );
 
   const icon = state.map(
@@ -198,7 +198,7 @@ const nudgeWord = ({
         incorrect: html`<i class="c-list--recovery-word__icon"
           >${warningIcon}</i
         >`,
-      }[s])
+      })[s],
   );
 
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
@@ -231,7 +231,7 @@ const nudgeWord = ({
       @change=${() => {
         const state_ = checkExpected(assignTo) ? "correct" : "incorrect";
         assignTo.value?.setCustomValidity(
-          state_ === "correct" ? "" : mismatchMessage
+          state_ === "correct" ? "" : mismatchMessage,
         );
         assignTo.value?.reportValidity();
         state.send(state_);

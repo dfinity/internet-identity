@@ -28,7 +28,7 @@ export const settingsDropdown = ({
           @keypress=${(e: KeyboardEvent) =>
             handleKeyPress({ e, callback: close })}
         />`
-      : undefined
+      : undefined,
   );
 
   return html`<div class="c-action-list__action c-dropdown">
@@ -57,7 +57,7 @@ export const settingsDropdown = ({
               ${setting.caption}
             </button>
           </li>
-        `
+        `,
       )}
     </ul>
   </div>`;

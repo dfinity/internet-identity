@@ -58,7 +58,7 @@ export const compression = (): Plugin =>
     // II canister only supports one content type per resource. That is why we remove the original file.
     algorithm: "gzip",
     deleteOriginalAssets: true,
-    include: /\.(js|woff2)$/
+    include: /\.(js|woff2)$/,
   });
 
 /**
@@ -96,7 +96,7 @@ export const replicaForwardPlugin = ({
         req.headers["host"]?.includes(".raw.")
       ) {
         console.log(
-          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`
+          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`,
         );
         res.statusCode = 400;
         res.end("Raw IC URLs are not supported");
@@ -112,7 +112,7 @@ export const replicaForwardPlugin = ({
       const [host, _port] = host_.split(":");
 
       const matchingRule = forwardRules.find((rule) =>
-        rule.hosts.includes(host)
+        rule.hosts.includes(host),
       );
 
       if (!isNullish(matchingRule)) {
@@ -135,7 +135,7 @@ export const replicaForwardPlugin = ({
         nonNullish(subdomain) &&
         forwardDomains.includes(domain) &&
         /([a-z0-9])+(-[a-z0-9]+)+/.test(
-          subdomain
+          subdomain,
         ) /* fast check for principal-ish */
       ) {
         // Assume the principal-ish thing is a canister ID

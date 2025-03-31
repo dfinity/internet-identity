@@ -69,7 +69,7 @@ class MockAuthenticatedConnection extends AuthenticatedConnection {
       MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
       mockDelegationIdentity,
       BigInt(12345),
-      mockActor
+      mockActor,
     );
   }
 
@@ -163,7 +163,7 @@ export const iiFlows: Record<string, () => void> = {
       loginPinIdentityMaterial: async ({ pin }) => {
         toast.info(html`Valid PIN is '123456'`);
         await withLoader(
-          () => new Promise((resolve) => setTimeout(resolve, 2000))
+          () => new Promise((resolve) => setTimeout(resolve, 2000)),
         );
         if (pin !== "123456") {
           return Promise.resolve({ kind: "badPin" });
@@ -188,7 +188,7 @@ export const iiFlows: Record<string, () => void> = {
       retrievePinIdentityMaterial: ({ userNumber }) => {
         toast.info(
           html`Looking up identity for ${userNumber} (pretending only 10000 has
-          pin identity)`
+          pin identity)`,
         );
 
         if (userNumber !== BigInt(10000)) {
@@ -261,7 +261,7 @@ const prettyResult = (obj: unknown) => {
   if (typeof obj === "object" && obj !== null) {
     return html`<ul>
       ${Object.entries(obj).map(
-        ([k, v]) => html`<li><strong class="t-strong">${k}: ${v}</strong></li>`
+        ([k, v]) => html`<li><strong class="t-strong">${k}: ${v}</strong></li>`,
       )}
     </ul>`;
   }

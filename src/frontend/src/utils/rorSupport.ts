@@ -18,7 +18,7 @@ const isNative = (fn: () => unknown) => /\[native code\]/.test(fn.toString());
 export const userSupportsWebauthRoR = (): boolean => {
   const userAgentSuportsRoR = supportsWebauthRoR(navigator.userAgent);
   const hasMonkeyPatchedCredentialGet = !isNative(
-    window.navigator.credentials.get
+    window.navigator.credentials.get,
   );
   return userAgentSuportsRoR && !hasMonkeyPatchedCredentialGet;
 };

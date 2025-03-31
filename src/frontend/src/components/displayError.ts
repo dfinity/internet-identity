@@ -60,7 +60,7 @@ export const displayError = (options: ErrorOptions): Promise<void> => {
 const init = (): Promise<void> =>
   new Promise((resolve) => {
     const displayErrorPrimary = document.getElementById(
-      "displayErrorPrimary"
+      "displayErrorPrimary",
     ) as HTMLButtonElement;
     displayErrorPrimary.onclick = () => resolve();
   });

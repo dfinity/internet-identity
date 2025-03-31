@@ -77,7 +77,7 @@ const showVerificationCodeTemplate = ({
 };
 
 export const showVerificationCodePage = renderPage(
-  showVerificationCodeTemplate
+  showVerificationCodeTemplate,
 );
 
 /**
@@ -92,11 +92,11 @@ export const showVerificationCode = async (
   connection: Connection,
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
-  credentialToBeVerified: CredentialId
+  credentialToBeVerified: CredentialId,
 ): Promise<"ok" | "canceled"> => {
   const countdown: AsyncCountdown<"match" | "canceled"> =
     AsyncCountdown.fromNanos(
-      tentativeRegistrationInfo.device_registration_timeout
+      tentativeRegistrationInfo.device_registration_timeout,
     );
 
   showVerificationCodePage({
@@ -150,7 +150,7 @@ const poll = ({
       } catch (e) {
         toast.error(
           "An error occurred while polling for verification: " +
-            unknownToString(e, "no details available :(")
+            unknownToString(e, "no details available :("),
         );
         console.warn("Error occurred when polling:", e);
       }
@@ -208,14 +208,14 @@ const anchorHasCredentials = async ({
   const matching = devices.find(
     (device) =>
       device.credential_id.length === 1 &&
-      credentialIdEqual(device.credential_id[0], credential)
+      credentialIdEqual(device.credential_id[0], credential),
   );
   return nonNullish(matching);
 };
 
 function credentialIdEqual(
   credentialId1: CredentialId,
-  credentialId2: CredentialId
+  credentialId2: CredentialId,
 ): boolean {
   if (credentialId1.length !== credentialId2.length) {
     return false;

@@ -86,7 +86,7 @@ export const authnTemplateAuthorize = ({
     <div class="l-stack">
       ${h1(
         html`${copy.first_time_title_1}<br />${copy.first_time_title_join}
-          ${name} `
+          ${name} `,
       )}
       ${mkChasm({ message: isAltOriginOf(action) ?? strong(origin) })}
     </div>
@@ -123,8 +123,8 @@ export const authnTemplateAuthorize = ({
                 message: altOrigin ?? strong(origin),
               })
             : nonNullish(altOrigin)
-            ? mkChasm({ info: strong(origin), message: altOrigin })
-            : strong(origin)}
+              ? mkChasm({ info: strong(origin), message: altOrigin })
+              : strong(origin)}
         </p>
       </div>
     `;
@@ -154,7 +154,7 @@ export const authnTemplateAuthorize = ({
 
 const authenticate = async (
   connection: Connection,
-  authContext: AuthContext
+  authContext: AuthContext,
 ): Promise<
   | {
       kind: "success";
@@ -203,7 +203,7 @@ const authenticate = async (
       derivationOrigin: authContext.authRequest.derivationOrigin,
       i18n,
       knownDapp: getDapps().find((dapp) =>
-        dapp.hasOrigin(authContext.requestOrigin)
+        dapp.hasOrigin(authContext.requestOrigin),
       ),
     }),
     allowPinLogin: authContext.authRequest.allowPinAuthentication ?? true,
@@ -232,7 +232,7 @@ const authenticate = async (
       derivationOrigin,
       publicKey: authContext.authRequest.sessionPublicKey,
       maxTimeToLive: authContext.authRequest.maxTimeToLive,
-    })
+    }),
   );
 
   if ("error" in result) {
@@ -275,7 +275,7 @@ const authenticate = async (
  * using an existing anchor or creating a new anchor, etc.
  */
 export const authFlowAuthorize = async (
-  connection: Connection
+  connection: Connection,
 ): Promise<never> => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -352,7 +352,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   const ariaExpanded = new Chan(false);
   const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
   const btnFlipped = ariaExpanded.map((expanded) =>
-    expanded ? "c-chasm__button--flipped" : undefined
+    expanded ? "c-chasm__button--flipped" : undefined,
   );
 
   return html`

@@ -37,7 +37,7 @@ export const findWebAuthnFlows = ({
 }: Parameters): WebAuthnFlow[] => {
   const currentRpId = new URL(currentOrigin).hostname;
   const relatedRpIds = relatedOrigins.map(
-    (relatedOrigin) => new URL(relatedOrigin).hostname
+    (relatedOrigin) => new URL(relatedOrigin).hostname,
   );
 
   // The devices are expected to be ordered by recently used already
@@ -49,10 +49,10 @@ export const findWebAuthnFlows = ({
           device.origin === currentOrigin ||
           (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
             ? undefined
-            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
+            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname,
         )
         // Filter out RP IDs that are not within `relatedRpIds`
-        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId))
+        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId)),
     ),
   ];
 

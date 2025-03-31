@@ -99,6 +99,6 @@ export const promptPinInfo = (): Promise<"continue" | "canceled"> => {
       onContinue: () => resolve("continue"),
       cancel: () => resolve("canceled"),
       scrollToTop: true,
-    })
+    }),
   );
 };

@@ -20,7 +20,7 @@ export const readCanisterId = ({
     return stdout.toString().trim();
   } catch (e) {
     throw Error(
-      `Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`
+      `Could not get canister ID for '${canisterName}' with command '${command}', was the canister deployed? ${e}`,
     );
   }
 };

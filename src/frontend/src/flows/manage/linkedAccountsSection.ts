@@ -52,7 +52,7 @@ export const linkedAccountsSection = ({
               nonNullish(currentCredential) &&
               credential.iss === currentCredential.iss &&
               credential.sub === currentCredential.sub,
-          })
+          }),
         )}
       </ul>
       <div class="c-action-list__actions">
@@ -143,10 +143,10 @@ export const accountItem = ({
                   <span class="t-muted">${copy.current_account_label}</span>
                 </div>`
               : nonNullish(lastUsageFormattedString)
-              ? html`<div class="t-muted">
-                  ${copy.last_used}: ${lastUsageFormattedString}
-                </div>`
-              : ""
+                ? html`<div class="t-muted">
+                    ${copy.last_used}: ${lastUsageFormattedString}
+                  </div>`
+                : ""
           }
         </div>
       </div>

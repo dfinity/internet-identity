@@ -36,7 +36,7 @@ const renderToasts = () => {
     html`<div class="c-toasts l-container">
       ${repeat(toastStore, (x) => x, toastTemplate)}
     </div>`,
-    document.body
+    document.body,
   );
 };
 
@@ -69,10 +69,10 @@ const toastTemplate = (toast: Toast): TemplateResult => {
   return html`<div
     role="alert"
     class="c-toast ${asyncReplace(
-      closing.map((closing) => (closing ? "c-toast--closing" : undefined))
+      closing.map((closing) => (closing ? "c-toast--closing" : undefined)),
     )}"
     @animationend=${asyncReplace(
-      closing.map((closing) => (closing ? () => removeToast() : undefined))
+      closing.map((closing) => (closing ? () => removeToast() : undefined)),
     )}
   >
     <div class="c-toast-body ${levelClass}">

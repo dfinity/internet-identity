@@ -9,14 +9,14 @@ test("should resolve canister id", async () => {
     new Response(null, {
       status: 200,
       headers: [[HEADER_NAME, "bkyz2-fmaaa-aaaaa-qaaaq-cai"]],
-    })
+    }),
   );
   global.fetch = fetchMock;
 
   expect(
     await resolveCanisterId({
       origin: "https://example.com",
-    })
+    }),
   ).toEqual({ ok: Principal.fromText("bkyz2-fmaaa-aaaaa-qaaaq-cai") });
 });
 
@@ -25,14 +25,14 @@ test("should not resolve canister id on missing header", async () => {
   fetchMock.mockReturnValueOnce(
     new Response(null, {
       status: 200,
-    })
+    }),
   );
   global.fetch = fetchMock;
 
   expect(
     await resolveCanisterId({
       origin: "https://example.com",
-    })
+    }),
   ).toEqual("not_found");
 });
 
@@ -50,12 +50,12 @@ test("should resolve canister id from well-known domain", async () => {
     expect(
       await resolveCanisterId({
         origin: `https://${canisterId}.${domain}`,
-      })
+      }),
     ).toEqual({ ok: Principal.fromText(canisterId) });
     expect(
       await resolveCanisterId({
         origin: `https://${canisterId}.raw.${domain}`,
-      })
+      }),
     ).toEqual({ ok: Principal.fromText(canisterId) });
   }
   // make sure fetch was not called
@@ -68,14 +68,14 @@ test("should not resolve canister id from malformed header", async () => {
     new Response(null, {
       status: 200,
       headers: [[HEADER_NAME, "not_a_canister_id"]],
-    })
+    }),
   );
   global.fetch = fetchMock;
 
   expect(
     await resolveCanisterId({
       origin: "https://example.com",
-    })
+    }),
   ).toEqual("not_found");
 });
 
@@ -87,14 +87,14 @@ test("should resolve canister id from a custom domain that returns a response wi
       status: 500,
       // Boundary Node sets the header even on error
       headers: [[HEADER_NAME, canisterId]],
-    })
+    }),
   );
   global.fetch = fetchMock;
 
   expect(
     await resolveCanisterId({
       origin: "https://example.com",
-    })
+    }),
   ).toEqual({ ok: Principal.fromText(canisterId) });
 });
 
@@ -102,6 +102,6 @@ test("should not resolve canister id from malformed origin", async () => {
   expect(
     await resolveCanisterId({
       origin: "not-an-origin",
-    })
+    }),
   ).toEqual("not_found");
 });

@@ -36,15 +36,15 @@ test("Should not issue delegation when derivationOrigin is missing from /.well-k
       browser,
       authenticatorId3,
       credentials[0],
-      originToRelyingPartyId(II_URL)
+      originToRelyingPartyId(II_URL),
     );
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`
+      `"${TEST_APP_CANONICAL_URL}" is not a valid derivation origin for "${TEST_APP_NICE_URL}"`,
     );
     expect(await errorView.getErrorDetail()).toEqual(
-      `"${TEST_APP_NICE_URL}" is not listed in the list of allowed alternative origins. Allowed alternative origins:`
+      `"${TEST_APP_NICE_URL}" is not listed in the list of allowed alternative origins. Allowed alternative origins:`,
     );
   });
 }, 300_000);

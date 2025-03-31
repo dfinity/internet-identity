@@ -42,7 +42,7 @@ async function takeLandingScreenshots(browser: WebdriverIO.Browser) {
         window.scrollTo(0, i * screenshotHeight);
       },
       i,
-      screenshotHeight
+      screenshotHeight,
     );
     await browser.saveScreenshot(`${SCREENSHOTS_DIR}/landing_${i + 1}.png`);
   }
@@ -59,7 +59,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
     await pageLinks.map(async (link) => {
       const pageName = await link.getAttribute("data-page-name");
       return pageName;
-    })
+    }),
   );
 
   // Iterate the pages and screenshot them
@@ -83,7 +83,7 @@ async function takeShowcaseScreenshots(browser: WebdriverIO.Browser) {
 
 /** Create a chrome instance and run callback, deleting session afterwards */
 async function withChrome<T>(
-  cb: (browser: WebdriverIO.Browser) => T
+  cb: (browser: WebdriverIO.Browser) => T,
 ): Promise<T> {
   // Screenshot image dimension, if specified
   const { mobileEmulation } = readScreenshotsConfig();
@@ -169,7 +169,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
     {
       timeout: 10 * 1000,
       timeoutMsg: "Images did not load after 10 seconds",
-    }
+    },
   );
 
   await browser.waitUntil(
@@ -177,7 +177,7 @@ async function visit(browser: WebdriverIO.Browser, url: string) {
     {
       timeout: 10 * 1000,
       timeoutMsg: "Browser did not load after 10 seconds",
-    }
+    },
   );
 }
 

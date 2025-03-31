@@ -21,10 +21,10 @@ export const pinInput = <T>({
 }: {
   pinLength?: number;
   onSubmit: (
-    result: T
+    result: T,
   ) => void /* Called when all inputs have been set or when .submit() is called */;
   verify: (
-    pin: string
+    pin: string,
   ) =>
     | Promise<PinResult<T>>
     | PinResult<T> /* Used to verify & transform the pin */;
@@ -59,7 +59,7 @@ export const pinInput = <T>({
   const errorMessage = currentError.map((currentError) =>
     nonNullish(currentError)
       ? html`<p class="t-centered t-error c-input--stack">${currentError}</p>`
-      : undefined
+      : undefined,
   );
   const notFilledError = `Please fill in all ${pinLength} inputs`;
 
@@ -98,7 +98,7 @@ export const pinInput = <T>({
         inputs,
         onSubmit,
         onMissing: () => currentError.send(notFilledError),
-      })
+      }),
     );
 
   const template = html`
@@ -141,14 +141,14 @@ export const pinInput = <T>({
                   @focus=${(e: Event) =>
                     /* on focus, select the input so that the content is effectively replaced */ withInputElement(
                       e,
-                      (_, elem) => elem.select()
+                      (_, elem) => elem.select(),
                     )}
                   @keydown=${(e: KeyboardEvent) =>
                     withInputElement(e, onKeydown_)}
                 />
               </label>
             </li>
-          `
+          `,
         )}
       </ul>
       ${asyncReplace(errorMessage)}
@@ -222,7 +222,7 @@ const onPaste = ({
   // Create an array of pairs of inputs + the char/digit to be pasted in that input
   const toBePasted = zip(
     nextInputs,
-    evnt.clipboardData.getData("text").trim().split("")
+    evnt.clipboardData.getData("text").trim().split(""),
   );
   if (toBePasted.length === 0) {
     return;

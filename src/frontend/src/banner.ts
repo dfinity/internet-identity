@@ -9,23 +9,27 @@ export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
   const isProduction: boolean = config.is_production[0] ?? false;
   const firstUrl: string = config.related_origins[0]?.[0] ?? OFFICIAL_II_URL;
   if (anyFeatures()) {
-    showWarning(html`Test only. Do not use your regular Internet Identity!
-      <a
-        class="features-warning-btn"
-        target="_blank"
-        rel="noopener noreferrer"
-        href="https://github.com/dfinity/internet-identity#build-features"
-        >more</a
-      >`);
+    showWarning(
+      html`Test only. Do not use your regular Internet Identity!
+        <a
+          class="features-warning-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          href="https://github.com/dfinity/internet-identity#build-features"
+          >more</a
+        >`,
+    );
   } else if (!isProduction) {
-    showWarning(html`This is not the official Internet Identity.
-      <a
-        class="features-warning-btn"
-        target="_blank"
-        rel="noopener noreferrer"
-        href=${firstUrl}
-        >go to official</a
-      >`);
+    showWarning(
+      html`This is not the official Internet Identity.
+        <a
+          class="features-warning-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          href=${firstUrl}
+          >go to official</a
+        >`,
+    );
   }
 };
 

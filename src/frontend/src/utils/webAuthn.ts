@@ -30,8 +30,8 @@ export const constructIdentity = async ({
     throw new Error(
       `Failed to create passkey: ${unknownToString(
         e,
-        "unknown error"
-      )}, ${await diagnosticInfo()}`
+        "unknown error",
+      )}, ${await diagnosticInfo()}`,
     );
   }
 };
@@ -60,7 +60,7 @@ export const extractAAGUID = (authData: Uint8Array): string | undefined => {
  * @param aaguid to lookup
  */
 export const lookupAAGUID = async (
-  aaguid: string
+  aaguid: string,
 ): Promise<string | undefined> => {
   const knownList = (await import("../assets/passkey_aaguid_data.json"))
     .default;

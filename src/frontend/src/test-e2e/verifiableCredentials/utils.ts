@@ -155,7 +155,7 @@ export const authenticateToRelyingParty = async ({
 
     await demoView.updateAlternativeOrigins(
       `{"alternativeOrigins":["${relyingParty}"]}`,
-      "certified"
+      "certified",
     );
 
     await vcTestApp.setAlternativeOrigin(derivationOrigin);
@@ -178,7 +178,7 @@ export const getVCPresentation = async (args: {
   const result = await getVCPresentation_(args);
   if (result.result === "aborted") {
     throw new Error(
-      "Expected successful VC flow, got error: " + JSON.stringify(result)
+      "Expected successful VC flow, got error: " + JSON.stringify(result),
     );
   }
 
@@ -264,7 +264,7 @@ export const register: Record<
           browser,
           authenticatorId,
           credentials[0],
-          originToRelyingPartyId(II_URL)
+          originToRelyingPartyId(II_URL),
         );
       },
       finalizeAuth: async (_: WebdriverIO.Browser) => {
@@ -337,7 +337,7 @@ export const addEmployeeToIssuer = async ({
 };
 
 const createIssuerActor = async (
-  issuerCanisterId: string
+  issuerCanisterId: string,
 ): Promise<ActorSubclass<_SERVICE>> => {
   const agent = await HttpAgent.create({
     host: REPLICA_URL,
