@@ -4,7 +4,7 @@ export const parseUserNumber = (s: string): bigint | null => {
   if (isUserNumber(s)) {
     try {
       return BigInt(s);
-    } catch (_err) {
+    } catch {
       return null;
     }
   } else {
