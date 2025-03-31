@@ -86,7 +86,7 @@ export const tempKeysSection = ({
             icon: html`<span class="c-icon c-icon--pin"
               >${cypherIcon}<span></span
             ></span>`,
-          })
+          }),
         )}
       </ul>
     </div>

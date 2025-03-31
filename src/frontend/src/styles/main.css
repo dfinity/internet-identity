@@ -131,11 +131,8 @@
   --vc-brand-alt: rgba(215, 205, 235, 1);
   --vc-grey: grey;
   --vc-light-grey: #d4d8e5;
-  --vc-brand-gradient: radial-gradient(
-      at 100% 100%,
-      hsla(265, 80%, 75%, 1) 0px,
-      transparent 50%
-    ),
+  --vc-brand-gradient:
+    radial-gradient(at 100% 100%, hsla(265, 80%, 75%, 1) 0px, transparent 50%),
     radial-gradient(at 100% 0%, hsla(272, 86%, 55%, 1) 0px, transparent 50%),
     radial-gradient(at 0% 18%, hsla(223, 79%, 66%, 1) 0px, transparent 50%);
 
@@ -256,11 +253,13 @@
   --rc-input-onSuccess: var(--rc-light);
 
   /* reference tokens: gradients */
-  --rg-brand: var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
+  --rg-brand:
+    var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
     var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
 
-  --rg-brand-full: var(--vc-brand-yellow), var(--vc-brand-orange),
-    var(--vc-brand-pink), var(--vc-brand-purple), var(--vc-brand-blue);
+  --rg-brand-full:
+    var(--vc-brand-yellow), var(--vc-brand-orange), var(--vc-brand-pink),
+    var(--vc-brand-purple), var(--vc-brand-blue);
 
   --rg-brand-alt: var(--vc-light-grey), white;
   --rg-button: var(--rc-button), var(--rc-button-pair);
@@ -937,7 +936,8 @@ a:hover,
   height: 0.3rem;
   transform: translate(-50%, -50%) rotate(var(--rotate, 0deg))
     translateY(var(--offsetY, 0));
-  transition: 200ms transform cubic-bezier(0.3, 0.7, 0, 1),
+  transition:
+    200ms transform cubic-bezier(0.3, 0.7, 0, 1),
     250ms background-color linear;
   border-radius: 50%;
 }
@@ -960,7 +960,9 @@ a:hover,
 
 :is(button, a, link, .c-dropdown):hover .c-icon--outlined {
   opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 2px 4px var(--rc-interaction);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 2px 4px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
 }
@@ -1745,7 +1747,9 @@ by all browsers (FF is missing) */
 .c-button:not([disabled]):hover {
   color: var(--rc-onButton);
   opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
   text-decoration: none;
@@ -1770,7 +1774,9 @@ by all browsers (FF is missing) */
 /* Copy pasted from the focus and hover, but with different opacity to show action */
 .c-button:not([disabled]):active {
   opacity: 0.5;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
 }
@@ -1826,7 +1832,8 @@ by all browsers (FF is missing) */
   visibility: hidden;
   transform: scale(0.4);
   opacity: 0;
-  transition: transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
+  transition:
+    transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
     opacity 300ms linear;
   color: greenyellow;
 }
@@ -1918,7 +1925,9 @@ by all browsers (FF is missing) */
 
 .c-input:focus {
   opacity: 0.9;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 3px 5px var(--rc-interaction);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
   outline: 2px dotted transparent;
   outline-offset: 2px;
 }
@@ -2303,7 +2312,9 @@ by all browsers (FF is missing) */
   z-index: -1;
   opacity: 0.3;
 
-  transition: 200ms opacity linear, 400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+  transition:
+    200ms opacity linear,
+    400ms filter cubic-bezier(0.3, 0.7, 0, 1);
 
   /*
    * the blur does not render nicely in Safari if its not on its own paint layer,
@@ -2480,7 +2491,9 @@ by all browsers (FF is missing) */
   filter: blur(20px);
   opacity: 0;
   transform: scaleX(0.1) scaleY(0.7);
-  transition: 300ms opacity linear, 600ms transform cubic-bezier(0.3, 0.7, 0, 1);
+  transition:
+    300ms opacity linear,
+    600ms transform cubic-bezier(0.3, 0.7, 0, 1);
 }
 
 .c-list--anchors .c-list__item:focus-within::before,
@@ -2908,7 +2921,8 @@ a.c-action-list__item {
   border-radius: 50%;
   line-height: 1;
 
-  transition: 400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
+  transition:
+    400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
     200ms color linear 200ms;
 }
 
@@ -3023,7 +3037,9 @@ a.c-action-list__item {
   filter: blur(30px);
   opacity: 0;
   transform: scale(1) translateZ(0);
-  transition: 300ms transform cubic-bezier(0.7, 0.3, 0, 1), 300ms opacity linear;
+  transition:
+    300ms transform cubic-bezier(0.7, 0.3, 0, 1),
+    300ms opacity linear;
 }
 
 [data-haserror="true"] .c-input--anchor__wrap::before,
@@ -3093,7 +3109,10 @@ a.c-action-list__item {
   text-align: right;
   pointer-events: none;
   transform: translateY(-2rem);
-  transition: 0ms opacity linear, 0ms visibility linear, 0ms transform;
+  transition:
+    0ms opacity linear,
+    0ms visibility linear,
+    0ms transform;
 }
 
 .c-dropdown__menu::before {
@@ -3102,7 +3121,9 @@ a.c-action-list__item {
   position: absolute;
   inset: 0;
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
-  transition: 100ms opacity linear 100ms, 100ms visibility linear 100ms,
+  transition:
+    100ms opacity linear 100ms,
+    100ms visibility linear 100ms,
     0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
 }
 
@@ -3111,7 +3132,9 @@ a.c-action-list__item {
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0rem);
-  transition: 200ms opacity linear, 200ms visibility linear,
+  transition:
+    200ms opacity linear,
+    200ms visibility linear,
     300ms transform cubic-bezier(0.7, 0.3, 0, 1);
 }
 

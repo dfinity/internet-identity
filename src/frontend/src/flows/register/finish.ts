@@ -125,6 +125,6 @@ export const displayUserNumber = ({
       identityBackground,
       marketingIntroSlot,
       scrollToTop: true,
-    })
+    }),
   );
 };

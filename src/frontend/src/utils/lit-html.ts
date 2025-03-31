@@ -16,7 +16,7 @@ export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
 
   if (isNullish(value)) {
     toast.error(
-      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
+      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug",
     );
     return;
   } else {
@@ -63,7 +63,7 @@ export const mount = (callback: (elem: Element) => void): DirectiveResult =>
 
 /* A wrapper for lit-html's render, rendering a page to the "pageContent" element */
 export function renderPage<
-  T extends (props: Parameters<T>[0]) => TemplateResult
+  T extends (props: Parameters<T>[0]) => TemplateResult,
 >(template: T): (props: Parameters<T>[0], container?: HTMLElement) => void {
   return (props, container) => {
     const contain =

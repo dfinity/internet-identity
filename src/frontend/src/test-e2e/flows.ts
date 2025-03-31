@@ -27,7 +27,7 @@ export const FLOWS = {
     return userNumber;
   },
   registerNewIdentityWelcomeView: async (
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<string> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
@@ -35,7 +35,7 @@ export const FLOWS = {
     return await FLOWS.register(browser);
   },
   registerNewIdentityAuthenticateView: async (
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<string> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -44,7 +44,7 @@ export const FLOWS = {
   },
   registerPin: async function (
     browser: WebdriverIO.Browser,
-    pin: string
+    pin: string,
   ): Promise<string> {
     const registerView = new RegisterView(browser);
     await registerView.waitForDisplay();
@@ -67,7 +67,7 @@ export const FLOWS = {
   },
   registerPinWelcomeView: async (
     browser: WebdriverIO.Browser,
-    pin: string
+    pin: string,
   ): Promise<string> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
@@ -76,7 +76,7 @@ export const FLOWS = {
   },
   registerPinNewIdentityAuthenticateView: async (
     pin: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<string> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -85,7 +85,7 @@ export const FLOWS = {
   },
   loginWelcomeView: async (
     userNumber: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
@@ -94,7 +94,7 @@ export const FLOWS = {
   loginAuthenticateView: async (
     userNumber: string,
     deviceName: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -105,7 +105,7 @@ export const FLOWS = {
   loginExistingAuthenticateView: async (
     userNumber: string,
     deviceName: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -116,7 +116,7 @@ export const FLOWS = {
   loginPinAuthenticateView: async (
     userNumber: string,
     pin: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
@@ -128,7 +128,7 @@ export const FLOWS = {
   loginPinWelcomeView: async (
     userNumber: string,
     pin: string,
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const welcomeView = new WelcomeView(browser);
     await welcomeView.waitForDisplay();
@@ -138,7 +138,7 @@ export const FLOWS = {
     await pinAuthView.enterPin(pin);
   },
   addRecoveryMechanismSeedPhrase: async (
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<string> => {
     const mainView = new MainView(browser);
     await mainView.waitForDisplay();
@@ -158,7 +158,7 @@ export const FLOWS = {
     return seedPhrase;
   },
   addRecoveryMechanismDevice: async (
-    browser: WebdriverIO.Browser
+    browser: WebdriverIO.Browser,
   ): Promise<void> => {
     const mainView = new MainView(browser);
     await mainView.waitForDisplay();
@@ -185,7 +185,7 @@ export const FLOWS = {
     await mainView.waitForDisplay();
     await mainView.addAdditionalDevice();
     const addRemoteDeviceInstructionsView = new AddRemoteDeviceInstructionsView(
-      browser
+      browser,
     );
     await addRemoteDeviceInstructionsView.addFIDODevice();
 
@@ -198,7 +198,7 @@ export const FLOWS = {
   },
   recoverUsingSeedPhrase: async (
     browser: WebdriverIO.Browser,
-    recoveryPhrase: string
+    recoveryPhrase: string,
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.recoverSeedPhrase();
@@ -210,7 +210,7 @@ export const FLOWS = {
   },
   recoverUsingDevice: async (
     browser: WebdriverIO.Browser,
-    userNumber: string
+    userNumber: string,
   ): Promise<void> => {
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.recoverDevice();

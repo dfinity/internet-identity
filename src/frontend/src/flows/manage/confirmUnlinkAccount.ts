@@ -63,7 +63,7 @@ const confirmUnlinkAccountTemplate = ({
 };
 
 export const confirmUnlinkAccountPage = renderPage(
-  confirmUnlinkAccountTemplate
+  confirmUnlinkAccountTemplate,
 );
 
 export const confirmUnlinkAccount = ({
@@ -82,6 +82,6 @@ export const confirmUnlinkAccount = ({
       next: () => resolve("confirmed"),
       cancel: () => resolve("cancelled"),
       isCurrentCredential,
-    })
+    }),
   );
 };

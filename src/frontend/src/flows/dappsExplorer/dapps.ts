@@ -37,7 +37,7 @@ export class KnownDapp {
       );
     } else {
       return (this.descr.authOrigins ?? []).some(
-        (authOrigin) => orig === new URL(authOrigin).origin
+        (authOrigin) => orig === new URL(authOrigin).origin,
       );
     }
   }
@@ -75,7 +75,7 @@ export const getDapps = (): KnownDapp[] => {
         name: "Test Dapp",
         website: "https://nice-name.com",
         logo: nnsDappLogo?.descr.logo ?? "no-such-logo",
-      })
+      }),
     );
   }
 

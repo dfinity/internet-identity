@@ -123,6 +123,11 @@ export const dappsExplorer = ({
 }): Promise<void> => {
   const i18n = new I18n();
   return new Promise((resolve) =>
-    dappsExplorerPage({ dapps, i18n, back: () => resolve(), scrollToTop: true })
+    dappsExplorerPage({
+      dapps,
+      i18n,
+      back: () => resolve(),
+      scrollToTop: true,
+    }),
   );
 };

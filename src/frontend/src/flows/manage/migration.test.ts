@@ -40,7 +40,7 @@ describe("recovery phrases don't have origin warnings", () => {
     it("returns undefined for recovery phrase", () => {
       expect(domainWarning(recoveryPhrase)).toBe(undefined);
       expect(
-        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] }),
       ).toBe(undefined);
     });
 
@@ -53,13 +53,13 @@ describe("recovery phrases don't have origin warnings", () => {
         domainWarning({
           ...authenticator,
           origin: ["https://identity.ic0.app"],
-        })
+        }),
       ).toBeUndefined();
     });
 
     test("bad origin is warning", () => {
       expect(
-        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] }),
       ).toBeDefined();
     });
   });
@@ -77,7 +77,7 @@ describe("recovery phrases don't have origin warnings", () => {
     it("undefined for recovery phrase", () => {
       expect(domainWarning(recoveryPhrase)).toBe(undefined);
       expect(
-        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] }),
       ).toBe(undefined);
     });
 
@@ -90,13 +90,13 @@ describe("recovery phrases don't have origin warnings", () => {
         domainWarning({
           ...authenticator,
           origin: ["https://identity.ic0.app"],
-        })
+        }),
       ).toBeDefined();
     });
 
     it("bad origin is warning", () => {
       expect(
-        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] }),
       ).toBeDefined();
     });
   });

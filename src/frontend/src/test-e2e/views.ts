@@ -223,7 +223,7 @@ export class RecoveryMethodSelectorView extends View {
     const seedPhrase = (await this.browser.execute(() =>
       Array.from(document.querySelectorAll(".c-list--recovery-word"))
         .map((e) => (e as HTMLElement).innerText)
-        .join(" ")
+        .join(" "),
     )) as string;
 
     assert(seedPhrase?.length > 0, "Seed phrase is empty!");
@@ -266,7 +266,7 @@ export class MainView extends View {
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
     const elems = await this.browser.$$(
-      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
+      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`,
     );
     if ((await elems.length) !== count) {
       throw Error("Bad number of elements");
@@ -275,13 +275,13 @@ export class MainView extends View {
 
   async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
     const differentOriginRpId = await this.browser.$(
-      '[data-role="passkeys"] [data-device] [data-rpid]'
+      '[data-role="passkeys"] [data-device] [data-rpid]',
     );
     if ((await differentOriginRpId.isExisting()) !== exist) {
       throw Error(
         exist
           ? "Different origin device not found"
-          : "Different origin device found"
+          : "Different origin device found",
       );
     }
   }
@@ -311,7 +311,7 @@ export class MainView extends View {
   async logout(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     await this.browser.$("#logoutButton").click();
   }
@@ -404,11 +404,11 @@ export class MainView extends View {
   }): Promise<void> {
     // Ensure the settings dropdown is in view
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     // Grab the trigger (button) and figure out the id of the element it opens
     const dropdownTrigger = await this.browser.$(
-      `[data-action="open-settings"][data-device="${deviceName}"]`
+      `[data-action="open-settings"][data-device="${deviceName}"]`,
     );
     const dropdownId = await dropdownTrigger.getAttribute("aria-controls");
     await dropdownTrigger.click();
@@ -420,9 +420,9 @@ export class MainView extends View {
         this.browser.execute(
           (dropdownId) =>
             document.getElementById(dropdownId)?.getAnimations().length === 0,
-          dropdownId
+          dropdownId,
         ),
-      { timeoutMsg: "Animation didn't end" }
+      { timeoutMsg: "Animation didn't end" },
     );
   }
 
@@ -430,7 +430,7 @@ export class MainView extends View {
   // separately)
   deviceAction({ deviceName, action }: { deviceName: string; action: string }) {
     return this.browser.$(
-      `[data-action="${action}"][data-device="${deviceName}"]`
+      `[data-action="${action}"][data-device="${deviceName}"]`,
     );
   }
 
@@ -475,7 +475,7 @@ export class AddRemoteDeviceAliasView extends View {
   async continue(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     await this.browser.$("#pickAliasSubmit").click();
   }
@@ -690,7 +690,7 @@ export class AboutView extends View {
 export class VcAllowView extends View {
   async waitForDisplay(): Promise<"ok" | "aborted"> {
     const elem = await this.browser.$(
-      '[data-page="vc-allow"],[data-page="vc-aborted"]'
+      '[data-page="vc-allow"],[data-page="vc-aborted"]',
     );
     await elem.waitForDisplayed({ timeout: 10_000 });
     const page = await elem.getAttribute("data-page");
@@ -747,7 +747,7 @@ export class IssuerAppView extends View {
 
   async setPrincipal({ principal }: { principal: string }): Promise<void> {
     const principalInput = await this.browser.$(
-      '[data-role="custom-principal"]'
+      '[data-role="custom-principal"]',
     );
     await principalInput.clearValue();
     await principalInput.setValue(principal);
@@ -759,7 +759,7 @@ export class IssuerAppView extends View {
     derivationOrigin: string;
   }): Promise<void> {
     const derivationOriginInput = await this.browser.$(
-      '[data-role="derivation-origin"]'
+      '[data-role="derivation-origin"]',
     );
     await derivationOriginInput.clearValue();
     await derivationOriginInput.setValue(derivationOrigin);
@@ -783,7 +783,7 @@ export class IssuerAppView extends View {
     const principalElem = await this.browser.$('[data-role="principal"]');
     // An attr without value will have the string 'true'; an attr not set will be null
     const isUnset = (await principalElem.getAttribute(
-      "data-unset"
+      "data-unset",
     )) as unknown as string | null;
     if (isUnset === "true") {
       return undefined;
@@ -841,7 +841,7 @@ export class VcTestAppView extends View {
     demoAppUrl: string,
     iiUrl: string,
     issuerUrl: string,
-    issuerCanisterId: string
+    issuerCanisterId: string,
   ): Promise<void> {
     await this.browser.url(demoAppUrl);
     await setInputValue(this.browser, '[data-role="ii-url"]', iiUrl);
@@ -849,7 +849,7 @@ export class VcTestAppView extends View {
     await setInputValue(
       this.browser,
       '[data-role="issuer-canister-id"]',
-      issuerCanisterId
+      issuerCanisterId,
     );
   }
 
@@ -899,7 +899,7 @@ export class VcTestAppView extends View {
     return setInputValue(
       this.browser,
       '[data-role="derivation-origin-rp"]',
-      origin
+      origin,
     );
   }
 
@@ -930,7 +930,7 @@ export class DemoAppView extends View {
     await this.browser.waitUntil(
       async () =>
         (await this.browser.$("#alternativeOrigins").getText()) !== "",
-      { timeoutMsg: "alternativeOrigins were not displayed" }
+      { timeoutMsg: "alternativeOrigins were not displayed" },
     );
   }
 
@@ -963,7 +963,7 @@ export class DemoAppView extends View {
     await waitToClose(this.browser);
     // wait for the demo app to update the principal
     await this.browser.waitUntil(
-      async () => (await this.getPrincipal()) !== ""
+      async () => (await this.getPrincipal()) !== "",
     );
     return this.getPrincipal();
   }
@@ -991,14 +991,14 @@ export class DemoAppView extends View {
       {
         timeout: 6_000,
         timeoutMsg: 'expected whoami response to contain "-" for 6s',
-      }
+      },
     );
     return await whoamiResponseElem.getText();
   }
 
   async updateAlternativeOrigins(
     alternativeOrigins: string,
-    mode: "certified" | "uncertified" | "redirect"
+    mode: "certified" | "uncertified" | "redirect",
   ): Promise<string> {
     await fillText(this.browser, "hostUrl", this.replicaUrl);
     await fillText(this.browser, "newAlternativeOrigins", alternativeOrigins);
@@ -1012,7 +1012,7 @@ export class DemoAppView extends View {
       {
         timeout: 6_000,
         timeoutMsg: "expected alternativeOrigins to update within 6s",
-      }
+      },
     );
     return await alternativeOriginsElem.getText();
   }
@@ -1020,7 +1020,7 @@ export class DemoAppView extends View {
   resetAlternativeOrigins(): Promise<string> {
     return this.updateAlternativeOrigins(
       '{"alternativeOrigins":[]}',
-      "certified"
+      "certified",
     );
   }
 
@@ -1137,7 +1137,7 @@ export class ErrorView extends View {
 async function setInputValue(
   browser: WebdriverIO.Browser,
   selector: string,
-  text: string
+  text: string,
 ): Promise<void> {
   const elem = await browser.$(selector);
   await elem.clearValue();
@@ -1147,7 +1147,7 @@ async function setInputValue(
 async function fillText(
   browser: WebdriverIO.Browser,
   id: string,
-  text: string
+  text: string,
 ): Promise<void> {
   const elem = await browser.$(`#${id}`);
   await elem.clearValue();

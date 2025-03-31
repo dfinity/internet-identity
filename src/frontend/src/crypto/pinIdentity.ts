@@ -69,7 +69,7 @@ export const constructPinIdentity = async ({
     "pkcs8" /* the export format */,
     secretKey /* the key to wrap */,
     browserKey /* the wrapping key */,
-    { name: "AES-GCM", iv: browserIv }
+    { name: "AES-GCM", iv: browserIv },
   );
 
   /* Instead of using the extractable key pair as identity, we re-create it
@@ -81,7 +81,7 @@ export const constructPinIdentity = async ({
     { name: "AES-GCM", iv: browserIv },
     { name: "ECDSA", namedCurve: keypairNamedCurve },
     false /* non-extractable */,
-    ["sign"] /* key usages */
+    ["sign"] /* key usages */,
   );
   const keypair = await ECDSAKeyIdentity.fromKeyPair({
     publicKey: keypair_.getKeyPair().publicKey,
@@ -96,7 +96,7 @@ export const constructPinIdentity = async ({
   const encryptedTwice = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: pinIv },
     pinKey,
-    encryptedOnce
+    encryptedOnce,
   );
 
   return {
@@ -142,7 +142,7 @@ export const reconstructPinIdentity = async ({
   const encryptedOnce = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: pinIv },
     pinKey,
-    encryptedTwice
+    encryptedTwice,
   );
 
   const secretKey = await crypto.subtle.unwrapKey(
@@ -152,7 +152,7 @@ export const reconstructPinIdentity = async ({
     { name: "AES-GCM", iv: browserIv } /* the encryption algo */,
     { name: "ECDSA", namedCurve },
     false /* non-extractable */,
-    ["sign"] /* key usages */
+    ["sign"] /* key usages */,
   );
 
   return ECDSAKeyIdentity.fromKeyPair({ privateKey: secretKey, publicKey });
@@ -172,7 +172,7 @@ export const generateKeyPair = async ({
       namedCurve,
     },
     true /* extractable for storage */,
-    ["sign"] /* The only usage of the actual keypair is to sign requests */
+    ["sign"] /* The only usage of the actual keypair is to sign requests */,
   );
 
   return ECDSAKeyIdentity.fromKeyPair(keyPair);
@@ -201,7 +201,7 @@ export const derivePinKey = async ({
     enc.encode(pin),
     "PBKDF2",
     false /* non extractable */,
-    ["deriveKey"] /* this material is only used to derive the PIN key */
+    ["deriveKey"] /* this material is only used to derive the PIN key */,
   );
 
   const encryptionKey = await crypto.subtle.deriveKey(
@@ -217,7 +217,7 @@ export const derivePinKey = async ({
     [
       "encrypt",
       "decrypt",
-    ] /* The password-derived key is used to encrypt/decrypt the keypair (2nd encryption round )*/
+    ] /* The password-derived key is used to encrypt/decrypt the keypair (2nd encryption round )*/,
   );
 
   return encryptionKey;
@@ -232,7 +232,7 @@ export const generateBrowserKey = async (): Promise<CryptoKey> => {
     [
       "wrapKey",
       "unwrapKey",
-    ] /* key is used to wrap (and unwrap) the identity secret key */
+    ] /* key is used to wrap (and unwrap) the identity secret key */,
   );
   return key;
 };

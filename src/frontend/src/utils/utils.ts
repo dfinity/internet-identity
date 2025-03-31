@@ -36,7 +36,7 @@ export async function diagnosticInfo(): Promise<string> {
 // Helper to gain access to the event's target
 export const withInputElement = <E extends Event>(
   evnt: E,
-  f: (evnt: E, element: HTMLInputElement) => void
+  f: (evnt: E, element: HTMLInputElement) => void,
 ): void => {
   const element = evnt.currentTarget;
   if (!(element instanceof HTMLInputElement)) {
@@ -48,7 +48,7 @@ export const withInputElement = <E extends Event>(
 
 /** Try to read unknown data as a record */
 export function unknownToRecord(
-  msg: unknown
+  msg: unknown,
 ): Record<string, unknown> | undefined {
   if (typeof msg !== "object") {
     return undefined;
@@ -68,13 +68,13 @@ export function unknownToRecord(
 export type NonEmptyArray<T> = [T, ...T[]];
 
 export function isNonEmptyArray<T>(
-  original: T[]
+  original: T[],
 ): original is NonEmptyArray<T> {
   return original.length >= 1;
 }
 
 export function asNonEmptyArray<T>(
-  original: T[]
+  original: T[],
 ): NonEmptyArray<T> | undefined {
   const arr: T[] = [...original];
 
@@ -247,14 +247,14 @@ export class Chan<A> implements AsyncIterable<A> {
   // that the element shouldn't be changed, in which case a default (initial) value
   // also needs to be provided.
   map<B>(
-    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B },
   ): Chan<B> {
     const { handleValue, latest } = this.__handleMapOpts(opts);
 
     // Create a chan that automatically maps the value
     const input = new Chan<B>(latest);
     this.listeners.push((value: A) =>
-      handleValue({ send: (a: B) => input.send(a), value })
+      handleValue({ send: (a: B) => input.send(a), value }),
     );
 
     return input;
@@ -276,7 +276,7 @@ export class Chan<A> implements AsyncIterable<A> {
 
   // How the mapped chan should handle the value
   protected __handleMapOpts<B>(
-    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B }
+    opts: ((a: A) => B) | { f: (a: A) => B | typeof Chan.unchanged; def: B },
   ): {
     handleValue: (arg: { send: (b: B) => void; value: A }) => void;
     latest: B;
@@ -352,7 +352,7 @@ export function shuffleArray<T>(array_: T[]): T[] {
 //
 // eslint-disable-next-line
 export type OmitParams<T extends (arg: any) => any, A extends string> = (
-  a: Omit<Parameters<T>[0], A>
+  a: Omit<Parameters<T>[0], A>,
 ) => ReturnType<T>;
 
 // Zip two arrays together
@@ -361,7 +361,7 @@ export const zip = <A, B>(a: A[], b: B[]): [A, B][] =>
 
 export const isValidKey = <T>(
   key: string | number | symbol,
-  keys: Array<keyof T>
+  keys: Array<keyof T>,
 ): key is keyof T => {
   return keys.includes(key as keyof T);
 };
@@ -388,14 +388,14 @@ export class CanisterError<T extends Record<string, unknown>> extends Error {
   }
 
   value<S extends keyof UnionToIntersection<T>>(
-    type: S
+    type: S,
   ): UnionToIntersection<T>[S] {
     return this.#value[type as keyof T] as UnionToIntersection<T>[S];
   }
 }
 
 export const isCanisterError = <T extends Record<string, unknown>>(
-  error: unknown
+  error: unknown,
 ): error is CanisterError<T> => {
   return error instanceof CanisterError;
 };
@@ -414,21 +414,21 @@ export const fromBase64URL = (base64Url: string): ArrayBuffer =>
     base64Url
       .replace(/-/g, "+")
       .replace(/_/g, "/")
-      .padEnd(Math.ceil(base64Url.length / 4) * 4, "=")
+      .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
   );
 
 // Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
 export const transformSignedDelegation = (
-  signed_delegation: SignedDelegation
+  signed_delegation: SignedDelegation,
 ): FrontendSignedDelegation => {
   return {
     delegation: new Delegation(
       Uint8Array.from(signed_delegation.delegation.pubkey),
       signed_delegation.delegation.expiration,
-      undefined
+      undefined,
     ),
     signature: Uint8Array.from(
-      signed_delegation.signature
+      signed_delegation.signature,
     ) as unknown as Signature,
   };
 };

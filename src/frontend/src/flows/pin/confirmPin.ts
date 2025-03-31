@@ -94,6 +94,6 @@ export const confirmPin = ({
       retry: () => resolve({ tag: "retry" }),
       focus: true,
       scrollToTop: true,
-    })
+    }),
   );
 };

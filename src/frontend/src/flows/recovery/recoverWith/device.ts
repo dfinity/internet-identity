@@ -43,7 +43,7 @@ export const recoverWithDevice = ({
 
         if (result.kind === "tooManyRecovery") {
           toast.error(
-            "This identity has more than one recovery devices, which is not expected"
+            "This identity has more than one recovery devices, which is not expected",
           );
           return;
         }
@@ -61,7 +61,7 @@ export const recoverWithDevice = ({
               infoToastTemplate({
                 title: copy.title_possibly_wrong_web_authn_flow,
                 messages: [copy.message_possibly_wrong_web_authn_flow_1],
-              })
+              }),
             );
             return;
           }
@@ -97,7 +97,7 @@ const attemptRecovery = async ({
 
   const recoveryCredentials = devices.filter(
     ({ purpose, key_type }) =>
-      "recovery" in purpose && !("seed_phrase" in key_type)
+      "recovery" in purpose && !("seed_phrase" in key_type),
   );
 
   if (recoveryCredentials.length === 0) {
