@@ -120,7 +120,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "133.0.6943.53", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
