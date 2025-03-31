@@ -35,6 +35,7 @@ export default defineConfig(
       sequence: {
         concurrent: false,
       },
+      maxConcurrency: 1,
     },
   }),
 );
