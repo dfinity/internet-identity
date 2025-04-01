@@ -116,7 +116,7 @@ const registerFlowOpts: RegisterFlowOpts = {
   },
   registrationAllowed: {
     isAllowed: true,
-    allowedOrigins: ["https://identity.ic0.app"] as string[],
+    allowedOrigins: ["https://identity.ic0.app", "https://identity.internetcomputer.org"] as string[],
   },
   storePinIdentity: () => {
     toast.info("PIN identity was stored");

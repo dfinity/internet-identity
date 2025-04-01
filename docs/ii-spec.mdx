@@ -72,7 +72,7 @@ Just for background: At launch this meant we relied on the trustworthiness of th
 ## Identity design and data model
 
 
-The Internet Computer serves this frontend under hostnames `https://identity.ic0.app` (official) and `https://identity.internetcomputer.org` (experimental).
+The Internet Computer serves this frontend under hostnames `https://identity.internetcomputer.org` (official) and `https://identity.internetcomputer.org` (experimental).
 
 The canister maintains a salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer's source of secure randomness.
 
@@ -136,7 +136,7 @@ sequenceDiagram
 
 2.  It installs a `message` event handler on its own `window`.
 
-3.  It loads the url `https://identity.ic0.app/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
+3.  It loads the url `https://identity.internetcomputer.org/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
 
 4.  In the `identityWindow`, the user logs in, and the `identityWindow` invokes
     ```ts
@@ -152,7 +152,7 @@ sequenceDiagram
 
 5.  The client application, after receiving the `InternetIdentityReady`, invokes
     ```ts
-    identityWindow.postMessage(msg, "https://identity.ic0.app")
+    identityWindow.postMessage(msg, "https://identity.internetcomputer.org")
     ```
 
     where `msg` is a value of type
@@ -288,7 +288,7 @@ To prevent misuse of this feature, the number of alternative origins _must not_ 
 :::
 
 :::note
-In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin `https://identity.ic0.app`.
+In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin `https://identity.internetcomputer.org`.
 :::
 
 ## The Internet Identity Service Backend interface
@@ -302,7 +302,7 @@ Note that the interface is split into 4 categories:
     * The aim of the API v2 is to introduce changes that cannot be made without breaking existing clients of the legacy API. While the API v2 has feature parity with the legacy API, the desired changes are not fully implemented yet:
       * Methods should return proper results with meaningful errors.
       * Adding explicit WebAuthn signatures to security critical operations.
-* HTTP gateway protocol, required to serve `https://identity.ic0.app`.
+* HTTP gateway protocol, required to serve `https://identity.internetcomputer.org`.
 * Auth protocol, for creating signed delegations.
 * Verifiable credentials protocol, for creating id alias credentials.
 * Internal methods, not intended to be called by external clients.
