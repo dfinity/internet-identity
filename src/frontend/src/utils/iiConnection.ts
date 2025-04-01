@@ -68,7 +68,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { analytics } from "./analytics";
+import { analytics } from "./analytics/analytics";
 import {
   convertToValidCredentialData,
   CredentialData,
