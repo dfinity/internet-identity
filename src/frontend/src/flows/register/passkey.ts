@@ -13,7 +13,7 @@ import {
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 
-import { analytics } from "$src/utils/analytics";
+import { analytics } from "$src/utils/analyitcs/analytics";
 import copyJson from "./passkey.json";
 
 /* Anchor construction component (for creating WebAuthn credentials) */

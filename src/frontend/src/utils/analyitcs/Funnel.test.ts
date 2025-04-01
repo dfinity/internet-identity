@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Funnel } from "./Funnel";
 import { analytics } from "./analytics";
-import { cleanUpWindowSessionTrackers } from "./trackWindowSession";
+import { cleanUpWindowSessionTrackers } from "../trackWindowSession";
 
 // Mock analytics
 vi.mock("./analytics", () => ({

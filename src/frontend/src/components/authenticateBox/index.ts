@@ -23,7 +23,7 @@ import {
 } from "$src/flows/register";
 import { I18n } from "$src/i18n";
 import { getAnchors, setAnchorUsed } from "$src/storage";
-import { analytics } from "$src/utils/analytics";
+import { analytics } from "$src/utils/analyitcs/analytics";
 import {
   AlreadyInProgress,
   ApiError,
