@@ -10,7 +10,7 @@ import { idbStorePinIdentityMaterial } from "$src/flows/pin/idb";
 import { registerDisabled } from "$src/flows/registerDisabled";
 import { I18n } from "$src/i18n";
 import { setAnchorUsed } from "$src/storage";
-import { analytics } from "$src/utils/analyitcs/analytics";
+import { analytics } from "$src/utils/analytics/analytics";
 import {
   passkeyAuthnMethodData,
   pinAuthnMethodData,

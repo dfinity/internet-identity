@@ -1,6 +1,6 @@
 import { vcFlow } from "./flows/verifiableCredentials";
 import { createSpa } from "./spa";
-import { analytics, initAnalytics } from "./utils/analyitcs/analytics";
+import { analytics, initAnalytics } from "./utils/analytics/analytics";
 
 void createSpa((connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);

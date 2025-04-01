@@ -9,7 +9,7 @@ import { authFlowAuthorize } from "./flows/authorize";
 import { authFlowManage, renderManageWarmup } from "./flows/manage";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
-import { analytics, initAnalytics } from "./utils/analyitcs/analytics";
+import { analytics, initAnalytics } from "./utils/analytics/analytics";
 
 void createSpa(async (connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);
