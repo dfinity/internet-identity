@@ -2,9 +2,9 @@ import { Funnel } from "./Funnel";
 
 /**
  * Registration flow events:
- * 
+ *
  * Square brackets [] indicate optional events.
- * 
+ *
  * registration-start (INIT)
  *   registration-trigger
  *     registration-webauthn-start
@@ -22,4 +22,6 @@ export const RegistrationEvents = {
   Success: "registration-success",
 } as const;
 
-export const registrationFunnel = new Funnel<typeof RegistrationEvents>("registration");
+export const registrationFunnel = new Funnel<typeof RegistrationEvents>(
+  "registration",
+);

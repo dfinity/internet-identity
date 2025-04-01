@@ -43,7 +43,10 @@ import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyPinOrOpenID } from "./passkey";
-import { RegistrationEvents, registrationFunnel } from "$src/utils/analytics/registrationFunnel";
+import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -260,12 +263,12 @@ export const registerFlow = async ({
       identity,
     }),
   );
-  
+
   if (result.kind !== "loginSuccess") {
     return result;
   }
   result.kind satisfies "loginSuccess";
-  
+
   registrationFunnel.trigger(RegistrationEvents.Created);
   const userNumber = result.userNumber;
   await finalizeIdentity?.(userNumber);

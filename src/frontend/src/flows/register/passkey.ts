@@ -13,7 +13,10 @@ import {
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import copyJson from "./passkey.json";
-import { RegistrationEvents, registrationFunnel } from "$src/utils/analytics/registrationFunnel";
+import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
