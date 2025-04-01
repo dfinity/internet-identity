@@ -1,5 +1,5 @@
-import { analytics } from "./analytics";
 import { trackWindowSession } from "../trackWindowSession";
+import { analytics } from "./analytics";
 
 export class Funnel<T extends Record<string, string>> {
   #name: string;
