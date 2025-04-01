@@ -23,7 +23,6 @@ import {
 } from "$src/flows/register";
 import { I18n } from "$src/i18n";
 import { getAnchors, setAnchorUsed } from "$src/storage";
-import { analytics } from "$src/utils/analytics/analytics";
 import {
   AlreadyInProgress,
   ApiError,
@@ -266,21 +265,17 @@ export const authenticateBoxFlow = async <I>({
     | FlowError
     | { tag: "canceled" }
   > => {
-    analytics.event("registration-start");
     const result2 = await registerFlow(registerFlowOpts);
 
     if (result2 === "canceled") {
-      analytics.event("registration-canceled");
       return { tag: "canceled" } as const;
     }
 
     if (result2.kind !== "loginSuccess") {
-      analytics.event("registration-error");
       return result2;
     }
 
     result2 satisfies LoginSuccess;
-    analytics.event("registration-success");
     return {
       newAnchor: true,
       ...result2,

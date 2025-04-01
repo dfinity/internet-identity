@@ -12,9 +12,11 @@ import {
 } from "$src/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
-
-import { analytics } from "$src/utils/analytics/analytics";
 import copyJson from "./passkey.json";
+import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
@@ -129,7 +131,7 @@ export const savePasskeyPinOrOpenID = async ({
         cancel: () => resolve("canceled"),
         scrollToTop: true,
         constructPasskey: async () => {
-          analytics.event("construct-passkey");
+          registrationFunnel.trigger(RegistrationEvents.WebauthnStart);
           try {
             const rpId =
               origin === window.location.origin
@@ -138,10 +140,8 @@ export const savePasskeyPinOrOpenID = async ({
             const identity = await withLoader(() =>
               constructIdentity({ rpId }),
             );
-            analytics.event("construct-passkey-success");
             resolve(identity);
           } catch (e) {
-            analytics.event("construct-passkey-error");
             toast.error(errorMessage(e));
           }
         },

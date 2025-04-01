@@ -4,6 +4,10 @@ import { identityCard } from "$src/components/identityCard";
 import { mainWindow } from "$src/components/mainWindow";
 import { toast } from "$src/components/toast";
 import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
+import {
   TemplateElement,
   mount,
   renderPage,
@@ -58,6 +62,9 @@ export const displayUserNumberTemplate = ({
           @click=${async () => {
             try {
               await navigator.clipboard.writeText(userNumber.toString());
+              registrationFunnel.trigger(
+                RegistrationEvents.CopyNewIdentityNumber,
+              );
               withRef(userNumberCopy, (elem) => {
                 elem.classList.add("is-copied");
               });
