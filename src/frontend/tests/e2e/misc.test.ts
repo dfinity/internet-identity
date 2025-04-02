@@ -4,7 +4,7 @@ import { DemoAppView, MainView } from "./views";
 
 import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
 
-test.skip("Device can be renamed", async () => {
+test("Device can be renamed", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);
@@ -30,7 +30,6 @@ test("Should show dapp logo for known dapp", async () => {
     await browser.$('[data-role="known-dapp-image"]').waitForExist();
 
     // Ensure image loaded succesfully
-    await new Promise(() => {});
     await browser.waitUntil(
       () =>
         browser.execute(function () {
