@@ -18,7 +18,7 @@
     undefined,
   );
 
-  const addDeviceAnchor = getAddDeviceAnchor()!;
+  const addDeviceAnchor = getAddDeviceAnchor(new URL(window.location.href))!;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
   const onResolve = async (
     registerDeviceResult: Awaited<ReturnType<typeof registerTentativeDevice>>,

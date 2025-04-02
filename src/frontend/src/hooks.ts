@@ -4,8 +4,7 @@ import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { nonNullish } from "@dfinity/utils";
 
 export const reroute: Reroute = ({ url }) => {
-  const addDeviceAnchor = getAddDeviceAnchor();
-  if (nonNullish(addDeviceAnchor)) {
+  if (nonNullish(getAddDeviceAnchor(url))) {
     return "/register/device";
   }
   if (url.hash === "#authorize") {
