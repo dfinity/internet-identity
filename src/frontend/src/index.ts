@@ -11,6 +11,7 @@ import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "./utils/addDeviceLink";
 import { analytics, initAnalytics } from "./utils/analytics/analytics";
 import { registrationFunnel } from "./utils/analytics/registrationFunnel";
+import { loginFunnel } from "./utils/analytics/loginFunnel";
 
 void createSpa(async (connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);
@@ -51,7 +52,6 @@ void createSpa(async (connection) => {
   // Simple, #-based routing
   if (url.hash === "#authorize") {
     analytics.event("page-authorize");
-    registrationFunnel.init();
     // User was brought here by a dapp for authorization
     return authFlowAuthorize(connection);
   } else if (url.hash === WEBAUTHN_IFRAME_PATH) {
@@ -60,7 +60,9 @@ void createSpa(async (connection) => {
     return webAuthnInIframeFlow(connection);
   } else {
     analytics.event("page-manage");
+    // Initialize funnels without origin.
     registrationFunnel.init();
+    loginFunnel.init();
     // The default flow
     return authFlowManage(connection);
   }
