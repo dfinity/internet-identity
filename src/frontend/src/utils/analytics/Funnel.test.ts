@@ -57,7 +57,7 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-enter",
-      undefined
+      undefined,
     );
   });
 
@@ -68,7 +68,7 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-enter",
-      properties
+      properties,
     );
   });
 
@@ -78,7 +78,7 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-leave",
-      undefined
+      undefined,
     );
   });
 
@@ -89,7 +89,7 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-leave",
-      properties
+      properties,
     );
   });
 
@@ -97,7 +97,7 @@ describe("Funnel", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-new-registration-start",
-      undefined
+      undefined,
     );
   });
 
@@ -107,7 +107,7 @@ describe("Funnel", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-new-registration-start",
-      properties
+      properties,
     );
   });
 
@@ -116,7 +116,7 @@ describe("Funnel", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart, additionalProps);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-new-registration-start",
-      additionalProps
+      additionalProps,
     );
   });
 
@@ -124,47 +124,62 @@ describe("Funnel", () => {
     const initProps = { userId: "123", source: "test" };
     const additionalProps = { step: 1, method: "email" };
     const expectedProps = { ...initProps, ...additionalProps };
-    
+
     funnel.init(initProps);
     funnel.trigger(LoginEvents.NewRegistrationStart, additionalProps);
-    
+
     expect(analytics.event).toHaveBeenCalledWith(
       "login-new-registration-start",
-      expectedProps
+      expectedProps,
     );
   });
 
   it("trigger() - tracks complete passkey login flow", () => {
     funnel.trigger(LoginEvents.ExistingUserStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start", undefined);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-start",
+      undefined,
+    );
 
     funnel.trigger(LoginEvents.ExistingUserPasskey);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-passkey", undefined);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-passkey",
+      undefined,
+    );
 
     funnel.trigger(LoginEvents.ExistingUserPasskeySuccess);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-existing-user-passkey-success",
-      undefined
+      undefined,
     );
   });
 
   it("trigger() - tracks complete OpenID login flow", () => {
     funnel.trigger(LoginEvents.ExistingUserStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start", undefined);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-start",
+      undefined,
+    );
 
     funnel.trigger(LoginEvents.ExistingUserOpenId);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-openid", undefined);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-existing-user-openid",
+      undefined,
+    );
 
     funnel.trigger(LoginEvents.ExistingUserOpenIdSuccess);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-existing-user-openid-success",
-      undefined
+      undefined,
     );
   });
 
   it("trigger() - tracks recovery start event", () => {
     funnel.trigger(LoginEvents.RecoveryStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-recovery-start", undefined);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-recovery-start",
+      undefined,
+    );
   });
 
   it("close() - stops tracking window session events", () => {

@@ -19,10 +19,16 @@ export class Funnel<T extends Record<string, string>> {
     // Start window session tracking
     this.#cleanupSession = trackWindowSession({
       onEnterSession: () => {
-        analytics.event(`start-${this.#name}-window-session-enter`, this.#properties);
+        analytics.event(
+          `start-${this.#name}-window-session-enter`,
+          this.#properties,
+        );
       },
       onLeaveSession: () => {
-        analytics.event(`start-${this.#name}-window-session-leave`, this.#properties);
+        analytics.event(
+          `start-${this.#name}-window-session-leave`,
+          this.#properties,
+        );
       },
     });
   }
@@ -50,12 +56,18 @@ export class Funnel<T extends Record<string, string>> {
     }
   }
 
-  trigger(event: T[keyof T], additionalProperties?: Record<string, string | number>): void {
+  trigger(
+    event: T[keyof T],
+    additionalProperties?: Record<string, string | number>,
+  ): void {
     const eventProperties = {
       ...(this.#properties || {}),
       ...(additionalProperties || {}),
     };
-    
-    analytics.event(event, Object.keys(eventProperties).length > 0 ? eventProperties : undefined);
+
+    analytics.event(
+      event,
+      Object.keys(eventProperties).length > 0 ? eventProperties : undefined,
+    );
   }
 }
