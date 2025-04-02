@@ -1,33 +1,3 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
-  "include": ["src/showcase", "src/frontend"],
-  "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2021", "DOM"],
-    "module": "esnext",
-    "strict": true,
-    "target": "es2018",
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": false,
-    "types": ["node", "vite/client", "vitest/globals"]
-    //    "paths": {
-    //      "$generated": ["./src/frontend/generated"],
-    //      "$generated/*": ["./src/frontend/generated/*"],
-    //      "$src": ["./src/frontend/src"],
-    //      "$lib/legacy/*": ["./src/frontend/src/*"]
-    //      "$lib": ["./src/frontend/lib"],
-    //      "$lib/*": ["./src/frontend/lib/*"],
-    //      "$showcase": ["./src/showcase/src"],
-    //      "$showcase/*": ["./src/showcase/src/*"]
-    //    }
-  },
-  "exclude": ["src/frontend/src/lib/generated/*"]
+  "extends": ["./.svelte-kit/tsconfig.json", "./tsconfig.base.json"],
 }
