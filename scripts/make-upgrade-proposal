@@ -302,6 +302,11 @@ test_release_candidate() {
   echo "Make sure to check various devices and ask others to also check"
 }
 
+share_proposal() {
+  echo "Share Proposal.md contents on Slack"
+  echo "Check that the arguments verification section matches the expected arguments."
+}
+
 confirm_proposal_arguments() {
   echo "Confirm that the sha256 of the arg.bin file matches the one in the Proposal.md file"
   echo ""
@@ -411,6 +416,7 @@ confirm_cmd append_proposal_argument
 confirm_cmd deploy_release_candidate
 confirm_manual "Confirm proposal arguments" confirm_proposal_arguments
 confirm_manual "Test release candidate" test_release_candidate
+confirm_manual "Share Proposal.md contents on Slack" share_proposal
 confirm_cmd dry_run_proposal
 confirm_manual "Review proposal" echo "Review the proposal above"
 confirm_cmd make_proposal
