@@ -44,7 +44,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     build: {
       assetsInlineLimit: 0,
-      outDir: "../../dist",
       emptyOutDir: true,
       rollupOptions: {
         // Bundle only english words in bip39.

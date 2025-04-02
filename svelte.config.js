@@ -8,7 +8,10 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     // See https://svelte.dev/docs/kit/adapters for more information about adapters.
-    adapter: adapter(),
+    adapter: adapter({
+      pages: "dist",
+      assets: "dist",
+    }),
     files: {
       appTemplate: "src/frontend/src/index.html",
       lib: "src/frontend/src/lib",
