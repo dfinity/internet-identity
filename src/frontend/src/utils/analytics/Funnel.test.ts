@@ -42,7 +42,13 @@ describe("Funnel", () => {
 
   it("init() - triggers start-login event", () => {
     funnel.init();
-    expect(analytics.event).toHaveBeenCalledWith("start-login");
+    expect(analytics.event).toHaveBeenCalledWith("start-login", undefined);
+  });
+
+  it("init() - triggers start-login event with properties", () => {
+    const properties = { userId: "123", source: "test" };
+    funnel.init(properties);
+    expect(analytics.event).toHaveBeenCalledWith("start-login", properties);
   });
 
   it("init() - tracks window session enter when window becomes visible", () => {
@@ -51,6 +57,18 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-enter",
+      undefined
+    );
+  });
+
+  it("init() - tracks window session enter with properties when window becomes visible", () => {
+    const properties = { userId: "123", source: "test" };
+    funnel.init(properties);
+    mockVisibilityState("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(analytics.event).toHaveBeenCalledWith(
+      "start-login-window-session-enter",
+      properties
     );
   });
 
@@ -60,6 +78,18 @@ describe("Funnel", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(analytics.event).toHaveBeenCalledWith(
       "start-login-window-session-leave",
+      undefined
+    );
+  });
+
+  it("init() - tracks window session leave with properties when window is hidden", () => {
+    const properties = { userId: "123", source: "test" };
+    funnel.init(properties);
+    mockVisibilityState("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(analytics.event).toHaveBeenCalledWith(
+      "start-login-window-session-leave",
+      properties
     );
   });
 
@@ -67,38 +97,74 @@ describe("Funnel", () => {
     funnel.trigger(LoginEvents.NewRegistrationStart);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-new-registration-start",
+      undefined
+    );
+  });
+
+  it("trigger() - tracks new registration start event with init properties", () => {
+    const properties = { userId: "123", source: "test" };
+    funnel.init(properties);
+    funnel.trigger(LoginEvents.NewRegistrationStart);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-new-registration-start",
+      properties
+    );
+  });
+
+  it("trigger() - tracks new registration start event with additional properties", () => {
+    const additionalProps = { step: 1, method: "email" };
+    funnel.trigger(LoginEvents.NewRegistrationStart, additionalProps);
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-new-registration-start",
+      additionalProps
+    );
+  });
+
+  it("trigger() - merges init properties with additional properties", () => {
+    const initProps = { userId: "123", source: "test" };
+    const additionalProps = { step: 1, method: "email" };
+    const expectedProps = { ...initProps, ...additionalProps };
+    
+    funnel.init(initProps);
+    funnel.trigger(LoginEvents.NewRegistrationStart, additionalProps);
+    
+    expect(analytics.event).toHaveBeenCalledWith(
+      "login-new-registration-start",
+      expectedProps
     );
   });
 
   it("trigger() - tracks complete passkey login flow", () => {
     funnel.trigger(LoginEvents.ExistingUserStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start");
+    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start", undefined);
 
     funnel.trigger(LoginEvents.ExistingUserPasskey);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-passkey");
+    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-passkey", undefined);
 
     funnel.trigger(LoginEvents.ExistingUserPasskeySuccess);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-existing-user-passkey-success",
+      undefined
     );
   });
 
   it("trigger() - tracks complete OpenID login flow", () => {
     funnel.trigger(LoginEvents.ExistingUserStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start");
+    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-start", undefined);
 
     funnel.trigger(LoginEvents.ExistingUserOpenId);
-    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-openid");
+    expect(analytics.event).toHaveBeenCalledWith("login-existing-user-openid", undefined);
 
     funnel.trigger(LoginEvents.ExistingUserOpenIdSuccess);
     expect(analytics.event).toHaveBeenCalledWith(
       "login-existing-user-openid-success",
+      undefined
     );
   });
 
   it("trigger() - tracks recovery start event", () => {
     funnel.trigger(LoginEvents.RecoveryStart);
-    expect(analytics.event).toHaveBeenCalledWith("login-recovery-start");
+    expect(analytics.event).toHaveBeenCalledWith("login-recovery-start", undefined);
   });
 
   it("close() - stops tracking window session events", () => {
@@ -120,7 +186,7 @@ describe("Funnel", () => {
     vi.useFakeTimers();
 
     funnel.init();
-    expect(analytics.event).toHaveBeenCalledWith("start-login");
+    expect(analytics.event).toHaveBeenCalledWith("start-login", undefined);
     expect(analytics.event).toHaveBeenCalledTimes(1);
 
     // Advance time by 5 seconds
@@ -129,6 +195,27 @@ describe("Funnel", () => {
     funnel.close();
     expect(analytics.event).toHaveBeenCalledTimes(2);
     expect(analytics.event).toHaveBeenCalledWith("end-login", {
+      "duration-login": 5,
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("close() - tracks duration since init and includes init properties", () => {
+    vi.useFakeTimers();
+
+    const properties = { userId: "123", source: "test" };
+    funnel.init(properties);
+    expect(analytics.event).toHaveBeenCalledWith("start-login", properties);
+    expect(analytics.event).toHaveBeenCalledTimes(1);
+
+    // Advance time by 5 seconds
+    vi.advanceTimersByTime(5000);
+
+    funnel.close();
+    expect(analytics.event).toHaveBeenCalledTimes(2);
+    expect(analytics.event).toHaveBeenCalledWith("end-login", {
+      ...properties,
       "duration-login": 5,
     });
 
