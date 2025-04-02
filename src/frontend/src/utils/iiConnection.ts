@@ -78,6 +78,7 @@ import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
+import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -463,12 +464,10 @@ export class Connection {
     | UnknownUser
     | ApiError
   > => {
-    analytics.event("login-passkey-start");
     let devices: Omit<DeviceData, "alias">[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
     } catch (e: unknown) {
-      analytics.event("login-passkey-error-lookup");
       const errObj =
         e instanceof Error
           ? e
@@ -477,7 +476,6 @@ export class Connection {
     }
 
     if (devices.length === 0) {
-      analytics.event("login-passkey-error-unknown");
       return { kind: "unknownUser", userNumber };
     }
 
@@ -488,7 +486,6 @@ export class Connection {
     // If we reach this point, it's because no PIN identity was found.
     // Therefore, it's because it was created in another domain.
     if (webAuthnAuthenticators.length === 0) {
-      analytics.event("login-passkey-error-pin-other-domain");
       return { kind: "pinUserOtherDomain" };
     }
 
@@ -500,6 +497,7 @@ export class Connection {
       );
     }
 
+    loginFunnel.trigger(LoginEvents.WebauthnStart);
     return this.fromWebauthnCredentials(
       userNumber,
       webAuthnAuthenticators

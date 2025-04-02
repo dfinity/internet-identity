@@ -64,6 +64,7 @@ import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";
 import infoToastCopy from "../infoToast/copy.json";
 import authnTemplatesCopy from "./authnTemplatesCopy.json";
+import { LoginEvents, loginFunnel } from "$src/utils/analytics/loginFunnel";
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
@@ -358,6 +359,7 @@ export const authenticateBoxFlow = async <I>({
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
+      loginFunnel.trigger(LoginEvents.TriggerUseExisting);
       return doLogin({ userNumber: result.userNumber });
     }
 
@@ -402,10 +404,12 @@ export const authenticateBoxFlow = async <I>({
     });
 
     if (result.tag === "pick") {
+      loginFunnel.trigger(LoginEvents.TriggerListItem);
       return doLogin({ userNumber: result.userNumber });
     }
 
     result satisfies { tag: "more_options" };
+    loginFunnel.trigger(LoginEvents.GoUseExisting);
     return await doPrompt();
   } else {
     const result = await pages.firstTime();
@@ -843,6 +847,10 @@ const useIdentityFlow = async <I>({
 
   const doLoginPasskey = async () => {
     const result = await withLoader(() => loginPasskey(userNumber));
+    // We need to trigger the success here because later we don't know whether it was a registration or login.
+    if (result.kind === "loginSuccess") {
+      loginFunnel.trigger(LoginEvents.Success);
+    }
     return { newAnchor: false, authnMethod: "passkey", ...result } as const;
   };
 
