@@ -237,13 +237,9 @@ fn cannot_register_with_faulty_jwt() {
 
     // Create identity - this will panic if it doesn't work. It should panic as we are using a faulty jwt.
 
-    let _identity_number = create_identity_with_openid_credential(
-        &env,
-        canister_id,
-        &faulty_jwt,
-        &salt,
-        test_principal,
-    );
+    let _identity_number =
+        create_identity_with_openid_credential(&env, canister_id, faulty_jwt, &salt, test_principal);
+
 }
 
 static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
