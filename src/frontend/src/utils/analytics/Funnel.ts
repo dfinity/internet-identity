@@ -5,22 +5,30 @@ export class Funnel<T extends Record<string, string>> {
   #name: string;
   #cleanupSession?: () => void;
   #startTimestamp?: number;
+  #properties?: Record<string, string | number>;
 
   constructor(name: string) {
     this.#name = name;
   }
 
-  init(): void {
+  init(properties?: Record<string, string | number>): void {
     this.#startTimestamp = Date.now();
-    analytics.event("start-" + this.#name);
+    this.#properties = properties;
+    analytics.event("start-" + this.#name, this.#properties);
 
     // Start window session tracking
     this.#cleanupSession = trackWindowSession({
       onEnterSession: () => {
-        analytics.event(`start-${this.#name}-window-session-enter`);
+        analytics.event(
+          `start-${this.#name}-window-session-enter`,
+          this.#properties,
+        );
       },
       onLeaveSession: () => {
-        analytics.event(`start-${this.#name}-window-session-leave`);
+        analytics.event(
+          `start-${this.#name}-window-session-leave`,
+          this.#properties,
+        );
       },
     });
   }
@@ -39,14 +47,27 @@ export class Funnel<T extends Record<string, string>> {
     ) {
       const durationMs = Date.now() - this.#startTimestamp;
       const durationSec = durationMs / 1000;
-      analytics.event(`end-${this.#name}`, {
+      const eventProperties = {
+        ...(this.#properties || {}),
         [`duration-${this.#name}`]: durationSec,
-      });
+      };
+      analytics.event(`end-${this.#name}`, eventProperties);
       this.#startTimestamp = undefined;
     }
   }
 
-  trigger(event: T[keyof T]): void {
-    analytics.event(event);
+  trigger(
+    event: T[keyof T],
+    additionalProperties?: Record<string, string | number>,
+  ): void {
+    const eventProperties = {
+      ...(this.#properties || {}),
+      ...(additionalProperties || {}),
+    };
+
+    analytics.event(
+      event,
+      Object.keys(eventProperties).length > 0 ? eventProperties : undefined,
+    );
   }
 }
