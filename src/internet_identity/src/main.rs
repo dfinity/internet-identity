@@ -807,12 +807,10 @@ mod openid_api {
         arg: OpenIDRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
         match verify(&arg.jwt, &arg.salt) {
-            Ok(_) => {
-                registration::registration_flow_v2::identity_registration_finish(
-                    CreateIdentityData::OpenID(arg),
-                )
-            },
-            Err(err) => Err(IdRegFinishError::InvalidAuthnMethod(err))
+            Ok(_) => registration::registration_flow_v2::identity_registration_finish(
+                CreateIdentityData::OpenID(arg),
+            ),
+            Err(err) => Err(IdRegFinishError::InvalidAuthnMethod(err)),
         }
     }
 
