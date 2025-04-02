@@ -1,13 +1,13 @@
 import {
   _SERVICE,
   InternetIdentityInit,
-} from "$generated/internet_identity_types";
-import { authenticateBoxFlow } from "$src/components/authenticateBox";
-import { withLoader } from "$src/components/loader";
-import { toast } from "$src/components/toast";
-import { registerFlow, RegisterFlowOpts } from "$src/flows/register";
-import { AuthenticatedConnection } from "$src/utils/iiConnection";
-import { MultiWebAuthnIdentity } from "$src/utils/multiWebAuthnIdentity";
+} from "$lib/generated/internet_identity_types";
+import { authenticateBoxFlow } from "$lib/templates/authenticateBox";
+import { withLoader } from "$lib/templates/loader";
+import { toast } from "$lib/templates/toast";
+import { registerFlow, RegisterFlowOpts } from "$lib/flows/register";
+import { AuthenticatedConnection } from "$lib/utils/iiConnection";
+import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
 import { ActorSubclass } from "@dfinity/agent";
 import { DelegationIdentity } from "@dfinity/identity";
 import { html, render, TemplateResult } from "lit-html";

@@ -4,18 +4,18 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Display User Number" pageName="displayUserNumber">
   <script>
-    import { toast } from "$src/components/toast";
-    import { userNumber } from "../constants";
-    import { displayUserNumberPage } from "$src/flows/register/finish";
-    import identityCardBackground from "$src/assets/identityCardBackground.png";
-    import { PreLoadImage } from "$src/utils/preLoadImage";
+    import { toast } from "$lib/templates/toast";
+      import { userNumber } from "../constants";
+      import { displayUserNumberPage } from "$lib/flows/register/finish";
+      import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png";
+      import { PreLoadImage } from "$lib/utils/preLoadImage";
 
-    const identityBackground = new PreLoadImage(identityCardBackground.src);
+      const identityBackground = new PreLoadImage(identityCardBackground.src);
 
-    displayUserNumberPage({
-      identityBackground,
-      userNumber,
-      onContinue: () => toast.info("done"),
-    });
+      displayUserNumberPage({
+        identityBackground,
+        userNumber,
+        onContinue: () => toast.info("done")
+        });
   </script>
 </Screen>

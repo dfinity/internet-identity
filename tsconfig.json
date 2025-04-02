@@ -1,4 +1,5 @@
 {
+  "extends": "./.svelte-kit/tsconfig.json",
   "include": ["src/showcase", "src/frontend"],
   "compilerOptions": {
     "allowJs": true,
@@ -15,15 +16,18 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["node", "vite/client", "vitest/globals"],
-    "paths": {
-      "$generated": ["./src/frontend/generated"],
-      "$generated/*": ["./src/frontend/generated/*"],
-      "$src": ["./src/frontend/src"],
-      "$src/*": ["./src/frontend/src/*"],
-      "$showcase": ["./src/showcase/src"],
-      "$showcase/*": ["./src/showcase/src/*"]
-    }
+    "verbatimModuleSyntax": false,
+    "types": ["node", "vite/client", "vitest/globals"]
+    //    "paths": {
+    //      "$generated": ["./src/frontend/generated"],
+    //      "$generated/*": ["./src/frontend/generated/*"],
+    //      "$src": ["./src/frontend/src"],
+    //      "$lib/legacy/*": ["./src/frontend/src/*"]
+    //      "$lib": ["./src/frontend/lib"],
+    //      "$lib/*": ["./src/frontend/lib/*"],
+    //      "$showcase": ["./src/showcase/src"],
+    //      "$showcase/*": ["./src/showcase/src/*"]
+    //    }
   },
-  "exclude": ["src/frontend/generated/*"]
+  "exclude": ["src/frontend/src/lib/generated/*"]
 }

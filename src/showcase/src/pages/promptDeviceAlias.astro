@@ -4,15 +4,15 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Prompt Device Alias" pageName="promptDeviceAlias">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { promptDeviceAliasPage } from "$src/components/alias";
+    import { promptDeviceAliasPage } from "$lib/templates/alias";
 
     promptDeviceAliasPage({
       title: "Register this device",
       cancel: () => toast.info("canceled"),
       continue: (alias) => toast.info(`device alias: ${alias}`),
-      i18n,
+      i18n
     });
   </script>
 </Screen>

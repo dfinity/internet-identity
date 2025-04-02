@@ -4,9 +4,9 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Confirm Remove Device" pageName="confirmRemoveDevice">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { confirmRemoveDevicePage } from "$src/flows/manage/confirmRemoveDevice";
+    import { confirmRemoveDevicePage } from "$lib/flows/manage/confirmRemoveDevice";
 
     confirmRemoveDevicePage({
       next: () => toast.info("ok"),
@@ -17,7 +17,7 @@ import Screen from "../layouts/Screen.astro";
       // This is used for screenshot testing, if we add a real date it will always change the screenshot
       lastUsedNanoseconds: undefined,
       originRegistered: "https://identity.internetcomputer.org",
-      isCurrentDevice: true,
+      isCurrentDevice: true
     });
   </script>
 </Screen>

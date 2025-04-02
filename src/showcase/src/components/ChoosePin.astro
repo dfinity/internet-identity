@@ -3,25 +3,25 @@
 <script>
   import { LitComponent } from "./lit";
 
-  import { pinInput } from "$src/components/pinInput";
-  import { Chan } from "$src/utils/utils";
-  import { html } from "lit-html";
-  import { asyncReplace } from "lit-html/directives/async-replace.js";
+    import { pinInput } from "$lib/templates/pinInput";
+    import { Chan } from "$lib/utils/utils";
+    import { html } from "lit-html";
+    import { asyncReplace } from "lit-html/directives/async-replace.js";
 
-  class ChoosePin extends LitComponent {
-    render() {
-      const submittedPin = new Chan("N/A");
-      const pinInputHidden_ = pinInput({
-        verify: (pin: string) => ({ ok: true, value: pin }),
-        onSubmit: (pin) => submittedPin.send(pin),
-        secret: true,
-      });
-      const pinInput_ = pinInput({
-        verify: (pin: string) => ({ ok: true, value: pin }),
-        onSubmit: (pin) => submittedPin.send(pin),
-      });
+    class ChoosePin extends LitComponent {
+      render() {
+        const submittedPin = new Chan("N/A");
+        const pinInputHidden_ = pinInput({
+          verify: (pin: string) => ({ ok: true, value: pin }),
+          onSubmit: (pin) => submittedPin.send(pin),
+          secret: true
+          });
+        const pinInput_ = pinInput({
+          verify: (pin: string) => ({ ok: true, value: pin }),
+          onSubmit: (pin) => submittedPin.send(pin)
+          });
 
-      return html`<div
+        return html`<div
         class="c-card"
         style="max-width: 30em; margin: 40px auto;"
       >
@@ -50,8 +50,8 @@
           </button>
         </div>
       </div>`;
-    }
-  }
+        }
+      }
 
-  customElements.define("choose-pin", ChoosePin);
+    customElements.define("choose-pin", ChoosePin);
 </script>

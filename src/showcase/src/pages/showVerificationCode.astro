@@ -4,23 +4,23 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Show Verification Code" pageName="showVerificationCode">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { chromeDevice, userNumber } from "../constants";
-    import { showVerificationCodePage } from "$src/flows/addDevice/welcomeView/showVerificationCode";
+    import { showVerificationCodePage } from "$lib/flows/addDevice/welcomeView/showVerificationCode";
 
     showVerificationCodePage({
       userNumber,
       alias: chromeDevice.alias,
       tentativeRegistrationInfo: {
         verification_code: "123456",
-        device_registration_timeout: undefined,
+        device_registration_timeout: undefined
       },
       cancel: () => toast.info("canceled"),
       remaining: {
-        async *[Symbol.asyncIterator]() {
+        async* [Symbol.asyncIterator]() {
           yield "00:34";
-        },
-      },
+        }
+      }
     });
   </script>
 </Screen>
