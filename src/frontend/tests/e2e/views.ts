@@ -620,7 +620,6 @@ export class AuthenticateView extends View {
     // TODO: Wait long enough for a possible page reload, remove once everything is a SvelteKit route
     await new Promise((resolve) => setTimeout(resolve, 3000));
     const moreOptions = this.browser.$('[data-role="more-options"]');
-    await new Promise(() => {});
     if (await moreOptions.isExisting()) {
       await moreOptions.click();
     } else {
