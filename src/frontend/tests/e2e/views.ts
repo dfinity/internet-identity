@@ -16,8 +16,8 @@ export class WelcomeView extends View {
   }
 
   async typeUserNumber(userNumber: string): Promise<void> {
-    await this.browser.$("[data-role=\"anchor-input\"]").waitForDisplayed();
-    await this.browser.$("[data-role=\"anchor-input\"]").setValue(userNumber);
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
+    await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
   }
 
   async login(userNumber: string): Promise<void> {
@@ -25,7 +25,7 @@ export class WelcomeView extends View {
     await this.browser.$("#loginButton").scrollIntoView();
     await this.browser.$("#loginButton").click();
     await this.typeUserNumber(userNumber);
-    await this.browser.$("[data-action=\"continue\"]").click();
+    await this.browser.$('[data-action="continue"]').click();
   }
 
   async register(): Promise<void> {
@@ -81,16 +81,16 @@ export class ConfirmRemoveDeviceView extends View {
 export class RegisterView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-action=\"construct-identity\"]")
+      .$('[data-action="construct-identity"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async create(): Promise<void> {
-    await this.browser.$("[data-action=\"construct-identity\"]").click();
+    await this.browser.$('[data-action="construct-identity"]').click();
   }
 
   async createPin(): Promise<void> {
-    await this.browser.$("[data-action=\"construct-pin-identity\"]").click();
+    await this.browser.$('[data-action="construct-pin-identity"]').click();
   }
 
   // View: Register confirmation
@@ -130,7 +130,7 @@ export class RegisterView extends View {
 
   async assertPinRegistrationNotShown(): Promise<void> {
     await this.browser
-      .$("[data-action=\"construct-pin-identity\"]")
+      .$('[data-action="construct-pin-identity"]')
       .waitForDisplayed({ reverse: true });
   }
 }
@@ -138,22 +138,22 @@ export class RegisterView extends View {
 export class PinRegistrationView extends View {
   async waitForPinInfo(): Promise<void> {
     await this.browser
-      .$("[data-action=\"continue-pin\"]")
+      .$('[data-action="continue-pin"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async pinInfoContinue(): Promise<void> {
-    await this.browser.$("[data-action=\"continue-pin\"]").click();
+    await this.browser.$('[data-action="continue-pin"]').click();
   }
 
   async waitForSetPin(): Promise<void> {
     await this.browser
-      .$("[data-role=\"set-pin\"]")
+      .$('[data-role="set-pin"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async setPin(pin: string): Promise<void> {
-    const inputs = await this.browser.$("[data-role=\"set-pin\"]").$$("input");
+    const inputs = await this.browser.$('[data-role="set-pin"]').$$("input");
     for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
     }
@@ -161,13 +161,13 @@ export class PinRegistrationView extends View {
 
   async waitForConfirmPin(): Promise<void> {
     await this.browser
-      .$("[data-role=\"confirm-pin\"]")
+      .$('[data-role="confirm-pin"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async confirmPin(pin: string): Promise<void> {
     const inputs = await this.browser
-      .$("[data-role=\"confirm-pin\"]")
+      .$('[data-role="confirm-pin"]')
       .$$("input");
     for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
@@ -176,16 +176,16 @@ export class PinRegistrationView extends View {
 }
 
 export class PinAuthView extends View {
-  private readonly ERROR_SELECTOR = "[data-haserror=\"true\"]";
+  private readonly ERROR_SELECTOR = '[data-haserror="true"]';
 
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-role=\"pin\"]")
+      .$('[data-role="pin"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
   async enterPin(pin: string): Promise<void> {
-    const inputs = await this.browser.$("[data-role=\"pin\"]").$$("input");
+    const inputs = await this.browser.$('[data-role="pin"]').$$("input");
     for (const [input, digit] of zip(Array.from(inputs), pin.split(""))) {
       await input.setValue(digit);
     }
@@ -199,7 +199,7 @@ export class PinAuthView extends View {
 }
 
 export class RecoveryMethodSelectorView extends View {
-  private readonly SELECTOR = "[data-page=\"add-recovery-phrase\"]";
+  private readonly SELECTOR = '[data-page="add-recovery-phrase"]';
 
   async waitForDisplay(): Promise<void> {
     await this.browser.$(this.SELECTOR).waitForExist();
@@ -207,7 +207,7 @@ export class RecoveryMethodSelectorView extends View {
 
   async waitForSeedPhrase(): Promise<void> {
     await this.browser
-      .$("[data-role=\"recovery-words\"]")
+      .$('[data-role="recovery-words"]')
       .waitForDisplayed({ timeout: 15_000 });
   }
 
@@ -223,7 +223,7 @@ export class RecoveryMethodSelectorView extends View {
     const seedPhrase = (await this.browser.execute(() =>
       Array.from(document.querySelectorAll(".c-list--recovery-word"))
         .map((e) => (e as HTMLElement).innerText)
-        .join(" ")
+        .join(" "),
     )) as string;
 
     assert(seedPhrase?.length > 0, "Seed phrase is empty!");
@@ -231,7 +231,7 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async skipRecovery(): Promise<void> {
-    await this.browser.$("[data-action=\"cancel\"]").click();
+    await this.browser.$('[data-action="cancel"]').click();
   }
 
   async copySeedPhrase(): Promise<void> {
@@ -247,26 +247,26 @@ export class RecoveryMethodSelectorView extends View {
   }
 
   async seedPhraseFill(): Promise<void> {
-    await this.browser.$("[data-action=\"next\"]").waitForDisplayed();
+    await this.browser.$('[data-action="next"]').waitForDisplayed();
     const missings = await this.browser.$$("[data-expected]");
     for await (const missing of missings) {
       const expected = await missing.getAttribute("data-expected");
       await missing.setValue(expected);
     }
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-action="next"]').click();
   }
 }
 
 export class MainView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-role=\"identity-management\"]")
+      .$('[data-role="identity-management"]')
       .waitForDisplayed({ timeout: 10_000 });
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {
     const elems = await this.browser.$$(
-      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`
+      `//aside[@data-role="passkeys"]//li[@data-device="${deviceName}"]`,
     );
     if ((await elems.length) !== count) {
       throw Error("Bad number of elements");
@@ -275,13 +275,13 @@ export class MainView extends View {
 
   async waitForDifferentOriginDevice(exist: boolean): Promise<void> {
     const differentOriginRpId = await this.browser.$(
-      "[data-role=\"passkeys\"] [data-device] [data-rpid]"
+      '[data-role="passkeys"] [data-device] [data-rpid]',
     );
     if ((await differentOriginRpId.isExisting()) !== exist) {
       throw Error(
         exist
           ? "Different origin device not found"
-          : "Different origin device found"
+          : "Different origin device found",
       );
     }
   }
@@ -311,19 +311,19 @@ export class MainView extends View {
   async logout(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     await this.browser.$("#logoutButton").click();
   }
 
   async addRecoverySeedPhrase(): Promise<void> {
-    await this.browser.$("[data-action=\"add-recovery-phrase\"]").click();
-    await this.browser.$("[data-page=\"add-recovery-phrase\"]").waitForExist();
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-action="add-recovery-phrase"]').click();
+    await this.browser.$('[data-page="add-recovery-phrase"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async addRecoveryDevice(): Promise<void> {
-    await this.browser.$("[data-action=\"add-recovery-device\"]").click();
+    await this.browser.$('[data-action="add-recovery-device"]').click();
   }
 
   async rename(deviceName: string, newName: string): Promise<void> {
@@ -349,8 +349,8 @@ export class MainView extends View {
   async protect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "protect" }).click();
-    await this.browser.$("[data-page=\"protect-phrase-info\"]").waitForExist();
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-page="protect-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
 
     const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -367,8 +367,8 @@ export class MainView extends View {
   async unprotect(deviceName: string, seedPhrase: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "unprotect" }).click();
-    await this.browser.$("[data-page=\"unprotect-phrase-info\"]").waitForExist();
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-page="unprotect-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
 
     const recoveryView = new RecoverSeedPhraseView(this.browser);
     await recoveryView.waitForSeedInputDisplay();
@@ -385,30 +385,30 @@ export class MainView extends View {
   async reset(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "reset" }).click();
-    await this.browser.$("[data-page=\"reset-phrase-info\"]").waitForExist();
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-page="reset-phrase-info"]').waitForExist();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async removeNotDisplayed(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "remove" }).waitForDisplayed({
-      reverse: true
+      reverse: true,
     });
   }
 
   // Open the device settings/actions dropdown
   async openDeviceActions({
-                            deviceName
-                          }: {
+    deviceName,
+  }: {
     deviceName: string;
   }): Promise<void> {
     // Ensure the settings dropdown is in view
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     // Grab the trigger (button) and figure out the id of the element it opens
     const dropdownTrigger = await this.browser.$(
-      `[data-action="open-settings"][data-device="${deviceName}"]`
+      `[data-action="open-settings"][data-device="${deviceName}"]`,
     );
     const dropdownId = await dropdownTrigger.getAttribute("aria-controls");
     await dropdownTrigger.click();
@@ -420,9 +420,9 @@ export class MainView extends View {
         this.browser.execute(
           (dropdownId) =>
             document.getElementById(dropdownId)?.getAnimations().length === 0,
-          dropdownId
+          dropdownId,
         ),
-      { timeoutMsg: "Animation didn't end" }
+      { timeoutMsg: "Animation didn't end" },
     );
   }
 
@@ -430,7 +430,7 @@ export class MainView extends View {
   // separately)
   deviceAction({ deviceName, action }: { deviceName: string; action: string }) {
     return this.browser.$(
-      `[data-action="${action}"][data-device="${deviceName}"]`
+      `[data-action="${action}"][data-device="${deviceName}"]`,
     );
   }
 
@@ -451,7 +451,7 @@ export class MainView extends View {
 
   async expectRecoveryDevice(exists: boolean): Promise<void> {
     const recoveryDeviceSelector =
-      "[data-role=\"recoveries\"] [data-device=\"Recovery Device\"]";
+      '[data-role="recoveries"] [data-device="Recovery Device"]';
     await this.browser
       .$(recoveryDeviceSelector)
       .waitForDisplayed({ timeout: 10_000, reverse: !exists });
@@ -475,7 +475,7 @@ export class AddRemoteDeviceAliasView extends View {
   async continue(): Promise<void> {
     // we need to scroll down in case of NOT headless, otherwise the button may not be visible
     await this.browser.execute(
-      "window.scrollTo(0, document.body.scrollHeight)"
+      "window.scrollTo(0, document.body.scrollHeight)",
     );
     await this.browser.$("#pickAliasSubmit").click();
   }
@@ -505,7 +505,7 @@ export class AddRemoteDeviceInstructionsView extends View {
   }
 
   async addFIDODevice(): Promise<void> {
-    await this.browser.$("[data-action=\"use-fido\"]").click();
+    await this.browser.$('[data-action="use-fido"]').click();
   }
 
   async addDeviceLink(): Promise<string> {
@@ -532,7 +532,7 @@ export class VerifyRemoteDeviceView extends View {
 
   async enterVerificationCode(code: string): Promise<void> {
     const inputs = await this.browser
-      .$("[data-role=\"verification-code\"]")
+      .$('[data-role="verification-code"]')
       .$$("input");
     for (const [input, digit] of zip(Array.from(inputs), code.split(""))) {
       await input.setValue(digit);
@@ -571,7 +571,7 @@ export class AddDeviceSuccessView extends View {
 export class AuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-page=\"authenticate\"]")
+      .$('[data-page="authenticate"]')
       .waitForExist({ timeout: 5_000 });
   }
 
@@ -585,19 +585,19 @@ export class AuthenticateView extends View {
 
   async continueWithAnchor(anchor: string): Promise<void> {
     await this.clickUseExisting();
-    await this.browser.$("[data-role=\"anchor-input\"]").waitForDisplayed();
-    await this.browser.$("[data-role=\"anchor-input\"]").setValue(anchor);
-    await this.browser.$("[data-action=\"continue\"]").click();
+    await this.browser.$('[data-role="anchor-input"]').waitForDisplayed();
+    await this.browser.$('[data-role="anchor-input"]').setValue(anchor);
+    await this.browser.$('[data-action="continue"]').click();
   }
 
   async expectAnchorInputField(): Promise<void> {
     await this.browser
-      .$("[data-role=\"anchor-input\"]")
+      .$('[data-role="anchor-input"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
   async authenticate(): Promise<void> {
-    const moreOptions = await this.browser.$("[data-role=\"more-options\"]");
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
     if (await moreOptions.isExisting()) {
       await moreOptions.click();
     }
@@ -605,7 +605,7 @@ export class AuthenticateView extends View {
   }
 
   async register(): Promise<void> {
-    const moreOptions = await this.browser.$("[data-role=\"more-options\"]");
+    const moreOptions = await this.browser.$('[data-role="more-options"]');
     if (await moreOptions.isExisting()) {
       await moreOptions.click();
     }
@@ -613,11 +613,14 @@ export class AuthenticateView extends View {
   }
 
   async switchToAnchorInput(): Promise<void> {
-    await this.browser.$("[data-role=\"anchor-input\"]").click();
+    await this.browser.$('[data-role="anchor-input"]').click();
   }
 
   async clickUseExisting(): Promise<void> {
-    const moreOptions = await this.browser.$("[data-role=\"more-options\"]");
+    // TODO: Wait long enough for a possible page reload, remove once everything is a SvelteKit route
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const moreOptions = this.browser.$('[data-role="more-options"]');
+    await new Promise(() => {});
     if (await moreOptions.isExisting()) {
       await moreOptions.click();
     } else {
@@ -631,9 +634,9 @@ export class AuthenticateView extends View {
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
     await this.browser
-      .$("[data-action=\"recover-with-phrase\"]")
+      .$('[data-action="recover-with-phrase"]')
       .waitForDisplayed();
-    await this.browser.$("[data-action=\"recover-with-phrase\"]").click();
+    await this.browser.$('[data-action="recover-with-phrase"]').click();
   }
 
   async recoverDevice(): Promise<void> {
@@ -642,9 +645,9 @@ export class AuthenticateView extends View {
     await this.browser.$("#recoverButton").scrollIntoView();
     await this.browser.$("#recoverButton").click();
     await this.browser
-      .$("[data-action=\"recover-with-device\"]")
+      .$('[data-action="recover-with-device"]')
       .waitForDisplayed();
-    await this.browser.$("[data-action=\"recover-with-device\"]").click();
+    await this.browser.$('[data-action="recover-with-device"]').click();
   }
 }
 
@@ -667,13 +670,13 @@ export class WelcomeBackView extends View {
 export class AddIdentityAnchorView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-role=\"anchor-input\"]")
+      .$('[data-role="anchor-input"]')
       .waitForDisplayed({ timeout: 3_000 });
   }
 
   async continue(userNumber?: string): Promise<void> {
     if (nonNullish(userNumber)) {
-      await this.browser.$("[data-role=\"anchor-input\"]").setValue(userNumber);
+      await this.browser.$('[data-role="anchor-input"]').setValue(userNumber);
     }
     await this.browser.$("#userNumberContinue").click();
   }
@@ -690,7 +693,7 @@ export class AboutView extends View {
 export class VcAllowView extends View {
   async waitForDisplay(): Promise<"ok" | "aborted"> {
     const elem = await this.browser.$(
-      "[data-page=\"vc-allow\"],[data-page=\"vc-aborted\"]"
+      '[data-page="vc-allow"],[data-page="vc-aborted"]',
     );
     await elem.waitForDisplayed({ timeout: 10_000 });
     const page = await elem.getAttribute("data-page");
@@ -713,53 +716,53 @@ export class VcAllowView extends View {
   }
 
   async allow(): Promise<void> {
-    await this.browser.$("[data-action=\"allow\"]").waitForDisplayed();
-    await this.browser.$("[data-action=\"allow\"]").scrollIntoView();
-    await this.browser.$("[data-action=\"allow\"]").click();
+    await this.browser.$('[data-action="allow"]').waitForDisplayed();
+    await this.browser.$('[data-action="allow"]').scrollIntoView();
+    await this.browser.$('[data-action="allow"]').click();
   }
 
   async hasUserNumberInput(): Promise<boolean> {
-    return await this.browser.$("[data-role=\"anchor-input\"]").isExisting();
+    return await this.browser.$('[data-role="anchor-input"]').isExisting();
   }
 
   async getRelyingParty(): Promise<string> {
-    return await this.browser.$("[data-role=\"relying-party\"]").getText();
+    return await this.browser.$('[data-role="relying-party"]').getText();
   }
 
   async getIssuer(): Promise<string> {
-    return await this.browser.$("[data-role=\"issuer\"]").getText();
+    return await this.browser.$('[data-role="issuer"]').getText();
   }
 }
 
 export class IssuerAppView extends View {
   async open({
-               issuerAppUrl,
-               iiUrl
-             }: {
+    issuerAppUrl,
+    iiUrl,
+  }: {
     issuerAppUrl: string;
     iiUrl: string;
   }): Promise<void> {
     await this.browser.url(issuerAppUrl);
-    const iiUrlInput = await this.browser.$("[data-role=\"ii-url\"]");
+    const iiUrlInput = await this.browser.$('[data-role="ii-url"]');
     await iiUrlInput.clearValue();
     await iiUrlInput.setValue(iiUrl);
   }
 
   async setPrincipal({ principal }: { principal: string }): Promise<void> {
     const principalInput = await this.browser.$(
-      "[data-role=\"custom-principal\"]"
+      '[data-role="custom-principal"]',
     );
     await principalInput.clearValue();
     await principalInput.setValue(principal);
   }
 
   async setDerivationOrigin({
-                              derivationOrigin
-                            }: {
+    derivationOrigin,
+  }: {
     derivationOrigin: string;
   }): Promise<void> {
     const derivationOriginInput = await this.browser.$(
-      "[data-role=\"derivation-origin\"]"
+      '[data-role="derivation-origin"]',
     );
     await derivationOriginInput.clearValue();
     await derivationOriginInput.setValue(derivationOrigin);
@@ -767,7 +770,7 @@ export class IssuerAppView extends View {
 
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("[data-page=\"add-employee\"]")
+      .$('[data-page="add-employee"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
@@ -776,14 +779,14 @@ export class IssuerAppView extends View {
   }
 
   async authenticate(): Promise<void> {
-    await this.browser.$("[data-action=\"authenticate\"]").click();
+    await this.browser.$('[data-action="authenticate"]').click();
   }
 
   async getPrincipal(): Promise<string | undefined> {
-    const principalElem = await this.browser.$("[data-role=\"principal\"]");
+    const principalElem = await this.browser.$('[data-role="principal"]');
     // An attr without value will have the string 'true'; an attr not set will be null
     const isUnset = (await principalElem.getAttribute(
-      "data-unset"
+      "data-unset",
     )) as unknown as string | null;
     if (isUnset === "true") {
       return undefined;
@@ -813,14 +816,14 @@ export class IssuerAppView extends View {
   }
 
   async canisterLogs(): Promise<string[]> {
-    const logs = await this.browser.$("[data-role=\"canister-logs\"]").getText();
+    const logs = await this.browser.$('[data-role="canister-logs"]').getText();
     return logs.split("\n").filter(Boolean);
   }
 
   // Returns the canister log
   async addEmployee(): Promise<string> {
     const logLinesBefore = await this.canisterLogs();
-    await this.browser.$("[data-action=\"add-employee\"]").click();
+    await this.browser.$('[data-action="add-employee"]').click();
 
     // wait for the demo app to update the principal
     await this.browser.waitUntil(async () => {
@@ -841,24 +844,24 @@ export class VcTestAppView extends View {
     demoAppUrl: string,
     iiUrl: string,
     issuerUrl: string,
-    issuerCanisterId: string
+    issuerCanisterId: string,
   ): Promise<void> {
     await this.browser.url(demoAppUrl);
-    await setInputValue(this.browser, "[data-role=\"ii-url\"]", iiUrl);
-    await setInputValue(this.browser, "[data-role=\"issuer-url\"]", issuerUrl);
+    await setInputValue(this.browser, '[data-role="ii-url"]', iiUrl);
+    await setInputValue(this.browser, '[data-role="issuer-url"]', issuerUrl);
     await setInputValue(
       this.browser,
-      "[data-role=\"issuer-canister-id\"]",
-      issuerCanisterId
+      '[data-role="issuer-canister-id"]',
+      issuerCanisterId,
     );
   }
 
   async startSignIn(): Promise<void> {
-    await this.browser.$("[data-action=\"authenticate\"]").click();
+    await this.browser.$('[data-action="authenticate"]').click();
   }
 
   async startVcFlow(): Promise<void> {
-    await this.browser.$("[data-action=\"verify-employee\"]").click();
+    await this.browser.$('[data-action="verify-employee"]').click();
   }
 
   /** Waits for the authentication to finish, the window to close and the principal to update.
@@ -892,23 +895,23 @@ export class VcTestAppView extends View {
   }
 
   getPrincipal(): Promise<string> {
-    return this.browser.$("[data-role=\"principal\"]").getText();
+    return this.browser.$('[data-role="principal"]').getText();
   }
 
   setAlternativeOrigin(origin: string) {
     return setInputValue(
       this.browser,
-      "[data-role=\"derivation-origin-rp\"]",
-      origin
+      '[data-role="derivation-origin-rp"]',
+      origin,
     );
   }
 
   getPresentationAlias(): Promise<string> {
-    return this.browser.$("[data-role=\"presentation-alias\"]").getText();
+    return this.browser.$('[data-role="presentation-alias"]').getText();
   }
 
   getPresentationCredential(): Promise<string> {
-    return this.browser.$("[data-role=\"presentation-credential\"]").getText();
+    return this.browser.$('[data-role="presentation-credential"]').getText();
   }
 }
 
@@ -930,7 +933,7 @@ export class DemoAppView extends View {
     await this.browser.waitUntil(
       async () =>
         (await this.browser.$("#alternativeOrigins").getText()) !== "",
-      { timeoutMsg: "alternativeOrigins were not displayed" }
+      { timeoutMsg: "alternativeOrigins were not displayed" },
     );
   }
 
@@ -948,7 +951,7 @@ export class DemoAppView extends View {
   }
 
   async getAuthnMethod(): Promise<string> {
-    return await this.browser.$("[data-role=\"authn-method\"]").getText();
+    return await this.browser.$('[data-role="authn-method"]').getText();
   }
 
   async signin(): Promise<void> {
@@ -963,7 +966,7 @@ export class DemoAppView extends View {
     await waitToClose(this.browser);
     // wait for the demo app to update the principal
     await this.browser.waitUntil(
-      async () => (await this.getPrincipal()) !== ""
+      async () => (await this.getPrincipal()) !== "",
     );
     return this.getPrincipal();
   }
@@ -990,15 +993,15 @@ export class DemoAppView extends View {
       },
       {
         timeout: 6_000,
-        timeoutMsg: "expected whoami response to contain \"-\" for 6s"
-      }
+        timeoutMsg: 'expected whoami response to contain "-" for 6s',
+      },
     );
     return await whoamiResponseElem.getText();
   }
 
   async updateAlternativeOrigins(
     alternativeOrigins: string,
-    mode: "certified" | "uncertified" | "redirect"
+    mode: "certified" | "uncertified" | "redirect",
   ): Promise<string> {
     await fillText(this.browser, "hostUrl", this.replicaUrl);
     await fillText(this.browser, "newAlternativeOrigins", alternativeOrigins);
@@ -1011,16 +1014,16 @@ export class DemoAppView extends View {
       },
       {
         timeout: 6_000,
-        timeoutMsg: "expected alternativeOrigins to update within 6s"
-      }
+        timeoutMsg: "expected alternativeOrigins to update within 6s",
+      },
     );
     return await alternativeOriginsElem.getText();
   }
 
   resetAlternativeOrigins(): Promise<string> {
     return this.updateAlternativeOrigins(
-      "{\"alternativeOrigins\":[]}",
-      "certified"
+      '{"alternativeOrigins":[]}',
+      "certified",
     );
   }
 
@@ -1057,7 +1060,7 @@ export class RecoverSeedPhraseView extends View {
   // enter seed phrase view
   async waitForSeedInputDisplay(): Promise<void> {
     await this.browser
-      .$("[data-page=\"recover-with-phrase\"]")
+      .$('[data-page="recover-with-phrase"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
@@ -1072,7 +1075,7 @@ export class RecoverSeedPhraseView extends View {
   }
 
   async enterSeedPhraseContinue(): Promise<void> {
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-action="next"]').click();
   }
 
   async skipDeviceEnrollment(): Promise<void> {
@@ -1087,7 +1090,7 @@ export class RecoverSeedPhraseView extends View {
 export class PromptUserNumberView extends View {
   async waitForUserNumberDisplay(): Promise<void> {
     await this.browser
-      .$("[data-page=\"prompt-user-number\"]")
+      .$('[data-page="prompt-user-number"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
@@ -1098,19 +1101,19 @@ export class PromptUserNumberView extends View {
   }
 
   async enterUserNumberContinue(): Promise<void> {
-    await this.browser.$("[data-action=\"next\"]").click();
+    await this.browser.$('[data-action="next"]').click();
   }
 }
 
 export class PromptDeviceAliasView extends View {
   async waitForDeviceAliasDisplay(): Promise<void> {
     await this.browser
-      .$("[data-page=\"prompt-device-alias\"]")
+      .$('[data-page="prompt-device-alias"]')
       .waitForDisplayed({ timeout: 5_000 });
   }
 
   async skipDeviceAlias(): Promise<void> {
-    await this.browser.$("[data-action=\"skip\"]").click();
+    await this.browser.$('[data-action="skip"]').click();
   }
 }
 
@@ -1126,7 +1129,7 @@ export class ErrorView extends View {
   }
 
   async getErrorDetail(): Promise<string> {
-    return (await this.browser.$("[data-role=\"error-detail\"]")).getText();
+    return (await this.browser.$('[data-role="error-detail"]')).getText();
   }
 
   async continue(): Promise<void> {
@@ -1137,7 +1140,7 @@ export class ErrorView extends View {
 async function setInputValue(
   browser: WebdriverIO.Browser,
   selector: string,
-  text: string
+  text: string,
 ): Promise<void> {
   const elem = await browser.$(selector);
   await elem.clearValue();
@@ -1147,7 +1150,7 @@ async function setInputValue(
 async function fillText(
   browser: WebdriverIO.Browser,
   id: string,
-  text: string
+  text: string,
 ): Promise<void> {
   const elem = await browser.$(`#${id}`);
   await elem.clearValue();
