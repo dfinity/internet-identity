@@ -2,6 +2,7 @@
 // applications that want to authenticate the user using Internet Identity
 import { analytics } from "$src/utils/analytics/analytics";
 import { loginFunnel } from "$src/utils/analytics/loginFunnel";
+import { registrationFunnel } from "$src/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
@@ -131,8 +132,8 @@ export async function authenticationProtocol({
   analytics.event("authorize-client-request-valid", {
     origin: requestOrigin,
   });
-  // TODO: Add origin to login funnel
-  loginFunnel.init();
+  loginFunnel.init({ origin: requestOrigin });
+  registrationFunnel.init({ origin: requestOrigin });
 
   const authContext = {
     authRequest: requestResult.request,
