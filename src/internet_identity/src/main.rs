@@ -778,7 +778,7 @@ mod openid_api {
         remove_openid_credential, update_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid::{self, OpenIdCredentialKey};
+    use crate::openid::{self, verify, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
@@ -806,9 +806,14 @@ mod openid_api {
     fn openid_identity_registration_finish(
         arg: OpenIDRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        registration::registration_flow_v2::identity_registration_finish(
-            CreateIdentityData::OpenID(arg),
-        )
+        match verify(&arg.jwt, &arg.salt) {
+            Ok(_) => {
+                registration::registration_flow_v2::identity_registration_finish(
+                    CreateIdentityData::OpenID(arg),
+                )
+            },
+            Err(err) => Err(IdRegFinishError::InvalidAuthnMethod(err))
+        }
     }
 
     #[update]
