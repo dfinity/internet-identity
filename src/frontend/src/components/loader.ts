@@ -10,7 +10,7 @@ const loaderUrl = import.meta.glob("./loader.svg", {
 })["./loader.svg"] as string;
 
 // Duration in milliseconds a user considers as taking forever
-const TAKING_FOREVER = 10000;
+const TAKING_FOREVER = 20000;
 
 const loader = (takingForever = false) =>
   html`<div id="loader" class="c-loader">
