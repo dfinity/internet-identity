@@ -1,5 +1,9 @@
 import adapter from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import {
+  compression,
+  minifyHTML,
+} from "@dfinity/internet-identity-vite-plugins";
 // import tsconfig from "./src/frontend/tsconfig.json" with { type: "json" };
 
 /** @type {import("@sveltejs/kit").Config} */
@@ -11,9 +15,11 @@ const config = {
     adapter: adapter({
       pages: "dist",
       assets: "dist",
+      fallback: "index.html",
+      precompress: true,
     }),
     files: {
-      appTemplate: "src/frontend/src/index.html",
+      appTemplate: "src/frontend/src/app.html",
       lib: "src/frontend/src/lib",
       routes: "src/frontend/src/routes",
       assets: "src/frontend/static",

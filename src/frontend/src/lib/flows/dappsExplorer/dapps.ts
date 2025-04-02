@@ -1,16 +1,15 @@
 import { features } from "$lib/legacy/features";
+// The list of dapps. This is derived from https://github.com/dfinity/portal:
+// * Only dapps using II are used
+// * All relevant logos are copied to II's assets
+// * Some logos are converted to webp
+import dappsJson from "./dapps.json";
 // This path should point to internet-identity/src/frontend/src/assets/icons/*
 const iconFiles = import.meta.glob("../../assets/icons/*", {
   eager: true,
   query: "?url",
   import: "default"
 });
-
-// The list of dapps. This is derived from https://github.com/dfinity/portal:
-// * Only dapps using II are used
-// * All relevant logos are copied to II's assets
-// * Some logos are converted to webp
-import dappsJson from "./dapps.json";
 
 // Infer the type of an array's elements
 type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
@@ -44,8 +43,7 @@ export class KnownDapp {
 
   // Path to use for logo files
   public get logoSrc(): string {
-    const path = `../../assets/icons/${this.descr.logo}`;
-    return iconFiles[path] as string;
+    return `/icons/${this.descr.logo}`;
   }
 
   public get name(): string {

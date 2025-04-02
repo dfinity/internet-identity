@@ -54,14 +54,14 @@ export default defineConfig(({ command, mode }): UserConfig => {
         //   "src/frontend/vc-flow/index.html",
         //   "src/frontend/callback/index.html",
         // ],
-        output: {
-          entryFileNames: `[name].js`,
-          // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
-          chunkFileNames: (chunkInfo) =>
-            `${chunkInfo.name.replace(/.es6|.min/gm, "")}-[hash]-cacheable.js`,
-
-          assetFileNames: `[name]-[hash]-cacheable.[ext]`,
-        },
+        // output: {
+        //   entryFileNames: `[name].js`,
+        //   // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
+        //   chunkFileNames: (chunkInfo) =>
+        //     `${chunkInfo.name.replace(/.es6|.min/gm, "")}-[hash]-cacheable.js`,
+        //
+        //   assetFileNames: `[name]-[hash]-cacheable.[ext]`,
+        // },
       },
       commonjsOptions: {
         // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
@@ -70,7 +70,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       sveltekit(),
-      inlineScriptsPlugin,
+      // inlineScriptsPlugin,
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],
