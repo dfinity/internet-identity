@@ -5,7 +5,7 @@ import { features } from "$lib/legacy/features";
 // * Some logos are converted to webp
 import dappsJson from "./dapps.json";
 // This path should point to internet-identity/src/frontend/src/assets/icons/*
-const iconFiles = import.meta.glob("../../assets/icons/*", {
+const iconFiles = import.meta.glob("$lib/icons/*", {
   eager: true,
   query: "?url",
   import: "default"
@@ -43,7 +43,7 @@ export class KnownDapp {
 
   // Path to use for logo files
   public get logoSrc(): string {
-    return `/icons/${this.descr.logo}`;
+    return iconFiles[this.descr.logo] as string;
   }
 
   public get name(): string {
