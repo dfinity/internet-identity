@@ -191,6 +191,52 @@ function build_internet_identity() {
       # Compile frontend assets to dist
       echo Compiling internet_identity frontend assets
       npm run build
+      
+      # II canister only supports one content type per resource. 
+      # That is why we only keep either compressed or uncompressed.
+      DIST_DIR="$SCRIPT_DIR/../dist"
+      find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
+          # Remove the .gz suffix to get the base filename
+          base_file="${gz_file%.gz}"
+          
+          # Generate the .br filename
+          br_file="${base_file}.br"
+      
+          # Delete the .br file if it exists
+          if [[ -f "$br_file" ]]; then
+              rm -f "$br_file"
+          fi
+          
+          # Keep files not ending in .js or .woff2 as uncompressed files
+          if [[ ! "$base_file" =~ \.(js|woff2)$ ]]; then
+              rm -f "$gz_file"
+              continue
+          fi
+      
+          # Delete the base file if it exists
+          if [[ -f "$base_file" ]]; then
+              rm -f "$base_file"
+          fi
+      done
+      
+      # Create additional index.html files for each SvelteKit route
+      ROUTES_DIR="$SCRIPT_DIR/../src/frontend/src/routes"
+      find "$ROUTES_DIR" -type d | while read -r dir; do
+          # Check if the directory contains a +page.svelte file
+          if [[ -f "$dir/+page.svelte" ]]; then
+            
+            # Get the relative path of the directory inside ROUTES_DIR
+            relative_dir="${dir#$ROUTES_DIR}"
+            if [ -n "$relative_dir" ]; then
+              
+              # Create the directory structure in the target directory
+              mkdir -p "$DIST_DIR/$relative_dir"
+          
+              # Copy index.html into the created directory
+              cp "$DIST_DIR/index.html" "$DIST_DIR/$relative_dir/"
+            fi 
+          fi 
+      done
   fi
 
   # This enables the "dummy_captcha" feature which makes sure the captcha string
