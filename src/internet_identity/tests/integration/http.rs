@@ -252,6 +252,7 @@ fn should_fallback_to_v1_certification() -> Result<(), CallError> {
 
 /// Verifies that the cache-control header is set for fonts.
 // #[test] TODO: There's no CSS file directly referenced in the HTML file anymore since the SvelteKit migration
+#[allow(dead_code)]
 fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
@@ -353,7 +354,8 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 }
 
 /// Verifies that the cache-control header is set for the SPA file.
-#[test]
+// #[test] TODO: There's no spa file anymore since the SvelteKit migration
+#[allow(dead_code)]
 fn should_set_cache_control_for_spa() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
@@ -415,7 +417,8 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
 }
 
 /// Verifies that the cache-control header is set for the icons.
-#[test]
+// #[test] TODO: There's no spa file referencing the icons anymore since the SvelteKit migration
+#[allow(dead_code)]
 fn should_set_cache_control_for_icons() -> Result<(), CallError> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
