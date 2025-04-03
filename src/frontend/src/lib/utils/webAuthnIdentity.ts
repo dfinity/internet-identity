@@ -27,7 +27,7 @@ function _coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
   return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
 }
 
-type PublicKeyCredentialWithAttachment = PublicKeyCredential & {
+type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
   // Extends `PublicKeyCredential` with an optional field introduced in the WebAuthn level 3 spec:
   // https://w3c.github.io/webauthn/#dom-publickeycredential-authenticatorattachment
   // Already supported by Chrome, Safari and Edge

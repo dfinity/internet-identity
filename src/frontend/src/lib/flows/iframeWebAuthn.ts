@@ -19,7 +19,7 @@ interface CredentialResponse {
     id: string;
   } & (
     | {
-    result: Omit<PublicKeyCredential, "getClientExtensionResults"> & {
+    result: Omit<PublicKeyCredential, "getClientExtensionResults" | "toJSON"> & {
       response: {
         authenticatorData?: ArrayBuffer;
         signature?: ArrayBuffer;
