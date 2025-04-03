@@ -1,4 +1,4 @@
-import { SignedIdAlias } from "$lib/generated/internet_identity_types";
+import type { SignedIdAlias } from "$lib/generated/internet_identity_types";
 import { useIdentity } from "$lib/templates/authenticateBox";
 import { infoToastTemplate } from "$lib/templates/infoToast";
 import { withLoader } from "$lib/templates/loader";

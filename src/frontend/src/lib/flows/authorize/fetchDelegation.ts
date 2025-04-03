@@ -1,4 +1,4 @@
-import {
+import type {
   PublicKey,
   SignedDelegation
 } from "$lib/generated/internet_identity_types";

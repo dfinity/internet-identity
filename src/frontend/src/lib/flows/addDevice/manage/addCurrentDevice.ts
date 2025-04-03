@@ -1,4 +1,4 @@
-import { DeviceData } from "$lib/generated/internet_identity_types";
+import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
 import { inferPasskeyAlias, loadUAParser } from "$lib/flows/register";

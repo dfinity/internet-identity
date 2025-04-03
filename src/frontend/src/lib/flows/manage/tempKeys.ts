@@ -8,7 +8,7 @@ import { I18n } from "$lib/legacy/i18n";
 import { unreachable } from "$lib/utils/utils";
 import { TemplateResult, html } from "lit-html";
 
-import { DeviceWithUsage } from "$lib/generated/internet_identity_types";
+import type { DeviceWithUsage } from "$lib/generated/internet_identity_types";
 import { warnBox } from "$lib/templates/warnBox";
 import { nonNullish } from "@dfinity/utils";
 import copyJson from "./tempKeys.json";

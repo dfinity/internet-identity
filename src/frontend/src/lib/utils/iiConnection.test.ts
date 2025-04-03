@@ -1,4 +1,4 @@
-import {
+import type {
   DeviceData,
   InternetIdentityInit,
   MetadataMapV2,

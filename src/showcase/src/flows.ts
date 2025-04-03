@@ -1,4 +1,4 @@
-import {
+import type {
   _SERVICE,
   InternetIdentityInit,
 } from "$lib/generated/internet_identity_types";

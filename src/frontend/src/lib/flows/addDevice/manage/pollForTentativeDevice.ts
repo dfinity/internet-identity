@@ -1,4 +1,4 @@
-import { DeviceData, Timestamp } from "$lib/generated/internet_identity_types";
+import type { DeviceData, Timestamp } from "$lib/generated/internet_identity_types";
 import { checkmarkIcon, copyIcon } from "$lib/templates/icons";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";

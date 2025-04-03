@@ -1,4 +1,4 @@
-import {
+import type {
   AddTentativeDeviceResponse,
   CredentialId
 } from "$lib/generated/internet_identity_types";

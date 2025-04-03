@@ -1,8 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import "$lib/legacy/styles/main.css";
 import { readdirSync } from "fs";
-import "$lib/legacy/styles/main.css";
 import Styleguide from "../components/Styleguide.astro";
 
 const files = readdirSync("./src/showcase/src/pages/");
@@ -92,30 +90,30 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
 
   <script>
     import { I18n } from "$lib/utils/i18n";
-      import { html, render } from "lit-html";
-      import { asyncReplace } from "lit-html/directives/async-replace.js";
+    import { html, render } from "lit-html";
+    import { asyncReplace } from "lit-html/directives/async-replace.js";
 
-      const i18nExample = () => {
-        type Lang = "en" | "fr";
-        const exampleI18n = new I18n<Lang>("en");
+    const i18nExample = () => {
+      type Lang = "en" | "fr";
+      const exampleI18n = new I18n<Lang>("en");
 
-        const copy = exampleI18n.i18n({
-          en: {
-            title: "i18n support",
-            paragraph:
-              "This is an example of internationalization support in Internet Identity. Click a button to change the language."
-            },
-          fr: {
-            title: "support i18n",
+      const copy = exampleI18n.i18n({
+        en: {
+          title: "i18n support",
+          paragraph:
+            "This is an example of internationalization support in Internet Identity. Click a button to change the language."
+        },
+        fr: {
+          title: "support i18n",
 
-            paragraph:
-              "Ceci est un exemple de support multi-language dans Internet Identity. Cliquez un des boutons ci-dessous pour changer la langue."
-            }
-          });
+          paragraph:
+            "Ceci est un exemple de support multi-language dans Internet Identity. Cliquez un des boutons ci-dessous pour changer la langue."
+        }
+      });
 
-        const langIs = (lang: Lang) =>
-          asyncReplace(exampleI18n.getLanguageAsync(), (x) => x == lang);
-        const langButton = (lang: Lang) => html`
+      const langIs = (lang: Lang) =>
+        asyncReplace(exampleI18n.getLanguageAsync(), (x) => x == lang);
+      const langButton = (lang: Lang) => html`
         <button
           ?disabled=${langIs(lang)}
           class="c-button"
@@ -125,7 +123,7 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
         </button>
       `;
 
-        return html`
+      return html`
         <section class="i18n-example">
           <article class="l-stack c-card c-card--highlight">
             <h2 class="t-title t-tile--main">${copy.title}</h2>
@@ -136,9 +134,9 @@ const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
           </article>
         </section>
       `;
-        };
+    };
 
-      const i18nExampleElement = document.getElementById("i18n-example") as HTMLElement;
-      render(i18nExample(), i18nExampleElement);
+    const i18nExampleElement = document.getElementById("i18n-example") as HTMLElement;
+    render(i18nExample(), i18nExampleElement);
   </script>
 </Layout>

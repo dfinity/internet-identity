@@ -1,4 +1,4 @@
-import { DeviceWithUsage } from "$lib/generated/internet_identity_types";
+import type { DeviceWithUsage } from "$lib/generated/internet_identity_types";
 import { TemplateResult } from "lit-html";
 
 // A simple authenticator (non-recovery device)

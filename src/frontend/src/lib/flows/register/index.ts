@@ -1,4 +1,4 @@
-import { AuthnMethodData } from "$lib/generated/internet_identity_types";
+import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import {
   PinIdentityMaterial,

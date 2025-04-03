@@ -1,4 +1,4 @@
-import { DeviceData } from "$lib/generated/internet_identity_types";
+import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { getCredentialsOrigin } from "./credential-devices";
 
 describe("credetial-devices test", () => {

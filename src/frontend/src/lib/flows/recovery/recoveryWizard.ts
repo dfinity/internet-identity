@@ -5,7 +5,7 @@ import { TemplateResult } from "lit-html";
 
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 
-import { DeviceData } from "$lib/generated/internet_identity_types";
+import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { infoScreenTemplate } from "$lib/templates/infoScreen";
 import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
 import { IdentityMetadata } from "$lib/legacy/repositories/identityMetadata";

@@ -1,4 +1,4 @@
-import {
+import type {
   IdentityAnchorInfo,
   Timestamp
 } from "$lib/generated/internet_identity_types";

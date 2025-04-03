@@ -1,4 +1,4 @@
-import { Purpose } from "$lib/generated/internet_identity_types";
+import type { Purpose } from "$lib/generated/internet_identity_types";
 import { warningLabelIcon } from "$lib/templates/infoScreen";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { LEGACY_II_URL } from "$lib/config";

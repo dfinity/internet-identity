@@ -1,4 +1,4 @@
-import { MetadataMapV2 } from "$lib/generated/internet_identity_types";
+import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import { isValidKey, unknownToString } from "$lib/utils/utils";
 
 export type IdentityMetadata = {

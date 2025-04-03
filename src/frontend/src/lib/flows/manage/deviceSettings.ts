@@ -1,4 +1,4 @@
-import { DeviceData } from "$lib/generated/internet_identity_types";
+import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { infoScreenTemplate } from "$lib/templates/infoScreen";

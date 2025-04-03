@@ -1,4 +1,4 @@
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { describe, expect, it, vi } from "vitest";
 import { isOfficialOrigin } from "./domainUtils";
 

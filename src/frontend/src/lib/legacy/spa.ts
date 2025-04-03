@@ -9,7 +9,7 @@ import { Connection } from "$lib/utils/iiConnection";
 import { version } from "./version";
 
 import { init } from "$lib/generated/internet_identity_idl";
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { fromBase64 } from "$lib/utils/utils";
 import { IDL } from "@dfinity/candid";
 import { isNullish, nonNullish } from "@dfinity/utils";

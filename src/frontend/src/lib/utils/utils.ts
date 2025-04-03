@@ -1,6 +1,6 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
-import { type SignedDelegation } from "$lib/generated/internet_identity_types";
+import type { SignedDelegation } from "$lib/generated/internet_identity_types";
 import { Signature } from "@dfinity/agent";
 import {
   Delegation,

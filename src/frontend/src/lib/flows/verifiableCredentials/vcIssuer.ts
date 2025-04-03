@@ -1,4 +1,4 @@
-import { SignedIdAlias } from "$lib/generated/internet_identity_types";
+import type { SignedIdAlias } from "$lib/generated/internet_identity_types";
 import { idlFactory as vc_issuer_idl } from "$lib/generated/vc_issuer_idl";
 
 import { features } from "$lib/legacy/features";

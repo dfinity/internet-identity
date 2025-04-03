@@ -1,4 +1,4 @@
-import {
+import type {
   DeviceWithUsage,
   PublicKey
 } from "$lib/generated/internet_identity_types";

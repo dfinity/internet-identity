@@ -1,4 +1,4 @@
-import { VerifyTentativeDeviceResponse } from "$lib/generated/internet_identity_types";
+import type { VerifyTentativeDeviceResponse } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
 import { mainWindow } from "$lib/templates/mainWindow";

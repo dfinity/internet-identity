@@ -14,7 +14,7 @@ import { TemplateResult, html } from "lit-html";
 import { settingsDropdown } from "./settingsDropdown";
 import { Devices, RecoveryPhrase } from "./types";
 
-import { DeviceWithUsage } from "$lib/generated/internet_identity_types";
+import type { DeviceWithUsage } from "$lib/generated/internet_identity_types";
 import copyJson from "./recoveryMethodsSection.json";
 
 // The list of recovery devices

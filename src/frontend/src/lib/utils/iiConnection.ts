@@ -2,7 +2,7 @@
  * This module contains everything related to connecting to the canister.
  */
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import {
+import type {
   _SERVICE,
   AddTentativeDeviceResponse,
   AnchorCredentials,

@@ -1,4 +1,4 @@
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 
 /**
  * Check if the current origin is in the list of related origins from the canister config

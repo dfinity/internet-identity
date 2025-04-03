@@ -1,4 +1,4 @@
-import { DeviceData, DeviceKey } from "$lib/generated/internet_identity_types";
+import type { DeviceData, DeviceKey } from "$lib/generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 

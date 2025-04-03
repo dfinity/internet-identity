@@ -1,4 +1,4 @@
-import { AnalyticsConfig } from "$lib/generated/internet_identity_types";
+import type { AnalyticsConfig } from "$lib/generated/internet_identity_types";
 import { isNullish } from "@dfinity/utils";
 import Plausible from "plausible-tracker";
 import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";

@@ -1,4 +1,4 @@
-import { OpenIdCredential } from "$lib/generated/internet_identity_types";
+import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
 import { googleIcon, pulsatingCircleIcon } from "$lib/templates/icons";
 import copyJson from "$lib/flows/manage/linkedAccountsSection.json";
 import { I18n } from "$lib/legacy/i18n";

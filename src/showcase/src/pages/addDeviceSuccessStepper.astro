@@ -5,17 +5,17 @@ import Screen from "../layouts/Screen.astro";
 <Screen title="Add Device Success Stepper" pageName="addDeviceSuccessStepper">
   <script>
     import { toast } from "$lib/templates/toast";
-      import { i18n } from "../i18n";
-      import { chromeDevice, userNumber } from "../constants";
-      import { addDeviceSuccessPage } from "$lib/flows/addDevice/addDeviceSuccess";
-      import { tentativeDeviceStepper } from "../../../frontend/src/flows/addDevice/stepper";
+    import { i18n } from "../i18n";
+    import { chromeDevice, userNumber } from "../constants";
+    import { addDeviceSuccessPage } from "$lib/flows/addDevice/addDeviceSuccess";
+    import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
 
-      addDeviceSuccessPage({
-        i18n,
-        userNumber,
-        deviceAlias: chromeDevice.alias,
-        stepper: tentativeDeviceStepper({step: "success"}),
-        onContinue: () => toast.info("Continue")
-        });
+    addDeviceSuccessPage({
+      i18n,
+      userNumber,
+      deviceAlias: chromeDevice.alias,
+      stepper: tentativeDeviceStepper({ step: "success" }),
+      onContinue: () => toast.info("Continue")
+    });
   </script>
 </Screen>

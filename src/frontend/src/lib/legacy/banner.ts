@@ -1,4 +1,4 @@
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { html, render, TemplateResult } from "lit-html";
 import { OFFICIAL_II_URL } from "../config";
 import { anyFeatures } from "./features";

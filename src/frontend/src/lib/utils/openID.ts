@@ -1,4 +1,4 @@
-import { MetadataMapV2 } from "$lib/generated/internet_identity_types";
+import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import { REDIRECT_CALLBACK_PATH, redirectInPopup } from "$lib/flows/redirect";
 import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";

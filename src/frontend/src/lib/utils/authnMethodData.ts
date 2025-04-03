@@ -1,4 +1,4 @@
-import {
+import type {
   AuthnMethodData,
   AuthnMethodSecuritySettings,
   MetadataMapV2

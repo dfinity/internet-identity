@@ -4,10 +4,10 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Prompt for Device Trusted" pageName="promptDeviceTrusted">
   <script>
-    import {userNumber} from "../constants";
-    import { promptDeviceTrustedPage } from "../../../frontend/src/flows/addDevice/welcomeView/promptDeviceTrusted";
+    import { userNumber } from "../constants";
+    import { promptDeviceTrustedPage } from "$lib/flows/addDevice/welcomeView/promptDeviceTrusted";
     import { i18n } from "../i18n";
-    import { toast } from "../../../frontend/src/components/toast";
+    import { toast } from "$lib/templates/toast";
 
     promptDeviceTrustedPage({
       userNumber,

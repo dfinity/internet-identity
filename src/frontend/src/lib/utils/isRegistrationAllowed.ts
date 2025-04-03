@@ -5,7 +5,7 @@
  * @param currentOrigin - The current origin from where the request is made
  * @returns Whether registration is allowed from the current origin
  */
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "./urlUtils";
 
