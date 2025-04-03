@@ -1,5 +1,8 @@
 import { KnownDapp } from "$lib/flows/dappsExplorer/dapps";
-import { readCanisterId, getReplicaHost } from "@dfinity/internet-identity-vite-plugins/utils";
+import {
+  readCanisterId,
+  getReplicaHost,
+} from "@dfinity/internet-identity-vite-plugins/utils";
 
 // XXX: this is not exactly a constant (since it might change on every node eval) but in
 // practice is very stable, and is much easier to use as "constants" than as a lookup function.
@@ -14,7 +17,7 @@ export const TEST_APP_NICE_URL = "https://nice-name.com";
 export const KNOWN_TEST_DAPP = new KnownDapp({
   name: "Test Dapp",
   website: "https://nice-name.com",
-  logo: "no-such-logo"
+  logo: "no-such-logo",
 });
 
 export const ISSUER_APP_URL = `https://${ISSUER_CANISTER_ID}.icp0.io`;
