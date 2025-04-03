@@ -71,7 +71,7 @@ export const getAnchorByPrincipal = async ({
 
     if (
       anchor.knownPrincipals.some(
-        (digest_) => digest_.principalDigest === principalDigest
+        (digest_) => digest_.principalDigest === principalDigest,
       )
     ) {
       return BigInt(ix);
@@ -110,7 +110,7 @@ export const getAnchorIfLastUsed = async ({
 
     // there is at most one principal known per anchor and origin.
     const lastUsed = anchor.knownPrincipals.filter(
-      (knownPrincipal) => knownPrincipal.originDigest === originDigest
+      (knownPrincipal) => knownPrincipal.originDigest === originDigest,
     )[0];
     if (isNullish(lastUsed)) {
       continue;
@@ -172,7 +172,7 @@ export const setKnownPrincipal = async ({
     // Remove the principal, if we've encountered it already
     const dedupedPrincipals = oldAnchor.knownPrincipals.filter(
       (principalData_) =>
-        principalData_.principalDigest !== principalData.principalDigest
+        principalData_.principalDigest !== principalData.principalDigest,
     );
 
     // Add the new principal and sort (most recently used is first)
@@ -202,7 +202,7 @@ type Awaitable<T> = T | PromiseLike<T>;
 
 // Read & update the storage
 const withStorage = (
-  op: (storage: Storage) => Awaitable<Storage>
+  op: (storage: Storage) => Awaitable<Storage>,
 ): Promise<Storage> => {
   return updateStorage(async (storage) => {
     const newStorage = await op(storage);
@@ -217,7 +217,7 @@ const updateStorage = async (
   op: (storage: Storage) => Awaitable<{
     ret: Storage;
     updated: boolean /* iff true, anchors are updated in storage */;
-  }>
+  }>,
 ): Promise<Storage> => {
   let doWrite = false;
 
@@ -420,7 +420,7 @@ const newHMACKey = async (): Promise<CryptoKey> => {
   const key = await crypto.subtle.generateKey(
     { name: "HMAC", hash: "SHA-512" },
     false /* not extractable */,
-    ["sign"] /* only used to "sign" (e.g. produce a digest ) */
+    ["sign"] /* only used to "sign" (e.g. produce a digest ) */,
   );
 
   return key;

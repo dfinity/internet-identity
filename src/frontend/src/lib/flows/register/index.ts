@@ -43,6 +43,10 @@ import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyPinOrOpenID } from "./passkey";
+import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -64,7 +68,7 @@ export const registerFlow = async ({
     | RateLimitExceeded
   >;
   checkCaptcha: (
-    captchaSolution: string
+    captchaSolution: string,
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
@@ -130,6 +134,7 @@ export const registerFlow = async ({
   // We register the device's origin in the current domain.
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
+  registrationFunnel.trigger(RegistrationEvents.Trigger);
   const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
     googleAllowed,
@@ -146,12 +151,11 @@ export const registerFlow = async ({
       }
 
       pinResult.tag satisfies "ok";
-      analytics.event("registration-pin");
 
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
       const { identity, pinIdentityMaterial } = await withLoader(() =>
-        constructPinIdentity(pinResult)
+        constructPinIdentity(pinResult),
       );
       const alias = await inferPinAlias({
         userAgent: navigator.userAgent,
@@ -179,7 +183,6 @@ export const registerFlow = async ({
       const openIdResult = await openidIdentityRegistrationFinish();
 
       if (openIdResult.kind === "loginSuccess") {
-        analytics.event("registration-openid");
         return {
           ...openIdResult,
           authnMethod: "google"
@@ -194,7 +197,6 @@ export const registerFlow = async ({
         return "canceled";
       }
 
-      analytics.event("registration-passkey");
       const alias = await inferPasskeyAlias({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
@@ -225,7 +227,6 @@ export const registerFlow = async ({
     result_.kind === "loginSuccess" &&
     result_.authnMethod === "google"
   ) {
-    analytics.event("registration-final-success");
     // for now we switch to passkey here so dapps don't know it's google
     return { ...result_, authnMethod: "passkey" as const };
   } else if ("kind" in result_ && result_.kind === "loginSuccess") {
@@ -233,7 +234,6 @@ export const registerFlow = async ({
     return { ...result_, authnMethod: "passkey" as const };
   } else if ("kind" in result_) {
     // if openid returned some error
-    analytics.event("registration-final-error");
     return result_;
   }
 
@@ -253,24 +253,23 @@ export const registerFlow = async ({
 
   const startOrCaptchaResult = await captchaIfNecessary(
     flowStart,
-    checkCaptcha
+    checkCaptcha,
   );
   if (startOrCaptchaResult === "canceled") return "canceled";
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
       authnMethod: authnMethodData,
-      identity
-    })
+      identity,
+    }),
   );
 
   if (result.kind !== "loginSuccess") {
-    analytics.event("registration-final-error");
     return result;
   }
   result.kind satisfies "loginSuccess";
-  analytics.event("registration-final-success");
 
+  registrationFunnel.trigger(RegistrationEvents.Created);
   const userNumber = result.userNumber;
   await finalizeIdentity?.(userNumber);
   // We don't want to nudge the user with the recovery phrase warning page
@@ -281,15 +280,13 @@ export const registerFlow = async ({
   // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
   // This way, dropping of at that point does not negatively impact UX with additional nagging.
   await withLoader(() =>
-    Promise.all([
-      result.connection.commitMetadata(),
-      setAnchorUsed(userNumber)
-    ])
+    Promise.all([result.connection.commitMetadata(), setAnchorUsed(userNumber)])
   );
   await displayUserNumber({
     userNumber,
     marketingIntroSlot: finishSlot
   });
+  registrationFunnel.trigger(RegistrationEvents.Success);
   return { ...result, authnMethod };
 };
 
@@ -340,8 +337,8 @@ export const getRegisterFlowOpts = async ({
     openidIdentityRegistrationFinish: () =>
       connection.openid_identity_registration_finish(
         getGoogleClientId,
-        tempIdentity
-      )
+        tempIdentity,
+      ),
   };
 };
 
@@ -535,23 +532,20 @@ async function captchaIfNecessary(
 > {
   const startResult = await flowStart();
   if (startResult.kind !== "registrationFlowStepSuccess") {
-    analytics.event("registration-start-error");
     return startResult;
   }
   startResult satisfies RegistrationFlowStepSuccess;
 
   if (startResult.nextStep.step === "checkCaptcha") {
-    analytics.event("registration-captcha");
+    registrationFunnel.trigger(RegistrationEvents.CaptchaCheck);
     const captchaResult = await promptCaptcha({
       captcha_png_base64: startResult.nextStep.captcha_png_base64,
       checkCaptcha
     });
     if (captchaResult === "canceled") {
-      analytics.event("registration-captcha-cancelled");
       return "canceled";
     }
     if (captchaResult.kind !== "registrationFlowStepSuccess") {
-      analytics.event("registration-captcha-error");
       return captchaResult;
     }
     captchaResult satisfies RegistrationFlowStepSuccess;

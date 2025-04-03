@@ -31,6 +31,6 @@ export const compatibilityNotice = (): void => {
       slot: pageContent(),
       showLogo: false
     }),
-    container
+    container,
   );
 };

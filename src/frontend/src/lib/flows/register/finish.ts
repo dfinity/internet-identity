@@ -4,6 +4,10 @@ import { identityCard } from "$lib/templates/identityCard";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
+import {
   TemplateElement,
   mount,
   renderPage,
@@ -56,16 +60,19 @@ export const displayUserNumberTemplate = ({
           tabindex="0"
           class="c-button__icon"
           @click=${async () => {
-    try {
-      await navigator.clipboard.writeText(userNumber.toString());
-      withRef(userNumberCopy, (elem) => {
-        elem.classList.add("is-copied");
-      });
-    } catch (e: unknown) {
-      toast.error("Unable to copy Internet Identity");
-      console.error("Unable to copy Internet Identity", e);
-    }
-  }}
+            try {
+              await navigator.clipboard.writeText(userNumber.toString());
+              registrationFunnel.trigger(
+                RegistrationEvents.CopyNewIdentityNumber,
+              );
+              withRef(userNumberCopy, (elem) => {
+                elem.classList.add("is-copied");
+              });
+            } catch (e: unknown) {
+              toast.error("Unable to copy Internet Identity");
+              console.error("Unable to copy Internet Identity", e);
+            }
+          }}
           >
             <span>Copy</span>
             ${copyIcon}
@@ -124,7 +131,7 @@ export const displayUserNumber = ({
       userNumber,
       identityBackground,
       marketingIntroSlot,
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

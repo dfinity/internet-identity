@@ -16,7 +16,7 @@ export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
 
   if (isNullish(value)) {
     toast.error(
-      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug"
+      "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug",
     );
     return;
   } else {

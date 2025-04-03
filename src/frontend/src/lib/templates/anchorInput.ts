@@ -156,7 +156,7 @@ const inputFilter = (
   inputFilter: (c: string) => boolean,
   onBad: () => void,
   /* callback called on valid input */
-  onInput?: (content: string) => void
+  onInput?: (content: string) => void,
 ) =>
   function(
     this: (HTMLInputElement | HTMLTextAreaElement) & {

@@ -35,7 +35,7 @@ const verifyTentativeDeviceTemplate = <T>({
   remaining: AsyncIterable<string>;
   cancel: () => void;
   verify: (
-    value: string
+    value: string,
   ) => Promise<{ retry: false; value: T } | { retry: true }>;
   doContinue: (result: T) => void;
 }) => {
@@ -107,10 +107,10 @@ type TemplateProps<T> = Parameters<typeof verifyTentativeDeviceTemplate<T>>[0];
 
 export function verifyTentativeDevicePage<T>(
   props: TemplateProps<T>,
-  container?: HTMLElement
+  container?: HTMLElement,
 ): void {
   return renderPage<(props: TemplateProps<T>) => TemplateResult>(
-    verifyTentativeDeviceTemplate
+    verifyTentativeDeviceTemplate,
   )(props, container);
 }
 
@@ -145,7 +145,7 @@ export const verifyTentativeDevice = async ({
     // to try again.
     verify: async (value: string): Promise<VerifyResultOrRetry> => {
       const result = await withLoader(() =>
-        connection.verifyTentativeDevice(value)
+        connection.verifyTentativeDevice(value),
       );
 
       if ("wrong_code" in result) {
@@ -167,7 +167,7 @@ export const verifyTentativeDevice = async ({
 };
 
 const handleVerifyResult = async (
-  result: VerifyResult | "canceled" | typeof AsyncCountdown.timeout
+  result: VerifyResult | "canceled" | typeof AsyncCountdown.timeout,
 ): Promise<"verified" | "failed"> => {
   // If the verification worked or the user canceled, then we don't show anything special
   if (result === "canceled") {

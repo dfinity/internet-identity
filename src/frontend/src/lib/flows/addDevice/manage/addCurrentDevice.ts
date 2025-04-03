@@ -43,7 +43,7 @@ export const addCurrentDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices: Omit<DeviceData, "alias">[],
-  origin: string | undefined
+  origin: string | undefined,
 ): Promise<void> => {
   const rpId = nonNullish(origin) ? new URL(origin).hostname : undefined;
   // Kick-off fetching "ua-parser-js";
@@ -60,7 +60,7 @@ export const addCurrentDevice = async (
       await displayCancelError({ primaryButton: "Back to manage" });
     } else {
       await displayFailedToAddDevice(
-        error instanceof Error ? error : unknownError()
+        error instanceof Error ? error : unknownError(),
       );
     }
     return;
@@ -77,20 +77,20 @@ export const addCurrentDevice = async (
       connection.add(
         deviceName,
         authenticatorAttachmentToKeyType(
-          newDevice.getAuthenticatorAttachment()
+          newDevice.getAuthenticatorAttachment(),
         ),
         { authentication: null },
         newDevice.getPublicKey().toDer(),
         { unprotected: null },
         origin ?? window.origin,
-        newDevice.rawId
-      )
+        newDevice.rawId,
+      ),
     );
 
     await addDeviceSuccess({ userNumber, deviceAlias: deviceName });
   } catch (error: unknown) {
     await displayFailedToAddDevice(
-      error instanceof Error ? error : unknownError()
+      error instanceof Error ? error : unknownError(),
     );
   }
 

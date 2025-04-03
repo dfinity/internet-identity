@@ -11,7 +11,7 @@ import { isSameOrigin } from "./urlUtils";
 
 export const isRegistrationAllowed = (
   config: InternetIdentityInit,
-  currentOrigin: string
+  currentOrigin: string,
 ): boolean => {
   // If there are no related origins defined or the related_origins list is empty, registration is allowed
   if (

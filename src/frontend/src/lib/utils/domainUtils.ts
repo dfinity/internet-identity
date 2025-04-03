@@ -6,7 +6,7 @@ import type { InternetIdentityInit } from "$lib/generated/internet_identity_type
  */
 export const isOfficialOrigin = (
   origin: string,
-  config: InternetIdentityInit
+  config: InternetIdentityInit,
 ): boolean => {
   const relatedOrigins = config.related_origins[0] ?? [];
 

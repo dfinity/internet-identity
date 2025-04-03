@@ -35,14 +35,14 @@ test("anchors are forwarded", () => {
   });
   render(useExisting, document.body);
   const addDeviceButton = document.querySelector(
-    "#addNewDeviceButton"
+    "#addNewDeviceButton",
   ) as HTMLButtonElement;
   addDeviceButton.click();
   expect(addDevice).toHaveBeenCalledWith(undefined);
   const input = document.querySelector("input") as HTMLInputElement;
   input.value = "123456";
   const recoverButton = document.querySelector(
-    "#recoverButton"
+    "#recoverButton",
   ) as HTMLButtonElement;
   addDeviceButton.click();
   expect(addDevice).toHaveBeenCalledWith(BigInt(123456));

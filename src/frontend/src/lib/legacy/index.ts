@@ -10,6 +10,8 @@ import { authFlowManage, renderManageWarmup } from "$lib/flows/manage";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { analytics, initAnalytics } from "$lib/utils/analytics";
+import { registrationFunnel } from "./utils/analytics/registrationFunnel";
+import { loginFunnel } from "./utils/analytics/loginFunnel";
 
 void createSpa(async (connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);
@@ -58,6 +60,9 @@ void createSpa(async (connection) => {
     return webAuthnInIframeFlow(connection);
   } else {
     analytics.event("page-manage");
+    // Initialize funnels without origin.
+    registrationFunnel.init();
+    loginFunnel.init();
     // The default flow
     return authFlowManage(connection);
   }

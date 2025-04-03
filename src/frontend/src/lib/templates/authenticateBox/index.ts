@@ -65,7 +65,7 @@ import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";
 import infoToastCopy from "../infoToast/copy.json";
 import authnTemplatesCopy from "./authnTemplatesCopy.json";
-
+import { LoginEvents, loginFunnel } from "$src/utils/analytics/loginFunnel";
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
@@ -206,10 +206,10 @@ export const authenticateBoxFlow = async <I>({
   i18n: I18n;
   templates: AuthnTemplates;
   addDevice: (
-    userNumber?: bigint
+    userNumber?: bigint,
   ) => Promise<{ tag: "deviceAdded" } | { tag: "canceled" }>;
   loginPasskey: (
-    userNumber: bigint
+    userNumber: bigint,
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -267,21 +267,17 @@ export const authenticateBoxFlow = async <I>({
     | FlowError
     | { tag: "canceled" }
   > => {
-    analytics.event("registration-start");
     const result2 = await registerFlow(registerFlowOpts);
 
     if (result2 === "canceled") {
-      analytics.event("registration-canceled");
       return { tag: "canceled" } as const;
     }
 
     if (result2.kind !== "loginSuccess") {
-      analytics.event("registration-error");
       return result2;
     }
 
     result2 satisfies LoginSuccess;
-    analytics.event("registration-success");
     return {
       newAnchor: true,
       ...result2
@@ -330,7 +326,7 @@ export const authenticateBoxFlow = async <I>({
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce
+        nonce,
       })
     );
 
@@ -364,6 +360,7 @@ export const authenticateBoxFlow = async <I>({
   > => {
     const result = await pages.useExisting();
     if (result.tag === "submit") {
+      loginFunnel.trigger(LoginEvents.TriggerUseExisting);
       return doLogin({ userNumber: result.userNumber });
     }
 
@@ -408,10 +405,12 @@ export const authenticateBoxFlow = async <I>({
     });
 
     if (result.tag === "pick") {
+      loginFunnel.trigger(LoginEvents.TriggerListItem);
       return doLogin({ userNumber: result.userNumber });
     }
 
     result satisfies { tag: "more_options" };
+    loginFunnel.trigger(LoginEvents.GoUseExisting);
     return await doPrompt();
   } else {
     const result = await pages.firstTime();
@@ -463,7 +462,7 @@ export const handleLoginFlowResult = async <E>(
     toast.info(
       infoToastTemplate({
         title: copy.title_possibly_wrong_web_authn_flow,
-        messages: [copy.message_possibly_wrong_web_authn_flow_1]
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
       })
     );
     return undefined;
@@ -477,8 +476,8 @@ export const handleLoginFlowResult = async <E>(
         title: copy.title_pin_another_domain,
         messages: [
           copy.message_pin_another_domain_1,
-          copy.message_pin_another_domain_2
-        ]
+          copy.message_pin_another_domain_2,
+        ],
       })
     );
     return undefined;
@@ -562,9 +561,9 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         </div>
         <button
           @click=${() =>
-        withUserNumber((userNumber) =>
-          useExistingProps.addDevice(userNumber)
-        )}
+            withUserNumber((userNumber) =>
+              useExistingProps.addDevice(userNumber)
+            )}
           id="addNewDeviceButton"
           class="c-button c-button--secondary"
         >
@@ -596,9 +595,9 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
           <li>
             <a
               @click="${() =>
-        withUserNumber((userNumber) =>
-          useExistingProps.recover(userNumber)
-        )}"
+                withUserNumber((userNumber) =>
+                  useExistingProps.recover(userNumber)
+                )}"
               id="recoverButton"
               class="t-link"
               >${copy.lost_access}</a
@@ -650,7 +649,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
       new Promise<{ tag: "use_existing" } | { tag: "register" }>((resolve) =>
         pages.firstTime({
           useExisting: () => resolve({ tag: "use_existing" }),
-          register: () => resolve({ tag: "register" })
+          register: () => resolve({ tag: "register" }),
         })
       ),
     useExisting: () =>
@@ -669,7 +668,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "add_device", userNumber }),
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
-          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" })
+          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" }),
         })
       ),
     pick: (pickProps: {
@@ -843,12 +842,16 @@ const useIdentityFlow = async <I>({
 > => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
-      userNumber
+      userNumber,
     })
   );
 
   const doLoginPasskey = async () => {
     const result = await withLoader(() => loginPasskey(userNumber));
+    // We need to trigger the success here because later we don't know whether it was a registration or login.
+    if (result.kind === "loginSuccess") {
+      loginFunnel.trigger(LoginEvents.Success);
+    }
     return { newAnchor: false, authnMethod: "passkey", ...result } as const;
   };
 
@@ -865,7 +868,7 @@ const useIdentityFlow = async <I>({
   const isValid = await withLoader(() =>
     verifyPinValidity({
       pinIdentityMaterial,
-      userNumber
+      userNumber,
     })
   );
   if (isValid === "expired") {

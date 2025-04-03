@@ -114,7 +114,7 @@ test("initializes identity metadata repository", async () => {
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     BigInt(1234),
-    mockActor
+    mockActor,
   );
 
   await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
@@ -130,7 +130,7 @@ test("commits changes on identity metadata", async () => {
     MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
     mockDelegationIdentity,
     userNumber,
-    mockActor
+    mockActor,
   );
 
   expect(infoResponse).toBeUndefined();
@@ -176,7 +176,7 @@ describe("Connection.login", () => {
           static fromCredentials(
             credentials: CredentialData[],
             rpId: string | undefined,
-            iframe: boolean | undefined
+            iframe: boolean | undefined,
           ) {
             return new MockMultiWebAuthnIdentity(credentials, rpId, iframe);
           }
@@ -193,9 +193,9 @@ describe("Connection.login", () => {
         return MockMultiWebAuthnIdentity.fromCredentials(
           [],
           undefined,
-          undefined
+          undefined,
         );
-      }
+      },
     );
   });
 
@@ -222,7 +222,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           "identity.ic0.app",
-          true
+          true,
         );
       }
     });
@@ -244,7 +244,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           undefined,
-          false
+          false,
         );
       }
     });
@@ -275,7 +275,7 @@ describe("Connection.login", () => {
         ]),
         undefined,
         // Do not use iframe
-        false
+        false,
       );
 
       failSign = false;
@@ -285,7 +285,7 @@ describe("Connection.login", () => {
       if (secondLoginResult.kind === "loginSuccess") {
         expect(secondLoginResult.showAddCurrentDevice).toBe(true);
         expect(secondLoginResult.connection).toBeInstanceOf(
-          AuthenticatedConnection
+          AuthenticatedConnection,
         );
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
@@ -296,7 +296,7 @@ describe("Connection.login", () => {
           ]),
           "identity.ic0.app",
           // Use iframe
-          true
+          true,
         );
       }
     });
@@ -327,7 +327,7 @@ describe("Connection.login", () => {
           currentOriginCredentialData2
         ]),
         undefined,
-        false
+        false,
       );
 
       failSign = false;
@@ -337,7 +337,7 @@ describe("Connection.login", () => {
       if (secondLoginResult.kind === "loginSuccess") {
         expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(secondLoginResult.connection).toBeInstanceOf(
-          AuthenticatedConnection
+          AuthenticatedConnection,
         );
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
@@ -347,7 +347,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData2
           ]),
           undefined,
-          false
+          false,
         );
       }
     });
@@ -376,7 +376,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           "identity.ic0.app",
-          true
+          true,
         );
       }
     });
@@ -405,7 +405,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           undefined,
-          false
+          false,
         );
       }
     });
@@ -434,7 +434,7 @@ describe("Connection.login", () => {
           currentDeviceCredentialData
         ]),
         undefined,
-        false
+        false,
       );
 
       failSign = false;
@@ -444,7 +444,7 @@ describe("Connection.login", () => {
       if (secondLoginResult.kind === "loginSuccess") {
         expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(secondLoginResult.connection).toBeInstanceOf(
-          AuthenticatedConnection
+          AuthenticatedConnection,
         );
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenNthCalledWith(
@@ -454,7 +454,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData
           ]),
           undefined,
-          false
+          false,
         );
       }
     });
@@ -483,7 +483,7 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
           undefined,
-          false
+          false,
         );
       }
     });
@@ -512,7 +512,7 @@ describe("Connection.login", () => {
           currentDeviceCredentialData
         ]),
         undefined,
-        false
+        false,
       );
 
       failSign = false;
@@ -521,7 +521,7 @@ describe("Connection.login", () => {
       expect(secondLoginResult.kind).toBe("loginSuccess");
       if (secondLoginResult.kind === "loginSuccess") {
         expect(secondLoginResult.connection).toBeInstanceOf(
-          AuthenticatedConnection
+          AuthenticatedConnection,
         );
         expect(secondLoginResult.showAddCurrentDevice).toBe(false);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(2);
@@ -532,7 +532,7 @@ describe("Connection.login", () => {
             currentOriginCredentialData
           ]),
           undefined,
-          false
+          false,
         );
       }
     });
@@ -559,7 +559,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceWithCredentialId)],
         undefined,
-        false
+        false,
       );
     });
   });
@@ -585,7 +585,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         [convertToValidCredentialData(deviceValidCredentialId)],
         undefined,
-        false
+        false,
       );
     });
   });
@@ -633,7 +633,7 @@ describe("Connection.login", () => {
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
-        mockActor
+        mockActor,
       );
 
       const origin = "https://identity.ic0.app";
@@ -643,7 +643,7 @@ describe("Connection.login", () => {
         purpose,
         newPublicKey,
         protection,
-        origin
+        origin,
       );
 
       expect(mockActor.add).toHaveBeenCalledTimes(1);
@@ -671,7 +671,7 @@ describe("Connection.login", () => {
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
-        mockActor
+        mockActor,
       );
 
       const longOrigin = "https://thisisalongdominathatshouldbe50plus.ic0.app";
@@ -681,7 +681,7 @@ describe("Connection.login", () => {
         purpose,
         newPublicKey,
         protection,
-        longOrigin
+        longOrigin,
       );
 
       expect(mockActor.add).toHaveBeenCalledTimes(1);
@@ -709,7 +709,7 @@ describe("Connection.login", () => {
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
-        mockActor
+        mockActor,
       );
 
       await connection.add(
@@ -718,7 +718,7 @@ describe("Connection.login", () => {
         purpose,
         newPublicKey,
         protection,
-        undefined
+        undefined,
       );
 
       expect(mockActor.add).toHaveBeenCalledTimes(1);
@@ -746,7 +746,7 @@ describe("Connection.login", () => {
         MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
         mockDelegationIdentity,
         userNumber,
-        mockActor
+        mockActor,
       );
 
       const credentialId = new Uint8Array([1, 2, 3, 4, 5]);
@@ -757,7 +757,7 @@ describe("Connection.login", () => {
         newPublicKey,
         protection,
         undefined,
-        credentialId.buffer
+        credentialId.buffer,
       );
 
       expect(mockActor.add).toHaveBeenCalledTimes(1);
@@ -812,7 +812,7 @@ describe("openid_identity_registration_finish", () => {
 
     const result = await connection.openid_identity_registration_finish(
       getGoogleClientId,
-      mockIdentity
+      mockIdentity,
     );
 
     expect(result).toEqual({ kind: "missingGoogleClientId" });
@@ -838,7 +838,7 @@ describe("openid_identity_registration_finish", () => {
 
     const result = await connection.openid_identity_registration_finish(
       getGoogleClientId,
-      mockIdentity
+      mockIdentity,
     );
 
     expect(result).toEqual({
@@ -866,7 +866,7 @@ describe("openid_identity_registration_finish", () => {
 
     const result = await connection.openid_identity_registration_finish(
       getGoogleClientId,
-      mockIdentity
+      mockIdentity,
     );
 
     expect(result).toEqual({
@@ -889,7 +889,7 @@ describe("openid_identity_registration_finish", () => {
 
     const result = await connection.openid_identity_registration_finish(
       getGoogleClientId,
-      mockIdentity
+      mockIdentity,
     );
 
     expect(result).toEqual({
@@ -912,7 +912,7 @@ describe("openid_identity_registration_finish", () => {
 
     const result = await connection.openid_identity_registration_finish(
       getGoogleClientId,
-      mockIdentity
+      mockIdentity,
     );
 
     expect(result).toEqual({ kind: "noRegistrationFlow" });

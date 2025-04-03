@@ -35,7 +35,7 @@ export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
  */
 const requestWithCredentials = async (
   config: Omit<RequestConfig, "authURL">,
-  options: RequestOptions
+  options: RequestOptions,
 ): Promise<string> => {
   const identityCredential = await navigator.credentials.get({
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -84,7 +84,7 @@ export const isPermissionError = (error: unknown) =>
  */
 const requestWithRedirect = async (
   config: Omit<RequestConfig, "configURL">,
-  options: RequestOptions
+  options: RequestOptions,
 ): Promise<string> => {
   const state = toBase64URL(window.crypto.getRandomValues(new Uint8Array(12)));
   const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
@@ -98,7 +98,7 @@ const requestWithRedirect = async (
   if (options.mediation === "required") {
     authURL.searchParams.set(
       "prompt",
-      isNullish(options.loginHint) ? "select_account" : "login"
+      isNullish(options.loginHint) ? "select_account" : "login",
     );
   }
   if (options.mediation === "silent") {
@@ -131,14 +131,14 @@ const requestWithRedirect = async (
  * @param principal to anonymize with a salt
  */
 export const createAnonymousNonce = async (
-  principal: Principal
+  principal: Principal,
 ): Promise<{ nonce: string; salt: Uint8Array }> => {
   const salt = window.crypto.getRandomValues(new Uint8Array(32));
   const bytes = new Uint8Array(32 + principal.toUint8Array().byteLength);
   bytes.set(salt);
   bytes.set(principal.toUint8Array(), 32);
   const nonce = toBase64URL(
-    await window.crypto.subtle.digest("SHA-256", bytes)
+    await window.crypto.subtle.digest("SHA-256", bytes),
   );
   return { nonce, salt };
 };
@@ -150,7 +150,7 @@ export const createAnonymousNonce = async (
  */
 export const requestJWT = (
   config: RequestConfig,
-  options: RequestOptions
+  options: RequestOptions,
 ): Promise<string> => {
   if (isNullish(config.configURL)) {
     // FedCM is not supported for this OpenID Provider
@@ -173,7 +173,7 @@ export const requestJWT = (
  * @returns common claims
  */
 export const decodeJWT = (
-  token: string
+  token: string,
 ): { iss: string; sub: string; aud: string } => {
   const [_header, body, _signature] = token.split(".");
   const { iss, sub, aud } = JSON.parse(atob(body));

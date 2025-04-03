@@ -59,7 +59,7 @@ export const vcProtocol = async ({
       jsonrpc: "2.0",
       ...content
     } satisfies VcResponse,
-    origin
+    origin,
   );
 
   return "success";

@@ -14,13 +14,13 @@ type PickCB = (userNumber: bigint) => void;
 /** A component for picking an anchor number. One big list where the elements are (clickable)
  * anchors */
 export const mkAnchorPicker = (
-  props: PickerProps
+  props: PickerProps,
 ): {
   template: TemplateResult;
 } => {
   const focus = props.focus ?? true;
   const elems = props.savedAnchors.map((anchor, i) =>
-    anchorItem({ anchor, pick: props.pick, focus: focus && i === 0 })
+    anchorItem({ anchor, pick: props.pick, focus: focus && i === 0 }),
   );
 
   const moreOptions = html`<li class="c-list__item c-list__item--noFocusStyle">

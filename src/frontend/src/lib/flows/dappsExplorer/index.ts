@@ -11,11 +11,11 @@ import copyJson from "./copy.json";
 
 /* Template for the explorer containing all dapps */
 const dappsExplorerTemplate = ({
-                                 dapps,
-                                 i18n,
-                                 back,
-                                 scrollToTop = false
-                               }: {
+  dapps,
+  i18n,
+  back,
+  scrollToTop = false,
+}: {
   dapps: KnownDapp[];
   i18n: I18n;
   back: () => void;

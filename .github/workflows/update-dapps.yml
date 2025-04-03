@@ -11,6 +11,7 @@ jobs:
   dapps-update:
     runs-on: ubuntu-latest
     steps:
+      - run: sudo apt-get update && sudo apt-get install -y imagemagick
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
       - run: npm ci

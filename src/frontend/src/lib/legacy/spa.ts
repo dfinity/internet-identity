@@ -26,7 +26,7 @@ globalThis.Buffer = Buffer;
 export const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
-    "[data-canister-id]"
+    "[data-canister-id]",
   ) as HTMLElement | null;
   if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
@@ -46,7 +46,7 @@ export const readCanisterId = (): string => {
 export const readCanisterConfig = (): InternetIdentityInit => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
-    "[data-canister-config]"
+    "[data-canister-config]",
   ) as HTMLElement | null;
   if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
     void displayError({
@@ -63,7 +63,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   try {
     const [jsonValue] = IDL.decode(
       [init({ IDL })[0]._type],
-      fromBase64(setupJs.dataset.canisterConfig)
+      fromBase64(setupJs.dataset.canisterConfig),
     );
     return jsonValue as unknown as InternetIdentityInit;
   } catch {
@@ -83,10 +83,10 @@ export const readCanisterConfig = (): InternetIdentityInit => {
 export const printDevMessage = () => {
   console.log("Welcome to Internet Identity!");
   console.log(
-    "The code can be found here: https://github.com/dfinity/internet-identity"
+    "The code can be found here: https://github.com/dfinity/internet-identity",
   );
   console.log(
-    `https://github.com/dfinity/internet-identity/commit/${version.commit}`
+    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,
   );
   if (nonNullish(version.release)) {
     console.log(`This is version ${version.release}`);

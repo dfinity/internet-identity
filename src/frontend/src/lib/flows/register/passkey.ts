@@ -15,17 +15,21 @@ import { html, TemplateResult } from "lit-html";
 
 import { analytics } from "$lib/utils/analytics";
 import copyJson from "./passkey.json";
+import {
+  RegistrationEvents,
+  registrationFunnel,
+} from "$src/utils/analytics/registrationFunnel";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const savePasskeyTemplate = ({
-                               constructPasskey,
-                               constructPin,
-                               constructOpenIdGoogle,
-                               i18n,
-                               cancel,
-                               scrollToTop = false
-                             }: {
+  constructPasskey,
+  constructPin,
+  constructOpenIdGoogle,
+  i18n,
+  cancel,
+  scrollToTop = false,
+}: {
   constructPasskey: () => void;
   constructPin?: () => void;
   constructOpenIdGoogle?: () => void;
@@ -129,19 +133,17 @@ export const savePasskeyPinOrOpenID = async ({
         cancel: () => resolve("canceled"),
         scrollToTop: true,
         constructPasskey: async () => {
-          analytics.event("construct-passkey");
+          registrationFunnel.trigger(RegistrationEvents.WebauthnStart);
           try {
             const rpId =
               origin === window.location.origin
                 ? undefined
                 : new URL(origin).hostname;
             const identity = await withLoader(() =>
-              constructIdentity({ rpId })
+              constructIdentity({ rpId }),
             );
-            analytics.event("construct-passkey-success");
             resolve(identity);
           } catch (e) {
-            analytics.event("construct-passkey-error");
             toast.error(errorMessage(e));
           }
         },
@@ -153,6 +155,7 @@ export const savePasskeyPinOrOpenID = async ({
     });
   }
   try {
+    registrationFunnel.trigger(RegistrationEvents.WebauthnStart);
     const identity = await withLoader(() => constructIdentity({}));
     return identity;
   } catch (e) {

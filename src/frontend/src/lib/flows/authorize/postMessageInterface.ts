@@ -1,6 +1,8 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
-import { analytics } from "$lib/utils/analytics";
+import { analytics } from "$src/utils/analytics/analytics";
+import { loginFunnel } from "$src/utils/analytics/loginFunnel";
+import { registrationFunnel } from "$src/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
@@ -58,41 +60,41 @@ export const AuthRequest = z.object({
     }),
   derivationOrigin: z.optional(z.string()),
   allowPinAuthentication: z.optional(z.boolean()),
-  autoSelectionPrincipal: z.optional(zodPrincipal)
+  autoSelectionPrincipal: z.optional(zodPrincipal),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;
 
 export type AuthResponse =
   | {
-  kind: "authorize-client-failure";
-  text: string;
-}
+      kind: "authorize-client-failure";
+      text: string;
+    }
   | {
-  kind: "authorize-client-success";
-  delegations: FrontendSignedDelegation[];
-  userPublicKey: Uint8Array;
-  authnMethod: "pin" | "passkey" | "recovery";
-};
+      kind: "authorize-client-success";
+      delegations: FrontendSignedDelegation[];
+      userPublicKey: Uint8Array;
+      authnMethod: "pin" | "passkey" | "recovery";
+    };
 
 /**
  * The postMessage-based authentication protocol.
  */
 export async function authenticationProtocol({
-                                               authenticate,
-                                               onProgress
-                                             }: {
+  authenticate,
+  onProgress,
+}: {
   /** The callback used to get auth data (i.e. select or create anchor) */
   authenticate: (authContext: {
     authRequest: AuthRequest;
     requestOrigin: string;
   }) => Promise<
     | {
-    kind: "success";
-    delegations: FrontendSignedDelegation[];
-    userPublicKey: Uint8Array;
-    authnMethod: "pin" | "passkey" | "recovery";
-  }
+        kind: "success";
+        delegations: FrontendSignedDelegation[];
+        userPublicKey: Uint8Array;
+        authnMethod: "pin" | "passkey" | "recovery";
+      }
     | { kind: "failure"; text: string }
   >;
   /* Progress update messages to let the user know what's happening. */
@@ -128,12 +130,14 @@ export async function authenticationProtocol({
   const requestOrigin =
     requestResult.request.derivationOrigin ?? requestResult.origin;
   analytics.event("authorize-client-request-valid", {
-    origin: requestOrigin
+    origin: requestOrigin,
   });
+  loginFunnel.init({ origin: requestOrigin });
+  registrationFunnel.init({ origin: requestOrigin });
 
   const authContext = {
     authRequest: requestResult.request,
-    requestOrigin: requestResult.origin
+    requestOrigin: requestResult.origin,
   };
 
   onProgress("validating");
@@ -148,24 +152,24 @@ export async function authenticationProtocol({
     console.error("Unexpected error during authentication", error);
     authenticateResult = {
       kind: "failure" as const,
-      text: "There was an unexpected error, please try again."
+      text: "There was an unexpected error, please try again.",
     };
   }
 
   if (authenticateResult.kind === "failure") {
     analytics.event("authorize-client-authenticate-error", {
       origin: requestOrigin,
-      failureReason: authenticateResult.text
+      failureReason: authenticateResult.text,
     });
     window.opener.postMessage({
       kind: "authorize-client-failure",
-      text: authenticateResult.text
+      text: authenticateResult.text,
     } satisfies AuthResponse);
     return "failure";
   }
   void (authenticateResult.kind satisfies "success");
   analytics.event("authorize-client-authenticate-success", {
-    origin: requestOrigin
+    origin: requestOrigin,
   });
 
   window.opener.postMessage(
@@ -173,7 +177,7 @@ export async function authenticationProtocol({
       kind: "authorize-client-success",
       delegations: authenticateResult.delegations,
       userPublicKey: authenticateResult.userPublicKey,
-      authnMethod: authenticateResult.authnMethod
+      authnMethod: authenticateResult.authnMethod,
     } satisfies AuthResponse,
     authContext.requestOrigin
   );
@@ -184,10 +188,10 @@ export async function authenticationProtocol({
 // Wait for a request to kickstart the flow
 const waitForRequest = (): Promise<
   | {
-  kind: "received";
-  request: AuthRequest;
-  origin: string;
-}
+      kind: "received";
+      request: AuthRequest;
+      origin: string;
+    }
   | { kind: "timeout" }
   | { kind: "invalid" }
 > => {

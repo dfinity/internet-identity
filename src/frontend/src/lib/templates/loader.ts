@@ -10,7 +10,7 @@ const loaderUrl = import.meta.glob("./loader.svg", {
 })["./loader.svg"] as string;
 
 // Duration in milliseconds a user considers as taking forever
-const TAKING_FOREVER = 10000;
+const TAKING_FOREVER = 20000;
 
 const loader = (takingForever = false) =>
   html`<div id="loader" class="c-loader">
@@ -32,7 +32,7 @@ const startLoader = (showCheckOngoingIssues?: boolean) => {
 
   const takingForeverTimeout = setTimeout(
     () => render(loader(true), container),
-    TAKING_FOREVER
+    TAKING_FOREVER,
   );
 
   return () => {
@@ -43,7 +43,7 @@ const startLoader = (showCheckOngoingIssues?: boolean) => {
 
 export const withLoader = async <A>(
   action: () => Promise<A>,
-  showCheckOngoingIssues?: boolean
+  showCheckOngoingIssues?: boolean,
 ): Promise<A> => {
   const endLoader = startLoader(showCheckOngoingIssues);
   try {

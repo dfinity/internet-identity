@@ -68,7 +68,7 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { analytics } from "./analytics";
+import { analytics } from "./analytics/analytics";
 import {
   convertToValidCredentialData,
   CredentialData
@@ -78,6 +78,7 @@ import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
+import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -376,7 +377,7 @@ export class Connection {
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce
+        nonce,
       })
     );
 
@@ -462,12 +463,10 @@ export class Connection {
     | UnknownUser
     | ApiError
   > => {
-    analytics.event("login-passkey-start");
     let devices: Omit<DeviceData, "alias">[];
     try {
       devices = await this.lookupAuthenticators(userNumber);
     } catch (e: unknown) {
-      analytics.event("login-passkey-error-lookup");
       const errObj =
         e instanceof Error
           ? e
@@ -476,18 +475,16 @@ export class Connection {
     }
 
     if (devices.length === 0) {
-      analytics.event("login-passkey-error-unknown");
       return { kind: "unknownUser", userNumber };
     }
 
     let webAuthnAuthenticators = devices.filter(
-      ({ key_type }) => !("browser_storage_key" in key_type)
+      ({ key_type }) => !("browser_storage_key" in key_type),
     );
 
     // If we reach this point, it's because no PIN identity was found.
     // Therefore, it's because it was created in another domain.
     if (webAuthnAuthenticators.length === 0) {
-      analytics.event("login-passkey-error-pin-other-domain");
       return { kind: "pinUserOtherDomain" };
     }
 
@@ -495,21 +492,22 @@ export class Connection {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
-          Object.keys(device.key_type)[0] === "cross_platform"
+          Object.keys(device.key_type)[0] === "cross_platform",
       );
     }
 
+    loginFunnel.trigger(LoginEvents.WebauthnStart);
     return this.fromWebauthnCredentials(
       userNumber,
       webAuthnAuthenticators
         .map(convertToValidCredentialData)
-        .filter(nonNullish)
+        .filter(nonNullish),
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[]
+    credentials: CredentialData[],
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
@@ -547,11 +545,11 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-      MultiWebAuthnIdentity.fromCredentials(
-        credentials,
-        currentFlow?.rpId,
-        currentFlow?.useIframe ?? false
-      );
+        MultiWebAuthnIdentity.fromCredentials(
+          credentials,
+          currentFlow?.rpId,
+          currentFlow?.useIframe ?? false,
+        );
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -751,7 +749,7 @@ export class Connection {
       sessionKey.getPublicKey(),
       new Date(Date.now() + tenMinutesInMsec),
       {
-        targets: [Principal.from(this.canisterId)]
+        targets: [Principal.from(this.canisterId)],
       }
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
@@ -1192,9 +1190,9 @@ export const creationOptions = (
       device.credential_id.length === 0
         ? []
         : {
-          id: new Uint8Array(device.credential_id[0]),
-          type: "public-key"
-        }
+            id: new Uint8Array(device.credential_id[0]),
+            type: "public-key",
+          }
     ),
     challenge: window.crypto.getRandomValues(new Uint8Array(16)),
     pubKeyCredParams: [
