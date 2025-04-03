@@ -1,6 +1,6 @@
 <script lang="ts">
   import { readCanisterConfig } from "$lib/utils/init";
-  import { analytics, initAnalytics } from "$lib/utils/analytics";
+  import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
 
   const { children } = $props();
 

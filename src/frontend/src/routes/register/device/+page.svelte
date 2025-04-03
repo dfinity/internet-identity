@@ -3,7 +3,7 @@
   import { AuthenticatedConnection, Connection } from "$lib/utils/iiConnection";
   import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
   import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
-  import { analytics } from "$lib/utils/analytics";
+  import { analytics } from "$lib/utils/analytics/analytics";
   import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
   import { goto } from "$app/navigation";
   import { handleLoginFlowResult } from "$lib/templates/authenticateBox";
