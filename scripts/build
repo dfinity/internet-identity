@@ -194,7 +194,7 @@ function build_internet_identity() {
       
       # II canister only supports one content type per resource. 
       # That is why we only keep either compressed or uncompressed.
-      DIST_DIR="$SCRIPT_DIR/../dist"
+      DIST_DIR="$SCRIPTS_DIR/../dist"
       find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
           # Remove the .gz suffix to get the base filename
           base_file="${gz_file%.gz}"
@@ -220,7 +220,7 @@ function build_internet_identity() {
       done
       
       # Create additional index.html files for each SvelteKit route
-      ROUTES_DIR="$SCRIPT_DIR/../src/frontend/src/routes"
+      ROUTES_DIR="$SCRIPTS_DIR/../src/frontend/src/routes"
       find "$ROUTES_DIR" -type d | while read -r dir; do
           # Check if the directory contains a +page.svelte file
           if [[ -f "$dir/+page.svelte" ]]; then
