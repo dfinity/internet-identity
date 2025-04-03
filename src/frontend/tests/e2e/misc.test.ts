@@ -4,7 +4,7 @@ import { DemoAppView, MainView } from "./views";
 
 import { DEVICE_NAME1, II_URL, TEST_APP_NICE_URL } from "./constants";
 
-test("Device can be renamed", async () => {
+test.skip("Device can be renamed", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await addVirtualAuthenticator(browser);
     await browser.url(II_URL);

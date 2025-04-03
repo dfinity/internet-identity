@@ -43,7 +43,8 @@ export class KnownDapp {
 
   // Path to use for logo files
   public get logoSrc(): string {
-    return iconFiles[this.descr.logo] as string;
+    console.log("hmm", iconFiles);
+    return iconFiles[`/src/frontend/src/lib/icons/${this.descr.logo}`] as string;
   }
 
   public get name(): string {
