@@ -13,4 +13,7 @@ export const reroute: Reroute = ({ url }) => {
   if (url.hash === WEBAUTHN_IFRAME_PATH) {
     return "/iframe/webauthn";
   }
+  if (url.pathname.startsWith("/vc-flow")) {
+    return "/vc-flow/index";
+  }
 };
