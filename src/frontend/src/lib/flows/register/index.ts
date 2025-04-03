@@ -10,7 +10,6 @@ import { idbStorePinIdentityMaterial } from "$lib/flows/pin/idb";
 import { registerDisabled } from "$lib/flows/registerDisabled";
 import { I18n } from "$lib/legacy/i18n";
 import { setAnchorUsed } from "$lib/legacy/storage";
-import { analytics } from "$lib/utils/analytics";
 import {
   passkeyAuthnMethodData,
   pinAuthnMethodData
@@ -45,8 +44,8 @@ import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyPinOrOpenID } from "./passkey";
 import {
   RegistrationEvents,
-  registrationFunnel,
-} from "$src/utils/analytics/registrationFunnel";
+  registrationFunnel
+} from "$lib/utils/analytics/registrationFunnel";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
@@ -68,7 +67,7 @@ export const registerFlow = async ({
     | RateLimitExceeded
   >;
   checkCaptcha: (
-    captchaSolution: string,
+    captchaSolution: string
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
@@ -155,7 +154,7 @@ export const registerFlow = async ({
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
       const { identity, pinIdentityMaterial } = await withLoader(() =>
-        constructPinIdentity(pinResult),
+        constructPinIdentity(pinResult)
       );
       const alias = await inferPinAlias({
         userAgent: navigator.userAgent,
@@ -253,15 +252,15 @@ export const registerFlow = async ({
 
   const startOrCaptchaResult = await captchaIfNecessary(
     flowStart,
-    checkCaptcha,
+    checkCaptcha
   );
   if (startOrCaptchaResult === "canceled") return "canceled";
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
       authnMethod: authnMethodData,
-      identity,
-    }),
+      identity
+    })
   );
 
   if (result.kind !== "loginSuccess") {
@@ -337,8 +336,8 @@ export const getRegisterFlowOpts = async ({
     openidIdentityRegistrationFinish: () =>
       connection.openid_identity_registration_finish(
         getGoogleClientId,
-        tempIdentity,
-      ),
+        tempIdentity
+      )
   };
 };
 

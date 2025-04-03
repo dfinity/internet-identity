@@ -23,7 +23,6 @@ import {
 } from "$lib/flows/register";
 import { I18n } from "$lib/legacy/i18n";
 import { getAnchors, setAnchorUsed } from "$lib/legacy/storage";
-import { analytics } from "$lib/utils/analytics";
 import {
   AlreadyInProgress,
   ApiError,
@@ -65,7 +64,8 @@ import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";
 import infoToastCopy from "../infoToast/copy.json";
 import authnTemplatesCopy from "./authnTemplatesCopy.json";
-import { LoginEvents, loginFunnel } from "$src/utils/analytics/loginFunnel";
+import { LoginEvents, loginFunnel } from "$lib/utils/analytics/loginFunnel";
+
 /** Template used for rendering specific authentication screens. See `authnScreens` below
  * for meaning of "firstTime", "useExisting" and "pick". */
 export type AuthnTemplates = {
@@ -206,10 +206,10 @@ export const authenticateBoxFlow = async <I>({
   i18n: I18n;
   templates: AuthnTemplates;
   addDevice: (
-    userNumber?: bigint,
+    userNumber?: bigint
   ) => Promise<{ tag: "deviceAdded" } | { tag: "canceled" }>;
   loginPasskey: (
-    userNumber: bigint,
+    userNumber: bigint
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -326,7 +326,7 @@ export const authenticateBoxFlow = async <I>({
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce,
+        nonce
       })
     );
 
@@ -462,7 +462,7 @@ export const handleLoginFlowResult = async <E>(
     toast.info(
       infoToastTemplate({
         title: copy.title_possibly_wrong_web_authn_flow,
-        messages: [copy.message_possibly_wrong_web_authn_flow_1],
+        messages: [copy.message_possibly_wrong_web_authn_flow_1]
       })
     );
     return undefined;
@@ -476,8 +476,8 @@ export const handleLoginFlowResult = async <E>(
         title: copy.title_pin_another_domain,
         messages: [
           copy.message_pin_another_domain_1,
-          copy.message_pin_another_domain_2,
-        ],
+          copy.message_pin_another_domain_2
+        ]
       })
     );
     return undefined;
@@ -494,7 +494,7 @@ const learnMoreBlock = html`<p class="l-stack t-centered">
     href="https://internetcomputer.org/internet-identity"
     target="_blank"
     rel="noopener noreferrer"
-    >Learn more</a
+  >Learn more</a
   >
   about Internet Identity
 </p>`;
@@ -507,25 +507,25 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       register: () => void;
     }) => {
       return html`${props.firstTime.slot}
-        <div class="l-stack">
-          <button
-            type="button"
-            @click=${() => firstTimeProps.register()}
-            id="registerButton"
-            class="c-button"
-          >
-            ${props.firstTime.createAnchorText}
-          </button>
-          <button
-            type="button"
-            @click=${() => firstTimeProps.useExisting()}
-            id="loginButton"
-            class="c-button c-button--secondary"
-          >
-            ${props.firstTime.useExistingText}
-          </button>
-        </div>
-        ${learnMoreBlock}`;
+      <div class="l-stack">
+        <button
+          type="button"
+          @click=${() => firstTimeProps.register()}
+          id="registerButton"
+          class="c-button"
+        >
+          ${props.firstTime.createAnchorText}
+        </button>
+        <button
+          type="button"
+          @click=${() => firstTimeProps.useExisting()}
+          id="loginButton"
+          class="c-button c-button--secondary"
+        >
+          ${props.firstTime.useExistingText}
+        </button>
+      </div>
+      ${learnMoreBlock}`;
     },
     useExisting: (useExistingProps: {
       register: () => void;
@@ -550,60 +550,60 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         f(userNumber);
       };
       return html` ${props.useExisting.slot} ${anchorInput.template}
-        <div class="c-button-group">
-          <button
-            data-action="continue"
-            @click=${() => anchorInput.submit()}
-            class="c-button"
-          >
-            ${copy.continue}
-          </button>
-        </div>
+      <div class="c-button-group">
         <button
-          @click=${() =>
-            withUserNumber((userNumber) =>
-              useExistingProps.addDevice(userNumber)
-            )}
-          id="addNewDeviceButton"
-          class="c-button c-button--secondary"
+          data-action="continue"
+          @click=${() => anchorInput.submit()}
+          class="c-button"
         >
-          ${copy.continue_with_another_device}
+          ${copy.continue}
         </button>
-        ${OPENID_AUTHENTICATION.isEnabled()
+      </div>
+      <button
+        @click=${() =>
+          withUserNumber((userNumber) =>
+            useExistingProps.addDevice(userNumber)
+          )}
+        id="addNewDeviceButton"
+        class="c-button c-button--secondary"
+      >
+        ${copy.continue_with_another_device}
+      </button>
+      ${OPENID_AUTHENTICATION.isEnabled()
         ? html`
-              <button
-                @click=${() =>
-          withUserNumber(() => useExistingProps.loginOpenIDGoogle())}
-                id="addNewDeviceButton"
-                class="c-button c-button--secondary"
-              >
-                ${copy.continue_with_google}
-              </button>
-            `
+          <button
+            @click=${() =>
+              withUserNumber(() => useExistingProps.loginOpenIDGoogle())}
+            id="addNewDeviceButton"
+            class="c-button c-button--secondary"
+          >
+            ${copy.continue_with_google}
+          </button>
+        `
         : ``}
 
-        <ul class="c-link-group">
-          <li>
-            <button
-              @click=${() => useExistingProps.register()}
-              id="registerButton"
-              class="t-link"
-            >
-              ${copy.create_new}
-            </button>
-          </li>
-          <li>
-            <a
-              @click="${() =>
-                withUserNumber((userNumber) =>
-                  useExistingProps.recover(userNumber)
-                )}"
-              id="recoverButton"
-              class="t-link"
-              >${copy.lost_access}</a
-            >
-          </li>
-        </ul>`;
+      <ul class="c-link-group">
+        <li>
+          <button
+            @click=${() => useExistingProps.register()}
+            id="registerButton"
+            class="t-link"
+          >
+            ${copy.create_new}
+          </button>
+        </li>
+        <li>
+          <a
+            @click="${() =>
+              withUserNumber((userNumber) =>
+                useExistingProps.recover(userNumber)
+              )}"
+            id="recoverButton"
+            class="t-link"
+          >${copy.lost_access}</a
+          >
+        </li>
+      </ul>`;
     },
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
@@ -613,10 +613,10 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       return html`
         ${props.pick.slot}
         ${mkAnchorPicker({
-        savedAnchors: pickProps.anchors,
-        pick: pickProps.onSubmit,
-        moreOptions: pickProps.moreOptions
-      }).template}
+          savedAnchors: pickProps.anchors,
+          pick: pickProps.onSubmit,
+          moreOptions: pickProps.moreOptions
+        }).template}
         ${learnMoreBlock}
       `;
     }
@@ -649,7 +649,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
       new Promise<{ tag: "use_existing" } | { tag: "register" }>((resolve) =>
         pages.firstTime({
           useExisting: () => resolve({ tag: "use_existing" }),
-          register: () => resolve({ tag: "register" }),
+          register: () => resolve({ tag: "register" })
         })
       ),
     useExisting: () =>
@@ -668,7 +668,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "add_device", userNumber }),
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
-          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" }),
+          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" })
         })
       ),
     pick: (pickProps: {
@@ -712,8 +712,8 @@ const page = ({
     })
     : mainWindow({
       slot: html`<!-- The title is hidden but used for accessibility -->
-          <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-          ${slot}`
+      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+      ${slot}`
     });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
@@ -842,7 +842,7 @@ const useIdentityFlow = async <I>({
 > => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
-      userNumber,
+      userNumber
     })
   );
 
@@ -868,7 +868,7 @@ const useIdentityFlow = async <I>({
   const isValid = await withLoader(() =>
     verifyPinValidity({
       pinIdentityMaterial,
-      userNumber,
+      userNumber
     })
   );
   if (isValid === "expired") {

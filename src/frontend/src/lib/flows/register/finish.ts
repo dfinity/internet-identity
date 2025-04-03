@@ -5,8 +5,8 @@ import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import {
   RegistrationEvents,
-  registrationFunnel,
-} from "$src/utils/analytics/registrationFunnel";
+  registrationFunnel
+} from "$lib/utils/analytics/registrationFunnel";
 import {
   TemplateElement,
   mount,
@@ -34,10 +34,10 @@ export const displayUserNumberTemplate = ({
 }) => {
   const userNumberCopy: Ref<HTMLButtonElement> = createRef();
   const displayUserNumberSlot = html`
-<hgroup
+    <hgroup
 
       ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}
-  >
+    >
 
       <h1 class="t-title t-title--main">
         You’ve created an Internet Identity!
@@ -46,55 +46,56 @@ export const displayUserNumberTemplate = ({
         Save this number by taking a screenshot or writing it down.
       </p>
     </hgroup>
-    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id" >
+    <div class="c-input c-input--stack c-input--textarea c-input--readonly c-input--icon c-input--id">
       ${
-    identityCard({
-      userNumber,
-      identityBackground
-    }) satisfies TemplateElement
-  }
-        <button
-          ${ref(userNumberCopy)}
-          aria-label="Copy phrase to clipboard""
-          title="Copy phrase to clipboard"
-          tabindex="0"
-          class="c-button__icon"
-          @click=${async () => {
-            try {
-              await navigator.clipboard.writeText(userNumber.toString());
-              registrationFunnel.trigger(
-                RegistrationEvents.CopyNewIdentityNumber,
-              );
-              withRef(userNumberCopy, (elem) => {
-                elem.classList.add("is-copied");
-              });
-            } catch (e: unknown) {
-              toast.error("Unable to copy Internet Identity");
-              console.error("Unable to copy Internet Identity", e);
-            }
-          }}
-          >
-            <span>Copy</span>
-            ${copyIcon}
-            ${checkmarkIcon}
-          </button>
-    </div>
+        identityCard({
+          userNumber,
+          identityBackground
+        }) satisfies TemplateElement
+      }
       <button
-        @click=${() => onContinue()}
-        id="displayUserContinue"
-        class="c-button l-stack"
+        ${ref(userNumberCopy)}
+        aria-label="Copy phrase to clipboard""
+      title="Copy phrase to clipboard"
+      tabindex="0"
+      class="c-button__icon"
+        @click=${async () => {
+        try {
+          await navigator.clipboard.writeText(userNumber.toString());
+          registrationFunnel.trigger(
+            RegistrationEvents.CopyNewIdentityNumber
+          );
+          withRef(userNumberCopy, (elem) => {
+            elem.classList.add("is-copied");
+          });
+        } catch (e: unknown) {
+          toast.error("Unable to copy Internet Identity");
+          console.error("Unable to copy Internet Identity", e);
+        }
+      }}
       >
-        I saved it, continue
+      <span>Copy</span>
+      ${copyIcon}
+      ${checkmarkIcon}
       </button>
+    </div>
+    <button
+      @click=${() => onContinue()}
+      id="displayUserContinue"
+      class="c-button l-stack"
+    >
+      I saved it, continue
+    </button>
     <section class="c-marketing-block">
       ${marketingIntroSlot}
       <aside class="l-stack">
         <h3 class="t-title">Why is it important to save this number?</h3>
-        <p class="t-paragraph">This number is unique but not secret. If you lose this number, you will lose access to all of the accounts that you created with it</p>
+        <p class="t-paragraph">This number is unique but not secret. If you lose this number, you will lose access to
+          all of the accounts that you created with it</p>
       </aside>
     </section>
 
-    `;
+  `;
 
   return mainWindow({
     showLogo: false,
@@ -131,7 +132,7 @@ export const displayUserNumber = ({
       userNumber,
       identityBackground,
       marketingIntroSlot,
-      scrollToTop: true,
-    }),
+      scrollToTop: true
+    })
   );
 };

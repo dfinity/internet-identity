@@ -12,24 +12,22 @@ import {
 } from "$lib/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
-
-import { analytics } from "$lib/utils/analytics";
 import copyJson from "./passkey.json";
 import {
   RegistrationEvents,
-  registrationFunnel,
-} from "$src/utils/analytics/registrationFunnel";
+  registrationFunnel
+} from "$lib/utils/analytics/registrationFunnel";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const savePasskeyTemplate = ({
-  constructPasskey,
-  constructPin,
-  constructOpenIdGoogle,
-  i18n,
-  cancel,
-  scrollToTop = false,
-}: {
+                               constructPasskey,
+                               constructPin,
+                               constructOpenIdGoogle,
+                               i18n,
+                               cancel,
+                               scrollToTop = false
+                             }: {
   constructPasskey: () => void;
   constructPin?: () => void;
   constructOpenIdGoogle?: () => void;
@@ -76,8 +74,8 @@ const savePasskeyTemplate = ({
       ${copy.save_passkey}
     </button>
     ${nonNullish(constructOpenIdGoogle)
-    ? createOpenIdButton(constructOpenIdGoogle)
-    : ""}
+      ? createOpenIdButton(constructOpenIdGoogle)
+      : ""}
     ${nonNullish(constructPin) ? createPinButton(constructPin) : ""}
     <button
       @click=${() => cancel()}
@@ -140,7 +138,7 @@ export const savePasskeyPinOrOpenID = async ({
                 ? undefined
                 : new URL(origin).hostname;
             const identity = await withLoader(() =>
-              constructIdentity({ rpId }),
+              constructIdentity({ rpId })
             );
             resolve(identity);
           } catch (e) {
