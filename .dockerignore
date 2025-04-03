@@ -25,3 +25,4 @@ Dockerfile
 scripts/
 !scripts/build
 !scripts/bootstrap
+!scripts/post-build
