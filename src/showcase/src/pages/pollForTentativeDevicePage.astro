@@ -4,9 +4,9 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Poll For Tentative Device Page" pageName="pollForTentativeDevicePage">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { pollForTentativeDevicePage } from "$src/flows/addDevice/manage/pollForTentativeDevice";
+    import { pollForTentativeDevicePage } from "$lib/flows/addDevice/manage/pollForTentativeDevice";
 
     pollForTentativeDevicePage({
       cancel: () => toast.info("canceled"),
@@ -14,11 +14,11 @@ import Screen from "../layouts/Screen.astro";
       origin: "https://identity.internetcomputer.org",
       userNumber: BigInt(1234),
       remaining: {
-        async *[Symbol.asyncIterator]() {
+        async* [Symbol.asyncIterator]() {
           yield "00:34";
-        },
+        }
       },
-      i18n,
+      i18n
     });
   </script>
 </Screen>

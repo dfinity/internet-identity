@@ -4,7 +4,7 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Manage Use Existing" pageName="manageUseExisting">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { manage } from "../templates";
 
     manage.useExisting({
@@ -12,7 +12,7 @@ import Screen from "../layouts/Screen.astro";
       recover: () => toast.info("Asked for recovery"),
       onSubmit: (userNumber) =>
         toast.info(`User number submitted: ${userNumber.toString()}`),
-      addDevice: () => toast.info("Asked for adding device"),
+      addDevice: () => toast.info("Asked for adding device")
     });
   </script>
 </Screen>

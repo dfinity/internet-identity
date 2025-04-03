@@ -4,9 +4,9 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Prompt Captch" pageName="promptCaptcha">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { promptCaptchaPage } from "$src/flows/register/captcha";
+    import { promptCaptchaPage } from "$lib/flows/register/captcha";
     import { dummyChallenge } from "../constants";
 
     promptCaptchaPage({
@@ -18,13 +18,13 @@ import Screen from "../layouts/Screen.astro";
         if (solution !== "8wJ6Q") {
           return {
             kind: "wrongCaptchaSolution",
-            new_captcha_png_base64: dummyChallenge.png_base64,
+            new_captcha_png_base64: dummyChallenge.png_base64
           };
         }
         return undefined;
       },
       onContinue: () => toast.info("Done"),
-      i18n,
+      i18n
     });
   </script>
 </Screen>

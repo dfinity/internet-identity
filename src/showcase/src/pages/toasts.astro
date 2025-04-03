@@ -4,8 +4,8 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Toasts" pageName="toasts">
   <script>
-    import { toast } from "$src/components/toast";
-    import { showMessage } from "$src/components/message";
+    import { toast } from "$lib/templates/toast";
+    import { showMessage } from "$lib/templates/message";
 
     showMessage({ message: "hello" });
     toast.info("This is an info!");

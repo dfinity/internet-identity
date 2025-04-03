@@ -4,9 +4,11 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Device Registration Disabled Info" pageName="deviceRegistrationDisabledInfo">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { userNumber, iiLegacyOrigin } from "../constants";
-    import { deviceRegistrationDisabledInfoPage } from "$src/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
+    import {
+      deviceRegistrationDisabledInfoPage
+    } from "$lib/flows/addDevice/welcomeView/deviceRegistrationModeDisabled";
 
     deviceRegistrationDisabledInfoPage({
       userNumber,

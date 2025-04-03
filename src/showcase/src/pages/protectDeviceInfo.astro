@@ -4,14 +4,14 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Protect Device Info" pageName="protectDeviceInfo">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { protectDeviceInfoPage } from "$src/flows/manage/deviceSettings";
+    import { protectDeviceInfoPage } from "$lib/flows/manage/deviceSettings";
 
     protectDeviceInfoPage({
       next: () => toast.info("next"),
       cancel: () => toast.info("cancel"),
-      i18n,
+      i18n
     });
   </script>
 </Screen>

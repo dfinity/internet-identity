@@ -1,7 +1,7 @@
-import { authnPages } from "$src/components/authenticateBox";
-import { toast } from "$src/components/toast";
-import { authnTemplateAuthorize } from "$src/flows/authorize";
-import { authnTemplateManage } from "$src/flows/manage";
+import { authnPages } from "$lib/templates/authenticateBox";
+import { toast } from "$lib/templates/toast";
+import { authnTemplateAuthorize } from "$lib/flows/authorize";
+import { authnTemplateManage } from "$lib/flows/manage";
 import { dapps } from "./constants";
 import { i18n } from "./i18n";
 

@@ -41,11 +41,11 @@ export const injectCanisterIdAndConfigPlugin = ({
 }): Plugin => ({
   name: "inject-canister-id-and-config",
   transformIndexHtml(html): string {
-    const rgx = /<script type="module" src="(?<src>[^"]+)"><\/script>/;
+    const rgx = /<body /;
     const canisterId = readCanisterId({ canisterName });
     const canisterConfig = readCanisterConfig({ canisterName });
     return html.replace(rgx, (_match, src) => {
-      return `<script data-canister-id="${canisterId}" data-canister-config="${canisterConfig}" type="module" src="${src}"></script>`;
+      return `<body data-canister-id="${canisterId}" data-canister-config="${canisterConfig}" `;
     });
   },
 });

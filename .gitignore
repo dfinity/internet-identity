@@ -16,6 +16,7 @@ dist/
 dist-showcase/
 .env
 lib
+!src/frontend/src/lib
 /.svelte-kit
 
 # Cargo build output

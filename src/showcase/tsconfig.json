@@ -2,6 +2,9 @@
   "extends": "../../tsconfig.json",
   "include": ["../frontend/src", "src"],
   "compilerOptions": {
-    "baseUrl": "../.."
+    "baseUrl": "../..",
+    "paths": {
+      "$lib/*": ["src/frontend/src/lib/*"]
+    }
   }
 }

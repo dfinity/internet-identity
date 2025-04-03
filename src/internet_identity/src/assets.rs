@@ -53,9 +53,9 @@ fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
     // then the frontend decodes it just like a canister call response.
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
     html.replace(
-        r#"<script "#,
+        r#"<body "#,
         &format!(
-            r#"<script data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
+            r#"<body data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
         ),
     )
 }

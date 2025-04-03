@@ -1,25 +1,27 @@
 import { UserConfig } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
 import { aliasConfig } from "./vite.config";
+import { sveltekit } from "@sveltejs/kit/vite";
 
 export default defineConfig(
   ({ mode }: UserConfig): UserConfig => ({
     resolve: {
       alias: aliasConfig,
     },
+    plugins: [sveltekit()],
     test: {
       environment: "jsdom",
       exclude: [
         ...configDefaults.exclude,
-        ...(mode === "test" ? ["src/frontend/src/test-e2e/**"] : []),
+        ...(mode === "test" ? ["src/frontend/tests/e2e/**"] : []),
       ],
       include: [
         ...configDefaults.include,
-        ...(mode === "e2e" ? ["src/frontend/src/test-e2e/**/*.test.ts"] : []),
+        ...(mode === "e2e" ? ["src/frontend/tests/e2e/**/*.test.ts"] : []),
       ],
       globals: true,
       watch: false,
-      setupFiles: "./src/frontend/test-setup.ts",
+      setupFiles: "./src/frontend/tests/e2e-setup.ts",
       // Make sure that our browser e2e tests run one by one:
       // - `sequence.concurrent: false` within each test file
       // - `fileParallelism: false` across test files

@@ -4,54 +4,54 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Display Manage Temp Key" pageName="displayManageTempKey">
   <script>
-    import { toast } from "$src/components/toast";
-    import { userNumber } from "../constants";
-    import { dapps } from "../constants";
-    import { displayManagePage } from "$src/flows/manage";
-    import identityCardBackground from "$src/assets/identityCardBackground.png";
-    import { PreLoadImage } from "$src/utils/preLoadImage";
+    import { toast } from "$lib/templates/toast";
+      import { userNumber } from "../constants";
+      import { dapps } from "../constants";
+      import { displayManagePage } from "$lib/flows/manage";
+      import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png";
+      import { PreLoadImage } from "$lib/utils/preLoadImage";
 
-    const identityBackground = new PreLoadImage(identityCardBackground.src);
+      const identityBackground = new PreLoadImage(identityCardBackground.src);
 
-    displayManagePage({
-      identityBackground,
-      userNumber,
-      devices: {
-        authenticators: [],
-        recoveries: {},
-        pinAuthenticators: [
-          {
-            alias: "Chrome on iPhone",
-            isCurrent: false,
-            rename: () => toast.info("rename"),
-            remove: () => toast.info("remove"),
+      displayManagePage({
+        identityBackground,
+        userNumber,
+        devices: {
+          authenticators: [],
+          recoveries: {},
+          pinAuthenticators: [
+            {
+              alias: "Chrome on iPhone",
+              isCurrent: false,
+              rename: () => toast.info("rename"),
+              remove: () => toast.info("remove")
+              }
+            ]
           },
-        ],
-      },
-      onAddDevice: () => {
-        toast.info("add device requested");
-      },
-      addRecoveryPhrase: () => {
-        toast.info("add recovery phrase");
-      },
-      addRecoveryKey: () => {
-        toast.info("add recovery key");
-      },
-      credentials: [],
-      onLinkAccount: () => {
-        toast.info("link account");
-      },
-      onUnlinkAccount: () => {
-        toast.info("unlink account");
-      },
-      dapps,
-      exploreDapps: () => {
-        toast.info("explore dapps");
-      },
-      tempKeysWarning: {
-        tag: "add_recovery",
-        action: () => toast.info("add recovery phrase"),
-      },
-    });
+        onAddDevice: () => {
+          toast.info("add device requested");
+          },
+        addRecoveryPhrase: () => {
+          toast.info("add recovery phrase");
+          },
+        addRecoveryKey: () => {
+          toast.info("add recovery key");
+          },
+        credentials: [],
+        onLinkAccount: () => {
+          toast.info("link account");
+          },
+        onUnlinkAccount: () => {
+          toast.info("unlink account");
+          },
+        dapps,
+        exploreDapps: () => {
+          toast.info("explore dapps");
+          },
+        tempKeysWarning: {
+          tag: "add_recovery",
+          action: () => toast.info("add recovery phrase")
+          }
+        });
   </script>
 </Screen>

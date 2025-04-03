@@ -4,9 +4,9 @@ import Screen from "../layouts/Screen.astro";
 
 <Screen title="Confirm Remove Device" pageName="confirmUnlinkAccount">
   <script>
-    import { toast } from "$src/components/toast";
+    import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { confirmUnlinkAccountPage } from "../../../frontend/src/flows/manage/confirmUnlinkAccount";
+    import { confirmUnlinkAccountPage } from "$lib/flows/manage/confirmUnlinkAccount";
     import { exampleAvatar } from "../constants";
 
     confirmUnlinkAccountPage({
