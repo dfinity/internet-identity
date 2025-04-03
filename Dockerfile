@@ -33,6 +33,7 @@ ENV RUSTUP_HOME=/opt/rustup \
 
 RUN mkdir -p ./scripts
 COPY ./scripts/bootstrap ./scripts/bootstrap
+COPY ./scripts/post-build ./scripts/post-build
 COPY ./rust-toolchain.toml ./rust-toolchain.toml
 
 RUN ./scripts/bootstrap
