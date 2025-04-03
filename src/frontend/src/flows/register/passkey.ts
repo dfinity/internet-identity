@@ -153,6 +153,7 @@ export const savePasskeyPinOrOpenID = async ({
     });
   }
   try {
+    registrationFunnel.trigger(RegistrationEvents.WebauthnStart);
     const identity = await withLoader(() => constructIdentity({}));
     return identity;
   } catch (e) {
