@@ -113,9 +113,11 @@ async function withChrome<T>(
     },
   });
 
-  if (isNullish(mobileEmulation)) {
-    await browser.setWindowSize(1200, 900);
-  }
+  await browser.setViewport({
+    width: mobileEmulation?.deviceMetrics.width ?? 1200,
+    height: mobileEmulation?.deviceMetrics?.height ?? 900,
+    devicePixelRatio: mobileEmulation?.deviceMetrics?.pixelRatio ?? 1,
+  });
 
   const res = await cb(browser);
   await browser.deleteSession();
