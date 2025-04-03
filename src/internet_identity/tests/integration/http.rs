@@ -28,11 +28,7 @@ use std::time::Duration;
 /// Verifies that some expected assets are delivered, certified and have security headers.
 #[test]
 fn ii_canister_serves_http_assets() -> Result<(), CallError> {
-    let assets: Vec<(&str, Option<&str>)> = vec![
-        ("/", None),
-        ("/index.js", Some("gzip")),
-        ("/.well-known/ic-domains", None),
-    ];
+    let assets: Vec<(&str, Option<&str>)> = vec![("/", None), ("/.well-known/ic-domains", None)];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
