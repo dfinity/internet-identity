@@ -1,24 +1,13 @@
-import {
-  compression,
-  injectCanisterIdAndConfigPlugin,
-  inlineScriptsPlugin,
-  minifyHTML,
-  replicaForwardPlugin,
-} from "@dfinity/internet-identity-vite-plugins";
+import { replicaForwardPlugin } from "@dfinity/internet-identity-vite-plugins";
 import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
 import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
-import { resolve } from "path";
 import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
   stream: "stream-browserify",
-  // Custom alias we are using to shorten and make absolute the imports
-  // $generated: resolve(__dirname, "src/frontend/generated"),
-  $src: resolve(__dirname, "src/frontend/src"),
-  $showcase: resolve(__dirname, "src/showcase/src"),
 };
 
 export default defineConfig(({ command, mode }): UserConfig => {
@@ -31,13 +20,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
     II_VERSION: `${process.env.II_VERSION ?? ""}`,
   };
 
-  // Path "../../" have to be expressed relative to the "root".
-  // e.g.
-  // root = src/frontend
-  // outDir = ../../dist
   return {
-    // root: "src/frontend",
-    // publicDir: "assets",
     envPrefix: "II_",
     resolve: {
       alias: aliasConfig,
@@ -48,20 +31,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
       rollupOptions: {
         // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
-        // input: [
-        //   "src/frontend/index.html",
-        //   "src/frontend/faq.html",
-        //   "src/frontend/vc-flow/index.html",
-        //   "src/frontend/callback/index.html",
-        // ],
-        // output: {
-        //   entryFileNames: `[name].js`,
-        //   // II canister only supports resources that contains a single dot in their filenames. qr-creator.js.gz = ok. qr-creator.min.js.gz not ok. qr-creator.es6.min.js.gz no ok.
-        //   chunkFileNames: (chunkInfo) =>
-        //     `${chunkInfo.name.replace(/.es6|.min/gm, "")}-[hash]-cacheable.js`,
-        //
-        //   assetFileNames: `[name]-[hash]-cacheable.[ext]`,
-        // },
       },
       commonjsOptions: {
         // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
@@ -70,21 +39,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       sveltekit(),
-      // inlineScriptsPlugin,
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],
       }),
-      [
-        ...(mode === "development"
-          ? [
-              injectCanisterIdAndConfigPlugin({
-                canisterName: "internet_identity",
-              }),
-            ]
-          : []),
-      ],
-      // [...(mode === "production" ? [minifyHTML(), compression()] : [])],
       [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
       {
         ...replicaForwardPlugin({

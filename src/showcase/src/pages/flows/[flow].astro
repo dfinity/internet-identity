@@ -14,7 +14,8 @@ const { flow } = Astro.params;
   <main id="pageContent" aria-live="polite" data-flow-name={flow}></main>
   <div id="loaderContainer"></div>
   <script>
-    import { iiFlows } from "$showcase/flows";
+
+    import { iiFlows } from "../../flows";
 
     const flow = (document.querySelector("[data-flow-name]") as HTMLElement)
       .dataset?.flowName as string;
