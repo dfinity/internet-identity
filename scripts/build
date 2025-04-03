@@ -218,25 +218,6 @@ function build_internet_identity() {
               rm -f "$base_file"
           fi
       done
-      
-      # Create additional index.html files for each SvelteKit route
-      ROUTES_DIR="$SCRIPTS_DIR/../src/frontend/src/routes"
-      find "$ROUTES_DIR" -type d | while read -r dir; do
-          # Check if the directory contains a +page.svelte file
-          if [[ -f "$dir/+page.svelte" ]]; then
-            
-            # Get the relative path of the directory inside ROUTES_DIR
-            relative_dir="${dir#$ROUTES_DIR}"
-            if [ -n "$relative_dir" ]; then
-              
-              # Create the directory structure in the target directory
-              mkdir -p "$DIST_DIR/$relative_dir"
-          
-              # Copy index.html into the created directory
-              cp "$DIST_DIR/index.html" "$DIST_DIR/$relative_dir/"
-            fi 
-          fi 
-      done
   fi
 
   # This enables the "dummy_captcha" feature which makes sure the captcha string
