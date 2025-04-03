@@ -9,9 +9,9 @@ import { authFlowAuthorize } from "$lib/flows/authorize";
 import { authFlowManage, renderManageWarmup } from "$lib/flows/manage";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
-import { analytics, initAnalytics } from "$lib/utils/analytics";
-import { registrationFunnel } from "./utils/analytics/registrationFunnel";
-import { loginFunnel } from "./utils/analytics/loginFunnel";
+import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
+import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
+import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 
 void createSpa(async (connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);

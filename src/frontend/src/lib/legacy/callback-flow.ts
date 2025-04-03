@@ -1,5 +1,5 @@
 import { callbackFlow } from "$lib/flows/redirect";
-import { analytics, initAnalytics } from "$lib/utils/analytics";
+import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
 import { createSpa } from "./spa";
 
 void createSpa((connection) => {
