@@ -4,12 +4,12 @@ import type {
   IdentityAnchorInfo,
   OpenIdCredential,
   OpenIdCredentialAddError,
-  OpenIdCredentialRemoveError
+  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png?url";
 import {
   AuthnTemplates,
-  authenticateBox
+  authenticateBox,
 } from "$lib/templates/authenticateBox";
 import { displayError } from "$lib/templates/displayError";
 import { identityCard } from "$lib/templates/identityCard";
@@ -18,7 +18,10 @@ import { logoutSection } from "$lib/templates/logout";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
-import { DOMAIN_COMPATIBILITY, OPENID_AUTHENTICATION } from "$lib/utils/featureFlags";
+import {
+  DOMAIN_COMPATIBILITY,
+  OPENID_AUTHENTICATION,
+} from "$lib/utils/featureFlags";
 import { addDevice } from "$lib/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$lib/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$lib/flows/dappsExplorer/dapps";
@@ -29,7 +32,7 @@ import copyJson from "$lib/flows/manage/linkedAccountsSection.json";
 import {
   TempKeyWarningAction,
   tempKeyWarningBox,
-  tempKeysSection
+  tempKeysSection,
 } from "$lib/flows/manage/tempKeys";
 import { addPhrase, recoveryWizard } from "$lib/flows/recovery/recoveryWizard";
 import { setupKey, setupPhrase } from "$lib/flows/recovery/setupRecovery";
@@ -38,7 +41,7 @@ import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import {
   AuthenticatedConnection,
   Connection,
-  bufferEqual
+  bufferEqual,
 } from "$lib/utils/iiConnection";
 import { TemplateElement, renderPage } from "$lib/utils/lit-html";
 import {
@@ -46,20 +49,20 @@ import {
   createGoogleRequestConfig,
   decodeJWT,
   isPermissionError,
-  requestJWT
+  requestJWT,
 } from "$lib/utils/openID";
 import { PreLoadImage } from "$lib/utils/preLoadImage";
 import {
   isProtected,
   isRecoveryDevice,
-  isRecoveryPhrase
+  isRecoveryPhrase,
 } from "$lib/utils/recoveryDevice";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
 import {
   OmitParams,
   isCanisterError,
   shuffleArray,
-  unreachable
+  unreachable,
 } from "$lib/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
@@ -72,7 +75,7 @@ import {
   protectDevice,
   renameDevice,
   resetPhrase,
-  unprotectDevice
+  unprotectDevice,
 } from "./deviceSettings";
 import { recoveryMethodsSection } from "./recoveryMethodsSection";
 import {
@@ -80,13 +83,13 @@ import {
   Devices,
   Protection,
   RecoveryKey,
-  RecoveryPhrase
+  RecoveryPhrase,
 } from "./types";
 
 /* Template for the authbox when authenticating to II */
 export const authnTemplateManage = ({
-                                      dapps
-                                    }: {
+  dapps,
+}: {
   dapps: KnownDapp[];
 }): AuthnTemplates => {
   const title = (title: string) =>
@@ -104,14 +107,14 @@ export const authnTemplateManage = ({
         </header>
       `,
       useExistingText: "Use existing",
-      createAnchorText: "Create Internet Identity"
+      createAnchorText: "Create Internet Identity",
     },
     useExisting: {
       slot: html`
         <header class="l-stack">
           ${title("Enter Identity 🔑")} ${subtitle("to continue")}
         </header>
-      `
+      `,
     },
 
     pick: {
@@ -119,8 +122,8 @@ export const authnTemplateManage = ({
         <header>
           ${title("Choose Identity 🔑")} ${subtitle("to continue")}
         </header>
-      `
-    }
+      `,
+    },
   };
 };
 
@@ -138,19 +141,19 @@ export const authFlowManage = async (connection: Connection) => {
     userNumber,
     connection: authenticatedConnection,
     newAnchor,
-    showAddCurrentDevice
+    showAddCurrentDevice,
   } = await authenticateBox({
     connection,
     i18n,
     templates: authnTemplateManage({ dapps }),
     allowPinLogin: true,
-    allowPinRegistration
+    allowPinRegistration,
   });
 
   if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
     await registerCurrentDeviceCurrentOrigin(
       userNumber,
-      authenticatedConnection
+      authenticatedConnection,
     );
   }
 
@@ -163,7 +166,7 @@ export const authFlowManage = async (connection: Connection) => {
   return renderManage({
     userNumber,
     connection: authenticatedConnection,
-    identityBackground
+    identityBackground,
   });
 };
 
@@ -173,7 +176,7 @@ const displayFailedToListDevices = (error: Error) =>
     message:
       "An unexpected error occurred when displaying your devices. Please try again",
     detail: error.toString(),
-    primaryButton: "Try again"
+    primaryButton: "Try again",
   });
 
 // Actual page content. We display the Identity Anchor and the list of
@@ -183,21 +186,21 @@ const displayFailedToListDevices = (error: Error) =>
 // recovery device, then we do not display a "nag box", but we list the
 // recovery devices.
 const displayManageTemplate = ({
-                                 userNumber,
-                                 devices: { authenticators, recoveries, pinAuthenticators },
-                                 onAddDevice,
-                                 onRemoveDevice,
-                                 addRecoveryPhrase,
-                                 addRecoveryKey,
-                                 credentials,
-                                 onLinkAccount,
-                                 onUnlinkAccount,
-                                 dapps,
-                                 exploreDapps,
-                                 identityBackground,
-                                 tempKeysWarning,
-                                 currentCredential
-                               }: {
+  userNumber,
+  devices: { authenticators, recoveries, pinAuthenticators },
+  onAddDevice,
+  onRemoveDevice,
+  addRecoveryPhrase,
+  addRecoveryKey,
+  credentials,
+  onLinkAccount,
+  onUnlinkAccount,
+  dapps,
+  exploreDapps,
+  identityBackground,
+  tempKeysWarning,
+  currentCredential,
+}: {
   userNumber: bigint;
   devices: Devices;
   onAddDevice: () => void;
@@ -231,10 +234,10 @@ const displayManageTemplate = ({
       : ""}
     ${pinAuthenticators.length > 0
       ? tempKeysSection({
-        authenticators: pinAuthenticators,
-        i18n,
-        onRemoveDevice
-      })
+          authenticators: pinAuthenticators,
+          i18n,
+          onRemoveDevice,
+        })
       : ""}
     ${authenticatorsSection({
       authenticators,
@@ -242,47 +245,47 @@ const displayManageTemplate = ({
       onRemoveDevice,
       warnNoPasskeys,
       cleanupRecommended,
-      i18n
+      i18n,
     })}
     ${OPENID_AUTHENTICATION.isEnabled()
       ? linkedAccountsSection({
-        credentials,
-        onLinkAccount,
-        onUnlinkAccount,
-        hasOtherAuthMethods: authenticators.length > 0,
-        currentCredential
-      })
+          credentials,
+          onLinkAccount,
+          onUnlinkAccount,
+          hasOtherAuthMethods: authenticators.length > 0,
+          currentCredential,
+        })
       : ""}
     ${recoveryMethodsSection({
       recoveries,
       addRecoveryPhrase,
       addRecoveryKey,
-      onRemoveDevice
+      onRemoveDevice,
     })}
     ${nonNullish(exploreDapps)
       ? html`<aside class="l-stack">
-        ${dappsTeaser({
-          dapps,
-          click: () => exploreDapps(),
-          copy: {
-            dapps_explorer: "Dapps explorer",
-            sign_into_dapps: "Connect to these dapps"
-          }
-        })}
-      </aside>`
+          ${dappsTeaser({
+            dapps,
+            click: () => exploreDapps(),
+            copy: {
+              dapps_explorer: "Dapps explorer",
+              sign_into_dapps: "Connect to these dapps",
+            },
+          })}
+        </aside>`
       : undefined}
     ${logoutSection()}
   </section>`;
 
   return mainWindow({
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 const anchorSection = ({
-                         userNumber,
-                         identityBackground
-                       }: {
+  userNumber,
+  identityBackground,
+}: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
 }): TemplateResult => html`
@@ -292,7 +295,7 @@ const anchorSection = ({
     >
       ${identityCard({
         userNumber,
-        identityBackground
+        identityBackground,
       }) satisfies TemplateElement}
     </div>
   </aside>
@@ -310,10 +313,10 @@ export const renderManageWarmup = (): OmitParams<
 
 // Get the list of devices from canister and actually display the page
 export const renderManage = async ({
-                                     userNumber,
-                                     connection: origConnection,
-                                     identityBackground
-                                   }: {
+  userNumber,
+  connection: origConnection,
+  identityBackground,
+}: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
   identityBackground: PreLoadImage;
@@ -322,7 +325,7 @@ export const renderManage = async ({
 
   // There's nowhere to go from here (i.e. all flows lead to/start from this page), so we
   // loop forever
-  for (; ;) {
+  for (;;) {
     let anchorInfo: IdentityAnchorInfo;
     try {
       // Ignore the `commitMetadata` response, it's not critical for the application.
@@ -330,7 +333,7 @@ export const renderManage = async ({
       anchorInfo = await withLoader(() => connection.getAnchorInfo());
     } catch (error: unknown) {
       await displayFailedToListDevices(
-        error instanceof Error ? error : unknownError()
+        error instanceof Error ? error : unknownError(),
       );
       continue;
     }
@@ -346,7 +349,7 @@ export const renderManage = async ({
       connection,
       anchorInfo.devices,
       anchorInfo.openid_credentials[0] ?? [],
-      identityBackground
+      identityBackground,
     );
     connection = newConnection ?? connection;
   }
@@ -356,12 +359,12 @@ export const displayManagePage = renderPage(displayManageTemplate);
 
 function isPinAuthenticated(
   devices_: DeviceData[],
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): boolean {
   const connectionPrincipal = connection.identity.getPrincipal();
   const currentDevice = devices_.find(({ pubkey }) => {
     const devicePrincipal = Principal.selfAuthenticating(
-      new Uint8Array(pubkey)
+      new Uint8Array(pubkey),
     );
     return devicePrincipal.toText() === connectionPrincipal.toText();
   });
@@ -375,7 +378,7 @@ export const displayManage = async (
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
   credentials: OpenIdCredential[],
-  identityBackground: PreLoadImage
+  identityBackground: PreLoadImage,
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -386,7 +389,7 @@ export const displayManage = async (
 
   // Create anonymous nonce and salt for calling principal from connection
   const { nonce, salt } = await createAnonymousNonce(
-    connection.delegationIdentity.getPrincipal()
+    connection.delegationIdentity.getPrincipal(),
   );
 
   const googleClientId =
@@ -398,17 +401,17 @@ export const displayManage = async (
       userNumber,
       connection,
       reload: resolve,
-      hasOtherAuthMethods: credentials.length > 0
+      hasOtherAuthMethods: credentials.length > 0,
     });
 
     if (devices.dupPhrase) {
       toast.error(
-        "More than one recovery phrases are registered, which is unexpected. Only one will be shown."
+        "More than one recovery phrases are registered, which is unexpected. Only one will be shown.",
       );
     }
     if (devices.dupKey) {
       toast.error(
-        "More than one recovery keys are registered, which is unexpected. Only one will be shown."
+        "More than one recovery keys are registered, which is unexpected. Only one will be shown.",
       );
     }
 
@@ -416,13 +419,13 @@ export const displayManage = async (
       const newDeviveOrigin =
         userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
-            credentials: devices_
-          })
+              credentials: devices_,
+            })
           : undefined;
       await addDevice({
         userNumber,
         connection,
-        origin: newDeviveOrigin ?? window.origin
+        origin: newDeviveOrigin ?? window.origin,
       });
       resolve();
     };
@@ -432,7 +435,7 @@ export const displayManage = async (
         .buffer as DerEncodedPublicKey;
       const isCurrentDevice = bufferEqual(
         connection.identity.getPublicKey().toDer(),
-        pubKey
+        pubKey,
       );
       const action = await confirmRemoveDevice({
         i18n,
@@ -440,7 +443,7 @@ export const displayManage = async (
         lastUsedNanoseconds: device.last_usage[0],
         originRegistered: device.origin[0],
         alias: device.alias,
-        isCurrentDevice
+        isCurrentDevice,
       });
       if (action === "cancelled") {
         // This triggers a spinner which refetches the data.
@@ -473,13 +476,13 @@ export const displayManage = async (
       // Recovery phrase doesn't need ROR, this is for consistency reasons.
       const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
         ? getCredentialsOrigin({
-          credentials: devices_
-        })
+            credentials: devices_,
+          })
         : undefined;
       await setupPhrase(
         userNumber,
         connection,
-        newDeviceOrigin ?? window.origin
+        newDeviceOrigin ?? window.origin,
       );
       resolve();
     };
@@ -493,8 +496,8 @@ export const displayManage = async (
         const jwt = await withLoader(() =>
           requestJWT(createGoogleRequestConfig(googleClientId), {
             mediation: "required",
-            nonce
-          })
+            nonce,
+          }),
         );
         const { iss, sub } = decodeJWT(jwt);
         if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
@@ -515,7 +518,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "JwtVerificationFailed":
@@ -546,7 +549,7 @@ export const displayManage = async (
       const action = await confirmUnlinkAccount({
         i18n,
         credential,
-        isCurrentCredential
+        isCurrentCredential,
       });
       if (action === "cancelled") {
         resolve();
@@ -568,7 +571,7 @@ export const displayManage = async (
               console.error(
                 `Authentication unexpectedly failed: ${error
                   .value(error.type)
-                  .toText()}`
+                  .toText()}`,
               );
               break;
             case "OpenIdCredentialNotFound":
@@ -598,14 +601,14 @@ export const displayManage = async (
       if (devices.recoveries.recoveryPhrase === undefined) {
         return {
           tag: "add_recovery",
-          action: addRecoveryPhrase
+          action: addRecoveryPhrase,
         };
       }
       // Second priority, nudge to add a passkey
       if (devices.authenticators.length === 0) {
         return {
           tag: "add_passkey",
-          action: onAddDevice
+          action: onAddDevice,
         };
       }
       // If both, recovery phrase and passkey are present, don't show a warning
@@ -640,7 +643,7 @@ export const displayManage = async (
         exploreDapps: dappsExplorerEnabled ? onExploreDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
-        currentCredential: connection.credential
+        currentCredential: connection.credential,
       });
 
     display();
@@ -649,11 +652,11 @@ export const displayManage = async (
 
 // Try to read a DeviceData as a recovery
 export const readRecovery = ({
-                               userNumber,
-                               connection,
-                               reload,
-                               device
-                             }: {
+  userNumber,
+  connection,
+  reload,
+  device,
+}: {
   device: DeviceWithUsage;
   userNumber: bigint;
   connection: AuthenticatedConnection;
@@ -666,18 +669,18 @@ export const readRecovery = ({
     if (isRecoveryPhrase(device)) {
       const protection: Protection = isProtected(device)
         ? {
-          isProtected: true,
-          unprotect: () => unprotectDevice(connection, device, reload)
-        }
+            isProtected: true,
+            unprotect: () => unprotectDevice(connection, device, reload),
+          }
         : {
-          isProtected: false,
-          protect: () =>
-            protectDevice({
-              connection,
-              device,
-              reload
-            })
-        };
+            isProtected: false,
+            protect: () =>
+              protectDevice({
+                connection,
+                device,
+                reload,
+              }),
+          };
       return {
         recoveryPhrase: {
           reset: () =>
@@ -685,16 +688,16 @@ export const readRecovery = ({
               userNumber,
               connection,
               device,
-              reload
+              reload,
             }),
-          ...protection
-        }
+          ...protection,
+        },
       };
     } else {
       return {
         recoveryKey: {
-          device
-        }
+          device,
+        },
       };
     }
   }
@@ -704,12 +707,12 @@ export const readRecovery = ({
 // and that better represent what we expect.
 // Exported for testing purposes
 export const devicesFromDevicesWithUsage = ({
-                                              devices: devices_,
-                                              reload,
-                                              connection,
-                                              userNumber,
-                                              hasOtherAuthMethods
-                                            }: {
+  devices: devices_,
+  reload,
+  connection,
+  userNumber,
+  hasOtherAuthMethods,
+}: {
   devices: DeviceWithUsage[];
   reload: (connection?: AuthenticatedConnection) => void;
   connection: AuthenticatedConnection;
@@ -749,9 +752,9 @@ export const devicesFromDevicesWithUsage = ({
         canBeRemoved,
         isCurrent: bufferEqual(
           currentPublicKey,
-          new Uint8Array(device.pubkey).buffer as ArrayBuffer
+          new Uint8Array(device.pubkey).buffer as ArrayBuffer,
         ),
-        device
+        device,
       };
 
       if ("browser_storage_key" in device.key_type) {
@@ -766,14 +769,14 @@ export const devicesFromDevicesWithUsage = ({
       recoveries: {},
       pinAuthenticators: [],
       dupPhrase: false,
-      dupKey: false
-    }
+      dupKey: false,
+    },
   );
 };
 
 // Show a domain-related warning, if necessary.
 export const domainWarning = (
-  device: DeviceData
+  device: DeviceData,
 ): TemplateResult | undefined => {
   if (DOMAIN_COMPATIBILITY.isEnabled()) {
     return undefined;

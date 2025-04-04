@@ -31,46 +31,49 @@ import type {
   SignedDelegation,
   Timestamp,
   UserNumber,
-  VerifyTentativeDeviceResponse
+  VerifyTentativeDeviceResponse,
 } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
-import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$lib/utils/featureFlags";
+import {
+  DOMAIN_COMPATIBILITY,
+  HARDWARE_KEY_TEST,
+} from "$lib/utils/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
-  IdentityMetadataRepository
+  IdentityMetadataRepository,
 } from "$lib/legacy/repositories/identityMetadata";
 import {
   createAnonymousNonce,
   createGoogleRequestConfig,
   decodeJWT,
-  requestJWT
+  requestJWT,
 } from "$lib/utils/openID";
 import {
   CanisterError,
   diagnosticInfo,
   transformSignedDelegation,
-  unknownToString
+  unknownToString,
 } from "$lib/utils/utils";
 import {
   Actor,
   ActorSubclass,
   DerEncodedPublicKey,
   HttpAgent,
-  SignIdentity
+  SignIdentity,
 } from "@dfinity/agent";
 import {
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
-  Ed25519KeyIdentity
+  Ed25519KeyIdentity,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   convertToValidCredentialData,
-  CredentialData
+  CredentialData,
 } from "./credential-devices";
 import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
@@ -78,7 +81,10 @@ import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
-import { webauthnAuthenticationFunnel, WebauthnAuthenticationEvents } from "./analytics/webauthnAuthenticationFunnel";
+import {
+  webauthnAuthenticationFunnel,
+  WebauthnAuthenticationEvents,
+} from "./analytics/webauthnAuthenticationFunnel";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -87,7 +93,8 @@ import { webauthnAuthenticationFunnel, WebauthnAuthenticationEvents } from "./an
  */
 export class DummyIdentity
   extends Ed25519KeyIdentity
-  implements IIWebAuthnIdentity {
+  implements IIWebAuthnIdentity
+{
   public rawId: ArrayBuffer;
 
   public constructor() {
@@ -174,12 +181,12 @@ export class Connection {
     readonly canisterId: string,
     readonly canisterConfig: InternetIdentityInit,
     // Used for testing purposes
-    readonly overrideActor?: ActorSubclass<_SERVICE>
+    readonly overrideActor?: ActorSubclass<_SERVICE>,
   ) {}
 
   identity_registration_start = async ({
-                                         tempIdentity
-                                       }: {
+    tempIdentity,
+  }: {
     tempIdentity: SignIdentity;
   }): Promise<
     | RegistrationFlowStepSuccess
@@ -199,7 +206,7 @@ export class Connection {
       } else {
         return {
           kind: "apiError",
-          error: new Error("Unknown error when registering")
+          error: new Error("Unknown error when registering"),
         };
       }
     }
@@ -207,7 +214,7 @@ export class Connection {
     if ("Ok" in startResponse) {
       return {
         kind: "registrationFlowStepSuccess",
-        nextStep: mapRegFlowNextStep(startResponse.Ok.next_step)
+        nextStep: mapRegFlowNextStep(startResponse.Ok.next_step),
       };
     }
 
@@ -225,15 +232,15 @@ export class Connection {
     }
     console.error(
       "unexpected identity_registration_start response",
-      startResponse
+      startResponse,
     );
     throw Error("unexpected identity_registration_start response");
   };
 
   check_captcha = async ({
-                           tempIdentity,
-                           captchaSolution
-                         }: {
+    tempIdentity,
+    captchaSolution,
+  }: {
     tempIdentity: SignIdentity;
     captchaSolution: string;
   }): Promise<
@@ -248,7 +255,7 @@ export class Connection {
     let captchaResponse;
     try {
       captchaResponse = await actor.check_captcha({
-        solution: captchaSolution
+        solution: captchaSolution,
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -256,7 +263,7 @@ export class Connection {
       } else {
         return {
           kind: "apiError",
-          error: new Error("Unknown error when registering")
+          error: new Error("Unknown error when registering"),
         };
       }
     }
@@ -266,12 +273,12 @@ export class Connection {
       if ("Finish" in nextStep) {
         return {
           kind: "registrationFlowStepSuccess",
-          nextStep: { step: "finish" }
+          nextStep: { step: "finish" },
         };
       }
       console.error(
         "unexpected next step in check_captcha response",
-        captchaResponse
+        captchaResponse,
       );
       throw Error("unexpected next step in check_captcha response");
     }
@@ -281,13 +288,13 @@ export class Connection {
       if ("WrongSolution" in err) {
         return {
           kind: "wrongCaptchaSolution",
-          new_captcha_png_base64: err.WrongSolution.new_captcha_png_base64
+          new_captcha_png_base64: err.WrongSolution.new_captcha_png_base64,
         };
       }
       if ("UnexpectedCall" in err) {
         return {
           kind: "unexpectedCall",
-          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step)
+          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
         };
       }
       if ("NoRegistrationFlow" in err) {
@@ -299,10 +306,10 @@ export class Connection {
   };
 
   identity_registration_finish = async ({
-                                          tempIdentity,
-                                          identity,
-                                          authnMethod
-                                        }: {
+    tempIdentity,
+    identity,
+    authnMethod,
+  }: {
     tempIdentity: SignIdentity;
     identity: SignIdentity;
     authnMethod: AuthnMethodData;
@@ -320,7 +327,7 @@ export class Connection {
     let finishResponse;
     try {
       finishResponse = await actor.identity_registration_finish({
-        authn_method: authnMethod
+        authn_method: authnMethod,
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -328,7 +335,7 @@ export class Connection {
       } else {
         return {
           kind: "apiError",
-          error: new Error("Unknown error when registering")
+          error: new Error("Unknown error when registering"),
         };
       }
     }
@@ -343,10 +350,10 @@ export class Connection {
           identity,
           delegationIdentity,
           userNumber,
-          actor
+          actor,
         ),
         userNumber,
-        showAddCurrentDevice: false
+        showAddCurrentDevice: false,
       };
     }
 
@@ -355,7 +362,7 @@ export class Connection {
 
   openid_identity_registration_finish = async (
     getGoogleClientId: () => string | undefined,
-    identity: SignIdentity
+    identity: SignIdentity,
   ): Promise<
     | LoginSuccess
     | ApiError
@@ -377,15 +384,15 @@ export class Connection {
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce
-      })
+        nonce,
+      }),
     );
 
     let finishResponse;
     try {
       finishResponse = await actor.openid_identity_registration_finish({
         jwt,
-        salt
+        salt,
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -393,7 +400,7 @@ export class Connection {
       } else {
         return {
           kind: "apiError",
-          error: new Error("Unknown error when registering")
+          error: new Error("Unknown error when registering"),
         };
       }
     }
@@ -405,7 +412,7 @@ export class Connection {
         kind: "loginSuccess",
         connection: await this.fromJwt(jwt, salt, identity),
         userNumber,
-        showAddCurrentDevice: false
+        showAddCurrentDevice: false,
       };
     }
 
@@ -425,13 +432,13 @@ export class Connection {
       if ("InvalidAuthnMethod" in err) {
         return {
           kind: "invalidAuthnMethod",
-          message: err.InvalidAuthnMethod
+          message: err.InvalidAuthnMethod,
         };
       }
       if ("UnexpectedCall" in err) {
         return {
           kind: "unexpectedCall",
-          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step)
+          nextStep: mapRegFlowNextStep(err.UnexpectedCall.next_step),
         };
       }
       if ("NoRegistrationFlow" in err) {
@@ -444,7 +451,7 @@ export class Connection {
         // this is unrecoverable, so we can just map it to a generic API error
         return {
           kind: "apiError",
-          error: new Error("StorageError: " + err.StorageError)
+          error: new Error("StorageError: " + err.StorageError),
         };
       }
     }
@@ -453,7 +460,7 @@ export class Connection {
   }
 
   login = async (
-    userNumber: bigint
+    userNumber: bigint,
   ): Promise<
     | LoginSuccess
     | AuthFail
@@ -479,7 +486,7 @@ export class Connection {
     }
 
     let webAuthnAuthenticators = devices.filter(
-      ({ key_type }) => !("browser_storage_key" in key_type)
+      ({ key_type }) => !("browser_storage_key" in key_type),
     );
 
     // If we reach this point, it's because no PIN identity was found.
@@ -492,7 +499,7 @@ export class Connection {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
-          Object.keys(device.key_type)[0] === "cross_platform"
+          Object.keys(device.key_type)[0] === "cross_platform",
       );
     }
 
@@ -501,13 +508,13 @@ export class Connection {
       userNumber,
       webAuthnAuthenticators
         .map(convertToValidCredentialData)
-        .filter(nonNullish)
+        .filter(nonNullish),
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[]
+    credentials: CredentialData[],
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
@@ -517,11 +524,11 @@ export class Connection {
         devices: credentials,
         currentOrigin: window.location.origin,
         // Empty array is the same as no related origins.
-        relatedOrigins: this.canisterConfig.related_origins[0] ?? []
+        relatedOrigins: this.canisterConfig.related_origins[0] ?? [],
       });
       this.webAuthFlows = {
         flows,
-        currentIndex: 0
+        currentIndex: 0,
       };
     }
     const flowsLength = this.webAuthFlows?.flows.length ?? 0;
@@ -545,11 +552,11 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-      MultiWebAuthnIdentity.fromCredentials(
-        credentials,
-        currentFlow?.rpId,
-        currentFlow?.useIframe ?? false
-      );
+        MultiWebAuthnIdentity.fromCredentials(
+          credentials,
+          currentFlow?.rpId,
+          currentFlow?.useIframe ?? false,
+        );
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -561,13 +568,15 @@ export class Connection {
       webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Failed);
       if (isWebAuthnCancel(e)) {
         // Better understand which users don't make it all the way.
-        webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Cancelled);
+        webauthnAuthenticationFunnel.trigger(
+          WebauthnAuthenticationEvents.Cancelled,
+        );
         // We only want to show a special error if the user might have to choose different web auth flow.
         if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
           // Increase the index to try the next flow.
           this.webAuthFlows = {
             flows: this.webAuthFlows.flows,
-            currentIndex: this.webAuthFlows.currentIndex + 1
+            currentIndex: this.webAuthFlows.currentIndex + 1,
           };
           return { kind: "possiblyWrongWebAuthnFlow" };
         }
@@ -577,8 +586,8 @@ export class Connection {
       throw new Error(
         `Failed to authenticate using passkey: ${unknownToString(
           e,
-          "unknown error"
-        )}, ${await diagnosticInfo()}`
+          "unknown error",
+        )}, ${await diagnosticInfo()}`,
       );
     }
 
@@ -590,7 +599,7 @@ export class Connection {
       identity,
       delegationIdentity,
       userNumber,
-      actor
+      actor,
     );
 
     // If the index is more than 0, it's because the first one failed.
@@ -604,12 +613,12 @@ export class Connection {
       kind: "loginSuccess",
       userNumber,
       connection,
-      showAddCurrentDevice
+      showAddCurrentDevice,
     };
   };
   fromIdentity = async (
     userNumber: bigint,
-    identity: SignIdentity
+    identity: SignIdentity,
   ): Promise<LoginSuccess> => {
     const delegationIdentity = await this.requestFEDelegation(identity);
     const actor = await this.createActor(delegationIdentity);
@@ -620,38 +629,38 @@ export class Connection {
       identity,
       delegationIdentity,
       userNumber,
-      actor
+      actor,
     );
     return {
       kind: "loginSuccess",
       userNumber,
       connection,
-      showAddCurrentDevice: false
+      showAddCurrentDevice: false,
     };
   };
 
   fromSeedPhrase = async (
     userNumber: bigint,
-    seedPhrase: string
+    seedPhrase: string,
   ): Promise<LoginSuccess | NoSeedPhrase | SeedPhraseFail> => {
     const pubkeys = (await this.lookupCredentials(userNumber)).recovery_phrases;
     if (pubkeys.length === 0) {
       return {
-        kind: "noSeedPhrase"
+        kind: "noSeedPhrase",
       };
     }
 
     const identity = await fromMnemonicWithoutValidation(
       seedPhrase,
-      IC_DERIVATION_PATH
+      IC_DERIVATION_PATH,
     );
     if (
       !pubkeys.some((pubkey) =>
-        bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey))
+        bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
       )
     ) {
       return {
-        kind: "seedPhraseFail"
+        kind: "seedPhraseFail",
       };
     }
     const delegationIdentity = await this.requestFEDelegation(identity);
@@ -666,28 +675,28 @@ export class Connection {
         identity,
         delegationIdentity,
         userNumber,
-        actor
+        actor,
       ),
-      showAddCurrentDevice: false
+      showAddCurrentDevice: false,
     };
   };
 
   lookupCredentials = async (
-    userNumber: UserNumber
+    userNumber: UserNumber,
   ): Promise<AnchorCredentials> => {
     const actor = await this.createActor();
     return await actor.get_anchor_credentials(userNumber);
   };
 
   lookupAll = async (
-    userNumber: UserNumber
+    userNumber: UserNumber,
   ): Promise<Omit<DeviceData, "alias">[]> => {
     const actor = await this.createActor();
     return await actor.lookup(userNumber);
   };
 
   lookupAuthenticators = async (
-    userNumber: UserNumber
+    userNumber: UserNumber,
   ): Promise<Omit<DeviceData, "alias">[]> => {
     const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
@@ -696,17 +705,17 @@ export class Connection {
 
   addTentativeDevice = async (
     userNumber: UserNumber,
-    device: Omit<DeviceData, "origin">
+    device: Omit<DeviceData, "origin">,
   ): Promise<AddTentativeDeviceResponse> => {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       ...device,
-      origin: isNullish(window?.origin) ? [] : [window.origin]
+      origin: isNullish(window?.origin) ? [] : [window.origin],
     });
   };
 
   lookupRecovery = async (
-    userNumber: UserNumber
+    userNumber: UserNumber,
   ): Promise<RecoveryDevice[]> => {
     const actor = await this.createActor();
     // lookup blanks out the alias for privacy reasons -> omit alias from DeviceData
@@ -717,7 +726,7 @@ export class Connection {
 
   // Create an actor representing the backend
   createActor = async (
-    identity?: SignIdentity
+    identity?: SignIdentity,
   ): Promise<ActorSubclass<_SERVICE>> => {
     if (this.overrideActor !== undefined) {
       return this.overrideActor;
@@ -729,17 +738,17 @@ export class Connection {
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),
-      shouldFetchRootKey
+      shouldFetchRootKey,
     });
 
     return Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
-      canisterId: this.canisterId
+      canisterId: this.canisterId,
     });
   };
 
   requestFEDelegation = async (
-    identity: SignIdentity
+    identity: SignIdentity,
   ): Promise<DelegationIdentity> => {
     const sessionKey = await ECDSAKeyIdentity.generate({ extractable: false });
     const tenMinutesInMsec = 10 * 1000 * 60;
@@ -749,8 +758,8 @@ export class Connection {
       sessionKey.getPublicKey(),
       new Date(Date.now() + tenMinutesInMsec),
       {
-        targets: [Principal.from(this.canisterId)]
-      }
+        targets: [Principal.from(this.canisterId)],
+      },
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
@@ -758,7 +767,7 @@ export class Connection {
   fromJwt = async (
     jwt: JWT,
     salt: Salt,
-    sessionIdentity: SignIdentity
+    sessionIdentity: SignIdentity,
   ): Promise<AuthenticatedConnection> => {
     const retryGetJwtDelegation = async (
       jwt: JWT,
@@ -766,7 +775,7 @@ export class Connection {
       sessionKey: SessionKey,
       expiration: bigint,
       actor: ActorSubclass<_SERVICE>,
-      maxRetries = 5
+      maxRetries = 5,
     ): Promise<SignedDelegation> => {
       for (let i = 0; i < maxRetries; i++) {
         // Linear backoff
@@ -777,7 +786,7 @@ export class Connection {
           jwt,
           salt,
           sessionKey,
-          expiration
+          expiration,
         );
         if ("Err" in res) {
           console.error(res.Err);
@@ -787,7 +796,7 @@ export class Connection {
         return res.Ok;
       }
       throw new Error(
-        `Failed to retrieve a delegation after ${maxRetries} retries.`
+        `Failed to retrieve a delegation after ${maxRetries} retries.`,
       );
     };
 
@@ -797,7 +806,7 @@ export class Connection {
     const prepareDelegationResponse = await actor.openid_prepare_delegation(
       jwt,
       salt,
-      sessionKey
+      sessionKey,
     );
 
     if ("Err" in prepareDelegationResponse)
@@ -807,19 +816,19 @@ export class Connection {
       prepareDelegationResponse.Ok;
 
     const signedDelegation = await withLoader(() =>
-      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor)
+      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor),
     );
 
     const transformedDelegation = transformSignedDelegation(signedDelegation);
 
     const chain = DelegationChain.fromDelegations(
       [transformedDelegation],
-      new Uint8Array(user_key)
+      new Uint8Array(user_key),
     );
 
     const jwtSignedIdentity = DelegationIdentity.fromDelegation(
       sessionIdentity,
-      chain
+      chain,
     );
 
     actor = await this.createActor(jwtSignedIdentity);
@@ -831,7 +840,7 @@ export class Connection {
       jwtSignedIdentity,
       anchor_number,
       actor,
-      decodeJWT(jwt)
+      decodeJWT(jwt),
     );
   };
 }
@@ -846,7 +855,7 @@ export class AuthenticatedConnection extends Connection {
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>,
-    public credential?: Pick<OpenIdCredential, "iss" | "sub">
+    public credential?: Pick<OpenIdCredential, "iss" | "sub">,
   ) {
     super(canisterId, canisterConfig);
     const metadataGetter = async () => {
@@ -865,7 +874,7 @@ export class AuthenticatedConnection extends Connection {
     };
     this.metadataRepository = IdentityMetadataRepository.init({
       getter: metadataGetter,
-      setter: metadataSetter
+      setter: metadataSetter,
     });
   }
 
@@ -894,8 +903,8 @@ export class AuthenticatedConnection extends Connection {
   };
 
   getPrincipal = async ({
-                          origin: origin_
-                        }: {
+    origin: origin_,
+  }: {
     origin: string;
   }): Promise<Principal> => {
     const origin = remapToLegacyDomain(origin_);
@@ -915,7 +924,7 @@ export class AuthenticatedConnection extends Connection {
   };
 
   verifyTentativeDevice = async (
-    pin: string
+    pin: string,
   ): Promise<VerifyTentativeDeviceResponse> => {
     const actor = await this.getActor();
     return await actor.verify_tentative_device(this.userNumber, pin);
@@ -928,7 +937,7 @@ export class AuthenticatedConnection extends Connection {
     newPublicKey: DerEncodedPublicKey,
     protection: DeviceData["protection"],
     origin: string | undefined,
-    credentialId?: ArrayBuffer
+    credentialId?: ArrayBuffer,
   ): Promise<void> => {
     const actor = await this.getActor();
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
@@ -945,7 +954,7 @@ export class AuthenticatedConnection extends Connection {
       purpose,
       protection,
       origin: sanitizedOrigin === undefined ? [] : [sanitizedOrigin],
-      metadata: []
+      metadata: [],
     });
   };
 
@@ -972,7 +981,7 @@ export class AuthenticatedConnection extends Connection {
   };
 
   private setIdentityMetadata = async (
-    metadata: MetadataMapV2
+    metadata: MetadataMapV2,
   ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
     const actor = await this.getActor();
     return await actor.identity_metadata_replace(this.userNumber, metadata);
@@ -993,19 +1002,19 @@ export class AuthenticatedConnection extends Connection {
   prepareDelegation = async (
     origin_: FrontendHostname,
     sessionKey: SessionKey,
-    maxTimeToLive?: bigint
+    maxTimeToLive?: bigint,
   ): Promise<[PublicKey, bigint] | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
       console.log(
-        `prepare_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey})`
+        `prepare_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey})`,
       );
       const actor = await this.getActor();
       return await actor.prepare_delegation(
         this.userNumber,
         origin,
         sessionKey,
-        nonNullish(maxTimeToLive) ? [maxTimeToLive] : []
+        nonNullish(maxTimeToLive) ? [maxTimeToLive] : [],
       );
     } catch (e: unknown) {
       console.error(e);
@@ -1016,19 +1025,19 @@ export class AuthenticatedConnection extends Connection {
   getDelegation = async (
     origin_: FrontendHostname,
     sessionKey: SessionKey,
-    timestamp: Timestamp
+    timestamp: Timestamp,
   ): Promise<GetDelegationResponse | { error: unknown }> => {
     try {
       const origin = remapToLegacyDomain(origin_);
       console.log(
-        `get_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey}, timestamp: ${timestamp})`
+        `get_delegation(user: ${this.userNumber}, origin: ${origin}, session_key: ${sessionKey}, timestamp: ${timestamp})`,
       );
       const actor = await this.getActor();
       return await actor.get_delegation(
         this.userNumber,
         origin,
         sessionKey,
-        timestamp
+        timestamp,
       );
     } catch (e: unknown) {
       console.error(e);
@@ -1037,9 +1046,9 @@ export class AuthenticatedConnection extends Connection {
   };
 
   prepareIdAlias = async ({
-                            issuerOrigin: issuerOrigin_,
-                            rpOrigin: rpOrigin_
-                          }: {
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
     issuerOrigin: string;
     rpOrigin: string;
   }): Promise<
@@ -1054,7 +1063,7 @@ export class AuthenticatedConnection extends Connection {
     const result = await actor.prepare_id_alias({
       issuer: issuerOrigin,
       relying_party: rpOrigin,
-      identity_number: userNumber
+      identity_number: userNumber,
     });
 
     if (isNullish(result)) {
@@ -1069,7 +1078,7 @@ export class AuthenticatedConnection extends Connection {
     if (!("Err" in result)) {
       console.error(
         "Expected property 'Ok' or 'Err', got: ",
-        JSON.stringify(result)
+        JSON.stringify(result),
       );
       return { error: "internal_error" };
     }
@@ -1084,10 +1093,10 @@ export class AuthenticatedConnection extends Connection {
   };
 
   getIdAlias = async ({
-                        preparedIdAlias,
-                        issuerOrigin: issuerOrigin_,
-                        rpOrigin: rpOrigin_
-                      }: {
+    preparedIdAlias,
+    issuerOrigin: issuerOrigin_,
+    rpOrigin: rpOrigin_,
+  }: {
     preparedIdAlias: PreparedIdAlias;
     issuerOrigin: string;
     rpOrigin: string;
@@ -1105,7 +1114,7 @@ export class AuthenticatedConnection extends Connection {
       issuer: issuerOrigin,
       relying_party: rpOrigin,
       identity_number: userNumber,
-      ...preparedIdAlias
+      ...preparedIdAlias,
     });
 
     if (isNullish(result)) {
@@ -1120,7 +1129,7 @@ export class AuthenticatedConnection extends Connection {
     if (!("Err" in result)) {
       console.error(
         "Expected property 'Ok' or 'Err', got: ",
-        JSON.stringify(result)
+        JSON.stringify(result),
       );
       return { error: "internal_error" };
     }
@@ -1148,7 +1157,7 @@ export class AuthenticatedConnection extends Connection {
     const actor = await this.getActor();
     const res = await actor.openid_credential_remove(this.userNumber, [
       iss,
-      sub
+      sub,
     ]);
     if ("Err" in res) throw new CanisterError(res.Err);
   };
@@ -1178,44 +1187,44 @@ export class AuthenticatedConnection extends Connection {
 export const creationOptions = (
   exclude: Omit<DeviceData, "alias">[] = [],
   authenticatorAttachment?: AuthenticatorAttachment,
-  rpId?: string
+  rpId?: string,
 ): PublicKeyCredentialCreationOptions => {
   return {
     authenticatorSelection: {
       userVerification: "preferred",
-      authenticatorAttachment
+      authenticatorAttachment,
     },
     attestation: "direct",
     excludeCredentials: exclude.flatMap((device) =>
       device.credential_id.length === 0
         ? []
         : {
-          id: new Uint8Array(device.credential_id[0]),
-          type: "public-key"
-        }
+            id: new Uint8Array(device.credential_id[0]),
+            type: "public-key",
+          },
     ),
     challenge: window.crypto.getRandomValues(new Uint8Array(16)),
     pubKeyCredParams: [
       {
         type: "public-key",
         // alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256
-        alg: -7
+        alg: -7,
       },
       {
         type: "public-key",
         // alg: PubKeyCoseAlgo.RSA_WITH_SHA256
-        alg: -257
-      }
+        alg: -257,
+      },
     ],
     rp: {
       name: "Internet Identity Service",
-      id: rpId
+      id: rpId,
     },
     user: {
       id: window.crypto.getRandomValues(new Uint8Array(16)),
       name: "Internet Identity",
-      displayName: "Internet Identity"
-    }
+      displayName: "Internet Identity",
+    },
   };
 };
 
@@ -1273,9 +1282,9 @@ export const inferHost = (): string => {
   if (
     location.host === "127.0.0.1" /* typical development */ ||
     location.host ===
-    "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
+      "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
     location.hostname.endsWith(
-      "localhost"
+      "localhost",
     ) /* local canisters from icx-proxy like rdmx6-....-foo.localhost */
   ) {
     // If this is a local deployment, then assume the api and assets are collocated
@@ -1288,7 +1297,7 @@ export const inferHost = (): string => {
 };
 
 const mapRegFlowNextStep = (
-  step: RegistrationFlowNextStep
+  step: RegistrationFlowNextStep,
 ): RegFlowNextStep => {
   if ("Finish" in step) {
     return { step: "finish" };
@@ -1296,6 +1305,6 @@ const mapRegFlowNextStep = (
   step satisfies { CheckCaptcha: { captcha_png_base64: string } };
   return {
     step: "checkCaptcha",
-    captcha_png_base64: step.CheckCaptcha.captcha_png_base64
+    captcha_png_base64: step.CheckCaptcha.captcha_png_base64,
   };
 };
