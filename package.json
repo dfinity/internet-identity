@@ -49,7 +49,7 @@
     "@types/ua-parser-js": "^0.7.36",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitest/browser": "^3.0.9",
-    "@wdio/globals": "^9.12.1",
+    "@wdio/globals": "^8.43.0",
     "astro": "^5.5.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -69,7 +69,7 @@
     "vite": "^6.2.4",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.0.9",
-    "webdriverio": "^9.12.2"
+    "webdriverio": "^8.43.0"
   },
   "dependencies": {
     "@dfinity/agent": "^2.1.2",
