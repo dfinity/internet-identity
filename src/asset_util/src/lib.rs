@@ -98,9 +98,9 @@ impl CertifiedAssets {
             content_type.to_mime_type_string(),
         ));
 
-        // Cache all assets with "cacheable" in the url path
+        // Cache all assets with "immutable" in the url path
         // Since the filenames are hashed, they will be reloaded only if the files change
-        if url_path.contains("cacheable") {
+        if url_path.contains("immutable") {
             headers.push((
                 "Cache-Control".to_string(),
                 "public, max-age=31536000".to_string(), // cache for 1 year
