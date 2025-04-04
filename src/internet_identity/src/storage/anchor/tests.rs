@@ -192,7 +192,7 @@ fn should_enforce_single_recovery_phrase() {
 
     assert!(matches!(
         result,
-        Err(AnchorError::MultipleRecoveryPhrases { .. })
+        Err(AnchorError::MultipleRecoveryPhrases)
     ));
     assert_eq!(anchor.devices().len(), 1);
 }
@@ -367,7 +367,7 @@ fn should_not_allow_modification_of_device_key() {
 
     assert!(matches!(
         result,
-        Err(AnchorError::CannotModifyDeviceKey { .. })
+        Err(AnchorError::CannotModifyDeviceKey)
     ));
     assert_eq!(anchor.devices()[0], sample_device());
 }
