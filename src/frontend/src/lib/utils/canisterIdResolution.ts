@@ -7,8 +7,8 @@ import { isNullish, nonNullish } from "@dfinity/utils";
  * @param origin The origin of the front-end to resolve the canister id of.
  */
 export const resolveCanisterId = ({
-                                    origin
-                                  }: {
+  origin,
+}: {
   origin: string;
 }): Promise<{ ok: Principal } | "not_found"> => {
   let url: URL;
@@ -18,8 +18,8 @@ export const resolveCanisterId = ({
     console.error(
       `Failed to parse origin '${origin}' as URL: ${unknownToString(
         error,
-        "unknown error"
-      )}`
+        "unknown error",
+      )}`,
     );
     return Promise.resolve("not_found");
   }
@@ -34,13 +34,13 @@ export const resolveCanisterId = ({
 };
 
 const parseCanisterIdFromHostname = (
-  hostname: string
+  hostname: string,
 ): Principal | undefined => {
   const wellKnownDomains = [
     "ic0.app",
     "icp0.io",
     "internetcomputer.org",
-    "localhost"
+    "localhost",
   ];
 
   if (wellKnownDomains.some((domain) => hostname.endsWith(domain))) {
@@ -55,7 +55,7 @@ const parseCanisterIdFromHostname = (
         return Principal.fromText(canisterId); // make sure the inferred part is actually a canister id, throws if not
       } catch {
         console.info(
-          `Unable to infer canister id from hostname '${hostname}', falling back to BN lookup.}`
+          `Unable to infer canister id from hostname '${hostname}', falling back to BN lookup.}`,
         );
       }
     }
@@ -65,8 +65,8 @@ const parseCanisterIdFromHostname = (
 // Lookup the canister by performing a request to the origin and check
 // if the server (probably BN) set a header to inform us of the canister ID
 const lookupCanister = async ({
-                                origin
-                              }: {
+  origin,
+}: {
   origin: string;
 }): Promise<{ ok: Principal } | "not_found"> => {
   const HEADER_NAME = "x-ic-canister-id";
@@ -78,14 +78,14 @@ const lookupCanister = async ({
         redirect: "error",
         method: "HEAD",
         // do not send cookies or other credentials
-        credentials: "omit"
-      }
+        credentials: "omit",
+      },
     );
 
     const headerValue = response.headers.get(HEADER_NAME);
     if (isNullish(headerValue)) {
       console.error(
-        `Canister ID header '${HEADER_NAME}' was not set on origin ${origin}`
+        `Canister ID header '${HEADER_NAME}' was not set on origin ${origin}`,
       );
 
       return "not_found";
@@ -96,8 +96,8 @@ const lookupCanister = async ({
     console.error(
       `Failed to resolve canister ID from origin '${origin}': ${unknownToString(
         error,
-        "unknown error"
-      )}`
+        "unknown error",
+      )}`,
     );
 
     return "not_found";

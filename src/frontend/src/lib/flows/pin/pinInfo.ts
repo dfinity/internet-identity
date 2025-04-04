@@ -7,11 +7,11 @@ import { TemplateResult, html } from "lit-html";
 import copyJson from "./pinInfo.json";
 
 const pinInfoTemplate = ({
-                           i18n,
-                           onContinue,
-                           cancel,
-                           scrollToTop = false
-                         }: {
+  i18n,
+  onContinue,
+  cancel,
+  scrollToTop = false,
+}: {
   onContinue: () => void;
   i18n: I18n;
   cancel: () => void;
@@ -84,7 +84,7 @@ const pinInfoTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -98,7 +98,7 @@ export const promptPinInfo = (): Promise<"continue" | "canceled"> => {
       i18n: new I18n(),
       onContinue: () => resolve("continue"),
       cancel: () => resolve("canceled"),
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

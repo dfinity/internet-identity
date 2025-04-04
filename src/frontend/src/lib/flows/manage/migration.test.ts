@@ -11,7 +11,7 @@ const recoveryPhrase: DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
-  metadata: []
+  metadata: [],
 };
 
 const authenticator: DeviceData = {
@@ -23,7 +23,7 @@ const authenticator: DeviceData = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
-  metadata: []
+  metadata: [],
 };
 
 describe("recovery phrases don't have origin warnings", () => {
@@ -31,7 +31,7 @@ describe("recovery phrases don't have origin warnings", () => {
     beforeEach(() => {
       vi.clearAllMocks();
       vi.stubGlobal("location", {
-        origin: "https://identity.ic0.app"
+        origin: "https://identity.ic0.app",
       });
       // domainWarning is used only when DOMAIN_COMPATIBILITY is false
       DOMAIN_COMPATIBILITY.set(false);
@@ -40,7 +40,7 @@ describe("recovery phrases don't have origin warnings", () => {
     it("returns undefined for recovery phrase", () => {
       expect(domainWarning(recoveryPhrase)).toBe(undefined);
       expect(
-        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] }),
       ).toBe(undefined);
     });
 
@@ -52,14 +52,14 @@ describe("recovery phrases don't have origin warnings", () => {
       expect(
         domainWarning({
           ...authenticator,
-          origin: ["https://identity.ic0.app"]
-        })
+          origin: ["https://identity.ic0.app"],
+        }),
       ).toBeUndefined();
     });
 
     test("bad origin is warning", () => {
       expect(
-        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] }),
       ).toBeDefined();
     });
   });
@@ -68,7 +68,7 @@ describe("recovery phrases don't have origin warnings", () => {
     beforeEach(() => {
       vi.clearAllMocks();
       vi.stubGlobal("location", {
-        origin: "https://identity.internetcomputer.org"
+        origin: "https://identity.internetcomputer.org",
       });
       // domainWarning is used only when DOMAIN_COMPATIBILITY is false
       DOMAIN_COMPATIBILITY.set(false);
@@ -77,7 +77,7 @@ describe("recovery phrases don't have origin warnings", () => {
     it("undefined for recovery phrase", () => {
       expect(domainWarning(recoveryPhrase)).toBe(undefined);
       expect(
-        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] })
+        domainWarning({ ...recoveryPhrase, origin: ["https://elsewhere"] }),
       ).toBe(undefined);
     });
 
@@ -89,14 +89,14 @@ describe("recovery phrases don't have origin warnings", () => {
       expect(
         domainWarning({
           ...authenticator,
-          origin: ["https://identity.ic0.app"]
-        })
+          origin: ["https://identity.ic0.app"],
+        }),
       ).toBeDefined();
     });
 
     it("bad origin is warning", () => {
       expect(
-        domainWarning({ ...authenticator, origin: ["https://elsewhere"] })
+        domainWarning({ ...authenticator, origin: ["https://elsewhere"] }),
       ).toBeDefined();
     });
   });

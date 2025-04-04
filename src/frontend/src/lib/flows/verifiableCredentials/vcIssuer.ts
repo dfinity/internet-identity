@@ -8,7 +8,7 @@ import {
   Icrc21ConsentInfo,
   IssuedCredentialData,
   PreparedCredentialData,
-  _SERVICE
+  _SERVICE,
 } from "@dfinity/internet-identity-vc-api";
 
 import { inferHost } from "$lib/utils/iiConnection";
@@ -26,20 +26,20 @@ export class VcIssuer {
       host: inferHost(),
       identity,
       // Only fetch the root key when we're not in prod
-      shouldFetchRootKey: features.FETCH_ROOT_KEY
+      shouldFetchRootKey: features.FETCH_ROOT_KEY,
     });
 
     return Actor.createActor<_SERVICE>(vc_issuer_idl, {
       agent,
-      canisterId: this.canisterId
+      canisterId: this.canisterId,
     });
   };
 
   prepareCredential = async ({
-                               signedIdAlias,
-                               credentialSpec,
-                               identity
-                             }: {
+    signedIdAlias,
+    credentialSpec,
+    identity,
+  }: {
     signedIdAlias: SignedIdAlias;
     credentialSpec: CredentialSpec;
     identity: Identity;
@@ -48,7 +48,7 @@ export class VcIssuer {
 
     const result = await actor.prepare_credential({
       signed_id_alias: signedIdAlias,
-      credential_spec: credentialSpec
+      credential_spec: credentialSpec,
     });
 
     if ("Err" in result) {
@@ -62,11 +62,11 @@ export class VcIssuer {
   };
 
   getCredential = async ({
-                           signedIdAlias,
-                           preparedCredential,
-                           credentialSpec,
-                           identity
-                         }: {
+    signedIdAlias,
+    preparedCredential,
+    credentialSpec,
+    identity,
+  }: {
     signedIdAlias: SignedIdAlias;
     credentialSpec: CredentialSpec;
     preparedCredential: PreparedCredentialData;
@@ -77,7 +77,7 @@ export class VcIssuer {
     const result = await actor.get_credential({
       signed_id_alias: signedIdAlias,
       prepared_context: preparedCredential.prepared_context,
-      credential_spec: credentialSpec
+      credential_spec: credentialSpec,
     });
 
     if ("Err" in result) {
@@ -89,15 +89,15 @@ export class VcIssuer {
   };
 
   getConsentMessage = async ({
-                               credentialSpec
-                             }: {
+    credentialSpec,
+  }: {
     credentialSpec: CredentialSpec;
   }): Promise<Icrc21ConsentInfo | "error"> => {
     const actor = await this.createActor();
 
     const result = await actor.vc_consent_message({
       preferences: { language: "en-US" },
-      credential_spec: credentialSpec
+      credential_spec: credentialSpec,
     });
 
     if ("Err" in result) {
@@ -109,8 +109,8 @@ export class VcIssuer {
   };
 
   getDerivationOrigin = async ({
-                                 origin
-                               }: {
+    origin,
+  }: {
     origin: string;
   }): Promise<{ kind: "origin"; origin: string } | { kind: "error" }> => {
     const actor = await this.createActor();
@@ -118,7 +118,7 @@ export class VcIssuer {
     let result;
     try {
       result = await actor.derivation_origin({
-        frontend_hostname: origin
+        frontend_hostname: origin,
       });
     } catch (e: unknown) {
       console.error("Could not get derivation origin (unexpected error)", e);

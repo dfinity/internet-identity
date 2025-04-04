@@ -15,7 +15,7 @@ import copyJson from "./confirmSeedPhrase.json";
 type Word = { word: string } & (
   | { check: false }
   | { check: true; elem: Ref<HTMLInputElement> }
-  );
+);
 
 // A list of indices nicely spread over the 24 BIP39 words (anchor is separate)
 export const checkIndices = [0, 1, 23];
@@ -26,12 +26,12 @@ const checkExpected = (elem: Ref<HTMLInputElement>): boolean =>
   withRef(elem, (elem) => elem.value === elem.dataset.expected) === true;
 
 const confirmSeedPhraseTemplate = ({
-                                     userNumberWord,
-                                     words: words_,
-                                     confirm,
-                                     back,
-                                     i18n
-                                   }: {
+  userNumberWord,
+  words: words_,
+  confirm,
+  back,
+  i18n,
+}: {
   userNumberWord: string;
   words: Pick<Word, "word" | "check">[];
   confirm: () => void;
@@ -68,7 +68,7 @@ const confirmSeedPhraseTemplate = ({
     index: "#",
     classes: ["c-list--recovery-word--important"],
     placeholder: "Identity number",
-    mismatchMessage: "This does not match your identity number."
+    mismatchMessage: "This does not match your identity number.",
   });
 
   const pageContentSlot = html`
@@ -82,20 +82,20 @@ const confirmSeedPhraseTemplate = ({
         <ol class="c-list c-list--recovery">
           ${userNumberInput}
           ${words.map((word, i) =>
-    wordTemplate({
-      word,
-      /* on word update, re-check all words */
-      update: () =>
-        wordsOk.send(
-          words.every(
-            (word) =>
-              // If the word is not one that needs checking, then ok
-              !word.check || checkExpected(word.elem)
-          )
-        ),
-      i
-    })
-  )}
+            wordTemplate({
+              word,
+              /* on word update, re-check all words */
+              update: () =>
+                wordsOk.send(
+                  words.every(
+                    (word) =>
+                      // If the word is not one that needs checking, then ok
+                      !word.check || checkExpected(word.elem),
+                  ),
+                ),
+              i,
+            }),
+          )}
         </ol>
       </div>
 
@@ -123,16 +123,16 @@ const confirmSeedPhraseTemplate = ({
     isWideContainer: true,
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 // Show a particular word
 export const wordTemplate = ({
-                               word,
-                               update,
-                               i
-                             }: {
+  word,
+  update,
+  i,
+}: {
   word: Word;
   /* Notify the caller that a word was updated */
   update: () => void;
@@ -155,19 +155,19 @@ export const wordTemplate = ({
     assignTo: word.elem,
     mismatchMessage: `This does not match the expected word (word ${
       i + 1
-    } in your recovery phrase).`
+    } in your recovery phrase).`,
   });
 };
 
 const nudgeWord = ({
-                     update,
-                     expected,
-                     index,
-                     assignTo,
-                     classes: classes_,
-                     placeholder,
-                     mismatchMessage
-                   }: {
+  update,
+  expected,
+  index,
+  assignTo,
+  classes: classes_,
+  placeholder,
+  mismatchMessage,
+}: {
   update: () => void;
   expected: string;
   index: string;
@@ -184,8 +184,8 @@ const nudgeWord = ({
       ({
         pending: "c-list--recovery-word__attention",
         correct: "c-list--recovery-word__correct",
-        incorrect: "c-list--recovery-word__incorrect"
-      })[s]
+        incorrect: "c-list--recovery-word__incorrect",
+      })[s],
   );
 
   const icon = state.map(
@@ -197,8 +197,8 @@ const nudgeWord = ({
         >`,
         incorrect: html`<i class="c-list--recovery-word__icon"
           >${warningIcon}</i
-        >`
-      })[s]
+        >`,
+      })[s],
   );
 
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
@@ -220,23 +220,23 @@ const nudgeWord = ({
       data-state=${asyncReplace(state)}
       placeholder=${ifDefined(placeholder)}
       @input=${() => {
-    /* On input, immediately show word as correct when correct, but don't show if a
-     * word is incorrect (done only when leaving the field) to not freak out user as they type */
-    const state_ = checkExpected(assignTo) ? "correct" : "pending";
-    assignTo.value?.setCustomValidity("");
-    assignTo.value?.reportValidity();
-    state.send(state_);
-    update();
-  }}
+        /* On input, immediately show word as correct when correct, but don't show if a
+         * word is incorrect (done only when leaving the field) to not freak out user as they type */
+        const state_ = checkExpected(assignTo) ? "correct" : "pending";
+        assignTo.value?.setCustomValidity("");
+        assignTo.value?.reportValidity();
+        state.send(state_);
+        update();
+      }}
       @change=${() => {
-    const state_ = checkExpected(assignTo) ? "correct" : "incorrect";
-    assignTo.value?.setCustomValidity(
-      state_ === "correct" ? "" : mismatchMessage
-    );
-    assignTo.value?.reportValidity();
-    state.send(state_);
-    update();
-  }}
+        const state_ = checkExpected(assignTo) ? "correct" : "incorrect";
+        assignTo.value?.setCustomValidity(
+          state_ === "correct" ? "" : mismatchMessage,
+        );
+        assignTo.value?.reportValidity();
+        state.send(state_);
+        update();
+      }}
     />&nbsp;
   </li>`;
 };
@@ -244,8 +244,8 @@ const nudgeWord = ({
 export const confirmSeedPhrasePage = renderPage(confirmSeedPhraseTemplate);
 
 export const confirmSeedPhrase = ({
-                                    phrase
-                                  }: {
+  phrase,
+}: {
   phrase: string;
 }): Promise<"confirmed" | "back"> => {
   return new Promise((resolve) => {
@@ -256,11 +256,11 @@ export const confirmSeedPhrase = ({
       userNumberWord,
       words: words.map((word, i) => ({
         word,
-        check: checkIndices.includes(i)
+        check: checkIndices.includes(i),
       })),
       confirm: () => resolve("confirmed"),
       back: () => resolve("back"),
-      i18n
+      i18n,
     });
   });
 };

@@ -17,7 +17,7 @@ describe("isRegistrationAllowed", () => {
       register_rate_limit: [],
       analytics_config: [],
       openid_google: [],
-      is_production: []
+      is_production: [],
     };
   };
 
@@ -35,7 +35,7 @@ describe("isRegistrationAllowed", () => {
     const config = createConfig([
       "https://identity.ic0.app",
       "https://identity.icp0.io",
-      "https://example.com"
+      "https://example.com",
     ]);
     expect(isRegistrationAllowed(config, "https://example.com")).toBe(true);
   });
@@ -43,7 +43,7 @@ describe("isRegistrationAllowed", () => {
   it("disallows registration when the origin is not in the related_origins list", () => {
     const config = createConfig([
       "https://identity.ic0.app",
-      "https://identity.icp0.io"
+      "https://identity.icp0.io",
     ]);
     expect(isRegistrationAllowed(config, "https://example.com")).toBe(false);
   });
@@ -51,7 +51,7 @@ describe("isRegistrationAllowed", () => {
   it("handles case-sensitive origins correctly", () => {
     const config = createConfig([
       "https://identity.ic0.app",
-      "https://Example.com"
+      "https://Example.com",
     ]);
     expect(isRegistrationAllowed(config, "https://example.com")).toBe(true);
     expect(isRegistrationAllowed(config, "https://Example.com")).toBe(true);

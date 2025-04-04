@@ -3,16 +3,16 @@ import { html, TemplateResult } from "lit-html";
 import { KnownDapp } from "./dapps";
 
 export const dappsHeader = ({
-                              dapps,
-                              clickable
-                            }: {
+  dapps,
+  clickable,
+}: {
   dapps: KnownDapp[];
   clickable: boolean;
 }): TemplateResult => html`
   <figure
     class="c-card__teaser c-marquee ${clickable
-  ? "c-marquee--clickable"
-  : undefined}"
+      ? "c-marquee--clickable"
+      : undefined}"
   >
     ${marqueeList(dapps)}
   </figure>
@@ -20,10 +20,10 @@ export const dappsHeader = ({
 
 /** A teaser for the dapps explorer, acting as a button */
 export const dappsTeaser = ({
-                              dapps,
-                              click,
-                              copy: { dapps_explorer, sign_into_dapps }
-                            }: {
+  dapps,
+  click,
+  copy: { dapps_explorer, sign_into_dapps },
+}: {
   dapps: KnownDapp[];
   click: () => void;
   copy: { dapps_explorer: DynamicKey; sign_into_dapps: DynamicKey };
@@ -49,7 +49,7 @@ const marqueeList = (dapps: KnownDapp[]): TemplateResult => {
 
   const paddedDapps = repeatArray({
     arr: dapps,
-    length: itemsPerRow * totalRows
+    length: itemsPerRow * totalRows,
   });
 
   /**
@@ -69,31 +69,31 @@ const marqueeList = (dapps: KnownDapp[]): TemplateResult => {
     style="--itemsPerRow: ${itemsPerRow}; --totalRows: ${totalRows}"
   >
     ${rows.map((rowDapps, i) => {
-    const rowContent = rowDapps.map(
-      ({ logoSrc, name }) =>
-        html`<div class="c-marquee__item">
+      const rowContent = rowDapps.map(
+        ({ logoSrc, name }) =>
+          html`<div class="c-marquee__item">
             <div class="c-marquee__image-container">
               <img
                 src=${logoSrc}
                 alt="${name}"
                 class="c-marquee__image c-marquee__image--loading"
                 @load=${(e: Event) => {
-          const img = e.target as HTMLImageElement;
-          img.classList.remove("c-marquee__image--loading");
-          img.classList.add("c-marquee__image--loaded");
-        }}
+                  const img = e.target as HTMLImageElement;
+                  img.classList.remove("c-marquee__image--loading");
+                  img.classList.add("c-marquee__image--loaded");
+                }}
               />
             </div>
-          </div>`
-    );
+          </div>`,
+      );
 
-    return html`<div class="c-marquee__row" style="--rowIndex: ${i}">
+      return html`<div class="c-marquee__row" style="--rowIndex: ${i}">
         <div class="c-marquee__rowHalf">${rowContent}</div>
         <div class="c-marquee__rowHalf c-marquee__rowHalf--second">
           ${rowContent}
         </div>
       </div>`;
-  })}
+    })}
   </div>`;
 };
 
@@ -109,12 +109,12 @@ const repeatArray = <T>({ arr, length }: { arr: T[]; length: number }): T[] =>
  * Chunk an array into chunks of the specified size (last chunk may be smaller)
  */
 const chunkArray = <T>({
-                         arr,
-                         chunkSize
-                       }: {
+  arr,
+  chunkSize,
+}: {
   arr: T[];
   chunkSize: number;
 }): T[][] =>
   Array.from(new Array(Math.ceil(arr.length / chunkSize)), (_, index) =>
-    arr.slice(index * chunkSize, index * chunkSize + chunkSize)
+    arr.slice(index * chunkSize, index * chunkSize + chunkSize),
   );

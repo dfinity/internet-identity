@@ -167,7 +167,7 @@ export const recoveryPhraseWarnings: {
     }
 
     return null;
-  }
+  },
 ];
 
 export const getWarnings = (userNumber: bigint, input: string): Warning[] => {

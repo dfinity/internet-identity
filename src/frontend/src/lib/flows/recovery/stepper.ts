@@ -2,8 +2,8 @@ import { checkmarkIcon } from "$lib/templates/icons";
 import { html } from "lit-html";
 
 export const phraseStepper = ({
-                                current
-                              }: {
+  current,
+}: {
   current: "store" | "confirm";
 }) => html`
   <div class="c-progress-container">

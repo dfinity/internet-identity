@@ -31,28 +31,28 @@ export const promptDeviceAliasTemplate = (props: {
     <form
       id="registerForm"
       @submit=${(e: SubmitEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    withRef(aliasInput, (alias) => props.continue(alias.value.trim()));
-  }}
+        e.preventDefault();
+        e.stopPropagation();
+        withRef(aliasInput, (alias) => props.continue(alias.value.trim()));
+      }}
     >
       <input
         id="pickAliasInput"
         ${ref(aliasInput)}
         @input=${(e: InputEvent) => {
-    if (!(e.currentTarget instanceof HTMLInputElement)) {
-      return;
-    }
-    e.currentTarget.setCustomValidity("");
-    e.currentTarget.reportValidity();
-  }}
+          if (!(e.currentTarget instanceof HTMLInputElement)) {
+            return;
+          }
+          e.currentTarget.setCustomValidity("");
+          e.currentTarget.reportValidity();
+        }}
         @invalid=${(e: InputEvent) => {
-    if (!(e.currentTarget instanceof HTMLInputElement)) {
-      return;
-    }
-    const message = validationMessage(e.currentTarget.validity);
-    e.currentTarget.setCustomValidity(message);
-  }}
+          if (!(e.currentTarget instanceof HTMLInputElement)) {
+            return;
+          }
+          const message = validationMessage(e.currentTarget.validity);
+          e.currentTarget.setCustomValidity(message);
+        }}
         placeholder=${copy.placeholder}
         value=${ifDefined(props.value)}
         aria-label="device name"
@@ -87,7 +87,7 @@ export const promptDeviceAliasTemplate = (props: {
 
   return mainWindow({
     showFooter: false,
-    slot: promptDeviceAliasSlot
+    slot: promptDeviceAliasSlot,
   });
 };
 
@@ -100,9 +100,9 @@ export const promptDeviceAliasTemplate = (props: {
  * @param patternMismatch Whether the input consists of only whitespace.
  */
 const validationMessage = ({
-                             valueMissing,
-                             patternMismatch
-                           }: {
+  valueMissing,
+  patternMismatch,
+}: {
   valueMissing: boolean;
   patternMismatch: boolean;
 }): string => {
@@ -117,11 +117,11 @@ const validationMessage = ({
 export const promptDeviceAliasPage = renderPage(promptDeviceAliasTemplate);
 
 export const promptDeviceAlias = ({
-                                    title,
-                                    message,
-                                    value,
-                                    cancelText
-                                  }: {
+  title,
+  message,
+  value,
+  cancelText,
+}: {
   title: string;
   message?: string | TemplateResult;
   value?: string;
@@ -136,6 +136,6 @@ export const promptDeviceAlias = ({
       cancelText,
       cancel: () => resolve(null),
       continue: resolve,
-      i18n
+      i18n,
     });
   });

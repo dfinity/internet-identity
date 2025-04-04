@@ -1,6 +1,6 @@
 import type {
   AddTentativeDeviceResponse,
-  CredentialId
+  CredentialId,
 } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { mainWindow } from "$lib/templates/mainWindow";
@@ -21,12 +21,12 @@ type TentativeRegistrationInfo = Extract<
 >["added_tentatively"];
 
 const showVerificationCodeTemplate = ({
-                                        userNumber,
-                                        alias,
-                                        tentativeRegistrationInfo,
-                                        remaining,
-                                        cancel
-                                      }: {
+  userNumber,
+  alias,
+  tentativeRegistrationInfo,
+  remaining,
+  cancel,
+}: {
   userNumber: bigint;
   alias: string;
   tentativeRegistrationInfo: TentativeRegistrationInfo;
@@ -72,12 +72,12 @@ const showVerificationCodeTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 export const showVerificationCodePage = renderPage(
-  showVerificationCodeTemplate
+  showVerificationCodeTemplate,
 );
 
 /**
@@ -92,11 +92,11 @@ export const showVerificationCode = async (
   connection: Connection,
   alias: string,
   tentativeRegistrationInfo: TentativeRegistrationInfo,
-  credentialToBeVerified: CredentialId
+  credentialToBeVerified: CredentialId,
 ): Promise<"ok" | "canceled"> => {
   const countdown: AsyncCountdown<"match" | "canceled"> =
     AsyncCountdown.fromNanos(
-      tentativeRegistrationInfo.device_registration_timeout
+      tentativeRegistrationInfo.device_registration_timeout,
     );
 
   showVerificationCodePage({
@@ -107,7 +107,7 @@ export const showVerificationCode = async (
     cancel: () => {
       countdown.stop("canceled");
       return "canceled";
-    }
+    },
   });
 
   // Poll repeatedly
@@ -116,7 +116,7 @@ export const showVerificationCode = async (
       userNumber,
       connection,
       credentialToBeVerified,
-      shouldStop: () => countdown.hasStopped()
+      shouldStop: () => countdown.hasStopped(),
     });
     countdown.stop(result);
   })();
@@ -128,11 +128,11 @@ export const showVerificationCode = async (
 // credential id equal to 'credentialToBeVerified', or until `shouldStop`
 // returns `true` for the first time.
 const poll = ({
-                userNumber,
-                connection,
-                credentialToBeVerified,
-                shouldStop
-              }: {
+  userNumber,
+  connection,
+  credentialToBeVerified,
+  shouldStop,
+}: {
   userNumber: bigint;
   connection: Connection;
   credentialToBeVerified: CredentialId;
@@ -145,12 +145,12 @@ const poll = ({
         return await anchorHasCredentials({
           userNumber,
           credential: credentialToBeVerified,
-          connection
+          connection,
         });
       } catch (e) {
         toast.error(
           "An error occurred while polling for verification: " +
-          unknownToString(e, "no details available :(")
+            unknownToString(e, "no details available :("),
         );
         console.warn("Error occurred when polling:", e);
       }
@@ -171,9 +171,9 @@ const poll = ({
   });
 
 const handlePollResult = async ({
-                                  userNumber,
-                                  result
-                                }: {
+  userNumber,
+  result,
+}: {
   userNumber: bigint;
   result: "match" | "canceled" | typeof AsyncCountdown.timeout;
 }): Promise<"ok" | "canceled"> => {
@@ -184,8 +184,8 @@ const handlePollResult = async ({
     await displayError({
       title: "Timeout Reached",
       message:
-        "The timeout has been reached. For security reasons the \"add device\" process has been aborted.",
-      primaryButton: "Ok"
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+      primaryButton: "Ok",
     });
     return "canceled";
   } else {
@@ -196,10 +196,10 @@ const handlePollResult = async ({
 
 // Returns true if the given anchor has credentials with the given credential id.
 const anchorHasCredentials = async ({
-                                      userNumber,
-                                      credential,
-                                      connection
-                                    }: {
+  userNumber,
+  credential,
+  connection,
+}: {
   userNumber: bigint;
   credential: CredentialId;
   connection: Connection;
@@ -208,14 +208,14 @@ const anchorHasCredentials = async ({
   const matching = devices.find(
     (device) =>
       device.credential_id.length === 1 &&
-      credentialIdEqual(device.credential_id[0], credential)
+      credentialIdEqual(device.credential_id[0], credential),
   );
   return nonNullish(matching);
 };
 
 function credentialIdEqual(
   credentialId1: CredentialId,
-  credentialId2: CredentialId
+  credentialId2: CredentialId,
 ): boolean {
   if (credentialId1.length !== credentialId2.length) {
     return false;

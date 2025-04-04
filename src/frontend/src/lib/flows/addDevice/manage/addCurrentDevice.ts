@@ -6,13 +6,13 @@ import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import {
   AuthenticatedConnection,
-  creationOptions
+  creationOptions,
 } from "$lib/utils/iiConnection";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
   isWebAuthnCancel,
-  isWebAuthnDuplicateDevice
+  isWebAuthnDuplicateDevice,
 } from "$lib/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 import { nonNullish } from "@dfinity/utils";
@@ -24,7 +24,7 @@ const displayFailedToAddDevice = (error: Error) =>
     message:
       "We failed to add the new device to this Identity Anchor. Please try again.",
     detail: error.message,
-    primaryButton: "Back to manage"
+    primaryButton: "Back to manage",
   });
 
 /**
@@ -51,7 +51,7 @@ export const addCurrentDevice = async (
   let newDevice: WebAuthnIdentity;
   try {
     newDevice = await WebAuthnIdentity.create({
-      publicKey: creationOptions(devices, undefined, rpId)
+      publicKey: creationOptions(devices, undefined, rpId),
     });
   } catch (error: unknown) {
     if (isWebAuthnDuplicateDevice(error)) {
@@ -70,7 +70,7 @@ export const addCurrentDevice = async (
     authenticatorType: newDevice.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
-    aaguid: newDevice.aaguid
+    aaguid: newDevice.aaguid,
   });
   try {
     await withLoader(() =>

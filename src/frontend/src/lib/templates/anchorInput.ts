@@ -9,13 +9,13 @@ import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 /** A component for inputting an anchor number */
 export const mkAnchorInput = ({
-                                userNumber,
-                                onSubmit,
-                                onInput,
-                                onChange,
-                                classes: classes_,
-                                dataExpected
-                              }: {
+  userNumber,
+  onSubmit,
+  onInput,
+  onChange,
+  classes: classes_,
+  dataExpected,
+}: {
   userNumber?: bigint;
 } & {
   onSubmit: (userNumber: bigint) => void;
@@ -127,8 +127,8 @@ export const mkAnchorInput = ({
         data-expected=${ifDefined(dataExpected)}
         @input=${inputFilter(isDigits, onBadInput, onInput)}
         @change=${nonNullish(onChange)
-    ? () => withRef(userNumberInput, (input) => onChange(input.value))
-    : undefined}
+          ? () => withRef(userNumberInput, (input) => onChange(input.value))
+          : undefined}
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
         @mousedown=${inputFilter(isDigits, onBadInput)}
@@ -158,7 +158,7 @@ const inputFilter = (
   /* callback called on valid input */
   onInput?: (content: string) => void,
 ) =>
-  function(
+  function (
     this: (HTMLInputElement | HTMLTextAreaElement) & {
       oldValue: string;
       oldSelectionStart: number | null;

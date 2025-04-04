@@ -5,13 +5,13 @@ import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import {
   RegistrationEvents,
-  registrationFunnel
+  registrationFunnel,
 } from "$lib/utils/analytics/registrationFunnel";
 import {
   TemplateElement,
   mount,
   renderPage,
-  withRef
+  withRef,
 } from "$lib/utils/lit-html";
 import { PreLoadImage } from "$lib/utils/preLoadImage";
 import { OmitParams } from "$lib/utils/utils";
@@ -19,12 +19,12 @@ import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 export const displayUserNumberTemplate = ({
-                                            onContinue,
-                                            userNumber,
-                                            identityBackground,
-                                            marketingIntroSlot,
-                                            scrollToTop = false
-                                          }: {
+  onContinue,
+  userNumber,
+  identityBackground,
+  marketingIntroSlot,
+  scrollToTop = false,
+}: {
   onContinue: () => void;
   userNumber: bigint;
   identityBackground: PreLoadImage;
@@ -50,7 +50,7 @@ export const displayUserNumberTemplate = ({
       ${
         identityCard({
           userNumber,
-          identityBackground
+          identityBackground,
         }) satisfies TemplateElement
       }
       <button
@@ -60,19 +60,19 @@ export const displayUserNumberTemplate = ({
       tabindex="0"
       class="c-button__icon"
         @click=${async () => {
-        try {
-          await navigator.clipboard.writeText(userNumber.toString());
-          registrationFunnel.trigger(
-            RegistrationEvents.CopyNewIdentityNumber
-          );
-          withRef(userNumberCopy, (elem) => {
-            elem.classList.add("is-copied");
-          });
-        } catch (e: unknown) {
-          toast.error("Unable to copy Internet Identity");
-          console.error("Unable to copy Internet Identity", e);
-        }
-      }}
+          try {
+            await navigator.clipboard.writeText(userNumber.toString());
+            registrationFunnel.trigger(
+              RegistrationEvents.CopyNewIdentityNumber,
+            );
+            withRef(userNumberCopy, (elem) => {
+              elem.classList.add("is-copied");
+            });
+          } catch (e: unknown) {
+            toast.error("Unable to copy Internet Identity");
+            console.error("Unable to copy Internet Identity", e);
+          }
+        }}
       >
       <span>Copy</span>
       ${copyIcon}
@@ -100,7 +100,7 @@ export const displayUserNumberTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: displayUserNumberSlot
+    slot: displayUserNumberSlot,
   });
 };
 
@@ -118,10 +118,10 @@ export const displayUserNumberWarmup = (): OmitParams<
 };
 
 export const displayUserNumber = ({
-                                    userNumber,
-                                    identityBackground,
-                                    marketingIntroSlot
-                                  }: {
+  userNumber,
+  identityBackground,
+  marketingIntroSlot,
+}: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
   marketingIntroSlot?: TemplateResult;
@@ -132,7 +132,7 @@ export const displayUserNumber = ({
       userNumber,
       identityBackground,
       marketingIntroSlot,
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

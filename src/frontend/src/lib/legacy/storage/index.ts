@@ -38,7 +38,7 @@ export const setAnchorUsed = async (userNumber: bigint) => {
 
     const anchors = storage.anchors;
     const defaultAnchor: Omit<Anchor, "lastUsedTimestamp"> = {
-      knownPrincipals: []
+      knownPrincipals: [],
     };
     const oldAnchor = anchors[ix] ?? defaultAnchor;
 
@@ -54,8 +54,8 @@ export const setAnchorUsed = async (userNumber: bigint) => {
  * more information.
  */
 export const getAnchorByPrincipal = async ({
-                                             principal
-                                           }: {
+  principal,
+}: {
   principal: Principal;
 }): Promise<bigint | undefined> => {
   const storage = await readStorage();
@@ -63,7 +63,7 @@ export const getAnchorByPrincipal = async ({
 
   const principalDigest = await computePrincipalDigest({
     principal,
-    hasher: storage.hasher
+    hasher: storage.hasher,
   });
 
   for (const ix in anchors) {
@@ -84,9 +84,9 @@ export const getAnchorByPrincipal = async ({
 /** Look up an anchor by principal, if it is the last used for the given origin.
  */
 export const getAnchorIfLastUsed = async ({
-                                            principal,
-                                            origin
-                                          }: {
+  principal,
+  origin,
+}: {
   principal: Principal;
   origin: string;
 }): Promise<bigint | undefined> => {
@@ -95,12 +95,12 @@ export const getAnchorIfLastUsed = async ({
 
   const principalDigest = await computePrincipalDigest({
     principal,
-    hasher: storage.hasher
+    hasher: storage.hasher,
   });
 
   const originDigest = await computeOriginDigest({
     origin,
-    hasher: storage.hasher
+    hasher: storage.hasher,
   });
 
   // candidate anchors with their timestamp, principal digest -> identity number
@@ -118,7 +118,7 @@ export const getAnchorIfLastUsed = async ({
     candidates.push({
       lastUsedTimestamp: lastUsed.lastUsedTimestamp,
       principalDigest: lastUsed.principalDigest,
-      identityNumber: ix
+      identityNumber: ix,
     });
   }
 
@@ -137,10 +137,10 @@ export const getAnchorIfLastUsed = async ({
 
 /** Set the principal as "known"; i.e. from which the anchor can be "looked up" */
 export const setKnownPrincipal = async ({
-                                          userNumber,
-                                          origin,
-                                          principal
-                                        }: {
+  userNumber,
+  origin,
+  principal,
+}: {
   userNumber: bigint;
   origin: string;
   principal: Principal;
@@ -148,7 +148,7 @@ export const setKnownPrincipal = async ({
   await withStorage(async (storage) => {
     const defaultAnchor: AnchorV3 = {
       knownPrincipals: [],
-      lastUsedTimestamp: nowMillis()
+      lastUsedTimestamp: nowMillis(),
     };
 
     const ix = userNumber.toString();
@@ -157,16 +157,16 @@ export const setKnownPrincipal = async ({
 
     const principalDigest = await computePrincipalDigest({
       principal,
-      hasher: storage.hasher
+      hasher: storage.hasher,
     });
 
     const principalData = {
       principalDigest,
       originDigest: await computeOriginDigest({
         origin,
-        hasher: storage.hasher
+        hasher: storage.hasher,
       }),
-      lastUsedTimestamp: nowMillis()
+      lastUsedTimestamp: nowMillis(),
     };
 
     // Remove the principal, if we've encountered it already
@@ -226,9 +226,9 @@ const updateStorage = async (
   const { ret: migratedStorage, didMigrate } = nonNullish(storedStorage)
     ? { ret: storedStorage, didMigrate: false }
     : {
-      ret: (await migrated()) ?? { anchors: {}, hasher: await newHMACKey() },
-      didMigrate: true
-    };
+        ret: (await migrated()) ?? { anchors: {}, hasher: await newHMACKey() },
+        didMigrate: true,
+      };
   doWrite ||= didMigrate;
 
   const { ret: updatedStorage, updated } = await op(migratedStorage);
@@ -280,7 +280,7 @@ const mostUnused = (anchors: Anchors): string | undefined => {
   // then sort by last used and return first element
   const arr = Object.keys(anchors).map((ix) => ({
     ix,
-    lastUsedTimestamp: anchors[ix].lastUsedTimestamp
+    lastUsedTimestamp: anchors[ix].lastUsedTimestamp,
   }));
 
   arr.sort((a, b) => a.lastUsedTimestamp - b.lastUsedTimestamp);
@@ -338,9 +338,9 @@ const nowMillis = (): number => {
  * non-extractable HMAC key).
  */
 const computePrincipalDigest = async ({
-                                        principal: principalObj,
-                                        hasher
-                                      }: {
+  principal: principalObj,
+  hasher,
+}: {
   principal: Principal;
   hasher: CryptoKey;
 }): Promise<string> => {
@@ -369,9 +369,9 @@ const computePrincipalDigest = async ({
  * non-extractable HMAC key).
  */
 const computeOriginDigest = async ({
-                                     origin: origin_,
-                                     hasher
-                                   }: {
+  origin: origin_,
+  hasher,
+}: {
   origin: string;
   hasher: CryptoKey;
 }): Promise<string> => {
@@ -461,7 +461,7 @@ const migratedV0 = async (): Promise<Storage | undefined> => {
   const ix = userNumber.toString();
 
   const anchors = {
-    [ix]: { lastUsedTimestamp: nowMillis(), knownPrincipals: [] }
+    [ix]: { lastUsedTimestamp: nowMillis(), knownPrincipals: [] },
   };
 
   const hasher = await newHMACKey();
@@ -475,7 +475,7 @@ const migratedV0 = async (): Promise<Storage | undefined> => {
 type AnchorV1 = z.infer<typeof AnchorV1>;
 const AnchorV1 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
-  lastUsedTimestamp: z.number()
+  lastUsedTimestamp: z.number(),
 });
 
 /** The type of all anchors in storage. */
@@ -540,7 +540,7 @@ type AnchorV2 = z.infer<typeof AnchorV2>;
 
 const AnchorV2 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
-  lastUsedTimestamp: z.number()
+  lastUsedTimestamp: z.number(),
 });
 const AnchorsV2 = z.record(AnchorV2);
 
@@ -584,21 +584,21 @@ const PrincipalDataV3 = z.object({
   digest: z.string(),
 
   /** The last time the user authenticated with the principal */
-  lastUsedTimestamp: z.number()
+  lastUsedTimestamp: z.number(),
 });
 
 const AnchorV3 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
 
-  knownPrincipals: z.array(PrincipalDataV3)
+  knownPrincipals: z.array(PrincipalDataV3),
 });
 const AnchorsV3 = z.record(AnchorV3);
 
 /** The type of all anchors in storage. */
 const StorageV3 = z.object({
   anchors: AnchorsV3,
-  hasher: z.instanceof(CryptoKey)
+  hasher: z.instanceof(CryptoKey),
 });
 
 const readIndexedDBV3 = (): Promise<StorageV3 | undefined> => {
@@ -650,21 +650,21 @@ const PrincipalDataV4 = z.object({
   originDigest: z.string(),
 
   /** The last time the user authenticated with the principal */
-  lastUsedTimestamp: z.number()
+  lastUsedTimestamp: z.number(),
 });
 
 const AnchorV4 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
 
-  knownPrincipals: z.array(PrincipalDataV4)
+  knownPrincipals: z.array(PrincipalDataV4),
 });
 const AnchorsV4 = z.record(AnchorV4);
 
 /** The type of all anchors in storage. */
 const StorageV4 = z.object({
   anchors: AnchorsV4,
-  hasher: z.instanceof(CryptoKey)
+  hasher: z.instanceof(CryptoKey),
 });
 const readIndexedDBV4 = (): Promise<StorageV4 | undefined> => {
   return readGeneric({ idbKey: IDB_KEY_V4, storageType: StorageV4 });
@@ -675,9 +675,9 @@ const writeIndexedDBV4 = async (storage: StorageV4) => {
 };
 
 const readGeneric = async <T extends ZodType>({
-                                                idbKey,
-                                                storageType
-                                              }: {
+  idbKey,
+  storageType,
+}: {
   idbKey: IDBValidKey;
   storageType: T;
 }): Promise<T["_output"] | undefined> => {

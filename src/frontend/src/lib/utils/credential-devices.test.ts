@@ -4,7 +4,7 @@ import { getCredentialsOrigin } from "./credential-devices";
 describe("credetial-devices test", () => {
   describe("getCredentialsOrigin", () => {
     const createDevice = (
-      origin: string | undefined
+      origin: string | undefined,
     ): Omit<DeviceData, "alias"> => ({
       origin: origin === undefined ? [] : [origin],
       protection: { unprotected: null },
@@ -13,26 +13,26 @@ describe("credetial-devices test", () => {
       key_type: { unknown: null },
       purpose: { authentication: null },
       credential_id: [],
-      metadata: []
+      metadata: [],
     });
 
     const undefinedOriginDevice: Omit<DeviceData, "alias"> =
       createDevice(undefined);
     const ic0OriginDevice: Omit<DeviceData, "alias"> = createDevice(
-      "https://identity.ic0.app"
+      "https://identity.ic0.app",
     );
     const icOrgOriginDevice: Omit<DeviceData, "alias"> = createDevice(
-      "https://identity.internetcomputer.org"
+      "https://identity.internetcomputer.org",
     );
     const icIoOriginDevice: Omit<DeviceData, "alias"> = createDevice(
-      "https://identity.icp0.io"
+      "https://identity.icp0.io",
     );
 
     it("should return a set of origins or `undefined`", () => {
       expect(
         getCredentialsOrigin({
-          credentials: [ic0OriginDevice, icOrgOriginDevice, icIoOriginDevice]
-        })
+          credentials: [ic0OriginDevice, icOrgOriginDevice, icIoOriginDevice],
+        }),
       ).toBeUndefined();
 
       expect(
@@ -40,41 +40,41 @@ describe("credetial-devices test", () => {
           credentials: [
             ic0OriginDevice,
             { ...ic0OriginDevice },
-            icIoOriginDevice
-          ]
-        })
+            icIoOriginDevice,
+          ],
+        }),
       ).toBeUndefined();
 
       expect(
         getCredentialsOrigin({
-          credentials: [ic0OriginDevice, { ...ic0OriginDevice }]
-        })
+          credentials: [ic0OriginDevice, { ...ic0OriginDevice }],
+        }),
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
-          credentials: [icOrgOriginDevice, { ...icOrgOriginDevice }]
-        })
+          credentials: [icOrgOriginDevice, { ...icOrgOriginDevice }],
+        }),
       ).toBe("https://identity.internetcomputer.org");
     });
 
     it("should consider `undefined` as the default domain", () => {
       expect(
         getCredentialsOrigin({
-          credentials: [undefinedOriginDevice]
-        })
+          credentials: [undefinedOriginDevice],
+        }),
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
-          credentials: [undefinedOriginDevice, ic0OriginDevice]
-        })
+          credentials: [undefinedOriginDevice, ic0OriginDevice],
+        }),
       ).toBe("https://identity.ic0.app");
 
       expect(
         getCredentialsOrigin({
-          credentials: [undefinedOriginDevice, icOrgOriginDevice]
-        })
+          credentials: [undefinedOriginDevice, icOrgOriginDevice],
+        }),
       ).toBeUndefined();
     });
   });

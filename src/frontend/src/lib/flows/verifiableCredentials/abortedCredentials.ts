@@ -23,11 +23,11 @@ export type AbortReason =
 /* A screen telling the user the flow was aborted and giving information
  * on why it was aborted and what they can do about it. */
 const abortedCredentialsTemplate = ({
-                                      i18n,
-                                      reason,
-                                      onAcknowledge,
-                                      scrollToTop = false
-                                    }: {
+  i18n,
+  reason,
+  onAcknowledge,
+  scrollToTop = false,
+}: {
   i18n: I18n;
   reason: AbortReason;
   onAcknowledge: () => void;
@@ -66,14 +66,14 @@ const abortedCredentialsTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
 export const abortedCredentialsPage = renderPage(abortedCredentialsTemplate);
 export const abortedCredentials = ({
-                                     reason
-                                   }: {
+  reason,
+}: {
   reason: AbortReason;
 }): Promise<"aborted"> => {
   return new Promise((resolve) =>
@@ -81,7 +81,7 @@ export const abortedCredentials = ({
       i18n: new I18n(),
       reason,
       onAcknowledge: () => resolve("aborted"),
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

@@ -14,11 +14,11 @@ import {
   Delegation,
   DelegationChain,
   DelegationIdentity,
-  ECDSAKeyIdentity
+  ECDSAKeyIdentity,
 } from "@dfinity/identity";
 import {
   CredentialSpec,
-  IssuedCredentialData
+  IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
 import { Principal } from "@dfinity/principal";
 import infoToastCopy from "$lib/templates/infoToast/copy.json";
@@ -29,8 +29,8 @@ import { VcIssuer } from "./vcIssuer";
 
 // The "verifiable credentials" approval flow
 export const vcFlow = async ({
-                               connection
-                             }: {
+  connection,
+}: {
   connection: Connection;
 }): Promise<never> => {
   const result = await vcProtocol({
@@ -38,25 +38,25 @@ export const vcFlow = async ({
     onProgress: (x) => {
       if (x === "waiting") {
         return showSpinner({
-          message: "Waiting for verification data"
+          message: "Waiting for verification data",
         });
       }
 
       if (x === "verifying") {
         return showSpinner({
-          message: "Checking verification data"
+          message: "Checking verification data",
         });
       }
       x satisfies never;
     },
 
     /* How the credentials are actually verified */
-    verifyCredentials: (args) => verifyCredentials({ connection, ...args })
+    verifyCredentials: (args) => verifyCredentials({ connection, ...args }),
   });
 
   if (result === "orphan") {
     await showMessage({
-      message: "No credentials data provided! Wrong URL?"
+      message: "No credentials data provided! Wrong URL?",
     });
   }
 
@@ -69,22 +69,22 @@ type VerifyCredentials = Parameters<typeof vcProtocol>[0]["verifyCredentials"];
 type VerifyCredentialsArgs = Parameters<VerifyCredentials>[0];
 
 const verifyCredentials = async ({
-                                   connection,
-                                   request: {
-                                     credentialSubject: givenP_RP,
-                                     issuer: { origin: issuerOrigin, canisterId: issuerCanisterId },
-                                     credentialSpec,
-                                     derivationOrigin: rpDerivationOrigin
-                                   },
-                                   rpOrigin: rpOrigin_
-                                 }: { connection: Connection } & VerifyCredentialsArgs) => {
+  connection,
+  request: {
+    credentialSubject: givenP_RP,
+    issuer: { origin: issuerOrigin, canisterId: issuerCanisterId },
+    credentialSpec,
+    derivationOrigin: rpDerivationOrigin,
+  },
+  rpOrigin: rpOrigin_,
+}: { connection: Connection } & VerifyCredentialsArgs) => {
   // Verify that principals may be issued to RP using the specified
   // derivation origin
   const validRpDerivationOrigin = await withLoader(() =>
     validateDerivationOrigin({
       requestOrigin: rpOrigin_,
-      derivationOrigin: rpDerivationOrigin
-    })
+      derivationOrigin: rpDerivationOrigin,
+    }),
   );
   if (validRpDerivationOrigin.result === "invalid") {
     return abortedCredentials({ reason: "bad_derivation_origin_rp" });
@@ -97,8 +97,8 @@ const verifyCredentials = async ({
   const issuerDerivationOriginResult = await getValidatedIssuerDerivationOrigin(
     {
       vcIssuer,
-      issuerOrigin
-    }
+      issuerOrigin,
+    },
   );
 
   if (issuerDerivationOriginResult.kind === "error") {
@@ -120,10 +120,10 @@ const verifyCredentials = async ({
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({
     relyingOrigin:
-    rpOrigin_ /* NOTE: the design does not show the derivation origin (yet) */,
+      rpOrigin_ /* NOTE: the design does not show the derivation origin (yet) */,
     providerOrigin: issuerOrigin,
     consentMessage: consentInfo.consent_message,
-    userNumber: userNumber_
+    userNumber: userNumber_,
   });
   if (allowed.tag === "canceled") {
     return "aborted";
@@ -136,7 +136,7 @@ const verifyCredentials = async ({
   let authResult = await useIdentity({
     userNumber,
     connection,
-    allowPinLogin: true
+    allowPinLogin: true,
   });
 
   if ("tag" in authResult) {
@@ -154,20 +154,20 @@ const verifyCredentials = async ({
   while (
     authResult.kind === "possiblyWrongWebAuthnFlow" &&
     currentRetry < MAX_RETRIES
-    ) {
+  ) {
     currentRetry++;
     const i18n = new I18n();
     const copy = i18n.i18n(infoToastCopy);
     toast.info(
       infoToastTemplate({
         title: copy.title_trying_again,
-        messages: [copy.message_possibly_wrong_web_authn_flow_1]
-      })
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
+      }),
     );
     authResult = await useIdentity({
       userNumber,
       connection,
-      allowPinLogin: true
+      allowPinLogin: true,
     });
 
     if ("tag" in authResult) {
@@ -186,8 +186,8 @@ const verifyCredentials = async ({
   // Compute the user's principal on the RP and ensure it matches what the RP sent us
   const computedP_RP = await withLoader(() =>
     authenticatedConnection.getPrincipal({
-      origin: rpOrigin
-    })
+      origin: rpOrigin,
+    }),
   );
   if (computedP_RP.compareTo(givenP_RP) !== "eq") {
     console.error("Principal did not match that expected by RP");
@@ -199,7 +199,7 @@ const verifyCredentials = async ({
   const pAliasPending = getAliasCredentials({
     rpOrigin,
     issuerOrigin: issuerDerivationOrigin /* Use the actual derivation origin */,
-    authenticatedConnection
+    authenticatedConnection,
   });
 
   // Grab the credentials from the issuer
@@ -217,7 +217,7 @@ const verifyCredentials = async ({
       issuerOrigin: issuerDerivationOrigin,
       issuerAliasCredential: pAlias.issuerAliasCredential,
       credentialSpec,
-      authenticatedConnection
+      authenticatedConnection,
     });
 
     if ("err" in issuedCredential) {
@@ -236,31 +236,31 @@ const verifyCredentials = async ({
   return createPresentation({
     issuerCanisterId,
     rpAliasCredential: pAlias.rpAliasCredential,
-    issuedCredential
+    issuedCredential,
   });
 };
 
 // Prepare & get aliases
 const getAliasCredentials = async ({
-                                     authenticatedConnection,
-                                     issuerOrigin,
-                                     rpOrigin
-                                   }: {
+  authenticatedConnection,
+  issuerOrigin,
+  rpOrigin,
+}: {
   issuerOrigin: string;
   rpOrigin: string;
   authenticatedConnection: AuthenticatedConnection;
 }): Promise<
   | {
-  ok: {
-    rpAliasCredential: SignedIdAlias;
-    issuerAliasCredential: SignedIdAlias;
-  };
-}
+      ok: {
+        rpAliasCredential: SignedIdAlias;
+        issuerAliasCredential: SignedIdAlias;
+      };
+    }
   | { err: "internal_error" | "auth_failed_ii" }
 > => {
   const preparedIdAlias = await authenticatedConnection.prepareIdAlias({
     issuerOrigin,
-    rpOrigin
+    rpOrigin,
   });
 
   if ("error" in preparedIdAlias) {
@@ -277,7 +277,7 @@ const getAliasCredentials = async ({
   const result = await authenticatedConnection.getIdAlias({
     preparedIdAlias,
     issuerOrigin,
-    rpOrigin
+    rpOrigin,
   });
 
   if ("error" in result) {
@@ -293,7 +293,7 @@ const getAliasCredentials = async ({
 
   const {
     rp_id_alias_credential: rpAliasCredential,
-    issuer_id_alias_credential: issuerAliasCredential
+    issuer_id_alias_credential: issuerAliasCredential,
   } = result;
 
   return { ok: { rpAliasCredential, issuerAliasCredential } };
@@ -301,22 +301,22 @@ const getAliasCredentials = async ({
 
 // Looks up and verify the derivation origin to be used by the issuer
 const getValidatedIssuerDerivationOrigin = async ({
-                                                    vcIssuer,
-                                                    issuerOrigin
-                                                  }: {
+  vcIssuer,
+  issuerOrigin,
+}: {
   vcIssuer: VcIssuer;
   issuerOrigin: string;
 }): Promise<
   | {
-  kind: "error";
-  err:
-    | "derivation_origin_issuer_error"
-    | "invalid_derivation_origin_issuer";
-}
+      kind: "error";
+      err:
+        | "derivation_origin_issuer_error"
+        | "invalid_derivation_origin_issuer";
+    }
   | { kind: "ok"; origin: string }
 > => {
   const derivationOriginResult = await vcIssuer.getDerivationOrigin({
-    origin: issuerOrigin
+    origin: issuerOrigin,
   });
 
   if (derivationOriginResult.kind === "error") {
@@ -326,11 +326,11 @@ const getValidatedIssuerDerivationOrigin = async ({
 
   const validationResult = await validateDerivationOrigin({
     requestOrigin: issuerOrigin,
-    derivationOrigin: derivationOriginResult.origin
+    derivationOrigin: derivationOriginResult.origin,
   });
   if (validationResult.result === "invalid") {
     console.error(
-      `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`
+      `Invalid derivation origin ${derivationOriginResult.origin} for issuer ${issuerOrigin}: ${validationResult.message}`,
     );
     return { kind: "error", err: "invalid_derivation_origin_issuer" };
   }
@@ -341,12 +341,12 @@ const getValidatedIssuerDerivationOrigin = async ({
 
 // Contact the issuer to issue the credentials
 const issueCredential = async ({
-                                 vcIssuer,
-                                 issuerOrigin,
-                                 issuerAliasCredential,
-                                 credentialSpec,
-                                 authenticatedConnection
-                               }: {
+  vcIssuer,
+  issuerOrigin,
+  issuerAliasCredential,
+  credentialSpec,
+  authenticatedConnection,
+}: {
   vcIssuer: VcIssuer;
   issuerOrigin: string;
   issuerAliasCredential: SignedIdAlias;
@@ -358,7 +358,7 @@ const issueCredential = async ({
 > => {
   const issuerIdentityRes = await authenticateForIssuer({
     authenticatedConnection,
-    issuerOrigin
+    issuerOrigin,
   });
 
   if ("err" in issuerIdentityRes) {
@@ -370,7 +370,7 @@ const issueCredential = async ({
   const args = {
     signedIdAlias: issuerAliasCredential,
     credentialSpec,
-    identity: issuerIdentity
+    identity: issuerIdentity,
   };
 
   const preparedCredential = await vcIssuer.prepareCredential(args);
@@ -382,7 +382,7 @@ const issueCredential = async ({
   const issuedCredential = await vcIssuer.getCredential({
     ...args,
     preparedCredential,
-    identity: issuerIdentity
+    identity: issuerIdentity,
   });
 
   if (issuedCredential === "error") {
@@ -395,22 +395,22 @@ const issueCredential = async ({
 // Perform an authentication (delegation, etc) of the user to the issuer
 // so that we can contact the issuer authenticated as the user
 const authenticateForIssuer = async ({
-                                       authenticatedConnection,
-                                       issuerOrigin
-                                     }: {
+  authenticatedConnection,
+  issuerOrigin,
+}: {
   authenticatedConnection: AuthenticatedConnection;
   issuerOrigin: string;
 }): Promise<{ ok: DelegationIdentity } | { err: "auth_failed_issuer" }> => {
   // This is basically a copy-paste of what we have in the authentication flow
 
   const tempIdentity: ECDSAKeyIdentity = await ECDSAKeyIdentity.generate({
-    extractable: false
+    extractable: false,
   });
   const delegation = await fetchDelegation({
     connection: authenticatedConnection,
     derivationOrigin: issuerOrigin,
     publicKey: new Uint8Array(tempIdentity.getPublicKey().toDer()),
-    maxTimeToLive: BigInt(5 * 60 * 1000_000_000) /* 5 minutes */
+    maxTimeToLive: BigInt(5 * 60 * 1000_000_000) /* 5 minutes */,
   });
 
   if ("error" in delegation) {
@@ -423,13 +423,13 @@ const authenticateForIssuer = async ({
     delegation: new Delegation(
       parsed_signed_delegation.delegation.pubkey,
       parsed_signed_delegation.delegation.expiration,
-      parsed_signed_delegation.delegation.targets
+      parsed_signed_delegation.delegation.targets,
     ),
-    signature: parsed_signed_delegation.signature
+    signature: parsed_signed_delegation.signature,
   };
   const delegations = DelegationChain.fromDelegations(
     [degs],
-    Uint8Array.from(userKey)
+    Uint8Array.from(userKey),
   );
   return { ok: DelegationIdentity.fromDelegation(tempIdentity, delegations) };
 };
@@ -448,10 +448,10 @@ const base64UrlEncode = (x: unknown): string => {
 
 // Create the final presentation (to be then returned to the RP)
 const createPresentation = ({
-                              issuerCanisterId,
-                              rpAliasCredential,
-                              issuedCredential
-                            }: {
+  issuerCanisterId,
+  rpAliasCredential,
+  issuedCredential,
+}: {
   issuerCanisterId: Principal;
   rpAliasCredential: SignedIdAlias;
   issuedCredential: IssuedCredentialData;
@@ -466,9 +466,9 @@ const createPresentation = ({
       type: "VerifiablePresentation",
       verifiableCredential: [
         rpAliasCredential.credential_jws satisfies string,
-        issuedCredential.vc_jws satisfies string
-      ] /* spec dictates first the alias creds, then the VC */
-    }
+        issuedCredential.vc_jws satisfies string,
+      ] /* spec dictates first the alias creds, then the VC */,
+    },
   };
 
   const header = base64UrlEncode(headerObj);

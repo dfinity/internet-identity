@@ -9,7 +9,7 @@ import {
   AuthenticatedConnection,
   Connection,
   IIWebAuthnIdentity,
-  LoginSuccess
+  LoginSuccess,
 } from "$lib/utils/iiConnection";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
 import { unknownToString, unreachableLax } from "$lib/utils/utils";
@@ -18,7 +18,7 @@ import {
   displayCancelError,
   displayDuplicateDeviceError,
   isWebAuthnCancel,
-  isWebAuthnDuplicateDevice
+  isWebAuthnDuplicateDevice,
 } from "$lib/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
@@ -46,11 +46,11 @@ export const useRecovery = async (
 
   const op = await (res === "phrase"
     ? recoverWithPhrase({
-      connection,
-      message: html`Your recovery phrase includes your Internet Identity
+        connection,
+        message: html`Your recovery phrase includes your Internet Identity
         number and a unique combination of 24 words that represent your private
-        key`
-    })
+        key`,
+      })
     : recoverWithDevice({ connection }));
 
   if ("tag" in op) {
@@ -67,9 +67,9 @@ export const useRecovery = async (
 
 // Show the user that the recovery was successful and offer to enroll a new device
 const postRecoveryFlow = async ({
-                                  userNumber,
-                                  connection
-                                }: {
+  userNumber,
+  connection,
+}: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
 }) => {
@@ -80,11 +80,11 @@ const postRecoveryFlow = async ({
     "Remember this device to avoid losing access to your account again. What device are you using?";
 
   // Offer to enroll the device repeatedly, until the user explicitly skips
-  for (; ;) {
+  for (;;) {
     const deviceAlias = await promptDeviceAlias({
       title: title,
       message: message,
-      cancelText: "Skip"
+      cancelText: "Skip",
     });
 
     // The user clicked "skip"
@@ -95,7 +95,7 @@ const postRecoveryFlow = async ({
     const enrollResult = await enrollAuthenticator({
       connection: connection,
       userNumber: userNumber,
-      deviceAlias
+      deviceAlias,
     });
 
     // The device was successfully enrolled, so we break out of the loop
@@ -118,10 +118,10 @@ const postRecoveryFlow = async ({
 
 // Offer to enroll a new device
 const enrollAuthenticator = async ({
-                                     connection,
-                                     userNumber,
-                                     deviceAlias
-                                   }: {
+  connection,
+  userNumber,
+  deviceAlias,
+}: {
   connection: AuthenticatedConnection;
   userNumber: bigint;
   deviceAlias: string;
@@ -134,19 +134,19 @@ const enrollAuthenticator = async ({
       const newDeviceOrigin =
         userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
-            credentials: devices
-          })
+              credentials: devices,
+            })
           : undefined;
       const rpId = nonNullish(newDeviceOrigin)
         ? new URL(newDeviceOrigin).hostname
         : undefined;
       const newDevice = await constructIdentity({
         devices,
-        rpId
+        rpId,
       });
       return {
         newDevice,
-        newDeviceOrigin
+        newDeviceOrigin,
       };
     });
     newDevice = newDeviceData.newDevice;
@@ -164,7 +164,7 @@ const enrollAuthenticator = async ({
         detail:
           "Could not create credentials: " +
           unknownToString(error, "unknown error"),
-        primaryButton: "Ok"
+        primaryButton: "Ok",
       });
     }
     return "error";
@@ -192,7 +192,7 @@ const enrollAuthenticator = async ({
       detail:
         "The Passkey could not be added to the Internet Identity: " +
         unknownToString(error, "unknown error"),
-      primaryButton: "Ok"
+      primaryButton: "Ok",
     });
     return "error";
   }

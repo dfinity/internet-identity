@@ -1,6 +1,6 @@
 import {
   AuthnTemplates,
-  authenticateBox
+  authenticateBox,
 } from "$lib/templates/authenticateBox";
 import { displayError } from "$lib/templates/displayError";
 import { caretDownIcon } from "$lib/templates/icons";
@@ -26,11 +26,11 @@ import { AuthContext, authenticationProtocol } from "./postMessageInterface";
 
 /* Template for the authbox when authenticating to a dapp */
 export const authnTemplateAuthorize = ({
-                                         origin,
-                                         derivationOrigin,
-                                         knownDapp,
-                                         i18n
-                                       }: {
+  origin,
+  derivationOrigin,
+  knownDapp,
+  i18n,
+}: {
   origin: string;
   derivationOrigin?: string;
   knownDapp?: { name: string; logoSrc: string };
@@ -50,9 +50,9 @@ export const authnTemplateAuthorize = ({
   const isAltOriginOf = (action: "pick" | "use_existing" | "first_time") =>
     nonNullish(derivationOrigin) && derivationOrigin !== origin
       ? html`
-        ${copy[`${action}_alternative_of`]} ${strong(origin)}
-        ${copy[`${action}_alternative_of_join`]} ${strong(derivationOrigin)}
-      `
+          ${copy[`${action}_alternative_of`]} ${strong(origin)}
+          ${copy[`${action}_alternative_of_join`]} ${strong(derivationOrigin)}
+        `
       : undefined;
 
   // There are a few big variations of this screen that share some common elements:
@@ -62,10 +62,10 @@ export const authnTemplateAuthorize = ({
 
   // Variation: the dapp is known and user is using II for the first time
   const firstTimeKnown = ({
-                            action,
-                            name,
-                            logoSrc
-                          }: {
+    action,
+    name,
+    logoSrc,
+  }: {
     action: "pick" | "use_existing" | "first_time";
     name: string;
     logoSrc: string;
@@ -86,7 +86,7 @@ export const authnTemplateAuthorize = ({
     <div class="l-stack">
       ${h1(
         html`${copy.first_time_title_1}<br />${copy.first_time_title_join}
-        ${name} `
+          ${name} `,
       )}
       ${mkChasm({ message: isAltOriginOf(action) ?? strong(origin) })}
     </div>
@@ -111,7 +111,7 @@ export const authnTemplateAuthorize = ({
     const altOrigin = isAltOriginOf(action);
     // The "use_existing" screen has a different layout (mainWindow) than the "pick" screen (landingPage).
     // Ideally the outer space would be handled by the parent.
-    const classAttribute = action === "use_existing" ? "class=\"l-stack\"" : "";
+    const classAttribute = action === "use_existing" ? 'class="l-stack"' : "";
     return html`
       <div ${classAttribute}>
         ${h1(html`${copy[`${action}_title_1`]}`)}
@@ -119,9 +119,9 @@ export const authnTemplateAuthorize = ({
           ${copy[`${action}_subtitle`]} ${copy[`${action}_subtitle_join`]}
           ${nonNullish(knownDapp)
             ? mkChasm({
-              info: strong(knownDapp.name),
-              message: altOrigin ?? strong(origin)
-            })
+                info: strong(knownDapp.name),
+                message: altOrigin ?? strong(origin),
+              })
             : nonNullish(altOrigin)
               ? mkChasm({ info: strong(origin), message: altOrigin })
               : strong(origin)}
@@ -134,34 +134,34 @@ export const authnTemplateAuthorize = ({
     firstTime: {
       slot: nonNullish(knownDapp)
         ? firstTimeKnown({
-          // XXX: cannot destructure, because getter values get lost
-          logoSrc: knownDapp.logoSrc,
-          name: knownDapp.name,
-          action: "first_time"
-        })
+            // XXX: cannot destructure, because getter values get lost
+            logoSrc: knownDapp.logoSrc,
+            name: knownDapp.name,
+            action: "first_time",
+          })
         : firstTimeUnknown("first_time"),
       useExistingText: copy.first_time_use,
-      createAnchorText: copy.first_time_create_text
+      createAnchorText: copy.first_time_create_text,
     },
     useExisting: {
-      slot: returning("use_existing")
+      slot: returning("use_existing"),
     },
     pick: {
-      slot: returning("pick")
-    }
+      slot: returning("pick"),
+    },
   };
 };
 
 const authenticate = async (
   connection: Connection,
-  authContext: AuthContext
+  authContext: AuthContext,
 ): Promise<
   | {
-  kind: "success";
-  delegations: FrontendSignedDelegation[];
-  userPublicKey: Uint8Array;
-  authnMethod: "pin" | "passkey" | "recovery";
-}
+      kind: "success";
+      delegations: FrontendSignedDelegation[];
+      userPublicKey: Uint8Array;
+      authnMethod: "pin" | "passkey" | "recovery";
+    }
   | { kind: "failure"; text: string }
 > => {
   const i18n = new I18n();
@@ -169,7 +169,7 @@ const authenticate = async (
 
   const validationResult = await validateDerivationOrigin({
     requestOrigin: authContext.requestOrigin,
-    derivationOrigin: authContext.authRequest.derivationOrigin
+    derivationOrigin: authContext.authRequest.derivationOrigin,
   });
 
   if (validationResult.result === "invalid") {
@@ -178,12 +178,12 @@ const authenticate = async (
       message: html`"${authContext.authRequest.derivationOrigin}"
       ${copy.is_not_valid_origin_for} "${authContext.requestOrigin}"`,
       detail: validationResult.message,
-      primaryButton: copy.continue
+      primaryButton: copy.continue,
     });
 
     return {
       kind: "failure",
-      text: `Invalid derivation origin: ${validationResult.message}`
+      text: `Invalid derivation origin: ${validationResult.message}`,
     };
   }
 
@@ -191,7 +191,7 @@ const authenticate = async (
   if (nonNullish(authContext.authRequest.autoSelectionPrincipal)) {
     autoSelectionIdentity = await getAnchorIfLastUsed({
       principal: authContext.authRequest.autoSelectionPrincipal,
-      origin: authContext.requestOrigin
+      origin: authContext.requestOrigin,
     });
   }
 
@@ -203,13 +203,13 @@ const authenticate = async (
       derivationOrigin: authContext.authRequest.derivationOrigin,
       i18n,
       knownDapp: getDapps().find((dapp) =>
-        dapp.hasOrigin(authContext.requestOrigin)
-      )
+        dapp.hasOrigin(authContext.requestOrigin),
+      ),
     }),
     allowPinLogin: authContext.authRequest.allowPinAuthentication ?? true,
     // Registration with PIN is not allowed anymore
     allowPinRegistration: false,
-    autoSelectionIdentity: autoSelectionIdentity
+    autoSelectionIdentity: autoSelectionIdentity,
   });
 
   // TODO: Remove if we see more problems logging in.
@@ -231,14 +231,14 @@ const authenticate = async (
       connection: authSuccess.connection,
       derivationOrigin,
       publicKey: authContext.authRequest.sessionPublicKey,
-      maxTimeToLive: authContext.authRequest.maxTimeToLive
-    })
+      maxTimeToLive: authContext.authRequest.maxTimeToLive,
+    }),
   );
 
   if ("error" in result) {
     return {
       kind: "failure",
-      text: "Unexpected error"
+      text: "Unexpected error",
     };
   }
 
@@ -261,21 +261,21 @@ const authenticate = async (
   await setKnownPrincipal({
     userNumber: authSuccess.userNumber,
     origin: authContext.requestOrigin,
-    principal
+    principal,
   });
 
   return {
     kind: "success",
     delegations: [parsed_signed_delegation],
     userPublicKey: Uint8Array.from(userKey),
-    authnMethod: authSuccess.authnMethod
+    authnMethod: authSuccess.authnMethod,
   };
 };
 /** Run the authentication flow, including postMessage protocol, offering to authenticate
  * using an existing anchor or creating a new anchor, etc.
  */
 export const authFlowAuthorize = async (
-  connection: Connection
+  connection: Connection,
 ): Promise<never> => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -288,16 +288,16 @@ export const authFlowAuthorize = async (
       showSpinner({
         message: {
           waiting: copy.waiting_for_auth_data,
-          validating: copy.finalizing_auth
-        }[status]
-      })
+          validating: copy.finalizing_auth,
+        }[status],
+      }),
   });
 
   if (result === "orphan") {
     await displayError({
       title: copy.wrong_place,
       message: copy.no_request_received,
-      primaryButton: copy.go_home
+      primaryButton: copy.go_home,
     });
 
     location.hash = "";
@@ -307,7 +307,7 @@ export const authFlowAuthorize = async (
     await displayError({
       title: copy.connection_closed,
       message: copy.connection_could_not_be_established,
-      primaryButton: copy.go_home
+      primaryButton: copy.go_home,
     });
 
     location.hash = "";
@@ -317,7 +317,7 @@ export const authFlowAuthorize = async (
     await displayError({
       title: copy.invalid_request,
       message: copy.invalid_authentication_request_received,
-      primaryButton: copy.go_home
+      primaryButton: copy.go_home,
     });
 
     location.hash = "";
@@ -326,7 +326,7 @@ export const authFlowAuthorize = async (
 
   if (result === "failure") {
     showMessage({
-      message: copy.auth_failed
+      message: copy.auth_failed,
     });
     throw new Error("Authentication failure");
   }
@@ -334,7 +334,7 @@ export const authFlowAuthorize = async (
   result satisfies "success";
   showMessage({
     role: "notify-auth-success",
-    message: copy.auth_success
+    message: copy.auth_success,
   });
   return await new Promise((_) => {
     /* halt */
@@ -352,7 +352,7 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
   const ariaExpanded = new Chan(false);
   const chasmToggle = () => ariaExpanded.send(!ariaExpanded.latest);
   const btnFlipped = ariaExpanded.map((expanded) =>
-    expanded ? "c-chasm__button--flipped" : undefined
+    expanded ? "c-chasm__button--flipped" : undefined,
   );
 
   return html`
@@ -362,9 +362,9 @@ const mkChasm = ({ info, message }: ChasmOpts): TemplateResult => {
       class="t-action"
       data-action="toggle-chasm"
       @click=${() => chasmToggle()}
-    >${info}
+      >${info}
       <span class="t-link__icon c-chasm__button ${asyncReplace(btnFlipped)}"
-      >${caretDownIcon}</span
+        >${caretDownIcon}</span
       ></span
     >
     <div

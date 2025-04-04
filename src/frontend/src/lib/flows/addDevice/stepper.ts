@@ -2,8 +2,8 @@ import { checkmarkIcon } from "$lib/templates/icons";
 import { html } from "lit-html";
 
 export const tentativeDeviceStepper = ({
-                                         step
-                                       }: {
+  step,
+}: {
   step: "activate" | "verify" | "success";
 }) => html`
   <div class="c-progress-container">

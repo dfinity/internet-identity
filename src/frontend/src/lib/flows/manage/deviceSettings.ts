@@ -10,7 +10,7 @@ import {
   AuthenticatedConnection,
   bufferEqual,
   Connection,
-  LoginSuccess
+  LoginSuccess,
 } from "$lib/utils/iiConnection";
 import { renderPage } from "$lib/utils/lit-html";
 import { isProtected, RecoveryPhrase } from "$lib/utils/recoveryDevice";
@@ -20,10 +20,10 @@ import copyJson from "./deviceSettings.json";
 
 /* Rename the device and return */
 export const renameDevice = async ({
-                                     connection,
-                                     device,
-                                     reload
-                                   }: {
+  connection,
+  device,
+  reload,
+}: {
   connection: AuthenticatedConnection;
   device: DeviceData;
   reload: () => void;
@@ -31,7 +31,7 @@ export const renameDevice = async ({
   const alias = await promptDeviceAlias({
     title: "Passkey Nickname",
     message: "Choose a nickname for this Passkey",
-    value: device.alias
+    value: device.alias,
   });
   if (alias === null) {
     reload();
@@ -50,11 +50,11 @@ export const renameDevice = async ({
 /* Resetting */
 
 export const resetPhraseInfoTemplate = ({
-                                          next,
-                                          cancel,
-                                          i18n,
-                                          scrollToTop = false
-                                        }: {
+  next,
+  cancel,
+  i18n,
+  scrollToTop = false,
+}: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
@@ -72,23 +72,23 @@ export const resetPhraseInfoTemplate = ({
     entries: [
       {
         header: copy.reset_what_happens_q,
-        content: copy.reset_what_happens_a
+        content: copy.reset_what_happens_a,
       },
       {
         header: copy.reset_save_q,
         content: [
           copy.reset_save_a_1,
           copy.reset_save_a_2,
-          copy.reset_save_a_3
-        ]
+          copy.reset_save_a_3,
+        ],
       },
       { header: copy.reset_use_q, content: copy.reset_use_a },
-      { header: copy.reset_share_q, content: copy.reset_share_a }
+      { header: copy.reset_share_q, content: copy.reset_share_a },
     ],
     pageId: "reset-phrase-info",
     label: copy.reset_label,
     icon: "warning",
-    scrollToTop
+    scrollToTop,
   });
 };
 
@@ -99,18 +99,18 @@ const resetPhraseInfo = (): Promise<"ok" | "cancel"> => {
     resetPhraseInfoPage({
       i18n: new I18n(),
       next: () => resolve("ok"),
-      cancel: () => resolve("cancel")
+      cancel: () => resolve("cancel"),
     });
   });
 };
 
 /* Reset the device and return to caller */
 export const resetPhrase = async ({
-                                    userNumber,
-                                    connection,
-                                    device,
-                                    reload
-                                  }: {
+  userNumber,
+  connection,
+  device,
+  reload,
+}: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
   device: DeviceData & RecoveryPhrase;
@@ -126,16 +126,16 @@ export const resetPhrase = async ({
 
   const sameDevice = bufferEqual(
     connection.identity.getPublicKey().toDer(),
-    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey
+    new Uint8Array(device.pubkey).buffer as DerEncodedPublicKey,
   );
 
   // The connection used in the replace op
   // (if the phrase is protected, this prompts for the phrase and builds a new connection)
   const opConnection = isProtected(device)
     ? await deviceConnection(
-      connection,
-      "Please input your recovery phrase to reset it."
-    )
+        connection,
+        "Please input your recovery phrase to reset it.",
+      )
     : connection;
   if (opConnection === null) {
     // User aborted
@@ -146,14 +146,14 @@ export const resetPhrase = async ({
     withLoader(() =>
       opConnection.replace(device.pubkey, {
         ...device,
-        pubkey: Array.from(new Uint8Array(pubkey))
-      })
+        pubkey: Array.from(new Uint8Array(pubkey)),
+      }),
     );
 
   const res = await phraseWizard({
     userNumber,
     operation: "reset",
-    uploadPhrase
+    uploadPhrase,
   });
 
   if ("ok" in res) {
@@ -170,7 +170,7 @@ export const resetPhrase = async ({
       title: "Could not reset recovery phrase",
       message: "An unexpected error occurred",
       detail: unknownToString(res.error, "unknown error"),
-      primaryButton: "Ok"
+      primaryButton: "Ok",
     });
     return reload();
   } else {
@@ -182,11 +182,11 @@ export const resetPhrase = async ({
 /* Protecting */
 
 export const protectDeviceInfoTemplate = ({
-                                            next,
-                                            cancel,
-                                            i18n,
-                                            scrollToTop = false
-                                          }: {
+  next,
+  cancel,
+  i18n,
+  scrollToTop = false,
+}: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
@@ -203,23 +203,23 @@ export const protectDeviceInfoTemplate = ({
     entries: [
       {
         header: copy.protect_what_happens_q,
-        content: copy.protect_what_happens_a
+        content: copy.protect_what_happens_a,
       },
       {
         header: copy.protect_save_q,
         content: [
           copy.protect_save_a_1,
           copy.protect_save_a_2,
-          copy.protect_save_a_3
-        ]
+          copy.protect_save_a_3,
+        ],
       },
       { header: copy.protect_use_q, content: copy.protect_use_a },
-      { header: copy.protect_share_q, content: copy.protect_share_a }
+      { header: copy.protect_share_q, content: copy.protect_share_a },
     ],
     pageId: "protect-phrase-info",
     label: copy.protect_label,
     icon: "warning",
-    scrollToTop
+    scrollToTop,
   });
 };
 
@@ -230,17 +230,17 @@ const protectDeviceInfo = (): Promise<"ok" | "cancel"> => {
     protectDeviceInfoPage({
       i18n: new I18n(),
       next: () => resolve("ok"),
-      cancel: () => resolve("cancel")
+      cancel: () => resolve("cancel"),
     });
   });
 };
 
 /* Protect the device and re-render the device settings (with the updated device) */
 export const protectDevice = async ({
-                                      connection,
-                                      device,
-                                      reload
-                                    }: {
+  connection,
+  device,
+  reload,
+}: {
   connection: AuthenticatedConnection;
   device: DeviceData & RecoveryPhrase;
   reload: () => void;
@@ -260,7 +260,7 @@ export const protectDevice = async ({
   // with the device.
   const newConnection = await deviceConnection(
     connection,
-    "Please input your recovery phrase to lock it."
+    "Please input your recovery phrase to lock it.",
   );
 
   // if null then user canceled so we just redraw the manage page
@@ -278,11 +278,11 @@ export const protectDevice = async ({
 /* Unprotect */
 
 export const unprotectDeviceInfoTemplate = ({
-                                              next,
-                                              cancel,
-                                              i18n,
-                                              scrollToTop = false
-                                            }: {
+  next,
+  cancel,
+  i18n,
+  scrollToTop = false,
+}: {
   next: () => void;
   cancel: () => void;
   i18n: I18n;
@@ -301,7 +301,7 @@ export const unprotectDeviceInfoTemplate = ({
     pageId: "unprotect-phrase-info",
     label: copy.unprotect_label,
     icon: "warning",
-    scrollToTop
+    scrollToTop,
   });
 };
 
@@ -312,7 +312,7 @@ const unprotectDeviceInfo = (): Promise<"ok" | "cancel"> => {
     unprotectDeviceInfoPage({
       i18n: new I18n(),
       next: () => resolve("ok"),
-      cancel: () => resolve("cancel")
+      cancel: () => resolve("cancel"),
     });
   });
 };
@@ -321,7 +321,7 @@ const unprotectDeviceInfo = (): Promise<"ok" | "cancel"> => {
 export const unprotectDevice = async (
   connection: AuthenticatedConnection,
   device: DeviceData & RecoveryPhrase,
-  back: () => void
+  back: () => void,
 ) => {
   const confirmed = await unprotectDeviceInfo();
   if (confirmed === "cancel") {
@@ -334,7 +334,7 @@ export const unprotectDevice = async (
   // NOTE: we do need to be authenticated with the device in order to unprotect it
   const newConnection = await deviceConnection(
     connection,
-    "Please input your recovery phrase to unlock it."
+    "Please input your recovery phrase to unlock it.",
   );
 
   await withLoader(async () => {
@@ -353,12 +353,12 @@ export const unprotectDevice = async (
 // NOTE: this expects a recovery phrase device
 const deviceConnection = async (
   connection: Connection,
-  recoveryPhraseMessage: string
+  recoveryPhraseMessage: string,
 ): Promise<AuthenticatedConnection | null> => {
   try {
     const loginResult = await recoverWithPhrase({
       connection,
-      message: recoveryPhraseMessage
+      message: recoveryPhraseMessage,
     });
 
     if ("tag" in loginResult) {
@@ -374,7 +374,7 @@ const deviceConnection = async (
       message:
         "An unexpected error occurred when trying to read recovery phrase for device modification.",
       detail: error instanceof Error ? error.toString() : "unknown error",
-      primaryButton: "Ok"
+      primaryButton: "Ok",
     });
     return null;
   }

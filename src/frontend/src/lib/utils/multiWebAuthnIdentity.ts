@@ -28,7 +28,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
   public static fromCredentials(
     credentialData: CredentialData[],
     rpId: string | undefined,
-    iframe: boolean | undefined
+    iframe: boolean | undefined,
   ): MultiWebAuthnIdentity {
     return new this(credentialData, rpId, iframe);
   }
@@ -39,7 +39,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
   protected constructor(
     readonly credentialData: CredentialData[],
     readonly rpId: string | undefined,
-    readonly iframe: boolean | undefined
+    readonly iframe: boolean | undefined,
   ) {
     super();
     this._actualIdentity = undefined;
@@ -75,12 +75,12 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
-          id: cd.credentialId
+          id: cd.credentialId,
         })),
         challenge: blob,
         userVerification: "discouraged",
-        rpId: this.rpId
-      }
+        rpId: this.rpId,
+      },
     };
     const result = (
       this.iframe === true && nonNullish(this.rpId)
@@ -95,7 +95,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
           unwrapDER(cd.pubkey, DER_COSE_OID),
           undefined,
           this.rpId,
-          undefined
+          undefined,
         );
         break;
       }
@@ -111,8 +111,8 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       new borc.Tagged(55799, {
         authenticator_data: new Uint8Array(response.authenticatorData),
         client_data_json: new TextDecoder().decode(response.clientDataJSON),
-        signature: new Uint8Array(response.signature)
-      })
+        signature: new Uint8Array(response.signature),
+      }),
     );
     // eslint-disable-next-line
     if (!cbor) {

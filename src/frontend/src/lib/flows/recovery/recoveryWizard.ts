@@ -15,19 +15,19 @@ import { isNullish } from "@dfinity/utils";
 import { addDevice } from "../addDevice/manage/addDevice";
 import {
   PinIdentityMaterial,
-  idbRetrievePinIdentityMaterial
+  idbRetrievePinIdentityMaterial,
 } from "../pin/idb";
 import copyJson from "./recoveryWizard.json";
 
 /* Phrase creation kick-off screen */
 
 const addPhraseTemplate = ({
-                             ok,
-                             cancel,
-                             i18n,
-                             scrollToTop = false,
-                             intent
-                           }: {
+  ok,
+  cancel,
+  i18n,
+  scrollToTop = false,
+  intent,
+}: {
   ok: () => void;
   cancel: () => void;
   i18n: I18n;
@@ -41,7 +41,7 @@ const addPhraseTemplate = ({
 
   const [cancelText, icon, label] = {
     userInitiated: [copy.cancel, "info", copy.label_info] as const,
-    securityReminder: [copy.skip, "warning", copy.label_warning] as const
+    securityReminder: [copy.skip, "warning", copy.label_warning] as const,
   }[intent];
 
   return infoScreenTemplate({
@@ -62,12 +62,12 @@ const addPhraseTemplate = ({
         content: [
           copy.how_save_phrase_a_1,
           copy.how_save_phrase_a_2,
-          copy.how_save_phrase_a_3
-        ]
+          copy.how_save_phrase_a_3,
+        ],
       },
       { header: copy.when_use_phrase_q, content: copy.when_use_phrase_a_1 },
-      { header: copy.share_phrase_q, content: copy.share_phrase_a_1 }
-    ]
+      { header: copy.share_phrase_q, content: copy.share_phrase_a_1 },
+    ],
   });
 };
 
@@ -75,8 +75,8 @@ export const addPhrasePage = renderPage(addPhraseTemplate);
 
 // Prompt the user to create a recovery phrase
 export const addPhrase = ({
-                            intent
-                          }: {
+  intent,
+}: {
   intent: Parameters<typeof addPhrasePage>[0]["intent"];
 }): Promise<"ok" | "cancel"> => {
   return new Promise((resolve) =>
@@ -85,20 +85,20 @@ export const addPhrase = ({
       ok: () => resolve("ok"),
       cancel: () => resolve("cancel"),
       scrollToTop: true,
-      intent
-    })
+      intent,
+    }),
   );
 };
 
 type DeviceStatus = "pin-only" | "one-device";
 
 const addDeviceWarningTemplate = ({
-                                    ok,
-                                    remindLater,
-                                    doNotRemindAgain,
-                                    i18n,
-                                    status
-                                  }: {
+  ok,
+  remindLater,
+  doNotRemindAgain,
+  i18n,
+  status,
+}: {
   ok: () => void;
   remindLater: () => void;
   doNotRemindAgain: () => void;
@@ -110,12 +110,12 @@ const addDeviceWarningTemplate = ({
   const [paragraph, title] = {
     "pin-only": [
       copy.paragraph_add_device_pin_only,
-      copy.add_device_title_pin_only
+      copy.add_device_title_pin_only,
     ],
     "one-device": [
       copy.paragraph_add_device_one_passkey,
-      copy.add_device_title_one_passkey
-    ]
+      copy.add_device_title_one_passkey,
+    ],
   }[status];
 
   return infoScreenTemplate({
@@ -130,7 +130,7 @@ const addDeviceWarningTemplate = ({
     scrollToTop: true,
     icon: "warning",
     pageId: "add-another-device-warning",
-    label: copy.label_warning
+    label: copy.label_warning,
   });
 };
 
@@ -139,8 +139,8 @@ export const addDeviceWarningPage = renderPage(addDeviceWarningTemplate);
 
 // Prompt the user to create a recovery phrase
 export const addDeviceWarning = ({
-                                   status
-                                 }: {
+  status,
+}: {
   status: DeviceStatus;
 }): Promise<{ action: "remind-later" | "do-not-remind" | "add-device" }> => {
   return new Promise((resolve) =>
@@ -149,8 +149,8 @@ export const addDeviceWarning = ({
       ok: () => resolve({ action: "add-device" }),
       remindLater: () => resolve({ action: "remind-later" }),
       doNotRemindAgain: () => resolve({ action: "do-not-remind" }),
-      status
-    })
+      status,
+    }),
   );
 };
 
@@ -178,11 +178,11 @@ export const addDeviceWarning = ({
  */
 // Exported for testing
 export const getDevicesStatus = ({
-                                   credentials,
-                                   identityMetadata,
-                                   pinIdentityMaterial,
-                                   nowInMillis
-                                 }: {
+  credentials,
+  identityMetadata,
+  pinIdentityMaterial,
+  nowInMillis,
+}: {
   credentials: Omit<DeviceData, "alias">[];
   identityMetadata: IdentityMetadata | undefined;
   pinIdentityMaterial: PinIdentityMaterial | undefined;
@@ -194,10 +194,10 @@ export const getDevicesStatus = ({
     (identityMetadata?.recoveryPageShownTimestampMillis ?? 0) <
     oneWeekAgoTimestamp;
   const showWarningPageEnabled = isNullish(
-    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis
+    identityMetadata?.doNotShowRecoveryPageRequestTimestampMillis,
   );
   const totalDevicesCount = credentials.filter(
-    ({ key_type }) => !("seed_phrase" in key_type)
+    ({ key_type }) => !("seed_phrase" in key_type),
   ).length;
   if (
     totalDevicesCount <= 1 &&
@@ -217,7 +217,7 @@ export const getDevicesStatus = ({
 // TODO: Add e2e test https://dfinity.atlassian.net/browse/GIX-2600
 export const recoveryWizard = async (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): Promise<void> => {
   // Here, if the user doesn't have any recovery device, we prompt them to add
   // one.
@@ -227,9 +227,9 @@ export const recoveryWizard = async (
         connection.lookupAll(userNumber),
         connection.getIdentityMetadata(),
         idbRetrievePinIdentityMaterial({
-          userNumber
-        })
-      ])
+          userNumber,
+        }),
+      ]),
   );
   const nowInMillis = Date.now();
 
@@ -237,33 +237,33 @@ export const recoveryWizard = async (
     credentials,
     identityMetadata,
     pinIdentityMaterial,
-    nowInMillis
+    nowInMillis,
   });
 
   const originNewDevice =
     userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
       ? getCredentialsOrigin({
-        credentials
-      })
+          credentials,
+        })
       : undefined;
 
   if (devicesStatus !== "no-warning") {
     connection.updateIdentityMetadata({
-      recoveryPageShownTimestampMillis: nowInMillis
+      recoveryPageShownTimestampMillis: nowInMillis,
     });
     const userChoice = await addDeviceWarning({
-      status: devicesStatus
+      status: devicesStatus,
     });
     if (userChoice.action === "add-device") {
       await addDevice({
         userNumber,
         connection,
-        origin: originNewDevice ?? window.origin
+        origin: originNewDevice ?? window.origin,
       });
     }
     if (userChoice.action === "do-not-remind") {
       connection.updateIdentityMetadata({
-        doNotShowRecoveryPageRequestTimestampMillis: nowInMillis
+        doNotShowRecoveryPageRequestTimestampMillis: nowInMillis,
       });
     }
     // Do nothing if `"remind-later"`.

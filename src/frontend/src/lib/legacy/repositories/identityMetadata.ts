@@ -12,7 +12,7 @@ export const DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS =
   "doNotShowRecoveryPageRequestTimestampMillis";
 const NUMBER_KEYS: Array<keyof IdentityMetadata> = [
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-  DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS
+  DO_NOT_SHOW_RECOVERY_PAGE_REQUEST_TIMESTAMP_MILLIS,
 ];
 
 const convertMetadata = (rawMetadata: MetadataMapV2): IdentityMetadata => {
@@ -33,15 +33,15 @@ const convertMetadata = (rawMetadata: MetadataMapV2): IdentityMetadata => {
 };
 
 const updateMetadataMapV2 = ({
-                               metadataMap,
-                               partialIdentityMetadata
-                             }: {
+  metadataMap,
+  partialIdentityMetadata,
+}: {
   metadataMap: MetadataMapV2;
   partialIdentityMetadata: Partial<IdentityMetadata>;
 }): MetadataMapV2 => {
   // Convert the partialIdentityMetadata into the format of MetadataMapV2
   const identityMetadataEntries: MetadataMapV2 = Object.entries(
-    partialIdentityMetadata
+    partialIdentityMetadata,
   ).map(([key, value]) => {
     if (typeof value === "number") {
       return [key, { String: value.toString() }] as [
@@ -55,7 +55,7 @@ const updateMetadataMapV2 = ({
   // Update or add entries in metadataMap
   const updatedMetadataMap: MetadataMapV2 = metadataMap.map(([key, value]) => {
     const updatedEntry = identityMetadataEntries.find(
-      ([identityKey]) => identityKey === key
+      ([identityKey]) => identityKey === key,
     );
     return updatedEntry ? updatedEntry : [key, value];
   });
@@ -91,9 +91,9 @@ export class IdentityMetadataRepository {
   private readonly setter: MetadataSetter;
 
   static init = ({
-                   getter,
-                   setter
-                 }: {
+    getter,
+    setter,
+  }: {
     getter: MetadataGetter;
     setter: MetadataSetter;
   }) => {
@@ -102,9 +102,9 @@ export class IdentityMetadataRepository {
   };
 
   private constructor({
-                        getter,
-                        setter
-                      }: {
+    getter,
+    setter,
+  }: {
     getter: MetadataGetter;
     setter: MetadataSetter;
   }) {
@@ -127,7 +127,7 @@ export class IdentityMetadataRepository {
     } catch (e) {
       console.warn(
         "Failed to load identity metadata: ",
-        unknownToString(e, "unknown error")
+        unknownToString(e, "unknown error"),
       );
     }
     return undefined;
@@ -149,14 +149,14 @@ export class IdentityMetadataRepository {
       this.metadata = this.metadata.then((metadataMap) =>
         updateMetadataMapV2({
           metadataMap: metadataMap,
-          partialIdentityMetadata: partialMetadata
-        })
+          partialIdentityMetadata: partialMetadata,
+        }),
       );
       this.updatedMetadata = true;
     } catch (e) {
       console.warn(
         "Error updating identity metadata: ",
-        unknownToString(e, "unknown error")
+        unknownToString(e, "unknown error"),
       );
     }
   };
@@ -178,7 +178,7 @@ export class IdentityMetadataRepository {
       } catch (error) {
         console.warn(
           "Error committing identity metadata: ",
-          unknownToString(error, "unknown error")
+          unknownToString(error, "unknown error"),
         );
         return false;
       }

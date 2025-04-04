@@ -8,26 +8,26 @@ import { unknownToString } from "$lib/utils/utils";
 import { constructIdentity } from "$lib/utils/webAuthn";
 import {
   isWebAuthnCancel,
-  webAuthnErrorCopy
+  webAuthnErrorCopy,
 } from "$lib/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 import copyJson from "./passkey.json";
 import {
   RegistrationEvents,
-  registrationFunnel
+  registrationFunnel,
 } from "$lib/utils/analytics/registrationFunnel";
 
 /* Anchor construction component (for creating WebAuthn credentials) */
 
 const savePasskeyTemplate = ({
-                               constructPasskey,
-                               constructPin,
-                               constructOpenIdGoogle,
-                               i18n,
-                               cancel,
-                               scrollToTop = false
-                             }: {
+  constructPasskey,
+  constructPin,
+  constructOpenIdGoogle,
+  i18n,
+  cancel,
+  scrollToTop = false,
+}: {
   constructPasskey: () => void;
   constructPin?: () => void;
   constructOpenIdGoogle?: () => void;
@@ -108,7 +108,7 @@ const savePasskeyTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -116,10 +116,10 @@ export const savePasskeyPage = renderPage(savePasskeyTemplate);
 
 // Prompt the user to create a WebAuthn identity or a PIN identity (if allowed)
 export const savePasskeyPinOrOpenID = async ({
-                                               pinAllowed,
-                                               origin,
-                                               googleAllowed
-                                             }: {
+  pinAllowed,
+  origin,
+  googleAllowed,
+}: {
   pinAllowed: boolean;
   origin: string;
   googleAllowed: boolean;
@@ -138,7 +138,7 @@ export const savePasskeyPinOrOpenID = async ({
                 ? undefined
                 : new URL(origin).hostname;
             const identity = await withLoader(() =>
-              constructIdentity({ rpId })
+              constructIdentity({ rpId }),
             );
             resolve(identity);
           } catch (e) {
@@ -148,7 +148,7 @@ export const savePasskeyPinOrOpenID = async ({
         constructPin: pinAllowed ? () => resolve("pin") : undefined,
         constructOpenIdGoogle: googleAllowed
           ? () => resolve("google")
-          : undefined
+          : undefined,
       });
     });
   }

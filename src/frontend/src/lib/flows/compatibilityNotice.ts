@@ -22,14 +22,14 @@ const pageContent = () =>
         Touch ID / Face ID) enabled and try again.
       </p>
     `,
-    additionalClasses: ["l-stack"]
+    additionalClasses: ["l-stack"],
   });
 export const compatibilityNotice = (): void => {
   const container = document.getElementById("pageContent") as HTMLElement;
   render(
     mainWindow({
       slot: pageContent(),
-      showLogo: false
+      showLogo: false,
     }),
     container,
   );

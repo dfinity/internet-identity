@@ -23,68 +23,68 @@ const clarifyError: {
     title: "Failed to authenticate",
     message:
       "We failed to authenticate you using your security device. If this is the first time you're trying to log in with this device, you have to add it as a new device first.",
-    detail: err.error.message
+    detail: err.error.message,
   }),
   webAuthnFailed: () => ({
     title: "Operation canceled",
     message:
-      "The interaction with your security device was canceled or timed out. Please try again."
+      "The interaction with your security device was canceled or timed out. Please try again.",
   }),
   unknownUser: (err) => ({
     title: "Unknown Internet Identity",
-    message: `Failed to find Internet Identity ${err.userNumber}. Please check your Internet Identity and try again.`
+    message: `Failed to find Internet Identity ${err.userNumber}. Please check your Internet Identity and try again.`,
   }),
   apiError: (err) => ({
     title: "We couldn't reach Internet Identity",
     message:
       "We failed to call the Internet Identity service, please try again.",
-    detail: err.error.message
+    detail: err.error.message,
   }),
   badPin: () => ({ title: "Could not authenticate", message: "Invalid PIN" }),
   registerNoSpace: () => ({
     title: "Failed to register",
     message:
-      "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity."
+      "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
   }),
   pinNotAllowed: () => ({
     title: "PIN method not allowed",
     message:
-      "The Dapp you are authenticating to does not allow PIN identities and you only have a PIN identity. Please retry using a Passkey: open a new Internet Identity page, add a passkey and retry."
+      "The Dapp you are authenticating to does not allow PIN identities and you only have a PIN identity. Please retry using a Passkey: open a new Internet Identity page, add a passkey and retry.",
   }),
   alreadyInProgress: () => ({
     title: "Registration is already in progress",
-    message: "Registration has already been started on this session."
+    message: "Registration has already been started on this session.",
   }),
   rateLimitExceeded: () => ({
     title: "Registration rate limit exceeded",
     message:
-      "Internet Identity is under heavy load. Too many registrations. Please try again later."
+      "Internet Identity is under heavy load. Too many registrations. Please try again later.",
   }),
   invalidCaller: () => ({
     title: "Registration is not allowed using the anonymous identity",
     message:
-      "Registration was attempted using the anonymous identity which is not allowed."
+      "Registration was attempted using the anonymous identity which is not allowed.",
   }),
   invalidAuthnMethod: (err) => ({
     title: "Invalid authentication method",
-    message: `Invalid authentication method: ${err.message}.`
+    message: `Invalid authentication method: ${err.message}.`,
   }),
   noRegistrationFlow: () => ({
     title: "Registration flow timed out",
-    message: "Registration flow timed out. Please restart."
+    message: "Registration flow timed out. Please restart.",
   }),
   unexpectedCall: (err) => ({
     title: "Unexpected call",
-    message: `Unexpected call: expected next step "${err.nextStep.step}"`
+    message: `Unexpected call: expected next step "${err.nextStep.step}"`,
   }),
   missingGoogleClientId: () => ({
     title: "Google Sign-in unavailable",
-    message: "Sign in with Google accounts is currently unavailable."
+    message: "Sign in with Google accounts is currently unavailable.",
   }),
   googleLoginFailed: () => ({
     title: "Google Sign-in failed",
-    message: "Failed to sign in with Google. Please try again."
-  })
+    message: "Failed to sign in with Google. Please try again.",
+  }),
 };
 
 export const flowErrorToastTemplate = <K extends FlowError["kind"]>(

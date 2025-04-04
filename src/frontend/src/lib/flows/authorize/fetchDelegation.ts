@@ -1,6 +1,6 @@
 import type {
   PublicKey,
-  SignedDelegation
+  SignedDelegation,
 } from "$lib/generated/internet_identity_types";
 import { toast } from "$lib/templates/toast";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
@@ -16,11 +16,11 @@ import type { SignedDelegation as FrontendSignedDelegation } from "@dfinity/iden
  * @return Tuple of PublicKey and matching delegation.
  */
 export const fetchDelegation = async ({
-                                        connection,
-                                        derivationOrigin,
-                                        publicKey,
-                                        maxTimeToLive
-                                      }: {
+  connection,
+  derivationOrigin,
+  publicKey,
+  maxTimeToLive,
+}: {
   connection: AuthenticatedConnection;
   derivationOrigin: string;
   publicKey: Uint8Array;
@@ -29,7 +29,7 @@ export const fetchDelegation = async ({
   const result = await connection.prepareDelegation(
     derivationOrigin,
     publicKey,
-    maxTimeToLive
+    maxTimeToLive,
   );
 
   if ("error" in result) {
@@ -42,7 +42,7 @@ export const fetchDelegation = async ({
     connection,
     derivationOrigin,
     publicKey,
-    timestamp
+    timestamp,
   );
 
   // Parse the candid SignedDelegation into a format that `DelegationChain` understands.
@@ -54,7 +54,7 @@ const retryGetDelegation = async (
   hostname: string,
   publicKey: PublicKey,
   timestamp: bigint,
-  maxRetries = 5
+  maxRetries = 5,
 ): Promise<SignedDelegation> => {
   for (let i = 0; i < maxRetries; i++) {
     // Linear backoff
@@ -69,7 +69,7 @@ const retryGetDelegation = async (
     if ("error" in res) {
       toast.error(
         "Error while fetching delegation: " +
-        unknownToString(res.error, "unknown error")
+          unknownToString(res.error, "unknown error"),
       );
       continue;
     }
@@ -77,6 +77,6 @@ const retryGetDelegation = async (
     return res.signed_delegation;
   }
   throw new Error(
-    `Failed to retrieve a delegation after ${maxRetries} retries.`
+    `Failed to retrieve a delegation after ${maxRetries} retries.`,
   );
 };
