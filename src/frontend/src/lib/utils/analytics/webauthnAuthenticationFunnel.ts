@@ -8,12 +8,12 @@ import { Funnel } from "./Funnel";
  *     cancelled-webauthn-authentication
  *   successful-webauthn-authentication
  */
-export enum WebauthnAuthorizationEvents {
+export enum WebauthnAuthenticationEvents {
   Failed = "failed-webauthn-authentication",
   Cancelled = "cancelled-webauthn-authentication",
   Success = "successful-webauthn-authentication",
 }
 
-export const webauthnAuthorizationFunnel = new Funnel<
-  typeof WebauthnAuthorizationEvents
+export const webauthnAuthenticationFunnel = new Funnel<
+  typeof WebauthnAuthenticationEvents
 >("webauthn-authentication");

@@ -68,7 +68,6 @@ import {
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { analytics } from "./analytics/analytics";
 import {
   convertToValidCredentialData,
   CredentialData
@@ -79,7 +78,7 @@ import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
-import { webauthnAuthorizationFunnel, WebauthnAuthorizationEvents } from "./analytics/webauthnAuthorizationFunnel";
+import { webauthnAuthenticationFunnel, WebauthnAuthenticationEvents } from "./analytics/webauthnAuthenticationFunnel";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -528,7 +527,7 @@ export class Connection {
     const flowsLength = this.webAuthFlows?.flows.length ?? 0;
 
     // Better understand which users make it (or don't) all the way.
-    webauthnAuthorizationFunnel.init({ flowsLength });
+    webauthnAuthenticationFunnel.init({ flowsLength });
 
     // We reached the last flow. Start from the beginning.
     // This might happen if the user cancelled manually in the flow that would have been successful.
@@ -559,10 +558,10 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       // Better understand which users don't make it all the way.
-      webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Failed);
+      webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Failed);
       if (isWebAuthnCancel(e)) {
         // Better understand which users don't make it all the way.
-        webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Cancelled);
+        webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Cancelled);
         // We only want to show a special error if the user might have to choose different web auth flow.
         if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
           // Increase the index to try the next flow.
@@ -599,7 +598,7 @@ export class Connection {
     const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
 
     // Better understand which users make it all the way.
-    webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Success);
+    webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Success);
 
     return {
       kind: "loginSuccess",
