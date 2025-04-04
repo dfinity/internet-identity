@@ -3,15 +3,15 @@ import { features } from "$lib/legacy/features";
 import {
   DummyIdentity,
   IIWebAuthnIdentity,
-  creationOptions
+  creationOptions,
 } from "$lib/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
 
 export const constructIdentity = async ({
-                                          devices,
-                                          rpId
-                                        }: {
+  devices,
+  rpId,
+}: {
   devices?: Array<DeviceData>;
   rpId?: string;
 }): Promise<IIWebAuthnIdentity> => {
@@ -62,7 +62,8 @@ export const extractAAGUID = (authData: Uint8Array): string | undefined => {
 export const lookupAAGUID = async (
   aaguid: string,
 ): Promise<string | undefined> => {
-  const knownList = (await import("$lib/legacy/assets/passkey_aaguid_data.json"))
-    .default;
+  const knownList = (
+    await import("$lib/legacy/assets/passkey_aaguid_data.json")
+  ).default;
   return knownList[aaguid as keyof typeof knownList];
 };

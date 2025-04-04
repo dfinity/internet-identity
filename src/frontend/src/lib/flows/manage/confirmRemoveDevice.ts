@@ -13,15 +13,15 @@ import copyJson from "./confirmRemoveDevice.json";
 // 'authentication' | 'recovery' from Purpose type
 export type PurposeType = "authentication" | "recovery";
 const confirmRemoveDeviceTemplate = ({
-                                       i18n,
-                                       purpose,
-                                       next,
-                                       cancel,
-                                       alias,
-                                       lastUsedNanoseconds,
-                                       originRegistered,
-                                       isCurrentDevice
-                                     }: {
+  i18n,
+  purpose,
+  next,
+  cancel,
+  alias,
+  lastUsedNanoseconds,
+  originRegistered,
+  isCurrentDevice,
+}: {
   i18n: I18n;
   purpose: Purpose;
   next: () => void;
@@ -38,12 +38,12 @@ const confirmRemoveDeviceTemplate = ({
   > = {
     authentication: {
       title: copy.title_authenticator_device,
-      message: copy.message_authenticator_device
+      message: copy.message_authenticator_device,
     },
     recovery: {
       title: copy.title_recovery_device,
-      message: copy.message_recovery_device
-    }
+      message: copy.message_recovery_device,
+    },
   };
   const purposeType = Object.keys(purpose)[0] as PurposeType;
   const input: Ref<HTMLInputElement> = createRef();
@@ -53,7 +53,7 @@ const confirmRemoveDeviceTemplate = ({
   let lastUsageFormattedString: string | undefined = undefined;
   if (nonNullish(lastUsedNanoseconds)) {
     const lastUsageTimeStamp = new Date(
-      Number(lastUsedNanoseconds / BigInt(1000000))
+      Number(lastUsedNanoseconds / BigInt(1000000)),
     );
     lastUsageFormattedString = formatLastUsage(lastUsageTimeStamp);
   }
@@ -71,55 +71,55 @@ const confirmRemoveDeviceTemplate = ({
       <p class="t-paragraph">${copy.irreversible_action}</p>
       <ul class="c-list c-list--bulleted">
         ${
-    showAlias
-      ? html`<li>
-              ${copy.label_nickname} <span class="t-strong">${alias}</span>
-            </li>`
-      : undefined
-  }
+          showAlias
+            ? html`<li>
+                ${copy.label_nickname} <span class="t-strong">${alias}</span>
+              </li>`
+            : undefined
+        }
         ${
-    nonNullish(lastUsageFormattedString)
-      ? html`<li>
-              ${copy.label_last_used}
-              <span class="t-strong">${lastUsageFormattedString}</span>
-            </li>`
-      : undefined
-  }
+          nonNullish(lastUsageFormattedString)
+            ? html`<li>
+                ${copy.label_last_used}
+                <span class="t-strong">${lastUsageFormattedString}</span>
+              </li>`
+            : undefined
+        }
         <li>${html`${copy.label_origin}
-        <span class="t-strong"
-        >${originRegistered ?? LEGACY_II_URL}</span
-        >`}</strong></li>
+          <span class="t-strong"
+            >${originRegistered ?? LEGACY_II_URL}</span
+          >`}</strong></li>
       </ul>
       <p class="t-paragraph">${mappedCopy.message}</p>
       ${
-    isCurrentDevice
-      ? html`<p class="t-paragraph">${copy.current_device_warning}</p>`
-      : undefined
-  }
+        isCurrentDevice
+          ? html`<p class="t-paragraph">${copy.current_device_warning}</p>`
+          : undefined
+      }
     </hgroup>
     <div>
       ${
-    purposeType === "authentication"
-      ? html`<input
-            autofocus
-            ${ref(input)}
-            id="confirmRemoveDeviceAlias"
-            class="c-input c-input--stack c-input--fullwidth"
-            spellcheck="false"
-            .onpaste=${(e: Event) => e.preventDefault()}
-            @input=${() =>
-        withRef(input, (inputElement) =>
-          withRef(confirmButton, (buttonElement) => {
-            if (inputElement.value === alias) {
-              buttonElement.disabled = false;
-            } else {
-              buttonElement.disabled = true;
-            }
-          })
-        )}
-          />`
-      : undefined
-  }
+        purposeType === "authentication"
+          ? html`<input
+              autofocus
+              ${ref(input)}
+              id="confirmRemoveDeviceAlias"
+              class="c-input c-input--stack c-input--fullwidth"
+              spellcheck="false"
+              .onpaste=${(e: Event) => e.preventDefault()}
+              @input=${() =>
+                withRef(input, (inputElement) =>
+                  withRef(confirmButton, (buttonElement) => {
+                    if (inputElement.value === alias) {
+                      buttonElement.disabled = false;
+                    } else {
+                      buttonElement.disabled = true;
+                    }
+                  }),
+                )}
+            />`
+          : undefined
+      }
     </div>
     <div class="l-stack">
       <button
@@ -145,20 +145,20 @@ const confirmRemoveDeviceTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
 export const confirmRemoveDevicePage = renderPage(confirmRemoveDeviceTemplate);
 
 export const confirmRemoveDevice = ({
-                                      i18n,
-                                      purpose,
-                                      alias,
-                                      lastUsedNanoseconds,
-                                      originRegistered,
-                                      isCurrentDevice
-                                    }: {
+  i18n,
+  purpose,
+  alias,
+  lastUsedNanoseconds,
+  originRegistered,
+  isCurrentDevice,
+}: {
   i18n: I18n;
   purpose: Purpose;
   alias: string;
@@ -175,7 +175,7 @@ export const confirmRemoveDevice = ({
       cancel: () => resolve("cancelled"),
       lastUsedNanoseconds,
       originRegistered,
-      isCurrentDevice
-    })
+      isCurrentDevice,
+    }),
   );
 };

@@ -2,12 +2,12 @@ import {
   checkmarkRoundIcon,
   lockedIcon,
   warningIcon,
-  warningRoundIcon
+  warningRoundIcon,
 } from "$lib/templates/icons";
 import { DynamicKey, I18n } from "$lib/legacy/i18n";
 import {
   recoveryKeyLabel,
-  recoveryPhraseLabel
+  recoveryPhraseLabel,
 } from "$lib/utils/recoveryDevice";
 import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
@@ -19,11 +19,11 @@ import copyJson from "./recoveryMethodsSection.json";
 
 // The list of recovery devices
 export const recoveryMethodsSection = ({
-                                         recoveries: { recoveryPhrase, recoveryKey },
-                                         addRecoveryPhrase,
-                                         addRecoveryKey,
-                                         onRemoveDevice
-                                       }: {
+  recoveries: { recoveryPhrase, recoveryKey },
+  addRecoveryPhrase,
+  addRecoveryKey,
+  onRemoveDevice,
+}: {
   recoveries: Devices["recoveries"];
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
@@ -37,13 +37,13 @@ export const recoveryMethodsSection = ({
     "l-stack",
     "c-card",
     "c-card--narrow",
-    ...(warnNoRecovery ? ["c-card--warning"] : [])
+    ...(warnNoRecovery ? ["c-card--warning"] : []),
   ];
 
   return html`
     <aside class=${wrapClasses.join(" ")} data-role="recoveries">
       ${warnNoRecovery
-    ? html`
+        ? html`
             <span
               class="c-card__label c-card__label--hasIcon"
               aria-hidden="true"
@@ -55,7 +55,7 @@ export const recoveryMethodsSection = ({
               <h2>${copy.security_warning}</h2>
             </span>
           `
-    : ""}
+        : ""}
       <div class="t-title">
         <h2>Recovery Methods</h2>
       </div>
@@ -63,14 +63,14 @@ export const recoveryMethodsSection = ({
       <div class="c-action-list">
         <ul>
           ${isNullish(recoveryPhrase)
-    ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
-    : recoveryPhraseItem({ recoveryPhrase, i18n })}
+            ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
+            : recoveryPhraseItem({ recoveryPhrase, i18n })}
           ${isNullish(recoveryKey)
-    ? missingRecovery({ recovery: "key", addRecoveryKey })
-    : recoveryKeyItem({
-      onRemoveDevice: () => onRemoveDevice(recoveryKey.device),
-      i18n
-    })}
+            ? missingRecovery({ recovery: "key", addRecoveryKey })
+            : recoveryKeyItem({
+                onRemoveDevice: () => onRemoveDevice(recoveryKey.device),
+                i18n,
+              })}
         </ul>
       </div>
     </aside>
@@ -81,32 +81,32 @@ export const recoveryMethodsSection = ({
 export const missingRecovery = (
   args:
     | {
-    recovery: "phrase";
-    addRecoveryPhrase: () => void;
-  }
+        recovery: "phrase";
+        addRecoveryPhrase: () => void;
+      }
     | {
-    recovery: "key";
-    addRecoveryKey: () => void;
-  }
+        recovery: "key";
+        addRecoveryKey: () => void;
+      },
 ) => {
   const { icon, iconClass, recoveryName, message, fn, action } =
     args.recovery === "phrase"
       ? {
-        icon: warningRoundIcon,
-        iconClass: "c-icon--error",
-        recoveryName: "Recovery Phrase",
-        message: "For minimum security, enable a recovery phrase.",
-        fn: () => args.addRecoveryPhrase(),
-        action: "add-recovery-phrase"
-      }
+          icon: warningRoundIcon,
+          iconClass: "c-icon--error",
+          recoveryName: "Recovery Phrase",
+          message: "For minimum security, enable a recovery phrase.",
+          fn: () => args.addRecoveryPhrase(),
+          action: "add-recovery-phrase",
+        }
       : {
-        icon: warningIcon,
-        iconClass: "c-icon--warning",
-        recoveryName: "Recovery Device",
-        message: "For extra security, enable a recovery device.",
-        fn: () => args.addRecoveryKey(),
-        action: "add-recovery-device"
-      };
+          icon: warningIcon,
+          iconClass: "c-icon--warning",
+          recoveryName: "Recovery Device",
+          message: "For extra security, enable a recovery device.",
+          fn: () => args.addRecoveryKey(),
+          action: "add-recovery-device",
+        };
   return html`
     <li class="c-action-list__item">
       <div class="c-action-list__status">
@@ -132,9 +132,9 @@ export const missingRecovery = (
 
 // List a recovery phrase
 export const recoveryPhraseItem = ({
-                                     recoveryPhrase,
-                                     i18n
-                                   }: {
+  recoveryPhrase,
+  i18n,
+}: {
   recoveryPhrase: RecoveryPhrase;
   i18n: I18n;
 }) => {
@@ -144,15 +144,15 @@ export const recoveryPhraseItem = ({
     { action: "reset", caption: "Reset", fn: () => recoveryPhrase.reset() },
     recoveryPhrase.isProtected
       ? {
-        action: "unprotect",
-        caption: "Unlock",
-        fn: () => recoveryPhrase.unprotect()
-      }
+          action: "unprotect",
+          caption: "Unlock",
+          fn: () => recoveryPhrase.unprotect(),
+        }
       : {
-        action: "protect",
-        caption: "Lock",
-        fn: () => recoveryPhrase.protect()
-      }
+          action: "protect",
+          caption: "Lock",
+          fn: () => recoveryPhrase.protect(),
+        },
   ];
 
   const { recovery_phrase_enabled } = i18n.i18n(copyJson);
@@ -179,16 +179,16 @@ const lock = (): TemplateResult => {
 
 // List a recovery key (non-phrase recovery device)
 export const recoveryKeyItem = ({
-                                  onRemoveDevice,
-                                  i18n
-                                }: {
+  onRemoveDevice,
+  i18n,
+}: {
   onRemoveDevice: () => void;
   i18n: I18n;
 }) => {
   const alias = recoveryKeyLabel;
   const id = "recovery-key";
   const settings = [
-    { action: "remove", caption: "Remove", fn: onRemoveDevice }
+    { action: "remove", caption: "Remove", fn: onRemoveDevice },
   ];
 
   const { recovery_key_enabled } = i18n.i18n(copyJson);

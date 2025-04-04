@@ -18,10 +18,10 @@ type ValidationResult =
  * @param derivationOrigin Origin to use for the principal derivation for this delegation
  */
 export const validateDerivationOrigin = async ({
-                                                 requestOrigin,
-                                                 derivationOrigin,
-                                                 resolveCanisterId = resolveCanisterIdFn
-                                               }: {
+  requestOrigin,
+  derivationOrigin,
+  resolveCanisterId = resolveCanisterIdFn,
+}: {
   requestOrigin: string;
   derivationOrigin?: string;
   resolveCanisterId?: typeof resolveCanisterIdFn;
@@ -33,12 +33,12 @@ export const validateDerivationOrigin = async ({
 
   try {
     const canisterIdResult = await resolveCanisterId({
-      origin: derivationOrigin
+      origin: derivationOrigin,
     });
     if (canisterIdResult === "not_found") {
       return {
         result: "invalid",
-        message: `Could not resolve canister id for derivationOrigin "${derivationOrigin}".`
+        message: `Could not resolve canister id for derivationOrigin "${derivationOrigin}".`,
       };
     }
     canisterIdResult satisfies { ok: Principal };
@@ -47,7 +47,7 @@ export const validateDerivationOrigin = async ({
     // is made through a BN that checks certification.
     // Some flexibility is allowed by `inferAlternativeOriginsUrl` to allow for dev setups.
     const alternativeOriginsUrl = inferAlternativeOriginsUrl({
-      canisterId: canisterIdResult.ok
+      canisterId: canisterIdResult.ok,
     });
     const response = await fetch(
       alternativeOriginsUrl,
@@ -55,17 +55,17 @@ export const validateDerivationOrigin = async ({
       {
         redirect: "error",
         headers: {
-          Accept: "application/json"
+          Accept: "application/json",
         },
         // do not send cookies or other credentials
-        credentials: "omit"
-      }
+        credentials: "omit",
+      },
     );
 
     if (response.status !== 200) {
       return {
         result: "invalid",
-        message: `resource ${alternativeOriginsUrl} returned invalid status: ${response.status}`
+        message: `resource ${alternativeOriginsUrl} returned invalid status: ${response.status}`,
       };
     }
 
@@ -77,7 +77,7 @@ export const validateDerivationOrigin = async ({
     if (!Array.isArray(alternativeOriginsObj?.alternativeOrigins)) {
       return {
         result: "invalid",
-        message: `resource ${alternativeOriginsUrl} has invalid format: received ${alternativeOriginsObj}`
+        message: `resource ${alternativeOriginsUrl} has invalid format: received ${alternativeOriginsObj}`,
       };
     }
 
@@ -87,7 +87,7 @@ export const validateDerivationOrigin = async ({
     ) {
       return {
         result: "invalid",
-        message: `Resource ${alternativeOriginsUrl} has too many entries: To prevent misuse at most ${MAX_ALTERNATIVE_ORIGINS} alternative origins are allowed.`
+        message: `Resource ${alternativeOriginsUrl} has too many entries: To prevent misuse at most ${MAX_ALTERNATIVE_ORIGINS} alternative origins are allowed.`,
       };
     }
 
@@ -95,15 +95,15 @@ export const validateDerivationOrigin = async ({
     if (!alternativeOriginsObj.alternativeOrigins.includes(requestOrigin)) {
       return {
         result: "invalid",
-        message: `"${requestOrigin}" is not listed in the list of allowed alternative origins. Allowed alternative origins: ${alternativeOriginsObj.alternativeOrigins}`
+        message: `"${requestOrigin}" is not listed in the list of allowed alternative origins. Allowed alternative origins: ${alternativeOriginsObj.alternativeOrigins}`,
       };
     }
   } catch (e) {
     return {
       result: "invalid",
       message: `An error occurred while validating the derivationOrigin "${derivationOrigin}": ${wrapError(
-        e
-      )}`
+        e,
+      )}`,
     };
   }
 
@@ -121,8 +121,8 @@ export const validateDerivationOrigin = async ({
  * @param canisterId The canister id to fetch the alternative origins file from.
  */
 const inferAlternativeOriginsUrl = ({
-                                      canisterId
-                                    }: {
+  canisterId,
+}: {
   canisterId: Principal;
 }): string => {
   // The official HTTP gateway

@@ -31,13 +31,13 @@ type Parameters = {
  * @returns {WebAuthnFlow[]} The ordered steps to try to perform the webauthn authentication.
  */
 export const findWebAuthnFlows = ({
-                                    devices,
-                                    currentOrigin,
-                                    relatedOrigins
-                                  }: Parameters): WebAuthnFlow[] => {
+  devices,
+  currentOrigin,
+  relatedOrigins,
+}: Parameters): WebAuthnFlow[] => {
   const currentRpId = new URL(currentOrigin).hostname;
   const relatedRpIds = relatedOrigins.map(
-    (relatedOrigin) => new URL(relatedOrigin).hostname
+    (relatedOrigin) => new URL(relatedOrigin).hostname,
   );
 
   // The devices are expected to be ordered by recently used already
@@ -49,17 +49,17 @@ export const findWebAuthnFlows = ({
           device.origin === currentOrigin ||
           (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
             ? undefined
-            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname
+            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname,
         )
         // Filter out RP IDs that are not within `relatedRpIds`
-        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId))
-    )
+        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId)),
+    ),
   ];
 
   // Create steps from `deviceRpIds`, currently that's one step per RP ID
   const steps: WebAuthnFlow[] = orderedDeviceRpIds.map((rpId) => ({
     rpId,
-    useIframe: nonNullish(rpId) && rpId !== currentRpId
+    useIframe: nonNullish(rpId) && rpId !== currentRpId,
   }));
 
   // If there are no steps, add a default step.

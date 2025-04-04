@@ -9,7 +9,7 @@ import { promptUserNumber } from "$lib/templates/promptUserNumber";
 import { toast } from "$lib/templates/toast";
 import {
   PinIdentityMaterial,
-  reconstructPinIdentity
+  reconstructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
 import { OPENID_AUTHENTICATION } from "$lib/utils/featureFlags";
 import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
@@ -19,7 +19,7 @@ import { useRecovery } from "$lib/flows/recovery/useRecovery";
 import {
   RegisterFlowOpts,
   getRegisterFlowOpts,
-  registerFlow
+  registerFlow,
 } from "$lib/flows/register";
 import { I18n } from "$lib/legacy/i18n";
 import { getAnchors, setAnchorUsed } from "$lib/legacy/storage";
@@ -43,19 +43,19 @@ import {
   UnexpectedCall,
   UnknownUser,
   WebAuthnFailed,
-  bufferEqual
+  bufferEqual,
 } from "$lib/utils/iiConnection";
 import { TemplateElement, withRef } from "$lib/utils/lit-html";
 import {
   createAnonymousNonce,
   createGoogleRequestConfig,
-  requestJWT
+  requestJWT,
 } from "$lib/utils/openID";
 import { parseUserNumber } from "$lib/utils/userNumber";
 import {
   NonEmptyArray,
   isNonEmptyArray,
-  unknownToString
+  unknownToString,
 } from "$lib/utils/utils";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 import { ECDSAKeyIdentity } from "@dfinity/identity";
@@ -83,13 +83,13 @@ export type AuthnTemplates = {
 };
 
 export const authenticateBox = async ({
-                                        connection,
-                                        i18n,
-                                        templates,
-                                        allowPinLogin,
-                                        allowPinRegistration,
-                                        autoSelectionIdentity
-                                      }: {
+  connection,
+  i18n,
+  templates,
+  allowPinLogin,
+  allowPinRegistration,
+  autoSelectionIdentity,
+}: {
   connection: Connection;
   i18n: I18n;
   templates: AuthnTemplates;
@@ -118,23 +118,23 @@ export const authenticateBox = async ({
       registerFlowOpts: await getRegisterFlowOpts({
         connection,
         allowPinRegistration,
-        getGoogleClientId
+        getGoogleClientId,
       }),
       verifyPinValidity: ({ userNumber, pinIdentityMaterial }) =>
         pinIdentityAuthenticatorValidity({
           userNumber,
           pinIdentityMaterial,
-          connection
+          connection,
         }),
       retrievePinIdentityMaterial: ({ userNumber }) =>
         idbRetrievePinIdentityMaterial({ userNumber }),
       allowPinLogin: allowPinLogin,
       autoSelectIdentity,
-      connection
+      connection,
     });
 
   // Retry until user has successfully authenticated
-  for (; ;) {
+  for (;;) {
     try {
       const result = await promptAuth(autoSelectionIdentity);
 
@@ -155,7 +155,7 @@ export const authenticateBox = async ({
         message:
           "Something went wrong during authentication. Please try again.",
         detail: unknownToString(err, "unknown error"),
-        primaryButton: "Try again"
+        primaryButton: "Try again",
       });
     }
     // clear out the auto-select so that after the first error / cancel
@@ -166,10 +166,10 @@ export const authenticateBox = async ({
 
 // Check that the PIN identity has a corresponding authenticator
 const pinIdentityAuthenticatorValidity = async ({
-                                                  pinIdentityMaterial,
-                                                  connection,
-                                                  userNumber
-                                                }: {
+  pinIdentityMaterial,
+  connection,
+  userNumber,
+}: {
   pinIdentityMaterial: PinIdentityMaterial;
   connection: Connection;
   userNumber: bigint;
@@ -180,8 +180,8 @@ const pinIdentityAuthenticatorValidity = async ({
   const hasAuthenticator = authenticators.some((authenticator) =>
     bufferEqual(
       new Uint8Array(authenticator.pubkey).buffer as DerEncodedPublicKey,
-      pinPubkeyDer
-    )
+      pinPubkeyDer,
+    ),
   );
 
   return hasAuthenticator ? "valid" : "expired";
@@ -190,26 +190,26 @@ const pinIdentityAuthenticatorValidity = async ({
 /** Authentication box component which authenticates a user
  * to II or to another dapp */
 export const authenticateBoxFlow = async <I>({
-                                               i18n,
-                                               templates,
-                                               addDevice,
-                                               loginPasskey,
-                                               loginPinIdentityMaterial,
-                                               recover,
-                                               registerFlowOpts,
-                                               verifyPinValidity,
-                                               retrievePinIdentityMaterial,
-                                               allowPinLogin,
-                                               autoSelectIdentity,
-                                               connection
-                                             }: {
+  i18n,
+  templates,
+  addDevice,
+  loginPasskey,
+  loginPinIdentityMaterial,
+  recover,
+  registerFlowOpts,
+  verifyPinValidity,
+  retrievePinIdentityMaterial,
+  allowPinLogin,
+  autoSelectIdentity,
+  connection,
+}: {
   i18n: I18n;
   templates: AuthnTemplates;
   addDevice: (
-    userNumber?: bigint
+    userNumber?: bigint,
   ) => Promise<{ tag: "deviceAdded" } | { tag: "canceled" }>;
   loginPasskey: (
-    userNumber: bigint
+    userNumber: bigint,
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -220,18 +220,18 @@ export const authenticateBoxFlow = async <I>({
     | ApiError
   >;
   loginPinIdentityMaterial: ({
-                               userNumber,
-                               pin,
-                               pinIdentityMaterial
-                             }: {
+    userNumber,
+    pin,
+    pinIdentityMaterial,
+  }: {
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
   }) => Promise<LoginSuccess | BadPin>;
   recover: () => Promise<LoginSuccess | { tag: "canceled" }>;
   retrievePinIdentityMaterial: ({
-                                  userNumber
-                                }: {
+    userNumber,
+  }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
   allowPinLogin: boolean;
@@ -244,9 +244,9 @@ export const authenticateBoxFlow = async <I>({
   registerFlowOpts: RegisterFlowOpts;
 }): Promise<
   | (LoginSuccess & {
-  newAnchor: boolean;
-  authnMethod: "pin" | "passkey" | "recovery";
-})
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
   | PossiblyWrongWebAuthnFlow
   | PinUserOtherDomain
   | FlowError
@@ -261,9 +261,9 @@ export const authenticateBoxFlow = async <I>({
   // The registration flow for a new identity
   const doRegister = async (): Promise<
     | (LoginSuccess & {
-    newAnchor: true;
-    authnMethod: "pin" | "passkey" | "recovery";
-  })
+        newAnchor: true;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
     | FlowError
     | { tag: "canceled" }
   > => {
@@ -280,7 +280,7 @@ export const authenticateBoxFlow = async <I>({
     result2 satisfies LoginSuccess;
     return {
       newAnchor: true,
-      ...result2
+      ...result2,
     };
   };
 
@@ -292,16 +292,16 @@ export const authenticateBoxFlow = async <I>({
       loginPasskey,
       loginPinIdentityMaterial,
       verifyPinValidity,
-      allowPinLogin
+      allowPinLogin,
     });
 
   const doLoginWithGoogle = async (
-    connection: Connection
+    connection: Connection,
   ): Promise<
     | (LoginSuccess & {
-    newAnchor: false;
-    authnMethod: "pin" | "passkey" | "recovery";
-  })
+        newAnchor: false;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
     | FlowError
   > => {
     const i18n = new I18n();
@@ -315,25 +315,25 @@ export const authenticateBoxFlow = async <I>({
     }
 
     const sessionIdentity = await ECDSAKeyIdentity.generate({
-      extractable: false
+      extractable: false,
     });
 
     const googleRequestConfig = createGoogleRequestConfig(googleClientId);
     const { nonce, salt } = await createAnonymousNonce(
-      sessionIdentity.getPrincipal()
+      sessionIdentity.getPrincipal(),
     );
 
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce
-      })
+        nonce,
+      }),
     );
 
     const authenticatedConnection = await connection.fromJwt(
       jwt,
       salt,
-      sessionIdentity
+      sessionIdentity,
     );
 
     return {
@@ -342,16 +342,16 @@ export const authenticateBoxFlow = async <I>({
       userNumber: authenticatedConnection.userNumber,
       showAddCurrentDevice: false,
       newAnchor: false,
-      authnMethod: "passkey" as const // we are returning passkey here because we don't want dapps to be able to block based on openID login
+      authnMethod: "passkey" as const, // we are returning passkey here because we don't want dapps to be able to block based on openID login
     };
   };
 
   // Prompt for an identity number
   const doPrompt = async (): Promise<
     | (LoginSuccess & {
-    newAnchor: boolean;
-    authnMethod: "pin" | "passkey" | "recovery";
-  })
+        newAnchor: boolean;
+        authnMethod: "pin" | "passkey" | "recovery";
+      })
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
     | FlowError
@@ -391,7 +391,7 @@ export const authenticateBoxFlow = async <I>({
       newAnchor:
         false /* If an anchor was recovered, then it's _not_ a new anchor */,
       authnMethod: "recovery",
-      ...recoverResult
+      ...recoverResult,
     };
   };
 
@@ -401,7 +401,7 @@ export const authenticateBoxFlow = async <I>({
   if (isNonEmptyArray(anchors)) {
     const result = await pages.pick({
       anchors,
-      autoSelect: autoSelectIdentity
+      autoSelect: autoSelectIdentity,
     });
 
     if (result.tag === "pick") {
@@ -447,7 +447,7 @@ export const handleLoginFlowResult = async <E>(
     | (LoginSuccess & E)
     | PossiblyWrongWebAuthnFlow
     | PinUserOtherDomain
-    | FlowError
+    | FlowError,
 ): Promise<
   ({ userNumber: bigint; connection: AuthenticatedConnection } & E) | undefined
 > => {
@@ -462,8 +462,8 @@ export const handleLoginFlowResult = async <E>(
     toast.info(
       infoToastTemplate({
         title: copy.title_possibly_wrong_web_authn_flow,
-        messages: [copy.message_possibly_wrong_web_authn_flow_1]
-      })
+        messages: [copy.message_possibly_wrong_web_authn_flow_1],
+      }),
     );
     return undefined;
   }
@@ -476,9 +476,9 @@ export const handleLoginFlowResult = async <E>(
         title: copy.title_pin_another_domain,
         messages: [
           copy.message_pin_another_domain_1,
-          copy.message_pin_another_domain_2
-        ]
-      })
+          copy.message_pin_another_domain_2,
+        ],
+      }),
     );
     return undefined;
   }
@@ -494,7 +494,7 @@ const learnMoreBlock = html`<p class="l-stack t-centered">
     href="https://internetcomputer.org/internet-identity"
     target="_blank"
     rel="noopener noreferrer"
-  >Learn more</a
+    >Learn more</a
   >
   about Internet Identity
 </p>`;
@@ -507,25 +507,25 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       register: () => void;
     }) => {
       return html`${props.firstTime.slot}
-      <div class="l-stack">
-        <button
-          type="button"
-          @click=${() => firstTimeProps.register()}
-          id="registerButton"
-          class="c-button"
-        >
-          ${props.firstTime.createAnchorText}
-        </button>
-        <button
-          type="button"
-          @click=${() => firstTimeProps.useExisting()}
-          id="loginButton"
-          class="c-button c-button--secondary"
-        >
-          ${props.firstTime.useExistingText}
-        </button>
-      </div>
-      ${learnMoreBlock}`;
+        <div class="l-stack">
+          <button
+            type="button"
+            @click=${() => firstTimeProps.register()}
+            id="registerButton"
+            class="c-button"
+          >
+            ${props.firstTime.createAnchorText}
+          </button>
+          <button
+            type="button"
+            @click=${() => firstTimeProps.useExisting()}
+            id="loginButton"
+            class="c-button c-button--secondary"
+          >
+            ${props.firstTime.useExistingText}
+          </button>
+        </div>
+        ${learnMoreBlock}`;
     },
     useExisting: (useExistingProps: {
       register: () => void;
@@ -537,12 +537,12 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
       const copy = i18n.i18n(authnTemplatesCopy);
 
       const anchorInput = mkAnchorInput({
-        onSubmit: useExistingProps.onSubmit
+        onSubmit: useExistingProps.onSubmit,
       });
       const withUserNumber = (f: (arg: bigint | undefined) => void) => {
         const value = withRef(
           anchorInput.userNumberInput,
-          (input) => input.value
+          (input) => input.value,
         );
 
         // XXX: we work around parseUserNumber returning "null" by defaulting to "undefined"
@@ -550,60 +550,60 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         f(userNumber);
       };
       return html` ${props.useExisting.slot} ${anchorInput.template}
-      <div class="c-button-group">
+        <div class="c-button-group">
+          <button
+            data-action="continue"
+            @click=${() => anchorInput.submit()}
+            class="c-button"
+          >
+            ${copy.continue}
+          </button>
+        </div>
         <button
-          data-action="continue"
-          @click=${() => anchorInput.submit()}
-          class="c-button"
+          @click=${() =>
+            withUserNumber((userNumber) =>
+              useExistingProps.addDevice(userNumber),
+            )}
+          id="addNewDeviceButton"
+          class="c-button c-button--secondary"
         >
-          ${copy.continue}
+          ${copy.continue_with_another_device}
         </button>
-      </div>
-      <button
-        @click=${() =>
-          withUserNumber((userNumber) =>
-            useExistingProps.addDevice(userNumber)
-          )}
-        id="addNewDeviceButton"
-        class="c-button c-button--secondary"
-      >
-        ${copy.continue_with_another_device}
-      </button>
-      ${OPENID_AUTHENTICATION.isEnabled()
-        ? html`
-          <button
-            @click=${() =>
-              withUserNumber(() => useExistingProps.loginOpenIDGoogle())}
-            id="addNewDeviceButton"
-            class="c-button c-button--secondary"
-          >
-            ${copy.continue_with_google}
-          </button>
-        `
-        : ``}
+        ${OPENID_AUTHENTICATION.isEnabled()
+          ? html`
+              <button
+                @click=${() =>
+                  withUserNumber(() => useExistingProps.loginOpenIDGoogle())}
+                id="addNewDeviceButton"
+                class="c-button c-button--secondary"
+              >
+                ${copy.continue_with_google}
+              </button>
+            `
+          : ``}
 
-      <ul class="c-link-group">
-        <li>
-          <button
-            @click=${() => useExistingProps.register()}
-            id="registerButton"
-            class="t-link"
-          >
-            ${copy.create_new}
-          </button>
-        </li>
-        <li>
-          <a
-            @click="${() =>
-              withUserNumber((userNumber) =>
-                useExistingProps.recover(userNumber)
-              )}"
-            id="recoverButton"
-            class="t-link"
-          >${copy.lost_access}</a
-          >
-        </li>
-      </ul>`;
+        <ul class="c-link-group">
+          <li>
+            <button
+              @click=${() => useExistingProps.register()}
+              id="registerButton"
+              class="t-link"
+            >
+              ${copy.create_new}
+            </button>
+          </li>
+          <li>
+            <a
+              @click="${() =>
+                withUserNumber((userNumber) =>
+                  useExistingProps.recover(userNumber),
+                )}"
+              id="recoverButton"
+              class="t-link"
+              >${copy.lost_access}</a
+            >
+          </li>
+        </ul>`;
     },
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
@@ -615,11 +615,11 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         ${mkAnchorPicker({
           savedAnchors: pickProps.anchors,
           pick: pickProps.onSubmit,
-          moreOptions: pickProps.moreOptions
+          moreOptions: pickProps.moreOptions,
         }).template}
         ${learnMoreBlock}
       `;
-    }
+    },
   };
 };
 
@@ -632,10 +632,10 @@ export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
     useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
       page({
         slot: templates.useExisting(opts),
-        useLandingPageTemplate: false
+        useLandingPageTemplate: false,
       }),
     pick: (opts: Parameters<typeof templates.pick>[0]) =>
-      page({ slot: templates.pick(opts), useLandingPageTemplate: true })
+      page({ slot: templates.pick(opts), useLandingPageTemplate: true }),
   };
 };
 
@@ -649,8 +649,8 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
       new Promise<{ tag: "use_existing" } | { tag: "register" }>((resolve) =>
         pages.firstTime({
           useExisting: () => resolve({ tag: "use_existing" }),
-          register: () => resolve({ tag: "register" })
-        })
+          register: () => resolve({ tag: "register" }),
+        }),
       ),
     useExisting: () =>
       new Promise<
@@ -668,8 +668,8 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
             resolve({ tag: "add_device", userNumber }),
           recover: (userNumber?: bigint) =>
             resolve({ tag: "recover", userNumber }),
-          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" })
-        })
+          loginOpenIDGoogle: () => resolve({ tag: "open_id_google" }),
+        }),
       ),
     pick: (pickProps: {
       anchors: NonEmptyArray<bigint>;
@@ -683,7 +683,7 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
         pages.pick({
           ...pickProps,
           onSubmit: (userNumber) => resolve({ tag: "pick", userNumber }),
-          moreOptions: () => resolve({ tag: "more_options" })
+          moreOptions: () => resolve({ tag: "more_options" }),
         });
         // If an existing autoSelect value is supplied immediately
         // resolve with the auto-selected identity number
@@ -693,46 +693,46 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
         ) {
           resolve({ tag: "pick", userNumber: pickProps.autoSelect });
         }
-      })
+      }),
   };
 };
 
 // Wrap the template with header & footer and render the page
 const page = ({
-                slot,
-                useLandingPageTemplate
-              }: {
+  slot,
+  useLandingPageTemplate,
+}: {
   slot: TemplateResult;
   useLandingPageTemplate: boolean;
 }) => {
   const template = useLandingPageTemplate
     ? landingPage({
-      slot,
-      dataPage: "authenticate"
-    })
+        slot,
+        dataPage: "authenticate",
+      })
     : mainWindow({
-      slot: html`<!-- The title is hidden but used for accessibility -->
-      <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
-      ${slot}`
-    });
+        slot: html`<!-- The title is hidden but used for accessibility -->
+          <h1 data-page="authenticate" class="is-hidden">Internet Identity</h1>
+          ${slot}`,
+      });
   const container = document.getElementById("pageContent") as HTMLElement;
   render(template, container);
 };
 
 const loginPasskey = ({
-                        connection,
-                        userNumber
-                      }: {
+  connection,
+  userNumber,
+}: {
   connection: Connection;
   userNumber: bigint;
 }) => connection.login(userNumber);
 
 const loginPinIdentityMaterial = ({
-                                    connection,
-                                    userNumber,
-                                    pin,
-                                    pinIdentityMaterial
-                                  }: {
+  connection,
+  userNumber,
+  pin,
+  pinIdentityMaterial,
+}: {
   connection: Connection;
   userNumber: bigint;
   pin: string;
@@ -742,7 +742,7 @@ const loginPinIdentityMaterial = ({
     try {
       const identity = await reconstructPinIdentity({
         pin,
-        pinIdentityMaterial
+        pinIdentityMaterial,
       });
 
       return connection.fromIdentity(userNumber, identity);
@@ -759,7 +759,7 @@ const loginPinIdentityMaterial = ({
 // Register this device as a new device with the anchor
 const asNewDevice = async (
   connection: Connection,
-  prefilledUserNumber?: bigint
+  prefilledUserNumber?: bigint,
 ): Promise<{ tag: "deviceAdded" } | { tag: "canceled" }> => {
   // Prompt the user for an anchor and provide additional information about the flow.
   // If the user number is already known, it is prefilled in the screen.
@@ -767,7 +767,7 @@ const asNewDevice = async (
     title: "Continue with another device",
     message:
       "Is this your first time connecting to Internet Identity on this device? In the next steps, you will add this device as an Internet Identity passkey. Do you wish to continue?",
-    userNumber: prefilledUserNumber
+    userNumber: prefilledUserNumber,
   });
   if (userNumberResult === "canceled") {
     return { tag: "canceled" };
@@ -777,31 +777,31 @@ const asNewDevice = async (
 
 // Helper to convert PIN identity material to a Der public-key
 const pinIdentityToDerPubkey = async (
-  pinIdentity: PinIdentityMaterial
+  pinIdentity: PinIdentityMaterial,
 ): Promise<DerEncodedPublicKey> => {
   return (await crypto.subtle.exportKey(
     "spki",
-    pinIdentity.publicKey
+    pinIdentity.publicKey,
   )) as DerEncodedPublicKey;
 };
 
 // Find and use a passkey, whether PIN or webauthn
 const useIdentityFlow = async <I>({
-                                    userNumber,
-                                    allowPinLogin,
-                                    retrievePinIdentityMaterial,
-                                    verifyPinValidity,
-                                    loginPasskey,
-                                    loginPinIdentityMaterial
-                                  }: {
+  userNumber,
+  allowPinLogin,
+  retrievePinIdentityMaterial,
+  verifyPinValidity,
+  loginPasskey,
+  loginPinIdentityMaterial,
+}: {
   userNumber: bigint;
   retrievePinIdentityMaterial: ({
-                                  userNumber
-                                }: {
+    userNumber,
+  }: {
     userNumber: bigint;
   }) => Promise<I | undefined>;
   loginPasskey: (
-    userNumber: bigint
+    userNumber: bigint,
   ) => Promise<
     | LoginSuccess
     | AuthFail
@@ -817,19 +817,19 @@ const useIdentityFlow = async <I>({
     pinIdentityMaterial: I;
   }) => Promise<"valid" | "expired">;
   loginPinIdentityMaterial: ({
-                               userNumber,
-                               pin,
-                               pinIdentityMaterial
-                             }: {
+    userNumber,
+    pin,
+    pinIdentityMaterial,
+  }: {
     userNumber: bigint;
     pin: string;
     pinIdentityMaterial: I;
   }) => Promise<LoginSuccess | BadPin>;
 }): Promise<
   | (LoginSuccess & {
-  newAnchor: boolean;
-  authnMethod: "pin" | "passkey" | "recovery";
-})
+      newAnchor: boolean;
+      authnMethod: "pin" | "passkey" | "recovery";
+    })
   | AuthFail
   | WebAuthnFailed
   | PossiblyWrongWebAuthnFlow
@@ -842,8 +842,8 @@ const useIdentityFlow = async <I>({
 > => {
   const pinIdentityMaterial: I | undefined = await withLoader(() =>
     retrievePinIdentityMaterial({
-      userNumber
-    })
+      userNumber,
+    }),
   );
 
   const doLoginPasskey = async () => {
@@ -868,8 +868,8 @@ const useIdentityFlow = async <I>({
   const isValid = await withLoader(() =>
     verifyPinValidity({
       pinIdentityMaterial,
-      userNumber
-    })
+      userNumber,
+    }),
   );
   if (isValid === "expired") {
     // the PIN identity seems to have been expired
@@ -888,7 +888,7 @@ const useIdentityFlow = async <I>({
       const result = await loginPinIdentityMaterial({
         userNumber,
         pin,
-        pinIdentityMaterial
+        pinIdentityMaterial,
       });
 
       if (result.kind !== "loginSuccess") {
@@ -897,7 +897,7 @@ const useIdentityFlow = async <I>({
 
       result satisfies LoginSuccess;
       return { ok: true, value: result };
-    }
+    },
   });
 
   if (result.kind === "canceled") {
@@ -925,10 +925,10 @@ const useIdentityFlow = async <I>({
 
 // Use a passkey, with concrete impl.
 export const useIdentity = ({
-                              userNumber,
-                              connection,
-                              allowPinLogin
-                            }: {
+  userNumber,
+  connection,
+  allowPinLogin,
+}: {
   userNumber: bigint;
   connection: Connection;
   allowPinLogin: boolean;
@@ -943,5 +943,5 @@ export const useIdentity = ({
 
     loginPasskey: (userNumber) => loginPasskey({ connection, userNumber }),
     loginPinIdentityMaterial: (opts) =>
-      loginPinIdentityMaterial({ ...opts, connection })
+      loginPinIdentityMaterial({ ...opts, connection }),
   });

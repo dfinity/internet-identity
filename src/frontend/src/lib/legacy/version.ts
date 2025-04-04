@@ -12,5 +12,5 @@ export type VersionInfo = {
 export const version: VersionInfo = {
   commit: versionList[0],
   release: versionList[1] === "" ? undefined : versionList[1],
-  dirty: versionList[2] === "dirty"
+  dirty: versionList[2] === "dirty",
 };

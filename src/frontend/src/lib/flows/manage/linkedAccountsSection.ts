@@ -15,12 +15,12 @@ import { settingsDropdown } from "./settingsDropdown";
 const MAX_CREDENTIALS = 100;
 
 export const linkedAccountsSection = ({
-                                        credentials,
-                                        onLinkAccount,
-                                        onUnlinkAccount,
-                                        hasOtherAuthMethods,
-                                        currentCredential
-                                      }: {
+  credentials,
+  onLinkAccount,
+  onUnlinkAccount,
+  hasOtherAuthMethods,
+  currentCredential,
+}: {
   credentials: OpenIdCredential[];
   onLinkAccount: () => void;
   onUnlinkAccount: (credential: OpenIdCredential) => void;
@@ -38,22 +38,22 @@ export const linkedAccountsSection = ({
     <h2 class="t-title">Linked Accounts</h2>
     <p class="t-paragraph t-lead">
       ${credentials.length === 0
-    ? copy.link_your_account_to_hold_assets_and_sign_into_dapps
-    : copy.use_your_accounts_to_hold_assets_and_sign_into_dapps}
+        ? copy.link_your_account_to_hold_assets_and_sign_into_dapps
+        : copy.use_your_accounts_to_hold_assets_and_sign_into_dapps}
     </p>
     <div class="c-action-list">
       <ul>
         ${credentials.map((credential, index) =>
-    accountItem({
-      credential,
-      index,
-      unlink: unlinkAvailable ? onUnlinkAccount : undefined,
-      isCurrent:
-        nonNullish(currentCredential) &&
-        credential.iss === currentCredential.iss &&
-        credential.sub === currentCredential.sub
-    })
-  )}
+          accountItem({
+            credential,
+            index,
+            unlink: unlinkAvailable ? onUnlinkAccount : undefined,
+            isCurrent:
+              nonNullish(currentCredential) &&
+              credential.iss === currentCredential.iss &&
+              credential.sub === currentCredential.sub,
+          }),
+        )}
       </ul>
       <div class="c-action-list__actions">
         <button
@@ -67,8 +67,8 @@ export const linkedAccountsSection = ({
           </span>
           <span>
             ${credentials.length === 0
-    ? copy.link_account
-    : copy.link_additional_account}
+              ? copy.link_account
+              : copy.link_additional_account}
           </span>
         </button>
       </div>
@@ -77,11 +77,11 @@ export const linkedAccountsSection = ({
 };
 
 export const accountItem = ({
-                              credential,
-                              index = 0,
-                              unlink,
-                              isCurrent
-                            }: {
+  credential,
+  index = 0,
+  unlink,
+  isCurrent,
+}: {
   credential: OpenIdCredential;
   index?: number;
   unlink?: (credential: OpenIdCredential) => void;
@@ -93,8 +93,8 @@ export const accountItem = ({
     {
       action: "unlink",
       caption: copy.unlink.toString(),
-      fn: () => unlink?.(credential)
-    }
+      fn: () => unlink?.(credential),
+    },
   ];
 
   const lastUsageTimeStamp = credential.last_usage_timestamp[0];
@@ -108,13 +108,13 @@ export const accountItem = ({
   return html`
     <li class="c-action-list__item" data-account=${credential.sub}>
       ${
-    nonNullish(picture)
-      ? html`<div class="c-action-list__avatar">
+        nonNullish(picture)
+          ? html`<div class="c-action-list__avatar">
               <img src="${picture}" alt="" aria-hidden="true" loading="lazy" />
               <div class="c-action-list__avatar--badge">${googleIcon}</div>
             </div>`
-      : ""
-  }
+          : ""
+      }
       <div class="c-action-list__label--stacked c-action-list__label">
         <div class="c-action-list__label c-action-list__label--spacer">
           <div class="c-action-list__label">
@@ -124,30 +124,30 @@ export const accountItem = ({
             </span>
           </div>
           ${
-    nonNullish(unlink)
-      ? settingsDropdown({
-        alias: credential.sub,
-        id: `account-${index}`,
-        settings
-      })
-      : ""
-  }
+            nonNullish(unlink)
+              ? settingsDropdown({
+                  alias: credential.sub,
+                  id: `account-${index}`,
+                  settings,
+                })
+              : ""
+          }
         </div>
         <div>
           ${
-    nonNullish(isCurrent) && isCurrent
-      ? html`<div>
+            nonNullish(isCurrent) && isCurrent
+              ? html`<div>
                   <span class="c-icon c-icon--ok c-icon--xs"
                     >${pulsatingCircleIcon}</span
                   >
                   <span class="t-muted">${copy.current_account_label}</span>
                 </div>`
-      : nonNullish(lastUsageFormattedString)
-        ? html`<div class="t-muted">
+              : nonNullish(lastUsageFormattedString)
+                ? html`<div class="t-muted">
                     ${copy.last_used}: ${lastUsageFormattedString}
                   </div>`
-        : ""
-  }
+                : ""
+          }
         </div>
       </div>
     </li>

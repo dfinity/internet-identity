@@ -3,16 +3,16 @@ import {
   VcFlowReady,
   VcFlowRequest,
   VcResponse,
-  VcVerifiablePresentation
+  VcVerifiablePresentation,
 } from "@dfinity/internet-identity-vc-api";
 
 export type { VcVerifiablePresentation } from "@dfinity/internet-identity-vc-api";
 
 // The protocol, from a "postMessage" req/resp point of view
 export const vcProtocol = async ({
-                                   onProgress,
-                                   verifyCredentials
-                                 }: {
+  onProgress,
+  verifyCredentials,
+}: {
   onProgress: (state: "waiting" | "verifying") => void;
   verifyCredentials: (args: {
     request: VcFlowRequest["params"];
@@ -42,22 +42,22 @@ export const vcProtocol = async ({
   // Verify the credentials
   const result = await verifyCredentials({
     request: request.params,
-    rpOrigin: origin
+    rpOrigin: origin,
   });
 
   // Respond to the RP
   const content =
     result === "aborted"
       ? ({
-        error: { version: "1", code: "UNKNOWN" }
-      } as const)
+          error: { version: "1", code: "UNKNOWN" },
+        } as const)
       : { result };
 
   window.opener.postMessage(
     {
       id: reqId,
       jsonrpc: "2.0",
-      ...content
+      ...content,
     } satisfies VcResponse,
     origin,
   );

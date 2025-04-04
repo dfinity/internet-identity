@@ -11,12 +11,12 @@ describe("addDeviceSuccess", () => {
         userNumber: BigInt(123456),
         i18n: new I18n(),
         deviceAlias: "Test device alias",
-        onContinue
+        onContinue,
       },
       document.body,
     );
 
-    document.querySelector<HTMLButtonElement>("[data-action=\"next\"]")?.click();
+    document.querySelector<HTMLButtonElement>('[data-action="next"]')?.click();
 
     expect(onContinue).toHaveBeenCalledTimes(1);
   });

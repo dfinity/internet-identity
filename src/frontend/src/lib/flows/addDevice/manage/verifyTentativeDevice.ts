@@ -23,13 +23,13 @@ type VerifyResultOrRetry =
   | { retry: true };
 
 const verifyTentativeDeviceTemplate = <T>({
-                                            userNumber,
-                                            alias,
-                                            remaining,
-                                            verify,
-                                            doContinue,
-                                            cancel
-                                          }: {
+  userNumber,
+  alias,
+  remaining,
+  verify,
+  doContinue,
+  cancel,
+}: {
   userNumber: bigint;
   alias: string;
   remaining: AsyncIterable<string>;
@@ -45,13 +45,13 @@ const verifyTentativeDeviceTemplate = <T>({
       if (result.retry) {
         return {
           ok: false,
-          error: "The entered verification code was invalid. Please try again."
+          error: "The entered verification code was invalid. Please try again.",
         };
       }
 
       return { ok: true, value: result.value };
     },
-    onSubmit: doContinue
+    onSubmit: doContinue,
   });
 
   const pageContentSlot = html`<article>
@@ -99,7 +99,7 @@ const verifyTentativeDeviceTemplate = <T>({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
@@ -121,10 +121,10 @@ export function verifyTentativeDevicePage<T>(
  * @param endTimestamp timestamp when the registration mode expires
  */
 export const verifyTentativeDevice = async ({
-                                              connection,
-                                              alias,
-                                              endTimestamp
-                                            }: {
+  connection,
+  alias,
+  endTimestamp,
+}: {
   connection: AuthenticatedConnection;
   alias: string;
   endTimestamp: bigint;
@@ -159,7 +159,7 @@ export const verifyTentativeDevice = async ({
       }
     },
     doContinue: (res) => countdown.stop(res),
-    remaining: countdown.remainingFormattedAsync()
+    remaining: countdown.remainingFormattedAsync(),
   });
 
   // We handle the result and yield back control
@@ -185,35 +185,35 @@ const handleVerifyResult = async (
     await showError({
       title: "Timeout Reached",
       message:
-        "The timeout has been reached. For security reasons the \"add device\" process has been aborted."
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
     });
     return "failed";
   } else if ("too_many_attempts" in result) {
     await showError({
       title: "Too Many Wrong Verification Codes Entered",
       message:
-        "Adding the device has been aborted due to too many invalid code entries."
+        "Adding the device has been aborted due to too many invalid code entries.",
     });
     return "failed";
   } else if ("device_registration_mode_off" in result) {
     await showError({
       title: "Device Registration Not Enabled",
       message:
-        "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device."
+        "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
     });
     return "failed";
   } else if ("timeout" in result) {
     await showError({
       title: "Timeout Reached",
       message:
-        "The timeout has been reached. For security reasons the \"add device\" process has been aborted."
+        'The timeout has been reached. For security reasons the "add device" process has been aborted.',
     });
     return "failed";
   } else if ("no_device_to_verify" in result) {
     await showError({
       title: "No Device To Verify",
       message:
-        "Verification not possible because the device is no longer in a state to be verified."
+        "Verification not possible because the device is no longer in a state to be verified.",
     });
     return "failed";
   } else {
@@ -223,7 +223,7 @@ const handleVerifyResult = async (
       title: "Something Went Wrong",
       message: "Device could not be verified.",
       detail: unknownToString(result, "unknown data"),
-      primaryButton: "Continue"
+      primaryButton: "Continue",
     });
 
     return "failed";

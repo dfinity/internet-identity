@@ -1,7 +1,7 @@
 import type {
   AddTentativeDeviceResponse,
   CredentialId,
-  DeviceData
+  DeviceData,
 } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
@@ -17,7 +17,7 @@ import {
   displayCancelError,
   displayDuplicateDeviceError,
   isWebAuthnCancel,
-  isWebAuthnDuplicateDevice
+  isWebAuthnDuplicateDevice,
 } from "$lib/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
@@ -68,7 +68,7 @@ export const registerTentativeDevice = async (
         title: "Error adding new device",
         message: "Unable to register new WebAuthn Device.",
         detail: result.message,
-        primaryButton: "Ok"
+        primaryButton: "Ok",
       });
     }
     return { tag: "canceled" };
@@ -78,7 +78,7 @@ export const registerTentativeDevice = async (
     authenticatorType: result.getAuthenticatorAttachment(),
     userAgent: navigator.userAgent,
     uaParser,
-    aaguid: result.aaguid
+    aaguid: result.aaguid,
   });
 
   // Finally, we submit it to the canister
@@ -92,12 +92,12 @@ export const registerTentativeDevice = async (
       ),
       purpose: { authentication: null },
       credential_id: [Array.from(new Uint8Array(result.rawId))],
-      metadata: []
+      metadata: [],
     };
   const addResponse = await addTentativeDevice({
     userNumber,
     connection,
-    device
+    device,
   });
 
   if ("tag" in addResponse) {
@@ -124,16 +124,16 @@ export const registerTentativeDevice = async (
   await addDeviceSuccess({
     userNumber,
     deviceAlias: alias,
-    stepper: tentativeDeviceStepper({ step: "success" })
+    stepper: tentativeDeviceStepper({ step: "success" }),
   });
   return { tag: "deviceAdded" };
 };
 
 /** Create new WebAuthn credentials */
 const createDevice = async ({
-                              userNumber,
-                              connection
-                            }: {
+  userNumber,
+  connection,
+}: {
   userNumber: bigint;
   connection: Connection;
 }): Promise<WebAuthnIdentity | Error> => {
@@ -141,7 +141,7 @@ const createDevice = async ({
     await connection.lookupAuthenticators(userNumber);
   try {
     return await WebAuthnIdentity.create({
-      publicKey: creationOptions(existingAuthenticators)
+      publicKey: creationOptions(existingAuthenticators),
     });
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -159,16 +159,16 @@ type AddDeviceSuccess = Extract<
 
 /** Add the device tentatively to the canister */
 export const addTentativeDevice = async ({
-                                           userNumber,
-                                           connection,
-                                           device
-                                         }: {
+  userNumber,
+  connection,
+  device,
+}: {
   userNumber: bigint;
   connection: Connection;
   device: Omit<DeviceData, "origin">;
 }): Promise<AddDeviceSuccess | { tag: "canceled" }> => {
   // Try to add the device tentatively, retrying if necessary
-  for (; ;) {
+  for (;;) {
     const result = await withLoader(() =>
       connection.addTentativeDevice(userNumber, device),
     );
@@ -178,8 +178,8 @@ export const addTentativeDevice = async ({
       await displayError({
         title: "Tentative Device Already Exists",
         message:
-          "The \"add device\" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the \"add device\" process.",
-        primaryButton: "Ok"
+          'The "add device" process was already started for another device. If you want to add this device instead, log in using an existing device and restart the "add device" process.',
+        primaryButton: "Ok",
       });
       return { tag: "canceled" };
     }

@@ -10,13 +10,13 @@ import copyJson from "./usePin.json";
 /* Prompt the user to input their PIN for use */
 
 const usePinTemplate = <T>({
-                             i18n,
-                             cancel,
-                             verify,
-                             onContinue,
-                             onUsePasskey,
-                             scrollToTop = false
-                           }: {
+  i18n,
+  cancel,
+  verify,
+  onContinue,
+  onUsePasskey,
+  scrollToTop = false,
+}: {
   i18n: I18n;
   cancel: () => void;
   verify: (pin: string) => Promise<PinResult<T>>;
@@ -29,7 +29,7 @@ const usePinTemplate = <T>({
   const pinInput_ = pinInput({
     onSubmit: onContinue,
     verify,
-    secret: true
+    secret: true,
   });
   const slot = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
@@ -53,18 +53,18 @@ const usePinTemplate = <T>({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
 export const usePinPage = <T>(
   props: Parameters<typeof usePinTemplate<T>>[0],
-  container?: HTMLElement
+  container?: HTMLElement,
 ) => renderPage(usePinTemplate<T>)(props, container);
 
 export const usePin = <T>({
-                            verifyPin
-                          }: {
+  verifyPin,
+}: {
   verifyPin: (pin: string) => Promise<PinResult<T>>;
 }): Promise<
   { kind: "pin"; result: T } | { kind: "canceled" } | { kind: "passkey" }
@@ -76,7 +76,7 @@ export const usePin = <T>({
       verify: verifyPin,
       onContinue: (result: T) => resolve({ kind: "pin", result }),
       cancel: () => resolve({ kind: "canceled" }),
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

@@ -1,6 +1,6 @@
 import type {
   DeviceWithUsage,
-  PublicKey
+  PublicKey,
 } from "$lib/generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
@@ -11,19 +11,19 @@ describe("devicesFromDevicesWithUsage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("location", {
-      origin: "https://identity.ic0.app"
+      origin: "https://identity.ic0.app",
     });
     vi.stubGlobal("navigator", {
       // Supports RoR
       userAgent:
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
     });
     DOMAIN_COMPATIBILITY.reset();
   });
 
   const currentDevicePubKey = new Uint8Array([1]);
   const mockConnection = {
-    getSignIdentityPubKey: () => currentDevicePubKey
+    getSignIdentityPubKey: () => currentDevicePubKey,
   } as unknown as AuthenticatedConnection;
 
   const createDevice = (
@@ -38,7 +38,7 @@ describe("devicesFromDevicesWithUsage", () => {
     pubkey: pubkey ?? [],
     key_type: { platform: null },
     purpose: { authentication: null },
-    credential_id: []
+    credential_id: [],
   });
 
   describe("domains compatibility flag disabled", () => {
@@ -50,14 +50,14 @@ describe("devicesFromDevicesWithUsage", () => {
       const devices = [
         createDevice(undefined, currentDevicePubKey),
         createDevice("https://identity.ic0.app"),
-        createDevice("https://identity.internetcomputer.org")
+        createDevice("https://identity.internetcomputer.org"),
       ];
       const expectedDevices = devicesFromDevicesWithUsage({
         devices,
         reload: () => undefined,
         connection: mockConnection,
         userNumber: BigInt(12345),
-        hasOtherAuthMethods: false
+        hasOtherAuthMethods: false,
       });
 
       expect(expectedDevices.authenticators[0].warn).toBeUndefined();
@@ -77,14 +77,14 @@ describe("devicesFromDevicesWithUsage", () => {
       const devices = [
         createDevice(undefined, currentDevicePubKey),
         createDevice("https://identity.ic0.app"),
-        createDevice("https://identity.internetcomputer.org")
+        createDevice("https://identity.internetcomputer.org"),
       ];
       const expectedDevices = devicesFromDevicesWithUsage({
         devices,
         reload: () => undefined,
         connection: mockConnection,
         userNumber: BigInt(12345),
-        hasOtherAuthMethods: false
+        hasOtherAuthMethods: false,
       });
 
       // We rely on the order of the devices to determine the current device
@@ -95,14 +95,14 @@ describe("devicesFromDevicesWithUsage", () => {
       const devices = [
         createDevice(undefined, currentDevicePubKey),
         createDevice("https://identity.ic0.app"),
-        createDevice("https://identity.internetcomputer.org")
+        createDevice("https://identity.internetcomputer.org"),
       ];
       const expectedDevices = devicesFromDevicesWithUsage({
         devices,
         reload: () => undefined,
         connection: mockConnection,
         userNumber: BigInt(12345),
-        hasOtherAuthMethods: false
+        hasOtherAuthMethods: false,
       });
 
       for (const device of expectedDevices.authenticators) {
@@ -114,14 +114,14 @@ describe("devicesFromDevicesWithUsage", () => {
     it("returns no info nor warning if all devices are in the same origin", () => {
       const devices = [
         createDevice(undefined),
-        createDevice("https://identity.ic0.app", currentDevicePubKey)
+        createDevice("https://identity.ic0.app", currentDevicePubKey),
       ];
       const expectedDevices = devicesFromDevicesWithUsage({
         devices,
         reload: () => undefined,
         connection: mockConnection,
         userNumber: BigInt(12345),
-        hasOtherAuthMethods: false
+        hasOtherAuthMethods: false,
       });
 
       for (const device of expectedDevices.authenticators) {

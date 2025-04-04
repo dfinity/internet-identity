@@ -3,12 +3,12 @@ import { mount, renderPage } from "$lib/utils/lit-html";
 import { TemplateResult, html } from "lit-html";
 
 export const promptRecoveryTemplate = ({
-                                         onUsePhrase,
-                                         onUseDevice,
-                                         onForgotAnchor,
-                                         cancel,
-                                         scrollToTop = false
-                                       }: {
+  onUsePhrase,
+  onUseDevice,
+  onForgotAnchor,
+  cancel,
+  scrollToTop = false,
+}: {
   onUsePhrase: () => void;
   onUseDevice: () => void;
   onForgotAnchor: () => void;
@@ -59,7 +59,7 @@ export const promptRecoveryTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -74,7 +74,7 @@ export const promptRecovery = (): Promise<
       onUseDevice: () => resolve("device"),
       onForgotAnchor: () => resolve("forgotten"),
       cancel: () => resolve("cancel"),
-      scrollToTop: true
+      scrollToTop: true,
     });
   });
 };

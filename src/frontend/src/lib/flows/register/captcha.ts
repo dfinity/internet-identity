@@ -10,18 +10,18 @@ import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import copyJson from "./captcha.json";
 
 export const promptCaptchaTemplate = <T>({
-                                           cancel,
-                                           captcha_png_base64,
-                                           checkCaptcha,
-                                           onContinue,
-                                           i18n,
-                                           focus: focus_,
-                                           scrollToTop = false
-                                         }: {
+  cancel,
+  captcha_png_base64,
+  checkCaptcha,
+  onContinue,
+  i18n,
+  focus: focus_,
+  scrollToTop = false,
+}: {
   cancel: () => void;
   captcha_png_base64: string;
   checkCaptcha: (
-    solution: string
+    solution: string,
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
   onContinue: (result: Exclude<T, WrongCaptchaSolution>) => void;
   i18n: I18n;
@@ -57,7 +57,7 @@ export const promptCaptchaTemplate = <T>({
       state.status === "prompting"
         ? captchaImg(state.captcha_png_base64)
         : Chan.unchanged,
-    def: captchaImg(captcha_png_base64)
+    def: captchaImg(captcha_png_base64),
   });
 
   // The text input where the chars can be typed
@@ -73,13 +73,13 @@ export const promptCaptchaTemplate = <T>({
         requesting: Chan.unchanged,
         prompting: Chan.unchanged,
         bad: copy.incorrect,
-        verifying: undefined
+        verifying: undefined,
       })[status],
-    def: undefined
+    def: undefined,
   });
 
   const hasError = errorText.map((errorText) =>
-    nonNullish(errorText) ? "has-error" : ""
+    nonNullish(errorText) ? "has-error" : "",
   );
 
   // The "next" button behavior
@@ -87,11 +87,11 @@ export const promptCaptchaTemplate = <T>({
     (state) =>
       state.status === "prompting"
         ? (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          doVerify();
-        }
-        : undefined
+            e.preventDefault();
+            e.stopPropagation();
+            doVerify();
+          }
+        : undefined,
   );
 
   const nextDisabled: Chan<boolean> = next.map(isNullish);
@@ -117,7 +117,7 @@ export const promptCaptchaTemplate = <T>({
         input.focus();
         state.send({
           status: "prompting",
-          captcha_png_base64: res.new_captcha_png_base64
+          captcha_png_base64: res.new_captcha_png_base64,
         });
         return;
       }
@@ -149,8 +149,8 @@ export const promptCaptchaTemplate = <T>({
         <div
           ${ref(captchaContainer)}
           ${mount(() => {
-    window.visualViewport?.addEventListener("resize", setResizeHandler);
-  })}
+            window.visualViewport?.addEventListener("resize", setResizeHandler);
+          })}
           class="c-input c-input--icon"
         >
           ${asyncReplace(img)}
@@ -162,8 +162,8 @@ export const promptCaptchaTemplate = <T>({
             ${ref(input)}
             id="captchaInput"
             class="c-input c-input--stack c-input--fullwidth ${asyncReplace(
-    hasError
-  )}"
+              hasError,
+            )}"
             autocapitalize="none"
             spellcheck="false"
           />
@@ -194,7 +194,7 @@ export const promptCaptchaTemplate = <T>({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot: promptCaptchaSlot
+    slot: promptCaptchaSlot,
   });
 };
 
@@ -202,20 +202,20 @@ type TemplateProps<T> = Parameters<typeof promptCaptchaTemplate<T>>[0];
 
 export function promptCaptchaPage<T>(
   props: TemplateProps<T>,
-  container?: HTMLElement
+  container?: HTMLElement,
 ): void {
   return renderPage<(props: TemplateProps<T>) => TemplateResult>(
-    promptCaptchaTemplate
+    promptCaptchaTemplate,
   )(props, container);
 }
 
 export const promptCaptcha = <T>({
-                                   captcha_png_base64,
-                                   checkCaptcha
-                                 }: {
+  captcha_png_base64,
+  checkCaptcha,
+}: {
   captcha_png_base64: string;
   checkCaptcha: (
-    solution: string
+    solution: string,
   ) => Promise<Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution>;
 }): Promise<Exclude<T, WrongCaptchaSolution> | "canceled"> => {
   return new Promise((resolve) => {
@@ -227,13 +227,13 @@ export const promptCaptcha = <T>({
       onContinue: resolve,
       i18n,
       scrollToTop: true,
-      focus: true
+      focus: true,
     });
   });
 };
 
 const isBadCaptchaResult = <T>(
-  res: Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution
+  res: Exclude<T, WrongCaptchaSolution> | WrongCaptchaSolution,
 ): res is WrongCaptchaSolution => {
   return (
     nonNullish(res) &&

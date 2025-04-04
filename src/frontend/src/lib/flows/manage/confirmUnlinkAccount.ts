@@ -9,12 +9,12 @@ import { html } from "lit-html";
 import copyJson from "./confirmUnlinkAccount.json";
 
 const confirmUnlinkAccountTemplate = ({
-                                        i18n,
-                                        credential,
-                                        next,
-                                        cancel,
-                                        isCurrentCredential
-                                      }: {
+  i18n,
+  credential,
+  next,
+  cancel,
+  isCurrentCredential,
+}: {
   i18n: I18n;
   credential: OpenIdCredential;
   next: () => void;
@@ -33,8 +33,8 @@ const confirmUnlinkAccountTemplate = ({
       <p class="t-paragraph">${copy.message}</p>
       ${accountItem({ credential })}
       ${nonNullish(isCurrentCredential) && isCurrentCredential
-    ? html`<p class="t-paragraph">${copy.current_credential_warning}</p>`
-    : undefined}
+        ? html`<p class="t-paragraph">${copy.current_credential_warning}</p>`
+        : undefined}
     </hgroup>
     <div class="l-stack">
       <button
@@ -58,19 +58,19 @@ const confirmUnlinkAccountTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
 export const confirmUnlinkAccountPage = renderPage(
-  confirmUnlinkAccountTemplate
+  confirmUnlinkAccountTemplate,
 );
 
 export const confirmUnlinkAccount = ({
-                                       i18n,
-                                       credential,
-                                       isCurrentCredential
-                                     }: {
+  i18n,
+  credential,
+  isCurrentCredential,
+}: {
   i18n: I18n;
   credential: OpenIdCredential;
   isCurrentCredential?: boolean;
@@ -81,7 +81,7 @@ export const confirmUnlinkAccount = ({
       credential,
       next: () => resolve("confirmed"),
       cancel: () => resolve("cancelled"),
-      isCurrentCredential
-    })
+      isCurrentCredential,
+    }),
   );
 };

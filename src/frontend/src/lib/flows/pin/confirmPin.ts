@@ -11,14 +11,14 @@ import copyJson from "./confirmPin.json";
 /* PIN confirmation (just prompts the user to re-enter their PIN) */
 
 const confirmPinTemplate = ({
-                              i18n,
-                              cancel,
-                              retry,
-                              onContinue,
-                              expectedPin: expectedPin,
-                              focus = false,
-                              scrollToTop = false
-                            }: {
+  i18n,
+  cancel,
+  retry,
+  onContinue,
+  expectedPin: expectedPin,
+  focus = false,
+  scrollToTop = false,
+}: {
   i18n: I18n;
   cancel: () => void;
   retry: () => void;
@@ -60,7 +60,7 @@ const confirmPinTemplate = ({
     onSubmit: (_pin) => onContinue(),
     verify,
     secret: true,
-    focus
+    focus,
   });
   const slot = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
@@ -75,14 +75,14 @@ const confirmPinTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
 export const confirmPinPage = renderPage(confirmPinTemplate);
 export const confirmPin = ({
-                             expectedPin
-                           }: {
+  expectedPin,
+}: {
   expectedPin: string;
 }): Promise<{ tag: "ok" } | { tag: "canceled" } | { tag: "retry" }> => {
   return new Promise((resolve) =>
@@ -93,7 +93,7 @@ export const confirmPin = ({
       cancel: () => resolve({ tag: "canceled" }),
       retry: () => resolve({ tag: "retry" }),
       focus: true,
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

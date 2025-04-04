@@ -9,15 +9,15 @@ import {
   Connection,
   LoginSuccess,
   PossiblyWrongWebAuthnFlow,
-  WebAuthnFailed
+  WebAuthnFailed,
 } from "$lib/utils/iiConnection";
 import { renderPage } from "$lib/utils/lit-html";
 import { nonNullish } from "@dfinity/utils";
 
 export const recoverWithDeviceTemplate = ({
-                                            next,
-                                            cancel
-                                          }: {
+  next,
+  cancel,
+}: {
   next: (userNumber: bigint) => void;
   cancel: () => void;
 }) =>
@@ -26,14 +26,14 @@ export const recoverWithDeviceTemplate = ({
     message:
       "Enter your Internet Identity and follow your browser's instructions to use your recovery device.",
     onContinue: (userNumber) => next(userNumber),
-    onCancel: () => cancel()
+    onCancel: () => cancel(),
   });
 
 export const recoverWithDevicePage = renderPage(recoverWithDeviceTemplate);
 
 export const recoverWithDevice = ({
-                                    connection
-                                  }: {
+  connection,
+}: {
   connection: Connection;
 }): Promise<LoginSuccess | { tag: "canceled" }> => {
   return new Promise((resolve) => {
@@ -43,7 +43,7 @@ export const recoverWithDevice = ({
 
         if (result.kind === "tooManyRecovery") {
           toast.error(
-            "This identity has more than one recovery devices, which is not expected"
+            "This identity has more than one recovery devices, which is not expected",
           );
           return;
         }
@@ -60,8 +60,8 @@ export const recoverWithDevice = ({
             toast.info(
               infoToastTemplate({
                 title: copy.title_possibly_wrong_web_authn_flow,
-                messages: [copy.message_possibly_wrong_web_authn_flow_1]
-              })
+                messages: [copy.message_possibly_wrong_web_authn_flow_1],
+              }),
             );
             return;
           }
@@ -74,15 +74,15 @@ export const recoverWithDevice = ({
         result satisfies LoginSuccess;
         return resolve(result);
       },
-      cancel: () => resolve({ tag: "canceled" })
+      cancel: () => resolve({ tag: "canceled" }),
     });
   });
 };
 
 const attemptRecovery = async ({
-                                 userNumber,
-                                 connection
-                               }: {
+  userNumber,
+  connection,
+}: {
   userNumber: bigint;
   connection: Connection;
 }): Promise<
@@ -97,7 +97,7 @@ const attemptRecovery = async ({
 
   const recoveryCredentials = devices.filter(
     ({ purpose, key_type }) =>
-      "recovery" in purpose && !("seed_phrase" in key_type)
+      "recovery" in purpose && !("seed_phrase" in key_type),
   );
 
   if (recoveryCredentials.length === 0) {

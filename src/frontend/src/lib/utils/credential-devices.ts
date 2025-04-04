@@ -1,4 +1,7 @@
-import type { DeviceData, DeviceKey } from "$lib/generated/internet_identity_types";
+import type {
+  DeviceData,
+  DeviceKey,
+} from "$lib/generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
 import { DerEncodedPublicKey } from "@dfinity/agent";
 
@@ -30,7 +33,7 @@ export const convertToValidCredentialData = (
   return {
     credentialId: Buffer.from(device.credential_id[0]),
     pubkey: derFromPubkey(device.pubkey),
-    origin: device.origin[0]
+    origin: device.origin[0],
   };
 };
 
@@ -56,8 +59,8 @@ export const convertToValidCredentialData = (
  * - If `string` then the origin can be used to add a new device. Remember to use the hostname only for RP ID.
  */
 export const getCredentialsOrigin = ({
-                                       credentials
-                                     }: {
+  credentials,
+}: {
   credentials: Omit<DeviceData, "alias">[];
 }): string | undefined => {
   const credentialOrigins = new Set(

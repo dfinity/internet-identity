@@ -12,7 +12,7 @@ test("can be canceled", () => {
       title: "Title",
       continue: ctn,
       cancel,
-      i18n: new I18n()
+      i18n: new I18n(),
     },
     document.body,
   );
@@ -33,7 +33,7 @@ test("can be picked", () => {
       title: "Title",
       continue: ctn,
       cancel,
-      i18n: new I18n()
+      i18n: new I18n(),
     },
     document.body,
   );
@@ -58,7 +58,7 @@ test("alias can contain special characters", () => {
       title: "Title",
       continue: ctn,
       cancel,
-      i18n: new I18n()
+      i18n: new I18n(),
     },
     document.body,
   );
@@ -83,7 +83,7 @@ test("alias should be trimmed", () => {
       title: "Title",
       continue: ctn,
       cancel,
-      i18n: new I18n()
+      i18n: new I18n(),
     },
     document.body,
   );
@@ -108,7 +108,7 @@ test("alias must not be whitespace only", () => {
       title: "Title",
       continue: ctn,
       cancel,
-      i18n: new I18n()
+      i18n: new I18n(),
     },
     document.body,
   );

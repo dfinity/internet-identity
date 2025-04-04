@@ -2,7 +2,7 @@ import { Funnel } from "./Funnel";
 
 /**
  * Authorize client flow events:
- * 
+ *
  * authorize-client-start (INIT)
  *   authorize-client-request-received
  *     authorize-client-request-valid

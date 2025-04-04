@@ -7,7 +7,7 @@ import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import {
   AuthenticatedConnection,
   creationOptions,
-  IC_DERIVATION_PATH
+  IC_DERIVATION_PATH,
 } from "$lib/utils/iiConnection";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
 import { unreachable, unreachableLax } from "$lib/utils/utils";
@@ -19,9 +19,9 @@ import { displaySeedPhrase } from "./displaySeedPhrase";
 
 // Set up a recovery device
 export const setupKey = async ({
-                                 devices: devices_,
-                                 connection
-                               }: {
+  devices: devices_,
+  connection,
+}: {
   // When provided, use these devices for exclusion (webauthn) instead of looking up devices
   // (avoids a request saves a couple seconds when used)
   devices?: Omit<DeviceData, "alias">[];
@@ -36,14 +36,14 @@ export const setupKey = async ({
       const newDeviceOrigin =
         userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
-            credentials: devices
-          })
+              credentials: devices,
+            })
           : undefined;
       const rpId = nonNullish(newDeviceOrigin)
         ? new URL(newDeviceOrigin).host
         : undefined;
       const recoverIdentity = await WebAuthnIdentity.create({
-        publicKey: creationOptions(devices, "cross-platform", rpId)
+        publicKey: creationOptions(devices, "cross-platform", rpId),
       });
 
       await connection.add(
@@ -53,7 +53,7 @@ export const setupKey = async ({
         recoverIdentity.getPublicKey().toDer(),
         { unprotected: null },
         newDeviceOrigin ?? window.location.origin,
-        recoverIdentity.rawId
+        recoverIdentity.rawId,
       );
     });
   } catch (error: unknown) {
@@ -67,7 +67,7 @@ export const setupKey = async ({
 export const setupPhrase = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  origin: string
+  origin: string,
 ): Promise<"ok" | "error" | "canceled"> => {
   const res = await phraseWizard({
     userNumber,
@@ -80,9 +80,9 @@ export const setupPhrase = async (
           { recovery: null },
           pubkey,
           { unprotected: null },
-          origin
-        )
-      )
+          origin,
+        ),
+      ),
   });
 
   if ("ok" in res) {
@@ -97,10 +97,10 @@ export const setupPhrase = async (
 
 // Set up a recovery phrase
 export const phraseWizard = async ({
-                                     userNumber,
-                                     operation,
-                                     uploadPhrase
-                                   }: {
+  userNumber,
+  operation,
+  uploadPhrase,
+}: {
   userNumber: bigint;
   operation: "create" | "reset";
   uploadPhrase: (pubkey: DerEncodedPublicKey) => Promise<void>;
@@ -108,7 +108,7 @@ export const phraseWizard = async ({
   const seedPhrase = generate().trim();
   const recoverIdentity = await fromMnemonicWithoutValidation(
     seedPhrase,
-    IC_DERIVATION_PATH
+    IC_DERIVATION_PATH,
   );
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;
@@ -131,17 +131,17 @@ export const phraseWizard = async ({
 
 // Show the new recovery phrase and ask for confirmation
 export const displayAndConfirmPhrase = async ({
-                                                operation,
-                                                phrase
-                                              }: {
+  operation,
+  phrase,
+}: {
   operation: "create" | "reset";
   phrase: string;
 }): Promise<"confirmed" | "canceled"> => {
   // Loop until the user has confirmed the phrase
-  for (; ;) {
+  for (;;) {
     const displayResult = await displaySeedPhrase({
       seedPhrase: phrase,
-      operation
+      operation,
     });
     // User has canceled, so we return
     if (displayResult === "canceled") {

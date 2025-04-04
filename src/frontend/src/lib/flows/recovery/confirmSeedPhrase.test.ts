@@ -11,7 +11,7 @@ test("word changes state", async () => {
     update: () => {
       /* */
     },
-    i: 0
+    i: 0,
   });
 
   render(template, document.body);
@@ -21,7 +21,7 @@ test("word changes state", async () => {
 
   // By default, ensure the state is "pending" and expected word is correct
   const elem = document.querySelector(
-    "[data-state=\"pending\"]"
+    '[data-state="pending"]',
   ) as HTMLInputElement;
   expect(elem.dataset.expected).toBe("hello");
 
@@ -48,7 +48,7 @@ test("words can be completed", async () => {
     { word: "one", check: false },
     { word: "two", check: true },
     { word: "three", check: false },
-    { word: "four", check: true }
+    { word: "four", check: true },
   ];
 
   await confirmSeedPhrasePage(
@@ -61,21 +61,21 @@ test("words can be completed", async () => {
       back: () => {
         /* */
       },
-      i18n
+      i18n,
     },
-    document.body
+    document.body,
   );
 
   await tick();
 
   const nextButton = document.querySelector(
-    "[data-action=\"next\"]"
+    '[data-action="next"]',
   ) as HTMLButtonElement;
 
   expect(nextButton.disabled).toBe(true);
 
   const inputNumber = document.querySelector(
-    "[data-expected=\"12345\"]"
+    '[data-expected="12345"]',
   ) as HTMLInputElement;
   inputNumber.value = "12345";
   inputNumber.dispatchEvent(new Event("input"));
@@ -83,7 +83,7 @@ test("words can be completed", async () => {
   expect(nextButton.disabled).toBe(true);
 
   const inputTwo = document.querySelector(
-    "[data-expected=\"two\"]"
+    '[data-expected="two"]',
   ) as HTMLInputElement;
   inputTwo.value = "two";
   inputTwo.dispatchEvent(new Event("input"));
@@ -91,7 +91,7 @@ test("words can be completed", async () => {
   expect(nextButton.disabled).toBe(true);
 
   const inputFour = document.querySelector(
-    "[data-expected=\"four\"]"
+    '[data-expected="four"]',
   ) as HTMLInputElement;
   inputFour.value = "bad";
   inputFour.dispatchEvent(new Event("input"));

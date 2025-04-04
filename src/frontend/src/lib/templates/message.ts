@@ -4,9 +4,9 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { mainWindow } from "./mainWindow";
 
 const showMessageTemplate = ({
-                               message,
-                               role
-                             }: {
+  message,
+  role,
+}: {
   message: TemplateElement;
   role?: string;
 }): TemplateResult =>
@@ -15,20 +15,20 @@ const showMessageTemplate = ({
     showFooter: false,
     slot: html`<p class="t-paragraph t-lead" data-role=${ifDefined(role)}>
       ${message}
-    </p>`
+    </p>`,
   });
 
 export const showMessagePage = renderPage(showMessageTemplate);
 
 // Show a simple, centered message (with optional "data-role" attribute)
 export const showMessage = ({
-                              message,
-                              role
-                            }: {
+  message,
+  role,
+}: {
   message: TemplateElement;
   role?: string;
 }): void =>
   showMessagePage({
     message,
-    role
+    role,
   });

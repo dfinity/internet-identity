@@ -3,11 +3,11 @@ import { renderPage } from "$lib/utils/lit-html";
 import { html } from "lit-html";
 
 const deviceRegistrationDisabledInfoTemplate = ({
-                                                  userNumber,
-                                                  origin,
-                                                  cancel,
-                                                  retry
-                                                }: {
+  userNumber,
+  origin,
+  cancel,
+  retry,
+}: {
   userNumber: bigint;
   origin: string;
   cancel: () => void;
@@ -56,12 +56,12 @@ const deviceRegistrationDisabledInfoTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 export const deviceRegistrationDisabledInfoPage = renderPage(
-  deviceRegistrationDisabledInfoTemplate
+  deviceRegistrationDisabledInfoTemplate,
 );
 
 /**
@@ -69,14 +69,14 @@ export const deviceRegistrationDisabledInfoPage = renderPage(
  * It shows instructions to the user on how to continue.
  */
 export const deviceRegistrationDisabledInfo = (
-  userNumber: bigint
+  userNumber: bigint,
 ): Promise<"canceled" | "retry"> => {
   return new Promise((resolve) =>
     deviceRegistrationDisabledInfoPage({
       userNumber,
       origin: window.origin,
       cancel: () => resolve("canceled"),
-      retry: () => resolve("retry")
-    })
+      retry: () => resolve("retry"),
+    }),
   );
 };

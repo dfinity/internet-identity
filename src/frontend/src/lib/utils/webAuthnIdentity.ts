@@ -7,7 +7,7 @@ import {
   Signature,
   fromHex,
   toHex,
-  wrapDER
+  wrapDER,
 } from "@dfinity/agent";
 import { bufFromBufLike } from "@dfinity/candid";
 import { isNullish } from "@dfinity/utils";
@@ -80,7 +80,7 @@ export class CosePublicKey implements PublicKey {
  *        coded string.
  */
 function _createChallengeBuffer(
-  challenge: string | Uint8Array = "<ic0.app>"
+  challenge: string | Uint8Array = "<ic0.app>",
 ): Uint8Array {
   if (typeof challenge === "string") {
     return Uint8Array.from(challenge, (c) => c.charCodeAt(0));
@@ -97,29 +97,29 @@ function _createChallengeBuffer(
  * @param credentialCreationOptions an optional CredentialCreationOptions object
  */
 async function _createCredential(
-  credentialCreationOptions?: CredentialCreationOptions
+  credentialCreationOptions?: CredentialCreationOptions,
 ): Promise<PublicKeyCredentialWithAttachment | null> {
   const creds = (await navigator.credentials.create(
     credentialCreationOptions ?? {
       publicKey: {
         authenticatorSelection: {
-          userVerification: "preferred"
+          userVerification: "preferred",
         },
         attestation: "direct",
         challenge: _createChallengeBuffer(),
         pubKeyCredParams: [
-          { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 }
+          { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
         ],
         rp: {
-          name: "Internet Identity Service"
+          name: "Internet Identity Service",
         },
         user: {
           id: randomBytes(16),
           name: "Internet Identity",
-          displayName: "Internet Identity"
-        }
-      }
-    }
+          displayName: "Internet Identity",
+        },
+      },
+    },
   )) as PublicKeyCredentialWithAttachment | null;
 
   if (creds === null) {
@@ -134,7 +134,7 @@ async function _createCredential(
     authenticatorAttachment: creds.authenticatorAttachment,
     getClientExtensionResults: creds.getClientExtensionResults,
     // Some password managers will return a Uint8Array, so we ensure we return an ArrayBuffer.
-    rawId: bufFromBufLike(creds.rawId)
+    rawId: bufFromBufLike(creds.rawId),
   };
 }
 
@@ -169,7 +169,7 @@ export class WebAuthnIdentity extends SignIdentity {
       fromHex(publicKey),
       undefined,
       rpId,
-      undefined
+      undefined,
     );
   }
 
@@ -178,7 +178,7 @@ export class WebAuthnIdentity extends SignIdentity {
    * @param credentialCreationOptions an optional CredentialCreationOptions Challenge
    */
   public static async create(
-    credentialCreationOptions?: CredentialCreationOptions
+    credentialCreationOptions?: CredentialCreationOptions,
   ): Promise<WebAuthnIdentity> {
     const creds = await _createCredential(credentialCreationOptions);
 
@@ -193,7 +193,7 @@ export class WebAuthnIdentity extends SignIdentity {
 
     // Parse the attestationObject as CBOR.
     const attObject = borc.decodeFirst(
-      new Uint8Array(response.attestationObject)
+      new Uint8Array(response.attestationObject),
     );
 
     return new this(
@@ -201,7 +201,7 @@ export class WebAuthnIdentity extends SignIdentity {
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
       credentialCreationOptions?.publicKey?.rp.id,
-      extractAAGUID(attObject.authData)
+      extractAAGUID(attObject.authData),
     );
   }
 
@@ -212,7 +212,7 @@ export class WebAuthnIdentity extends SignIdentity {
     cose: ArrayBuffer,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
     protected rpId: string | undefined,
-    public readonly aaguid: string | undefined
+    public readonly aaguid: string | undefined,
   ) {
     super();
     this._publicKey = new CosePublicKey(cose);
@@ -240,13 +240,13 @@ export class WebAuthnIdentity extends SignIdentity {
         allowCredentials: [
           {
             type: "public-key",
-            id: this.rawId
-          }
+            id: this.rawId,
+          },
         ],
         challenge: blob,
         userVerification: "preferred",
-        rpId: this.rpId
-      }
+        rpId: this.rpId,
+      },
     })) as PublicKeyCredentialWithAttachment;
 
     if (result.authenticatorAttachment !== null) {
@@ -259,8 +259,8 @@ export class WebAuthnIdentity extends SignIdentity {
       new borc.Tagged(55799, {
         authenticator_data: new Uint8Array(response.authenticatorData),
         client_data_json: new TextDecoder().decode(response.clientDataJSON),
-        signature: new Uint8Array(response.signature)
-      })
+        signature: new Uint8Array(response.signature),
+      }),
     );
     if (isNullish(cbor)) {
       throw new Error("failed to encode cbor");
@@ -275,7 +275,7 @@ export class WebAuthnIdentity extends SignIdentity {
     return {
       publicKey: toHex(this._publicKey.getCose()),
       rawId: toHex(this.rawId),
-      rpId: this.rpId
+      rpId: this.rpId,
     };
   }
 }

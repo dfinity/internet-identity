@@ -20,7 +20,7 @@ const recoveryPhrase: Omit<DeviceData, "alias"> = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
-  metadata: []
+  metadata: [],
 };
 
 const device: Omit<DeviceData, "alias"> = {
@@ -31,7 +31,7 @@ const device: Omit<DeviceData, "alias"> = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
-  metadata: []
+  metadata: [],
 };
 
 const recoveryDevice: Omit<DeviceData, "alias"> = {
@@ -41,7 +41,7 @@ const recoveryDevice: Omit<DeviceData, "alias"> = {
   pubkey: new Uint8Array(),
   key_type: { cross_platform: null },
   purpose: { recovery: null },
-  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])]
+  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
 };
 
 const oneDeviceOnly: Omit<DeviceData, "alias">[] = [device];
@@ -50,26 +50,26 @@ const oneRecoveryDeviceOnly: Omit<DeviceData, "alias">[] = [recoveryDevice];
 
 const oneDeviceAndPhrase: Omit<DeviceData, "alias">[] = [
   device,
-  recoveryPhrase
+  recoveryPhrase,
 ];
 
 const twoDevices: Omit<DeviceData, "alias">[] = [
   device,
   { ...device },
-  recoveryPhrase
+  recoveryPhrase,
 ];
 
 const threeDevices: Omit<DeviceData, "alias">[] = [
   device,
   { ...device },
   { ...device },
-  recoveryPhrase
+  recoveryPhrase,
 ];
 
 const oneNormalOneRecovery: Omit<DeviceData, "alias">[] = [
   device,
   recoveryDevice,
-  recoveryPhrase
+  recoveryPhrase,
 ];
 
 test("getDevicesStatus returns 'pin-only' for user with pin and has seen recovery longer than a week ago", () => {
@@ -77,11 +77,11 @@ test("getDevicesStatus returns 'pin-only' for user with pin and has seen recover
     getDevicesStatus({
       credentials: noCredentials,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("pin-only");
 });
 
@@ -90,11 +90,11 @@ test("getDevicesStatus returns 'one-device' for user with one passkey and has se
     getDevicesStatus({
       credentials: oneDeviceOnly,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("one-device");
 });
 
@@ -104,8 +104,8 @@ test("getDevicesStatus returns true for user with one passkey and empty identity
       credentials: oneDeviceOnly,
       identityMetadata: {},
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("one-device");
 });
 
@@ -114,11 +114,11 @@ test("getDevicesStatus returns 'one-device' for user with one recovery device an
     getDevicesStatus({
       credentials: oneRecoveryDeviceOnly,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("one-device");
 });
 
@@ -127,11 +127,11 @@ test("getDevicesStatus returns 'one-device' for user with one device and a recov
     getDevicesStatus({
       credentials: oneDeviceAndPhrase,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("one-device");
 });
 
@@ -141,11 +141,11 @@ test("getDevicesStatus returns 'no-warning' for user with pin that has disabled 
       credentials: noCredentials,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
-        doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo
+        doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });
 
@@ -155,11 +155,11 @@ test("getDevicesStatus returns 'no-warning' for user with one device that has di
       credentials: oneDeviceOnly,
       identityMetadata: {
         recoveryPageShownTimestampMillis: moreThanAWeekAgo,
-        doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo
+        doNotShowRecoveryPageRequestTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });
 
@@ -168,11 +168,11 @@ test("getDevicesStatus returns 'no-warning' for user with two devices", () => {
     getDevicesStatus({
       credentials: twoDevices,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });
 
@@ -181,11 +181,11 @@ test("getDevicesStatus returns 'no-warning' for user with one normal device and 
     getDevicesStatus({
       credentials: oneNormalOneRecovery,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: moreThanAWeekAgo
+        recoveryPageShownTimestampMillis: moreThanAWeekAgo,
       },
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });
 
@@ -195,8 +195,8 @@ test("getDevicesStatus returns 'no-warning' for user with more than two devices 
       credentials: threeDevices,
       identityMetadata: {},
       pinIdentityMaterial: undefined,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });
 
@@ -205,10 +205,10 @@ test("getDevicesStatus returns 'no-warning' for user with pin and has seen recov
     getDevicesStatus({
       credentials: noCredentials,
       identityMetadata: {
-        recoveryPageShownTimestampMillis: lessThanAWeekAgo
+        recoveryPageShownTimestampMillis: lessThanAWeekAgo,
       },
       pinIdentityMaterial,
-      nowInMillis
-    })
+      nowInMillis,
+    }),
   ).toBe("no-warning");
 });

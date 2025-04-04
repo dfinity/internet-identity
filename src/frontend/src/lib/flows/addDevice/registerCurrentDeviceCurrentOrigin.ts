@@ -7,10 +7,10 @@ import { addCurrentDevice } from "./manage/addCurrentDevice";
 import copyJson from "./registerCurrentDeviceCurrentOrigin.json";
 
 const registerCurrentDeviceCurrentOriginTemplate = ({
-                                                      add,
-                                                      skip,
-                                                      i18n
-                                                    }: {
+  add,
+  skip,
+  i18n,
+}: {
   add: () => void;
   skip: () => void;
   i18n: I18n;
@@ -27,19 +27,19 @@ const registerCurrentDeviceCurrentOriginTemplate = ({
     scrollToTop: true,
     icon: "info",
     pageId: "add-current-device",
-    label: copy.label_icon
+    label: copy.label_icon,
   });
 };
 
 export const registerCurrentDeviceCurrentOriginPage = renderPage(
-  registerCurrentDeviceCurrentOriginTemplate
+  registerCurrentDeviceCurrentOriginTemplate,
 );
 
 // Prompt the user to add the current device (with the current origin).
 // Adding the current device to the current origin improves the UX of the user when they come back to this origin.
 export const registerCurrentDeviceCurrentOrigin = (
   userNumber: bigint,
-  connection: AuthenticatedConnection
+  connection: AuthenticatedConnection,
 ): Promise<void> =>
   new Promise((resolve) =>
     registerCurrentDeviceCurrentOriginPage({
@@ -52,10 +52,10 @@ export const registerCurrentDeviceCurrentOrigin = (
           userNumber,
           connection,
           existingDevices,
-          undefined
+          undefined,
         );
         resolve();
       },
-      skip: () => resolve()
-    })
+      skip: () => resolve(),
+    }),
   );

@@ -1,6 +1,6 @@
 import type {
   IdentityAnchorInfo,
-  Timestamp
+  Timestamp,
 } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
@@ -14,10 +14,10 @@ import { verifyTentativeDevice } from "./verifyTentativeDevice";
 
 // The flow for adding a remote (i.e. other browser, non-hardware) device
 export const addDevice = async ({
-                                  userNumber,
-                                  connection,
-                                  origin
-                                }: {
+  userNumber,
+  connection,
+  origin,
+}: {
   userNumber: bigint;
   connection: AuthenticatedConnection;
   origin: string;
@@ -27,8 +27,8 @@ export const addDevice = async ({
     await withLoader(() =>
       Promise.all([
         connection.enterDeviceRegistrationMode(),
-        connection.getAnchorInfo()
-      ])
+        connection.getAnchorInfo(),
+      ]),
     );
 
   let tentativeDevice = anchorInfo.device_registration[0]?.tentative_device[0];
@@ -38,7 +38,7 @@ export const addDevice = async ({
       userNumber,
       connection,
       timestamp,
-      origin
+      origin,
     );
 
     if (result === "timeout") {
@@ -46,8 +46,8 @@ export const addDevice = async ({
       await displayError({
         title: "Timeout Reached",
         message:
-          "The timeout has been reached. For security reasons the \"add device\" process has been aborted.",
-        primaryButton: "Ok"
+          'The timeout has been reached. For security reasons the "add device" process has been aborted.',
+        primaryButton: "Ok",
       });
       return;
     } else if (result === "use-fido") {
@@ -58,7 +58,7 @@ export const addDevice = async ({
         userNumber,
         connection,
         anchorInfo.devices,
-        origin
+        origin,
       );
       return;
     } else if (result === "canceled") {
@@ -75,14 +75,14 @@ export const addDevice = async ({
   const result = await verifyTentativeDevice({
     connection,
     alias,
-    endTimestamp: timestamp
+    endTimestamp: timestamp,
   });
 
   if (result === "verified") {
     await addDeviceSuccess({
       userNumber,
       deviceAlias: alias,
-      stepper: tentativeDeviceStepper({ step: "success" })
+      stepper: tentativeDeviceStepper({ step: "success" }),
     });
   }
 };

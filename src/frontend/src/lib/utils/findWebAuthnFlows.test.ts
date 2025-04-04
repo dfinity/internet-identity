@@ -11,7 +11,7 @@ describe("findWebAuthnFlows", () => {
   const relatedOrigins = [
     "https://identity.ic0.app",
     "https://identity.internetcomputer.org",
-    "https://identity.icp0.io"
+    "https://identity.icp0.io",
   ];
 
   const createMockCredential = (
@@ -19,7 +19,7 @@ describe("findWebAuthnFlows", () => {
   ): CredentialData => ({
     pubkey: new ArrayBuffer(32),
     credentialId: new ArrayBuffer(16),
-    origin
+    origin,
   });
 
   it("should return default flow if no devices are provided", () => {
@@ -27,7 +27,7 @@ describe("findWebAuthnFlows", () => {
       supportsRor: true,
       devices: [],
       currentOrigin: currentOrigin,
-      relatedOrigins
+      relatedOrigins,
     });
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
   });
@@ -37,7 +37,7 @@ describe("findWebAuthnFlows", () => {
       supportsRor: true,
       devices: [createMockCredential(nonCurrentOrigin1)],
       currentOrigin: currentOrigin,
-      relatedOrigins
+      relatedOrigins,
     });
 
     expect(result).toEqual([{ useIframe: true, rpId: nonCurrentOrigin1RpId }]);
@@ -48,10 +48,10 @@ describe("findWebAuthnFlows", () => {
       supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
-        createMockCredential(currentOrigin)
+        createMockCredential(currentOrigin),
       ],
       currentOrigin: currentOrigin,
-      relatedOrigins
+      relatedOrigins,
     });
 
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
@@ -62,10 +62,10 @@ describe("findWebAuthnFlows", () => {
       supportsRor: true,
       devices: [
         createMockCredential(undefined),
-        createMockCredential(LEGACY_II_URL)
+        createMockCredential(LEGACY_II_URL),
       ],
       currentOrigin: LEGACY_II_URL,
-      relatedOrigins
+      relatedOrigins,
     });
 
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
@@ -79,16 +79,16 @@ describe("findWebAuthnFlows", () => {
         createMockCredential(currentOrigin),
         createMockCredential(nonCurrentOrigin1),
         createMockCredential(nonCurrentOrigin2),
-        createMockCredential(nonCurrentOrigin2)
+        createMockCredential(nonCurrentOrigin2),
       ],
       currentOrigin: currentOrigin,
-      relatedOrigins
+      relatedOrigins,
     });
 
     expect(result).toEqual([
       { useIframe: false, rpId: undefined },
       { useIframe: true, rpId: nonCurrentOrigin1RpId },
-      { useIframe: true, rpId: nonCurrentOrigin2RpId }
+      { useIframe: true, rpId: nonCurrentOrigin2RpId },
     ]);
   });
 
@@ -100,10 +100,10 @@ describe("findWebAuthnFlows", () => {
         createMockCredential(currentOrigin),
         createMockCredential(nonCurrentOrigin1),
         createMockCredential(nonCurrentOrigin2),
-        createMockCredential(nonCurrentOrigin2)
+        createMockCredential(nonCurrentOrigin2),
       ],
       currentOrigin: currentOrigin,
-      relatedOrigins: []
+      relatedOrigins: [],
     });
 
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
@@ -117,13 +117,13 @@ describe("findWebAuthnFlows", () => {
         createMockCredential(currentOrigin),
         createMockCredential(nonCurrentOrigin1),
         createMockCredential(nonCurrentOrigin2),
-        createMockCredential(nonCurrentOrigin2)
+        createMockCredential(nonCurrentOrigin2),
       ],
       currentOrigin: currentOrigin,
       relatedOrigins: [
         "https://not-identity.ic0.app",
-        "https://not-identity.icp0.io"
-      ]
+        "https://not-identity.icp0.io",
+      ],
     });
 
     expect(result).toEqual([{ useIframe: false, rpId: undefined }]);
@@ -137,16 +137,16 @@ describe("findWebAuthnFlows", () => {
         createMockCredential(currentOrigin),
         createMockCredential(currentOrigin),
         createMockCredential(nonCurrentOrigin1),
-        createMockCredential(nonCurrentOrigin2)
+        createMockCredential(nonCurrentOrigin2),
       ],
       currentOrigin: currentOrigin,
-      relatedOrigins: [currentOrigin, nonCurrentOrigin1, nonCurrentOrigin2]
+      relatedOrigins: [currentOrigin, nonCurrentOrigin1, nonCurrentOrigin2],
     });
 
     expect(result).toEqual([
       { useIframe: true, rpId: nonCurrentOrigin2RpId },
       { useIframe: false, rpId: undefined },
-      { useIframe: true, rpId: nonCurrentOrigin1RpId }
+      { useIframe: true, rpId: nonCurrentOrigin1RpId },
     ]);
   });
 });

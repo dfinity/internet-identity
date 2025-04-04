@@ -20,35 +20,35 @@ const pageContent = (options: ErrorOptions) =>
     showFooter: false,
     showLogo: false,
     slot: html` ${warnBox({
-      title: options.title,
-      message: options.message,
-      htmlElement: "div",
-      slot: nonNullish(options.detail)
-        ? html`<div class="l-stack">
-          <h4>Error details:</h4>
-          <pre data-role="error-detail" class="t-paragraph">
+        title: options.title,
+        message: options.message,
+        htmlElement: "div",
+        slot: nonNullish(options.detail)
+          ? html`<div class="l-stack">
+              <h4>Error details:</h4>
+              <pre data-role="error-detail" class="t-paragraph">
 ${options.detail}</pre
-          >
-        </div>`
-        : undefined
-    })}
+              >
+            </div>`
+          : undefined,
+      })}
 
-    <div class="l-stack">
-      <button
-        id="displayErrorPrimary"
-        data-error-code=${ifDefined(options.errorCode)}
-        class="c-button c-button--primary"
-      >
-        ${options.primaryButton}
-      </button>
-      <a
-        href="${ERROR_SUPPORT_URL}"
-        target="_blank"
-        class="c-button c-button--secondary"
-      >
-        Go to support
-      </a>
-    </div>`
+      <div class="l-stack">
+        <button
+          id="displayErrorPrimary"
+          data-error-code=${ifDefined(options.errorCode)}
+          class="c-button c-button--primary"
+        >
+          ${options.primaryButton}
+        </button>
+        <a
+          href="${ERROR_SUPPORT_URL}"
+          target="_blank"
+          class="c-button c-button--secondary"
+        >
+          Go to support
+        </a>
+      </div>`,
   });
 
 export const displayError = (options: ErrorOptions): Promise<void> => {

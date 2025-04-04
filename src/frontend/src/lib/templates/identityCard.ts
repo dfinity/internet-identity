@@ -2,9 +2,9 @@ import { PreLoadImage } from "$lib/utils/preLoadImage";
 import { html, TemplateResult } from "lit-html";
 
 export const identityCard = ({
-                               userNumber,
-                               identityBackground
-                             }: {
+  userNumber,
+  identityBackground,
+}: {
   userNumber: bigint;
   identityBackground: PreLoadImage;
 }): TemplateResult => {

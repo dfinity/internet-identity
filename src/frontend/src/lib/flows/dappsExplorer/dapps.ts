@@ -9,7 +9,7 @@ import dappsJson from "./dapps.json";
 const iconFiles = import.meta.glob("$lib/icons/*", {
   eager: true,
   query: "?url",
-  import: "default"
+  import: "default",
 });
 
 // Infer the type of an array's elements
@@ -37,14 +37,16 @@ export class KnownDapp {
       );
     } else {
       return (this.descr.authOrigins ?? []).some(
-        (authOrigin) => orig === new URL(authOrigin).origin
+        (authOrigin) => orig === new URL(authOrigin).origin,
       );
     }
   }
 
   // Path to use for logo files
   public get logoSrc(): string {
-    return iconFiles[`/src/frontend/src/lib/icons/${this.descr.logo}`] as string;
+    return iconFiles[
+      `/src/frontend/src/lib/icons/${this.descr.logo}`
+    ] as string;
   }
 
   public get name(): string {
@@ -73,8 +75,8 @@ export const getDapps = (): KnownDapp[] => {
       new KnownDapp({
         name: "Test Dapp",
         website: "https://nice-name.com",
-        logo: nnsDappLogo?.descr.logo ?? "no-such-logo"
-      })
+        logo: nnsDappLogo?.descr.logo ?? "no-such-logo",
+      }),
     );
   }
 

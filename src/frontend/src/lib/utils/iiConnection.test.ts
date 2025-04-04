@@ -2,25 +2,25 @@ import type {
   DeviceData,
   InternetIdentityInit,
   MetadataMapV2,
-  _SERVICE
+  _SERVICE,
 } from "$lib/generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import {
   IdentityMetadata,
-  RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS
+  RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
 } from "$lib/legacy/repositories/identityMetadata";
 import {
   ActorSubclass,
   DerEncodedPublicKey,
   SignIdentity,
-  Signature
+  Signature,
 } from "@dfinity/agent";
 import { DelegationIdentity } from "@dfinity/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
 import {
   CredentialData,
-  convertToValidCredentialData
+  convertToValidCredentialData,
 } from "./credential-devices";
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
@@ -34,27 +34,27 @@ const createMockDevice = (origin?: string): DeviceData => ({
   pubkey: new Uint8Array(),
   key_type: { platform: null },
   purpose: { authentication: null },
-  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])]
+  credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
 });
 const mockDevice = createMockDevice();
 
 const mockDelegationIdentity = {
   getDelegation() {
     return {
-      delegations: []
+      delegations: [],
     };
-  }
+  },
 } as unknown as DelegationIdentity;
 
 const recoveryPageShownTimestampMillis = 1234567890;
 const mockRawMetadata: MetadataMapV2 = [
   [
     RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-    { String: String(recoveryPageShownTimestampMillis) }
-  ]
+    { String: String(recoveryPageShownTimestampMillis) },
+  ],
 ];
 const mockIdentityMetadata: IdentityMetadata = {
-  recoveryPageShownTimestampMillis
+  recoveryPageShownTimestampMillis,
 };
 
 // Used to await that the getter has resolved.
@@ -72,12 +72,12 @@ const DEFAULT_INIT: InternetIdentityInit = {
     [
       "https://identity.ic0.app",
       "https://identity.internetcomputer.org",
-      "https://identity.icp0.io"
-    ]
+      "https://identity.icp0.io",
+    ],
   ],
   fetch_root_key: [],
   enable_dapps_explorer: [],
-  is_production: []
+  is_production: [],
 };
 
 const mockActor = {
@@ -87,7 +87,7 @@ const mockActor = {
     return { Ok: { metadata: mockRawMetadata } };
   }),
   identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
-  lookup: vi.fn().mockResolvedValue([mockDevice])
+  lookup: vi.fn().mockResolvedValue([mockDevice]),
 } as unknown as ActorSubclass<_SERVICE>;
 
 const currentOrigin = "https://identity.internetcomputer.org";
@@ -102,7 +102,7 @@ beforeEach(async () => {
   infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
-    origin: currentOrigin
+    origin: currentOrigin,
   });
   DOMAIN_COMPATIBILITY.reset();
 });
@@ -140,7 +140,7 @@ test("commits changes on identity metadata", async () => {
 
   const newRecoveryPageShownTimestampMillis = 9876543210;
   connection.updateIdentityMetadata({
-    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis
+    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
   });
 
   expect(mockActor.identity_metadata_replace).not.toHaveBeenCalled();
@@ -150,8 +150,8 @@ test("commits changes on identity metadata", async () => {
   expect(mockActor.identity_metadata_replace).toHaveBeenCalledWith(userNumber, [
     [
       RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-      { String: String(newRecoveryPageShownTimestampMillis) }
-    ]
+      { String: String(newRecoveryPageShownTimestampMillis) },
+    ],
   ]);
 });
 
@@ -167,9 +167,9 @@ describe("Connection.login", () => {
               toDer: () => new ArrayBuffer(0) as DerEncodedPublicKey,
               toRaw: () => new ArrayBuffer(0),
               rawKey: () => new ArrayBuffer(0),
-              derKey: () => new ArrayBuffer(0) as DerEncodedPublicKey
+              derKey: () => new ArrayBuffer(0) as DerEncodedPublicKey,
             };
-          }
+          },
         } as unknown as WebAuthnIdentity;
 
         class MockMultiWebAuthnIdentity extends MultiWebAuthnIdentity {
@@ -205,7 +205,7 @@ describe("Connection.login", () => {
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
       });
     });
 
@@ -230,7 +230,7 @@ describe("Connection.login", () => {
     it("login returns undefined RP ID if no related origins are in the config", async () => {
       const config: InternetIdentityInit = {
         ...DEFAULT_INIT,
-        related_origins: []
+        related_origins: [],
       };
       const connection = new Connection("aaaaa-aa", config, mockActor);
 
@@ -259,7 +259,7 @@ describe("Connection.login", () => {
         convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice])
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
@@ -271,7 +271,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
-          currentDeviceCredentialData
+          currentDeviceCredentialData,
         ]),
         undefined,
         // Do not use iframe
@@ -292,7 +292,7 @@ describe("Connection.login", () => {
           2,
           expect.arrayContaining([
             currentDeviceCredentialData,
-            currentDeviceCredentialData
+            currentDeviceCredentialData,
           ]),
           "identity.ic0.app",
           // Use iframe
@@ -312,7 +312,7 @@ describe("Connection.login", () => {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
         lookup: vi
           .fn()
-          .mockResolvedValue([currentOriginDevice, currentOriginDevice2])
+          .mockResolvedValue([currentOriginDevice, currentOriginDevice2]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
@@ -324,7 +324,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
-          currentOriginCredentialData2
+          currentOriginCredentialData2,
         ]),
         undefined,
         false
@@ -344,7 +344,7 @@ describe("Connection.login", () => {
           2,
           expect.arrayContaining([
             currentOriginCredentialData,
-            currentOriginCredentialData2
+            currentOriginCredentialData2,
           ]),
           undefined,
           false
@@ -359,7 +359,7 @@ describe("Connection.login", () => {
       vi.stubGlobal("navigator", {
         // Does NOT Supports RoR
         userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0"
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
       });
     });
 
@@ -388,7 +388,7 @@ describe("Connection.login", () => {
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
       });
     });
 
@@ -419,7 +419,7 @@ describe("Connection.login", () => {
         convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice])
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
@@ -431,7 +431,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
-          currentDeviceCredentialData
+          currentDeviceCredentialData,
         ]),
         undefined,
         false
@@ -451,7 +451,7 @@ describe("Connection.login", () => {
           2,
           expect.arrayContaining([
             currentDeviceCredentialData,
-            currentOriginCredentialData
+            currentOriginCredentialData,
           ]),
           undefined,
           false
@@ -466,7 +466,7 @@ describe("Connection.login", () => {
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
       });
     });
 
@@ -497,7 +497,7 @@ describe("Connection.login", () => {
         convertToValidCredentialData(currentDevice);
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice])
+        lookup: vi.fn().mockResolvedValue([currentOriginDevice, currentDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
@@ -509,7 +509,7 @@ describe("Connection.login", () => {
       expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
         expect.arrayContaining([
           currentOriginCredentialData,
-          currentDeviceCredentialData
+          currentDeviceCredentialData,
         ]),
         undefined,
         false
@@ -529,7 +529,7 @@ describe("Connection.login", () => {
           2,
           expect.arrayContaining([
             currentDeviceCredentialData,
-            currentOriginCredentialData
+            currentOriginCredentialData,
           ]),
           undefined,
           false
@@ -550,8 +550,8 @@ describe("Connection.login", () => {
           .fn()
           .mockResolvedValue([
             deviceWithCredentialId,
-            deviceWithoutCredentialId
-          ])
+            deviceWithoutCredentialId,
+          ]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
       await connection.login(BigInt(12345));
@@ -576,8 +576,8 @@ describe("Connection.login", () => {
           .fn()
           .mockResolvedValue([
             deviceValidCredentialId,
-            deviceInvalidCredentialId
-          ])
+            deviceInvalidCredentialId,
+          ]),
       } as unknown as ActorSubclass<_SERVICE>;
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
       await connection.login(BigInt(12345));
@@ -600,10 +600,10 @@ describe("Connection.login", () => {
         pubkey: new Uint8Array(),
         key_type: { browser_storage_key: null },
         purpose: { authentication: null },
-        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])]
+        credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
       };
       const mockActor = {
-        lookup: vi.fn().mockResolvedValue([pinDevice])
+        lookup: vi.fn().mockResolvedValue([pinDevice]),
       } as unknown as ActorSubclass<_SERVICE>;
 
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
@@ -624,7 +624,7 @@ describe("Connection.login", () => {
     it("passes origin if origin less than 50 characters", async () => {
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        add: vi.fn().mockResolvedValue(undefined)
+        add: vi.fn().mockResolvedValue(undefined),
       } as unknown as ActorSubclass<_SERVICE>;
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
@@ -655,14 +655,14 @@ describe("Connection.login", () => {
         purpose,
         protection,
         origin: [origin],
-        metadata: []
+        metadata: [],
       });
     });
 
     it("doesn't pass origin if origin more than 50 characters", async () => {
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        add: vi.fn().mockResolvedValue(undefined)
+        add: vi.fn().mockResolvedValue(undefined),
       } as unknown as ActorSubclass<_SERVICE>;
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
@@ -693,14 +693,14 @@ describe("Connection.login", () => {
         purpose,
         protection,
         origin: [],
-        metadata: []
+        metadata: [],
       });
     });
 
     it("handles no origin being passed", async () => {
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        add: vi.fn().mockResolvedValue(undefined)
+        add: vi.fn().mockResolvedValue(undefined),
       } as unknown as ActorSubclass<_SERVICE>;
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
@@ -730,14 +730,14 @@ describe("Connection.login", () => {
         purpose,
         protection,
         origin: [],
-        metadata: []
+        metadata: [],
       });
     });
 
     it("passes credential id if present", async () => {
       const mockActor = {
         identity_info: vi.fn().mockResolvedValue({ Ok: { metadata: [] } }),
-        add: vi.fn().mockResolvedValue(undefined)
+        add: vi.fn().mockResolvedValue(undefined),
       } as unknown as ActorSubclass<_SERVICE>;
       const userNumber = BigInt(12345);
       const connection = new AuthenticatedConnection(
@@ -769,7 +769,7 @@ describe("Connection.login", () => {
         purpose,
         protection,
         origin: [],
-        metadata: []
+        metadata: [],
       });
     });
   });
@@ -785,20 +785,20 @@ vi.mock("$lib/utils/openID", () => ({
   createAnonymousNonce: () =>
     Promise.resolve({ nonce: mockNonce, salt: mockSalt }),
   createGoogleRequestConfig: () => ({}),
-  requestJWT: () => Promise.resolve(mockJwt)
+  requestJWT: () => Promise.resolve(mockJwt),
 }));
 
 vi.mock("$lib/templates/loader", () => ({
-  withLoader: <T>(fn: () => Promise<T>) => fn()
+  withLoader: <T>(fn: () => Promise<T>) => fn(),
 }));
 
 describe("openid_identity_registration_finish", () => {
   const mockIdentity = {
     getPrincipal: () => ({ toString: () => "mock-principal" }),
     getPublicKey: () => ({
-      toDer: () => new Uint8Array([1, 2, 3]).buffer
+      toDer: () => new Uint8Array([1, 2, 3]).buffer,
     }),
-    sign: () => Promise.resolve(new Uint8Array([4, 5, 6]).buffer)
+    sign: () => Promise.resolve(new Uint8Array([4, 5, 6]).buffer),
   } as unknown as SignIdentity;
 
   beforeEach(() => {
@@ -822,8 +822,8 @@ describe("openid_identity_registration_finish", () => {
     const mockUserNumber = BigInt(12345);
     const mockActor = {
       openid_identity_registration_finish: vi.fn().mockResolvedValue({
-        Ok: { identity_number: mockUserNumber }
-      })
+        Ok: { identity_number: mockUserNumber },
+      }),
     } as unknown as ActorSubclass<_SERVICE>;
 
     // Mock createActor to return our mockActor
@@ -845,18 +845,18 @@ describe("openid_identity_registration_finish", () => {
       kind: "loginSuccess",
       connection: mockAuthConnection,
       userNumber: mockUserNumber,
-      showAddCurrentDevice: false
+      showAddCurrentDevice: false,
     });
     expect(mockActor.openid_identity_registration_finish).toHaveBeenCalledWith({
       jwt: mockJwt,
-      salt: mockSalt
+      salt: mockSalt,
     });
   });
 
   it("should handle API errors", async () => {
     const mockError = new Error("API Error");
     const mockActor = {
-      openid_identity_registration_finish: vi.fn().mockRejectedValue(mockError)
+      openid_identity_registration_finish: vi.fn().mockRejectedValue(mockError),
     } as unknown as ActorSubclass<_SERVICE>;
 
     const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
@@ -871,7 +871,7 @@ describe("openid_identity_registration_finish", () => {
 
     expect(result).toEqual({
       kind: "apiError",
-      error: mockError
+      error: mockError,
     });
   });
 
@@ -879,7 +879,7 @@ describe("openid_identity_registration_finish", () => {
     const mockActor = {
       openid_identity_registration_finish: vi
         .fn()
-        .mockRejectedValue("Unknown error")
+        .mockRejectedValue("Unknown error"),
     } as unknown as ActorSubclass<_SERVICE>;
 
     const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
@@ -894,15 +894,15 @@ describe("openid_identity_registration_finish", () => {
 
     expect(result).toEqual({
       kind: "apiError",
-      error: new Error("Unknown error when registering")
+      error: new Error("Unknown error when registering"),
     });
   });
 
   it("should handle registration errors", async () => {
     const mockActor = {
       openid_identity_registration_finish: vi.fn().mockResolvedValue({
-        Err: { NoRegistrationFlow: null }
-      })
+        Err: { NoRegistrationFlow: null },
+      }),
     } as unknown as ActorSubclass<_SERVICE>;
 
     const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);

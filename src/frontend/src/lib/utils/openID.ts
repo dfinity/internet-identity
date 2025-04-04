@@ -25,7 +25,7 @@ export interface RequestOptions {
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
   clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
-  configURL: "https://accounts.google.com/gsi/fedcm.json"
+  configURL: "https://accounts.google.com/gsi/fedcm.json",
 });
 
 /**
@@ -46,11 +46,11 @@ const requestWithCredentials = async (
           configURL: config.configURL,
           clientId: config.clientId,
           nonce: options.nonce,
-          loginHint: options.loginHint
-        }
-      ]
+          loginHint: options.loginHint,
+        },
+      ],
     },
-    mediation: options.mediation
+    mediation: options.mediation,
   });
 
   if (

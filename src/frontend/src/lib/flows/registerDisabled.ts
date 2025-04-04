@@ -3,9 +3,9 @@ import { warnBox } from "$lib/templates/warnBox";
 import { html, render } from "lit-html";
 
 const pageContent = ({
-                       onCancel,
-                       allowedOrigins
-                     }: {
+  onCancel,
+  allowedOrigins,
+}: {
   onCancel: () => void;
   allowedOrigins: string[];
 }) => {
@@ -14,22 +14,22 @@ const pageContent = ({
     </hgroup>
     <div class="l-stack">
       ${warnBox({
-    title: "Registration Disabled",
-    message: html`<p class="t-paragraph t-lead">
+        title: "Registration Disabled",
+        message: html`<p class="t-paragraph t-lead">
             To keep you safe, we disabled registration from this address. If you
             want to securely create a new Internet Identity, visit:
             ${allowedOrigins.length === 1
-      ? html`<a class="t-link" href=${allowedOrigins[0]}
+              ? html`<a class="t-link" href=${allowedOrigins[0]}
                     >${allowedOrigins[0]}</a
                   >.`
-      : html`
+              : html`
                   <ul>
                     ${allowedOrigins.map(
-        (origin) =>
-          html`<li>
+                      (origin) =>
+                        html`<li>
                           <a class="t-link" href=${origin}>${origin}</a>
-                        </li>`
-      )}
+                        </li>`,
+                    )}
                   </ul>
                 `}
           </p>
@@ -41,8 +41,8 @@ const pageContent = ({
               href="https://forum.dfinity.org/t/internet-identity-proposal-to-deprecate-account-creation-on-all-origins-other-than-https-identity-ic0-app/9760"
               >here</a
             >.
-          </p>`
-  })}
+          </p>`,
+      })}
     </div>
     <div class="l-stack">
       <button class="c-button" @click="${onCancel}" id="deviceAliasCancel">
@@ -53,7 +53,7 @@ const pageContent = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
@@ -63,7 +63,7 @@ const pageContent = ({
  * @returns Promise resolved when the user clicks cancel
  */
 export const registerDisabled = (
-  allowedOrigins: string[]
+  allowedOrigins: string[],
 ): Promise<{ tag: "canceled" }> => {
   return new Promise((resolve) => {
     const container = document.getElementById("pageContent") as HTMLElement;
@@ -72,9 +72,9 @@ export const registerDisabled = (
         onCancel: () => {
           resolve({ tag: "canceled" });
         },
-        allowedOrigins
+        allowedOrigins,
       }),
-      container
+      container,
     );
   });
 };

@@ -11,24 +11,24 @@ export const showWarningIfNecessary = (config: InternetIdentityInit): void => {
   if (anyFeatures()) {
     showWarning(
       html`Test only. Do not use your regular Internet Identity!
-      <a
-        class="features-warning-btn"
-        target="_blank"
-        rel="noopener noreferrer"
-        href="https://github.com/dfinity/internet-identity#build-features"
-      >more</a
-      >`
+        <a
+          class="features-warning-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          href="https://github.com/dfinity/internet-identity#build-features"
+          >more</a
+        >`,
     );
   } else if (!isProduction) {
     showWarning(
       html`This is not the official Internet Identity.
-      <a
-        class="features-warning-btn"
-        target="_blank"
-        rel="noopener noreferrer"
-        href=${firstUrl}
-      >go to official</a
-      >`
+        <a
+          class="features-warning-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          href=${firstUrl}
+          >go to official</a
+        >`,
     );
   }
 };

@@ -11,12 +11,12 @@ export type AddDeviceSuccessTemplateProps = Parameters<
 >[0];
 
 const addDeviceSuccessTemplate = ({
-                                    userNumber,
-                                    deviceAlias,
-                                    onContinue,
-                                    stepper,
-                                    i18n
-                                  }: {
+  userNumber,
+  deviceAlias,
+  onContinue,
+  stepper,
+  i18n,
+}: {
   userNumber: bigint;
   deviceAlias: DeviceAlias;
   onContinue: () => void;
@@ -36,7 +36,7 @@ const addDeviceSuccessTemplate = ({
     </hgroup>
     <output
       class="c-input c-input--stack c-input--fullwidth c-input--readonly t-vip t-vip--small"
-    >${deviceAlias}</output
+      >${deviceAlias}</output
     >
     <div class="l-stack">
       <button
@@ -52,7 +52,7 @@ const addDeviceSuccessTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot
+    slot,
   });
 };
 
@@ -70,7 +70,7 @@ export const addDeviceSuccess = (
       addDeviceSuccessTemplate({
         ...props,
         onContinue: resolve,
-        i18n: new I18n()
+        i18n: new I18n(),
       }),
       container,
     );
