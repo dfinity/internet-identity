@@ -144,7 +144,7 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
     blob.push(anchor_number_blob.len() as u8);
     blob.extend(anchor_number_blob);
 
-    blob.push(frontend.bytes().len() as u8);
+    blob.push(frontend.len() as u8);
     blob.extend(frontend.bytes());
 
     hash_bytes(blob)
