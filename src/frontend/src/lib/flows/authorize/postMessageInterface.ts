@@ -1,6 +1,6 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
-import { analytics } from "$lib/utils/analytics/analytics";
+import { authorizeClientFunnel, AuthorizeClientEvents } from "$lib/utils/analytics/authorizeClientFunnel";
 import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
@@ -109,6 +109,7 @@ export async function authenticationProtocol({
     // Else signal that the connection has been unexpectedly closed.
     return "closed";
   }
+  authorizeClientFunnel.init();
 
   // Send a message to indicate we're ready.
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
@@ -119,7 +120,7 @@ export async function authenticationProtocol({
   onProgress("waiting");
 
   const requestResult = await waitForRequest();
-  analytics.event("authorize-client-request-received");
+  authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestReceived);
   if (requestResult.kind === "timeout") {
     return "closed";
   }
@@ -129,9 +130,7 @@ export async function authenticationProtocol({
   void (requestResult.kind satisfies "received");
   const requestOrigin =
     requestResult.request.derivationOrigin ?? requestResult.origin;
-  analytics.event("authorize-client-request-valid", {
-    origin: requestOrigin
-  });
+  authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestValid);
   loginFunnel.init({ origin: requestOrigin });
   registrationFunnel.init({ origin: requestOrigin });
 
@@ -147,7 +146,7 @@ export async function authenticationProtocol({
   // It most probably means users closing the window, but we should investigate.
   try {
     authenticateResult = await authenticate(authContext);
-    analytics.event("authorize-client-authenticate");
+    authorizeClientFunnel.trigger(AuthorizeClientEvents.Authenticate);
   } catch (error: unknown) {
     console.error("Unexpected error during authentication", error);
     authenticateResult = {
@@ -157,7 +156,7 @@ export async function authenticationProtocol({
   }
 
   if (authenticateResult.kind === "failure") {
-    analytics.event("authorize-client-authenticate-error", {
+    authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateError, {
       origin: requestOrigin,
       failureReason: authenticateResult.text
     });
@@ -168,9 +167,7 @@ export async function authenticationProtocol({
     return "failure";
   }
   void (authenticateResult.kind satisfies "success");
-  analytics.event("authorize-client-authenticate-success", {
-    origin: requestOrigin
-  });
+  authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateSuccess);
 
   window.opener.postMessage(
     {
