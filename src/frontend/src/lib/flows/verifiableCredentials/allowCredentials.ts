@@ -27,7 +27,7 @@ const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
     foundDapp = new KnownDapp({
       name: origin,
       website: origin,
-      logo: unknownDappLogo
+      logo: unknownDappLogo,
     });
   }
 
@@ -37,15 +37,15 @@ const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
 /* A screen prompting the user to allow (or cancel) issuing verified
  * credentials */
 const allowCredentialsTemplate = ({
-                                    i18n,
-                                    relyingOrigin,
-                                    providerOrigin,
-                                    consentMessage: consentMessage_,
-                                    userNumber,
-                                    onAllow,
-                                    onCancel,
-                                    scrollToTop = false
-                                  }: {
+  i18n,
+  relyingOrigin,
+  providerOrigin,
+  consentMessage: consentMessage_,
+  userNumber,
+  onAllow,
+  onCancel,
+  scrollToTop = false,
+}: {
   i18n: I18n;
   relyingOrigin: string;
   providerOrigin: string;
@@ -59,7 +59,7 @@ const allowCredentialsTemplate = ({
   const copy = i18n.i18n(copyJson);
   const anchorInput = mkAnchorInput({
     userNumber,
-    onSubmit: (userNumber) => onAllow(userNumber)
+    onSubmit: (userNumber) => onAllow(userNumber),
   });
 
   const presentCredential = () => {
@@ -166,7 +166,7 @@ const allowCredentialsTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: true,
-    slot
+    slot,
   });
 };
 
@@ -174,11 +174,11 @@ export const allowCredentialsPage = renderPage(allowCredentialsTemplate);
 
 // Prompt to allow verifying credentials
 export const allowCredentials = ({
-                                   relyingOrigin,
-                                   providerOrigin,
-                                   consentMessage,
-                                   userNumber
-                                 }: {
+  relyingOrigin,
+  providerOrigin,
+  consentMessage,
+  userNumber,
+}: {
   relyingOrigin: string;
   providerOrigin: string;
   consentMessage: string;
@@ -193,7 +193,7 @@ export const allowCredentials = ({
       userNumber,
       onAllow: (userNumber) => resolve({ tag: "allowed", userNumber }),
       onCancel: () => resolve({ tag: "canceled" }),
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

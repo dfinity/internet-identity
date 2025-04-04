@@ -1,4 +1,8 @@
-import { DUMMY_AUTH, DUMMY_CAPTCHA, FETCH_ROOT_KEY } from "$lib/legacy/environment";
+import {
+  DUMMY_AUTH,
+  DUMMY_CAPTCHA,
+  FETCH_ROOT_KEY,
+} from "$lib/legacy/environment";
 
 // Contains code related to the "build features". Features should be accessed
 // from the `features` object below. This file also contains helper functions
@@ -6,7 +10,7 @@ import { DUMMY_AUTH, DUMMY_CAPTCHA, FETCH_ROOT_KEY } from "$lib/legacy/environme
 export const features = {
   FETCH_ROOT_KEY,
   DUMMY_AUTH,
-  DUMMY_CAPTCHA
+  DUMMY_CAPTCHA,
 };
 
 export const anyFeatures = (): boolean => {

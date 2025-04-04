@@ -3,9 +3,9 @@ import { mount, renderPage } from "$lib/utils/lit-html";
 import { TemplateResult, html } from "lit-html";
 
 export const forgotNumberTemplate = ({
-                                       cancel,
-                                       scrollToTop = false
-                                     }: {
+  cancel,
+  scrollToTop = false,
+}: {
   cancel: () => void;
   /* put the page into view */
   scrollToTop?: boolean;
@@ -49,7 +49,7 @@ export const forgotNumberTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -59,7 +59,7 @@ export const forgotNumber = (): Promise<"cancel"> => {
   return new Promise((resolve) => {
     forgotNumberPage({
       cancel: () => resolve("cancel"),
-      scrollToTop: true
+      scrollToTop: true,
     });
   });
 };

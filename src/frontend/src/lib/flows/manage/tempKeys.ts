@@ -1,7 +1,7 @@
 import { cypherIcon } from "$lib/templates/icons";
 import {
   authenticatorItem,
-  dedupLabels
+  dedupLabels,
 } from "$lib/flows/manage/authenticatorsSection";
 import { Authenticator } from "$lib/flows/manage/types";
 import { I18n } from "$lib/legacy/i18n";
@@ -17,9 +17,9 @@ export type TempKeyWarningAction =
   | { tag: "add_recovery"; action: () => void }
   | { tag: "add_passkey"; action: () => void };
 export const tempKeyWarningBox = ({
-                                    i18n,
-                                    warningAction
-                                  }: {
+  i18n,
+  warningAction,
+}: {
   i18n: I18n;
   warningAction?: TempKeyWarningAction;
 }): TemplateResult => {
@@ -50,15 +50,15 @@ export const tempKeyWarningBox = ({
     headerSlot: html`<h2>${copy.security_warning}</h2>`,
     title: copy.you_are_using_temporary_key,
     message: copy.set_up_recovery_and_passkey,
-    slot: buttonTemplate
+    slot: buttonTemplate,
   });
 };
 
 export const tempKeysSection = ({
-                                  authenticators: authenticators_,
-                                  i18n,
-                                  onRemoveDevice
-                                }: {
+  authenticators: authenticators_,
+  i18n,
+  onRemoveDevice,
+}: {
   authenticators: Authenticator[];
   i18n: I18n;
   onRemoveDevice: (device: DeviceWithUsage) => void;
@@ -78,16 +78,16 @@ export const tempKeysSection = ({
     <div class="c-action-list">
       <ul>
         ${authenticators.map((authenticator, index) =>
-    authenticatorItem({
-      authenticator,
-      index,
-      i18n,
-      onRemove: () => onRemoveDevice(authenticator.device),
-      icon: html`<span class="c-icon c-icon--pin"
+          authenticatorItem({
+            authenticator,
+            index,
+            i18n,
+            onRemove: () => onRemoveDevice(authenticator.device),
+            icon: html`<span class="c-icon c-icon--pin"
               >${cypherIcon}<span></span
-            ></span>`
-    })
-  )}
+            ></span>`,
+          }),
+        )}
       </ul>
     </div>
   </aside>`;

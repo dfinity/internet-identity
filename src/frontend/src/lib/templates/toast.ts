@@ -27,7 +27,7 @@ export const toast = {
   success: (message: Toast["message"]): void => {
     toastStore.push({ message, level: "success" });
     renderToasts();
-  }
+  },
 };
 
 // Render or rerender toasts.
@@ -36,7 +36,7 @@ const renderToasts = () => {
     html`<div class="c-toasts l-container">
       ${repeat(toastStore, (x) => x, toastTemplate)}
     </div>`,
-    document.body
+    document.body,
   );
 };
 
@@ -58,22 +58,22 @@ const toastTemplate = (toast: Toast): TemplateResult => {
   const levelClass = {
     error: "c-toast-body--error",
     info: "c-toast-body--info",
-    success: "c-toast-body--success"
+    success: "c-toast-body--success",
   }[toast.level];
   const levelIcon = {
     error: warningIcon,
     info: settingsIcon,
-    success: checkmarkIcon
+    success: checkmarkIcon,
   }[toast.level];
 
   return html`<div
     role="alert"
     class="c-toast ${asyncReplace(
-    closing.map((closing) => (closing ? "c-toast--closing" : undefined))
-  )}"
+      closing.map((closing) => (closing ? "c-toast--closing" : undefined)),
+    )}"
     @animationend=${asyncReplace(
-    closing.map((closing) => (closing ? () => removeToast() : undefined))
-  )}
+      closing.map((closing) => (closing ? () => removeToast() : undefined)),
+    )}
   >
     <div class="c-toast-body ${levelClass}">
       <div class="c-toast-body__icon">${levelIcon}</div>

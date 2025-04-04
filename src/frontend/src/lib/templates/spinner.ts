@@ -2,8 +2,8 @@ import { renderPage, TemplateElement } from "$lib/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
 
 const showSpinnerTemplate = ({
-                               message
-                             }: {
+  message,
+}: {
   message: TemplateElement;
 }): TemplateResult => {
   return html`
@@ -25,5 +25,5 @@ export const showSpinnerPage = renderPage(showSpinnerTemplate);
 // Show a simple, centered message (with optional "data-role" attribute)
 export const showSpinner = ({ message }: { message: TemplateElement }): void =>
   showSpinnerPage({
-    message
+    message,
   });

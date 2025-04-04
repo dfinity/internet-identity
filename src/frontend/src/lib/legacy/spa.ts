@@ -33,7 +33,7 @@ export const readCanisterId = (): string => {
       title: "Canister ID not set",
       message:
         "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
-      primaryButton: "Reload"
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -53,7 +53,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
       title: "Canister config not set",
       message:
         "There was a problem contacting the IC. The host serving this page did not give us the canister config. Try reloading the page and contact support if the problem persists.",
-      primaryButton: "Reload"
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -71,7 +71,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
       title: "Canister config not valid",
       message:
         "There was a problem contacting the IC. The host serving this page did not give us a valid canister config. Try reloading the page and contact support if the problem persists.",
-      primaryButton: "Reload"
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -99,8 +99,8 @@ export const printDevMessage = () => {
     const message = `
 Some features are enabled:
 ${Object.entries(features)
-      .map(([k, v]) => ` - ${k}: ${v}`)
-      .join("\n")}
+  .map(([k, v]) => ` - ${k}: ${v}`)
+  .join("\n")}
 see more at https://github.com/dfinity/internet-identity#features
       `;
     console.warn(message);

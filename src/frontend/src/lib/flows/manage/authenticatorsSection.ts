@@ -2,7 +2,7 @@ import type { DeviceWithUsage } from "$lib/generated/internet_identity_types";
 import {
   infoIcon,
   pulsatingCircleIcon,
-  warningIcon
+  warningIcon,
 } from "$lib/templates/icons";
 import sectionCopyJson from "$lib/flows/manage/authenticatorsSection.json";
 import { I18n } from "$lib/legacy/i18n";
@@ -28,7 +28,7 @@ export type DedupAuthenticator = Authenticator & { dupCount?: number };
 
 // Deduplicate devices with same (duplicated) aliases
 export const dedupLabels = (
-  authenticators: Authenticator[]
+  authenticators: Authenticator[],
 ): DedupAuthenticator[] => {
   return authenticators.reduce<Authenticator[]>((acc, authenticator) => {
     const _authenticator: DedupAuthenticator = { ...authenticator };
@@ -43,13 +43,13 @@ export const dedupLabels = (
 };
 
 export const authenticatorsSection = ({
-                                        authenticators: authenticators_,
-                                        onAddDevice,
-                                        onRemoveDevice,
-                                        warnNoPasskeys,
-                                        cleanupRecommended,
-                                        i18n
-                                      }: {
+  authenticators: authenticators_,
+  onAddDevice,
+  onRemoveDevice,
+  warnNoPasskeys,
+  cleanupRecommended,
+  i18n,
+}: {
   authenticators: Authenticator[];
   onAddDevice: () => void;
   onRemoveDevice: (device: DeviceWithUsage) => void;
@@ -62,7 +62,7 @@ export const authenticatorsSection = ({
     "l-stack",
     "c-card",
     "c-card--narrow",
-    ...(warnNoPasskeys ? ["c-card--warning"] : [])
+    ...(warnNoPasskeys ? ["c-card--warning"] : []),
   ];
 
   const authenticators = dedupLabels(authenticators_);
@@ -70,8 +70,8 @@ export const authenticatorsSection = ({
   return html`
     <aside class=${wrapClasses.join(" ")} data-role="passkeys">
       ${
-    warnNoPasskeys
-      ? html`
+        warnNoPasskeys
+          ? html`
               <span
                 class="c-card__label c-card__label--hasIcon"
                 aria-hidden="true"
@@ -83,8 +83,8 @@ export const authenticatorsSection = ({
                 <h2>Security warning</h2>
               </span>
             `
-      : ""
-  }
+          : ""
+      }
       <div class="t-title t-title--complications">
         <h2 class="t-title">Passkeys</h2>
         <span class="t-title__complication c-tooltip" tabindex="0">
@@ -98,22 +98,22 @@ export const authenticatorsSection = ({
       <p
         class="${warnNoPasskeys ? "warning-message" : ""} t-paragraph t-lead"
       >${
-    warnNoPasskeys
-      ? "Set up a passkey and securely sign into dapps by unlocking your device."
-      : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
-  }
+        warnNoPasskeys
+          ? "Set up a passkey and securely sign into dapps by unlocking your device."
+          : "Use passkeys to hold assets and securely sign into dapps by unlocking your device."
+      }
       </p>
       <div class="c-action-list">
         <ul>
           ${authenticators.map((authenticator, index) =>
-    authenticatorItem({
-      authenticator,
-      index,
-      i18n,
-      onRemove: () => onRemoveDevice(authenticator.device),
-      showRpId: cleanupRecommended
-    })
-  )}
+            authenticatorItem({
+              authenticator,
+              index,
+              i18n,
+              onRemove: () => onRemoveDevice(authenticator.device),
+              showRpId: cleanupRecommended,
+            }),
+          )}
         </ul>
         <div class="c-action-list__actions">
           <button
@@ -131,8 +131,8 @@ export const authenticatorsSection = ({
         </div>
       </div>
       ${
-    cleanupRecommended
-      ? html`<div>
+        cleanupRecommended
+          ? html`<div>
               <p class="l-stack--small">
                 ${copy.some_passkeys_may_be_outdated_and} ${" "}
                 <a target="_blank" href="${MANAGE_PASSKEYS_SUPPORT_URL}">
@@ -141,29 +141,29 @@ export const authenticatorsSection = ({
                 ${" "} ${copy.can_improve_sign_in}
               </p>
             </div>`
-      : undefined
-  }
+          : undefined
+      }
     </aside>`;
 };
 
 export const authenticatorItem = ({
-                                    authenticator: {
-                                      alias,
-                                      last_usage,
-                                      dupCount,
-                                      warn,
-                                      info,
-                                      rename,
-                                      rpId,
-                                      isCurrent,
-                                      canBeRemoved
-                                    },
-                                    index,
-                                    i18n,
-                                    icon,
-                                    onRemove,
-                                    showRpId
-                                  }: {
+  authenticator: {
+    alias,
+    last_usage,
+    dupCount,
+    warn,
+    info,
+    rename,
+    rpId,
+    isCurrent,
+    canBeRemoved,
+  },
+  index,
+  i18n,
+  icon,
+  onRemove,
+  showRpId,
+}: {
   authenticator: DedupAuthenticator;
   index: number;
   i18n: I18n;
@@ -173,14 +173,14 @@ export const authenticatorItem = ({
 }) => {
   const copy = i18n.i18n(copyJson);
   const settings = [
-    { action: "rename", caption: "Rename", fn: () => rename() }
+    { action: "rename", caption: "Rename", fn: () => rename() },
   ];
 
   if (canBeRemoved) {
     settings.push({
       action: "remove",
       caption: "Remove",
-      fn: onRemove
+      fn: onRemove,
     });
   }
 
@@ -209,36 +209,36 @@ export const authenticatorItem = ({
         <div class="c-action-list__label c-action-list__label--spacer">
           ${alias}
           ${nonNullish(dupCount) && dupCount > 0
-    ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
-    : undefined}
+            ? html`<i class="t-muted">&nbsp;(${dupCount})</i>`
+            : undefined}
           <div class="c-action-list__label"></div>
           ${settingsDropdown({
-    alias,
-    id: `authenticator-${index}`,
-    settings
-  })}
+            alias,
+            id: `authenticator-${index}`,
+            settings,
+          })}
         </div>
         ${nonNullish(showRpId) && showRpId && nonNullish(rpId)
-    ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
+          ? html`<div class="c-tooltip" tabindex="0" data-icon="info">
               <div class="t-discreet" data-rpid="${rpId}">${rpId}</div>
               <span class="c-tooltip__message c-card c-card--tight">
                 ${copy.passkey_registered_in} ${rpId}
               </span>
             </div>`
-    : undefined}
+          : undefined}
         <div>
           ${isCurrent
-    ? html`<div>
+            ? html`<div>
                 <span class="c-icon c-icon--ok c-icon--xs"
                   >${pulsatingCircleIcon}</span
                 >
                 <span class="t-muted">${copy.current_device_label}</span>
               </div>`
-    : nonNullish(lastUsageFormattedString)
-      ? html`<div class="t-muted">
+            : nonNullish(lastUsageFormattedString)
+              ? html`<div class="t-muted">
                   Last used: ${lastUsageFormattedString}
                 </div>`
-      : undefined}
+              : undefined}
         </div>
       </div>
     </li>

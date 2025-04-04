@@ -20,20 +20,20 @@ type Entry = {
  *  * extra information (list of entries)
  */
 export const infoScreenTemplate = ({
-                                     next,
-                                     nextText,
-                                     cancel,
-                                     cancelText,
-                                     additionalAction,
-                                     additionalActionText,
-                                     title,
-                                     paragraph,
-                                     entries,
-                                     pageId,
-                                     label,
-                                     icon,
-                                     scrollToTop = false
-                                   }: {
+  next,
+  nextText,
+  cancel,
+  cancelText,
+  additionalAction,
+  additionalActionText,
+  title,
+  paragraph,
+  entries,
+  pageId,
+  label,
+  icon,
+  scrollToTop = false,
+}: {
   next: () => void;
   nextText: DynamicKey | string;
   cancel: () => void;
@@ -76,26 +76,26 @@ export const infoScreenTemplate = ({
         ${cancelText}
       </button>
       ${nonNullish(additionalAction)
-    ? html`<button
+        ? html`<button
             @click=${() => additionalAction()}
             data-action="additional"
             class="c-button c-button--textOnly"
           >
             ${additionalActionText}
           </button>`
-    : undefined}
+        : undefined}
     </div>
     ${nonNullish(entries) && entries.length > 0
-    ? html`<section class="c-marketing-block">
+      ? html`<section class="c-marketing-block">
           ${entries.map((entry) => renderEntry(entry))}
         </section>`
-    : undefined}
+      : undefined}
   `;
 
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -116,8 +116,8 @@ const renderEntry = (entry: Entry): TemplateResult => {
     <aside class="l-stack">
       <h3 class="t-title">${entry.header}</h3>
       ${Array.isArray(entry.content)
-    ? renderBulletList(entry.content)
-    : renderBlock(entry.content)}
+        ? renderBulletList(entry.content)
+        : renderBlock(entry.content)}
     </aside>
   `;
 };

@@ -1,7 +1,7 @@
 import { handleLoginFlowResult } from "$lib/templates/authenticateBox";
 import {
   WEBAUTHN_IFRAME_PATH,
-  webAuthnInIframeFlow
+  webAuthnInIframeFlow,
 } from "$lib/flows/iframeWebAuthn";
 import { nonNullish } from "@dfinity/utils";
 import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
@@ -24,7 +24,7 @@ void createSpa(async (connection) => {
     // Register this device (tentatively)
     const registerDeviceResult = await registerTentativeDevice(
       addDeviceAnchor,
-      connection
+      connection,
     );
     if (registerDeviceResult.tag === "canceled") {
       // Adding a device was canceled, fall back into default flow
@@ -42,7 +42,7 @@ void createSpa(async (connection) => {
     if (nonNullish(loginData)) {
       return await renderManage({
         userNumber,
-        connection: loginData.connection
+        connection: loginData.connection,
       });
     }
   }

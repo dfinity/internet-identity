@@ -5,7 +5,7 @@ import { createStore, get, set } from "idb-keyval";
 export {
   PinIdentityMaterial,
   constructPinIdentity,
-  reconstructPinIdentity
+  reconstructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
 
 /* IndexedDB-specific storage for browser identities
@@ -15,9 +15,9 @@ export const idbIdentitiesStore = () =>
   createStore("browser-identities", "identities");
 
 export const idbStorePinIdentityMaterial = async ({
-                                                    userNumber,
-                                                    pinIdentityMaterial
-                                                  }: {
+  userNumber,
+  pinIdentityMaterial,
+}: {
   userNumber: bigint;
   pinIdentityMaterial: PinIdentityMaterial;
 }): Promise<void> => {
@@ -25,8 +25,8 @@ export const idbStorePinIdentityMaterial = async ({
 };
 
 export const idbRetrievePinIdentityMaterial = async ({
-                                                       userNumber
-                                                     }: {
+  userNumber,
+}: {
   userNumber: bigint;
 }): Promise<PinIdentityMaterial | undefined> => {
   const retrieved = await get(userNumber.toString(), idbIdentitiesStore());

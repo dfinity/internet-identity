@@ -6,7 +6,7 @@ import { html, render } from "lit-html";
 const loaderUrl = import.meta.glob("./loader.svg", {
   eager: true,
   query: "?url",
-  import: "default"
+  import: "default",
 })["./loader.svg"] as string;
 
 // Duration in milliseconds a user considers as taking forever
@@ -17,12 +17,12 @@ const loader = (takingForever = false) =>
     <img class="c-loader__image" src="${loaderUrl}" alt="loading" />
     ${takingForever
       ? html`<a
-        href="${ERROR_SUPPORT_URL}"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="c-loader__link"
-      >Check ongoing issues</a
-      >`
+          href="${ERROR_SUPPORT_URL}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="c-loader__link"
+          >Check ongoing issues</a
+        >`
       : ""}
   </div>`;
 

@@ -17,13 +17,13 @@ interface warnBoxProps {
 }
 
 export const warnBox = ({
-                          title,
-                          headerSlot,
-                          message,
-                          slot,
-                          htmlElement = "aside",
-                          additionalClasses = []
-                        }: warnBoxProps): TemplateResult => {
+  title,
+  headerSlot,
+  message,
+  slot,
+  htmlElement = "aside",
+  additionalClasses = [],
+}: warnBoxProps): TemplateResult => {
   const cssClasses = ["c-card", "c-card--narrow", "c-card--warning"];
   if (additionalClasses.length > 0) {
     cssClasses.push(...additionalClasses);

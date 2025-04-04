@@ -60,6 +60,6 @@ export const formModal = ({ slot }: { slot: TemplateResult }): Promise<void> =>
             <button type="submit" class="c-button c-button--primary">OK</button>
           </div>
         </form>
-      `
-    })
+      `,
+    }),
   );

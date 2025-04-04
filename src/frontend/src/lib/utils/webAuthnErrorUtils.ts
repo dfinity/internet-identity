@@ -14,7 +14,7 @@ export const displayCancelError = (options: {
   return displayError({
     title: i18n.cancel_title,
     message: i18n.cancel_message,
-    primaryButton: options.primaryButton
+    primaryButton: options.primaryButton,
   });
 };
 
@@ -26,7 +26,7 @@ export const displayDuplicateDeviceError = (options: {
     title: i18n.duplicate_device_title,
     message: i18n.duplicate_device_message,
     detail: i18n.duplicate_device_detail,
-    primaryButton: options.primaryButton
+    primaryButton: options.primaryButton,
   });
 };
 

@@ -16,14 +16,14 @@ test("anchors are forwarded", () => {
     firstTime: {
       slot: html``,
       useExistingText: "",
-      createAnchorText: ""
+      createAnchorText: "",
     },
     useExisting: {
-      slot: html``
+      slot: html``,
     },
     pick: {
-      slot: html``
-    }
+      slot: html``,
+    },
   });
 
   const useExisting = pages.useExisting({
@@ -31,7 +31,7 @@ test("anchors are forwarded", () => {
     onSubmit: () => {},
     addDevice,
     recover,
-    loginOpenIDGoogle: () => {}
+    loginOpenIDGoogle: () => {},
   });
   render(useExisting, document.body);
   const addDeviceButton = document.querySelector(

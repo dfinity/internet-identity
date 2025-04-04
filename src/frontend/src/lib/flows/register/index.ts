@@ -2,7 +2,7 @@ import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import {
   PinIdentityMaterial,
-  constructPinIdentity
+  constructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
 import { OPENID_AUTHENTICATION } from "$lib/legacy/featureFlags";
 import { anyFeatures } from "$lib/legacy/features";
@@ -12,7 +12,7 @@ import { I18n } from "$lib/legacy/i18n";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import {
   passkeyAuthnMethodData,
-  pinAuthnMethodData
+  pinAuthnMethodData,
 } from "$lib/utils/authnMethodData";
 import {
   AlreadyInProgress,
@@ -28,7 +28,7 @@ import {
   RegisterNoSpace,
   RegistrationFlowStepSuccess,
   UnexpectedCall,
-  WrongCaptchaSolution
+  WrongCaptchaSolution,
 } from "$lib/utils/iiConnection";
 import { isRegistrationAllowed } from "$lib/utils/isRegistrationAllowed";
 import { lookupAAGUID } from "$lib/utils/webAuthn";
@@ -44,21 +44,21 @@ import { displayUserNumberWarmup } from "./finish";
 import { savePasskeyPinOrOpenID } from "./passkey";
 import {
   RegistrationEvents,
-  registrationFunnel
+  registrationFunnel,
 } from "$lib/utils/analytics/registrationFunnel";
 
 /** Registration (identity creation) flow for new users */
 export const registerFlow = async ({
-                                     identityRegistrationStart,
-                                     checkCaptcha,
-                                     identityRegistrationFinish,
-                                     storePinIdentity,
-                                     registrationAllowed,
-                                     pinAllowed,
-                                     uaParser,
-                                     googleAllowed,
-                                     openidIdentityRegistrationFinish
-                                   }: {
+  identityRegistrationStart,
+  checkCaptcha,
+  identityRegistrationFinish,
+  storePinIdentity,
+  registrationAllowed,
+  pinAllowed,
+  uaParser,
+  googleAllowed,
+  openidIdentityRegistrationFinish,
+}: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
@@ -67,7 +67,7 @@ export const registerFlow = async ({
     | RateLimitExceeded
   >;
   checkCaptcha: (
-    captchaSolution: string
+    captchaSolution: string,
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
@@ -76,9 +76,9 @@ export const registerFlow = async ({
     | WrongCaptchaSolution
   >;
   identityRegistrationFinish: ({
-                                 identity,
-                                 authnMethod
-                               }: {
+    identity,
+    authnMethod,
+  }: {
     identity: SignIdentity;
     authnMethod: AuthnMethodData;
   }) => Promise<
@@ -137,7 +137,7 @@ export const registerFlow = async ({
   const savePasskeyResult = await savePasskeyPinOrOpenID({
     pinAllowed: await pinAllowed(),
     googleAllowed,
-    origin: deviceOrigin
+    origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
     return "canceled";
@@ -154,22 +154,22 @@ export const registerFlow = async ({
       // XXX: this withLoader could be replaced with one that indicates what's happening (like the
       // "Hang tight, ..." spinner)
       const { identity, pinIdentityMaterial } = await withLoader(() =>
-        constructPinIdentity(pinResult)
+        constructPinIdentity(pinResult),
       );
       const alias = await inferPinAlias({
         userAgent: navigator.userAgent,
-        uaParser
+        uaParser,
       });
       return {
         identity,
         authnMethodData: pinAuthnMethodData({
           alias,
-          pubKey: identity.getPublicKey().toDer()
+          pubKey: identity.getPublicKey().toDer(),
         }),
         finalizeIdentity: (userNumber: bigint) =>
           storePinIdentity({ userNumber, pinIdentityMaterial }),
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
-        authnMethod: "pin" as const
+        authnMethod: "pin" as const,
       };
     } else if (savePasskeyResult === "google") {
       const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
@@ -184,7 +184,7 @@ export const registerFlow = async ({
       if (openIdResult.kind === "loginSuccess") {
         return {
           ...openIdResult,
-          authnMethod: "google"
+          authnMethod: "google",
         };
       } else {
         return openIdResult;
@@ -200,7 +200,7 @@ export const registerFlow = async ({
         authenticatorType: identity.getAuthenticatorAttachment(),
         userAgent: navigator.userAgent,
         uaParser,
-        aaguid: identity.aaguid
+        aaguid: identity.aaguid,
       });
       return {
         identity,
@@ -209,9 +209,9 @@ export const registerFlow = async ({
           pubKey: identity.getPublicKey().toDer(),
           credentialId: identity.rawId,
           authenticatorAttachment: identity.getAuthenticatorAttachment(),
-          origin: deviceOrigin
+          origin: deviceOrigin,
         }),
-        authnMethod: "passkey" as const
+        authnMethod: "passkey" as const,
       };
     }
   })();
@@ -241,7 +241,7 @@ export const registerFlow = async ({
     authnMethodData,
     finalizeIdentity,
     finishSlot,
-    authnMethod
+    authnMethod,
   }: {
     identity: SignIdentity;
     authnMethodData: AuthnMethodData;
@@ -252,15 +252,15 @@ export const registerFlow = async ({
 
   const startOrCaptchaResult = await captchaIfNecessary(
     flowStart,
-    checkCaptcha
+    checkCaptcha,
   );
   if (startOrCaptchaResult === "canceled") return "canceled";
 
   const result = await withLoader(() =>
     identityRegistrationFinish({
       authnMethod: authnMethodData,
-      identity
-    })
+      identity,
+    }),
   );
 
   if (result.kind !== "loginSuccess") {
@@ -274,16 +274,19 @@ export const registerFlow = async ({
   // We don't want to nudge the user with the recovery phrase warning page
   // right after they've created their anchor.
   result.connection.updateIdentityMetadata({
-    recoveryPageShownTimestampMillis: Date.now()
+    recoveryPageShownTimestampMillis: Date.now(),
   });
   // Immediately commit (and await) the metadata, so that the identity is fully set up when the user sees the success page
   // This way, dropping of at that point does not negatively impact UX with additional nagging.
   await withLoader(() =>
-    Promise.all([result.connection.commitMetadata(), setAnchorUsed(userNumber)])
+    Promise.all([
+      result.connection.commitMetadata(),
+      setAnchorUsed(userNumber),
+    ]),
   );
   await displayUserNumber({
     userNumber,
-    marketingIntroSlot: finishSlot
+    marketingIntroSlot: finishSlot,
   });
   registrationFunnel.trigger(RegistrationEvents.Success);
   return { ...result, authnMethod };
@@ -292,10 +295,10 @@ export const registerFlow = async ({
 export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 
 export const getRegisterFlowOpts = async ({
-                                            connection,
-                                            allowPinRegistration,
-                                            getGoogleClientId
-                                          }: {
+  connection,
+  allowPinRegistration,
+  getGoogleClientId,
+}: {
   connection: Connection;
   allowPinRegistration: boolean;
   getGoogleClientId: () => string | undefined;
@@ -303,7 +306,7 @@ export const getRegisterFlowOpts = async ({
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
   const tempIdentity = await ECDSAKeyIdentity.generate({
-    extractable: false
+    extractable: false,
   });
   const registrationAllowed =
     // Allow registration in DEV mode
@@ -326,7 +329,7 @@ export const getRegisterFlowOpts = async ({
       await connection.identity_registration_finish({
         tempIdentity,
         identity,
-        authnMethod
+        authnMethod,
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
@@ -336,8 +339,8 @@ export const getRegisterFlowOpts = async ({
     openidIdentityRegistrationFinish: () =>
       connection.openid_identity_registration_finish(
         getGoogleClientId,
-        tempIdentity
-      )
+        tempIdentity,
+      ),
   };
 };
 
@@ -348,11 +351,11 @@ type PreloadedUAParser = ReturnType<typeof loadUAParser>;
 
 // Logic for inferring a passkey alias based on the authenticator type & user agent
 export const inferPasskeyAlias = async ({
-                                          authenticatorType,
-                                          userAgent,
-                                          uaParser: uaParser_,
-                                          aaguid
-                                        }: {
+  authenticatorType,
+  userAgent,
+  uaParser: uaParser_,
+  aaguid,
+}: {
   authenticatorType: AuthenticatorType;
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
@@ -428,7 +431,7 @@ export const inferPasskeyAlias = async ({
   const os = uaParser.getOS().name;
   const browserOn = [
     ...(nonNullish(browser) ? [browser] : []),
-    ...(nonNullish(os) ? [os] : [])
+    ...(nonNullish(os) ? [os] : []),
   ];
   authenticatorType satisfies undefined | "platform";
   if (browserOn.length !== 0) {
@@ -440,9 +443,9 @@ export const inferPasskeyAlias = async ({
 };
 
 export const inferPinAlias = async ({
-                                      userAgent,
-                                      uaParser: uaParser_
-                                    }: {
+  userAgent,
+  uaParser: uaParser_,
+}: {
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
 }): Promise<string> => {
@@ -460,7 +463,7 @@ export const inferPinAlias = async ({
   const os = uaParser.getOS().name;
   const browserOn = [
     ...(nonNullish(browser) ? [browser] : []),
-    ...(nonNullish(os) ? [os] : [])
+    ...(nonNullish(os) ? [os] : []),
   ];
   if (browserOn.length !== 0) {
     return browserOn.join(" on ");
@@ -472,9 +475,9 @@ export const inferPinAlias = async ({
 
 // Logic for deciding whether PIN identity registration is allowed based on the user agent
 export const pinRegisterAllowed = async ({
-                                           userAgent,
-                                           uaParser: uaParser_
-                                         }: {
+  userAgent,
+  uaParser: uaParser_,
+}: {
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
 }): Promise<boolean> => {
@@ -511,14 +514,14 @@ async function captchaIfNecessary(
     | RateLimitExceeded
   >,
   checkCaptcha: (
-    captchaSolution: string
+    captchaSolution: string,
   ) => Promise<
     | RegistrationFlowStepSuccess
     | ApiError
     | NoRegistrationFlow
     | UnexpectedCall
     | WrongCaptchaSolution
-  >
+  >,
 ): Promise<
   | RegistrationFlowStepSuccess
   | ApiError
@@ -539,7 +542,7 @@ async function captchaIfNecessary(
     registrationFunnel.trigger(RegistrationEvents.CaptchaCheck);
     const captchaResult = await promptCaptcha({
       captcha_png_base64: startResult.nextStep.captcha_png_base64,
-      checkCaptcha
+      checkCaptcha,
     });
     if (captchaResult === "canceled") {
       return "canceled";

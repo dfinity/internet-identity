@@ -54,7 +54,7 @@ const dappsExplorerTemplate = ({
   const wrappedPageContent = mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContent
+    slot: pageContent,
   });
 
   return wrappedPageContent;
@@ -70,36 +70,36 @@ export type DappTemplateArgs = {
 };
 
 export const dappTemplate = ({
-                               logoSrc,
-                               name,
-                               oneLiner,
-                               oneLinerAboveTitle = false
-                             }: DappTemplateArgs): TemplateResult => {
+  logoSrc,
+  name,
+  oneLiner,
+  oneLinerAboveTitle = false,
+}: DappTemplateArgs): TemplateResult => {
   return html`
     <div class="c-action-list__icon" aria-hidden="true">
       <img src=${logoSrc} alt=${name} loading="lazy" />
     </div>
     <div
       class="c-action-list__label c-action-list__label--stacked${oneLinerAboveTitle ===
-  true
-    ? " c-action-list__label--inverted"
-    : ""}"
+      true
+        ? " c-action-list__label--inverted"
+        : ""}"
     >
       <h3 class="t-title t-title--list">${name}</h3>
       ${nonNullish(oneLiner)
-    ? html`<p class="t-weak">${oneLiner}</p>`
-    : undefined}
+        ? html`<p class="t-weak">${oneLiner}</p>`
+        : undefined}
     </div>
   `;
 };
 
 /* Template for a single dapp */
 const dappTemplateLink = ({
-                            website,
-                            logoSrc,
-                            name,
-                            oneLiner
-                          }: KnownDapp): TemplateResult => {
+  website,
+  logoSrc,
+  name,
+  oneLiner,
+}: KnownDapp): TemplateResult => {
   return html`
     <a
       href=${website}
@@ -117,8 +117,8 @@ const dappTemplateLink = ({
 
 /* Show a list of dapps known to use Internet Identity, in a closable modal */
 export const dappsExplorer = ({
-                                dapps
-                              }: {
+  dapps,
+}: {
   dapps: KnownDapp[];
 }): Promise<void> => {
   const i18n = new I18n();
@@ -127,7 +127,7 @@ export const dappsExplorer = ({
       dapps,
       i18n,
       back: () => resolve(),
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };

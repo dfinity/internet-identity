@@ -5,12 +5,12 @@ import { mkAnchorInput } from "./anchorInput";
 import { mainWindow } from "./mainWindow";
 
 export const promptUserNumberTemplate = ({
-                                           title,
-                                           message,
-                                           userNumber,
-                                           onContinue: onSubmit,
-                                           onCancel
-                                         }: {
+  title,
+  message,
+  userNumber,
+  onContinue: onSubmit,
+  onCancel,
+}: {
   title: string;
   message?: string;
   userNumber?: bigint;
@@ -48,17 +48,17 @@ export const promptUserNumberTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot: promptUserNumberSlot
+    slot: promptUserNumberSlot,
   });
 };
 
 export const promptUserNumberPage = renderPage(promptUserNumberTemplate);
 
 export const promptUserNumber = ({
-                                   title,
-                                   message,
-                                   userNumber
-                                 }: {
+  title,
+  message,
+  userNumber,
+}: {
   title: string;
   message?: string;
   userNumber?: bigint;
@@ -69,6 +69,6 @@ export const promptUserNumber = ({
       message,
       userNumber,
       onContinue: resolve,
-      onCancel: () => resolve("canceled")
+      onCancel: () => resolve("canceled"),
     });
   });

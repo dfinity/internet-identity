@@ -14,9 +14,9 @@ import copyJson from "./landingPage.json";
  *
  */
 export const landingPage = ({
-                              slot,
-                              dataPage
-                            }: {
+  slot,
+  dataPage,
+}: {
   slot: TemplateResult;
   dataPage: string;
 }): TemplateResult => {
@@ -43,21 +43,21 @@ export const landingPage = ({
         </div>
         <div class="c-landingPage__left__footer">
           ${navigationLink({
-    icon: questionIcon,
-    labelText: "Support",
-    id: "support-link",
-    url: "https://internetidentity.zendesk.com/hc/en-us",
-    rel: "noopener noreferrer",
-    classes: "t-link--discreet c-footer__link"
-  })}
+            icon: questionIcon,
+            labelText: "Support",
+            id: "support-link",
+            url: "https://internetidentity.zendesk.com/hc/en-us",
+            rel: "noopener noreferrer",
+            classes: "t-link--discreet c-footer__link",
+          })}
           ${navigationLink({
-    icon: githubIcon,
-    labelText: "Source code",
-    id: "source-link",
-    url: "https://github.com/dfinity/internet-identity",
-    rel: "noopener noreferrer",
-    classes: "t-link--discreet c-footer__link"
-  })}
+            icon: githubIcon,
+            labelText: "Source code",
+            id: "source-link",
+            url: "https://github.com/dfinity/internet-identity",
+            rel: "noopener noreferrer",
+            classes: "t-link--discreet c-footer__link",
+          })}
         </div>
       </section>
     </div>

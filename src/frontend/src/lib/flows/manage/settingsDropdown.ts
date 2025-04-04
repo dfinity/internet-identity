@@ -5,10 +5,10 @@ import { html, TemplateResult } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 
 export const settingsDropdown = ({
-                                   alias,
-                                   id,
-                                   settings
-                                 }: {
+  alias,
+  id,
+  settings,
+}: {
   alias: string;
   id: string;
   settings: { fn: () => void; caption: string; action: string }[];
@@ -26,9 +26,9 @@ export const settingsDropdown = ({
           tabindex="-1"
           @click=${() => close()}
           @keypress=${(e: KeyboardEvent) =>
-        handleKeyPress({ e, callback: close })}
+            handleKeyPress({ e, callback: close })}
         />`
-      : undefined
+      : undefined,
   );
 
   return html`<div class="c-action-list__action c-dropdown">
@@ -46,7 +46,7 @@ export const settingsDropdown = ({
     </button>
     <ul class="c-dropdown__menu" id="dropdown-${id}">
       ${settings.map(
-    (setting) => html`
+        (setting) => html`
           <li class="c-dropdown__item">
             <button
               class="c-dropdown__link"
@@ -57,8 +57,8 @@ export const settingsDropdown = ({
               ${setting.caption}
             </button>
           </li>
-        `
-  )}
+        `,
+      )}
     </ul>
   </div>`;
 };

@@ -10,14 +10,14 @@ import { phraseStepper } from "./stepper";
 import copyJson from "./displaySeedPhrase.json";
 
 const displaySeedPhraseTemplate = ({
-                                     operation,
-                                     userNumberWord,
-                                     words,
-                                     onContinue,
-                                     cancel,
-                                     copyPhrase: copyPhrase_,
-                                     i18n
-                                   }: {
+  operation,
+  userNumberWord,
+  words,
+  onContinue,
+  cancel,
+  copyPhrase: copyPhrase_,
+  i18n,
+}: {
   /* whether the phrase is created for the first time or just reset */
   operation: "create" | "reset";
   userNumberWord: string;
@@ -75,14 +75,14 @@ const displaySeedPhraseTemplate = ({
               ${userNumberWord}
             </li>
             ${recoveryWords.map(
-    (word, i) =>
-      html`<li
+              (word, i) =>
+                html`<li
                   class="c-list--recovery-word"
                   style="--index: '${i + 1}';"
                 >
                   <i>${word}</i>
-                </li>`
-  )}
+                </li>`,
+            )}
           </ol>
           <i
             ${ref(phraseCopyElement)}
@@ -108,11 +108,11 @@ const displaySeedPhraseTemplate = ({
           id="ack-checkbox"
           name="scales"
           @change=${() =>
-    withRef(continueButton, (continueButton) =>
-      withRef(checkbox, (checkbox) => {
-        continueButton.disabled = !checkbox.checked;
-      })
-    )}
+            withRef(continueButton, (continueButton) =>
+              withRef(checkbox, (checkbox) => {
+                continueButton.disabled = !checkbox.checked;
+              }),
+            )}
         />
         <label for="ack-checkbox" class="t-strong"
           >${copy.i_have_stored_phrase}</label
@@ -143,16 +143,16 @@ const displaySeedPhraseTemplate = ({
     isWideContainer: true,
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 export const displaySeedPhrasePage = renderPage(displaySeedPhraseTemplate);
 
 export const displaySeedPhrase = ({
-                                    operation,
-                                    seedPhrase
-                                  }: {
+  operation,
+  seedPhrase,
+}: {
   operation: "create" | "reset";
   seedPhrase: string;
 }): Promise<"ok" | "canceled"> => {
@@ -167,7 +167,7 @@ export const displaySeedPhrase = ({
       onContinue: () => resolve("ok"),
       cancel: () => resolve("canceled"),
       copyPhrase: () => navigator.clipboard.writeText(seedPhrase),
-      i18n
-    })
+      i18n,
+    }),
   );
 };

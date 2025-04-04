@@ -1,7 +1,7 @@
 import { Connection } from "$lib/utils/iiConnection";
 import {
   waitForWindowReadyRequest,
-  waitForWindowReadyResponse
+  waitForWindowReadyResponse,
 } from "$lib/utils/internalPostMessage";
 import { isNullish } from "@dfinity/utils";
 
@@ -19,22 +19,25 @@ interface CredentialResponse {
     id: string;
   } & (
     | {
-    result: Omit<PublicKeyCredential, "getClientExtensionResults" | "toJSON"> & {
-      response: {
-        authenticatorData?: ArrayBuffer;
-        signature?: ArrayBuffer;
-        userHandle?: ArrayBuffer;
-      };
-    };
-  }
+        result: Omit<
+          PublicKeyCredential,
+          "getClientExtensionResults" | "toJSON"
+        > & {
+          response: {
+            authenticatorData?: ArrayBuffer;
+            signature?: ArrayBuffer;
+            userHandle?: ArrayBuffer;
+          };
+        };
+      }
     // We will create a DOMException from this error object
     | {
-    error: {
-      name: string;
-      message: string;
-    };
-  }
-    );
+        error: {
+          name: string;
+          message: string;
+        };
+      }
+  );
 }
 
 const isCredentialRequest = (data: unknown): data is CredentialRequest =>
@@ -62,7 +65,7 @@ const requestCredential = (
       if ("result" in event.data.ii_credential_response) {
         resolve({
           ...event.data.ii_credential_response.result,
-          getClientExtensionResults: () => ({})
+          getClientExtensionResults: () => ({}),
         } as PublicKeyCredential);
       }
       if ("error" in event.data.ii_credential_response) {
@@ -74,7 +77,7 @@ const requestCredential = (
 
     // Request credential
     const request: CredentialRequest = {
-      ii_credential_request: { id, options }
+      ii_credential_request: { id, options },
     };
     targetWindow.postMessage(request, targetOrigin);
   });
@@ -115,10 +118,10 @@ const handleCredentialRequest = (
                 userHandle:
                   "userHandle" in credential.response
                     ? (credential.response.userHandle as ArrayBuffer)
-                    : undefined
-              }
-            }
-          }
+                    : undefined,
+              },
+            },
+          },
         };
         window.parent.postMessage(response, targetOrigin);
       } catch (error: unknown) {
@@ -128,9 +131,9 @@ const handleCredentialRequest = (
             // We need to manually copy the error values here since the error instance will be lost in the postMessage
             error: {
               name: "NotAllowedError",
-              message: error instanceof Error ? error.message : "Unknown error"
-            }
-          }
+              message: error instanceof Error ? error.message : "Unknown error",
+            },
+          },
         };
         window.parent.postMessage(response, targetOrigin);
       }

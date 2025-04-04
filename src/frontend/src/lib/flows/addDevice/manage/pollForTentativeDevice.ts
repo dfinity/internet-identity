@@ -1,4 +1,7 @@
-import type { DeviceData, Timestamp } from "$lib/generated/internet_identity_types";
+import type {
+  DeviceData,
+  Timestamp,
+} from "$lib/generated/internet_identity_types";
 import { checkmarkIcon, copyIcon } from "$lib/templates/icons";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
@@ -17,13 +20,13 @@ import type QrCreator from "qr-creator"; // XXX: import to only import the _type
 import copyJson from "./pollForTentativeDevice.json";
 
 const pollForTentativeDeviceTemplate = ({
-                                          userNumber,
-                                          cancel,
-                                          useFIDO,
-                                          remaining,
-                                          origin,
-                                          i18n
-                                        }: {
+  userNumber,
+  cancel,
+  useFIDO,
+  remaining,
+  origin,
+  i18n,
+}: {
   userNumber: bigint;
   cancel: () => void;
   useFIDO: () => void;
@@ -63,10 +66,10 @@ const pollForTentativeDeviceTemplate = ({
       <div
         class="t-centered c-qrcode"
         ${mount((container) =>
-    container instanceof HTMLElement
-      ? displayQR({ link, container })
-      : undefined
-  )}
+          container instanceof HTMLElement
+            ? displayQR({ link, container })
+            : undefined,
+        )}
       ></div>
     </div>
     <div
@@ -115,12 +118,12 @@ const pollForTentativeDeviceTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
 export const pollForTentativeDevicePage = renderPage(
-  pollForTentativeDeviceTemplate
+  pollForTentativeDeviceTemplate,
 );
 
 type PollReturn = DeviceData | "use-fido" | "timeout" | "canceled";
@@ -134,7 +137,7 @@ export const pollForTentativeDevice = async (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   endTimestamp: Timestamp,
-  origin: string
+  origin: string,
 ): Promise<PollReturn> => {
   const i18n = new I18n();
   const countdown: AsyncCountdown<PollReturn> =
@@ -146,13 +149,13 @@ export const pollForTentativeDevice = async (
     origin,
     userNumber,
     remaining: countdown.remainingFormattedAsync(),
-    i18n
+    i18n,
   });
 
   // Poll repeatedly
   void (async () => {
     const result = await poll(userNumber, connection, () =>
-      countdown.hasStopped()
+      countdown.hasStopped(),
     );
     countdown.stop(result);
   })();
@@ -165,7 +168,7 @@ export const pollForTentativeDevice = async (
 const poll = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
-  shouldStop: () => boolean
+  shouldStop: () => boolean,
 ): Promise<DeviceData | "use-fido"> =>
   // eslint-disable-next-line no-async-promise-executor
   new Promise(async (resolve) => {
@@ -195,9 +198,9 @@ const loadQrCreator = async (): Promise<typeof QrCreator | undefined> => {
 
 // Displays the QR code with given link, in the given container
 const displayQR = async ({
-                           link: text,
-                           container
-                         }: {
+  link: text,
+  container,
+}: {
   link: string;
   container: HTMLElement;
 }) => {
@@ -211,7 +214,7 @@ const displayQR = async ({
 
   // Retrieve a fitting color CSS (defaults to black if for some reason none is set)
   const fill: string = getComputedStyle(
-    document.documentElement
+    document.documentElement,
   ).getPropertyValue("currentColor");
 
   // Create the QR code
@@ -221,8 +224,8 @@ const displayQR = async ({
       fill,
       radius: 0, // Don't round the squares
       ecLevel: "M", // Medium error correction
-      size: 256 // in pixels
+      size: 256, // in pixels
     },
-    container
+    container,
   );
 };

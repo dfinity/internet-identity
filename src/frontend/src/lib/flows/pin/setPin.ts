@@ -12,12 +12,12 @@ import copyJson from "./setPin.json";
 /* Prompt the user to create a new PIN */
 
 const setPinTemplate = ({
-                          i18n,
-                          cancel,
-                          onContinue,
-                          focus = false,
-                          scrollToTop = false
-                        }: {
+  i18n,
+  cancel,
+  onContinue,
+  focus = false,
+  scrollToTop = false,
+}: {
   i18n: I18n;
   cancel: () => void;
   onContinue: (pin: string) => void;
@@ -30,7 +30,7 @@ const setPinTemplate = ({
     onSubmit: onContinue,
     verify: (pin) => verifyPin(pin),
     secret: true,
-    focus
+    focus,
   });
   const slot = html`
     <hgroup ${scrollToTop ? mount(() => window.scrollTo(0, 0)) : undefined}>
@@ -51,7 +51,7 @@ const setPinTemplate = ({
   return mainWindow({
     showFooter: false,
     showLogo: false,
-    slot
+    slot,
   });
 };
 
@@ -82,8 +82,8 @@ export const setPin = (): Promise<
       onContinue: (pin: string) => resolve({ tag: "ok", pin }),
       cancel: () => resolve({ tag: "canceled" }),
       focus: true,
-      scrollToTop: true
-    })
+      scrollToTop: true,
+    }),
   );
 };
 
@@ -95,7 +95,7 @@ export const setPinFlow = async (): Promise<
     return { tag: "canceled" };
   }
 
-  for (; ;) {
+  for (;;) {
     const result = await setPin();
     if (result.tag === "canceled") {
       return { tag: "canceled" };

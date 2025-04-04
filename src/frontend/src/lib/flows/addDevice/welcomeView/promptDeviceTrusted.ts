@@ -10,11 +10,11 @@ export type PromptDeviceTrustedTemplateProps = Parameters<
 >[0];
 
 const promptDeviceTrustedTemplate = ({
-                                       userNumber,
-                                       confirm,
-                                       cancel,
-                                       i18n
-                                     }: {
+  userNumber,
+  confirm,
+  cancel,
+  i18n,
+}: {
   userNumber: bigint;
   confirm: () => void;
   cancel: () => void;
@@ -52,7 +52,7 @@ const promptDeviceTrustedTemplate = ({
   return mainWindow({
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
@@ -62,14 +62,14 @@ export const promptDeviceTrustedPage = renderPage(promptDeviceTrustedTemplate);
  * Page to prompt the user whether they trust the current device.
  */
 export const promptDeviceTrusted = (
-  props: Pick<PromptDeviceTrustedTemplateProps, "userNumber">
+  props: Pick<PromptDeviceTrustedTemplateProps, "userNumber">,
 ): Promise<"confirmed" | "canceled"> => {
   return new Promise((resolve) =>
     promptDeviceTrustedPage({
       ...props,
       confirm: () => resolve("confirmed"),
       cancel: () => resolve("canceled"),
-      i18n: new I18n()
-    })
+      i18n: new I18n(),
+    }),
   );
 };

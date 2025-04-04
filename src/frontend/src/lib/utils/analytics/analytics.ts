@@ -18,7 +18,7 @@ const convertToPlausibleConfig = (
       hashMode: plausibleConfig.hash_mode[0],
       domain: plausibleConfig.domain[0],
       trackLocalhost: plausibleConfig.track_localhost[0],
-      apiHost: plausibleConfig.api_host[0]
+      apiHost: plausibleConfig.api_host[0],
     });
   }
 };
@@ -46,5 +46,5 @@ export const analytics = {
   },
   event: (name: string, props?: Record<string, string | number | boolean>) => {
     tracker?.trackEvent(name, { props });
-  }
+  },
 };

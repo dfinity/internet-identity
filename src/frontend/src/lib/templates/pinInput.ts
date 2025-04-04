@@ -13,18 +13,18 @@ export type PinResult<T> =
 
 // A Pin Input component
 export const pinInput = <T>({
-                              pinLength = 6,
-                              onSubmit: onSubmit_,
-                              verify,
-                              secret = false,
-                              focus = false
-                            }: {
+  pinLength = 6,
+  onSubmit: onSubmit_,
+  verify,
+  secret = false,
+  focus = false,
+}: {
   pinLength?: number;
   onSubmit: (
-    result: T
+    result: T,
   ) => void /* Called when all inputs have been set or when .submit() is called */;
   verify: (
-    pin: string
+    pin: string,
   ) =>
     | Promise<PinResult<T>>
     | PinResult<T> /* Used to verify & transform the pin */;
@@ -59,7 +59,7 @@ export const pinInput = <T>({
   const errorMessage = currentError.map((currentError) =>
     nonNullish(currentError)
       ? html`<p class="t-centered t-error c-input--stack">${currentError}</p>`
-      : undefined
+      : undefined,
   );
   const notFilledError = `Please fill in all ${pinLength} inputs`;
 
@@ -97,8 +97,8 @@ export const pinInput = <T>({
       submitIfFilled({
         inputs,
         onSubmit,
-        onMissing: () => currentError.send(notFilledError)
-      })
+        onMissing: () => currentError.send(notFilledError),
+      }),
     );
 
   const template = html`
@@ -109,23 +109,23 @@ export const pinInput = <T>({
         data-haserror=${asyncReplace(hasError)}
       >
         ${Array.from(
-    { length: pinLength },
-    /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
-     * type="password", otherwise the browser tries to save one char as a password */
-    (_, ix) => html`
+          { length: pinLength },
+          /* XXX: we use a special class/font for the 'secret' PIN input instead of setting
+           * type="password", otherwise the browser tries to save one char as a password */
+          (_, ix) => html`
             <li class="c-list__item--pin c-input--anchor">
               <label class="c-input--anchor__wrap">
                 <input
                   ${
-      /* autofocus doesn't always work, so we use a manual approach */
-      (focus ?? false) && ix === 0
-        ? mount((e) => {
-          if (e instanceof HTMLElement) {
-            e.focus();
-          }
-        })
-        : undefined
-    }
+                    /* autofocus doesn't always work, so we use a manual approach */
+                    (focus ?? false) && ix === 0
+                      ? mount((e) => {
+                          if (e instanceof HTMLElement) {
+                            e.focus();
+                          }
+                        })
+                      : undefined
+                  }
                   autocomplete="off"
                   autocapitalize="off"
                   spellcheck="false"
@@ -134,22 +134,22 @@ export const pinInput = <T>({
                   size="1"
                   maxlength="1"
                   class="c-input c-input--pin c-input--pin__error ${secret
-      ? "c-input--pin__secret"
-      : undefined}"
+                    ? "c-input--pin__secret"
+                    : undefined}"
                   @input=${(e: InputEvent) => withInputElement(e, onInput_)}
                   @paste=${(e: ClipboardEvent) => withInputElement(e, onPaste_)}
                   @focus=${(e: Event) =>
-      /* on focus, select the input so that the content is effectively replaced */ withInputElement(
-      e,
-      (_, elem) => elem.select()
-    )}
+                    /* on focus, select the input so that the content is effectively replaced */ withInputElement(
+                      e,
+                      (_, elem) => elem.select(),
+                    )}
                   @keydown=${(e: KeyboardEvent) =>
-      withInputElement(e, onKeydown_)}
+                    withInputElement(e, onKeydown_)}
                 />
               </label>
             </li>
-          `
-  )}
+          `,
+        )}
       </ul>
       ${asyncReplace(errorMessage)}
     </div>
@@ -160,11 +160,11 @@ export const pinInput = <T>({
 
 /* Callback used when an input is being set */
 const onInput = ({
-                   element,
-                   evnt,
-                   inputs,
-                   onFilled
-                 }: {
+  element,
+  evnt,
+  inputs,
+  onFilled,
+}: {
   element: HTMLInputElement;
   evnt: InputEvent;
   inputs: HTMLInputElement[];
@@ -193,11 +193,11 @@ const onInput = ({
 
 /* Callback used when the user pastes */
 const onPaste = ({
-                   evnt,
-                   inputs,
-                   element,
-                   onFilled
-                 }: {
+  evnt,
+  inputs,
+  element,
+  onFilled,
+}: {
   evnt: ClipboardEvent;
   element: HTMLInputElement;
   inputs: HTMLInputElement[];
@@ -222,7 +222,7 @@ const onPaste = ({
   // Create an array of pairs of inputs + the char/digit to be pasted in that input
   const toBePasted = zip(
     nextInputs,
-    evnt.clipboardData.getData("text").trim().split("")
+    evnt.clipboardData.getData("text").trim().split(""),
   );
   if (toBePasted.length === 0) {
     return;
@@ -249,9 +249,9 @@ const onPaste = ({
 
 /* Callback used to handle pressing backspace on an empty input */
 const onKeydown = ({
-                     evnt,
-                     element
-                   }: {
+  evnt,
+  element,
+}: {
   evnt: KeyboardEvent;
   element: HTMLInputElement;
 }) => {
@@ -269,10 +269,10 @@ const onKeydown = ({
 
 // Calls 'onSubmit', only if all inputs have a value. Otherwise, 'onMissing' is called.
 const submitIfFilled = ({
-                          inputs,
-                          onSubmit,
-                          onMissing = () => {}
-                        }: {
+  inputs,
+  onSubmit,
+  onMissing = () => {},
+}: {
   inputs: HTMLInputElement[];
   onSubmit: (pin: string) => void;
   onMissing?: () => void;

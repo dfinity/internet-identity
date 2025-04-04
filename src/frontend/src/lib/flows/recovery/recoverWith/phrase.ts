@@ -15,11 +15,11 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 
 const recoverWithPhraseTemplate = <T>({
-                                        confirm,
-                                        verify,
-                                        back,
-                                        message
-                                      }: {
+  confirm,
+  verify,
+  back,
+  message,
+}: {
   confirm: (result: T) => void;
   verify: (phrase: {
     userNumber: bigint;
@@ -32,7 +32,7 @@ const recoverWithPhraseTemplate = <T>({
   const numWords = RECOVERYPHRASE_WORDCOUNT;
   const wordRefs: Ref<HTMLInputElement>[] = Array.from(
     { length: numWords },
-    () => createRef()
+    () => createRef(),
   );
 
   const userNumberInput = createRef<HTMLInputElement>();
@@ -101,19 +101,19 @@ const recoverWithPhraseTemplate = <T>({
       <div class="c-output--recovery l-stack">
         <ol class="c-list c-list--recovery">
           ${wordTemplate({
-    index: "#",
-    classes: ["c-list--recovery-word--important"],
-    assignTo: userNumberInput,
-    placeholder: "Identity number",
-    validityType: "number"
-  })}
+            index: "#",
+            classes: ["c-list--recovery-word--important"],
+            assignTo: userNumberInput,
+            placeholder: "Identity number",
+            validityType: "number",
+          })}
           ${wordRefs.map((wordRef, i) =>
-    wordTemplate({
-      assignTo: wordRef,
-      index: `${i + 1}`,
-      validityType: "word"
-    })
-  )}
+            wordTemplate({
+              assignTo: wordRef,
+              index: `${i + 1}`,
+              validityType: "word",
+            }),
+          )}
         </ol>
       </div>
 
@@ -140,7 +140,7 @@ const recoverWithPhraseTemplate = <T>({
     isWideContainer: true,
     showLogo: false,
     showFooter: false,
-    slot: pageContentSlot
+    slot: pageContentSlot,
   });
 };
 
@@ -166,7 +166,7 @@ const reportValidity = ({ element }: { element: HTMLInputElement }): State => {
         ? "User number cannot be empty"
         : !/^\d+$/.test(word)
           ? "Enter your Internet Identity here. This is a number and contains no other characters."
-          : undefined
+          : undefined,
   }[validityType](word);
   if (nonNullish(reason)) {
     element.setCustomValidity(reason);
@@ -186,12 +186,12 @@ type State = "pending" | "incorrect";
 
 // Show a particular word
 export const wordTemplate = ({
-                               assignTo,
-                               index,
-                               classes: classes_,
-                               validityType,
-                               placeholder
-                             }: {
+  assignTo,
+  index,
+  classes: classes_,
+  validityType,
+  placeholder,
+}: {
   assignTo: Ref<HTMLInputElement>;
   index: string;
   classes?: string[];
@@ -204,8 +204,8 @@ export const wordTemplate = ({
     (s: State) =>
       ({
         pending: "c-list--recovery-word__attention",
-        incorrect: "c-list--recovery-word__incorrect"
-      })[s]
+        incorrect: "c-list--recovery-word__incorrect",
+      })[s],
   );
 
   // The icon to show (when warning of a bad word)
@@ -218,8 +218,8 @@ export const wordTemplate = ({
           @click=${() => withRef(assignTo, (input) => input.reportValidity())}
           class="c-list--recovery-word__icon"
           >${warningIcon}</i
-        >`
-      })[s]
+        >`,
+      })[s],
   );
   const classes = [...(classes_ ?? []), "c-list--recovery-word"];
 
@@ -232,53 +232,53 @@ export const wordTemplate = ({
       autofocus
       data-validity-type=${validityType}
       @paste=${(evnt: ClipboardEvent) =>
-    withInputElement(evnt, (_, element) => {
-      evnt.preventDefault();
+        withInputElement(evnt, (_, element) => {
+          evnt.preventDefault();
 
-      // Get the text pasted
-      if (evnt.clipboardData === null) {
-        return;
-      }
-      const text = evnt.clipboardData.getData("text");
+          // Get the text pasted
+          if (evnt.clipboardData === null) {
+            return;
+          }
+          const text = evnt.clipboardData.getData("text");
 
-      // Split the text into words, dropping (leading) white spaces, empty strings (from e.g. double spaces), etc
-      const [word = undefined, ...rest] = text
-        .trimStart()
-        .split(" ")
-        .filter(Boolean);
-      if (isNullish(word)) {
-        return;
-      }
+          // Split the text into words, dropping (leading) white spaces, empty strings (from e.g. double spaces), etc
+          const [word = undefined, ...rest] = text
+            .trimStart()
+            .split(" ")
+            .filter(Boolean);
+          if (isNullish(word)) {
+            return;
+          }
 
-      // Use the first word and set that as input value
-      element.value = word;
-      // Trigger an event for the input to re-evaluate the validity
-      element.dispatchEvent(new Event("change"));
+          // Use the first word and set that as input value
+          element.value = word;
+          // Trigger an event for the input to re-evaluate the validity
+          element.dispatchEvent(new Event("change"));
 
-      // Forward the rest of the text (if any) to the next input element (if any)
-      if (rest.length <= 0) {
-        return;
-      }
-      const newData = new DataTransfer();
-      newData.setData("text", rest.join(" "));
-      const newEvent = new ClipboardEvent("paste", {
-        clipboardData: newData
-      });
+          // Forward the rest of the text (if any) to the next input element (if any)
+          if (rest.length <= 0) {
+            return;
+          }
+          const newData = new DataTransfer();
+          newData.setData("text", rest.join(" "));
+          const newEvent = new ClipboardEvent("paste", {
+            clipboardData: newData,
+          });
 
-      // Firefox does not set the clipboardData accuratly with the ClipboardEvent constructor. Empirical workaround.
-      // Note: this cannot replace providing the clipboardData as initial value of the ClipboardEvent. Removing such value when using the contructor would not comply with specification and make the feature fails in Chrome and Safari.
-      newEvent.clipboardData?.setData("text", rest.join(" "));
+          // Firefox does not set the clipboardData accuratly with the ClipboardEvent constructor. Empirical workaround.
+          // Note: this cannot replace providing the clipboardData as initial value of the ClipboardEvent. Removing such value when using the contructor would not comply with specification and make the feature fails in Chrome and Safari.
+          newEvent.clipboardData?.setData("text", rest.join(" "));
 
-      // Go up until we find a list item, then to the next sibling, and finally back down until we find an input
-      const next = element
-        .closest("li")
-        ?.nextElementSibling?.querySelector("input");
-      if (isNullish(next)) {
-        return;
-      }
+          // Go up until we find a list item, then to the next sibling, and finally back down until we find an input
+          const next = element
+            .closest("li")
+            ?.nextElementSibling?.querySelector("input");
+          if (isNullish(next)) {
+            return;
+          }
 
-      next.dispatchEvent(newEvent);
-    })}
+          next.dispatchEvent(newEvent);
+        })}
       type="text"
       autocapitalize="none"
       spellcheck="false"
@@ -287,18 +287,18 @@ export const wordTemplate = ({
       ${nonNullish(assignTo) ? ref(assignTo) : undefined}
       data-state=${asyncReplace(state)}
       @input=${(e: InputEvent) => {
-    state.send("pending");
-    withInputElement(e, (_e, element) => {
-      // Reset validity when typing
-      resetValidity({ element });
-    });
-  }}
+        state.send("pending");
+        withInputElement(e, (_e, element) => {
+          // Reset validity when typing
+          resetValidity({ element });
+        });
+      }}
       @change=${(e: InputEvent) => {
-    withInputElement(e, (_, element) => {
-      // Check validity when leaving the field
-      state.send(reportValidity({ element }));
-    });
-  }}
+        withInputElement(e, (_, element) => {
+          // Check validity when leaving the field
+          state.send(reportValidity({ element }));
+        });
+      }}
     />&nbsp;
   </li>`;
 };
@@ -307,13 +307,13 @@ type TemplateProps<T> = Parameters<typeof recoverWithPhraseTemplate<T>>[0];
 
 export const recoverWithPhrasePage = <T>(
   props: TemplateProps<T>,
-  container?: HTMLElement
+  container?: HTMLElement,
 ) => renderPage(recoverWithPhraseTemplate<T>)(props, container);
 
 export const recoverWithPhrase = ({
-                                    connection,
-                                    message
-                                  }: {
+  connection,
+  message,
+}: {
   connection: Connection;
   message: TemplateResult | string;
 }): Promise<LoginSuccess | { tag: "canceled" }> => {
@@ -322,14 +322,14 @@ export const recoverWithPhrase = ({
       confirm: (result) => resolve(result),
       verify: async ({ userNumber, words }) => {
         const result = await withLoader(() =>
-          connection.fromSeedPhrase(userNumber, words.join(" "))
+          connection.fromSeedPhrase(userNumber, words.join(" ")),
         );
         if (result.kind !== "loginSuccess") {
           const msg = {
             noSeedPhrase:
               "No recovery phrase: there is no recovery phrase associated with this identity. Cancel and recover another way.",
             seedPhraseFail:
-              "Invalid Seed Phrase: Failed to authenticate using this seed phrase. Did you enter it correctly?"
+              "Invalid Seed Phrase: Failed to authenticate using this seed phrase. Did you enter it correctly?",
           }[result.kind];
 
           return { ok: false, err: msg };
@@ -339,7 +339,7 @@ export const recoverWithPhrase = ({
         return { ok: true, value: result };
       },
       back: () => resolve({ tag: "canceled" }),
-      message
+      message,
     });
   });
 };
