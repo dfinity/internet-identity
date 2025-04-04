@@ -1,4 +1,4 @@
-import { FeatureFlag } from "$lib/legacy/featureFlags/index";
+import { FeatureFlag } from "$lib/utils/featureFlags/index";
 
 class MockStorage {
   #data: Record<string, string> = {};

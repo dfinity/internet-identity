@@ -2,7 +2,7 @@ import type {
   DeviceWithUsage,
   PublicKey,
 } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { devicesFromDevicesWithUsage } from "./index";

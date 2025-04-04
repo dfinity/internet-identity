@@ -1,5 +1,5 @@
 import type { DeviceData } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { domainWarning } from "$lib/flows/manage";
 
 const recoveryPhrase: DeviceData = {

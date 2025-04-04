@@ -45,6 +45,10 @@ export class FeatureFlag {
     this.#value = this.#defaultValue;
     this.#storage.removeItem(this.#key);
   }
+
+  temporaryOverride(value: boolean) {
+    this.#value = Boolean(value);
+  }
 }
 
 // Initialize feature flags with values from localstorage
@@ -70,3 +74,4 @@ export const {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
 } = initializedFeatureFlags;
+export default initializedFeatureFlags;

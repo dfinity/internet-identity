@@ -1,7 +1,7 @@
 import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";

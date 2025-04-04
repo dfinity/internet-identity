@@ -21,7 +21,7 @@ import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
 import {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
-} from "$lib/legacy/featureFlags";
+} from "$lib/utils/featureFlags";
 import { addDevice } from "$lib/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$lib/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$lib/flows/dappsExplorer/dapps";

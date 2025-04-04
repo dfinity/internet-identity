@@ -2,7 +2,7 @@ import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { generate } from "$lib/legacy/crypto/mnemonic";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import {
   AuthenticatedConnection,

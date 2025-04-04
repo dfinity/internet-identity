@@ -4,7 +4,7 @@ import type {
   MetadataMapV2,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,

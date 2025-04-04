@@ -38,7 +38,7 @@ import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
-} from "$lib/legacy/featureFlags";
+} from "$lib/utils/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
