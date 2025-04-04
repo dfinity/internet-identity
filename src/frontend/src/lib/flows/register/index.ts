@@ -4,7 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity
 } from "$lib/legacy/crypto/pinIdentity";
-import { OPENID_AUTHENTICATION } from "$lib/legacy/featureFlags";
+import { OPENID_AUTHENTICATION } from "$lib/utils/featureFlags";
 import { anyFeatures } from "$lib/legacy/features";
 import { idbStorePinIdentityMaterial } from "$lib/flows/pin/idb";
 import { registerDisabled } from "$lib/flows/registerDisabled";

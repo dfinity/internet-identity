@@ -1,7 +1,7 @@
 import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
@@ -28,7 +28,7 @@ import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
 
 export const useRecovery = async (
-  connection: Connection,
+  connection: Connection
 ): Promise<LoginSuccess | { tag: "canceled" }> => {
   const res = await promptRecovery();
 
@@ -48,8 +48,8 @@ export const useRecovery = async (
     ? recoverWithPhrase({
       connection,
       message: html`Your recovery phrase includes your Internet Identity
-        number and a unique combination of 24 words that represent your private
-        key`
+      number and a unique combination of 24 words that represent your private
+      key`
     })
     : recoverWithDevice({ connection }));
 
@@ -182,7 +182,7 @@ const enrollAuthenticator = async ({
       newDevice.getPublicKey().toDer(),
       { unprotected: null },
       newDeviceOrigin ?? window.location.origin,
-      newDevice.rawId,
+      newDevice.rawId
     );
   } catch (error: unknown) {
     await displayError({

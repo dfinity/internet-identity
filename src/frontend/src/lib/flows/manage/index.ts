@@ -18,7 +18,7 @@ import { logoutSection } from "$lib/templates/logout";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
-import { DOMAIN_COMPATIBILITY, OPENID_AUTHENTICATION } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY, OPENID_AUTHENTICATION } from "$lib/utils/featureFlags";
 import { addDevice } from "$lib/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$lib/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$lib/flows/dappsExplorer/dapps";
@@ -227,50 +227,50 @@ const displayManageTemplate = ({
     </hgroup>
     ${anchorSection({ userNumber, identityBackground })}
     ${nonNullish(tempKeysWarning)
-    ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
-    : ""}
+      ? tempKeyWarningBox({ i18n, warningAction: tempKeysWarning })
+      : ""}
     ${pinAuthenticators.length > 0
-    ? tempKeysSection({
-      authenticators: pinAuthenticators,
-      i18n,
-      onRemoveDevice
-    })
-    : ""}
+      ? tempKeysSection({
+        authenticators: pinAuthenticators,
+        i18n,
+        onRemoveDevice
+      })
+      : ""}
     ${authenticatorsSection({
-    authenticators,
-    onAddDevice,
-    onRemoveDevice,
-    warnNoPasskeys,
-    cleanupRecommended,
-    i18n
-  })}
-    ${OPENID_AUTHENTICATION.isEnabled()
-    ? linkedAccountsSection({
-      credentials,
-      onLinkAccount,
-      onUnlinkAccount,
-      hasOtherAuthMethods: authenticators.length > 0,
-      currentCredential
-    })
-    : ""}
-    ${recoveryMethodsSection({
-    recoveries,
-    addRecoveryPhrase,
-    addRecoveryKey,
-    onRemoveDevice
-  })}
-    ${nonNullish(exploreDapps)
-    ? html`<aside class="l-stack">
-        ${dappsTeaser({
-      dapps,
-      click: () => exploreDapps(),
-      copy: {
-        dapps_explorer: "Dapps explorer",
-        sign_into_dapps: "Connect to these dapps"
-      }
+      authenticators,
+      onAddDevice,
+      onRemoveDevice,
+      warnNoPasskeys,
+      cleanupRecommended,
+      i18n
     })}
+    ${OPENID_AUTHENTICATION.isEnabled()
+      ? linkedAccountsSection({
+        credentials,
+        onLinkAccount,
+        onUnlinkAccount,
+        hasOtherAuthMethods: authenticators.length > 0,
+        currentCredential
+      })
+      : ""}
+    ${recoveryMethodsSection({
+      recoveries,
+      addRecoveryPhrase,
+      addRecoveryKey,
+      onRemoveDevice
+    })}
+    ${nonNullish(exploreDapps)
+      ? html`<aside class="l-stack">
+        ${dappsTeaser({
+          dapps,
+          click: () => exploreDapps(),
+          copy: {
+            dapps_explorer: "Dapps explorer",
+            sign_into_dapps: "Connect to these dapps"
+          }
+        })}
       </aside>`
-    : undefined}
+      : undefined}
     ${logoutSection()}
   </section>`;
 
@@ -291,9 +291,9 @@ const anchorSection = ({
       class="c-input c-input--stack c-input--fullwidth c-input--textarea c-input--readonly c-input--icon c-input--id"
     >
       ${identityCard({
-  userNumber,
-  identityBackground
-}) satisfies TemplateElement}
+        userNumber,
+        identityBackground
+      }) satisfies TemplateElement}
     </div>
   </aside>
 `;

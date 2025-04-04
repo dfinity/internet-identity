@@ -35,7 +35,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
-import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY, HARDWARE_KEY_TEST } from "$lib/utils/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
@@ -377,7 +377,7 @@ export class Connection {
     const jwt = await withLoader(() =>
       requestJWT(googleRequestConfig, {
         mediation: "required",
-        nonce,
+        nonce
       })
     );
 
@@ -479,7 +479,7 @@ export class Connection {
     }
 
     let webAuthnAuthenticators = devices.filter(
-      ({ key_type }) => !("browser_storage_key" in key_type),
+      ({ key_type }) => !("browser_storage_key" in key_type)
     );
 
     // If we reach this point, it's because no PIN identity was found.
@@ -492,7 +492,7 @@ export class Connection {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
-          Object.keys(device.key_type)[0] === "cross_platform",
+          Object.keys(device.key_type)[0] === "cross_platform"
       );
     }
 
@@ -501,13 +501,13 @@ export class Connection {
       userNumber,
       webAuthnAuthenticators
         .map(convertToValidCredentialData)
-        .filter(nonNullish),
+        .filter(nonNullish)
     );
   };
 
   fromWebauthnCredentials = async (
     userNumber: bigint,
-    credentials: CredentialData[],
+    credentials: CredentialData[]
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
@@ -545,11 +545,11 @@ export class Connection {
     const identity = features.DUMMY_AUTH
       ? new DummyIdentity()
       : // Passing all the credentials doesn't hurt and it could help in case an `origin` was wrongly set in the backend.
-        MultiWebAuthnIdentity.fromCredentials(
-          credentials,
-          currentFlow?.rpId,
-          currentFlow?.useIframe ?? false,
-        );
+      MultiWebAuthnIdentity.fromCredentials(
+        credentials,
+        currentFlow?.rpId,
+        currentFlow?.useIframe ?? false
+      );
     let delegationIdentity: DelegationIdentity;
 
     // Here we expect a webauth exception if the user canceled the webauthn prompt (triggered by
@@ -749,7 +749,7 @@ export class Connection {
       sessionKey.getPublicKey(),
       new Date(Date.now() + tenMinutesInMsec),
       {
-        targets: [Principal.from(this.canisterId)],
+        targets: [Principal.from(this.canisterId)]
       }
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
@@ -1190,9 +1190,9 @@ export const creationOptions = (
       device.credential_id.length === 0
         ? []
         : {
-            id: new Uint8Array(device.credential_id[0]),
-            type: "public-key",
-          }
+          id: new Uint8Array(device.credential_id[0]),
+          type: "public-key"
+        }
     ),
     challenge: window.crypto.getRandomValues(new Uint8Array(16)),
     pubKeyCredParams: [

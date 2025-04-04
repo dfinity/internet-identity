@@ -7,7 +7,7 @@ import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 
 import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { infoScreenTemplate } from "$lib/templates/infoScreen";
-import { DOMAIN_COMPATIBILITY } from "$lib/legacy/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
 import { IdentityMetadata } from "$lib/legacy/repositories/identityMetadata";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";

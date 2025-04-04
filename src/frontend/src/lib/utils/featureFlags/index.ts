@@ -2,7 +2,7 @@
 const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
-  HARDWARE_KEY_TEST: false,
+  HARDWARE_KEY_TEST: false
 } as const satisfies Record<string, boolean>;
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -16,7 +16,7 @@ export class FeatureFlag {
   constructor(
     storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
     key: string,
-    defaultValue: boolean,
+    defaultValue: boolean
   ) {
     this.#storage = storage;
     this.#key = key;
@@ -45,6 +45,10 @@ export class FeatureFlag {
     this.#value = this.#defaultValue;
     this.#storage.removeItem(this.#key);
   }
+
+  override(value: boolean) {
+    this.#value = Boolean(value);
+  }
 }
 
 // Initialize feature flags with values from localstorage
@@ -54,9 +58,9 @@ const initializedFeatureFlags = Object.fromEntries(
     new FeatureFlag(
       window.localStorage,
       LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-      defaultValue,
-    ),
-  ]),
+      defaultValue
+    )
+  ])
 );
 
 // Make feature flags configurable from browser console
@@ -68,5 +72,6 @@ window.__featureFlags = initializedFeatureFlags;
 export const {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
-  HARDWARE_KEY_TEST,
+  HARDWARE_KEY_TEST
 } = initializedFeatureFlags;
+export default initializedFeatureFlags;
