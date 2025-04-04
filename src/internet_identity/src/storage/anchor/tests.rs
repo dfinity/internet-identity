@@ -190,10 +190,7 @@ fn should_enforce_single_recovery_phrase() {
         .unwrap();
     let result = anchor.add_device(recovery_phrase(1, DeviceProtection::Unprotected));
 
-    assert!(matches!(
-        result,
-        Err(AnchorError::MultipleRecoveryPhrases)
-    ));
+    assert!(matches!(result, Err(AnchorError::MultipleRecoveryPhrases)));
     assert_eq!(anchor.devices().len(), 1);
 }
 
@@ -365,10 +362,7 @@ fn should_not_allow_modification_of_device_key() {
 
     let result = anchor.modify_device(&sample_device().pubkey, device(1));
 
-    assert!(matches!(
-        result,
-        Err(AnchorError::CannotModifyDeviceKey)
-    ));
+    assert!(matches!(result, Err(AnchorError::CannotModifyDeviceKey)));
     assert_eq!(anchor.devices()[0], sample_device());
 }
 
