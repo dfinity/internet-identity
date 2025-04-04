@@ -126,7 +126,7 @@ mod tests;
 /// * version   0: invalid
 /// * version 1-8: no longer supported
 /// * version   9: 4KB anchors, candid anchor record layout, persistent state in virtual memory,
-///                with memory manager (from 2nd page on), archive entries buffer in stable memory
+///   with memory manager (from 2nd page on), archive entries buffer in stable memory
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 9..=9;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;

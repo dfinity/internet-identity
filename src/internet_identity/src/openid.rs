@@ -145,13 +145,13 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-    blob.push(client_id.bytes().len() as u8);
+    blob.push(client_id.len() as u8);
     blob.extend(client_id.bytes());
 
-    blob.push(iss.bytes().len() as u8);
+    blob.push(iss.len() as u8);
     blob.extend(iss.bytes());
 
-    blob.push(sub.bytes().len() as u8);
+    blob.push(sub.len() as u8);
     blob.extend(sub.bytes());
     let mut hasher = Sha256::new();
     hasher.update(blob);
