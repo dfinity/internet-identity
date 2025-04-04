@@ -64,7 +64,8 @@ impl From<IdentityUpdateError> for String {
 ///
 /// * anchor_number: indicates the anchor to be provided op should be called on
 /// * op: Function that modifies an anchor and returns a [Result] indicating
-///  success or failure which determines whether additional bookkeeping (on success) is required.
+///   success or failure which determines whether additional bookkeeping (on success) is required.
+/// 
 ///  On success, the function must also return an [Operation] which is used for archiving purposes.
 pub fn anchor_operation_with_authz_check<R, E>(
     anchor_number: AnchorNumber,
