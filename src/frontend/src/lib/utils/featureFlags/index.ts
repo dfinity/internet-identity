@@ -46,7 +46,7 @@ export class FeatureFlag {
     this.#storage.removeItem(this.#key);
   }
 
-  override(value: boolean) {
+  temporaryOverride(value: boolean) {
     this.#value = Boolean(value);
   }
 }

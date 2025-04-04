@@ -22,7 +22,7 @@ export const init: ServerInit = () => {
         );
         continue;
       }
-      featureFlags[flag]?.override(value === "true");
+      featureFlags[flag]?.temporaryOverride(value === "true");
       url.searchParams.delete(key);
     }
   }
