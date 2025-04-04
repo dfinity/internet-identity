@@ -79,6 +79,7 @@ import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancel } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
+import { webauthnAuthorizationFunnel, WebauthnAuthorizationEvents } from "./analytics/webauthnAuthorizationFunnel";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -527,7 +528,7 @@ export class Connection {
     const flowsLength = this.webAuthFlows?.flows.length ?? 0;
 
     // Better understand which users make it (or don't) all the way.
-    analytics.event("start-webauthn-authentication", { flowsLength });
+    webauthnAuthorizationFunnel.init({ flowsLength });
 
     // We reached the last flow. Start from the beginning.
     // This might happen if the user cancelled manually in the flow that would have been successful.
@@ -558,10 +559,10 @@ export class Connection {
       delegationIdentity = await this.requestFEDelegation(identity);
     } catch (e: unknown) {
       // Better understand which users don't make it all the way.
-      analytics.event("failed-webauthn-authentication", { flowsLength });
+      webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Failed);
       if (isWebAuthnCancel(e)) {
         // Better understand which users don't make it all the way.
-        analytics.event("cancelled-webauthn-authentication", { flowsLength });
+        webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Cancelled);
         // We only want to show a special error if the user might have to choose different web auth flow.
         if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
           // Increase the index to try the next flow.
@@ -598,7 +599,7 @@ export class Connection {
     const showAddCurrentDevice = (this.webAuthFlows?.currentIndex ?? 0) > 0;
 
     // Better understand which users make it all the way.
-    analytics.event("successful-webauthn-authentication", { flowsLength });
+    webauthnAuthorizationFunnel.trigger(WebauthnAuthorizationEvents.Success);
 
     return {
       kind: "loginSuccess",
