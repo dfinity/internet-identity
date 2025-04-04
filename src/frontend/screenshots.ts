@@ -4,6 +4,7 @@
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
 import { existsSync, mkdirSync } from "fs";
 import { remote } from "webdriverio";
+import { isNullish } from "@dfinity/utils";
 
 const SCREENSHOTS_DIR =
   process.env["SCREENSHOTS_DIR"] ?? "./screenshots/custom";
@@ -112,11 +113,9 @@ async function withChrome<T>(
     },
   });
 
-  await browser.setViewport({
-    width: mobileEmulation?.deviceMetrics.width ?? 1200,
-    height: mobileEmulation?.deviceMetrics?.height ?? 900,
-    devicePixelRatio: mobileEmulation?.deviceMetrics?.pixelRatio ?? 1,
-  });
+  if (isNullish(mobileEmulation)) {
+    await browser.setWindowSize(1200, 900);
+  }
 
   const res = await cb(browser);
   await browser.deleteSession();
