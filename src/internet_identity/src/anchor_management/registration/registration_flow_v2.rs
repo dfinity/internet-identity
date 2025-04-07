@@ -5,6 +5,7 @@ use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
     activity_bookkeeping, add_openid_credential, post_operation_bookkeeping,
+    store_anchor_number_and_pubkey_with_credential_id,
 };
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
@@ -15,10 +16,10 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
-    DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult,
-    IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    AuthnMethod, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError,
+    CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult,
+    IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
+    RegistrationFlowNextStep, StaticCaptchaTrigger, WebAuthn,
 };
 
 impl RegistrationFlowState {
@@ -213,6 +214,20 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 &mut identity,
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
+
+            match &id_reg_finish_arg.authn_method.authn_method {
+                AuthnMethod::WebAuthn(WebAuthn {
+                    pubkey,
+                    credential_id,
+                }) => {
+                    store_anchor_number_and_pubkey_with_credential_id(
+                        credential_id,
+                        identity.anchor_number(),
+                        pubkey.clone(),
+                    );
+                }
+                _ => {}
+            }
 
             Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),
