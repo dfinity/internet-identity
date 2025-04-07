@@ -23,6 +23,7 @@ pub struct Anchor {
     devices: Vec<Device>,
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
+    name: Option<String>,
 }
 
 impl Device {
@@ -136,6 +137,7 @@ impl From<Anchor> for (StorableAnchor, StableAnchor) {
             },
             StableAnchor {
                 openid_credentials: anchor.openid_credentials,
+                name: anchor.name,
             },
         )
     }
@@ -152,10 +154,11 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
         Anchor {
             anchor_number,
             devices: storable_anchor.devices,
-            openid_credentials: stable_anchor
+            openid_credentials: stable_anchor.clone()
                 .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
+            name: stable_anchor.map(|anchor| anchor.name).unwrap_or_default(),
         }
     }
 }
@@ -169,6 +172,7 @@ impl Anchor {
             devices: vec![],
             openid_credentials: vec![],
             metadata: None,
+            name: None,
         }
     }
 
@@ -372,6 +376,18 @@ impl Anchor {
         }
         self.openid_credentials.push(openid_credential);
         Ok(())
+    }
+
+    pub fn set_name(
+        &mut self,
+        name: Option<String>,
+    ) -> Result<(), AnchorError> {
+        self.name = name;
+        Ok(())
+    }
+
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     pub fn remove_openid_credential(

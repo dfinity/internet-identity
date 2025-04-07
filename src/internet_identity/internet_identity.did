@@ -513,6 +513,7 @@ type IdentityInfo = record {
     openid_credentials : opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata : MetadataMapV2;
+    name : opt text;
 };
 
 type IdentityInfoError = variant {

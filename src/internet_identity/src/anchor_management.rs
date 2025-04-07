@@ -51,6 +51,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     tentative_device: Some(tentative_device.clone()),
                 }),
                 openid_credentials,
+                name: anchor.name(),
             },
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
                 IdentityAnchorInfo {
@@ -60,12 +61,14 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                         tentative_device: None,
                     }),
                     openid_credentials,
+                    name: anchor.name(),
                 }
             }
             None | Some(_) => IdentityAnchorInfo {
                 devices,
                 device_registration: None,
                 openid_credentials,
+                name: anchor.name(),
             },
         }
     })
