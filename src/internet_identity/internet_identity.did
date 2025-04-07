@@ -804,4 +804,7 @@ service : (opt InternetIdentityInit) -> {
     // Only callable by this IIs archive canister.
     fetch_entries : () -> (vec BufferedArchiveEntry);
     acknowledge_entries : (sequence_number : nat64) -> ();
+
+    // Prototype Methods
+    get_pubkey_by_credential_id : (credential_id : blob) -> (opt record { anchor_number : UserNumber; pubkey: PublicKey });
 };
