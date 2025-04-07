@@ -52,6 +52,7 @@ pub fn identity_registration_finish(
         "identity_registration_finish",
         (IdRegFinishArg {
             authn_method: authn_method.clone(),
+            name: None,
         },),
     )
     .map(|(x,)| x)
