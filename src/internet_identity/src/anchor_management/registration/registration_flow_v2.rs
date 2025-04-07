@@ -204,6 +204,9 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             identity
+                .set_name(id_reg_finish_arg.name.clone())
+                .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+            identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             activity_bookkeeping(
@@ -216,10 +219,13 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             }
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
-            let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
+            let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
             let openid_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
+            identity
+                .set_name(name.clone())
+                .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             activity_bookkeeping(

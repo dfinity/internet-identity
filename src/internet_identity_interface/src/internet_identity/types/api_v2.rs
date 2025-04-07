@@ -80,6 +80,7 @@ pub struct IdentityInfo {
     pub authn_method_registration: Option<AuthnMethodRegistration>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub metadata: HashMap<String, MetadataEntryV2>,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -187,12 +188,14 @@ pub enum CheckCaptchaError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishArg {
     pub authn_method: AuthnMethodData,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct OpenIDRegFinishArg {
     pub jwt: String,
     pub salt: [u8; 32],
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

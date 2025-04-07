@@ -176,6 +176,7 @@ pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

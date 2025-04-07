@@ -608,6 +608,7 @@ mod v2_api {
                 .map(AuthnMethodRegistration::from),
             openid_credentials: anchor_info.openid_credentials,
             metadata,
+            name: anchor_info.name,
         };
         Ok(identity_info)
     }
@@ -866,6 +867,7 @@ mod openid_api {
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
         let mut anchor = state::anchor(anchor_number);
+        let name = anchor.name();
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
         state::storage_borrow_mut(|storage| storage.write(anchor))
@@ -885,6 +887,7 @@ mod openid_api {
             user_key,
             expiration,
             anchor_number,
+            name,
         })
     }
 
