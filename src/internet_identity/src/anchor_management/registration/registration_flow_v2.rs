@@ -5,6 +5,7 @@ use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
     activity_bookkeeping, add_openid_credential, post_operation_bookkeeping,
+    store_anchor_number_and_pubkey_with_credential_id,
 };
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
@@ -15,10 +16,10 @@ use ic_cdk::caller;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
-    AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
-    DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult,
-    IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    AuthnMethod, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError,
+    CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult,
+    IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
+    RegistrationFlowNextStep, StaticCaptchaTrigger, WebAuthn,
 };
 
 impl RegistrationFlowState {
@@ -204,6 +205,9 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             identity
+                .set_name(id_reg_finish_arg.name.clone())
+                .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+            identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             activity_bookkeeping(
@@ -211,15 +215,32 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
 
+            match &id_reg_finish_arg.authn_method.authn_method {
+                AuthnMethod::WebAuthn(WebAuthn {
+                    pubkey,
+                    credential_id,
+                }) => {
+                    store_anchor_number_and_pubkey_with_credential_id(
+                        credential_id,
+                        identity.anchor_number(),
+                        pubkey.clone(),
+                    );
+                }
+                _ => {}
+            }
+
             Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),
             }
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
-            let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
+            let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
             let openid_credential =
                 openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
 
+            identity
+                .set_name(name.clone())
+                .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             activity_bookkeeping(

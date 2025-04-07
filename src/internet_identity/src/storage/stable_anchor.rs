@@ -8,6 +8,7 @@ use std::borrow::Cow;
 #[derive(CandidType, Deserialize, Clone)]
 pub struct StableAnchor {
     pub openid_credentials: Vec<OpenIdCredential>,
+    pub name: Option<String>,
 }
 
 impl Storable for StableAnchor {

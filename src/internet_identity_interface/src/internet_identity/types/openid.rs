@@ -37,6 +37,7 @@ pub struct OpenIdPrepareDelegationResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
+    pub name: Option<String>,
 }
 
 #[derive(CandidType, Debug, Deserialize, Serialize)]

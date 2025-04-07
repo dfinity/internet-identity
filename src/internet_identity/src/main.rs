@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use storage::{Salt, Storage};
+use storage::{DiscoverableCredentialData, Salt, Storage};
 
 mod anchor_management;
 mod archive;
@@ -608,6 +608,7 @@ mod v2_api {
                 .map(AuthnMethodRegistration::from),
             openid_credentials: anchor_info.openid_credentials,
             metadata,
+            name: anchor_info.name,
         };
         Ok(identity_info)
     }
@@ -866,6 +867,7 @@ mod openid_api {
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
         let mut anchor = state::anchor(anchor_number);
+        let name = anchor.name();
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
         state::storage_borrow_mut(|storage| storage.write(anchor))
@@ -885,6 +887,7 @@ mod openid_api {
             user_key,
             expiration,
             anchor_number,
+            name,
         })
     }
 
@@ -902,6 +905,21 @@ mod openid_api {
             Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
+    }
+}
+
+/// API required for the discoverable credentials flow
+mod discoverable_credentials {
+    use crate::anchor_management::lookup_anchor_number_and_pubkey_with_credential_id;
+    use crate::DiscoverableCredentialData;
+    use ic_cdk::query;
+    use internet_identity_interface::internet_identity::types::CredentialId;
+
+    #[query]
+    fn get_pubkey_by_credential_id(
+        credential_id: CredentialId,
+    ) -> Option<DiscoverableCredentialData> {
+        lookup_anchor_number_and_pubkey_with_credential_id(&credential_id)
     }
 }
 
