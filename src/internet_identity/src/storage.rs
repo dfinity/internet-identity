@@ -86,6 +86,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
+use storable_credential_id::StorableCredentialId;
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -102,6 +103,7 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::anchor::Anchor;
+pub use crate::storage::discoverable_credential_data::DiscoverableCredentialData;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::stable_anchor::StableAnchor;
@@ -114,10 +116,12 @@ use internet_identity_interface::internet_identity::types::*;
 pub mod anchor;
 pub mod registration_rates;
 
+mod discoverable_credential_data;
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
 mod storable_anchor;
 mod storable_anchor_number_list;
+mod storable_credential_id;
 mod storable_openid_credential_key;
 mod storable_persistent_state;
 #[cfg(test)]
@@ -143,6 +147,7 @@ const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
 const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
+const LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID_INDEX: u8 = 9u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -155,6 +160,8 @@ const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
 const STABLE_ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
+const LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -221,6 +228,9 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
         StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList, ManagedMemory<M>>,
+    lookup_anchor_and_pubkey_with_credential_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_anchor_and_pubkey_with_credential_id_memory:
+        StableBTreeMap<StorableCredentialId, DiscoverableCredentialData, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -285,6 +295,10 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
+        let lookup_anchor_and_pubkey_with_credential_id_memory =
+            memory_manager.get(LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID);
+        let lookup_anchor_and_pubkey_with_credential_id_memory =
+            memory_manager.get(LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -324,6 +338,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_openid_credential_memory: StableBTreeMap::init(
                 lookup_anchor_with_openid_credential_memory,
+            ),
+            lookup_anchor_and_pubkey_with_credential_id_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_and_pubkey_with_credential_id_memory.clone(),
+            ),
+            lookup_anchor_and_pubkey_with_credential_id_memory: StableBTreeMap::init(
+                lookup_anchor_and_pubkey_with_credential_id_memory,
             ),
         }
     }
@@ -493,6 +513,31 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
+    pub fn lookup_anchor_number_and_pubkey_with_credential_id(
+        &self,
+        credential_id: &CredentialId,
+    ) -> Option<DiscoverableCredentialData> {
+        let anchor_number_and_pubkey: Option<DiscoverableCredentialData> = self
+            .lookup_anchor_and_pubkey_with_credential_id_memory
+            .get(&credential_id.clone().into());
+
+        anchor_number_and_pubkey
+    }
+
+    // this should only return data if there is pre-existing data under that credential id - ergo, never.
+    pub fn store_anchor_number_and_pubkey_with_credential_id(
+        &mut self,
+        credential_id: &CredentialId,
+        anchor_number: AnchorNumber,
+        pubkey: PublicKey,
+    ) -> Option<DiscoverableCredentialData> {
+        self.lookup_anchor_and_pubkey_with_credential_id_memory
+            .insert(
+                credential_id.clone().into(),
+                DiscoverableCredentialData::new(anchor_number, pubkey),
+            )
+    }
+
     /// Make sure all the required metadata is recorded to stable memory.
     pub fn flush(&mut self) {
         let slice = unsafe {
@@ -654,6 +699,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_openid_credential".to_string(),
                 self.lookup_anchor_with_openid_credential_memory_wrapper
+                    .size(),
+            ),
+            (
+                "lookup_anchor_and_pubkey_with_credential_id".to_string(),
+                self.lookup_anchor_and_pubkey_with_credential_id_memory_wrapper
                     .size(),
             ),
         ])

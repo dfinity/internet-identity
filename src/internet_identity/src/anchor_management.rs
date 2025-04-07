@@ -1,16 +1,17 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::TentativeDeviceRegistration;
+use crate::state::{storage_borrow_mut, TentativeDeviceRegistration};
 use crate::storage::anchor::{Anchor, AnchorError, Device};
+use crate::storage::DiscoverableCredentialData;
 use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
-    IdentityAnchorInfo, MetadataEntry,
+    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceRegistrationInfo,
+    DeviceWithUsage, IdentityAnchorInfo, MetadataEntry, PublicKey,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -234,6 +235,31 @@ pub fn update_openid_credential(
 /// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
+}
+
+/// Lookup `AnchorNumber` and `PublicKey` for the given `CredentialId`.
+pub fn lookup_anchor_number_and_pubkey_with_credential_id(
+    credential_id: &CredentialId,
+) -> Option<DiscoverableCredentialData> {
+    storage_borrow(|storage| {
+        storage.lookup_anchor_number_and_pubkey_with_credential_id(credential_id)
+    })
+}
+
+/// Store `AnchorNumber` and `PublicKey` for the given `CredentialId`.
+// TODO: this is still dead code, needs to be added to the registration finish.
+pub fn store_anchor_number_and_pubkey_with_credential_id(
+    credential_id: &CredentialId,
+    anchor_number: AnchorNumber,
+    pubkey: PublicKey,
+) -> Option<DiscoverableCredentialData> {
+    storage_borrow_mut(|storage| {
+        storage.store_anchor_number_and_pubkey_with_credential_id(
+            credential_id,
+            anchor_number,
+            pubkey,
+        )
+    })
 }
 
 #[test]
