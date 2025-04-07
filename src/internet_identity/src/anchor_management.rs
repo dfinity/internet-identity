@@ -164,6 +164,7 @@ pub fn replace_device(
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
 
     state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &old_device));
+
     Operation::ReplaceDevice {
         old_device,
         new_device: DeviceDataWithoutAlias::from(new_device),
@@ -247,7 +248,6 @@ pub fn lookup_anchor_number_and_pubkey_with_credential_id(
 }
 
 /// Store `AnchorNumber` and `PublicKey` for the given `CredentialId`.
-// TODO: this is still dead code, needs to be added to the registration finish.
 pub fn store_anchor_number_and_pubkey_with_credential_id(
     credential_id: &CredentialId,
     anchor_number: AnchorNumber,

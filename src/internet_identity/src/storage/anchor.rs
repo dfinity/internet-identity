@@ -7,6 +7,7 @@ use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -480,6 +481,17 @@ pub struct Device {
     pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
+impl Ord for Device {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.credential_id.cmp(&other.credential_id)
+    }
+}
+
+impl PartialOrd for Device {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 impl Device {
     pub fn variable_fields_len(&self) -> usize {
         self.alias.len()

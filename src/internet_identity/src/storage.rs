@@ -79,6 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
+use anchor::Device;
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -297,8 +298,6 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_and_pubkey_with_credential_id_memory =
             memory_manager.get(LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID);
-        let lookup_anchor_and_pubkey_with_credential_id_memory =
-            memory_manager.get(LOOKUP_ANCHOR_AND_PUBKEY_WITH_CREDENTIAL_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -422,6 +421,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();
+        let previous_anchor = self.read(anchor_number)?;
 
         // Write fixed 4KB anchor
         let buf = storable_anchor.to_bytes();
@@ -453,6 +453,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             previous_openid_credentials,
             current_openid_credentials,
+        );
+        self.update_lookup_anchor_number_and_pubkey_with_credential_id(
+            anchor_number,
+            previous_anchor.devices().clone(),
+            storable_anchor.devices,
         );
 
         Ok(())
@@ -536,6 +541,35 @@ impl<M: Memory + Clone> Storage<M> {
                 credential_id.clone().into(),
                 DiscoverableCredentialData::new(anchor_number, pubkey),
             )
+    }
+
+    fn update_lookup_anchor_number_and_pubkey_with_credential_id(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Vec<Device>,
+        current: Vec<Device>,
+    ) {
+        let previous_set: BTreeSet<Device> = previous
+            .into_iter()
+            .filter(|dev| dev.credential_id.is_some())
+            .collect();
+        let current_set: BTreeSet<Device> = current
+            .into_iter()
+            .filter(|dev| dev.credential_id.is_some())
+            .collect();
+        let credential_to_be_removed = previous_set.difference(&current_set);
+        let credential_to_be_added = current_set.difference(&previous_set);
+        credential_to_be_removed.cloned().for_each(|key| {
+            self.lookup_anchor_and_pubkey_with_credential_id_memory
+                .remove(&key.credential_id.unwrap().into());
+        });
+        credential_to_be_added.cloned().for_each(|key| {
+            self.lookup_anchor_and_pubkey_with_credential_id_memory
+                .insert(
+                    key.credential_id.unwrap().into(),
+                    DiscoverableCredentialData::new(anchor_number, key.pubkey).into(),
+                );
+        });
     }
 
     /// Make sure all the required metadata is recorded to stable memory.

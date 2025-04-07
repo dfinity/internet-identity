@@ -215,18 +215,16 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
 
-            match &id_reg_finish_arg.authn_method.authn_method {
-                AuthnMethod::WebAuthn(WebAuthn {
-                    pubkey,
+            if let AuthnMethod::WebAuthn(WebAuthn {
+                pubkey,
+                credential_id,
+            }) = &id_reg_finish_arg.authn_method.authn_method
+            {
+                store_anchor_number_and_pubkey_with_credential_id(
                     credential_id,
-                }) => {
-                    store_anchor_number_and_pubkey_with_credential_id(
-                        credential_id,
-                        identity.anchor_number(),
-                        pubkey.clone(),
-                    );
-                }
-                _ => {}
+                    identity.anchor_number(),
+                    pubkey.clone(),
+                );
             }
 
             Operation::RegisterAnchor {
