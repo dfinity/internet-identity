@@ -7,11 +7,7 @@
   } from "$lib/utils/iiConnection";
   import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
   import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
-  import {
-    DelegationChain,
-    DelegationIdentity,
-    ECDSAKeyIdentity,
-  } from "@dfinity/identity";
+  import { ECDSAKeyIdentity } from "@dfinity/identity";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import Flow from "$lib/components/Flow.svelte";
   import { renderManage } from "$lib/flows/manage";
@@ -32,10 +28,16 @@
       extractable: false,
     });
     await connection.identity_registration_start({ tempIdentity });
-    const rpId =
-      origin === window.location.origin ? undefined : new URL(origin).hostname;
+    const displayName = prompt("Account name?") ?? "Internet Identity";
     const identity = await DiscoverablePasskeyIdentity.create({
-      publicKey: creationOptions([], undefined, rpId),
+      publicKey: {
+        ...creationOptions([], undefined, undefined),
+        user: {
+          id: window.crypto.getRandomValues(new Uint8Array(16)),
+          name: displayName,
+          displayName,
+        },
+      },
     });
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
@@ -46,7 +48,7 @@
     });
     const deviceOrigin = window.location.origin;
     const result = await connection.identity_registration_finish({
-      name: prompt("Account name?") ?? undefined,
+      name: displayName,
       tempIdentity,
       identity,
       authnMethod: passkeyAuthnMethodData({
@@ -64,11 +66,9 @@
   };
   const continueWithPasskey = async () => {
     let anchorNumber: UserNumber;
-    const rpId =
-      origin === window.location.origin ? undefined : new URL(origin).hostname;
     const passkeyIdentity = new DiscoverablePasskeyIdentity({
       credentialRequestOptions: {
-        publicKey: creationOptions([], undefined, rpId),
+        publicKey: creationOptions([], undefined, undefined),
       },
       getPublicKey: async (result) => {
         const lookupResult = await connection.getPubKeyByCredentialId(
