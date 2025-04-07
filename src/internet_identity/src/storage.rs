@@ -531,14 +531,11 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         pubkey: PublicKey,
     ) -> Option<DiscoverableCredentialData> {
-        let result = self
-            .lookup_anchor_and_pubkey_with_credential_id_memory
+        self.lookup_anchor_and_pubkey_with_credential_id_memory
             .insert(
                 credential_id.clone().into(),
                 DiscoverableCredentialData::new(anchor_number, pubkey),
-            );
-
-        result
+            )
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
