@@ -154,7 +154,8 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
         Anchor {
             anchor_number,
             devices: storable_anchor.devices,
-            openid_credentials: stable_anchor.clone()
+            openid_credentials: stable_anchor
+                .clone()
                 .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
@@ -378,10 +379,7 @@ impl Anchor {
         Ok(())
     }
 
-    pub fn set_name(
-        &mut self,
-        name: Option<String>,
-    ) -> Result<(), AnchorError> {
+    pub fn set_name(&mut self, name: Option<String>) -> Result<(), AnchorError> {
         self.name = name;
         Ok(())
     }
