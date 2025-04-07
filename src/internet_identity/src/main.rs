@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use storage::{Salt, Storage};
+use storage::{DiscoverableCredentialData, Salt, Storage};
 
 mod anchor_management;
 mod archive;
@@ -902,6 +902,21 @@ mod openid_api {
             Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
+    }
+}
+
+/// API required for the discoverable credentials flow
+mod discoverable_credentials {
+    use crate::anchor_management::lookup_anchor_number_and_pubkey_with_credential_id;
+    use crate::DiscoverableCredentialData;
+    use ic_cdk::query;
+    use internet_identity_interface::internet_identity::types::CredentialId;
+
+    #[query]
+    fn get_discoverable_credential_data(
+        credential_id: CredentialId,
+    ) -> Option<DiscoverableCredentialData> {
+        lookup_anchor_number_and_pubkey_with_credential_id(&credential_id)
     }
 }
 
