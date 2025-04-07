@@ -916,7 +916,7 @@ mod discoverable_credentials {
     use internet_identity_interface::internet_identity::types::CredentialId;
 
     #[query]
-    fn get_discoverable_credential_data(
+    fn get_pubkey_by_credential_id(
         credential_id: CredentialId,
     ) -> Option<DiscoverableCredentialData> {
         lookup_anchor_number_and_pubkey_with_credential_id(&credential_id)
