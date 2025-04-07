@@ -305,6 +305,8 @@ type IdentityAnchorInfo = record {
     device_registration : opt DeviceRegistrationInfo;
     // OpenID accounts linked to this anchor
     openid_credentials : opt vec OpenIdCredential;
+    // Your nickname
+    name : opt text;
 };
 
 type AnchorCredentials = record {
@@ -389,6 +391,7 @@ type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
     expiration : Timestamp;
     anchor_number : UserNumber;
+    name : opt text;
 };
 
 // API V2 specific types
@@ -458,8 +461,9 @@ type AuthnMethodData = record {
 };
 
 type OpenIDRegFinishArg = record {
-    jwt: JWT;
-    salt: Salt;
+    jwt : JWT;
+    salt : Salt;
+    name : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -652,6 +656,7 @@ type CheckCaptchaError = variant {
 
 type IdRegFinishArg = record {
     authn_method : AuthnMethodData;
+    name : opt text;
 };
 
 type IdRegFinishResult = record {
