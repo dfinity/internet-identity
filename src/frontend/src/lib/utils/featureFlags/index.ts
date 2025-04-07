@@ -3,6 +3,7 @@ const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
   HARDWARE_KEY_TEST: false,
+  DISCOVERABLE_PASSKEY_FLOW: true,
 } as const satisfies Record<string, boolean>;
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -52,26 +53,49 @@ export class FeatureFlag {
 }
 
 // Initialize feature flags with values from localstorage
-const initializedFeatureFlags = Object.fromEntries(
-  Object.entries(FEATURE_FLAGS_WITH_DEFAULTS).map(([key, defaultValue]) => [
-    key,
-    new FeatureFlag(
-      window.localStorage,
-      LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-      defaultValue,
-    ),
-  ]),
-);
+let initializedFeatureFlags: Record<string, FeatureFlag> = {};
 
-// Make feature flags configurable from browser console
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.__featureFlags = initializedFeatureFlags;
+export const initFeatureFlags = () => {
+  initializedFeatureFlags = Object.fromEntries(
+    Object.entries(FEATURE_FLAGS_WITH_DEFAULTS).map(([key, defaultValue]) => [
+      key,
+      new FeatureFlag(
+        globalThis.window.localStorage,
+        LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
+        defaultValue,
+      ),
+    ]),
+  );
+  console.log("initializedFeatureFlags", initializedFeatureFlags);
 
-// Export initialized feature flags as named exports
+  // Make feature flags configurable from browser console
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.__featureFlags = initializedFeatureFlags;
+};
+
+// Export initialized feature flags as named exports,
+// uses proxies since the values aren't initialized yet.
 export const {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
-} = initializedFeatureFlags;
-export default initializedFeatureFlags;
+  DISCOVERABLE_PASSKEY_FLOW,
+} = new Proxy(initializedFeatureFlags!, {
+  get(_, flag) {
+    return new Proxy(
+      {},
+      {
+        get(_, prop) {
+          const target = initializedFeatureFlags[flag as string];
+          const value = Reflect.get(target, prop, target);
+          if (typeof value === "function") {
+            return value.bind(target);
+          }
+          return value;
+        },
+      },
+    );
+  },
+});
+export default initializedFeatureFlags!;

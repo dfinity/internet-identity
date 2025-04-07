@@ -1,9 +1,18 @@
-import { ServerInit } from "@sveltejs/kit";
-import featureFlags from "$lib/utils/featureFlags";
+import { Reroute, ServerInit } from "@sveltejs/kit";
+import featureFlags, {
+  DISCOVERABLE_PASSKEY_FLOW,
+  initFeatureFlags,
+} from "$lib/utils/featureFlags";
+import { nonNullish } from "@dfinity/utils";
+import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
+import { WEBAUTHN_IFRAME_PATH } from "$lib/flows/iframeWebAuthn";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
 export const init: ServerInit = () => {
+  // Initialize feature flags before any other code runs.
+  initFeatureFlags();
+
   // Override feature flags based on search params before any other code
   // including other hooks runs that might depend on these feature flags.
   //
