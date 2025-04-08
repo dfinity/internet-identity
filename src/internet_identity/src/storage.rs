@@ -416,6 +416,12 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Writes the data of the specified anchor to stable memory.
+    ///
+    /// It's not possible to know if an anchor has been written before,
+    /// but we need to know this to safely read the previous anchor.
+    ///
+    /// Therefore, this information is passed as an additional argument,
+    /// this argument can be removed once `anchor_memory` is removed.
     pub fn write(&mut self, data: Anchor, is_previously_written: bool) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();

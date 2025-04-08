@@ -243,7 +243,7 @@ fn should_write_and_update_device_credential_lookup() {
 
     // Check if device credential lookup is cleaned up from storage when anchor is written
     anchor.remove_device(&device_0.pubkey).unwrap();
-    storage.write(anchor.clone(), false).unwrap();
+    storage.write(anchor.clone(), true).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
         None
@@ -257,7 +257,7 @@ fn should_write_and_update_device_credential_lookup() {
 
     // Check if device credential lookup is written to storage when anchor is written
     anchor.add_device(device_2.clone()).unwrap();
-    storage.write(anchor.clone(), false).unwrap();
+    storage.write(anchor.clone(), true).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
         None
