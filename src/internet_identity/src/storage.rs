@@ -415,11 +415,6 @@ impl<M: Memory + Clone> Storage<M> {
         Some(Anchor::new(anchor_number))
     }
 
-    /// Check if an Identity Anchor is allocated
-    pub fn anchor_is_allocated(&mut self, anchor_number: AnchorNumber) -> bool {
-        anchor_number < self.header.id_range_lo + self.header.num_anchors as u64
-    }
-
     /// Writes the data of the specified anchor to stable memory.
     pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
