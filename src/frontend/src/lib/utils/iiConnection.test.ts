@@ -4,7 +4,8 @@ import type {
   MetadataMapV2,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
+import featureFlags from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
@@ -104,7 +105,7 @@ beforeEach(async () => {
   vi.stubGlobal("location", {
     origin: currentOrigin,
   });
-  DOMAIN_COMPATIBILITY.reset();
+  get(featureFlags).DOMAIN_COMPATIBILITY.reset();
 });
 
 test("initializes identity metadata repository", async () => {
@@ -201,7 +202,7 @@ describe("Connection.login", () => {
 
   describe("domains compatibility flag enabled and browser support", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(true);
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
@@ -355,7 +356,7 @@ describe("Connection.login", () => {
 
   describe("domains compatibility flag enabled and browser doesn't support", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(true);
       vi.stubGlobal("navigator", {
         // Does NOT Supports RoR
         userAgent:
@@ -384,7 +385,7 @@ describe("Connection.login", () => {
 
   describe("domains compatibility flag disabled", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(false);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(false);
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
@@ -462,7 +463,7 @@ describe("Connection.login", () => {
 
   describe("domains compatibility flag disabled", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(false);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(false);
       vi.stubGlobal("navigator", {
         // Supports RoR
         userAgent:
