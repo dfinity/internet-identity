@@ -305,6 +305,8 @@ type IdentityAnchorInfo = record {
     device_registration : opt DeviceRegistrationInfo;
     // OpenID accounts linked to this anchor
     openid_credentials : opt vec OpenIdCredential;
+    // Your nickname
+    name : opt text;
 };
 
 type AnchorCredentials = record {
@@ -389,6 +391,7 @@ type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
     expiration : Timestamp;
     anchor_number : UserNumber;
+    name : opt text;
 };
 
 // API V2 specific types
@@ -458,8 +461,9 @@ type AuthnMethodData = record {
 };
 
 type OpenIDRegFinishArg = record {
-    jwt: JWT;
-    salt: Salt;
+    jwt : JWT;
+    salt : Salt;
+    name : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -509,6 +513,7 @@ type IdentityInfo = record {
     openid_credentials : opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata : MetadataMapV2;
+    name : opt text;
 };
 
 type IdentityInfoError = variant {
@@ -652,6 +657,7 @@ type CheckCaptchaError = variant {
 
 type IdRegFinishArg = record {
     authn_method : AuthnMethodData;
+    name : opt text;
 };
 
 type IdRegFinishResult = record {
@@ -804,4 +810,7 @@ service : (opt InternetIdentityInit) -> {
     // Only callable by this IIs archive canister.
     fetch_entries : () -> (vec BufferedArchiveEntry);
     acknowledge_entries : (sequence_number : nat64) -> ();
+
+    // Prototype Methods
+    get_pubkey_by_credential_id : (credential_id : blob) -> (opt record { anchor_number : UserNumber; pubkey: PublicKey });
 };

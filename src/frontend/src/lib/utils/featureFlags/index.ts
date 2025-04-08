@@ -3,6 +3,7 @@ const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
   HARDWARE_KEY_TEST: false,
+  DISCOVERABLE_PASSKEY_FLOW: false,
 } as const satisfies Record<string, boolean>;
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -73,5 +74,6 @@ export const {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
+  DISCOVERABLE_PASSKEY_FLOW,
 } = initializedFeatureFlags;
 export default initializedFeatureFlags;
