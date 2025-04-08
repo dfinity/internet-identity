@@ -7,7 +7,7 @@ import type { FeatureFlag } from "$lib/utils/featureFlags/index.js";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
-export const load = ({ url }) => {
+export const load = ({ url }: { url: URL }) => {
   // Override feature flags based on search params before any other code
   // including other hooks runs that might depend on these feature flags.
   //
