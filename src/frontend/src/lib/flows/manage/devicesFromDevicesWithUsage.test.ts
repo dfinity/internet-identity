@@ -2,7 +2,8 @@ import type {
   DeviceWithUsage,
   PublicKey,
 } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
+import featureFlags from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { devicesFromDevicesWithUsage } from "./index";
@@ -18,7 +19,7 @@ describe("devicesFromDevicesWithUsage", () => {
       userAgent:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
     });
-    DOMAIN_COMPATIBILITY.reset();
+    get(featureFlags).DOMAIN_COMPATIBILITY.reset();
   });
 
   const currentDevicePubKey = new Uint8Array([1]);
@@ -43,7 +44,7 @@ describe("devicesFromDevicesWithUsage", () => {
 
   describe("domains compatibility flag disabled", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(false);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(false);
     });
 
     it("returns warning icon in the device in different origin als current", () => {
@@ -70,7 +71,7 @@ describe("devicesFromDevicesWithUsage", () => {
 
   describe("domains compatibility flag enabled", () => {
     beforeEach(() => {
-      DOMAIN_COMPATIBILITY.set(true);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(true);
     });
 
     it("returns isCurrent as expected", () => {

@@ -1,5 +1,6 @@
 import type { DeviceData } from "$lib/generated/internet_identity_types";
-import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
+import featureFlags from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import { domainWarning } from "$lib/flows/manage";
 
 const recoveryPhrase: DeviceData = {
@@ -34,7 +35,7 @@ describe("recovery phrases don't have origin warnings", () => {
         origin: "https://identity.ic0.app",
       });
       // domainWarning is used only when DOMAIN_COMPATIBILITY is false
-      DOMAIN_COMPATIBILITY.set(false);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(false);
     });
 
     it("returns undefined for recovery phrase", () => {
@@ -71,7 +72,7 @@ describe("recovery phrases don't have origin warnings", () => {
         origin: "https://identity.internetcomputer.org",
       });
       // domainWarning is used only when DOMAIN_COMPATIBILITY is false
-      DOMAIN_COMPATIBILITY.set(false);
+      get(featureFlags).DOMAIN_COMPATIBILITY.set(false);
     });
 
     it("undefined for recovery phrase", () => {

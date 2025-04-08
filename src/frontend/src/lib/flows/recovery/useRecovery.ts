@@ -1,7 +1,8 @@
 import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
+import featureFlags from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
@@ -132,7 +133,8 @@ const enrollAuthenticator = async ({
     const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
       const newDeviceOrigin =
-        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() &&
+        get(featureFlags).DOMAIN_COMPATIBILITY.isEnabled()
           ? getCredentialsOrigin({
               credentials: devices,
             })

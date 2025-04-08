@@ -35,10 +35,8 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
-import {
-  DOMAIN_COMPATIBILITY,
-  HARDWARE_KEY_TEST,
-} from "$lib/utils/featureFlags";
+import { get } from "svelte/store";
+import featureFlags from "$lib/state/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
@@ -495,7 +493,7 @@ export class Connection {
       return { kind: "pinUserOtherDomain" };
     }
 
-    if (HARDWARE_KEY_TEST.isEnabled()) {
+    if (get(featureFlags).HARDWARE_KEY_TEST.isEnabled()) {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
@@ -518,7 +516,10 @@ export class Connection {
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
-    if (isNullish(this.webAuthFlows) && DOMAIN_COMPATIBILITY.isEnabled()) {
+    if (
+      isNullish(this.webAuthFlows) &&
+      get(featureFlags).DOMAIN_COMPATIBILITY.isEnabled()
+    ) {
       const flows = findWebAuthnFlows({
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
