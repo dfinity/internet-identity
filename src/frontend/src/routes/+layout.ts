@@ -1,18 +1,16 @@
-import { browser } from "$app/environment";
-import initializedFeatureFlags from "$lib/utils/featureFlags";
-
 export const ssr = false;
 export const prerender = true;
 
 import featureFlags from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import type { FeatureFlag } from "$lib/utils/featureFlags/index.js";
+import { goto } from "$app/navigation";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
 export const load = ({ url }: { url: URL }) => {
   // Override feature flags based on search params before any other code
-  // including other hooks runs that might depend on these feature flags.
+  // runs that might depend on these feature flags.
   //
   // Example: ?feature_flag_openid_authentication=true
   for (const [key, value] of url.searchParams.entries()) {
@@ -42,5 +40,13 @@ export const load = ({ url }: { url: URL }) => {
   //
   // SvelteKit will log a warning to the console here in dev mode since we're
   // not using the method supplied by SvelteKit, this can be safely ignored.
-  window.history.replaceState(undefined, "", url);
+  window.history.replaceState({}, "", url);
+
+  console.log(get(featureFlags).DISCOVERABLE_PASSKEY_FLOW.isEnabled());
+  if (
+    url.pathname === "/" &&
+    get(featureFlags).DISCOVERABLE_PASSKEY_FLOW.isEnabled()
+  ) {
+    goto("/authenticate", { replaceState: true });
+  }
 };

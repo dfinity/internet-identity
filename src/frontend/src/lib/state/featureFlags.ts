@@ -5,12 +5,14 @@ interface FeatureFlags {
   DOMAIN_COMPATIBILITY: FeatureFlag;
   OPENID_AUTHENTICATION: FeatureFlag;
   HARDWARE_KEY_TEST: FeatureFlag;
+  DISCOVERABLE_PASSKEY_FLOW: FeatureFlag;
 }
 
 const FEATURE_FLAGS_WITH_DEFAULTS = {
   DOMAIN_COMPATIBILITY: true,
   OPENID_AUTHENTICATION: false,
   HARDWARE_KEY_TEST: false,
+  DISCOVERABLE_PASSKEY_FLOW: false,
 } as const satisfies Record<string, boolean>;
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -18,6 +20,7 @@ const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 const featureFlags = readable<FeatureFlags>(undefined, (set) => {
   // We cannot use browser because this is also imported in our showcase
   if (typeof window === "undefined") return;
+  console.log("initializing");
 
   // Initialize feature flags with values from localstorage
   const initializedFeatureFlags = Object.fromEntries(

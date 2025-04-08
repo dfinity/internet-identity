@@ -1,10 +1,12 @@
 <script lang="ts">
   import { readCanisterConfig } from "$lib/utils/init";
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
+  import { replaceState } from "$app/navigation";
 
-  const { children } = $props();
+  const { children, data } = $props();
 
   const canisterConfig = readCanisterConfig();
+
   initAnalytics(canisterConfig.analytics_config[0]?.[0]);
   analytics.pageView();
 </script>
