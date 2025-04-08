@@ -428,8 +428,9 @@ impl<M: Memory + Clone> Storage<M> {
         let mut reader = Reader::new(&self.anchor_memory, address);
         let mut read_buf = vec![0; self.header.entry_size as usize];
         let _previous_storable_anchor = reader
-            .read(&mut read_buf)
-            .map(|_| StorableAnchor::from_bytes(Cow::Owned(read_buf)));
+            .read_exact(&mut read_buf)
+            .ok()
+            .map(|()| StorableAnchor::from_bytes(Cow::Owned(read_buf)));
 
         // Write current fixed 4KB stable memory anchor
         let write_buf = storable_anchor.to_bytes();
