@@ -64,6 +64,7 @@
     }
     authenticatedConnection = result.connection;
   };
+
   const continueWithPasskey = async () => {
     let anchorNumber: UserNumber;
     const passkeyIdentity = new DiscoverablePasskeyIdentity({
@@ -87,6 +88,7 @@
     );
     authenticatedConnection = result.connection;
   };
+
   const continueWithGoogle = () => {};
 </script>
 

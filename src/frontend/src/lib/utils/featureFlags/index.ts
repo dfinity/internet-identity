@@ -66,7 +66,6 @@ export const initFeatureFlags = () => {
       ),
     ]),
   );
-  console.log("initializedFeatureFlags", initializedFeatureFlags);
 
   // Make feature flags configurable from browser console
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
