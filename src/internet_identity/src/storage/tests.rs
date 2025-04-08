@@ -201,6 +201,81 @@ fn should_write_and_update_openid_credential_lookup() {
     );
 }
 
+#[test]
+fn should_write_and_update_device_credential_lookup() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut anchor = storage.allocate_anchor().unwrap();
+    let device_0 = Device {
+        pubkey: ByteBuf::from(vec![0]),
+        credential_id: Some(ByteBuf::from(vec![0])),
+        ..sample_device()
+    };
+    let device_1 = Device {
+        pubkey: ByteBuf::from(vec![1]),
+        credential_id: Some(ByteBuf::from(vec![1])),
+        ..sample_device()
+    };
+    let device_2 = Device {
+        pubkey: ByteBuf::from(vec![2]),
+        credential_id: Some(ByteBuf::from(vec![2])),
+        ..sample_device()
+    };
+    anchor.add_device(device_0.clone()).unwrap();
+    anchor.add_device(device_1.clone()).unwrap();
+
+    // Check if both anchor and device credential lookups are written to storage
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
+    // Check if device credential lookup is cleaned up from storage when anchor is written
+    anchor.remove_device(&device_0.pubkey).unwrap();
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
+    // Check if device credential lookup is written to storage when anchor is written
+    anchor.add_device(device_2.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_2.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
