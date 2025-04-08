@@ -416,7 +416,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Writes the data of the specified anchor to stable memory.
-    pub fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
+    pub fn write(&mut self, data: Anchor, is_previously_written: bool) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();
 
@@ -425,12 +425,14 @@ impl<M: Memory + Clone> Storage<M> {
         let address = self.record_address(record_number);
 
         // Read previous fixed 4KB stable memory anchor
-        let mut reader = Reader::new(&self.anchor_memory, address);
-        let mut read_buf = vec![0; self.header.entry_size as usize];
-        let _previous_storable_anchor = reader
-            .read_exact(&mut read_buf)
-            .ok()
-            .map(|()| StorableAnchor::from_bytes(Cow::Owned(read_buf)));
+        let previous_storable_anchor = is_previously_written.then(|| {
+            let mut reader = Reader::new(&self.anchor_memory, address);
+            let mut read_buf = vec![0; self.header.entry_size as usize];
+            reader
+                .read_exact(&mut read_buf)
+                .expect("failed to read memory");
+            StorableAnchor::from_bytes(Cow::Owned(read_buf))
+        });
 
         // Write current fixed 4KB stable memory anchor
         let write_buf = storable_anchor.to_bytes();
@@ -461,7 +463,7 @@ impl<M: Memory + Clone> Storage<M> {
         );
 
         // Update `CredentialId` to `AnchorNumber` lookup map
-        let previous_devices = vec![]; //previous_storable_anchor.map_or(vec![], |anchor| anchor.devices);
+        let previous_devices = previous_storable_anchor.map_or(vec![], |anchor| anchor.devices);
         let current_devices = storable_anchor.devices;
         self.update_lookup_anchors_with_device_credential(
             anchor_number,

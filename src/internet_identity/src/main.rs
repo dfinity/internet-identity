@@ -868,7 +868,7 @@ mod openid_api {
         let mut anchor = state::anchor(anchor_number);
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
-        state::storage_borrow_mut(|storage| storage.write(anchor))
+        state::storage_borrow_mut(|storage| storage.write(anchor, true))
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
         let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
