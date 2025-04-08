@@ -15,7 +15,7 @@ const FEATURE_FLAGS_WITH_DEFAULTS = {
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 
-const featureFlags = readable<FeatureFlags>(undefined, (set) => {
+const featureFlags = readable<FeatureFlags>(undefined, (_set, update) => {
   // We cannot use browser because this is also imported in our showcase
   if (typeof window === "undefined") return;
 
@@ -35,7 +35,12 @@ const featureFlags = readable<FeatureFlags>(undefined, (set) => {
   // @ts-ignore
   window.__featureFlags = initializedFeatureFlags;
   // Set the initial values
-  set(initializedFeatureFlags as unknown as FeatureFlags);
+  // set(initializedFeatureFlags as unknown as FeatureFlags);
+  update((flags: FeatureFlags | undefined) =>
+    flags !== undefined
+      ? flags
+      : (initializedFeatureFlags as unknown as FeatureFlags),
+  );
 });
 
 export default featureFlags;
