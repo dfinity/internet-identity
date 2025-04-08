@@ -233,13 +233,19 @@ pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
 
-/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
-pub fn set_anchor_name(
+/// Set `name` of the given anchor.
+/// Return an error if the `name` to be updated is too long.
+pub fn add_anchor_name(
     anchor: &mut Anchor,
     name: Option<String>,
 ) -> Result<Operation, AnchorError> {
-    anchor.set_name(name)?;
-    Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
+    let previous_name = anchor.name();
+    anchor.set_name(name.clone())?;
+    Ok(match (previous_name, name) {
+        (None, Some(_)) => Operation::AddName,
+        (Some(_), None) => Operation::RemoveName,
+        _ => Operation::UpdateName,
+    })
 }
 
 #[test]

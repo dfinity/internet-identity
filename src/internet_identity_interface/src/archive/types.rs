@@ -40,8 +40,12 @@ pub enum Operation {
     RegisterAnchorWithOpenIdCredential { iss: String },
 
     // Account name, set for new users in new discoverable passkeys flow
-    #[serde(rename = "set_name")]
-    SetName,
+    #[serde(rename = "add_name")]
+    AddName,
+    #[serde(rename = "update_name")]
+    UpdateName,
+    #[serde(rename = "remove_name")]
+    RemoveName,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
