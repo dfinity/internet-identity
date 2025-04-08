@@ -1,4 +1,3 @@
-use crate::openid::OpenIdCredentialKey;
 use candid::CandidType;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
