@@ -233,6 +233,15 @@ pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
 
+/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
+pub fn set_anchor_name(
+    anchor: &mut Anchor,
+    name: Option<String>,
+) -> Result<Operation, AnchorError> {
+    anchor.set_name(name)?;
+    Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
+}
+
 #[test]
 fn should_register_openid_credential_only_for_a_single_anchor() {
     use crate::state::{storage_borrow_mut, storage_replace};

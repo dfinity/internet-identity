@@ -23,6 +23,7 @@ pub struct Anchor {
     devices: Vec<Device>,
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
+    name: Option<String>,
 }
 
 impl Device {
@@ -136,6 +137,7 @@ impl From<Anchor> for (StorableAnchor, StableAnchor) {
             },
             StableAnchor {
                 openid_credentials: anchor.openid_credentials,
+                name: anchor.name,
             },
         )
     }
@@ -153,9 +155,11 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
             anchor_number,
             devices: storable_anchor.devices,
             openid_credentials: stable_anchor
+                .clone()
                 .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
+            name: stable_anchor.and_then(|anchor| anchor.name),
         }
     }
 }
@@ -169,6 +173,7 @@ impl Anchor {
             devices: vec![],
             openid_credentials: vec![],
             metadata: None,
+            name: None,
         }
     }
 
@@ -432,6 +437,21 @@ impl Anchor {
         check_anchor_invariants(&self.devices[..], &metadata)?;
         self.metadata = metadata;
         Ok(())
+    }
+
+    pub fn set_name(&mut self, name: Option<String>) -> Result<(), AnchorError> {
+        const MAX_NAME_LENGTH: usize = 128;
+        if name.as_ref().is_some_and(|n| n.len() > MAX_NAME_LENGTH) {
+            return Err(AnchorError::NameTooLong {
+                limit: MAX_NAME_LENGTH,
+            });
+        }
+        self.name = name;
+        Ok(())
+    }
+
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 }
 
@@ -722,6 +742,9 @@ pub enum AnchorError {
     ReservedMetadataKey {
         key: String,
     },
+    NameTooLong {
+        limit: usize,
+    },
 }
 
 impl fmt::Display for AnchorError {
@@ -759,6 +782,7 @@ impl fmt::Display for AnchorError {
             AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
             AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
+            AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
         }
     }
 }
