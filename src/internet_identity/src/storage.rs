@@ -425,12 +425,12 @@ impl<M: Memory + Clone> Storage<M> {
         let address = self.record_address(record_number);
 
         // Read previous fixed 4KB stable memory anchor
-        // let mut reader = Reader::new(&self.anchor_memory, address);
-        // let mut read_buf = vec![0; self.header.entry_size as usize];
-        // let previous_storable_anchor = reader
-        //     .read_exact(&mut read_buf)
-        //     .ok()
-        //     .map(|()| StorableAnchor::from_bytes(Cow::Owned(read_buf)));
+        let mut reader = Reader::new(&self.anchor_memory, address);
+        let mut read_buf = vec![0; self.header.entry_size as usize];
+        let _previous_storable_anchor = reader
+            .read_exact(&mut read_buf)
+            .ok()
+            .map(|()| StorableAnchor::from_bytes(Cow::Owned(read_buf)));
 
         // Write current fixed 4KB stable memory anchor
         let write_buf = storable_anchor.to_bytes();
