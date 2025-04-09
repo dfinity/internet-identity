@@ -1,50 +1,49 @@
+import { type Writable, get } from "svelte/store";
+
 export class FeatureFlag {
   readonly #storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
   readonly #key: string;
   readonly #defaultValue: boolean;
-  readonly #set: (setArg: boolean) => void;
-  readonly #get: () => boolean;
+  readonly #store: Writable<boolean>;
 
   constructor(
     storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
     key: string,
     defaultValue: boolean,
-    set: (setArg: boolean) => void,
-    get: () => boolean,
+    store: Writable<boolean>,
   ) {
     this.#storage = storage;
     this.#key = key;
     this.#defaultValue = defaultValue;
-    this.#set = set;
-    this.#get = get;
+    this.#store = store;
 
     const storedValue = this.#storage.getItem(this.#key);
     try {
-      set(
+      this.#store.set(
         storedValue === null
           ? this.#defaultValue
           : Boolean(JSON.parse(storedValue)),
       );
     } catch {
-      set(this.#defaultValue);
+      this.#store.set(this.#defaultValue);
     }
   }
 
   isEnabled(): boolean {
-    return this.#get();
+    return get(this.#store);
   }
 
   set(value: boolean) {
-    this.#set(Boolean(value));
-    this.#storage.setItem(this.#key, JSON.stringify(this.#get()));
+    this.#store.set(Boolean(value));
+    this.#storage.setItem(this.#key, JSON.stringify(get(this.#store)));
   }
 
   reset(): void {
-    this.#set(this.#defaultValue);
+    this.#store.set(this.#defaultValue);
     this.#storage.removeItem(this.#key);
   }
 
   temporaryOverride(value: boolean) {
-    this.#set(Boolean(value));
+    this.#store.set(Boolean(value));
   }
 }

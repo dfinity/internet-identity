@@ -29,24 +29,13 @@ const createFeatureFlagStore = (
     };
   }
 
-  // define getter function to pass to flag object
-  const get = () => {
-    let value: boolean = false;
-    update((oldVal) => {
-      value = oldVal;
-      return oldVal;
-    });
-    return value;
-  };
-
   // Initialize feature flag object with value from localstorage
 
   const initializedFeatureFlag: FeatureFlag = new FeatureFlag(
     window.localStorage,
     LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
     defaultValue,
-    set,
-    get,
+    { subscribe, set, update },
   );
 
   // Make feature flags configurable from browser console
