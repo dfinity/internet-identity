@@ -1,7 +1,5 @@
 import type { ServerInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
-import type { FeatureFlag } from "$lib/utils/featureFlags";
-import { get } from "svelte/store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 

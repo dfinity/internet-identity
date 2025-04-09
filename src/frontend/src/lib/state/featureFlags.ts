@@ -1,4 +1,4 @@
-import { Updater, writable, type Writable } from "svelte/store";
+import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
 
 declare global {
@@ -52,7 +52,7 @@ const createFeatureFlagStore = (
   // Make feature flags configurable from browser console
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  if (!window.__featureFlags) {
+  if (typeof window.__featureFlags === "undefined") {
     window.__featureFlags = {};
   }
   window.__featureFlags[name] = initializedFeatureFlag;

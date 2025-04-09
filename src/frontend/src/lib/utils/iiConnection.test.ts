@@ -4,8 +4,7 @@ import type {
   MetadataMapV2,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
-import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
-import { get } from "svelte/store";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import {
   IdentityMetadata,
   RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
