@@ -394,7 +394,6 @@ type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
     expiration : Timestamp;
     anchor_number : UserNumber;
-    name : opt text;
 };
 
 // API V2 specific types
@@ -466,7 +465,6 @@ type AuthnMethodData = record {
 type OpenIDRegFinishArg = record {
     jwt : JWT;
     salt : Salt;
-    name : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -516,7 +514,6 @@ type IdentityInfo = record {
     openid_credentials : opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata : MetadataMapV2;
-    name : opt text;
 };
 
 type IdentityInfoError = variant {
@@ -660,7 +657,6 @@ type CheckCaptchaError = variant {
 
 type IdRegFinishArg = record {
     authn_method : AuthnMethodData;
-    name : opt text;
 };
 
 type IdRegFinishResult = record {
