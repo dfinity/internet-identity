@@ -1,5 +1,5 @@
-import { ServerInit } from "@sveltejs/kit";
-import featureFlags from "$lib/utils/featureFlags";
+import type { ServerInit } from "@sveltejs/kit";
+import featureFlags from "$lib/state/featureFlags";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -22,11 +22,10 @@ export const init: ServerInit = () => {
         );
         continue;
       }
-      featureFlags[flag]?.temporaryOverride(value === "true");
+      featureFlags[flag]?.set(value === "true");
       url.searchParams.delete(key);
     }
   }
-
   // After a feature flag override has been processed, it's removed from the url
   // to avoid confusing users with unexpected information they don't understand.
   //
