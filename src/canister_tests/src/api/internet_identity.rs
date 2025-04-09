@@ -3,7 +3,7 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types::{
-    self, IdentityNumber, OpenIdCredentialKey,
+    self, CredentialId, DeviceKeyWithAnchor, IdentityNumber, OpenIdCredentialKey,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
@@ -435,6 +435,22 @@ pub fn openid_credential_remove(
         sender,
         "openid_credential_remove",
         (identity_number, openid_credential_key),
+    )
+    .map(|(x,)| x)
+}
+pub fn lookup_device_key(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    credential_id: &CredentialId,
+) -> Result<Option<DeviceKeyWithAnchor>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "lookup_device_key",
+        (credential_id,),
     )
     .map(|(x,)| x)
 }
