@@ -232,6 +232,7 @@ pub fn update_openid_credential(
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
+
 /// Lookup `DeviceKeyWithAnchor` for the given `CredentialId`.
 pub fn lookup_device_key_with_credential_id(
     credential_id: &CredentialId,
