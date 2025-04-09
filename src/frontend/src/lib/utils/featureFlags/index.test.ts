@@ -1,4 +1,5 @@
 import { FeatureFlag } from "$lib/utils/featureFlags/index";
+import { writable, type Writable } from "svelte/store";
 
 class MockStorage {
   #data: Record<string, string> = {};
@@ -16,17 +17,8 @@ class MockStorage {
   }
 }
 
-const createStore = (initialValue: boolean) => {
-  const store = {
-    value: initialValue,
-    set: function (newVal: boolean) {
-      this.value = newVal;
-    },
-    get: function () {
-      return this.value;
-    },
-  };
-  return store;
+const createTestStore = (initialValue: boolean) => {
+  return writable(initialValue);
 };
 
 test("feature flag to be initialized", () => {
@@ -34,42 +26,18 @@ test("feature flag to be initialized", () => {
   storage.setItem("c", "true");
   storage.setItem("d", "false");
 
-  const aStore = createStore(true);
-  const bStore = createStore(false);
-  const cStore = createStore(false);
-  const dStore = createStore(true);
+  const aStore = createTestStore(true);
+  const bStore = createTestStore(false);
+  const cStore = createTestStore(false);
+  const dStore = createTestStore(true);
 
-  const enabledFlag = new FeatureFlag(
-    storage,
-    "a",
-    true,
-    aStore.set,
-    aStore.get,
-  );
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
-  const disabledFlag = new FeatureFlag(
-    storage,
-    "b",
-    false,
-    bStore.set,
-    bStore.get,
-  );
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
 
-  const storedOverrideFlag = new FeatureFlag(
-    storage,
-    "c",
-    false,
-    cStore.set,
-    cStore.get,
-  );
+  const storedOverrideFlag = new FeatureFlag(storage, "c", false, cStore);
 
-  const storedDisabledFlag = new FeatureFlag(
-    storage,
-    "d",
-    true,
-    dStore.set,
-    dStore.get,
-  );
+  const storedDisabledFlag = new FeatureFlag(storage, "d", true, dStore);
 
   expect(enabledFlag.isEnabled()).toEqual(true);
   expect(disabledFlag.isEnabled()).toEqual(false);
@@ -79,24 +47,12 @@ test("feature flag to be initialized", () => {
 
 test("feature flag to be set", () => {
   const storage = new MockStorage();
-  const aStore = createStore(true);
-  const bStore = createStore(false);
+  const aStore = createTestStore(true);
+  const bStore = createTestStore(false);
 
-  const enabledFlag = new FeatureFlag(
-    storage,
-    "a",
-    true,
-    aStore.set,
-    aStore.get,
-  );
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
-  const disabledFlag = new FeatureFlag(
-    storage,
-    "b",
-    false,
-    bStore.set,
-    bStore.get,
-  );
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
 
   enabledFlag.set(false);
   disabledFlag.set(true);
@@ -109,24 +65,12 @@ test("feature flag to be set", () => {
 
 test("feature flag to be reset", () => {
   const storage = new MockStorage();
-  const aStore = createStore(true);
-  const bStore = createStore(false);
+  const aStore = createTestStore(true);
+  const bStore = createTestStore(false);
 
-  const enabledFlag = new FeatureFlag(
-    storage,
-    "a",
-    true,
-    aStore.set,
-    aStore.get,
-  );
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
-  const disabledFlag = new FeatureFlag(
-    storage,
-    "b",
-    false,
-    bStore.set,
-    bStore.get,
-  );
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
 
   enabledFlag.set(false);
   disabledFlag.set(true);
