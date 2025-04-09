@@ -27,6 +27,7 @@ import { forgotNumber } from "./forgotNumber";
 import { promptRecovery } from "./promptRecovery";
 import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 
 export const useRecovery = async (
   connection: Connection,
@@ -133,8 +134,7 @@ const enrollAuthenticator = async ({
     const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
       const newDeviceOrigin =
-        userSupportsWebauthRoR() &&
-        get(featureFlags).DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && get(DOMAIN_COMPATIBILITY)
           ? getCredentialsOrigin({
               credentials: devices,
             })

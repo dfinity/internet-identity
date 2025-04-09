@@ -4,7 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
-import featureFlags from "$lib/state/featureFlags";
+import featureFlags, { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { anyFeatures } from "$lib/legacy/features";
 import { idbStorePinIdentityMaterial } from "$lib/flows/pin/idb";
@@ -335,7 +335,7 @@ export const getRegisterFlowOpts = async ({
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
     googleAllowed:
-      get(featureFlags).OPENID_AUTHENTICATION.isEnabled() &&
+      get(OPENID_AUTHENTICATION) &&
       (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
     openidIdentityRegistrationFinish: () =>
       connection.openid_identity_registration_finish(

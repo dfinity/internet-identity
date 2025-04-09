@@ -15,7 +15,7 @@ export const init: ServerInit = async () => {
   for (const [key, value] of url.searchParams.entries()) {
     if (key.startsWith(FEATURE_FLAG_PREFIX)) {
       const flag = key.slice(FEATURE_FLAG_PREFIX.length).toUpperCase();
-      if (!(flag in get(featureFlags))) {
+      if (!(flag in featureFlags)) {
         console.warn(`Invalid feature flag received '${flag}'`);
         continue;
       }
@@ -25,9 +25,7 @@ export const init: ServerInit = async () => {
         );
         continue;
       }
-      (get(featureFlags) as unknown as Record<string, FeatureFlag>)[
-        flag
-      ]?.temporaryOverride(value === "true");
+      featureFlags[flag]?.set(value === "true");
       url.searchParams.delete(key);
     }
   }

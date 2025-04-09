@@ -36,7 +36,7 @@ import type {
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { get } from "svelte/store";
-import featureFlags from "$lib/state/featureFlags";
+import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
@@ -83,6 +83,7 @@ import {
   webauthnAuthenticationFunnel,
   WebauthnAuthenticationEvents,
 } from "./analytics/webauthnAuthenticationFunnel";
+import { HARDWARE_KEY_TEST } from "$lib/state/featureFlags";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -493,7 +494,7 @@ export class Connection {
       return { kind: "pinUserOtherDomain" };
     }
 
-    if (get(featureFlags).HARDWARE_KEY_TEST.isEnabled()) {
+    if (get(HARDWARE_KEY_TEST)) {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
         (device) =>
           Object.keys(device.key_type)[0] === "unknown" ||
@@ -516,10 +517,7 @@ export class Connection {
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
-    if (
-      isNullish(this.webAuthFlows) &&
-      get(featureFlags).DOMAIN_COMPATIBILITY.isEnabled()
-    ) {
+    if (isNullish(this.webAuthFlows) && get(DOMAIN_COMPATIBILITY)) {
       const flows = findWebAuthnFlows({
         supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
