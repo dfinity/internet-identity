@@ -151,11 +151,7 @@ export const authFlowManage = async (connection: Connection) => {
     allowPinRegistration,
   });
 
-  if (
-    showAddCurrentDevice &&
-    DOMAIN_COMPATIBILITY &&
-    get(DOMAIN_COMPATIBILITY)
-  ) {
+  if (get(DOMAIN_COMPATIBILITY)) {
     await registerCurrentDeviceCurrentOrigin(
       userNumber,
       authenticatedConnection,

@@ -1,6 +1,5 @@
 import type { DeviceData } from "$lib/generated/internet_identity_types";
-import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
-import { get } from "svelte/store";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { domainWarning } from "$lib/flows/manage";
 
 const recoveryPhrase: DeviceData = {
