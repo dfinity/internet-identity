@@ -1,4 +1,5 @@
 import { FeatureFlag } from "$lib/utils/featureFlags/index";
+import { writable } from "svelte/store";
 
 class MockStorage {
   #data: Record<string, string> = {};
@@ -21,10 +22,18 @@ test("feature flag to be initialized", () => {
   storage.setItem("c", "true");
   storage.setItem("d", "false");
 
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
-  const storedOverrideFlag = new FeatureFlag(storage, "c", false);
-  const storedDisabledFlag = new FeatureFlag(storage, "d", true);
+  const aStore = writable(true);
+  const bStore = writable(false);
+  const cStore = writable(false);
+  const dStore = writable(true);
+
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
+
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
+
+  const storedOverrideFlag = new FeatureFlag(storage, "c", false, cStore);
+
+  const storedDisabledFlag = new FeatureFlag(storage, "d", true, dStore);
 
   expect(enabledFlag.isEnabled()).toEqual(true);
   expect(disabledFlag.isEnabled()).toEqual(false);
@@ -34,8 +43,12 @@ test("feature flag to be initialized", () => {
 
 test("feature flag to be set", () => {
   const storage = new MockStorage();
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
+  const aStore = writable(true);
+  const bStore = writable(false);
+
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
+
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
 
   enabledFlag.set(false);
   disabledFlag.set(true);
@@ -48,8 +61,12 @@ test("feature flag to be set", () => {
 
 test("feature flag to be reset", () => {
   const storage = new MockStorage();
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
+  const aStore = writable(true);
+  const bStore = writable(false);
+
+  const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
+
+  const disabledFlag = new FeatureFlag(storage, "b", false, bStore);
 
   enabledFlag.set(false);
   disabledFlag.set(true);

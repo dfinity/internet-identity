@@ -7,7 +7,8 @@ import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 
 import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { infoScreenTemplate } from "$lib/templates/infoScreen";
-import { DOMAIN_COMPATIBILITY } from "$lib/utils/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import { IdentityMetadata } from "$lib/legacy/repositories/identityMetadata";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
@@ -241,7 +242,7 @@ export const recoveryWizard = async (
   });
 
   const originNewDevice =
-    userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+    userSupportsWebauthRoR() && get(DOMAIN_COMPATIBILITY)
       ? getCredentialsOrigin({
           credentials,
         })

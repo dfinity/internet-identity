@@ -21,7 +21,8 @@ import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
 import {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
-} from "$lib/utils/featureFlags";
+} from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 import { addDevice } from "$lib/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$lib/flows/dappsExplorer";
 import { KnownDapp, getDapps } from "$lib/flows/dappsExplorer/dapps";
@@ -150,7 +151,7 @@ export const authFlowManage = async (connection: Connection) => {
     allowPinRegistration,
   });
 
-  if (showAddCurrentDevice && DOMAIN_COMPATIBILITY.isEnabled()) {
+  if (showAddCurrentDevice && get(DOMAIN_COMPATIBILITY)) {
     await registerCurrentDeviceCurrentOrigin(
       userNumber,
       authenticatedConnection,
@@ -247,7 +248,7 @@ const displayManageTemplate = ({
       cleanupRecommended,
       i18n,
     })}
-    ${OPENID_AUTHENTICATION.isEnabled()
+    ${get(OPENID_AUTHENTICATION)
       ? linkedAccountsSection({
           credentials,
           onLinkAccount,
@@ -417,7 +418,7 @@ export const displayManage = async (
 
     const onAddDevice = async () => {
       const newDeviveOrigin =
-        userSupportsWebauthRoR() && DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && get(DOMAIN_COMPATIBILITY)
           ? getCredentialsOrigin({
               credentials: devices_,
             })
@@ -474,7 +475,7 @@ export const displayManage = async (
       }
       doAdd satisfies "ok";
       // Recovery phrase doesn't need ROR, this is for consistency reasons.
-      const newDeviceOrigin = DOMAIN_COMPATIBILITY.isEnabled()
+      const newDeviceOrigin = get(DOMAIN_COMPATIBILITY)
         ? getCredentialsOrigin({
             credentials: devices_,
           })
@@ -778,7 +779,7 @@ export const devicesFromDevicesWithUsage = ({
 export const domainWarning = (
   device: DeviceData,
 ): TemplateResult | undefined => {
-  if (DOMAIN_COMPATIBILITY.isEnabled()) {
+  if (get(DOMAIN_COMPATIBILITY)) {
     return undefined;
   }
   // Recovery phrases are not FIDO devices, meaning they are not tied to a particular origin (unless most authenticators like TouchID, etc, and e.g. recovery _devices_ in the case of YubiKeys and the like)
