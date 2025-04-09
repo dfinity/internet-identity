@@ -34,6 +34,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
             .map(OpenIdCredentialData::from)
             .collect(),
     );
+    let name = anchor.name();
     let now = time();
 
     state::tentative_device_registrations(|tentative_device_registrations| {
@@ -51,6 +52,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                     tentative_device: Some(tentative_device.clone()),
                 }),
                 openid_credentials,
+                name,
             },
             Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
                 IdentityAnchorInfo {
@@ -60,12 +62,14 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
                         tentative_device: None,
                     }),
                     openid_credentials,
+                    name,
                 }
             }
             None | Some(_) => IdentityAnchorInfo {
                 devices,
                 device_registration: None,
                 openid_credentials,
+                name,
             },
         }
     })

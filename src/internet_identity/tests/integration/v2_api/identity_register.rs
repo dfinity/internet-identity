@@ -56,11 +56,16 @@ fn should_transition_flow_principal_to_temp_key() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let identity_nr =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed")
-            .expect("registration finish failed")
-            .identity_number;
+    let identity_nr = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed")
+    .expect("registration finish failed")
+    .identity_number;
 
     // authenticated call
     let result = api_v2::identity_info(&env, canister_id, flow_principal, identity_nr)
@@ -94,9 +99,14 @@ fn should_not_exceed_configured_identity_range() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed");
+    let result = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed");
     assert!(matches!(
         result,
         Err(IdRegFinishError::IdentityLimitReached)
@@ -222,9 +232,14 @@ fn should_fail_on_invalid_metadata() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed");
+    let result = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed");
     assert!(matches!(
         result,
         Err(IdRegFinishError::InvalidAuthnMethod(_))

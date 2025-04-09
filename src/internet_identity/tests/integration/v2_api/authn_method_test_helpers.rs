@@ -72,7 +72,7 @@ pub fn create_identity_with_authn_method(
             .expect("check_captcha failed");
     }
 
-    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method)
+    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method, None)
         .expect("API call failed")
         .expect("registration finish failed")
         .identity_number
@@ -125,6 +125,7 @@ pub fn create_identity_with_openid_credential(
         &OpenIDRegFinishArg {
             jwt: jwt.to_owned(),
             salt: *salt,
+            name: None,
         },
     )
     .expect("API call failed")
