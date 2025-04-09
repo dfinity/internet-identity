@@ -1,4 +1,5 @@
 import { replicaForwardPlugin } from "@dfinity/internet-identity-vite-plugins";
+import tailwindcss from "@tailwindcss/vite";
 import { readReplicaPort } from "@dfinity/internet-identity-vite-plugins/utils";
 import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
@@ -40,6 +41,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       sveltekit(),
+      tailwindcss(),
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],

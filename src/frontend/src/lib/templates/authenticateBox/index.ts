@@ -11,7 +11,7 @@ import {
   PinIdentityMaterial,
   reconstructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
-import featureFlags from "$lib/state/featureFlags";
+import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
 import { idbRetrievePinIdentityMaterial } from "$lib/flows/pin/idb";
@@ -570,7 +570,7 @@ export const authnTemplates = (i18n: I18n, props: AuthnTemplates) => {
         >
           ${copy.continue_with_another_device}
         </button>
-        ${get(featureFlags).OPENID_AUTHENTICATION.isEnabled()
+        ${get(OPENID_AUTHENTICATION)
           ? html`
               <button
                 @click=${() =>

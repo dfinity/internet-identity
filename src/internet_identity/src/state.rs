@@ -163,6 +163,7 @@ pub struct RateLimitState {
     pub token_timestamp: Timestamp,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Default)]
 enum StorageState {
     #[default]

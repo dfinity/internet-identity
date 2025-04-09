@@ -1,44 +1,80 @@
-import { readable } from "svelte/store";
+import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
 
-interface FeatureFlags {
-  DOMAIN_COMPATIBILITY: FeatureFlag;
-  OPENID_AUTHENTICATION: FeatureFlag;
-  HARDWARE_KEY_TEST: FeatureFlag;
-  DISCOVERABLE_PASSKEY_FLOW: FeatureFlag;
+declare global {
+  interface Window {
+    __featureFlags: Record<string, FeatureFlag>;
+  }
 }
 
-const FEATURE_FLAGS_WITH_DEFAULTS = {
-  DOMAIN_COMPATIBILITY: true,
-  OPENID_AUTHENTICATION: false,
-  HARDWARE_KEY_TEST: false,
-  DISCOVERABLE_PASSKEY_FLOW: false,
-} as const satisfies Record<string, boolean>;
+type FeatureFlagStore = Writable<boolean> & {
+  getFeatureFlag: () => FeatureFlag | undefined;
+};
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 
-const featureFlags = readable<FeatureFlags>(undefined, (set) => {
-  // We cannot use browser because this is also imported in our showcase
-  if (typeof window === "undefined") return;
-  console.log("initializing");
+const createFeatureFlagStore = (
+  name: string,
+  defaultValue: boolean,
+): FeatureFlagStore => {
+  const { subscribe, set, update } = writable(defaultValue);
 
-  // Initialize feature flags with values from localstorage
-  const initializedFeatureFlags = Object.fromEntries(
-    Object.entries(FEATURE_FLAGS_WITH_DEFAULTS).map(([key, defaultValue]) => [
-      key,
-      new FeatureFlag(
-        window.localStorage,
-        LOCALSTORAGE_FEATURE_FLAGS_PREFIX + key,
-        defaultValue,
-      ),
-    ]),
+  // We cannot use browser because this is also imported in our showcase
+  if (typeof window === "undefined") {
+    return {
+      subscribe,
+      set,
+      update,
+      getFeatureFlag: () => undefined,
+    };
+  }
+
+  // Initialize feature flag object with value from localstorage
+
+  const initializedFeatureFlag: FeatureFlag = new FeatureFlag(
+    window.localStorage,
+    LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
+    defaultValue,
+    { subscribe, set, update },
   );
+
   // Make feature flags configurable from browser console
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  window.__featureFlags = initializedFeatureFlags;
-  // Set the initial values
-  set(initializedFeatureFlags as unknown as FeatureFlags);
-});
+  if (typeof window.__featureFlags === "undefined") {
+    window.__featureFlags = {};
+  }
+  window.__featureFlags[name] = initializedFeatureFlag;
 
-export default featureFlags;
+  const getFeatureFlag = () => {
+    return initializedFeatureFlag;
+  };
+
+  return {
+    subscribe,
+    set,
+    update,
+    getFeatureFlag,
+  };
+};
+
+export const DOMAIN_COMPATIBILITY = createFeatureFlagStore(
+  "DOMAIN_COMPATIBILITY",
+  true,
+);
+
+export const OPENID_AUTHENTICATION = createFeatureFlagStore(
+  "OPENID_AUTHENTICATION",
+  false,
+);
+
+export const HARDWARE_KEY_TEST = createFeatureFlagStore(
+  "HARDWARE_KEY_TEST",
+  false,
+);
+
+export default {
+  DOMAIN_COMPATIBILITY,
+  OPENID_AUTHENTICATION,
+  HARDWARE_KEY_TEST,
+} as Record<string, FeatureFlagStore>;

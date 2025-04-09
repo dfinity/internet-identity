@@ -1,8 +1,6 @@
 import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import featureFlags from "$lib/state/featureFlags";
-import { get } from "svelte/store";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
@@ -27,7 +25,8 @@ import { forgotNumber } from "./forgotNumber";
 import { promptRecovery } from "./promptRecovery";
 import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
-
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 export const useRecovery = async (
   connection: Connection,
 ): Promise<LoginSuccess | { tag: "canceled" }> => {
@@ -133,8 +132,7 @@ const enrollAuthenticator = async ({
     const newDeviceData = await withLoader(async () => {
       const devices = (await connection.getAnchorInfo()).devices;
       const newDeviceOrigin =
-        userSupportsWebauthRoR() &&
-        get(featureFlags).DOMAIN_COMPATIBILITY.isEnabled()
+        userSupportsWebauthRoR() && get(DOMAIN_COMPATIBILITY)
           ? getCredentialsOrigin({
               credentials: devices,
             })
