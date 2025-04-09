@@ -5,13 +5,12 @@ import { get } from "svelte/store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
-export const init: ServerInit = async () => {
+export const init: ServerInit = () => {
   // Override feature flags based on search params before any other code
   // including other hooks runs that might depend on these feature flags.
   //
   // Example: ?feature_flag_openid_authentication=true
   const url = new URL(window.location.href);
-
   for (const [key, value] of url.searchParams.entries()) {
     if (key.startsWith(FEATURE_FLAG_PREFIX)) {
       const flag = key.slice(FEATURE_FLAG_PREFIX.length).toUpperCase();
