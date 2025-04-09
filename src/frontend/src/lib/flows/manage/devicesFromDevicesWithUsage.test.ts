@@ -2,8 +2,7 @@ import type {
   DeviceWithUsage,
   PublicKey,
 } from "$lib/generated/internet_identity_types";
-import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
-import { get } from "svelte/store";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { devicesFromDevicesWithUsage } from "./index";
