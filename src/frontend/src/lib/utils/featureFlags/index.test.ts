@@ -1,5 +1,5 @@
 import { FeatureFlag } from "$lib/utils/featureFlags/index";
-import { writable, type Writable } from "svelte/store";
+import { writable } from "svelte/store";
 
 class MockStorage {
   #data: Record<string, string> = {};
@@ -17,19 +17,15 @@ class MockStorage {
   }
 }
 
-const createTestStore = (initialValue: boolean) => {
-  return writable(initialValue);
-};
-
 test("feature flag to be initialized", () => {
   const storage = new MockStorage();
   storage.setItem("c", "true");
   storage.setItem("d", "false");
 
-  const aStore = createTestStore(true);
-  const bStore = createTestStore(false);
-  const cStore = createTestStore(false);
-  const dStore = createTestStore(true);
+  const aStore = writable(true);
+  const bStore = writable(false);
+  const cStore = writable(false);
+  const dStore = writable(true);
 
   const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
@@ -47,8 +43,8 @@ test("feature flag to be initialized", () => {
 
 test("feature flag to be set", () => {
   const storage = new MockStorage();
-  const aStore = createTestStore(true);
-  const bStore = createTestStore(false);
+  const aStore = writable(true);
+  const bStore = writable(false);
 
   const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
@@ -65,8 +61,8 @@ test("feature flag to be set", () => {
 
 test("feature flag to be reset", () => {
   const storage = new MockStorage();
-  const aStore = createTestStore(true);
-  const bStore = createTestStore(false);
+  const aStore = writable(true);
+  const bStore = writable(false);
 
   const enabledFlag = new FeatureFlag(storage, "a", true, aStore);
 
