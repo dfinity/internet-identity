@@ -86,6 +86,12 @@ pub mod compat {
         RemoveOpenIdCredential { iss: String },
         #[serde(rename = "register_with_openid_credential")]
         RegisterWithOpenIdCredential { iss: String },
+        #[serde(rename = "add_name")]
+        AddName,
+        #[serde(rename = "update_name")]
+        UpdateName,
+        #[serde(rename = "remove_name")]
+        RemoveName,
     }
 
     impl From<Operation> for CompatOperation {
@@ -113,6 +119,9 @@ pub mod compat {
                 Operation::RegisterAnchorWithOpenIdCredential { iss } => {
                     CompatOperation::RegisterWithOpenIdCredential { iss }
                 }
+                Operation::AddName => CompatOperation::AddName,
+                Operation::UpdateName => CompatOperation::UpdateName,
+                Operation::RemoveName => CompatOperation::RemoveName,
                 Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")
                 }
