@@ -5,7 +5,7 @@ import { ElementArray } from "webdriverio";
 
 const checkIfHasTailwind = async (styles: ElementArray) => {
   for (const style of styles) {
-    const text = await style.getElementText(style.elementId);
+    const text = await style.getHTML();
     if (await text.includes("tailwindcss")) {
       return true;
     }
