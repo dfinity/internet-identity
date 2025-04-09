@@ -1139,7 +1139,7 @@ export class ErrorView extends View {
 export class NewAuthenticateView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$("#newAuthenticateTitle")
+      .$('[data-role="new-authenticate-view"]')
       .waitForDisplayed({ timeout: 5000 });
   }
 }
