@@ -6,7 +6,7 @@ import { Funnel } from "./Funnel";
  * Square brackets [] indicate optional events.
  *
  * login-start (INIT) - Triggered in Landing Page or List of identities
- *   identites-list | no-identities
+ *   identities-list | no-identities
  *     login-trigger-list-item - Triggered when user clicks on a number
  *       login-webauthn-start - Triggered when the webauthn is triggered
  *         login-success - Triggered after successful webauthn interaction
@@ -17,7 +17,7 @@ import { Funnel } from "./Funnel";
  */
 export enum LoginEvents {
   GoUseExisting = "go-use-existing",
-  IdentitiesList = "identites-list",
+  IdentitiesList = "identities-list",
   NoIdentities = "no-identities",
   TriggerListItem = "login-trigger-list-item",
   TriggerUseExisting = "login-trigger-use-existing",
