@@ -811,5 +811,5 @@ service : (opt InternetIdentityInit) -> {
     acknowledge_entries : (sequence_number : nat64) -> ();
 
     // Discoverable passkeys protocol
-    lookup_device_key : (credential_id : blob) -> (opt record DeviceKeyWithAnchor);
+    lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
 };

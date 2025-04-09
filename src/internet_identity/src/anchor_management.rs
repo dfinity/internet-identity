@@ -236,7 +236,19 @@ pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option
 pub fn lookup_device_key_with_credential_id(
     credential_id: &CredentialId,
 ) -> Option<DeviceKeyWithAnchor> {
-    // storage_borrow(|storage| storage.(key))
+    let anchor_number =
+        storage_borrow(|storage| storage.lookup_anchor_with_device_credential(credential_id))?;
+    let anchor = state::anchor(anchor_number);
+    let device = anchor.devices().iter().find(|device| {
+        device
+            .credential_id
+            .as_ref()
+            .is_some_and(|device_credential_id| device_credential_id == credential_id)
+    });
+    device.map(|device| DeviceKeyWithAnchor {
+        pubkey: device.pubkey.clone(),
+        anchor_number,
+    })
 }
 
 #[test]
