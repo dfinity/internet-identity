@@ -463,8 +463,8 @@ type AuthnMethodData = record {
 };
 
 type OpenIDRegFinishArg = record {
-    jwt : JWT;
-    salt : Salt;
+    jwt: JWT;
+    salt: Salt;
 };
 
 // Extra information about registration status for new authentication methods
@@ -809,4 +809,7 @@ service : (opt InternetIdentityInit) -> {
     // Only callable by this IIs archive canister.
     fetch_entries : () -> (vec BufferedArchiveEntry);
     acknowledge_entries : (sequence_number : nat64) -> ();
+
+    // Discoverable passkeys protocol
+    lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
 };
