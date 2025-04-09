@@ -3,6 +3,7 @@ import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { assert } from "vitest";
 import { waitToClose } from "./util";
+import { ElementArray } from "webdriverio";
 
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}
@@ -648,6 +649,10 @@ export class AuthenticateView extends View {
       .waitForDisplayed();
     await this.browser.$('[data-action="recover-with-device"]').click();
   }
+
+  async getStyleSheets(): Promise<ElementArray> {
+    return this.browser.$$("style");
+  }
 }
 
 export class WelcomeBackView extends View {
@@ -1141,6 +1146,10 @@ export class NewAuthenticateView extends View {
     await this.browser
       .$('[data-role="new-authenticate-view"]')
       .waitForDisplayed({ timeout: 5000 });
+  }
+
+  async getStyleSheets(): Promise<ElementArray> {
+    return this.browser.$$("style");
   }
 }
 
