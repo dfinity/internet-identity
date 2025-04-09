@@ -122,6 +122,10 @@ export interface DeviceData {
   'credential_id' : [] | [CredentialId],
 }
 export type DeviceKey = PublicKey;
+export interface DeviceKeyWithAnchor {
+  'pubkey' : DeviceKey,
+  'anchor_number' : UserNumber,
+}
 export type DeviceProtection = { 'unprotected' : null } |
   { 'protected' : null };
 export interface DeviceRegistrationInfo {
@@ -430,10 +434,6 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
-  'get_pubkey_by_credential_id' : ActorMethod<
-    [Uint8Array | number[]],
-    [] | [{ 'pubkey' : PublicKey, 'anchor_number' : UserNumber }]
-  >,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'identity_authn_info' : ActorMethod<
@@ -463,6 +463,10 @@ export interface _SERVICE {
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
+  'lookup_device_key' : ActorMethod<
+    [Uint8Array | number[]],
+    [] | [DeviceKeyWithAnchor]
+  >,
   'openid_credential_add' : ActorMethod<
     [IdentityNumber, JWT, Salt],
     { 'Ok' : null } |

@@ -342,6 +342,10 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const DeviceKeyWithAnchor = IDL.Record({
+    'pubkey' : DeviceKey,
+    'anchor_number' : UserNumber,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -531,15 +535,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
-    'get_pubkey_by_credential_id' : IDL.Func(
-        [IDL.Vec(IDL.Nat8)],
-        [
-          IDL.Opt(
-            IDL.Record({ 'pubkey' : PublicKey, 'anchor_number' : UserNumber })
-          ),
-        ],
-        [],
-      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
     'identity_authn_info' : IDL.Func(
@@ -574,6 +569,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'lookup_device_key' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
+        [IDL.Opt(DeviceKeyWithAnchor)],
+        ['query'],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
