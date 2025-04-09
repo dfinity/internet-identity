@@ -310,3 +310,9 @@ pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey(OpenIdCredentialKey),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DeviceKeyWithAnchor {
+    pub pubkey: DeviceKey,
+    pub anchor_number: AnchorNumber,
+}
