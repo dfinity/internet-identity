@@ -237,7 +237,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
 
     state::storage_borrow_mut(|s| {
         s.registration_rates.new_registration();
-        s.write(identity, false)
+        s.create(identity)
     })
     .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
 
