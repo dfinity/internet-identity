@@ -161,7 +161,7 @@ export const resetPhrase = async ({
     // to use the new phrase to void logging them out
     let nextConnection = undefined;
     if (sameDevice) {
-      nextConnection = (await connection.fromIdentity(() => userNumber, res.ok))
+      nextConnection = (await connection.fromIdentity(userNumber, res.ok))
         .connection;
     }
     return reload(nextConnection);

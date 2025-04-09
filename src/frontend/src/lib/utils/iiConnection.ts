@@ -305,12 +305,10 @@ export class Connection {
   };
 
   identity_registration_finish = async ({
-    name,
     tempIdentity,
     identity,
     authnMethod,
   }: {
-    name?: string;
     tempIdentity: SignIdentity;
     identity: SignIdentity;
     authnMethod: AuthnMethodData;
@@ -328,7 +326,6 @@ export class Connection {
     let finishResponse;
     try {
       finishResponse = await actor.identity_registration_finish({
-        name: nonNullish(name) ? [name] : [],
         authn_method: authnMethod,
       });
     } catch (error: unknown) {
@@ -395,7 +392,6 @@ export class Connection {
       finishResponse = await actor.openid_identity_registration_finish({
         jwt,
         salt,
-        name: [], // TODO: add name here
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -620,7 +616,7 @@ export class Connection {
     };
   };
   fromIdentity = async (
-    getUserNumber: () => bigint,
+    userNumber: bigint,
     identity: SignIdentity,
   ): Promise<LoginSuccess> => {
     const delegationIdentity = await this.requestFEDelegation(identity);
@@ -631,12 +627,12 @@ export class Connection {
       this.canisterConfig,
       identity,
       delegationIdentity,
-      getUserNumber(),
+      userNumber,
       actor,
     );
     return {
       kind: "loginSuccess",
-      userNumber: getUserNumber(),
+      userNumber,
       connection,
       showAddCurrentDevice: false,
     };
@@ -845,16 +841,6 @@ export class Connection {
       actor,
       decodeJWT(jwt),
     );
-  };
-
-  getPubKeyByCredentialId = async (
-    credentialId: ArrayBuffer,
-  ): Promise<{ pubkey: PublicKey; anchor_number: UserNumber } | undefined> => {
-    const actor = await this.createActor();
-    const [result] = await actor.lookup_device_key(
-      new Uint8Array(credentialId),
-    );
-    return result;
   };
 }
 
