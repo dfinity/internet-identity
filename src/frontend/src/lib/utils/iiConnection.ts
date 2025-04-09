@@ -851,7 +851,7 @@ export class Connection {
     credentialId: ArrayBuffer,
   ): Promise<{ pubkey: PublicKey; anchor_number: UserNumber } | undefined> => {
     const actor = await this.createActor();
-    const [result] = await actor.get_pubkey_by_credential_id(
+    const [result] = await actor.lookup_device_key(
       new Uint8Array(credentialId),
     );
     return result;
