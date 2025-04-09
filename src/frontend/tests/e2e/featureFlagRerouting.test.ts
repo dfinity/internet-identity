@@ -1,12 +1,12 @@
 import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
-import { NewAuthenticateView, MainView } from "./views";
+import { NewAuthenticateView, AuthenticateView } from "./views";
 
 const checkIfHasTailwind = async (browser: WebdriverIO.Browser) => {
   return await browser.execute(() => {
     const styles = Array.from(document.getElementsByTagName("style"));
     for (const style of styles) {
-      if (style.innerHTML.includes("tailwindcss")) {
+      if (style.innerText.includes("tailwindcss")) {
         return true;
       }
     }
@@ -38,8 +38,8 @@ test("Should show regular view without feature flag and not load app.css", async
     await browser.url(II_URL);
 
     // Check that we're on the regular page (not authenticate)
-    const mainView = new MainView(browser);
-    await mainView.waitForDisplay();
+    const authenticateView = new AuthenticateView(browser);
+    await authenticateView.waitForDisplay();
 
     // Check that app.css is loaded by verifying it's in the document
     const hasAppCss = await checkIfHasTailwind(browser);
