@@ -650,7 +650,7 @@ export class AuthenticateView extends View {
     await this.browser.$('[data-action="recover-with-device"]').click();
   }
 
-  async getStyleSheets(): Promise<ElementArray> {
+  getStyleSheets(): Promise<ElementArray> {
     return this.browser.$$("style");
   }
 }
@@ -1148,7 +1148,7 @@ export class NewAuthenticateView extends View {
       .waitForDisplayed({ timeout: 5000 });
   }
 
-  async getStyleSheets(): Promise<ElementArray> {
+  getStyleSheets(): Promise<ElementArray> {
     return this.browser.$$("style");
   }
 }
