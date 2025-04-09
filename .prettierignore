@@ -18,7 +18,6 @@ dist/
 .env
 lib
 !src/frontend/src/lib
-src/frontend/src/lib/generated
 demos/vc_issuer/app/generated/
 
 # Cargo build output
