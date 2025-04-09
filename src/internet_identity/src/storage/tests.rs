@@ -64,7 +64,7 @@ fn should_read_previous_write() {
     let anchor_number = anchor.anchor_number();
 
     anchor.add_device(sample_device()).unwrap();
-    storage.write(anchor.clone()).unwrap();
+    storage.create(anchor.clone()).unwrap();
 
     let read_anchor = storage.read(anchor_number).unwrap();
     assert_eq!(anchor, read_anchor);
@@ -78,7 +78,7 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
 
     let anchor = Anchor::new(222);
 
-    let result = storage.write(anchor);
+    let result = storage.create(anchor);
     assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
 }
 
@@ -125,7 +125,7 @@ fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 
     let anchor = storage.allocate_anchor().unwrap();
-    storage.write(anchor).unwrap();
+    storage.create(anchor).unwrap();
 
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 }
@@ -147,7 +147,7 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
 
     // Check if both anchor and OpenID credential lookups are written to storage
-    storage.write(anchor.clone()).unwrap();
+    storage.create(anchor.clone()).unwrap();
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
     assert_eq!(
         storage
@@ -166,7 +166,7 @@ fn should_write_and_update_openid_credential_lookup() {
     anchor
         .remove_openid_credential(&openid_credential_0.key())
         .unwrap();
-    storage.write(anchor.clone()).unwrap();
+    storage.update(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
         None
@@ -182,7 +182,7 @@ fn should_write_and_update_openid_credential_lookup() {
     anchor
         .add_openid_credential(openid_credential_2.clone())
         .unwrap();
-    storage.write(anchor.clone()).unwrap();
+    storage.update(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
         None
@@ -196,6 +196,81 @@ fn should_write_and_update_openid_credential_lookup() {
     assert_eq!(
         storage
             .lookup_anchor_with_openid_credential(&openid_credential_2.key())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+}
+
+#[test]
+fn should_write_and_update_device_credential_lookup() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut anchor = storage.allocate_anchor().unwrap();
+    let device_0 = Device {
+        pubkey: ByteBuf::from(vec![0]),
+        credential_id: Some(ByteBuf::from(vec![0])),
+        ..sample_device()
+    };
+    let device_1 = Device {
+        pubkey: ByteBuf::from(vec![1]),
+        credential_id: Some(ByteBuf::from(vec![1])),
+        ..sample_device()
+    };
+    let device_2 = Device {
+        pubkey: ByteBuf::from(vec![2]),
+        credential_id: Some(ByteBuf::from(vec![2])),
+        ..sample_device()
+    };
+    anchor.add_device(device_0.clone()).unwrap();
+    anchor.add_device(device_1.clone()).unwrap();
+
+    // Check if both anchor and device credential lookups are written to storage
+    storage.create(anchor.clone()).unwrap();
+    assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
+    // Check if device credential lookup is cleaned up from storage when anchor is written
+    anchor.remove_device(&device_0.pubkey).unwrap();
+    storage.update(anchor.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+
+    // Check if device credential lookup is written to storage when anchor is written
+    anchor.add_device(device_2.clone()).unwrap();
+    storage.update(anchor.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
+        None
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_1.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor.anchor_number()
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_2.credential_id.clone().unwrap())
             .unwrap(),
         anchor.anchor_number()
     );
