@@ -1,6 +1,6 @@
 import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
-import { NewAuthenticateView } from "./views";
+import { NewAuthenticateView, MainView } from "./views";
 
 test("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
@@ -34,7 +34,8 @@ test("Should show regular view without feature flag and not load app.css", async
     await browser.url(II_URL);
 
     // Check that we're on the regular page (not authenticate)
-    await browser.$('[data-page="welcome"]').waitForDisplayed();
+    const mainView = new MainView(browser);
+    await mainView.waitForDisplay();
 
     // Check that app.css is not loaded
     const hasAppCss = await browser.execute(() => {
