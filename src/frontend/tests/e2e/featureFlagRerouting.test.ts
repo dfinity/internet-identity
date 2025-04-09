@@ -6,6 +6,8 @@ const checkIfHasTailwind = async (browser: WebdriverIO.Browser) => {
   return await browser.execute(() => {
     const styles = Array.from(document.getElementsByTagName("style"));
     for (const style of styles) {
+      console.log(style.innerHTML);
+      console.log(style.innerText);
       if (style.innerText.includes("tailwindcss")) {
         return true;
       }
