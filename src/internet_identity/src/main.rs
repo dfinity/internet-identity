@@ -246,6 +246,11 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     )
 }
 
+#[query]
+fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
+    anchor_management::lookup_device_key_with_credential_id(&credential_id)
+}
+
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));

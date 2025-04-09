@@ -832,3 +832,43 @@ fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError
     assert_eq!(devices, vec![device, device_data_1()]);
     Ok(())
 }
+
+/// Verifies that a device key can be looked up with credential id
+#[test]
+fn should_lookup_device_key_with_credential_id() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+    let credential_id = ByteBuf::from(vec![1, 2, 3]);
+    let device = DeviceData {
+        credential_id: Some(credential_id.clone()),
+        key_type: KeyType::Platform,
+        ..DeviceData::auth_test_device()
+    };
+
+    // Add device
+    api::add(&env, canister_id, principal_1(), user_number, &device)?;
+
+    // Lookup device key by credential id
+    let DeviceKeyWithAnchor {
+        pubkey,
+        anchor_number,
+    } = api::lookup_device_key(&env, canister_id, principal_1(), &credential_id)?.unwrap();
+    assert_eq!(pubkey, device.pubkey);
+    assert_eq!(anchor_number, user_number);
+
+    // Remove device
+    api::remove(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &device.pubkey,
+    )?;
+
+    // Lookup device key by credential id
+    let not_found = api::lookup_device_key(&env, canister_id, principal_1(), &credential_id)?;
+    assert_eq!(not_found, None);
+
+    Ok(())
+}
