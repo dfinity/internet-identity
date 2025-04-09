@@ -220,7 +220,6 @@ pub fn remove_openid_credential(
 
 /// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
 /// Return an error if the `OpenIdCredential` to be updated does not exist.
-#[allow(unused)]
 pub fn update_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
@@ -249,6 +248,19 @@ pub fn lookup_device_key_with_credential_id(
     device.map(|device| DeviceKeyWithAnchor {
         pubkey: device.pubkey.clone(),
         anchor_number,
+    })
+}
+
+/// Set `name` of the given anchor.
+/// Return an error if the `name` to be updated is too long.
+#[allow(unused)]
+pub fn set_name(anchor: &mut Anchor, name: Option<String>) -> Result<Operation, AnchorError> {
+    let previous_name = anchor.name();
+    anchor.set_name(name.clone())?;
+    Ok(match (previous_name, name) {
+        (None, Some(_)) => Operation::AddName,
+        (Some(_), None) => Operation::RemoveName,
+        _ => Operation::UpdateName,
     })
 }
 
@@ -305,4 +317,27 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
             iss: openid_credential.iss.clone()
         })
     );
+}
+
+#[test]
+fn should_set_name() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::archive::types::Operation;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // Verify operations/errors
+    assert_eq!(
+        set_name(&mut anchor, Some("Hello world!".into())),
+        Ok(Operation::AddName)
+    );
+    assert_eq!(set_name(&mut anchor, Some("Jonathan Maximilian Theodore Alexander Montgomery Fitzgerald Jameson Davidson Hawthorne Winchester Baldwin the Fifth of Lancaster".into())), Err(AnchorError::NameTooLong {limit: 128}));
+    assert_eq!(
+        set_name(&mut anchor, Some("Hello world2!".into())),
+        Ok(Operation::UpdateName)
+    );
+    assert_eq!(set_name(&mut anchor, None), Ok(Operation::RemoveName));
 }
