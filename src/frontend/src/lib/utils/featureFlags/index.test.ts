@@ -21,10 +21,52 @@ test("feature flag to be initialized", () => {
   storage.setItem("c", "true");
   storage.setItem("d", "false");
 
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
-  const storedOverrideFlag = new FeatureFlag(storage, "c", false);
-  const storedDisabledFlag = new FeatureFlag(storage, "d", true);
+  // Create store values and setter/getter functions
+  let aValue = true;
+  let bValue = false;
+  let cValue = false;
+  let dValue = true;
+
+  const createSetterGetter = (value: boolean) => {
+    return {
+      set: (newVal: boolean) => {
+        value = newVal;
+      },
+      get: () => value,
+    };
+  };
+
+  const enabledFlag = new FeatureFlag(
+    storage,
+    "a",
+    true,
+    createSetterGetter(aValue).set,
+    createSetterGetter(aValue).get,
+  );
+
+  const disabledFlag = new FeatureFlag(
+    storage,
+    "b",
+    false,
+    createSetterGetter(bValue).set,
+    createSetterGetter(bValue).get,
+  );
+
+  const storedOverrideFlag = new FeatureFlag(
+    storage,
+    "c",
+    false,
+    createSetterGetter(cValue).set,
+    createSetterGetter(cValue).get,
+  );
+
+  const storedDisabledFlag = new FeatureFlag(
+    storage,
+    "d",
+    true,
+    createSetterGetter(dValue).set,
+    createSetterGetter(dValue).get,
+  );
 
   expect(enabledFlag.isEnabled()).toEqual(true);
   expect(disabledFlag.isEnabled()).toEqual(false);
@@ -34,8 +76,33 @@ test("feature flag to be initialized", () => {
 
 test("feature flag to be set", () => {
   const storage = new MockStorage();
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
+  let aValue = true;
+  let bValue = false;
+
+  const createSetterGetter = (value: boolean) => {
+    return {
+      set: (newVal: boolean) => {
+        value = newVal;
+      },
+      get: () => value,
+    };
+  };
+
+  const enabledFlag = new FeatureFlag(
+    storage,
+    "a",
+    true,
+    createSetterGetter(aValue).set,
+    createSetterGetter(aValue).get,
+  );
+
+  const disabledFlag = new FeatureFlag(
+    storage,
+    "b",
+    false,
+    createSetterGetter(bValue).set,
+    createSetterGetter(bValue).get,
+  );
 
   enabledFlag.set(false);
   disabledFlag.set(true);
@@ -48,8 +115,33 @@ test("feature flag to be set", () => {
 
 test("feature flag to be reset", () => {
   const storage = new MockStorage();
-  const enabledFlag = new FeatureFlag(storage, "a", true);
-  const disabledFlag = new FeatureFlag(storage, "b", false);
+  let aValue = true;
+  let bValue = false;
+
+  const createSetterGetter = (value: boolean) => {
+    return {
+      set: (newVal: boolean) => {
+        value = newVal;
+      },
+      get: () => value,
+    };
+  };
+
+  const enabledFlag = new FeatureFlag(
+    storage,
+    "a",
+    true,
+    createSetterGetter(aValue).set,
+    createSetterGetter(aValue).get,
+  );
+
+  const disabledFlag = new FeatureFlag(
+    storage,
+    "b",
+    false,
+    createSetterGetter(bValue).set,
+    createSetterGetter(bValue).get,
+  );
 
   enabledFlag.set(false);
   disabledFlag.set(true);
