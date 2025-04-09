@@ -4,7 +4,7 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
-import featureFlags, { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
+import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { anyFeatures } from "$lib/legacy/features";
 import { idbStorePinIdentityMaterial } from "$lib/flows/pin/idb";

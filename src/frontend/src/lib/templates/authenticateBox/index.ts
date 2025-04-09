@@ -11,7 +11,7 @@ import {
   PinIdentityMaterial,
   reconstructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
-import featureFlags, { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
+import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
 import { idbRetrievePinIdentityMaterial } from "$lib/flows/pin/idb";

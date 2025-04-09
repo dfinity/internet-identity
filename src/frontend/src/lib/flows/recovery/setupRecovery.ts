@@ -2,7 +2,7 @@ import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { generate } from "$lib/legacy/crypto/mnemonic";
-import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import {

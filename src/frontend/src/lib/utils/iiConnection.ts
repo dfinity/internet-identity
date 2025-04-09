@@ -36,7 +36,7 @@ import type {
 import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { get } from "svelte/store";
-import featureFlags, { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { features } from "$lib/legacy/features";
 import {
   IdentityMetadata,
