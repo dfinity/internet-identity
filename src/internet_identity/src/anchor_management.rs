@@ -324,6 +324,7 @@ fn should_set_name() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::archive::types::Operation;
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
     let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
