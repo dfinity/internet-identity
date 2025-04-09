@@ -9,8 +9,8 @@ use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, DeviceData, DeviceKey, DeviceRegistrationInfo, DeviceWithUsage,
-    IdentityAnchorInfo, MetadataEntry,
+    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
+    DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, MetadataEntry,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -231,6 +231,12 @@ pub fn update_openid_credential(
 /// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
 pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
     storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
+}
+/// Lookup `DeviceKeyWithAnchor` for the given `CredentialId`.
+pub fn lookup_device_key_with_credential_id(
+    credential_id: &CredentialId,
+) -> Option<DeviceKeyWithAnchor> {
+    // storage_borrow(|storage| storage.(key))
 }
 
 #[test]

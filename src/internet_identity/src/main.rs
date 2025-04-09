@@ -1,6 +1,8 @@
-use crate::anchor_management::tentative_device_registration;
 use crate::anchor_management::tentative_device_registration::{
     TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
+};
+use crate::anchor_management::{
+    lookup_device_key_with_credential_id, tentative_device_registration,
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
@@ -244,6 +246,10 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
             credentials
         },
     )
+}
+
+fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
+    lookup_device_key_with_credential_id(&credential_id)
 }
 
 #[update] // this is an update call because queries are not (yet) certified
