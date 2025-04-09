@@ -1136,6 +1136,14 @@ export class ErrorView extends View {
   }
 }
 
+export class NewAuthenticateView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$("#newAuthenticateTitle")
+      .waitForDisplayed({ timeout: 5000 });
+  }
+}
+
 async function setInputValue(
   browser: WebdriverIO.Browser,
   selector: string,

@@ -1,5 +1,5 @@
-import type { ServerInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
+import type { ServerInit } from "@sveltejs/kit";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 

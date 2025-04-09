@@ -73,8 +73,14 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
   false,
 );
 
+export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
+  "DISCOVERABLE_PASSKEY_FLOW",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
+  DISCOVERABLE_PASSKEY_FLOW,
 } as Record<string, FeatureFlagStore>;
