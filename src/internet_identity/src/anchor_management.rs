@@ -220,7 +220,6 @@ pub fn remove_openid_credential(
 
 /// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
 /// Return an error if the `OpenIdCredential` to be updated does not exist.
-#[allow(unused)]
 pub fn update_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
@@ -235,10 +234,8 @@ pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option
 
 /// Set `name` of the given anchor.
 /// Return an error if the `name` to be updated is too long.
-pub fn add_anchor_name(
-    anchor: &mut Anchor,
-    name: Option<String>,
-) -> Result<Operation, AnchorError> {
+#[allow(unused)]
+pub fn set_name(anchor: &mut Anchor, name: Option<String>) -> Result<Operation, AnchorError> {
     let previous_name = anchor.name();
     anchor.set_name(name.clone())?;
     Ok(match (previous_name, name) {
