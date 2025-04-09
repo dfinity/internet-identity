@@ -88,4 +88,4 @@ export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
-} as Record<string, Writable<boolean>>;
+} as Record<string, FeatureFlagStore>;
