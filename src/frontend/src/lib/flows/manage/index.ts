@@ -18,7 +18,7 @@ import { logoutSection } from "$lib/templates/logout";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
-import featureFlags, {
+import {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
 } from "$lib/state/featureFlags";
