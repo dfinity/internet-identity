@@ -99,6 +99,11 @@ type DeviceWithUsage = record {
     metadata : opt MetadataMap;
 };
 
+type DeviceKeyWithAnchor = record {
+    pubkey : DeviceKey;
+    anchor_number : UserNumber;
+};
+
 // Map with some variants for the value type.
 // Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
 type MetadataMap = vec record {
@@ -808,4 +813,7 @@ service : (opt InternetIdentityInit) -> {
     // Only callable by this IIs archive canister.
     fetch_entries : () -> (vec BufferedArchiveEntry);
     acknowledge_entries : (sequence_number : nat64) -> ();
+
+    // Discoverable passkeys protocol
+    lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
 };

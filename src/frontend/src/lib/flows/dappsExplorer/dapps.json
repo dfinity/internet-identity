@@ -103,6 +103,12 @@
     "logo": "nnsfront-enddapp_logo-dark.webp"
   },
   {
+    "name": "NNS Dapp",
+    "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
+    "website": "https://nns.internetcomputer.org",
+    "logo": "nnsfront-enddapp_logo-dark.webp"
+  },
+  {
     "name": "Trax",
     "website": "https://trax.so/",
     "logo": "trax_logo.webp"
