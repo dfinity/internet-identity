@@ -19,6 +19,6 @@ export const reroute: Reroute = ({ url }) => {
     return "/vc-flow/index";
   }
   if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
-    return "/authenticate";
+    return "/new-authenticate";
   }
 };
