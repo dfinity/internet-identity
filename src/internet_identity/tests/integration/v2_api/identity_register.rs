@@ -1,10 +1,11 @@
 mod dynamic_captcha;
 
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, create_identity_with_authn_method_and_name,
+    test_authn_method,
 };
 use candid::Principal;
-use canister_tests::api::internet_identity::api_v2;
+use canister_tests::api::internet_identity::{api_v2, get_anchor_info};
 use canister_tests::framework::{
     arg_with_anchor_range, arg_with_rate_limit, assert_metric, env, get_metrics,
     install_ii_canister, install_ii_canister_with_arg, test_principal, time, II_WASM,
@@ -56,11 +57,16 @@ fn should_transition_flow_principal_to_temp_key() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let identity_nr =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed")
-            .expect("registration finish failed")
-            .identity_number;
+    let identity_nr = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed")
+    .expect("registration finish failed")
+    .identity_number;
 
     // authenticated call
     let result = api_v2::identity_info(&env, canister_id, flow_principal, identity_nr)
@@ -94,9 +100,14 @@ fn should_not_exceed_configured_identity_range() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed");
+    let result = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed");
     assert!(matches!(
         result,
         Err(IdRegFinishError::IdentityLimitReached)
@@ -222,9 +233,14 @@ fn should_fail_on_invalid_metadata() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let result =
-        api_v2::identity_registration_finish(&env, canister_id, flow_principal, &authn_method)
-            .expect("API call failed");
+    let result = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed");
     assert!(matches!(
         result,
         Err(IdRegFinishError::InvalidAuthnMethod(_))
@@ -295,4 +311,18 @@ fn should_not_require_captcha_when_disabled() {
         .expect("registration start failed");
 
     assert!(matches!(result.next_step, RegistrationFlowNextStep::Finish));
+}
+
+#[test]
+fn should_register_new_identity_with_name() {
+    let env = env();
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((42, 44)));
+    let authn_method = test_authn_method();
+    let name = Some("John Doe".to_string());
+    let identity_number =
+        create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone());
+    let anchor_info =
+        get_anchor_info(&env, canister_id, authn_method.principal(), identity_number).unwrap();
+    assert_eq!(anchor_info.name, name);
 }

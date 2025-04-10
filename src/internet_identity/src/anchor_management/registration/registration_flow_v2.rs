@@ -4,7 +4,7 @@ use crate::anchor_management::registration::captcha::{
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
-    activity_bookkeeping, add_openid_credential, post_operation_bookkeeping,
+    activity_bookkeeping, add_openid_credential, post_operation_bookkeeping, set_name,
 };
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::Device;
@@ -199,6 +199,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
 
     let operation = match &arg {
         CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
+            let name = id_reg_finish_arg.name.clone();
             let device = DeviceWithUsage::try_from(id_reg_finish_arg.authn_method.clone())
                 .map(|device| Device::from(DeviceData::from(device)))
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
@@ -206,6 +207,8 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+            set_name(&mut identity, name)
+                .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
                 &mut identity,
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
@@ -217,11 +220,16 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
             let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
-            let openid_credential =
-                openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
-
+            let (openid_credential, name) = openid::with_provider(jwt, |provider| {
+                let openid_credential = provider.verify(jwt, salt)?;
+                let name = provider.metadata_name(openid_credential.metadata.clone());
+                Ok((openid_credential, name))
+            })
+            .map_err(IdRegFinishError::InvalidAuthnMethod)?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+            set_name(&mut identity, name)
+                .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
                 &mut identity,
                 &AuthorizationKey::OpenIdCredentialKey(openid_credential.key()),

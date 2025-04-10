@@ -187,6 +187,7 @@ pub enum CheckCaptchaError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdRegFinishArg {
     pub authn_method: AuthnMethodData,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

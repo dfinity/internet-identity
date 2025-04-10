@@ -59,6 +59,15 @@ pub fn create_identity_with_authn_method(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
+    create_identity_with_authn_method_and_name(env, canister_id, authn_method, None)
+}
+
+pub fn create_identity_with_authn_method_and_name(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    authn_method: &AuthnMethodData,
+    name: Option<String>,
+) -> IdentityNumber {
     // unique flow principal as the time changes every round
     let flow_principal = test_principal(time(env));
     let result = api_v2::identity_registration_start(env, canister_id, flow_principal)
@@ -72,7 +81,7 @@ pub fn create_identity_with_authn_method(
             .expect("check_captcha failed");
     }
 
-    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method)
+    api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method, name)
         .expect("API call failed")
         .expect("registration finish failed")
         .identity_number
