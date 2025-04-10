@@ -850,6 +850,7 @@ describe("openid_identity_registration_finish", () => {
     expect(mockActor.openid_identity_registration_finish).toHaveBeenCalledWith({
       jwt: mockJwt,
       salt: mockSalt,
+      name: [],
     });
   });
 

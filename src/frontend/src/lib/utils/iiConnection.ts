@@ -327,6 +327,7 @@ export class Connection {
     try {
       finishResponse = await actor.identity_registration_finish({
         authn_method: authnMethod,
+        name: [],
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
