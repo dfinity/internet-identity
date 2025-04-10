@@ -1,5 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
+import { isNullish } from "@dfinity/utils";
 
 declare global {
   interface Window {
@@ -20,7 +21,7 @@ const createFeatureFlagStore = (
   const { subscribe, set, update } = writable(defaultValue);
 
   // We cannot use browser because this is also imported in our showcase
-  if (typeof window === "undefined") {
+  if (isNullish(globalThis.window)) {
     return {
       subscribe,
       set,
