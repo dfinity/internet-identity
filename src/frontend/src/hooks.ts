@@ -2,8 +2,8 @@ import { Reroute } from "@sveltejs/kit";
 import { WEBAUTHN_IFRAME_PATH } from "$lib/flows/iframeWebAuthn";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { nonNullish } from "@dfinity/utils";
-import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
-import { get } from "svelte/store";
+// import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
+// import { get } from "svelte/store";
 
 export const reroute: Reroute = ({ url }) => {
   if (nonNullish(getAddDeviceAnchor(url))) {
@@ -18,7 +18,7 @@ export const reroute: Reroute = ({ url }) => {
   if (url.pathname.startsWith("/vc-flow")) {
     return "/vc-flow/index";
   }
-  if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
-    return "/new-authenticate";
-  }
+  // if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
+  //   return "/new-authenticate";
+  // }
 };
