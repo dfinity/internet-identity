@@ -400,6 +400,7 @@ export const authenticateBoxFlow = async <I>({
   // we assume a new user and show the "firstTime" screen.
   const anchors = await getAnchors();
   if (isNonEmptyArray(anchors)) {
+    loginFunnel.trigger(LoginEvents.IdentitiesList);
     const result = await pages.pick({
       anchors,
       autoSelect: autoSelectIdentity,
@@ -414,6 +415,7 @@ export const authenticateBoxFlow = async <I>({
     loginFunnel.trigger(LoginEvents.GoUseExisting);
     return await doPrompt();
   } else {
+    loginFunnel.trigger(LoginEvents.NoIdentities);
     const result = await pages.firstTime();
 
     if (result.tag === "register") {

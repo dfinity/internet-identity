@@ -6,12 +6,13 @@ import { Funnel } from "./Funnel";
  * Square brackets [] indicate optional events.
  *
  * registration-start (INIT)
- *   registration-trigger
- *     registration-webauthn-start
- *       [captcha-check]
- *         registration-created
- *           [copy-new-identity-number]
- *             registration-success
+ *   identities-list | no-identities (come from loginFunnel)
+ *     registration-trigger
+ *       registration-webauthn-start
+ *         [captcha-check]
+ *           registration-created
+ *             [copy-new-identity-number]
+ *               registration-success
  */
 export const RegistrationEvents = {
   Trigger: "registration-trigger",
