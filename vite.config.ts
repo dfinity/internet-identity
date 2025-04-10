@@ -24,56 +24,56 @@ export default defineConfig(({ command, mode }): UserConfig => {
 
   return {
     envPrefix: "II_",
-    resolve: {
-      alias: aliasConfig,
-    },
-    build: {
-      assetsInlineLimit: 0,
-      emptyOutDir: true,
-      rollupOptions: {
-        // Bundle only english words in bip39.
-        external: /.*\/wordlists\/(?!english).*\.json/,
-      },
-      commonjsOptions: {
-        // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
-        strictRequires: true,
-      },
-    },
+    // resolve: {
+    //   alias: aliasConfig,
+    // },
+    // build: {
+    //   assetsInlineLimit: 0,
+    //   emptyOutDir: true,
+    //   rollupOptions: {
+    //     // Bundle only english words in bip39.
+    //     external: /.*\/wordlists\/(?!english).*\.json/,
+    //   },
+    //   commonjsOptions: {
+    //     // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
+    //     strictRequires: true,
+    //   },
+    // },
     plugins: [
       sveltekit(),
       tailwindcss(),
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
-      nodePolyfills({
-        include: ["buffer"],
-      }),
-      [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
-      {
-        ...replicaForwardPlugin({
-          forwardDomains: ["icp0.io", "ic0.app"],
-          forwardRules: [
-            {
-              hosts: ["nice-name.com"],
-              canisterName: "test_app",
-            },
-            {
-              hosts: ["nice-issuer-custom-orig.com"],
-              canisterName: "issuer",
-            },
-            ...(process.env.NO_HOT_RELOAD === "1"
-              ? [
-                  {
-                    hosts: [
-                      "identity.ic0.app",
-                      "identity.internetcomputer.org",
-                    ],
-                    canisterName: "internet_identity",
-                  },
-                ]
-              : []),
-          ],
-        }),
-        apply: "serve",
-      },
+      // nodePolyfills({
+      //   include: ["buffer"],
+      // }),
+      // [...(process.env.TLS_DEV_SERVER === "1" ? [basicSsl()] : [])],
+      // {
+      //   ...replicaForwardPlugin({
+      //     forwardDomains: ["icp0.io", "ic0.app"],
+      //     forwardRules: [
+      //       {
+      //         hosts: ["nice-name.com"],
+      //         canisterName: "test_app",
+      //       },
+      //       {
+      //         hosts: ["nice-issuer-custom-orig.com"],
+      //         canisterName: "issuer",
+      //       },
+      //       ...(process.env.NO_HOT_RELOAD === "1"
+      //         ? [
+      //             {
+      //               hosts: [
+      //                 "identity.ic0.app",
+      //                 "identity.internetcomputer.org",
+      //               ],
+      //               canisterName: "internet_identity",
+      //             },
+      //           ]
+      //         : []),
+      //     ],
+      //   }),
+      //   apply: "serve",
+      // },
     ],
     optimizeDeps: {
       esbuildOptions: {
