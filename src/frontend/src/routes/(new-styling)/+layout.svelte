@@ -1,6 +1,6 @@
 <script lang="ts">
   // Enable new styles only in the new layout pages.
-  import "../../app.css";
+  import "$lib/app.css";
 
   const { children } = $props();
 </script>
