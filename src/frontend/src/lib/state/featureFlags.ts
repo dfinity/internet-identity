@@ -1,5 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
+import { isNullish } from "@dfinity/utils";
 
 declare global {
   interface Window {
@@ -20,7 +21,7 @@ const createFeatureFlagStore = (
   const { subscribe, set, update } = writable(defaultValue);
 
   // We cannot use browser because this is also imported in our showcase
-  if (typeof window === "undefined") {
+  if (isNullish(globalThis.window)) {
     return {
       subscribe,
       set,
@@ -73,8 +74,14 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
   false,
 );
 
+export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
+  "DISCOVERABLE_PASSKEY_FLOW",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
+  DISCOVERABLE_PASSKEY_FLOW,
 } as Record<string, FeatureFlagStore>;
