@@ -345,10 +345,6 @@ export const idlFactory = ({ IDL }) => {
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
   });
-  const DeviceKeyWithAnchor = IDL.Record({
-    pubkey: DeviceKey,
-    anchor_number: UserNumber,
-  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
