@@ -1,7 +1,6 @@
-@import "../../../../node_modules/tailwindcss/dist/lib.d.mts";
+@import "tailwindcss";
+@import "@skeletonlabs/skeleton";
+@import "@skeletonlabs/skeleton/optional/presets";
+@import "@skeletonlabs/skeleton/themes/cerberus";
 
-@import "index.css";
-@import "presets.css";
-@import "cerberus.css";
-
-@import "../../../../node_modules/@skeletonlabs/skeleton-svelte/dist";
+@source '../../../../node_modules/@skeletonlabs/skeleton-svelte/dist';
