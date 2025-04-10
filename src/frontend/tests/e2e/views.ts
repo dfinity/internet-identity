@@ -3,7 +3,6 @@ import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { assert } from "vitest";
 import { waitToClose } from "./util";
-import { ElementArray } from "webdriverio";
 
 class View {
   constructor(protected browser: WebdriverIO.Browser) {}

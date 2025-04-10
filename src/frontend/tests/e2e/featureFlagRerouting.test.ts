@@ -2,7 +2,7 @@ import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
 import { NewAuthenticateView, AuthenticateView } from "./views";
 
-const checkIfHasTailwind = async (browser: WebdriverIO.Browser) => {
+const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   return browser.execute(async () => {
     for (const style of Array.from(document.styleSheets)) {
       const rules = await style.cssRules;
@@ -17,7 +17,7 @@ const checkIfHasTailwind = async (browser: WebdriverIO.Browser) => {
   });
 };
 
-const checkIfHasSkeleton = async (browser: WebdriverIO.Browser) => {
+const checkIfHasSkeleton = (browser: WebdriverIO.Browser) => {
   return browser.execute(async () => {
     for (const style of Array.from(document.styleSheets)) {
       const rules = await style.cssRules;
