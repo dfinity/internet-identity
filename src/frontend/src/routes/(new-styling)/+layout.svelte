@@ -1,0 +1,8 @@
+<script lang="ts">
+  // Enable new styles only in the new layout pages.
+  import "$lib/app.css";
+
+  const { children } = $props();
+</script>
+
+{@render children()}

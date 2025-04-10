@@ -5,7 +5,7 @@ import packagejson from "./package.json" with { type: "json" };
 /** @type {import("@sveltejs/kit").Config} */
 const config = {
   // Consult https://svelte.dev/docs/kit/integrations for more information about preprocessors
-  preprocess: vitePreprocess({ style: false, script: false }),
+  preprocess: vitePreprocess(),
   kit: {
     // See https://svelte.dev/docs/kit/adapters for more information about adapters.
     adapter: adapter({
