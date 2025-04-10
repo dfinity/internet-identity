@@ -219,13 +219,16 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             }
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
-            let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
-            let openid_credential =
-                openid::verify(jwt, salt).map_err(IdRegFinishError::InvalidAuthnMethod)?;
-
+            let OpenIDRegFinishArg { jwt, salt } = openid_registration_data;
+            let (openid_credential, name) = openid::with_provider(jwt, |provider| {
+                let openid_credential = provider.verify(jwt, salt)?;
+                let name = provider.metadata_name(openid_credential.metadata.clone());
+                Ok((openid_credential, name))
+            })
+            .map_err(IdRegFinishError::InvalidAuthnMethod)?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-            set_name(&mut identity, name.clone())
+            set_name(&mut identity, name)
                 .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
                 &mut identity,

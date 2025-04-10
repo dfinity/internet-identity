@@ -90,10 +90,18 @@ impl OpenIdCredential {
     }
 }
 
-trait OpenIdProvider {
+pub trait OpenIdProvider {
     fn issuer(&self) -> &'static str;
 
+    /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
+    ///
+    /// # Arguments
+    ///
+    /// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
+    /// * `salt`: The random salt that was used to bind the nonce to the caller principal
     fn verify(&self, jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String>;
+
+    fn metadata_name(&self, metadata: HashMap<String, MetadataEntryV2>) -> Option<String>;
 }
 
 #[derive(Deserialize)]
@@ -110,27 +118,23 @@ pub fn setup_google(config: OpenIdConfig) {
         .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
 }
 
-/// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
-///
-/// # Arguments
-///
-/// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
-/// * `salt`: The random salt that was used to bind the nonce to the caller principal
-pub fn verify(jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, String> {
+pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, String>
+where
+    F: FnOnce(&dyn OpenIdProvider) -> Result<R, String>,
+{
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .map_err(|_| "Failed to decode JWT")?;
+
     let claims: PartialClaims =
         serde_json::from_slice(validation_item.claims()).map_err(|_| "Unable to decode claims")?;
 
     PROVIDERS.with_borrow(|providers| {
-        match providers
+        providers
             .iter()
             .find(|provider| provider.issuer() == claims.iss)
-        {
-            Some(provider) => provider.verify(jwt, salt),
-            None => Err(format!("Unsupported issuer: {}", claims.iss)),
-        }
+            .ok_or_else(|| format!("Unsupported issuer: {}", claims.iss))
+            .and_then(|provider| callback(provider.as_ref()))
     })
 }
 
@@ -183,6 +187,10 @@ impl OpenIdProvider for ExampleProvider {
     fn verify(&self, _: &str, _: &[u8; 32]) -> Result<OpenIdCredential, String> {
         Ok(self.credential())
     }
+
+    fn metadata_name(&self, _metadata: HashMap<String, MetadataEntryV2>) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -205,7 +213,10 @@ fn should_return_credential() {
     PROVIDERS.replace(vec![Box::new(provider)]);
     let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIn0.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
 
-    assert_eq!(verify(jwt, &[0u8; 32]), Ok(credential));
+    assert_eq!(
+        with_provider(jwt, |provider| provider.verify(jwt, &[0u8; 32])),
+        Ok(credential)
+    );
 }
 
 #[test]
@@ -214,7 +225,7 @@ fn should_return_error_unsupported_issuer() {
     let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIn0.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
 
     assert_eq!(
-        verify(jwt, &[0u8; 32]),
+        with_provider(jwt, |provider| provider.verify(jwt, &[0u8; 32])),
         Err("Unsupported issuer: https://example.com".into())
     );
 }
@@ -224,7 +235,8 @@ fn should_return_error_when_encoding_invalid() {
     let invalid_jwt = "invalid-jwt";
 
     assert_eq!(
-        verify(invalid_jwt, &[0u8; 32]),
+        with_provider(invalid_jwt, |provider| provider
+            .verify(invalid_jwt, &[0u8; 32])),
         Err("Failed to decode JWT".to_string())
     );
 }
@@ -234,7 +246,8 @@ fn should_return_error_when_claims_invalid() {
     let jwt_without_issuer = "eyJhbGciOiJIUzI1NiJ9.e30.ZRrHA1JJJW8opsbCGfG_HACGpVUMN_a9IV7pAx_Zmeo";
 
     assert_eq!(
-        verify(jwt_without_issuer, &[0u8; 32]),
+        with_provider(jwt_without_issuer, |provider| provider
+            .verify(jwt_without_issuer, &[0u8; 32])),
         Err("Unable to decode claims".to_string())
     );
 }
