@@ -1,16 +1,35 @@
 import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
 import { NewAuthenticateView, AuthenticateView } from "./views";
-import { ElementArray } from "webdriverio";
 
-const checkIfHasTailwind = async (styles: ElementArray) => {
-  for (const style of styles) {
-    const text = await style.getHTML();
-    if (await text.includes("tailwindcss")) {
-      return true;
+const checkIfHasTailwind = async (browser: WebdriverIO.Browser) => {
+  return browser.execute(async () => {
+    for (const style of Array.from(document.styleSheets)) {
+      const rules = await style.cssRules;
+      for (const rule of Array.from(rules)) {
+        if (rule.cssText.includes("@layer base")) {
+          // This should be tailwind only but can be made more specific
+          return true;
+        }
+      }
     }
-  }
-  return false;
+    return false;
+  });
+};
+
+const checkIfHasSkeleton = async (browser: WebdriverIO.Browser) => {
+  return browser.execute(async () => {
+    for (const style of Array.from(document.styleSheets)) {
+      const rules = await style.cssRules;
+      for (const rule of Array.from(rules)) {
+        if (rule.cssText.includes("cerberus")) {
+          // This should be tailwind only but can be made more specific
+          return true;
+        }
+      }
+    }
+    return false;
+  });
 };
 
 test("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
@@ -18,7 +37,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     // Visit the root with feature flag
     await browser.url(`${II_URL}/?feature_flag_discoverable_passkey_flow=true`);
 
-    // Check that we're redirected to authenticate page
+    // Check that we're redirected to new-authenticate page
     const newAuthenticateView = new NewAuthenticateView(browser);
     await newAuthenticateView.waitForDisplay();
 
@@ -26,10 +45,10 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     expect(await browser.getUrl()).toBe(`${II_URL}/`);
 
     // Check that app.css is loaded by verifying it's in the document
-    const hasAppCss = await checkIfHasTailwind(
-      await newAuthenticateView.getStyleSheets(),
-    );
-    expect(hasAppCss).toBe(true);
+    const hasTailwind = await checkIfHasTailwind(browser);
+    const hasSkeleton = await checkIfHasSkeleton(browser);
+    expect(hasTailwind).toBe(true);
+    expect(hasSkeleton).toBe(true);
   });
 }, 300_000);
 
@@ -38,14 +57,13 @@ test("Should show regular view without feature flag and not load app.css", async
     // Visit the root without feature flag
     await browser.url(II_URL);
 
-    // Check that we're on the regular page (not authenticate)
+    // Check that we're on the regular page (not new-authenticate)
     const authenticateView = new AuthenticateView(browser);
     await authenticateView.waitForDisplay();
 
-    // Check that app.css is loaded by verifying it's in the document
-    const hasAppCss = await checkIfHasTailwind(
-      await authenticateView.getStyleSheets(),
-    );
-    expect(hasAppCss).toBe(false);
+    const hasTailwind = await checkIfHasTailwind(browser);
+    const hasSkeleton = await checkIfHasSkeleton(browser);
+    expect(hasTailwind).toBe(false);
+    expect(hasSkeleton).toBe(false);
   });
 }, 300_000);

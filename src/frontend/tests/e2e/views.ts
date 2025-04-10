@@ -649,10 +649,6 @@ export class AuthenticateView extends View {
       .waitForDisplayed();
     await this.browser.$('[data-action="recover-with-device"]').click();
   }
-
-  getStyleSheets(): Promise<ElementArray> {
-    return this.browser.$$("style");
-  }
 }
 
 export class WelcomeBackView extends View {
@@ -1146,10 +1142,6 @@ export class NewAuthenticateView extends View {
     await this.browser
       .$('[data-role="new-authenticate-view"]')
       .waitForDisplayed({ timeout: 5000 });
-  }
-
-  getStyleSheets(): Promise<ElementArray> {
-    return this.browser.$$("style");
   }
 }
 
