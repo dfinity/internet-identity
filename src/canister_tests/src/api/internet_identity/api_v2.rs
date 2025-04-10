@@ -43,6 +43,7 @@ pub fn identity_registration_finish(
     canister_id: CanisterId,
     sender: Principal,
     authn_method: &AuthnMethodData,
+    name: Option<String>,
 ) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
     call_candid_as(
         env,
@@ -52,6 +53,7 @@ pub fn identity_registration_finish(
         "identity_registration_finish",
         (IdRegFinishArg {
             authn_method: authn_method.clone(),
+            name,
         },),
     )
     .map(|(x,)| x)
