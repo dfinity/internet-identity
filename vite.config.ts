@@ -40,8 +40,8 @@ export default defineConfig(({ command, mode }): UserConfig => {
       },
     },
     plugins: [
-      sveltekit(),
       tailwindcss(),
+      sveltekit(),
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],
