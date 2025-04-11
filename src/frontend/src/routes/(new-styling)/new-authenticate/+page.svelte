@@ -40,8 +40,7 @@
   };
 
   const handleContinueWithOtherIdentity = () => {
-    //TODO
-    console.log("continuing with other");
+    lastUsedIdentity = undefined;
   };
 </script>
 

@@ -17,7 +17,7 @@
   // TODO: this should really be pulled from a central store that initializes itself on load
   // TODO: of course we would also need to pull account/profile/role/login info, but one thing
   // TODO: after another
-  let lastUsedIdentity = $state<string | undefined>();
+  let lastUsedIdentity = $state<string | undefined>("gargle");
 
   const handleContinueWithPasskey = () => {
     showPasskeyCard = true;
@@ -43,8 +43,7 @@
   };
 
   const handleContinueWithOtherIdentity = () => {
-    //TODO
-    console.log("continuing with other");
+    lastUsedIdentity = undefined;
   };
 </script>
 
