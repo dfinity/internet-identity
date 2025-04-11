@@ -12,7 +12,7 @@
   // TODO: this should really be pulled from a central store that initializes itself on load
   // TODO: of course we would also need to pull account/profile/role/login info, but one thing
   // TODO: after another
-  let lastUsedIdentity = $state<string | undefined>("shpargle");
+  let lastUsedIdentity = $state<string | undefined>();
   let showPasskeyCard = $state(false);
 
   const handleContinueWithPasskey = () => {

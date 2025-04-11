@@ -17,7 +17,7 @@
   // TODO: this should really be pulled from a central store that initializes itself on load
   // TODO: of course we would also need to pull account/profile/role/login info, but one thing
   // TODO: after another
-  let lastUsedIdentity = $state<string | undefined>("shpargle");
+  let lastUsedIdentity = $state<string | undefined>();
 
   const handleContinueWithPasskey = () => {
     showPasskeyCard = true;
@@ -70,6 +70,7 @@
       >
     {:else}
       <!-- TODO: here we would actually select the account, not the identity -->
+      <!-- TODO: text-left not working -->
       <Button
         onclick={handleContinueWithLastUsedIdentity}
         class="w-full px-6 py-4 text-left"
