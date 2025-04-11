@@ -9,7 +9,6 @@ export const init: ServerInit = () => {
   //
   // Example: ?feature_flag_openid_authentication=true
 
-  // need to remove the hash because otherwise searchParams fails
   const url = new URL(window.location.href);
 
   for (const [key, value] of url.searchParams.entries()) {
