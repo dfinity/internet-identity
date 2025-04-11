@@ -16,7 +16,7 @@
     variant === "primary"
       ? "preset-filled bg-ii-background-primary-dark text-ii-background-primary-light dark:bg-ii-background-primary-light dark:text-ii-background-primary-dark"
       : variant === "secondary"
-        ? "border-ii-text-primary-light border-2 border-solid border-box"
+        ? "border-ii-text-primary-dark dark:border-ii-text-primary-light preset-outlined"
         : variant === "text-only"
           ? ""
           : "";
