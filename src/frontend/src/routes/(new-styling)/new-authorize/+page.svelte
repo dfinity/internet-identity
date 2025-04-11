@@ -8,16 +8,19 @@
   import PasskeyCard from "$lib/components/UI/PasskeyCard.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { goto } from "$app/navigation";
+  import { isNullish } from "@dfinity/utils";
 
-  let showPasskeyCard = $state(true);
+  let showPasskeyCard = $state(false);
 
-  //TODO: get dapp name via postmessageinterface
-  let dappName = "DAPP";
+  // TODO: get dapp name via postmessageinterface
+  let dappName = $state<string>("DAPP");
+  // TODO: this should really be pulled from a central store that initializes itself on load
+  // TODO: of course we would also need to pull account/profile/role/login info, but one thing
+  // TODO: after another
+  let lastUsedIdentity = $state<string | undefined>("shpargle");
 
   const handleContinueWithPasskey = () => {
-    //TODO
     showPasskeyCard = true;
-    console.log("continuing with passkey");
   };
 
   const handleContinueWithGoogle = () => {
@@ -31,8 +34,17 @@
   };
 
   const handleGotoCreatePasskey = () => {
-    console.log("going to create passkey");
     goto("/new-authorize/name-identity");
+  };
+
+  const handleContinueWithLastUsedIdentity = () => {
+    //TODO
+    console.log("continuing with last used");
+  };
+
+  const handleContinueWithOtherIdentity = () => {
+    //TODO
+    console.log("continuing with other");
   };
 </script>
 
@@ -41,18 +53,34 @@
   <CenterCard>
     <div class="flex flex-col gap-1">
       <h1 class="h1 font-bold">[Sign in]</h1>
-      <h2 class="p font-medium">
+      <p class="p font-medium">
         to continue with <span class="font-bold">{dappName}</span>
-      </h2>
+      </p>
     </div>
-    <Button onclick={handleContinueWithPasskey} class="w-full" variant="primary"
-      >Continue with Passkey</Button
-    >
-    <Button
-      onclick={handleContinueWithGoogle}
-      class="w-full"
-      variant="secondary">Continue with Google</Button
-    >
+    {#if isNullish(lastUsedIdentity)}
+      <Button
+        onclick={handleContinueWithPasskey}
+        class="w-full"
+        variant="primary">Continue with Passkey</Button
+      >
+      <Button
+        onclick={handleContinueWithGoogle}
+        class="w-full"
+        variant="secondary">Continue with Google</Button
+      >
+    {:else}
+      <!-- TODO: here we would actually select the account, not the identity -->
+      <Button
+        onclick={handleContinueWithLastUsedIdentity}
+        class="w-full px-6 py-4 text-left"
+        variant="primary">Continue as {lastUsedIdentity}</Button
+      >
+      <Button
+        onclick={handleContinueWithOtherIdentity}
+        class="w-full px-6 py-4 text-left"
+        variant="dashed">Use another Internet Identity</Button
+      >
+    {/if}
   </CenterCard>
 
   {#if showPasskeyCard}

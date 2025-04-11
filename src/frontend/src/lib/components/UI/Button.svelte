@@ -7,7 +7,7 @@
   } = $props<{
     children: () => any;
     class?: string;
-    variant?: "primary" | "secondary" | "text-only";
+    variant?: "primary" | "secondary" | "text-only" | "dashed";
     [key: string]: any;
   }>();
 
@@ -19,7 +19,9 @@
         ? "border-ii-text-primary-dark dark:border-ii-text-primary-light preset-outlined"
         : variant === "text-only"
           ? ""
-          : "";
+          : variant === "dashed"
+            ? "border-dashed preset-outlined border-ii-text-primary-dark dark:border-ii-text-primary-light"
+            : "";
 </script>
 
 <button
