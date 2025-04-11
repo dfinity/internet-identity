@@ -4,11 +4,13 @@
   const {
     handleConnectPasskey,
     handleGotoCreateIdentity,
+    close,
     ...rest
   }: {
     handleConnectPasskey: () => void;
     handleGotoCreateIdentity: () => void;
     [key: string]: any;
+    close: () => void;
   } = $props();
 </script>
 
@@ -23,5 +25,8 @@
     onclick={handleGotoCreateIdentity}
     class="w-full max-w-96"
     variant="secondary">Don't have a passkey? Create one</Button
+  >
+  <Button class="w-full max-w-96" onclick={close} variant="secondary"
+    >Back</Button
   >
 </div>

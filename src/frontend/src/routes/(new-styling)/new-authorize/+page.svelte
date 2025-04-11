@@ -108,7 +108,11 @@
     <BottomCard {close}>
       {#if !creatingIdentity}
         <FlyWrapper handleTransitionEnd={transitionedOut}>
-          <PasskeyCard {handleConnectPasskey} {handleGotoCreateIdentity} />
+          <PasskeyCard
+            {handleConnectPasskey}
+            {handleGotoCreateIdentity}
+            {close}
+          />
         </FlyWrapper>
       {:else if hasTransitionedOut}
         <!-- TODO: handle resizing -->
