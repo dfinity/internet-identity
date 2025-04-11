@@ -12,15 +12,12 @@ export const reroute: Reroute = ({ url }) => {
     return "/register/device";
   }
   if (url.hash === "#authorize") {
-    return "/authorize";
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
   }
   if (url.hash === WEBAUTHN_IFRAME_PATH) {
     return "/iframe/webauthn";
   }
   if (url.pathname.startsWith("/vc-flow")) {
     return "/vc-flow/index";
-  }
-  if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
-    return "/new-authenticate";
   }
 };
