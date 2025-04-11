@@ -201,6 +201,7 @@
       <Button
         onclick={handleContinueWithGoogle}
         class="w-full"
+        disabled
         variant="secondary">Continue with Google</Button
       >
     {:else}
