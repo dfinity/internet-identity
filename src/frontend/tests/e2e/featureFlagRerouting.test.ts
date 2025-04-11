@@ -44,7 +44,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     await newAuthorizeView.waitForDisplay();
 
     // Verify URL shows only "/"
-    expect(await browser.getUrl()).toBe(`${II_URL}/`);
+    expect(await browser.getUrl()).toBe(`${II_URL}/#authorize`);
 
     // Check that app.css is loaded by verifying it's in the document
     const hasTailwind = await checkIfHasTailwind(browser);
