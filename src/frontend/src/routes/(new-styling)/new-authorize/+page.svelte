@@ -7,17 +7,20 @@
   import Button from "$lib/components/UI/Button.svelte";
   import PasskeyCard from "$lib/components/UI/PasskeyCard.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
-  import { goto } from "$app/navigation";
   import { isNullish } from "@dfinity/utils";
+  import NameIdentityCard from "$lib/components/UI/NameIdentityCard.svelte";
+  import BottomCard from "$lib/components/UI/BottomCard.svelte";
+  import FlyWrapper from "$lib/components/UI/animation/FlyWrapper.svelte";
 
   let showPasskeyCard = $state(false);
+  let creatingIdentity = $state(false);
 
   // TODO: get dapp name via postmessageinterface
   let dappName = $state<string>("DAPP");
   // TODO: this should really be pulled from a central store that initializes itself on load
   // TODO: of course we would also need to pull account/profile/role/login info, but one thing
   // TODO: after another
-  let lastUsedIdentity = $state<string | undefined>("gargle");
+  let lastUsedIdentity = $state<string | undefined>();
 
   const handleContinueWithPasskey = () => {
     showPasskeyCard = true;
@@ -33,8 +36,8 @@
     console.log("connecting passkey");
   };
 
-  const handleGotoCreatePasskey = () => {
-    goto("/new-authorize/name-identity");
+  const handleGotoCreateIdentity = () => {
+    creatingIdentity = true;
   };
 
   const handleContinueWithLastUsedIdentity = () => {
@@ -44,6 +47,24 @@
 
   const handleContinueWithOtherIdentity = () => {
     lastUsedIdentity = undefined;
+  };
+
+  const handleCreateIdentity = () => {
+    // TODO
+  };
+
+  const close = () => {
+    showPasskeyCard = false;
+    creatingIdentity = false;
+    hasTransitionedOut = false;
+  };
+
+  //TODO: there are be more elegant ways to do this
+  let hasTransitionedOut = $state(false);
+
+  const transitionedOut = () => {
+    console.log("finished transitino");
+    hasTransitionedOut = true;
   };
 </script>
 
@@ -84,12 +105,17 @@
   </CenterCard>
 
   {#if showPasskeyCard}
-    <PasskeyCard
-      close={() => {
-        showPasskeyCard = false;
-      }}
-      {handleConnectPasskey}
-      {handleGotoCreatePasskey}
-    />
+    <BottomCard {close}>
+      {#if !creatingIdentity}
+        <FlyWrapper handleTransitionEnd={transitionedOut}>
+          <PasskeyCard {handleConnectPasskey} {handleGotoCreateIdentity} />
+        </FlyWrapper>
+      {:else if hasTransitionedOut}
+        <!-- TODO: handle resizing -->
+        <FlyWrapper delay={300}>
+          <NameIdentityCard class="relative" {handleCreateIdentity} {close} />
+        </FlyWrapper>
+      {/if}
+    </BottomCard>
   {/if}
 </CenterContainer>

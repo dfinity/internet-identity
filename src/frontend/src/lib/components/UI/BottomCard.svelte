@@ -27,7 +27,7 @@
 </script>
 
 <div
-  class="fixed top-0 left-0 h-screen w-screen backdrop-blur-3xl backdrop-brightness-50"
+  class="fixed top-0 left-0 h-screen w-screen backdrop-blur-3xl backdrop-brightness-50 transition-all"
   onclick={handleClick}
   onkeydown={handleKeydown}
   role="button"

@@ -2,7 +2,7 @@
   // Enable new styles only in the new layout pages.
   import "$lib/app.css";
   import Background from "$lib/components/UI/Background.svelte";
-  import { fly } from "svelte/transition";
+  import FlyWrapper from "$lib/components/UI/animation/FlyWrapper.svelte";
 
   const { children, data } = $props();
 </script>
@@ -11,18 +11,8 @@
   <Background
     class="text-ii-text-primary-dark dark:text-ii-text-primary-light bg-ii-background-primary-light dark:bg-ii-background-primary-dark"
   >
-    <div
-      in:fly={{
-        duration: 300,
-        delay: 300,
-        x: 200,
-      }}
-      out:fly={{
-        duration: 300,
-        x: -200,
-      }}
-    >
+    <FlyWrapper>
       {@render children()}
-    </div>
+    </FlyWrapper>
   </Background>
 {/key}
