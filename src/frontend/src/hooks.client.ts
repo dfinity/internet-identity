@@ -8,7 +8,12 @@ export const init: ServerInit = () => {
   // including other hooks runs that might depend on these feature flags.
   //
   // Example: ?feature_flag_openid_authentication=true
-  const url = new URL(window.location.href);
+
+  // need to remove the hash because otherwise searchParams fails
+  const url = new URL(
+    window.location.href.replace("#", "--temporary-replacement--"),
+  );
+
   for (const [key, value] of url.searchParams.entries()) {
     if (key.startsWith(FEATURE_FLAG_PREFIX)) {
       const flag = key.slice(FEATURE_FLAG_PREFIX.length).toUpperCase();
@@ -26,6 +31,10 @@ export const init: ServerInit = () => {
       url.searchParams.delete(key);
     }
   }
+
+  url.href = url.href.replace("--temporary-replacement--", "#");
+  url.pathname = url.pathname.replace("--temporary-replacement--", "#");
+
   // After a feature flag override has been processed, it's removed from the url
   // to avoid confusing users with unexpected information they don't understand.
   //

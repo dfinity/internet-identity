@@ -183,8 +183,8 @@
   };
 </script>
 
-<!-- an element with data-role 'new-authorize-view' is necessary for the e2e tests to pass -->
-<CenterContainer data-role="new-authorize-view">
+<!-- an element with data-page 'new-authorize-view' is necessary for the e2e tests to pass -->
+<CenterContainer data-page="new-authorize-view">
   <CenterCard>
     <div class="flex flex-col gap-1">
       <h1 class="h1 font-bold">[Sign in]</h1>

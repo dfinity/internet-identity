@@ -1147,7 +1147,7 @@ export class NewAuthenticateView extends View {
 export class NewAuthorizeView extends View {
   async waitForDisplay(): Promise<void> {
     await this.browser
-      .$('[data-role="new-authorize-view"]')
+      .$('[data-page="new-authorize-view"]')
       .waitForDisplayed({ timeout: 5000 });
   }
 }

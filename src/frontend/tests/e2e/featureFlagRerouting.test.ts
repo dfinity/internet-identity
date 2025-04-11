@@ -40,8 +40,8 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     );
 
     // Check that we're redirected to new-authenticate page
-    const newAuthenticateView = new NewAuthorizeView(browser);
-    await newAuthenticateView.waitForDisplay();
+    const newAuthorizeView = new NewAuthorizeView(browser);
+    await newAuthorizeView.waitForDisplay();
 
     // Verify URL shows only "/"
     expect(await browser.getUrl()).toBe(`${II_URL}/`);
@@ -57,7 +57,9 @@ test("Should redirect to new-styling authenticate with feature flag and load app
 test("Should show regular view without feature flag and not load app.css", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Visit the root without feature flag
-    await browser.url(`${II_URL}/#authorize`);
+    await browser.url(
+      `${II_URL}/#authorize?feature_flag_discoverable_passkey_flow=false`,
+    );
 
     // Check that we're on the regular page (not new-authenticate)
     const authenticateView = new AuthenticateView(browser);
