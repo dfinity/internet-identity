@@ -5,10 +5,9 @@
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
   import Button from "$lib/components/UI/Button.svelte";
   import PasskeyCard from "$lib/components/UI/PasskeyCard.svelte";
-  import { goto } from "$app/navigation";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish } from "@dfinity/utils";
-  import BottomCard from "$lib/components/UI/BottomCard.svelte";
+  import BottomCardOrModal from "$lib/components/UI/BottomCardOrModal.svelte";
   import FlyWrapper from "$lib/components/UI/animation/FlyWrapper.svelte";
   import NameIdentityCard from "$lib/components/UI/NameIdentityCard.svelte";
 
@@ -99,7 +98,7 @@
     {/if}
   </CenterCard>
   {#if showPasskeyCard}
-    <BottomCard {close}>
+    <BottomCardOrModal {close}>
       {#if !creatingIdentity}
         <FlyWrapper handleTransitionEnd={transitionedOut}>
           <PasskeyCard
@@ -114,6 +113,6 @@
           <NameIdentityCard class="relative" {handleCreateIdentity} {close} />
         </FlyWrapper>
       {/if}
-    </BottomCard>
+    </BottomCardOrModal>
   {/if}
 </CenterContainer>

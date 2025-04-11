@@ -9,8 +9,8 @@
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish } from "@dfinity/utils";
   import NameIdentityCard from "$lib/components/UI/NameIdentityCard.svelte";
-  import BottomCard from "$lib/components/UI/BottomCard.svelte";
   import FlyWrapper from "$lib/components/UI/animation/FlyWrapper.svelte";
+  import BottomCardOrModal from "$lib/components/UI/BottomCardOrModal.svelte";
 
   let showPasskeyCard = $state(false);
   let creatingIdentity = $state(false);
@@ -105,7 +105,7 @@
   </CenterCard>
 
   {#if showPasskeyCard}
-    <BottomCard {close}>
+    <BottomCardOrModal {close}>
       {#if !creatingIdentity}
         <FlyWrapper handleTransitionEnd={transitionedOut}>
           <PasskeyCard
@@ -120,6 +120,6 @@
           <NameIdentityCard class="relative" {handleCreateIdentity} {close} />
         </FlyWrapper>
       {/if}
-    </BottomCard>
+    </BottomCardOrModal>
   {/if}
 </CenterContainer>
