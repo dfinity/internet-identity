@@ -5,3 +5,11 @@
 @import "@skeletonlabs/skeleton/themes/cerberus";
 
 @source '../../../../node_modules/@skeletonlabs/skeleton-svelte/dist';
+
+@theme {
+  --color-ii-background-primary-light: oklch(0.85 0.0222 222.35);
+  --color-ii-background-primary-dark: oklch(0.21 0.0271 271.06);
+
+  --color-ii-text-primary-dark: oklch(0.21 0.0271 271.06);
+  --color-ii-text-primary-light: oklch(0.85 0.0222 222.35);
+}
