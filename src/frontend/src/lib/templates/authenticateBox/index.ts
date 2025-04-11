@@ -748,7 +748,7 @@ const loginPinIdentityMaterial = ({
         pinIdentityMaterial,
       });
 
-      return connection.fromIdentity(userNumber, identity);
+      return connection.fromIdentity(() => userNumber, identity);
     } catch {
       // We handle all exceptions as wrong PIN because there is no nice way to check for that particular failure.
       // The best we could do is check that the error is a DOMException and that the name is "OperationError". However,

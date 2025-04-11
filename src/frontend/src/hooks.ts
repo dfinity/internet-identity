@@ -20,7 +20,11 @@ export const reroute: Reroute = ({ url }) => {
   if (url.pathname.startsWith("/vc-flow")) {
     return "/vc-flow/index";
   }
-  if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
-    return "/new-authenticate";
+  // TODO: this is out of scope for this release
+  // if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
+  //   return "/new-authenticate";
+  // }
+  if (url.hash === "#authorize") {
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
   }
 };
