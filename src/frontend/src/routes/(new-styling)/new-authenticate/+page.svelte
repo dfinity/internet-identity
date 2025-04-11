@@ -64,7 +64,6 @@
   };
 </script>
 
-<!-- an element with id 'newAuthenticateTitle' is necessary for the e2e tests to pass -->
 <CenterContainer data-role="new-authenticate-view">
   <CenterCard>
     <div class="flex flex-col gap-1">

@@ -11,20 +11,21 @@ export const reroute: Reroute = ({ url }) => {
   if (nonNullish(getAddDeviceAnchor(url))) {
     return "/register/device";
   }
-  if (url.hash === "#authorize") {
-    return "/authorize";
-  }
   if (url.hash === WEBAUTHN_IFRAME_PATH) {
     return "/iframe/webauthn";
   }
   if (url.pathname.startsWith("/vc-flow")) {
     return "/vc-flow/index";
   }
+  if (url.hash === "#authorize") {
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
+  }
   // TODO: this is out of scope for this release
   // if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
   //   return "/new-authenticate";
   // }
-  if (url.hash === "#authorize") {
-    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
+  // for now, reroute to index if someone tries to get in there
+  if (url.pathname === "/new-authenticate") {
+    return "/";
   }
 };

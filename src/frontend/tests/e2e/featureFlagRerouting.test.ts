@@ -1,6 +1,6 @@
 import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
-import { NewAuthenticateView, AuthenticateView } from "./views";
+import { NewAuthorizeView, AuthenticateView } from "./views";
 
 const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   return browser.execute(async () => {
@@ -40,7 +40,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     );
 
     // Check that we're redirected to new-authenticate page
-    const newAuthenticateView = new NewAuthenticateView(browser);
+    const newAuthenticateView = new NewAuthorizeView(browser);
     await newAuthenticateView.waitForDisplay();
 
     // Verify URL shows only "/"

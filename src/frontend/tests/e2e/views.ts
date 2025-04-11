@@ -1144,6 +1144,14 @@ export class NewAuthenticateView extends View {
   }
 }
 
+export class NewAuthorizeView extends View {
+  async waitForDisplay(): Promise<void> {
+    await this.browser
+      .$('[data-role="new-authorize-view"]')
+      .waitForDisplayed({ timeout: 5000 });
+  }
+}
+
 async function setInputValue(
   browser: WebdriverIO.Browser,
   selector: string,
