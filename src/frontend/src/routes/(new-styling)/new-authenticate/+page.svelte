@@ -59,7 +59,6 @@
   let hasTransitionedOut = $state(false);
 
   const transitionedOut = () => {
-    console.log("finished transitino");
     hasTransitionedOut = true;
   };
 </script>

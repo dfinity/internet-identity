@@ -28,7 +28,7 @@
   <Button
     variant="primary"
     disabled={name.length === 0}
-    onclick={handleCreateIdentity}>Identify with Passkey</Button
+    onclick={() => handleCreateIdentity(name)}>Identify with Passkey</Button
   >
   <Button onclick={close} variant="secondary">Back</Button>
 </div>
