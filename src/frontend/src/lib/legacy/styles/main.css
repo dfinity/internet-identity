@@ -1220,23 +1220,19 @@ a:hover,
   position: relative;
 
   padding: var(--bezel-y) var(--bezel-x);
-  /* border: var(--rs-line) solid var(--rc-line); */
 
   background-color: var(--nvc-surface-dark);
   border-radius: var(--rs-card-border-radius);
 }
 
 .c-card:has(.c-output--recovery) {
-  /* may god have mercy on my soul part 2 */
   background-color: transparent !important;
 }
 
 .c-card--invisible {
-  /* may god have mercy on my soul */
   background-color: transparent !important;
 }
 
-/* may god not get bored of having mercy on my soul */
 @media (max-width: 512px) {
   .c-card:has([data-page="authenticate"]) {
     margin: 1rem;
