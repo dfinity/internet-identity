@@ -424,26 +424,6 @@ export class Connection {
     return this.handleIdentityFinishErrors(finishResponse);
   };
 
-  openid_identity_registration_finish2 = async (
-    identity: SignIdentity,
-    jwt: JWT,
-    salt: Salt,
-  ): Promise<LoginSuccess> => {
-    const actor = await this.createActor(identity);
-    const response = await actor
-      .openid_identity_registration_finish({
-        jwt,
-        salt,
-      })
-      .then(throwCanisterError);
-    return {
-      kind: "loginSuccess",
-      connection: await this.fromJwt(jwt, salt, identity),
-      userNumber: response.identity_number,
-      showAddCurrentDevice: false,
-    };
-  };
-
   private handleIdentityFinishErrors(finishResponse: {
     Err: IdRegFinishError;
   }):
