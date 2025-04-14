@@ -633,7 +633,7 @@ body {
 a,
 .t-link {
   display: inline;
-  color: var(--rc-interaction-text);
+  color: var(--nvc-text-light);
   text-decoration: none;
   cursor: pointer;
   font-weight: 600;
@@ -678,6 +678,11 @@ a:hover,
   left: 50%;
   transform: translate(-50%, -50%) translateY(-0.1em);
   width: 100%;
+}
+
+.t-link__icon svg path {
+  stroke: var(--nvc-text-light);
+  fill: var(--nvc-text-light);
 }
 
 /* 
@@ -894,7 +899,7 @@ a:hover,
   --onBgc: var(--rc-positive);
 }
 .c-icon--info__flipped {
-  --bgc: var(--rc-info);
+  --bgc: var(--nvc-text-purple-primary);
   --onBgc: var(--rc-onInfo);
   border-radius: 50%;
 }
@@ -1221,9 +1226,21 @@ a:hover,
   border-radius: var(--rs-card-border-radius);
 }
 
+.c-card:has(.c-output--recovery) {
+  /* may god have mercy on my soul part 2 */
+  background-color: transparent !important;
+}
+
 .c-card--invisible {
   /* may god have mercy on my soul */
   background-color: transparent !important;
+}
+
+/* may god not get bored of having mercy on my soul */
+@media (max-width: 512px) {
+  .c-card:has([data-page="authenticate"]) {
+    margin: 1rem;
+  }
 }
 
 .c-card--vertically-centered {
@@ -1250,13 +1267,13 @@ a:hover,
   --bezel-x: var(--rs-card-bezel);
   --bezel-y: var(--rs-card-bezel);
 
-  /* background-color: var(--nvc-surface-dark); */
+  background-color: var(--nvc-surface-dark);
   border: none;
 }
 
-.c-card--background .c-card--highlight {
+/* .c-card--background .c-card--highlight {
   background-color: transparent;
-}
+} */
 
 /**
   * Card Teaser
@@ -1298,7 +1315,7 @@ a:hover,
 @media (max-width: 512px) {
   .c-card--highlight {
     border: none;
-    border-radius: 0;
+    border-radius: var(--rs-card-border-radius);
   }
 }
 
@@ -1393,8 +1410,8 @@ by all browsers (FF is missing) */
 }
 
 .c-card__close svg {
-  fill: var(--rc-onButton);
-  stroke: var(--rc-background);
+  fill: var(--nvc-text-light);
+  stroke: var(--nvc-text-light);
 }
 
 .c-card__title {
@@ -1480,6 +1497,7 @@ by all browsers (FF is missing) */
 .c-toast {
   position: relative;
   animation: appearFromBottom 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--nvc-text-grey);
 }
 
 .c-toast--closing {
@@ -1765,7 +1783,7 @@ by all browsers (FF is missing) */
 .c-button__icon:not([disabled]):hover {
   fill: var(var(--nvc-text-purple-secondary));
   stroke-width: 0.5px;
-  stroke: var(--rc-button);
+  stroke: var(--nvc-text-light);
 }
 
 .c-button svg * {
@@ -1780,7 +1798,7 @@ by all browsers (FF is missing) */
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
-  color: var(--nvc-text-purple-secondary);
+  /* color: var(--nvc-text-purple-secondary); */
   opacity: 0.9;
   box-shadow:
     0 0 0 2px #ffffff,
@@ -1801,10 +1819,20 @@ by all browsers (FF is missing) */
   border: var(--rs-line) solid var(--nvc-text-grey);
 }
 
-.c-button--secondary:not([disabled]):hover,
+.c-button--secondary {
+  background: var(--nvc-surface-dark);
+  color: var(--nvc-text-light);
+  border: var(--rs-line) solid var(--nvc-text-grey);
+}
+
+.c-button-transparent {
+  background-color: transparent !important;
+}
+
+/* .c-button--secondary:not([disabled]):hover,
 .c-button--secondary:not([disabled]):focus {
   color: var(--nvc-text-purple-secondary);
-}
+} */
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
 .c-button:not([disabled]):active {
@@ -1894,8 +1922,8 @@ by all browsers (FF is missing) */
 
   position: relative;
   padding: var(--bezel);
-  background: var(--rc-input);
-  color: var(--rc-onInput);
+  background: var(--nvc-input-grey);
+  color: var(--nvc-text-light);
   /* border: calc(var(--rs-line) * 2) solid var(--rc-line); */
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
@@ -1933,7 +1961,7 @@ by all browsers (FF is missing) */
   display: flex;
   gap: var(--rs-inline-button-gap);
   justify-content: space-between;
-  border-top: var(--rs-line) solid var(--rc-line);
+  border-top: var(--rs-line) solid var(--nvc-text-grey);
   margin-top: calc(var(--vs-stack) * 6);
   padding-top: calc(var(--vs-stack) * 2);
 }
@@ -2252,7 +2280,7 @@ by all browsers (FF is missing) */
   /* Needed for the floating "copy" button, if present */
   position: relative;
 
-  background-color: var(--rc-line);
+  background-color: var(--nvc-surface-dark);
   border-radius: var(--rs-input-border-radius);
   --bezel: calc(1.5 * var(--rs-input-bezel));
   padding: var(--bezel);
@@ -2281,7 +2309,7 @@ by all browsers (FF is missing) */
     it creates a scoped design logic that is easier to understand
     and maintain.
   */
-  --bg: var(--rc-line);
+  --bg: var(--nvc-surface-dark);
   --fg: var(--rc-onInput);
 
   position: relative;
@@ -2399,7 +2427,7 @@ by all browsers (FF is missing) */
 
 /* When a word is disabled, make it more opaque to look non-interactive */
 .c-list--recovery-word__disabled {
-  --bg: var(--rc-input-readonly);
+  --bg: var(--nvc-surface-dark);
   --fg: var(--rc-onInput-readonly);
   background-color: var(--vc-mist);
   /* make sure the user can't select the word */
@@ -2408,7 +2436,7 @@ by all browsers (FF is missing) */
 
 /* When a word requires attention make it look interactive */
 .c-list--recovery-word__attention {
-  --bg: var(--rc-button);
+  --bg: var(--nvc-surface-dark);
 }
 
 /* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
