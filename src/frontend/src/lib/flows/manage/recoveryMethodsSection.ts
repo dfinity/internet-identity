@@ -37,7 +37,7 @@ export const recoveryMethodsSection = ({
     "l-stack",
     "c-card",
     "c-card--narrow",
-    ...(warnNoRecovery ? ["c-card--warning"] : []),
+    ...(warnNoRecovery ? [""] : []),
   ];
 
   return html`

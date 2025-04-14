@@ -136,6 +136,27 @@
     radial-gradient(at 100% 0%, hsla(272, 86%, 55%, 1) 0px, transparent 50%),
     radial-gradient(at 0% 18%, hsla(223, 79%, 66%, 1) 0px, transparent 50%);
 
+  /* NEW VALUE TOKENS
+  * As we are being asked to very quickly come up with a dark color scheme
+  * We are adding these additional tokens so we definitely don't break anything for now
+  */
+
+  /* #0d0d0b */
+  --nvc-surface-dark: oklch(0.16 0.0041 106.86);
+  /* #2b2c30 */
+  --nvc-surface-medium: oklch(0.29 0.0074 274.72);
+  /* #1b1d1c */
+  --nvc-input-grey: oklch(0.23 0.0036 164.73);
+  /* #6353c4 */
+  --nvc-surface-purple-primary: oklch(0.52 0.1695 285.31);
+  --nvc-text-purple-primary: oklch(0.52 0.1695 285.31);
+  /* #9f95d9 */
+  --nvc-text-purple-secondary: oklch(0.7 0.0986 290.37);
+  /* #373737 */
+  --nvc-text-grey: oklch(0.34 0 0);
+  /* #ffffff */
+  --nvc-text-light: oklch(1 0 0);
+
   /**
    * value tokens: sizes (--vs => valueSize)
    * 1) general purpose spacer unit
@@ -165,6 +186,7 @@
    */
 
   /* reference tokens: colors (--rc => referenceColor) */
+
   --rc-dark: var(--vc-raven);
   --rc-light: var(--vc-snow);
 
@@ -197,11 +219,11 @@
   --rc-line-interaction: var(--vc-brand-purple);
   --rc-line-inverted: var(--rc-dark);
 
-  --rc-button: var(--vc-brand-purple);
-  --rc-button-pair: var(--vc-brand-purple-light);
+  --rc-button: var(--nvc-text-purple-primary);
+  --rc-button-pair: var(--nvc-text-purple-primary);
 
   --rc-interaction: var(--vc-brand-blue);
-  --rc-interaction-text: var(--rc-button);
+  --rc-interaction-text: var(--nvc-text-purple-secondary);
   --rc-interactionHighlight-text: var(--vc-brand-purple-light);
   --rc-loading: var(--vc-brand-purple);
 
@@ -210,7 +232,7 @@
   --rc-button--disabled: var(--vc-shadow);
 
   --rc-background-image--highlight: var(--vc-brand-gradient);
-  --rc-background--highlight: var(--vc-brand-purple);
+  --rc-background--highlight: var(--nvc-surface-dark);
   --rc-background--highlight-text: var(--vc-snow);
 
   /*
@@ -454,8 +476,8 @@ display:revert; revert to element instead of attribute */
   font-weight: 350;
   letter-spacing: -0.005em;
 
-  background: var(--rc-background);
-  color: var(--rc-text);
+  background: var(--nvc-surface-medium);
+  color: var(--nvc-text-light);
 }
 
 /**
@@ -469,7 +491,8 @@ body {
 body {
   font-size: 1.6rem;
   line-height: var(--rs-line-height-body);
-  background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt));
+  /* background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt)); */
+  background-color: var(--nvc-surface-medium);
   background-size: 100% 100%;
   min-height: 100dvh;
 
@@ -588,7 +611,7 @@ body {
 }
 
 .t-muted {
-  color: var(--rc-text--disabled);
+  color: var(--nvc-text-light);
   font-size: 0.8em;
 }
 
@@ -633,7 +656,7 @@ a:hover,
   text-decoration: underline;
   text-decoration-thickness: var(--rs-line);
   text-underline-offset: 0.5ex;
-  color: var(--rc-interactionHighlight-text);
+  color: var(--nvc-text-purple-secondary);
 }
 
 .t-link--discreet:not([disabled]):focus,
@@ -931,7 +954,7 @@ a:hover,
   position: absolute;
   top: 50%;
   left: 50%;
-  background: var(--bgc);
+  background: var(--nvc-text-light);
   width: 0.3rem;
   height: 0.3rem;
   transform: translate(-50%, -50%) rotate(var(--rotate, 0deg))
@@ -954,7 +977,7 @@ a:hover,
 
 :is(button, a, link, .c-dropdown) .c-icon--outlined,
 .c-icon--outlined:is(button, a, link, .c-dropdown) {
-  border: 1px solid var(--rc-button);
+  border: 1px solid var(--nvc-text-grey);
   border-radius: 1px;
 }
 
@@ -1028,8 +1051,8 @@ a:hover,
 }
 
 .c-landingPage__left {
-  background-image: var(--rc-background-image--highlight);
-  background-color: var(--rc-background--highlight);
+  /* background-image: var(--rc-background-image--highlight); */
+  background-color: var(--nvc-surface-dark);
   color: var(--rc-background--highlight-text);
 
   grid-area: left;
@@ -1079,6 +1102,9 @@ a:hover,
   /* This is necessary in case the content is bigger than the parent. */
   /* It keeps the start of the box at the top of the container. */
   max-height: 90%;
+  background-color: var(--nvc-surface-dark);
+  padding: 2rem;
+  border-radius: 1rem;
 
   display: flex;
   flex-direction: column;
@@ -1102,7 +1128,7 @@ a:hover,
 .c-landingPage__left__footer > a:active,
 .c-landingPage__left__footer > a:focus,
 .c-landingPage__left__footer > a:visited {
-  color: var(--rc-light-transparent);
+  color: var(var(--nvc-text-purple-secondary));
 }
 
 @media (max-width: 1024px) {
@@ -1111,8 +1137,8 @@ a:hover,
     flex-direction: column;
     align-items: center;
 
-    background-image: var(--rc-background-image--highlight);
-    background-color: var(--rc-background--highlight);
+    /* background-image: var(--rc-background-image--highlight); */
+    background-color: var(--nvc-surface-medium);
 
     height: auto;
     min-height: 100vh;
@@ -1157,7 +1183,7 @@ a:hover,
   .c-landingPage__right {
     order: 1;
 
-    background: var(--rc-light);
+    background: var(--nvc-surface-dark);
     border-radius: var(--rs-card-border-radius);
     padding: var(--rs-split-page-right-pane-bezzel--mobile);
 
@@ -1189,10 +1215,15 @@ a:hover,
   position: relative;
 
   padding: var(--bezel-y) var(--bezel-x);
-  border: var(--rs-line) solid var(--rc-line);
+  /* border: var(--rs-line) solid var(--rc-line); */
 
-  background-color: var(--rc-card);
+  background-color: var(--nvc-surface-dark);
   border-radius: var(--rs-card-border-radius);
+}
+
+.c-card--invisible {
+  /* may god have mercy on my soul */
+  background-color: transparent !important;
 }
 
 .c-card--vertically-centered {
@@ -1219,8 +1250,12 @@ a:hover,
   --bezel-x: var(--rs-card-bezel);
   --bezel-y: var(--rs-card-bezel);
 
-  background-color: var(--rc-background-card--background);
+  /* background-color: var(--nvc-surface-dark); */
   border: none;
+}
+
+.c-card--background .c-card--highlight {
+  background-color: transparent;
 }
 
 /**
@@ -1257,7 +1292,7 @@ a:hover,
   --bezel-x: calc(var(--rs-card-bezel) * 0.3);
   --bezel-y: calc(var(--rs-card-bezel) * 0.3);
 
-  background: var(--rc-card-backdrop);
+  background-color: var(--nvc-surface-dark);
 }
 
 @media (max-width: 512px) {
@@ -1305,7 +1340,7 @@ a:hover,
 /** can be replaced with :has(.c-card__icon) as soon as it's supported
 by all browsers (FF is missing) */
 .c-card__label--hasIcon {
-  border-bottom: var(--rs-line) solid var(--rc-line);
+  border-bottom: var(--rs-line) solid var(--nvc-text-grey);
   padding-bottom: calc(0.5 * var(--rs-card-bezel));
   margin-bottom: calc(0.75 * var(--rs-card-bezel));
   margin-top: calc(-0.15 * var(--rs-card-bezel));
@@ -1405,9 +1440,9 @@ by all browsers (FF is missing) */
 
 .c-card--warning::after,
 .c-card--modal::after {
-  background: var(--rc-background);
+  background: var(--nvc-surface-dark);
   border-radius: var(--rs-card-border-radius);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+  /* box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4); */
 }
 
 .c-marketing-block {
@@ -1592,7 +1627,7 @@ by all browsers (FF is missing) */
 }
 
 .t-action:hover {
-  color: var(--rc-interaction);
+  color: var(--nvc-text-purple-secondary);
 }
 
 /**
@@ -1728,7 +1763,7 @@ by all browsers (FF is missing) */
 
 .c-button__icon:not([disabled]):focus,
 .c-button__icon:not([disabled]):hover {
-  fill: var(--rc-onButton);
+  fill: var(var(--nvc-text-purple-secondary));
   stroke-width: 0.5px;
   stroke: var(--rc-button);
 }
@@ -1745,7 +1780,7 @@ by all browsers (FF is missing) */
 
 .c-button:not([disabled]):focus,
 .c-button:not([disabled]):hover {
-  color: var(--rc-onButton);
+  color: var(--nvc-text-purple-secondary);
   opacity: 0.9;
   box-shadow:
     0 0 0 2px #ffffff,
@@ -1757,18 +1792,18 @@ by all browsers (FF is missing) */
 
 .c-button--textOnly:not([disabled]):hover,
 .c-button--textOnly:not([disabled]):focus {
-  color: var(--rc-interactionHighlight-text);
+  color: var(--nvc-text-light);
 }
 
 .c-button--secondary {
-  background: var(--rc-button-secondary);
-  color: var(--rc-onButton-secondary);
-  border: var(--rs-line) solid var(--rc-line-interaction);
+  background: var(--nvc-surface-dark);
+  color: var(--nvc-text-light);
+  border: var(--rs-line) solid var(--nvc-text-grey);
 }
 
 .c-button--secondary:not([disabled]):hover,
 .c-button--secondary:not([disabled]):focus {
-  color: var(--rc-onButton-secondary);
+  color: var(--nvc-text-purple-secondary);
 }
 
 /* Copy pasted from the focus and hover, but with different opacity to show action */
@@ -1861,7 +1896,7 @@ by all browsers (FF is missing) */
   padding: var(--bezel);
   background: var(--rc-input);
   color: var(--rc-onInput);
-  border: calc(var(--rs-line) * 2) solid var(--rc-line);
+  /* border: calc(var(--rs-line) * 2) solid var(--rc-line); */
   word-break: break-word;
   border-radius: var(--rs-input-border-radius);
 }
@@ -1955,7 +1990,7 @@ by all browsers (FF is missing) */
 .c-input--readonly {
   background: var(--rc-input-readonly);
   color: var(--rc-input-onReadonly);
-  border: var(--rs-line) var(--rc-line) solid;
+  /* border: var(--rs-line) var(--rc-line) solid; */
 }
 
 .c-input--textarea {
@@ -2104,8 +2139,8 @@ by all browsers (FF is missing) */
  */
 
 .c-footer {
-  background: var(--rc-footer);
-  color: var(--rc-onFooter);
+  background: var(--nvc-surface-dark);
+  color: var(--nvc-text-light);
   padding: var(--rs-footer-gutter);
 }
 
@@ -2471,7 +2506,8 @@ by all browsers (FF is missing) */
 }
 
 .c-list--anchors .c-list__item::after {
-  background: var(--vc-brand-alt);
+  /* background: var(--vc-brand-alt); */
+  background-color: var(--nvc-surface-dark);
   opacity: 0;
   mix-blend-mode: darken;
   transition: opacity 200ms linear;
@@ -2553,13 +2589,13 @@ by all browsers (FF is missing) */
 .c-list__parcel {
   position: relative;
   padding: var(--rs-list-parcel-bezel) 0.8em;
-  border: var(--rs-line) solid var(--rc-line);
+  border: var(--rs-line) solid var(--nvc-text-grey);
   flex-grow: 1;
   margin: calc(-1 * var(--rs-line));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--rc-input);
+  background: var(--nvc-surface-dark);
 }
 
 .c-list__parcel--detail {
@@ -2721,8 +2757,8 @@ by all browsers (FF is missing) */
 
 .c-action-list {
   margin-top: 1rem;
-  background: var(--rc-background);
-  border: var(--rs-line) solid var(--rc-line);
+  background: var(--nvc-surface-dark);
+  border: var(--rs-line) solid var(--nvc-text-grey);
   padding: var(--rs-list-parcel-bezel);
 }
 
@@ -2791,7 +2827,7 @@ a.c-action-list__item {
   content: "";
   display: block;
   height: var(--rs-line);
-  background: var(--rc-line);
+  background: var(--nvc-text-grey);
   position: absolute;
   top: 0;
   left: var(--rs-list-parcel-bezel);
@@ -2846,7 +2882,7 @@ a.c-action-list__item {
 }
 
 .c-action-list__action:hover {
-  border-color: var(--rc-button);
+  border-color: var(--nvc-text-purple-secondary);
 }
 
 .c-action-list__action:hover svg {
@@ -3091,7 +3127,7 @@ a.c-action-list__item {
 }
 
 .c-action-list__action.c-dropdown__trigger:hover {
-  color: var(--rc-text);
+  color: var(--nvc-text-purple-secondary);
 }
 
 .c-dropdown__menu {
@@ -3161,7 +3197,7 @@ a.c-action-list__item {
 .c-dropdown__trigger[aria-expanded="true"]
   + .c-dropdown__menu
   .c-dropdown__link:hover {
-  color: var(--rc-interaction);
+  color: var(--nvc-text-purple-secondary);
 }
 
 .c-dropdown__backdrop {
@@ -3236,7 +3272,7 @@ input[type="checkbox"] {
 
 .c-loader__link:hover,
 .c-loader__link:focus {
-  color: var(--rc-surface);
+  color: var(--nvc-text-purple-secondary);
 }
 
 /* Wrap QR codes in a white square (for legibility) and prettify a bit */
