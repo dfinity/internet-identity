@@ -121,7 +121,7 @@ export const authnTemplateManage = ({
     pick: {
       slot: html`
         <header>
-          ${title("Choose Identity 🔑")} ${subtitle("to continue")}
+          ${title("Choose Identity 🔑")} ${subtitle("you want to manage")}
         </header>
       `,
     },
