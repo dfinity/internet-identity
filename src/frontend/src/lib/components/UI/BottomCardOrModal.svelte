@@ -1,57 +1,93 @@
 <script lang="ts">
-  import { slide, fade } from "svelte/transition";
   import { isMobile } from "$lib/state/UI/isMobile";
+  import { onMount, type Snippet } from "svelte";
+  import { scale, fly } from "svelte/transition";
 
   const {
+    title,
     children,
+    onclose,
     class: classes,
-    close,
     ...rest
   } = $props<{
-    children: () => any;
+    title: string;
+    children?: Snippet;
+    onclose: () => void;
     class?: string;
-    close: () => void;
     [key: string]: any;
   }>();
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      close();
-    }
-  }
+  let dialogRef: HTMLDialogElement;
+  let visible = $state(false);
+  let onCancel = (e: Event): void => {
+    e.preventDefault();
+    visible = false;
+  };
 
-  function handleClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      close();
-    }
-  }
+  onMount(() => {
+    dialogRef.showModal();
+    visible = true;
+  });
 </script>
 
-<div
-  class={`fixed top-0 left-0 h-screen w-screen backdrop-blur-3xl backdrop-brightness-50 ${!$isMobile && "flex items-center justify-center"}`}
-  onclick={handleClick}
-  onkeydown={handleKeydown}
-  role="button"
-  tabindex="0"
-  transition:fade={{
-    duration: 150,
-  }}
->
-  {#if $isMobile}
-    <div
-      class={`preset-filled card bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light fixed bottom-0 w-full rounded-t-2xl rounded-b-none pb-4 ${classes}`}
-      {...rest}
-      transition:slide={{ axis: "y", duration: 150 }}
-    >
-      {@render children()}
-    </div>
-  {:else}
-    <div
-      class={`preset-filled card bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light min-h-md min-w-md overflow-hidden rounded-2xl pb-4 ${classes}`}
-      {...rest}
-      transition:slide={{ axis: "y", duration: 150 }}
-    >
-      {@render children()}
-    </div>
-  {/if}
-</div>
+{#if $isMobile}
+  <dialog
+    bind:this={dialogRef}
+    oncancel={onCancel}
+    closedby="any"
+    class={`top-auto mx-auto max-w-100 overflow-hidden bg-transparent backdrop:transition-opacity backdrop:duration-150 backdrop:opacity-${visible ? 100 : 0} backdrop:backdrop-brightness-75`}
+    {...rest}
+  >
+    {#if visible}
+      <div
+        class={`bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light flex max-h-screen flex-col overflow-hidden rounded-t-2xl p-6 ${classes}`}
+        transition:fly|global={{ duration: 150, y: "100%" }}
+        onoutroend={onclose}
+      >
+        <div class="flex">
+          <h3 class="h3 -mt-1 mb-4 flex-1 items-center">{title}</h3>
+          <button
+            type="button"
+            class="btn-icon preset-tonal rounded-full"
+            onclick={onCancel}>✕</button
+          >
+        </div>
+        <div
+          class="bg-ii-background-primary-light dark:bg-ii-background-primary-dark overflow-y-auto"
+        >
+          {@render children()}
+        </div>
+      </div>
+    {/if}
+  </dialog>
+{:else}
+  <dialog
+    bind:this={dialogRef}
+    oncancel={onCancel}
+    closedby="any"
+    class={`m-auto max-h-screen max-w-100 bg-transparent backdrop:transition-opacity backdrop:duration-150 backdrop:opacity-${visible ? 100 : 0} backdrop:backdrop-brightness-75`}
+    {...rest}
+  >
+    {#if visible}
+      <div
+        class={`bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light flex max-h-screen flex-col overflow-hidden rounded-2xl p-6 ${classes}`}
+        transition:scale|global={{ duration: 150, start: 0.8 }}
+        onoutroend={onclose}
+      >
+        <div class="flex">
+          <h3 class="h3 -mt-1 mb-4 flex-1 items-center">{title}</h3>
+          <button
+            type="button"
+            class="btn-icon preset-tonal rounded-full"
+            onclick={onCancel}>✕</button
+          >
+        </div>
+        <div
+          class="bg-ii-background-primary-light dark:bg-ii-background-primary-dark flex flex-1 flex-col overflow-y-auto"
+        >
+          {@render children()}
+        </div>
+      </div>
+    {/if}
+  </dialog>
+{/if}
