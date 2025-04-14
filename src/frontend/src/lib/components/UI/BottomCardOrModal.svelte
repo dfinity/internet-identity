@@ -71,7 +71,7 @@
     {#if visible}
       <div
         class={`bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light flex max-h-screen flex-col overflow-hidden rounded-2xl p-6 ${classes}`}
-        transition:scale|global={{ duration: 150, start: 0.8 }}
+        transition:scale|global={{ duration: 150, start: 0.9 }}
         onoutroend={onclose}
       >
         <div class="flex">

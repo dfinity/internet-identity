@@ -368,34 +368,37 @@
     class="min-h-96"
   >
     {#if showCreatingPasskey}
-      <div class="mb-8 flex flex-col gap-4">
-        <p>
-          Explicabo corrupti temporibus consequuntur quae accusamus eligendi
-          eius, ducimus iste iure.
-        </p>
-        <label class="label">
-          <span class="label-text">Name</span>
-          <input
-            bind:value={passkeyName}
-            class="input px-4 py-2"
-            type="text"
-            autofocus
-          />
-        </label>
-      </div>
-      <div class="mt-auto flex flex-col gap-4">
-        <Button
-          onclick={handleStartRegistrationWithPasskey}
-          class="w-full"
-          disabled={passkeyName.length === 0}
-          variant="primary">Create Passkey</Button
-        >
-        <Button
-          onclick={handleCancelCreatePasskey}
-          class="w-full"
-          variant="secondary">Back</Button
-        >
-      </div>
+      <form class="flex flex-1 flex-col gap-8">
+        <div class="flex flex-col gap-4">
+          <p>
+            Explicabo corrupti temporibus consequuntur quae accusamus eligendi
+            eius, ducimus iste iure.
+          </p>
+          <label class="label">
+            <span class="label-text">Name</span>
+            <input
+              bind:value={passkeyName}
+              class="input px-4 py-2"
+              type="text"
+              autofocus
+            />
+          </label>
+        </div>
+        <div class="mt-auto flex flex-col gap-4">
+          <Button
+            onclick={handleStartRegistrationWithPasskey}
+            class="w-full"
+            type="submit"
+            disabled={passkeyName.length === 0}
+            variant="primary">Create Passkey</Button
+          >
+          <Button
+            onclick={handleCancelCreatePasskey}
+            class="w-full"
+            variant="secondary">Back</Button
+          >
+        </div>
+      </form>
     {:else}
       <div class="mb-8 flex flex-col gap-4">
         <p>
