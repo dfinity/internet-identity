@@ -803,7 +803,6 @@ export class Connection {
     jwt: JWT,
     salt: Salt,
     sessionIdentity: SignIdentity,
-    maxRetries = 5,
   ): Promise<AuthenticatedConnection> => {
     const retryGetJwtDelegation = async (
       jwt: JWT,
@@ -811,6 +810,7 @@ export class Connection {
       sessionKey: SessionKey,
       expiration: bigint,
       actor: ActorSubclass<_SERVICE>,
+      maxRetries = 5,
     ): Promise<SignedDelegation> => {
       for (let i = 0; i < maxRetries; i++) {
         // Linear backoff
@@ -850,12 +850,8 @@ export class Connection {
     const { anchor_number, expiration, user_key } =
       prepareDelegationResponse.Ok;
 
-    const signedDelegation = await retryGetJwtDelegation(
-      jwt,
-      salt,
-      sessionKey,
-      expiration,
-      actor,
+    const signedDelegation = await withLoader(() =>
+      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor),
     );
 
     const transformedDelegation = transformSignedDelegation(signedDelegation);
