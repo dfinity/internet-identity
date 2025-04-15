@@ -2348,8 +2348,8 @@ by all browsers (FF is missing) */
   * the index shown is important for recovery. Also this works around issues related
   * to different counter behavior on Safari & Chrome. */
   content: var(--index);
-  background-color: var(--bg);
-  color: var(--fg);
+  background-color: var(--nvc-surface-dark);
+  color: var(--nvc-text-light);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
   margin-right: 0.75em;
@@ -2946,11 +2946,11 @@ a.c-action-list__item {
   align-items: center;
   flex: 1 1 0;
   position: relative;
-  color: var(--rc-button);
+  color: var(--nvc-text-light);
 }
 
 .c-progress-stepper__step[aria-current="true"] ~ .c-progress-stepper__step {
-  color: var(--rc-text);
+  color: var(--nvc-text-light);
 }
 
 .c-progress-stepper__step::before {
@@ -2965,17 +2965,12 @@ a.c-action-list__item {
   position: relative;
   z-index: 2;
 
-  background: linear-gradient(
-    90deg,
-    var(--rc-button) 50%,
-    var(--rc-button-secondary) 50%
-  );
+  background: var(--nvc-text-light);
 
   background-size: 200% 100%;
   background-position: 0 0;
 
-  color: var(--rc-onButton);
-  border: var(--rs-line) solid var(--rc-line-interaction);
+  color: var(--nvc-surface-dark);
 
   width: var(--bullet-size);
   height: var(--bullet-size);
@@ -2993,7 +2988,7 @@ a.c-action-list__item {
 .c-progress-stepper__step[aria-current="true"]
   ~ .c-progress-stepper__step
   .c-progress-stepper__icon {
-  color: var(--rc-onButton-secondary);
+  color: var(--nvc-surface-dark);
   background-position: 100% 0;
 }
 
@@ -3024,7 +3019,7 @@ a.c-action-list__item {
   top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
   left: 0;
   right: 0;
-  border-bottom: var(--rs-line) solid var(--rc-line-interaction);
+  border-bottom: var(--rs-line) solid var(--nvc-text-light);
 }
 
 .c-progress-stepper__step:first-child::after {
@@ -3039,7 +3034,7 @@ a.c-action-list__item {
   margin-top: 0.6em;
   font-size: 1.2rem;
   line-height: 1.2;
-  color: var(--rc-text-secondary);
+  color: var(--nvc-text-light);
   width: min-content;
   min-width: 8rem;
 }
@@ -3454,6 +3449,10 @@ input[type="checkbox"] {
   height: 2px;
   border-radius: 50%;
   background-color: var(--vc-brand-purple);
+}
+
+.c-warning {
+  color: var(--nvc-text-light);
 }
 
 /*
