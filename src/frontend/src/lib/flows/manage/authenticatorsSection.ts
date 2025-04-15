@@ -80,7 +80,7 @@ export const authenticatorsSection = ({
                   class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
                   >${warningIcon}</i
                 >
-                <h2>Security warning</h2>
+                <h2 class="c-warning">Security warning</h2>
               </span>
             `
           : ""

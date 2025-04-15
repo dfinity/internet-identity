@@ -400,6 +400,18 @@ export const isCanisterError = <T extends Record<string, unknown>>(
   return error instanceof CanisterError;
 };
 
+export const throwCanisterError = <
+  T extends { Ok: unknown } | { Err: Record<string, unknown> },
+  S = T extends { Ok: infer Ok } ? Ok : never,
+>(
+  response: T,
+): Promise<S> => {
+  if ("Err" in response) {
+    throw new CanisterError(response.Err);
+  }
+  return response.Ok as Promise<S>;
+};
+
 export const toBase64 = (bytes: ArrayBuffer): string =>
   btoa(String.fromCharCode(...new Uint8Array(bytes)));
 

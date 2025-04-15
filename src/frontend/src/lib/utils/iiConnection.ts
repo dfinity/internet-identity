@@ -7,8 +7,10 @@ import type {
   AddTentativeDeviceResponse,
   AnchorCredentials,
   AuthnMethodData,
+  CredentialId,
   DeviceData,
   DeviceKey,
+  DeviceKeyWithAnchor,
   FrontendHostname,
   GetDelegationResponse,
   IdAliasCredentials,
@@ -308,10 +310,12 @@ export class Connection {
     tempIdentity,
     identity,
     authnMethod,
+    name,
   }: {
     tempIdentity: SignIdentity;
     identity: SignIdentity;
     authnMethod: AuthnMethodData;
+    name?: string;
   }): Promise<
     | LoginSuccess
     | ApiError
@@ -327,7 +331,7 @@ export class Connection {
     try {
       finishResponse = await actor.identity_registration_finish({
         authn_method: authnMethod,
-        name: [],
+        name: nonNullish(name) ? [name] : [],
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -617,7 +621,7 @@ export class Connection {
     };
   };
   fromIdentity = async (
-    userNumber: bigint,
+    getUserNumber: () => bigint,
     identity: SignIdentity,
   ): Promise<LoginSuccess> => {
     const delegationIdentity = await this.requestFEDelegation(identity);
@@ -628,6 +632,28 @@ export class Connection {
       this.canisterConfig,
       identity,
       delegationIdentity,
+      getUserNumber(),
+      actor,
+    );
+    return {
+      kind: "loginSuccess",
+      userNumber: getUserNumber(),
+      connection,
+      showAddCurrentDevice: false,
+    };
+  };
+
+  fromDelegationIdentity = async (
+    userNumber: bigint,
+    identity: SignIdentity,
+  ): Promise<LoginSuccess> => {
+    const actor = await this.createActor(identity);
+
+    const connection = new AuthenticatedConnection(
+      this.canisterId,
+      this.canisterConfig,
+      identity,
+      identity as DelegationIdentity,
       userNumber,
       actor,
     );
@@ -701,6 +727,14 @@ export class Connection {
     const actor = await this.createActor();
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) => "authentication" in device.purpose);
+  };
+
+  lookupDeviceKey = async (
+    credentialId: CredentialId,
+  ): Promise<DeviceKeyWithAnchor | undefined> => {
+    const actor = await this.createActor();
+    const [deviceKeyWithAnchor] = await actor.lookup_device_key(credentialId);
+    return deviceKeyWithAnchor;
   };
 
   addTentativeDevice = async (
