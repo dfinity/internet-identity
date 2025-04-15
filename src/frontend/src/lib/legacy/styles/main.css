@@ -1205,10 +1205,12 @@ a:hover,
   .c-landingPage__right__info {
     display: block;
     margin-bottom: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   .c-landingPage__right__info h1 {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
     font-weight: bold;
   }
 

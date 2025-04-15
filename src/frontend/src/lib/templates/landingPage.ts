@@ -17,9 +17,11 @@ import { isNullish } from "@dfinity/utils";
 export const landingPage = ({
   slot,
   dataPage,
+  landingType,
 }: {
   slot: TemplateResult;
   dataPage: string;
+  landingType: "firstTime" | "useExisting" | "pick";
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
@@ -30,11 +32,12 @@ export const landingPage = ({
       <div class="c-landingPage__logo">
         <div class="c-logo">${icLogo}</div>
       </div>
-      ${isLanding &&
-      html`<div class="c-landingPage__right__info">
-        <h1>${copy.landing_title_1}</h1>
-        <h2>${copy.landing_subtitle}</h2>
-      </div>`}
+      ${isLanding && landingType !== "firstTime"
+        ? html`<div class="c-landingPage__right__info">
+            <h1>${copy.landing_title_1}</h1>
+            <h2>${copy.landing_subtitle}</h2>
+          </div>`
+        : ""}
       <section class="c-landingPage__right" aria-label="Marketing Copy">
         <div class="c-landingPage__right__content">
           <div class="c-landingPage__right__content--full-width">${slot}</div>
