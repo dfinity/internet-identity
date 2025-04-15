@@ -44,7 +44,7 @@ export const mainWindow = ({
         class="${containerClasses.join(" ")}"
       >
         ${showLogo ? html`<div class="c-logo">${icLogo}</div>` : ""}
-        <div class="c-card c-card--background">
+        <div class="c-card c-card--background c-card--invisible">
           <div class="c-card c-card--highlight">${slot}</div>
         </div>
       </div>
