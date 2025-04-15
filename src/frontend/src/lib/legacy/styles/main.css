@@ -597,7 +597,7 @@ body {
 }
 
 .t-paragraph--weak {
-  color: var(--rc-text--weak);
+  color: var(--nvc-text-light);
 }
 
 .t-vip {
@@ -1325,7 +1325,9 @@ a:hover,
 
   overflow-y: auto;
 
-  background-color: var(--rc-card--highlight-background);
+  background-color: var(--nvc-surface-dark);
+
+  border: var(--rs-line) solid var(--nvc-text-grey);
 
   padding: var(--bezel-y) var(--bezel-x);
 
