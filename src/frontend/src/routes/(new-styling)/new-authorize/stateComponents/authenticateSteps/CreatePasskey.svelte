@@ -2,6 +2,7 @@
   import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
   import { type AuthenticateStep } from "../../state";
+  import { onMount } from "svelte";
 
   type Props = Omit<
     Extract<AuthenticateStep, { step: "createPasskey" }>,
@@ -10,7 +11,18 @@
 
   const { create, back }: Props = $props();
 
+  let inputRef: HTMLInputElement;
   let name = $state("");
+  let loading = $state(false);
+
+  const handleSubmit = () => {
+    loading = true;
+    create(name);
+  };
+
+  onMount(() => {
+    inputRef.focus();
+  });
 </script>
 
 <form class="flex flex-1 flex-col gap-8">
@@ -21,16 +33,23 @@
     </p>
     <label class="label">
       <span class="label-text">Name</span>
-      <input bind:value={name} class="input px-4 py-2" type="text" autofocus />
+      <input
+        bind:this={inputRef}
+        bind:value={name}
+        disabled={loading}
+        class="input px-4 py-2"
+        type="text"
+      />
     </label>
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-4">
     <Button
-      onclick={() => create(name)}
+      onclick={handleSubmit}
       type="submit"
-      disabled={name.length === 0}
-      variant="primary">Create Passkey</Button
+      disabled={name.length === 0 || loading}
+      variant="primary">{loading ? "Loading..." : "Create Passkey"}</Button
     >
-    <Button onclick={back} variant="secondary">Cancel</Button>
+    <Button onclick={back} disabled={loading} variant="secondary">Cancel</Button
+    >
   </div>
 </form>

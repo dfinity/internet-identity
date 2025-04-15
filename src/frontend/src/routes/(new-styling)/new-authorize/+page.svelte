@@ -245,8 +245,10 @@
         isCanisterError<IdRegStartError>(error) &&
         error.type !== "AlreadyInProgress"
       ) {
-        throw error;
+        // Ignore since it means we can continue with an existing registration
+        return;
       }
+      throw error;
     }
   };
 
@@ -379,7 +381,7 @@
           title={currentState.step.step === "solveCaptcha"
             ? "Prove you're not a robot"
             : "Continue with Passkey"}
-          onclose={pickAuthenticationMethod}
+          onClose={pickAuthenticationMethod}
           class="min-h-96"
         >
           {#if currentState.step.step === "connectOrCreatePasskey"}
