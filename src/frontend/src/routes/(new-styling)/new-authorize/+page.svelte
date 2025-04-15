@@ -375,7 +375,7 @@
 </script>
 
 {#snippet authenticate()}
-  <div class="margin mb-8 flex flex-col gap-1">
+  <div class="mb-8 flex flex-col gap-1">
     <h1 class="h1 font-bold">Sign in</h1>
     <p class="p font-medium">
       to continue with <span class="font-bold">{dappName.slice(7, 18)}</span>
@@ -391,26 +391,30 @@
 {#snippet continueAs(lastUsedIdentity: LastUsed)}
   <!-- TODO: here we would actually select the account, not the identity -->
   <!-- TODO: text-left not working -->
-  <Button
-    onclick={handleContinueWithLastUsedIdentity}
-    class="w-full px-6 py-4 text-left"
-    variant="primary">Continue as {lastUsedIdentity.name}</Button
-  >
-  <Button
-    onclick={handleContinueWithOtherIdentity}
-    class="w-full px-6 py-4 text-left"
-    variant="dashed">Use another Internet Identity</Button
-  >
+  <div class="flex flex-col items-stretch gap-4">
+    <Button
+      onclick={handleContinueWithLastUsedIdentity}
+      class="px-6 py-4 text-left"
+      variant="primary">Continue as {lastUsedIdentity.name}</Button
+    >
+    <Button
+      onclick={handleContinueWithOtherIdentity}
+      class="px-6 py-4 text-left"
+      variant="dashed">Use another Internet Identity</Button
+    >
+  </div>
 {/snippet}
 
 {#snippet pickAuthenticationMethod()}
-  <Button onclick={handleContinueWithPasskey} class="w-full" variant="primary"
-    >Continue with Passkey</Button
-  >
-  <Button onclick={handleContinueWithGoogle} class="w-full" variant="secondary"
-    >Continue with Google</Button
-  >
-  <Button class="w-full" variant="text-only">Cancel</Button>
+  <div class="flex flex-col items-stretch gap-4">
+    <Button onclick={handleContinueWithPasskey} variant="primary"
+      >Continue with Passkey</Button
+    >
+    <Button onclick={handleContinueWithGoogle} variant="secondary"
+      >Continue with Google</Button
+    >
+    <Button class="w-full" variant="text-only">Cancel</Button>
+  </div>
   {#if showPasskeyModal || nonNullish(captcha)}
     <BottomCardOrModal
       title={nonNullish(captcha)
@@ -458,18 +462,15 @@
           spellcheck="false"
         />
       </div>
-      <div class="mt-auto flex flex-col gap-4">
+      <div class="mt-auto flex flex-col items-stretch gap-4">
         <Button
           onclick={handleValidateCaptcha}
-          class="w-full"
           type="submit"
           disabled={captcha.solution.length === 0}
           variant="primary">Submit</Button
         >
-        <Button
-          onclick={handleHidePasskeyModal}
-          class="w-full"
-          variant="secondary">Cancel</Button
+        <Button onclick={handleHidePasskeyModal} variant="secondary"
+          >Cancel</Button
         >
       </div>
     </form>
@@ -493,18 +494,15 @@
         />
       </label>
     </div>
-    <div class="mt-auto flex flex-col gap-4">
+    <div class="mt-auto flex flex-col items-stretch gap-4">
       <Button
         onclick={handleStartRegistrationWithPasskey}
-        class="w-full"
         type="submit"
         disabled={passkeyName.length === 0}
         variant="primary">Create Passkey</Button
       >
-      <Button
-        onclick={handleCancelCreatePasskey}
-        class="w-full"
-        variant="secondary">Back</Button
+      <Button onclick={handleCancelCreatePasskey} variant="secondary"
+        >Back</Button
       >
     </div>
   </form>
@@ -521,11 +519,11 @@
       consequuntur quae accusamus eligendi eius.
     </p>
   </div>
-  <div class="mt-auto flex flex-col gap-4">
-    <Button onclick={handleConnectPasskey} class="w-full" variant="primary"
+  <div class="mt-auto flex flex-col items-stretch gap-4">
+    <Button onclick={handleConnectPasskey} variant="primary"
       >Connect my Passkey</Button
     >
-    <Button onclick={handleCreatePasskey} class="w-full" variant="secondary"
+    <Button onclick={handleCreatePasskey} variant="secondary"
       >Don't have a passkey? Create one</Button
     >
   </div>
