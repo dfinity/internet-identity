@@ -1,12 +1,9 @@
 <script lang="ts">
   import Button from "$lib/components/UI/Button.svelte";
-  import { type AuthenticateStep } from "../../state";
+  import { type State } from "../state";
   import { tick } from "svelte";
 
-  type Props = Omit<
-    Extract<AuthenticateStep, { step: "solveCaptcha" }>,
-    "step"
-  >;
+  type Props = Omit<Extract<State, { state: "solveCaptcha" }>, "state">;
 
   const { image, attempt, solve, cancel }: Props = $props();
 

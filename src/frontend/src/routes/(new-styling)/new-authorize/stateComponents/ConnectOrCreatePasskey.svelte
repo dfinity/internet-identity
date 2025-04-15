@@ -1,11 +1,11 @@
 <script lang="ts">
   import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
-  import { type AuthenticateStep } from "../../state.js";
+  import { type State } from "../state.js";
 
   type Props = Omit<
-    Extract<AuthenticateStep, { step: "connectOrCreatePasskey" }>,
-    "step"
+    Extract<State, { state: "connectOrCreatePasskey" }>,
+    "state"
   >;
 
   const { connect, create }: Props = $props();

@@ -35,21 +35,17 @@
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
   import { type State } from "./state";
-  import PickAuthenticationMethod from "./stateComponents/authenticateSteps/PickAuthenticationMethod.svelte";
-  import ConnectOrCreatePasskey from "./stateComponents/authenticateSteps/ConnectOrCreatePasskey.svelte";
-  import CreatePasskey from "./stateComponents/authenticateSteps/CreatePasskey.svelte";
-  import SolveCaptcha from "./stateComponents/authenticateSteps/SolveCaptcha.svelte";
+  import PickAuthenticationMethod from "./stateComponents/PickAuthenticationMethod.svelte";
+  import ConnectOrCreatePasskey from "./stateComponents/ConnectOrCreatePasskey.svelte";
+  import CreatePasskey from "./stateComponents/CreatePasskey.svelte";
+  import SolveCaptcha from "./stateComponents/SolveCaptcha.svelte";
   import ContinueAs from "./stateComponents/ContinueAs.svelte";
   import BottomCardOrModal from "$lib/components/UI/BottomCardOrModal.svelte";
+  import Button from "$lib/components/UI/Button.svelte";
 
   const { data }: PageProps = $props();
 
-  let currentState = $state<State>({
-    state: "authenticate",
-    step: { step: "pickAuthenticationMethod" },
-    pick: (method) => continueWithAuthenticationMethod(method),
-    cancel: () => cancelAuthorize(),
-  });
+  let currentState = $state<State>({ state: "pickAuthenticationMethod" });
   let authContext = $state.raw<AuthContext>();
   let dappName = $derived<string>(
     authContext ? authContext?.requestOrigin : "",
@@ -60,42 +56,15 @@
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
-  const cancelAuthorize = () => {
-    // TODO
-  };
-
   const pickAuthenticationMethod = () => {
-    currentState = {
-      state: "authenticate",
-      step: { step: "pickAuthenticationMethod" },
-      pick: (method) => continueWithAuthenticationMethod(method),
-      cancel: () => cancelAuthorize(),
-    };
-  };
-
-  const continueWithAuthenticationMethod = async (
-    method: "passkey" | "google",
-  ) => {
-    switch (method) {
-      case "passkey":
-        await connectOrCreatePasskey();
-        break;
-      case "google":
-        await authenticateWithGoogle();
-        break;
-    }
+    currentState = { state: "pickAuthenticationMethod" };
   };
 
   const connectOrCreatePasskey = async () => {
     currentState = {
-      state: "authenticate",
-      step: {
-        step: "connectOrCreatePasskey",
-        connect: authenticateWithPasskey,
-        create: createPasskey,
-      },
-      pick: continueWithAuthenticationMethod,
-      cancel: cancelAuthorize,
+      state: "connectOrCreatePasskey",
+      connect: authenticateWithPasskey,
+      create: createPasskey,
     };
   };
 
@@ -125,27 +94,22 @@
 
   const createPasskey = async () => {
     currentState = {
-      state: "authenticate",
-      step: {
-        step: "createPasskey",
-        create: async (name: string) => {
-          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
-            publicKey: {
-              ...creationOptions([], undefined, undefined),
-              user: {
-                id: window.crypto.getRandomValues(new Uint8Array(16)),
-                name,
-                displayName: name,
-              },
+      state: "createPasskey",
+      create: async (name: string) => {
+        const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
+          publicKey: {
+            ...creationOptions([], undefined, undefined),
+            user: {
+              id: window.crypto.getRandomValues(new Uint8Array(16)),
+              name,
+              displayName: name,
             },
-          });
-          await startRegistration();
-          await registerWithPasskey(passkeyIdentity);
-        },
-        back: connectOrCreatePasskey,
+          },
+        });
+        await startRegistration();
+        await registerWithPasskey(passkeyIdentity);
       },
-      pick: continueWithAuthenticationMethod,
-      cancel: cancelAuthorize,
+      cancel: connectOrCreatePasskey,
     };
   };
 
@@ -255,22 +219,17 @@
   const solveCaptcha = async (captcha: string, attempt = 0): Promise<void> =>
     new Promise((resolve) => {
       currentState = {
-        state: "authenticate",
-        step: {
-          step: "solveCaptcha",
-          image: captcha,
-          attempt,
-          solve: async (solution) => {
-            const nextCaptcha = await validateCaptcha(solution);
-            if (nonNullish(nextCaptcha)) {
-              await solveCaptcha(nextCaptcha, attempt + 1);
-            }
-            resolve();
-          },
-          cancel: pickAuthenticationMethod,
+        state: "solveCaptcha",
+        image: captcha,
+        attempt,
+        solve: async (solution) => {
+          const nextCaptcha = await validateCaptcha(solution);
+          if (nonNullish(nextCaptcha)) {
+            await solveCaptcha(nextCaptcha, attempt + 1);
+          }
+          resolve();
         },
-        pick: continueWithAuthenticationMethod,
-        cancel: cancelAuthorize,
+        cancel: pickAuthenticationMethod,
       };
     });
 
@@ -364,34 +323,45 @@
 
 <CenterContainer data-page="new-authorize-view">
   <CenterCard>
-    <div class="mb-8 flex flex-col gap-1">
-      <h1 class="h1 font-bold">Sign in</h1>
-      <p class="p font-medium">
-        to continue with <span class="font-bold">{dappName.slice(7, 18)}</span>
-      </p>
-    </div>
     {#if isNullish(authContext)}
       <p>Loading...</p>
-    {:else if currentState.state === "continueAs"}
-      <ContinueAs {...currentState} />
-    {:else if currentState.state === "authenticate"}
-      <PickAuthenticationMethod {...currentState} />
-      {#if currentState.step.step !== "pickAuthenticationMethod"}
-        <BottomCardOrModal
-          title={currentState.step.step === "solveCaptcha"
-            ? "Prove you're not a robot"
-            : "Continue with Passkey"}
-          onClose={pickAuthenticationMethod}
-          class="min-h-96"
-        >
-          {#if currentState.step.step === "connectOrCreatePasskey"}
-            <ConnectOrCreatePasskey {...currentState.step} />
-          {:else if currentState.step.step === "createPasskey"}
-            <CreatePasskey {...currentState.step} />
-          {:else if currentState.step.step === "solveCaptcha"}
-            <SolveCaptcha {...currentState.step} />
-          {/if}
-        </BottomCardOrModal>
+    {:else}
+      <div class="mb-8 flex flex-col gap-1">
+        <h1 class="h1 font-bold">Sign in</h1>
+        <p class="p font-medium">
+          to continue with <span class="font-bold">{dappName.slice(7, 18)}</span
+          >
+        </p>
+      </div>
+      {#if currentState.state === "continueAs"}
+        <ContinueAs {...currentState} />
+      {:else}
+        <div class="flex flex-col items-stretch gap-4">
+          <Button onclick={connectOrCreatePasskey} variant="primary"
+            >Continue with Passkey</Button
+          >
+          <Button onclick={authenticateWithGoogle} variant="secondary"
+            >Continue with Google</Button
+          >
+          <Button variant="text-only">Cancel</Button>
+        </div>
+        {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey" || currentState.state === "solveCaptcha"}
+          <BottomCardOrModal
+            title={currentState.state === "solveCaptcha"
+              ? "Prove you're not a robot"
+              : "Continue with Passkey"}
+            onClose={pickAuthenticationMethod}
+            class="min-h-96"
+          >
+            {#if currentState.state === "connectOrCreatePasskey"}
+              <ConnectOrCreatePasskey {...currentState} />
+            {:else if currentState.state === "createPasskey"}
+              <CreatePasskey {...currentState} />
+            {:else if currentState.state === "solveCaptcha"}
+              <SolveCaptcha {...currentState} />
+            {/if}
+          </BottomCardOrModal>
+        {/if}
       {/if}
     {/if}
   </CenterCard>

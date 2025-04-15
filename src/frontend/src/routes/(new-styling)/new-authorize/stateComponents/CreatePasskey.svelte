@@ -1,15 +1,12 @@
 <script lang="ts">
   import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
-  import { type AuthenticateStep } from "../../state";
+  import { type State } from "../state";
   import { onMount } from "svelte";
 
-  type Props = Omit<
-    Extract<AuthenticateStep, { step: "createPasskey" }>,
-    "step"
-  >;
+  type Props = Omit<Extract<State, { state: "createPasskey" }>, "state">;
 
-  const { create, back }: Props = $props();
+  const { create, cancel }: Props = $props();
 
   let inputRef: HTMLInputElement;
   let name = $state("");
@@ -49,7 +46,8 @@
       disabled={name.length === 0 || loading}
       variant="primary">{loading ? "Loading..." : "Create Passkey"}</Button
     >
-    <Button onclick={back} disabled={loading} variant="secondary">Cancel</Button
+    <Button onclick={cancel} disabled={loading} variant="secondary"
+      >Cancel</Button
     >
   </div>
 </form>
