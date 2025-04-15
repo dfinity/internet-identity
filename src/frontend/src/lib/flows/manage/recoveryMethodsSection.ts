@@ -52,7 +52,7 @@ export const recoveryMethodsSection = ({
                 class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
                 >${warningIcon}</i
               >
-              <h2>${copy.security_warning}</h2>
+              <h2 class="c-warning">${copy.security_warning}</h2>
             </span>
           `
         : ""}
