@@ -53,7 +53,6 @@ import {
 import {
   CanisterError,
   diagnosticInfo,
-  throwCanisterError,
   transformSignedDelegation,
   unknownToString,
 } from "$lib/utils/utils";
