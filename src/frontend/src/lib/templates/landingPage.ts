@@ -30,6 +30,11 @@ export const landingPage = ({
       <div class="c-landingPage__logo">
         <div class="c-logo">${icLogo}</div>
       </div>
+      ${isLanding &&
+      html`<div class="c-landingPage__right__info">
+        <h1>${copy.landing_title_1}</h1>
+        <h2>${copy.landing_subtitle}</h2>
+      </div>`}
       <section class="c-landingPage__right" aria-label="Marketing Copy">
         <div class="c-landingPage__right__content">
           <div class="c-landingPage__right__content--full-width">${slot}</div>

@@ -570,7 +570,7 @@ body {
 }
 
 .t-title--main {
-  font-size: 2.8rem;
+  font-size: 2.7rem;
   margin-top: 0.5em;
 }
 
@@ -1129,6 +1129,10 @@ a:hover,
   align-items: stretch;
 }
 
+.c-landingPage__right__info {
+  display: none;
+}
+
 .c-landingPage__right__content--full-width {
   width: 100%;
 }
@@ -1196,6 +1200,16 @@ a:hover,
 
   .c-landingPage__left__content {
     display: none;
+  }
+
+  .c-landingPage__right__info {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .c-landingPage__right__info h1 {
+    font-size: 2.4rem;
+    font-weight: bold;
   }
 
   .c-landingPage__right {
