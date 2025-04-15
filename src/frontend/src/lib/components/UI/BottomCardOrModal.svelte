@@ -65,7 +65,7 @@
     bind:this={dialogRef}
     oncancel={onCancel}
     closedby="any"
-    class={`m-auto max-h-screen max-w-100 bg-transparent backdrop:transition-opacity backdrop:duration-150 backdrop:opacity-${visible ? 100 : 0} backdrop:backdrop-brightness-75`}
+    class={`m-auto max-h-screen w-100 bg-transparent backdrop:transition-opacity backdrop:duration-150 backdrop:opacity-${visible ? 100 : 0} backdrop:backdrop-brightness-75`}
     {...rest}
   >
     {#if visible}
@@ -75,7 +75,7 @@
         onoutroend={onclose}
       >
         <div class="flex">
-          <h3 class="h3 -mt-1 mb-4 flex-1 items-center">{title}</h3>
+          <h1 class="h1 -mt-1 mb-4 flex-1 items-center text-2xl">{title}</h1>
           <button
             type="button"
             class="btn-icon preset-tonal rounded-full"

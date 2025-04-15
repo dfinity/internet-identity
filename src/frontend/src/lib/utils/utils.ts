@@ -407,6 +407,7 @@ export const throwCanisterError = <
   response: T,
 ): Promise<S> => {
   if ("Err" in response) {
+    console.error(response);
     throw new CanisterError(response.Err);
   }
   return response.Ok as Promise<S>;

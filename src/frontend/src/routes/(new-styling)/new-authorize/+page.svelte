@@ -16,6 +16,8 @@
   import { readCanisterId, readCanisterConfig } from "$lib/utils/init";
   import type {
     CheckCaptchaError,
+    IdRegFinishError,
+    IdRegStartError,
     OpenIdDelegationError,
     UserNumber,
   } from "$lib/generated/internet_identity_types";
@@ -34,6 +36,7 @@
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
+  import { fly } from "svelte/transition";
 
   interface LastUsed {
     number: UserNumber;
@@ -43,6 +46,7 @@
   interface Captcha {
     uri: string;
     solution: string;
+    retry?: boolean;
   }
 
   type Register =
@@ -57,8 +61,8 @@
 
   const { data }: PageProps = $props();
 
-  let showPasskeyCard = $state(false);
-  let showCreatingPasskey = $state(false);
+  let showPasskeyModal = $state(false);
+  let showNamingPasskey = $state(false);
 
   // TODO: this should really be pulled from a central store that initializes itself on load
   // TODO: of course we would also need to pull account/profile/role/login info, but one thing
@@ -72,6 +76,7 @@
   let dappName = $derived<string>(
     authContext ? authContext?.requestOrigin : "",
   );
+
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
   let onAuthenticate: (
@@ -79,7 +84,7 @@
   ) => void;
 
   const handleContinueWithPasskey = () => {
-    showPasskeyCard = true;
+    showPasskeyModal = true;
   };
 
   const handleContinueWithGoogle = async () => {
@@ -120,17 +125,29 @@
   };
 
   const handleStartRegistration = async () => {
-    const { next_step } = await data.session.actor
-      .identity_registration_start()
-      .then(throwCanisterError);
-    if ("CheckCaptcha" in next_step) {
-      captcha = {
-        uri: next_step.CheckCaptcha.captcha_png_base64,
-        solution: "",
-      };
-      return;
+    try {
+      const { next_step } = await data.session.actor
+        .identity_registration_start()
+        .then(throwCanisterError);
+      if ("CheckCaptcha" in next_step) {
+        captcha = {
+          uri: `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`,
+          solution: "",
+        };
+        return;
+      }
+      await handleFinishRegistration();
+    } catch (error) {
+      // Registration was started already previously, continue as is
+      if (
+        isCanisterError<IdRegStartError>(error) &&
+        error.type === "AlreadyInProgress"
+      ) {
+        await handleFinishRegistration();
+        return;
+      }
+      throw error;
     }
-    await handleFinishRegistration();
   };
 
   const handleValidateCaptcha = async () => {
@@ -148,8 +165,9 @@
         error.type === "WrongSolution"
       ) {
         captcha = {
-          uri: error.value(error.type).new_captcha_png_base64,
+          uri: `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`,
           solution: "",
+          retry: true,
         };
         return;
       }
@@ -172,22 +190,40 @@
     if (isNullish(register) || register.method !== "jwt") {
       return;
     }
-    await data.session.actor
-      .openid_identity_registration_finish({
+    try {
+      await data.session.actor
+        .openid_identity_registration_finish({
+          jwt: register.jwt,
+          salt: data.session.salt,
+        })
+        .then(throwCanisterError);
+      const { identity, anchorNumber } = await authenticateWithJWT({
         jwt: register.jwt,
         salt: data.session.salt,
-      })
-      .then(throwCanisterError);
-    const { identity, anchorNumber } = await authenticateWithJWT({
-      jwt: register.jwt,
-      salt: data.session.salt,
-      actor: data.session.actor,
-    });
-    const result = await connection.fromDelegationIdentity(
-      anchorNumber,
-      identity,
-    );
-    onAuthenticate(result.connection);
+        actor: data.session.actor,
+      });
+      const result = await connection.fromDelegationIdentity(
+        anchorNumber,
+        identity,
+      );
+      onAuthenticate(result.connection);
+    } catch (error) {
+      // Show CAPTCHA if it was skipped but is required
+      if (
+        isCanisterError<IdRegFinishError>(error) &&
+        error.type === "UnexpectedCall"
+      ) {
+        const nextStep = error.value(error.type).next_step;
+        if ("CheckCaptcha" in nextStep) {
+          captcha = {
+            uri: `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+            solution: "",
+          };
+          return;
+        }
+      }
+      throw error;
+    }
   };
 
   const handleFinishRegistrationWithPasskey = async () => {
@@ -210,17 +246,35 @@
         register.passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    const { identity_number } = await data.session.actor
-      .identity_registration_finish({
-        name: nonNullish(name) ? [name] : [],
-        authn_method: authnMethod,
-      })
-      .then(throwCanisterError);
-    const result = await connection.fromIdentity(
-      () => identity_number,
-      data.session.identity,
-    );
-    onAuthenticate(result.connection);
+    try {
+      const { identity_number } = await data.session.actor
+        .identity_registration_finish({
+          name: nonNullish(name) ? [name] : [],
+          authn_method: authnMethod,
+        })
+        .then(throwCanisterError);
+      const result = await connection.fromIdentity(
+        () => identity_number,
+        data.session.identity,
+      );
+      onAuthenticate(result.connection);
+    } catch (error) {
+      // Show CAPTCHA if it was skipped but is required
+      if (
+        isCanisterError<IdRegFinishError>(error) &&
+        error.type === "UnexpectedCall"
+      ) {
+        const nextStep = error.value(error.type).next_step;
+        if ("CheckCaptcha" in nextStep) {
+          captcha = {
+            uri: `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+            solution: "",
+          };
+          return;
+        }
+      }
+      throw error;
+    }
   };
 
   const handleConnectPasskey = async () => {
@@ -248,11 +302,11 @@
   };
 
   const handleCreatePasskey = () => {
-    showCreatingPasskey = true;
+    showNamingPasskey = true;
   };
 
   const handleCancelCreatePasskey = () => {
-    showCreatingPasskey = false;
+    showNamingPasskey = false;
     passkeyName = "";
   };
 
@@ -283,10 +337,11 @@
     await handleStartRegistration();
   };
 
-  const handleHidePasskeyCard = () => {
-    showPasskeyCard = false;
-    showCreatingPasskey = false;
+  const handleHidePasskeyModal = () => {
+    showPasskeyModal = false;
+    showNamingPasskey = false;
     passkeyName = "";
+    captcha = undefined;
   };
 
   authenticationProtocol({
@@ -356,70 +411,124 @@
     >Continue with Google</Button
   >
   <Button class="w-full" variant="text-only">Cancel</Button>
-  {#if showPasskeyCard}
-    {@render connectOrCreatePasskey()}
+  {#if showPasskeyModal || nonNullish(captcha)}
+    <BottomCardOrModal
+      title={nonNullish(captcha)
+        ? "Prove you're not a robot"
+        : "Continue with Passkey"}
+      onclose={handleHidePasskeyModal}
+      class="min-h-96"
+    >
+      {#if nonNullish(captcha)}
+        {@render solveCaptcha()}
+      {:else if showNamingPasskey}
+        {@render nameYourPasskey()}
+      {:else}
+        {@render connectOrCreatePasskey()}
+      {/if}
+    </BottomCardOrModal>
   {/if}
 {/snippet}
 
-{#snippet connectOrCreatePasskey()}
-  <BottomCardOrModal
-    title={showCreatingPasskey ? "Name your Passkey" : "Activate a Passkey"}
-    onclose={handleHidePasskeyCard}
-    class="min-h-96"
-  >
-    {#if showCreatingPasskey}
-      <form class="flex flex-1 flex-col gap-8">
-        <div class="flex flex-col gap-4">
-          <p>
-            Explicabo corrupti temporibus consequuntur quae accusamus eligendi
-            eius, ducimus iste iure.
-          </p>
-          <label class="label">
-            <span class="label-text">Name</span>
-            <input
-              bind:value={passkeyName}
-              class="input px-4 py-2"
-              type="text"
-              autofocus
-            />
-          </label>
+{#snippet solveCaptcha()}
+  {#if nonNullish(captcha)}
+    <form class="flex flex-1 flex-col gap-8">
+      <div class="flex flex-col gap-4">
+        <div class="preset-tonal relative flex items-center justify-center">
+          <img
+            src={captcha.uri}
+            class="h-30 w-55 mix-blend-darken dark:mix-blend-lighten dark:invert"
+            alt="CAPTCHA Characters"
+          />
+          <div
+            class="dark:bg-ii-background-primary-light bg-ii-background-primary-dark absolute h-30 w-55 mix-blend-lighten dark:mix-blend-darken"
+          ></div>
         </div>
-        <div class="mt-auto flex flex-col gap-4">
-          <Button
-            onclick={handleStartRegistrationWithPasskey}
-            class="w-full"
-            type="submit"
-            disabled={passkeyName.length === 0}
-            variant="primary">Create Passkey</Button
-          >
-          <Button
-            onclick={handleCancelCreatePasskey}
-            class="w-full"
-            variant="secondary">Back</Button
-          >
-        </div>
-      </form>
-    {:else}
-      <div class="mb-8 flex flex-col gap-4">
-        <p>
-          Lorem ipsum dolor sit amet consectetur, adipisicing elit. Doloribus
-          alias amet quas, ducimus iste iure et.
-        </p>
-        <p>
-          Boriosam aliquid rerum dolore porro optio, explicabo corrupti
-          temporibus consequuntur quae accusamus eligendi eius.
-        </p>
+        {#if captcha.retry}
+          <p class="p">Incorrect solution, try again</p>
+        {:else}
+          <p class="p">Type the characters you see</p>
+        {/if}
+        <input
+          bind:value={captcha.solution}
+          class="input px-4 py-2"
+          type="text"
+          autofocus
+          autocapitalize="none"
+          spellcheck="false"
+        />
       </div>
       <div class="mt-auto flex flex-col gap-4">
-        <Button onclick={handleConnectPasskey} class="w-full" variant="primary"
-          >Connect my Passkey</Button
+        <Button
+          onclick={handleValidateCaptcha}
+          class="w-full"
+          type="submit"
+          disabled={captcha.solution.length === 0}
+          variant="primary">Submit</Button
         >
-        <Button onclick={handleCreatePasskey} class="w-full" variant="secondary"
-          >Don't have a passkey? Create one</Button
+        <Button
+          onclick={handleHidePasskeyModal}
+          class="w-full"
+          variant="secondary">Cancel</Button
         >
       </div>
-    {/if}
-  </BottomCardOrModal>
+    </form>
+  {/if}
+{/snippet}
+
+{#snippet nameYourPasskey()}
+  <form class="flex flex-1 flex-col gap-8">
+    <div class="flex flex-col gap-4" in:fly={{ duration: 200, x: 10 }}>
+      <p>
+        Explicabo corrupti temporibus consequuntur quae accusamus eligendi eius,
+        ducimus iste iure.
+      </p>
+      <label class="label">
+        <span class="label-text">Name</span>
+        <input
+          bind:value={passkeyName}
+          class="input px-4 py-2"
+          type="text"
+          autofocus
+        />
+      </label>
+    </div>
+    <div class="mt-auto flex flex-col gap-4">
+      <Button
+        onclick={handleStartRegistrationWithPasskey}
+        class="w-full"
+        type="submit"
+        disabled={passkeyName.length === 0}
+        variant="primary">Create Passkey</Button
+      >
+      <Button
+        onclick={handleCancelCreatePasskey}
+        class="w-full"
+        variant="secondary">Back</Button
+      >
+    </div>
+  </form>
+{/snippet}
+
+{#snippet connectOrCreatePasskey()}
+  <div class="mb-8 flex flex-col gap-4" in:fly={{ duration: 200, x: -10 }}>
+    <p>
+      Lorem ipsum dolor sit amet consectetur, adipisicing elit. Doloribus alias
+      amet quas, ducimus iste iure et.
+    </p>
+    <p>
+      Boriosam aliquid rerum dolore porro optio, explicabo corrupti temporibus
+      consequuntur quae accusamus eligendi eius.
+    </p>
+  </div>
+  <div class="mt-auto flex flex-col gap-4">
+    <Button onclick={handleConnectPasskey} class="w-full" variant="primary"
+      >Connect my Passkey</Button
+    >
+    <Button onclick={handleCreatePasskey} class="w-full" variant="secondary"
+      >Don't have a passkey? Create one</Button
+    >
+  </div>
 {/snippet}
 
 <!-- an element with data-page 'new-authorize-view' is necessary for the e2e tests to pass -->
