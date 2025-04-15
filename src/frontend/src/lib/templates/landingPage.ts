@@ -3,7 +3,6 @@ import { html, TemplateResult } from "lit-html";
 import { navigationLink } from "./footer";
 import { githubIcon, icLogo, questionIcon } from "./icons";
 import copyJson from "./landingPage.json";
-import { isNullish } from "@dfinity/utils";
 
 /**
  * Landing page template
