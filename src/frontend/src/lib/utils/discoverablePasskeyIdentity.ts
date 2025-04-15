@@ -144,6 +144,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   #credentialId?: ArrayBuffer;
   #aaguid?: string;
   #publicKey?: CosePublicKey;
+
   #getPublicKey: (
     result: PublicKeyCredentialWithAttachment,
   ) => Promise<CosePublicKey>;
@@ -190,6 +191,10 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
 
   getAaguid(): string | undefined {
     return this.#aaguid;
+  }
+
+  getName(): string | undefined {
+    return this.#credentialCreationOptions?.publicKey.user.displayName;
   }
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined {

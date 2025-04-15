@@ -643,6 +643,28 @@ export class Connection {
     };
   };
 
+  fromDelegationIdentity = async (
+    userNumber: bigint,
+    identity: SignIdentity,
+  ): Promise<LoginSuccess> => {
+    const actor = await this.createActor(identity);
+
+    const connection = new AuthenticatedConnection(
+      this.canisterId,
+      this.canisterConfig,
+      identity,
+      identity as DelegationIdentity,
+      userNumber,
+      actor,
+    );
+    return {
+      kind: "loginSuccess",
+      userNumber,
+      connection,
+      showAddCurrentDevice: false,
+    };
+  };
+
   fromSeedPhrase = async (
     userNumber: bigint,
     seedPhrase: string,

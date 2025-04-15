@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { type Snippet } from "svelte";
+
   const {
     children,
     class: classes,
     ...rest
   } = $props<{
-    children: () => any;
+    children: Snippet;
     class?: string;
     [key: string]: any;
   }>();
