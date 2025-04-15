@@ -21,7 +21,7 @@ export const landingPage = ({
 }: {
   slot: TemplateResult;
   dataPage: string;
-  landingType: "firstTime" | "useExisting" | "pick";
+  landingType?: "firstTime" | "useExisting" | "pick";
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);

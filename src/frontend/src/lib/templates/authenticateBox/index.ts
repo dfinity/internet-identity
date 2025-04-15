@@ -74,15 +74,15 @@ export type AuthnTemplates = {
     slot: TemplateResult;
     useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
     createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
-    landingType: "firstTime";
+    landingType?: "firstTime";
   };
   useExisting: {
     slot: TemplateResult;
-    landingType: "useExisting";
+    landingType?: "useExisting";
   };
   pick: {
     slot: TemplateResult;
-    landingType: "pick";
+    landingType?: "pick";
   };
 };
 
