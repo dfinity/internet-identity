@@ -3,6 +3,7 @@ import { html, TemplateResult } from "lit-html";
 import { navigationLink } from "./footer";
 import { githubIcon, icLogo, questionIcon } from "./icons";
 import copyJson from "./landingPage.json";
+import { isNullish } from "@dfinity/utils";
 
 /**
  * Landing page template
@@ -22,6 +23,7 @@ export const landingPage = ({
 }): TemplateResult => {
   const i18n = new I18n();
   const copy = i18n.i18n(copyJson);
+  const isLanding = window.location.hash.length === 0;
 
   return html`<main class="c-landingPage" data-page="${dataPage}">
     <div class="c-landingPage__container">
@@ -35,11 +37,17 @@ export const landingPage = ({
       </section>
       <section class="c-landingPage__left" aria-label="Action Pane">
         <div class="c-landingPage__left__content">
-          <h1 class="c-landingPage__title">
-            <span>${copy.title_1}</span>
-            <span>${copy.title_2}</span>
+          <h1
+            class="${isLanding
+              ? "c-landingPage__title"
+              : "c-landingPage__title__authorize"}"
+          >
+            <span>${isLanding ? copy.landing_title_1 : copy.title_1}</span>
+            <span>${isLanding ? copy.landing_title_2 : copy.title_2}</span>
           </h1>
-          <p class="t-paragraph">${copy.subtitle}</p>
+          <p class="t-paragraph">
+            ${isLanding ? copy.landing_subtitle : copy.subtitle}
+          </p>
         </div>
         <div class="c-landingPage__left__footer">
           ${navigationLink({

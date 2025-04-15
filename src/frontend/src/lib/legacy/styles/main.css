@@ -357,7 +357,8 @@
   --rs-split-page-right-pane-bezzel--mobile: calc(var(--vs-stack) * 4);
   --rs-split-page-stack: calc(var(--vs-stack) * 4);
   --rs-split-page-stack--large: calc(var(--vs-stack) * 6);
-  --rs-split-page-title: calc(1.2rem + 1.1vw);
+  --rs-split-page-title-landing: calc(1.2rem + 1.1vw);
+  --rs-split-page-title-authorize: calc(2.8rem + 1vw);
 
   /* This is not used in CSS, but it's used to compensate for the logo size. */
   --rs-logo-height: 3rem;
@@ -1032,7 +1033,19 @@ a:hover,
 }
 
 .c-landingPage__title {
-  font-size: var(--rs-split-page-title);
+  font-size: var(--rs-split-page-title-landing);
+  font-weight: 600;
+  line-height: 1.1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* We don't want to break the lines of the title */
+  white-space: nowrap;
+}
+
+.c-landingPage__title__authorize {
+  font-size: var(--rs-split-page-title-authorize);
   font-weight: 600;
   line-height: 1.1;
 
