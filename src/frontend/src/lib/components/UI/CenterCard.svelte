@@ -1,18 +1,17 @@
 <script lang="ts">
+  import { type Snippet } from "svelte";
+
   const {
     children,
     class: classes,
     ...rest
   } = $props<{
-    children: () => any;
+    children: Snippet;
     class?: string;
     [key: string]: any;
   }>();
 </script>
 
-<div
-  class={`card flex min-w-80 flex-col gap-2 sm:min-w-80 md:min-w-md lg:min-w-lg ${classes}`}
-  {...rest}
->
+<div class={`card flex w-100 flex-col gap-2 p-6 ${classes}`} {...rest}>
   {@render children()}
 </div>
