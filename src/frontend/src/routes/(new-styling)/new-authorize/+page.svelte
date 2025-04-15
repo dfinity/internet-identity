@@ -1,8 +1,4 @@
 <script lang="ts">
-  //This is the screen where you authenticate with a dapp
-  //Signing in here gets you to a dapp
-  //I called it authorize to mirror the existing nomenclature
-
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
@@ -35,7 +31,6 @@
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
   import { type State } from "./state";
-  import PickAuthenticationMethod from "./stateComponents/PickAuthenticationMethod.svelte";
   import ConnectOrCreatePasskey from "./stateComponents/ConnectOrCreatePasskey.svelte";
   import CreatePasskey from "./stateComponents/CreatePasskey.svelte";
   import SolveCaptcha from "./stateComponents/SolveCaptcha.svelte";
