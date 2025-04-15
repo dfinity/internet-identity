@@ -41,8 +41,10 @@
   oncancel={onCancel}
   closedby="any"
   class={[
-    "max-h-screen overflow-hidden bg-transparent backdrop:backdrop-brightness-75 backdrop:transition-opacity backdrop:duration-150",
-    $isMobile ? "mt-auto min-w-full" : "m-auto w-100",
+    "flex max-h-screen flex-col overflow-hidden bg-transparent backdrop:backdrop-brightness-75 backdrop:transition-opacity backdrop:duration-150",
+    $isMobile
+      ? "mt-auto min-w-full"
+      : "m-auto w-100 max-[460px]:m-0 max-[460px]:min-h-full max-[460px]:min-w-full",
     !visible && "backdrop:opacity-0",
   ]}
   {...props}
@@ -51,7 +53,9 @@
     <div
       class={[
         "bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light flex max-h-screen flex-col overflow-hidden p-6",
-        $isMobile ? "rounded-t-2xl" : "rounded-2xl",
+        $isMobile
+          ? "rounded-t-2xl"
+          : "rounded-2xl max-[460px]:flex-1 max-[460px]:rounded-none",
         className,
       ]}
       transition:transitionFn
@@ -66,7 +70,7 @@
         >
       </div>
       <div
-        class="bg-ii-background-primary-light dark:bg-ii-background-primary-dark flex flex-1 flex-col overflow-y-auto"
+        class="bg-ii-background-primary-light dark:bg-ii-background-primary-dark flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
       >
         {@render children?.()}
       </div>
