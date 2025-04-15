@@ -65,7 +65,7 @@ const confirmRemoveDeviceTemplate = ({
     <hgroup data-page="confirm-remove-device-page">
       <div class="c-card__label c-card__label--hasIcon">
         ${warningLabelIcon}
-        <h2>${copy.label}</h2>
+        <h2 class="c-warning">${copy.label}</h2>
       </div>
       <h1 class="t-title t-title--main">${mappedCopy.title}</h1>
       <p class="t-paragraph">${copy.irreversible_action}</p>
