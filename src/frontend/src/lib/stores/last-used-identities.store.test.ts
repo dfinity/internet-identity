@@ -1,12 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { get } from "svelte/store";
-
-// Mock the dependency: writableStored
-vi.mock("$app/environment", () => ({
-  browser: true, // Or false, depending on the test case
-}));
-
-// Import the stores AFTER mocking the dependency
 import {
   lastUsedIdentitiesStore,
   lastUsedIdentityStore,
@@ -15,6 +8,11 @@ import type {
   LastUsedIdentity,
   LastUsedIdentitiesData,
 } from "./last-used-identities.store";
+
+// Mock the dependency: writableStored
+vi.mock("$app/environment", () => ({
+  browser: true, // Or false, depending on the test case
+}));
 
 describe("lastUsedIdentitiesStore", () => {
   const mockTimestamp1 = 1700000000000;
