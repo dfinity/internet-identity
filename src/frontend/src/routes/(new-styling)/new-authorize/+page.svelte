@@ -35,7 +35,7 @@
   import CreatePasskey from "./stateComponents/CreatePasskey.svelte";
   import SolveCaptcha from "./stateComponents/SolveCaptcha.svelte";
   import ContinueAs from "./stateComponents/ContinueAs.svelte";
-  import BottomCardOrModal from "$lib/components/UI/BottomCardOrModal.svelte";
+  import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
 
   const { data }: PageProps = $props();
@@ -202,7 +202,7 @@
     } catch (error) {
       if (
         isCanisterError<IdRegStartError>(error) &&
-        error.type !== "AlreadyInProgress"
+        error.type === "AlreadyInProgress"
       ) {
         // Ignore since it means we can continue with an existing registration
         return;
@@ -341,12 +341,14 @@
           <Button variant="text-only">Cancel</Button>
         </div>
         {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey" || currentState.state === "solveCaptcha"}
-          <BottomCardOrModal
+          <Dialog
             title={currentState.state === "solveCaptcha"
               ? "Prove you're not a robot"
               : "Continue with Passkey"}
             onClose={pickAuthenticationMethod}
-            class="min-h-96"
+            class="min-h-96 w-100"
+            closeOnOutsideClick={currentState.state !== "solveCaptcha"}
+            showCloseButton={currentState.state !== "solveCaptcha"}
           >
             {#if currentState.state === "connectOrCreatePasskey"}
               <ConnectOrCreatePasskey {...currentState} />
@@ -355,7 +357,7 @@
             {:else if currentState.state === "solveCaptcha"}
               <SolveCaptcha {...currentState} />
             {/if}
-          </BottomCardOrModal>
+          </Dialog>
         {/if}
       {/if}
     {/if}
