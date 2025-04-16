@@ -64,27 +64,33 @@
   };
 
   const authenticateWithPasskey = async () => {
-    let userNumber: UserNumber;
-    const passkeyIdentity = new DiscoverablePasskeyIdentity({
-      credentialRequestOptions: {
-        publicKey: creationOptions([], undefined, undefined),
-      },
-      getPublicKey: async (result) => {
-        const lookupResult = await connection.lookupDeviceKey(
-          new Uint8Array(result.rawId),
-        );
-        if (isNullish(lookupResult)) {
-          throw new Error("Account not migrated yet");
-        }
-        userNumber = lookupResult.anchor_number;
-        return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-      },
-    });
-    const result = await connection.fromIdentity(
-      () => userNumber,
-      passkeyIdentity,
-    );
-    onAuthenticate(result.connection);
+    currentState = { state: "loading" };
+    try {
+      let userNumber: UserNumber;
+      const passkeyIdentity = new DiscoverablePasskeyIdentity({
+        credentialRequestOptions: {
+          publicKey: creationOptions([], undefined, undefined),
+        },
+        getPublicKey: async (result) => {
+          const lookupResult = await connection.lookupDeviceKey(
+            new Uint8Array(result.rawId),
+          );
+          if (isNullish(lookupResult)) {
+            throw new Error("Account not migrated yet");
+          }
+          userNumber = lookupResult.anchor_number;
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
+      });
+      const result = await connection.fromIdentity(
+        () => userNumber,
+        passkeyIdentity,
+      );
+      onAuthenticate(result.connection);
+    } catch {
+      // If error or cancelled, go back to method selection
+      pickAuthenticationMethod();
+    }
   };
 
   const createPasskey = async () => {
