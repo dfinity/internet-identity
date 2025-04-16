@@ -7,7 +7,7 @@ export type LastUsedIdentity = {
   lastUsedTimestampMillis: number;
   identityNumber: bigint;
 };
-export type LastUsedIdentitiesData = {
+type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
 };
 type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
