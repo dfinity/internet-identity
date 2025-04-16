@@ -4,7 +4,7 @@
   import { type State } from "../state";
   import { onMount } from "svelte";
 
-  type Props = Omit<Extract<State, { state: "createPasskey" }>, "state">;
+  type Props = Extract<State, { state: "createPasskey" }>;
 
   const { create, cancel }: Props = $props();
 

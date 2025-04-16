@@ -3,10 +3,7 @@
   import { fly } from "svelte/transition";
   import { type State } from "../state.js";
 
-  type Props = Omit<
-    Extract<State, { state: "connectOrCreatePasskey" }>,
-    "state"
-  >;
+  type Props = Extract<State, { state: "connectOrCreatePasskey" }>;
 
   const { connect, create }: Props = $props();
 </script>

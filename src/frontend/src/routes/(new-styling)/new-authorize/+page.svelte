@@ -31,10 +31,10 @@
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
   import { type State } from "./state";
-  import ConnectOrCreatePasskey from "./stateComponents/ConnectOrCreatePasskey.svelte";
-  import CreatePasskey from "./stateComponents/CreatePasskey.svelte";
-  import SolveCaptcha from "./stateComponents/SolveCaptcha.svelte";
-  import ContinueAs from "./stateComponents/ContinueAs.svelte";
+  import ConnectOrCreatePasskey from "./components/ConnectOrCreatePasskey.svelte";
+  import CreatePasskey from "./components/CreatePasskey.svelte";
+  import SolveCaptcha from "./components/SolveCaptcha.svelte";
+  import ContinueAs from "./components/ContinueAs.svelte";
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
 

@@ -2,7 +2,7 @@
   import Button from "$lib/components/UI/Button.svelte";
   import { type State } from "../state";
 
-  type Props = Omit<Extract<State, { state: "continueAs" }>, "state">;
+  type Props = Extract<State, { state: "continueAs" }>;
 
   const { number, name }: Props = $props();
 </script>

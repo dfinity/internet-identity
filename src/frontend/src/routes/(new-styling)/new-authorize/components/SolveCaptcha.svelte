@@ -3,7 +3,7 @@
   import { type State } from "../state";
   import { tick } from "svelte";
 
-  type Props = Omit<Extract<State, { state: "solveCaptcha" }>, "state">;
+  type Props = Extract<State, { state: "solveCaptcha" }>;
 
   const { image, attempt, solve, cancel }: Props = $props();
 
