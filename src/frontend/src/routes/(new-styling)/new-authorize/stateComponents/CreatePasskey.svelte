@@ -10,10 +10,8 @@
 
   let inputRef: HTMLInputElement;
   let name = $state("");
-  let loading = $state(false);
 
   const handleSubmit = () => {
-    loading = true;
     create(name);
   };
 
@@ -33,7 +31,6 @@
       <input
         bind:this={inputRef}
         bind:value={name}
-        disabled={loading}
         class="input px-4 py-2"
         type="text"
       />
@@ -43,11 +40,9 @@
     <Button
       onclick={handleSubmit}
       type="submit"
-      disabled={name.length === 0 || loading}
-      variant="primary">{loading ? "Loading..." : "Create Passkey"}</Button
+      disabled={name.length === 0}
+      variant="primary">{"Create Passkey"}</Button
     >
-    <Button onclick={cancel} disabled={loading} variant="secondary"
-      >Cancel</Button
-    >
+    <Button onclick={cancel} variant="secondary">Cancel</Button>
   </div>
 </form>
