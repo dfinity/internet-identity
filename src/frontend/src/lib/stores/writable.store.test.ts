@@ -22,7 +22,7 @@ const mockIdentity2: LastUsedIdentity = {
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const stringigyJson = (data: any) => JSON.stringify(data, jsonReplacer);
+const stringifyJson = (data: any) => JSON.stringify(data, jsonReplacer);
 
 describe("writableStored", () => {
   beforeEach(() => {
@@ -40,14 +40,14 @@ describe("writableStored", () => {
 
     expect(
       window.localStorage.getItem(storeLocalStorageKey.LastUsedIdentities),
-    ).toEqual(stringigyJson(newState));
+    ).toEqual(stringifyJson(newState));
   });
 
   it("loads initial value from local storage if present", () => {
     const storedState = mockIdentity2;
     window.localStorage.setItem(
       storeLocalStorageKey.LastUsedIdentities,
-      stringigyJson(storedState),
+      stringifyJson(storedState),
     );
     const store = writableStored<LastUsedIdentity>({
       key: storeLocalStorageKey.LastUsedIdentities,
@@ -89,7 +89,7 @@ describe("writableStored", () => {
       const defaultValue = mockIdentity1;
       window.localStorage.setItem(
         storeLocalStorageKey.LastUsedIdentities,
-        stringigyJson({ data: storedState, version: 0 }),
+        stringifyJson({ data: storedState, version: 0 }),
       );
       const store = writableStored<LastUsedIdentity>({
         key: storeLocalStorageKey.LastUsedIdentities,
@@ -105,7 +105,7 @@ describe("writableStored", () => {
       const defaultValue = mockIdentity1;
       window.localStorage.setItem(
         storeLocalStorageKey.LastUsedIdentities,
-        stringigyJson({ data: storedState, version: 2 }),
+        stringifyJson({ data: storedState, version: 2 }),
       );
       const store = writableStored<LastUsedIdentity>({
         key: storeLocalStorageKey.LastUsedIdentities,
@@ -117,7 +117,7 @@ describe("writableStored", () => {
       expect(
         localStorage.getItem(storeLocalStorageKey.LastUsedIdentities),
       ).toEqual(
-        stringigyJson({
+        stringifyJson({
           data: defaultValue,
           version: 1,
         }),
@@ -129,7 +129,7 @@ describe("writableStored", () => {
       const defaultValue = mockIdentity1;
       window.localStorage.setItem(
         storeLocalStorageKey.LastUsedIdentities,
-        stringigyJson({ data: storedState, version: 2 }), // Stored data has a version
+        stringifyJson({ data: storedState, version: 2 }), // Stored data has a version
       );
       const store = writableStored<LastUsedIdentity>({
         // New store definition has no version
@@ -140,7 +140,7 @@ describe("writableStored", () => {
       expect(get(store)).toEqual(defaultValue);
       expect(
         localStorage.getItem(storeLocalStorageKey.LastUsedIdentities),
-      ).toEqual(stringigyJson(defaultValue)); // Expect default value because stored had version, new didn't
+      ).toEqual(stringifyJson(defaultValue)); // Expect default value because stored had version, new didn't
     });
 
     it("should not replace value in local storage when no versions provided", () => {
@@ -148,7 +148,7 @@ describe("writableStored", () => {
       const defaultValue = mockIdentity1;
       window.localStorage.setItem(
         storeLocalStorageKey.LastUsedIdentities,
-        stringigyJson(storedState), // No version in stored data
+        stringifyJson(storedState), // No version in stored data
       );
       const store = writableStored<LastUsedIdentity>({
         // No version in store definition
@@ -164,7 +164,7 @@ describe("writableStored", () => {
       const defaultValue = mockIdentity1;
       window.localStorage.setItem(
         storeLocalStorageKey.LastUsedIdentities,
-        stringigyJson({ data: storedState, version: 5 }),
+        stringifyJson({ data: storedState, version: 5 }),
       );
       const store = writableStored<LastUsedIdentity>({
         key: storeLocalStorageKey.LastUsedIdentities,
@@ -187,13 +187,13 @@ describe("writableStored", () => {
       store.set(newState);
       expect(
         window.localStorage.getItem(storeLocalStorageKey.LastUsedIdentities),
-      ).toEqual(stringigyJson(newState));
+      ).toEqual(stringifyJson(newState));
 
       store.unsubscribeStorage();
       store.set(defaultValue);
       expect(
         window.localStorage.getItem(storeLocalStorageKey.LastUsedIdentities),
-      ).toEqual(stringigyJson(newState));
+      ).toEqual(stringifyJson(newState));
     });
   });
 
