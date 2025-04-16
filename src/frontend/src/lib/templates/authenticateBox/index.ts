@@ -74,12 +74,15 @@ export type AuthnTemplates = {
     slot: TemplateResult;
     useExistingText: TemplateElement /** text shown on the button leading to "useExisting" */;
     createAnchorText: TemplateElement /** text shown on the button leading to "useExisting" */;
+    landingType?: "firstTime";
   };
   useExisting: {
     slot: TemplateResult;
+    landingType?: "useExisting";
   };
   pick: {
     slot: TemplateResult;
+    landingType?: "pick";
   };
 };
 
@@ -631,14 +634,23 @@ export const authnPages = (i18n: I18n, props: AuthnTemplates) => {
 
   return {
     firstTime: (opts: Parameters<typeof templates.firstTime>[0]) =>
-      page({ slot: templates.firstTime(opts), useLandingPageTemplate: true }),
+      page({
+        slot: templates.firstTime(opts),
+        useLandingPageTemplate: true,
+        landingType: "firstTime",
+      }),
     useExisting: (opts: Parameters<typeof templates.useExisting>[0]) =>
       page({
         slot: templates.useExisting(opts),
         useLandingPageTemplate: false,
+        landingType: "useExisting",
       }),
     pick: (opts: Parameters<typeof templates.pick>[0]) =>
-      page({ slot: templates.pick(opts), useLandingPageTemplate: true }),
+      page({
+        slot: templates.pick(opts),
+        useLandingPageTemplate: true,
+        landingType: "pick",
+      }),
   };
 };
 
@@ -704,14 +716,17 @@ export const authnScreens = (i18n: I18n, props: AuthnTemplates) => {
 const page = ({
   slot,
   useLandingPageTemplate,
+  landingType,
 }: {
   slot: TemplateResult;
   useLandingPageTemplate: boolean;
+  landingType: "firstTime" | "useExisting" | "pick";
 }) => {
   const template = useLandingPageTemplate
     ? landingPage({
         slot,
         dataPage: "authenticate",
+        landingType,
       })
     : mainWindow({
         slot: html`<!-- The title is hidden but used for accessibility -->

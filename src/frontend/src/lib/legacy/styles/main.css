@@ -357,7 +357,8 @@
   --rs-split-page-right-pane-bezzel--mobile: calc(var(--vs-stack) * 4);
   --rs-split-page-stack: calc(var(--vs-stack) * 4);
   --rs-split-page-stack--large: calc(var(--vs-stack) * 6);
-  --rs-split-page-title: calc(1.2rem + 1.1vw);
+  --rs-split-page-title-landing: calc(1.2rem + 1.1vw);
+  --rs-split-page-title-authorize: calc(2.8rem + 1vw);
 
   /* This is not used in CSS, but it's used to compensate for the logo size. */
   --rs-logo-height: 3rem;
@@ -569,7 +570,7 @@ body {
 }
 
 .t-title--main {
-  font-size: 2.8rem;
+  font-size: 2.7rem;
   margin-top: 0.5em;
 }
 
@@ -1032,7 +1033,19 @@ a:hover,
 }
 
 .c-landingPage__title {
-  font-size: var(--rs-split-page-title);
+  font-size: var(--rs-split-page-title-landing);
+  font-weight: 600;
+  line-height: 1.1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* We don't want to break the lines of the title */
+  white-space: nowrap;
+}
+
+.c-landingPage__title__authorize {
+  font-size: var(--rs-split-page-title-authorize);
   font-weight: 600;
   line-height: 1.1;
 
@@ -1116,6 +1129,10 @@ a:hover,
   align-items: stretch;
 }
 
+.c-landingPage__right__info {
+  display: none;
+}
+
 .c-landingPage__right__content--full-width {
   width: 100%;
 }
@@ -1185,12 +1202,31 @@ a:hover,
     display: none;
   }
 
+  .c-landingPage__right__info {
+    display: block;
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+
+  .c-landingPage__right__info h1 {
+    font-size: 3.2rem;
+    line-height: 1.25;
+    font-weight: bold;
+    margin-bottom: 0.8rem;
+  }
+
+  .c-landingPage__right__info h2 {
+    margin-bottom: 2rem;
+  }
+
   .c-landingPage__right {
     order: 1;
 
     background: var(--nvc-surface-dark);
     border-radius: var(--rs-card-border-radius);
-    padding: var(--rs-split-page-right-pane-bezzel--mobile);
+    /* padding: var(--rs-split-page-right-pane-bezzel--mobile); */
+    padding: 2rem;
 
     overflow: auto;
   }
