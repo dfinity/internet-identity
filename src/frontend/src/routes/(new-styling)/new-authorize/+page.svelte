@@ -37,6 +37,7 @@
   import ContinueAs from "./components/ContinueAs.svelte";
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 
   const { data }: PageProps = $props();
 
@@ -309,16 +310,23 @@
         onAuthenticate = async (authenticatedConnection) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
-          const result = await fetchDelegation({
-            connection: authenticatedConnection,
-            derivationOrigin,
-            publicKey: context.authRequest.sessionPublicKey,
-            maxTimeToLive: context.authRequest.maxTimeToLive,
-          });
+          const [result, anchorInfo] = await Promise.all([
+            fetchDelegation({
+              connection: authenticatedConnection,
+              derivationOrigin,
+              publicKey: context.authRequest.sessionPublicKey,
+              maxTimeToLive: context.authRequest.maxTimeToLive,
+            }),
+            authenticatedConnection.getAnchorInfo(),
+          ]);
           if ("error" in result) {
             return;
           }
           const [userKey, parsed_signed_delegation] = result;
+          lastUsedIdentitiesStore.addLatestUsed(
+            authenticatedConnection.userNumber,
+            anchorInfo.name[0],
+          );
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
@@ -326,7 +334,13 @@
             authnMethod: "passkey",
           });
         };
-        currentState = { state: "pickAuthenticationMethod" };
+        currentState = nonNullish(data.lastUsedIdentity)
+          ? {
+              state: "continueAs",
+              number: data.lastUsedIdentity.identityNumber,
+              name: data.lastUsedIdentity.name,
+            }
+          : { state: "pickAuthenticationMethod" };
       });
     },
     onProgress: () => {},
