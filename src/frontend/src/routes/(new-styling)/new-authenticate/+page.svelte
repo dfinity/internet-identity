@@ -96,7 +96,7 @@
     {/if}
   </CenterCard>
   {#if showPasskeyCard}
-    <Dialog {close}>
+    <Dialog onClose={close}>
       {#if !creatingIdentity}
         <FlyWrapper handleTransitionEnd={transitionedOut}>
           <PasskeyCard
