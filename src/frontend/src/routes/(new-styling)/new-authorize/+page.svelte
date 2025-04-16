@@ -323,10 +323,9 @@
             return;
           }
           const [userKey, parsed_signed_delegation] = result;
-          // TODO: Handle when the "name" is not defined
           lastUsedIdentitiesStore.addLatestUsed(
             authenticatedConnection.userNumber,
-            anchorInfo.name[0] ?? "",
+            anchorInfo.name[0],
           );
           resolve({
             kind: "success",

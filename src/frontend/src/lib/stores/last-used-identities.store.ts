@@ -3,7 +3,7 @@ import { derived, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
 
 export type LastUsedIdentity = {
-  name: string;
+  name?: string;
   lastUsedTimestampMillis: number;
   identityNumber: bigint;
 };
@@ -11,7 +11,7 @@ export type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
 };
 type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
-  addLatestUsed: (identityNumber: bigint, name: string) => void;
+  addLatestUsed: (identityNumber: bigint, name?: string) => void;
   reset: () => void;
 };
 
@@ -24,7 +24,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
 
   return {
     subscribe,
-    addLatestUsed: (identityNumber: bigint, name: string) => {
+    addLatestUsed: (identityNumber: bigint, name?: string) => {
       update((lastUsedIdentities) => {
         lastUsedIdentities[identityNumber.toString()] = {
           name,
