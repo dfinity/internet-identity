@@ -6,7 +6,7 @@
   import { nonNullish } from "@dfinity/utils";
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
-    onClose: () => void;
+    onClose?: () => void;
     title?: string;
     closeOnOutsideClick?: boolean;
     showCloseButton?: boolean;
@@ -29,7 +29,7 @@
   let dialogRef: HTMLDialogElement;
   let onCancel = (e: Event): void => {
     e.preventDefault();
-    onClose();
+    onClose?.();
   };
 
   const transitionFn = $derived(
@@ -61,7 +61,6 @@
   ]}
   transition:transitionFn|global
   onoutrostart={fadeOutBackDrop}
-  onoutroend={onClose}
   {...props}
 >
   <div
@@ -77,7 +76,7 @@
       {#if nonNullish(title)}
         <h1 class="h1 -mt-1 mb-4 flex-1 items-center text-2xl">{title}</h1>
       {/if}
-      {#if showCloseButton}
+      {#if showCloseButton && nonNullish(onClose)}
         <button
           type="button"
           class="btn-icon preset-tonal rounded-full"

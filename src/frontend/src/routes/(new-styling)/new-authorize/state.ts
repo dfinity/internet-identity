@@ -1,4 +1,5 @@
 export type State =
+  | { state: "loading" }
   | { state: "continueAs"; number: bigint; name?: string }
   | {
       state: "pickAuthenticationMethod";

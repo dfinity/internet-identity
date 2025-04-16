@@ -40,7 +40,7 @@
 
   const { data }: PageProps = $props();
 
-  let currentState = $state<State>({ state: "pickAuthenticationMethod" });
+  let currentState = $state<State>({ state: "loading" });
   let authContext = $state.raw<AuthContext>();
   let dappName = $derived<string>(
     authContext ? authContext?.requestOrigin : "",
@@ -91,18 +91,24 @@
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
-        const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
-          publicKey: {
-            ...creationOptions([], undefined, undefined),
-            user: {
-              id: window.crypto.getRandomValues(new Uint8Array(16)),
-              name,
-              displayName: name,
+        currentState = { state: "loading" };
+        try {
+          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
+            publicKey: {
+              ...creationOptions([], undefined, undefined),
+              user: {
+                id: window.crypto.getRandomValues(new Uint8Array(16)),
+                name,
+                displayName: name,
+              },
             },
-          },
-        });
-        await startRegistration();
-        await registerWithPasskey(passkeyIdentity);
+          });
+          await startRegistration();
+          await registerWithPasskey(passkeyIdentity);
+        } catch {
+          // If error or cancelled, go back to method selection
+          pickAuthenticationMethod();
+        }
       },
       cancel: connectOrCreatePasskey,
     };
@@ -160,12 +166,14 @@
     if (isNullish(clientId)) {
       return;
     }
+    currentState = { state: "loading" };
     const requestConfig = createGoogleRequestConfig(clientId);
-    const jwt = await requestJWT(requestConfig, {
-      nonce: data.session.nonce,
-      mediation: "required",
-    });
+    let jwt: string | undefined;
     try {
+      jwt = await requestJWT(requestConfig, {
+        nonce: data.session.nonce,
+        mediation: "required",
+      });
       const { identity, anchorNumber } = await authenticateWithJWT({
         jwt,
         salt: data.session.salt,
@@ -179,12 +187,14 @@
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "NoSuchAnchor"
+        error.type === "NoSuchAnchor" &&
+        nonNullish(jwt)
       ) {
         await startRegistration();
         await registerWithGoogle(jwt);
         return;
       }
+      currentState = { state: "pickAuthenticationMethod" };
       throw error;
     }
   };
@@ -310,6 +320,7 @@
             authnMethod: "passkey",
           });
         };
+        currentState = { state: "pickAuthenticationMethod" };
       });
     },
     onProgress: () => {},
@@ -318,8 +329,17 @@
 
 <CenterContainer data-page="new-authorize-view">
   <CenterCard>
-    {#if isNullish(authContext)}
+    {#if currentState.state === "loading"}
       <p>Loading...</p>
+    {:else if currentState.state === "solveCaptcha"}
+      <Dialog
+        title={currentState.state === "solveCaptcha"
+          ? "Prove you're not a robot"
+          : "Continue with Passkey"}
+        class="min-h-96 w-100"
+      >
+        <SolveCaptcha {...currentState} />
+      </Dialog>
     {:else}
       <div class="mb-8 flex flex-col gap-1">
         <h1 class="h1 font-bold">Sign in</h1>
@@ -340,22 +360,16 @@
           >
           <Button variant="text-only">Cancel</Button>
         </div>
-        {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey" || currentState.state === "solveCaptcha"}
+        {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
           <Dialog
-            title={currentState.state === "solveCaptcha"
-              ? "Prove you're not a robot"
-              : "Continue with Passkey"}
+            title={"Continue with Passkey"}
             onClose={pickAuthenticationMethod}
             class="min-h-96 w-100"
-            closeOnOutsideClick={currentState.state !== "solveCaptcha"}
-            showCloseButton={currentState.state !== "solveCaptcha"}
           >
             {#if currentState.state === "connectOrCreatePasskey"}
               <ConnectOrCreatePasskey {...currentState} />
             {:else if currentState.state === "createPasskey"}
               <CreatePasskey {...currentState} />
-            {:else if currentState.state === "solveCaptcha"}
-              <SolveCaptcha {...currentState} />
             {/if}
           </Dialog>
         {/if}
