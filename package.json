@@ -44,7 +44,7 @@
     "@skeletonlabs/skeleton": "^3.1.2",
     "@skeletonlabs/skeleton-svelte": "^1.2.0",
     "@sveltejs/adapter-static": "^3.0.8",
-    "@sveltejs/kit": "^2.16.0",
+    "@sveltejs/kit": "^2.20.6",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/vite": "^4.1.3",
@@ -72,7 +72,7 @@
     "ts-node": "^10.9.2",
     "typescript": "5.8.2",
     "typescript-eslint": "^8.20.0",
-    "vite": "^6.2.5",
+    "vite": "^6.2.6",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.0.9",
     "webdriverio": "^8.43.0"

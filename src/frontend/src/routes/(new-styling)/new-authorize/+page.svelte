@@ -1,13 +1,7 @@
 <script lang="ts">
-  //This is the screen where you authenticate with a dapp
-  //Signing in here gets you to a dapp
-  //I called it authorize to mirror the existing nomenclature
-
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
-  import Button from "$lib/components/UI/Button.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import BottomCardOrModal from "$lib/components/UI/BottomCardOrModal.svelte";
   import {
     AuthenticatedConnection,
     Connection,
@@ -36,216 +30,112 @@
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
-  import { fly } from "svelte/transition";
-
-  interface LastUsed {
-    number: UserNumber;
-    name?: string;
-  }
-
-  interface Captcha {
-    uri: string;
-    solution: string;
-    retry?: boolean;
-  }
-
-  type Register =
-    | {
-        method: "jwt";
-        jwt: string;
-      }
-    | {
-        method: "passkey";
-        passkeyIdentity: DiscoverablePasskeyIdentity;
-      };
+  import { type State } from "./state";
+  import ConnectOrCreatePasskey from "./components/ConnectOrCreatePasskey.svelte";
+  import CreatePasskey from "./components/CreatePasskey.svelte";
+  import SolveCaptcha from "./components/SolveCaptcha.svelte";
+  import ContinueAs from "./components/ContinueAs.svelte";
+  import Dialog from "$lib/components/UI/Dialog.svelte";
+  import Button from "$lib/components/UI/Button.svelte";
 
   const { data }: PageProps = $props();
 
-  let showPasskeyModal = $state(false);
-  let showNamingPasskey = $state(false);
-
-  // TODO: this should really be pulled from a central store that initializes itself on load
-  // TODO: of course we would also need to pull account/profile/role/login info, but one thing
-  // TODO: after another
-  let lastUsedIdentity: LastUsed | undefined = undefined;
-  let continueAsIdentity = $state.raw<LastUsed | undefined>(lastUsedIdentity);
-  let captcha = $state<Captcha | undefined>();
-  let register = $state<Register | undefined>();
-  let passkeyName = $state("");
+  let currentState = $state<State>({ state: "loading" });
   let authContext = $state.raw<AuthContext>();
   let dappName = $derived<string>(
     authContext ? authContext?.requestOrigin : "",
   );
 
-  const connection = new Connection(readCanisterId(), readCanisterConfig());
-
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
   ) => void;
+  const connection = new Connection(readCanisterId(), readCanisterConfig());
 
-  const handleContinueWithPasskey = () => {
-    showPasskeyModal = true;
+  const pickAuthenticationMethod = () => {
+    currentState = { state: "pickAuthenticationMethod" };
   };
 
-  const handleContinueWithGoogle = async () => {
-    const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
-    if (isNullish(clientId)) {
-      return;
-    }
-    const requestConfig = createGoogleRequestConfig(clientId);
-    const jwt = await requestJWT(requestConfig, {
-      nonce: data.session.nonce,
-      mediation: "required",
-    });
+  const connectOrCreatePasskey = async () => {
+    currentState = {
+      state: "connectOrCreatePasskey",
+      connect: authenticateWithPasskey,
+      create: createPasskey,
+    };
+  };
+
+  const authenticateWithPasskey = async () => {
+    currentState = { state: "loading" };
     try {
-      const { identity, anchorNumber } = await authenticateWithJWT({
-        jwt,
-        salt: data.session.salt,
-        actor: data.session.actor,
+      let userNumber: UserNumber;
+      const passkeyIdentity = new DiscoverablePasskeyIdentity({
+        credentialRequestOptions: {
+          publicKey: creationOptions([], undefined, undefined),
+        },
+        getPublicKey: async (result) => {
+          const lookupResult = await connection.lookupDeviceKey(
+            new Uint8Array(result.rawId),
+          );
+          if (isNullish(lookupResult)) {
+            throw new Error("Account not migrated yet");
+          }
+          userNumber = lookupResult.anchor_number;
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
       });
-      const result = await connection.fromDelegationIdentity(
-        anchorNumber,
-        identity,
+      const result = await connection.fromIdentity(
+        () => userNumber,
+        passkeyIdentity,
       );
       onAuthenticate(result.connection);
-    } catch (error) {
-      if (
-        isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "NoSuchAnchor"
-      ) {
-        register = {
-          method: "jwt",
-          jwt,
-        };
-        await handleStartRegistration();
-        return;
-      }
-      throw error;
+    } catch {
+      // If error or cancelled, go back to method selection
+      pickAuthenticationMethod();
     }
   };
 
-  const handleStartRegistration = async () => {
-    try {
-      const { next_step } = await data.session.actor
-        .identity_registration_start()
-        .then(throwCanisterError);
-      if ("CheckCaptcha" in next_step) {
-        captcha = {
-          uri: `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`,
-          solution: "",
-        };
-        return;
-      }
-      await handleFinishRegistration();
-    } catch (error) {
-      // Registration was started already previously, continue as is
-      if (
-        isCanisterError<IdRegStartError>(error) &&
-        error.type === "AlreadyInProgress"
-      ) {
-        await handleFinishRegistration();
-        return;
-      }
-      throw error;
-    }
-  };
-
-  const handleValidateCaptcha = async () => {
-    if (isNullish(captcha)) {
-      return;
-    }
-    try {
-      await data.session.actor
-        .check_captcha({ solution: captcha.solution })
-        .then(throwCanisterError);
-      await handleFinishRegistration();
-    } catch (error) {
-      if (
-        isCanisterError<CheckCaptchaError>(error) &&
-        error.type === "WrongSolution"
-      ) {
-        captcha = {
-          uri: `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`,
-          solution: "",
-          retry: true,
-        };
-        return;
-      }
-      throw error;
-    }
-  };
-
-  const handleFinishRegistration = async () => {
-    switch (register?.method) {
-      case "passkey":
-        await handleFinishRegistrationWithPasskey();
-        break;
-      case "jwt":
-        await handleFinishRegistrationWithJWT();
-        break;
-    }
-  };
-
-  const handleFinishRegistrationWithJWT = async () => {
-    if (isNullish(register) || register.method !== "jwt") {
-      return;
-    }
-    try {
-      await data.session.actor
-        .openid_identity_registration_finish({
-          jwt: register.jwt,
-          salt: data.session.salt,
-        })
-        .then(throwCanisterError);
-      const { identity, anchorNumber } = await authenticateWithJWT({
-        jwt: register.jwt,
-        salt: data.session.salt,
-        actor: data.session.actor,
-      });
-      const result = await connection.fromDelegationIdentity(
-        anchorNumber,
-        identity,
-      );
-      onAuthenticate(result.connection);
-    } catch (error) {
-      // Show CAPTCHA if it was skipped but is required
-      if (
-        isCanisterError<IdRegFinishError>(error) &&
-        error.type === "UnexpectedCall"
-      ) {
-        const nextStep = error.value(error.type).next_step;
-        if ("CheckCaptcha" in nextStep) {
-          captcha = {
-            uri: `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
-            solution: "",
-          };
-          return;
+  const createPasskey = async () => {
+    currentState = {
+      state: "createPasskey",
+      create: async (name: string) => {
+        currentState = { state: "loading" };
+        try {
+          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
+            publicKey: {
+              ...creationOptions([], undefined, undefined),
+              user: {
+                id: window.crypto.getRandomValues(new Uint8Array(16)),
+                name,
+                displayName: name,
+              },
+            },
+          });
+          await startRegistration();
+          await registerWithPasskey(passkeyIdentity);
+        } catch {
+          // If error or cancelled, go back to method selection
+          pickAuthenticationMethod();
         }
-      }
-      throw error;
-    }
+      },
+      cancel: connectOrCreatePasskey,
+    };
   };
 
-  const handleFinishRegistrationWithPasskey = async () => {
-    if (isNullish(register) || register.method !== "passkey") {
-      return;
-    }
+  const registerWithPasskey = async (passkey: DiscoverablePasskeyIdentity) => {
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
-      authenticatorType: register.passkeyIdentity.getAuthenticatorAttachment(),
+      authenticatorType: passkey.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: register.passkeyIdentity.getAaguid(),
+      aaguid: passkey.getAaguid(),
     });
-    const name = register.passkeyIdentity.getName();
     const authnMethod = passkeyAuthnMethodData({
       alias,
-      pubKey: register.passkeyIdentity.getPublicKey().toDer(),
-      credentialId: register.passkeyIdentity.getCredentialId()!,
-      authenticatorAttachment:
-        register.passkeyIdentity.getAuthenticatorAttachment(),
+      pubKey: passkey.getPublicKey().toDer(),
+      credentialId: passkey.getCredentialId()!,
+      authenticatorAttachment: passkey.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
+    const name = passkey.getName();
     try {
       const { identity_number } = await data.session.actor
         .identity_registration_finish({
@@ -259,17 +149,17 @@
       );
       onAuthenticate(result.connection);
     } catch (error) {
-      // Show CAPTCHA if it was skipped but is required
       if (
         isCanisterError<IdRegFinishError>(error) &&
         error.type === "UnexpectedCall"
       ) {
         const nextStep = error.value(error.type).next_step;
         if ("CheckCaptcha" in nextStep) {
-          captcha = {
-            uri: `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
-            solution: "",
-          };
+          // Show CAPTCHA if it was skipped but is required
+          await solveCaptcha(
+            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+          );
+          await registerWithPasskey(passkey);
           return;
         }
       }
@@ -277,71 +167,139 @@
     }
   };
 
-  const handleConnectPasskey = async () => {
-    let userNumber: UserNumber;
-    const passkeyIdentity = new DiscoverablePasskeyIdentity({
-      credentialRequestOptions: {
-        publicKey: creationOptions([], undefined, undefined),
-      },
-      getPublicKey: async (result) => {
-        const lookupResult = await connection.lookupDeviceKey(
-          new Uint8Array(result.rawId),
+  const authenticateWithGoogle = async () => {
+    const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
+    if (isNullish(clientId)) {
+      return;
+    }
+    currentState = { state: "loading" };
+    const requestConfig = createGoogleRequestConfig(clientId);
+    let jwt: string | undefined;
+    try {
+      jwt = await requestJWT(requestConfig, {
+        nonce: data.session.nonce,
+        mediation: "required",
+      });
+      const { identity, anchorNumber } = await authenticateWithJWT({
+        jwt,
+        salt: data.session.salt,
+        actor: data.session.actor,
+      });
+      const result = await connection.fromDelegationIdentity(
+        anchorNumber,
+        identity,
+      );
+      onAuthenticate(result.connection);
+    } catch (error) {
+      if (
+        isCanisterError<OpenIdDelegationError>(error) &&
+        error.type === "NoSuchAnchor" &&
+        nonNullish(jwt)
+      ) {
+        await startRegistration();
+        await registerWithGoogle(jwt);
+        return;
+      }
+      currentState = { state: "pickAuthenticationMethod" };
+      throw error;
+    }
+  };
+
+  const startRegistration = async (): Promise<void> => {
+    try {
+      const { next_step } = await data.session.actor
+        .identity_registration_start()
+        .then(throwCanisterError);
+      if ("CheckCaptcha" in next_step) {
+        await solveCaptcha(
+          `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`,
         );
-        if (isNullish(lookupResult)) {
-          throw new Error("Account not migrated yet");
-        }
-        userNumber = lookupResult.anchor_number;
-        return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-      },
-    });
-    const result = await connection.fromIdentity(
-      () => userNumber,
-      passkeyIdentity,
-    );
-    onAuthenticate(result.connection);
+      }
+    } catch (error) {
+      if (
+        isCanisterError<IdRegStartError>(error) &&
+        error.type === "AlreadyInProgress"
+      ) {
+        // Ignore since it means we can continue with an existing registration
+        return;
+      }
+      throw error;
+    }
   };
 
-  const handleCreatePasskey = () => {
-    showNamingPasskey = true;
-  };
-
-  const handleCancelCreatePasskey = () => {
-    showNamingPasskey = false;
-    passkeyName = "";
-  };
-
-  const handleContinueWithLastUsedIdentity = () => {
-    //TODO
-    console.log("continuing with last used");
-  };
-
-  const handleContinueWithOtherIdentity = () => {
-    lastUsedIdentity = undefined;
-  };
-
-  const handleStartRegistrationWithPasskey = async () => {
-    const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
-      publicKey: {
-        ...creationOptions([], undefined, undefined),
-        user: {
-          id: window.crypto.getRandomValues(new Uint8Array(16)),
-          name: passkeyName,
-          displayName: passkeyName,
+  const solveCaptcha = async (captcha: string, attempt = 0): Promise<void> =>
+    new Promise((resolve) => {
+      currentState = {
+        state: "solveCaptcha",
+        image: captcha,
+        attempt,
+        solve: async (solution) => {
+          const nextCaptcha = await validateCaptcha(solution);
+          if (nonNullish(nextCaptcha)) {
+            await solveCaptcha(nextCaptcha, attempt + 1);
+          }
+          resolve();
         },
-      },
+        cancel: pickAuthenticationMethod,
+      };
     });
-    register = {
-      method: "passkey",
-      passkeyIdentity,
-    };
-    await handleStartRegistration();
+
+  const validateCaptcha = async (
+    solution: string,
+  ): Promise<string | undefined> => {
+    try {
+      const { next_step } = await data.session.actor
+        .check_captcha({ solution })
+        .then(throwCanisterError);
+      if ("CheckCaptcha" in next_step) {
+        return `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`;
+      }
+    } catch (error) {
+      if (
+        isCanisterError<CheckCaptchaError>(error) &&
+        error.type === "WrongSolution"
+      ) {
+        return `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
+      }
+      throw error;
+    }
   };
 
-  const handleHidePasskeyModal = () => {
-    showPasskeyModal = false;
-    showNamingPasskey = false;
-    passkeyName = "";
-    captcha = undefined;
+  const registerWithGoogle = async (jwt: string) => {
+    try {
+      await data.session.actor
+        .openid_identity_registration_finish({
+          jwt,
+          salt: data.session.salt,
+        })
+        .then(throwCanisterError);
+      const { identity, anchorNumber } = await authenticateWithJWT({
+        jwt,
+        salt: data.session.salt,
+        actor: data.session.actor,
+      });
+      const result = await connection.fromDelegationIdentity(
+        anchorNumber,
+        identity,
+      );
+      onAuthenticate(result.connection);
+    } catch (error) {
+      if (
+        isCanisterError<IdRegFinishError>(error) &&
+        error.type === "UnexpectedCall"
+      ) {
+        const nextStep = error.value(error.type).next_step;
+        if ("CheckCaptcha" in nextStep) {
+          // Show CAPTCHA if it was skipped but is required
+          await solveCaptcha(
+            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+          );
+          await registerWithGoogle(jwt);
+          return;
+        }
+      }
+      throw error;
+    }
   };
 
   authenticationProtocol({
@@ -368,174 +326,60 @@
             authnMethod: "passkey",
           });
         };
+        currentState = { state: "pickAuthenticationMethod" };
       });
     },
     onProgress: () => {},
   });
 </script>
 
-{#snippet authenticate()}
-  <div class="mb-8 flex flex-col gap-1">
-    <h1 class="h1 font-bold">Sign in</h1>
-    <p class="p font-medium">
-      to continue with <span class="font-bold">{dappName.slice(7, 18)}</span>
-    </p>
-  </div>
-  {#if nonNullish(continueAsIdentity)}
-    {@render continueAs(continueAsIdentity)}
-  {:else}
-    {@render pickAuthenticationMethod()}
-  {/if}
-{/snippet}
-
-{#snippet continueAs(lastUsedIdentity: LastUsed)}
-  <!-- TODO: here we would actually select the account, not the identity -->
-  <!-- TODO: text-left not working -->
-  <div class="flex flex-col items-stretch gap-4">
-    <Button
-      onclick={handleContinueWithLastUsedIdentity}
-      class="px-6 py-4 text-left"
-      variant="primary">Continue as {lastUsedIdentity.name}</Button
-    >
-    <Button
-      onclick={handleContinueWithOtherIdentity}
-      class="px-6 py-4 text-left"
-      variant="dashed">Use another Internet Identity</Button
-    >
-  </div>
-{/snippet}
-
-{#snippet pickAuthenticationMethod()}
-  <div class="flex flex-col items-stretch gap-4">
-    <Button onclick={handleContinueWithPasskey} variant="primary"
-      >Continue with Passkey</Button
-    >
-    <Button onclick={handleContinueWithGoogle} variant="secondary"
-      >Continue with Google</Button
-    >
-    <Button class="w-full" variant="text-only">Cancel</Button>
-  </div>
-  {#if showPasskeyModal || nonNullish(captcha)}
-    <BottomCardOrModal
-      title={nonNullish(captcha)
-        ? "Prove you're not a robot"
-        : "Continue with Passkey"}
-      onclose={handleHidePasskeyModal}
-      class="min-h-96"
-    >
-      {#if nonNullish(captcha)}
-        {@render solveCaptcha()}
-      {:else if showNamingPasskey}
-        {@render nameYourPasskey()}
-      {:else}
-        {@render connectOrCreatePasskey()}
-      {/if}
-    </BottomCardOrModal>
-  {/if}
-{/snippet}
-
-{#snippet solveCaptcha()}
-  {#if nonNullish(captcha)}
-    <form class="flex flex-1 flex-col gap-8">
-      <div class="flex flex-col gap-4">
-        <div class="preset-tonal relative flex items-center justify-center">
-          <img
-            src={captcha.uri}
-            class="h-30 w-55 mix-blend-darken dark:mix-blend-lighten dark:invert"
-            alt="CAPTCHA Characters"
-          />
-          <div
-            class="dark:bg-ii-background-primary-light bg-ii-background-primary-dark absolute h-30 w-55 mix-blend-lighten dark:mix-blend-darken"
-          ></div>
-        </div>
-        {#if captcha.retry}
-          <p class="p">Incorrect solution, try again</p>
-        {:else}
-          <p class="p">Type the characters you see</p>
-        {/if}
-        <input
-          bind:value={captcha.solution}
-          class="input px-4 py-2"
-          type="text"
-          autofocus
-          autocapitalize="none"
-          spellcheck="false"
-        />
-      </div>
-      <div class="mt-auto flex flex-col items-stretch gap-4">
-        <Button
-          onclick={handleValidateCaptcha}
-          type="submit"
-          disabled={captcha.solution.length === 0}
-          variant="primary">Submit</Button
-        >
-        <Button onclick={handleHidePasskeyModal} variant="secondary"
-          >Cancel</Button
-        >
-      </div>
-    </form>
-  {/if}
-{/snippet}
-
-{#snippet nameYourPasskey()}
-  <form class="flex flex-1 flex-col gap-8">
-    <div class="flex flex-col gap-4" in:fly={{ duration: 200, x: 10 }}>
-      <p>
-        Explicabo corrupti temporibus consequuntur quae accusamus eligendi eius,
-        ducimus iste iure.
-      </p>
-      <label class="label">
-        <span class="label-text">Name</span>
-        <input
-          bind:value={passkeyName}
-          class="input px-4 py-2"
-          type="text"
-          autofocus
-        />
-      </label>
-    </div>
-    <div class="mt-auto flex flex-col items-stretch gap-4">
-      <Button
-        onclick={handleStartRegistrationWithPasskey}
-        type="submit"
-        disabled={passkeyName.length === 0}
-        variant="primary">Create Passkey</Button
-      >
-      <Button onclick={handleCancelCreatePasskey} variant="secondary"
-        >Back</Button
-      >
-    </div>
-  </form>
-{/snippet}
-
-{#snippet connectOrCreatePasskey()}
-  <div class="mb-8 flex flex-col gap-4" in:fly={{ duration: 200, x: -10 }}>
-    <p>
-      Lorem ipsum dolor sit amet consectetur, adipisicing elit. Doloribus alias
-      amet quas, ducimus iste iure et.
-    </p>
-    <p>
-      Boriosam aliquid rerum dolore porro optio, explicabo corrupti temporibus
-      consequuntur quae accusamus eligendi eius.
-    </p>
-  </div>
-  <div class="mt-auto flex flex-col items-stretch gap-4">
-    <Button onclick={handleConnectPasskey} variant="primary"
-      >Connect my Passkey</Button
-    >
-    <Button onclick={handleCreatePasskey} variant="secondary"
-      >Don't have a passkey? Create one</Button
-    >
-  </div>
-{/snippet}
-
-<!-- an element with data-page 'new-authorize-view' is necessary for the e2e tests to pass -->
 <CenterContainer data-page="new-authorize-view">
   <CenterCard>
-    {#if nonNullish(authContext)}
-      {@render authenticate()}
+    {#if currentState.state === "loading"}
+      <p>Loading...</p>
+    {:else if currentState.state === "solveCaptcha"}
+      <Dialog
+        title={currentState.state === "solveCaptcha"
+          ? "Prove you're not a robot"
+          : "Continue with Passkey"}
+        class="min-h-96 w-100"
+      >
+        <SolveCaptcha {...currentState} />
+      </Dialog>
     {:else}
-      <div>Loading...</div>
+      <div class="mb-8 flex flex-col gap-1">
+        <h1 class="h1 font-bold">Sign in</h1>
+        <p class="p font-medium">
+          to continue with <span class="font-bold">{dappName.slice(7, 18)}</span
+          >
+        </p>
+      </div>
+      {#if currentState.state === "continueAs"}
+        <ContinueAs {...currentState} />
+      {:else}
+        <div class="flex flex-col items-stretch gap-4">
+          <Button onclick={connectOrCreatePasskey} variant="primary"
+            >Continue with Passkey</Button
+          >
+          <Button onclick={authenticateWithGoogle} variant="secondary"
+            >Continue with Google</Button
+          >
+          <Button variant="text-only">Cancel</Button>
+        </div>
+        {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
+          <Dialog
+            title={"Continue with Passkey"}
+            onClose={pickAuthenticationMethod}
+            class="min-h-96 w-100"
+          >
+            {#if currentState.state === "connectOrCreatePasskey"}
+              <ConnectOrCreatePasskey {...currentState} />
+            {:else if currentState.state === "createPasskey"}
+              <CreatePasskey {...currentState} />
+            {/if}
+          </Dialog>
+        {/if}
+      {/if}
     {/if}
   </CenterCard>
 </CenterContainer>
