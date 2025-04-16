@@ -312,19 +312,22 @@
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([
             fetchDelegation({
-            connection: authenticatedConnection,
-            derivationOrigin,
-            publicKey: context.authRequest.sessionPublicKey,
-            maxTimeToLive: context.authRequest.maxTimeToLive,
-          }),
-          authenticatedConnection.getAnchorInfo(),
-        ]);
+              connection: authenticatedConnection,
+              derivationOrigin,
+              publicKey: context.authRequest.sessionPublicKey,
+              maxTimeToLive: context.authRequest.maxTimeToLive,
+            }),
+            authenticatedConnection.getAnchorInfo(),
+          ]);
           if ("error" in result) {
             return;
           }
           const [userKey, parsed_signed_delegation] = result;
           // TODO: Handle when the "name" is not defined
-          lastUsedIdentitiesStore.addLatestUsed(authenticatedConnection.userNumber, anchorInfo.name[0] ?? "");
+          lastUsedIdentitiesStore.addLatestUsed(
+            authenticatedConnection.userNumber,
+            anchorInfo.name[0] ?? "",
+          );
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
@@ -333,7 +336,11 @@
           });
         };
         currentState = nonNullish(data.lastUsedIdentity)
-          ? { state: "continueAs", number: data.lastUsedIdentity.identityNumber, name: data.lastUsedIdentity.name }
+          ? {
+              state: "continueAs",
+              number: data.lastUsedIdentity.identityNumber,
+              name: data.lastUsedIdentity.name,
+            }
           : { state: "pickAuthenticationMethod" };
       });
     },

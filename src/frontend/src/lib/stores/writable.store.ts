@@ -12,7 +12,7 @@ type VersionedData<T> = { data: T | undefined; version: number | undefined };
 
 /** Returns true when the value has numeric version and data fields. */
 const isVersionedData = <T>(
-  data: T | VersionedData<T>
+  data: T | VersionedData<T>,
 ): data is VersionedData<T> =>
   nonNullish(data) &&
   typeof data === "object" &&
@@ -43,13 +43,9 @@ const writeData = <T>({
 
 /** Returns the version field of the value if it has one, otherwise undefined. */
 const getVersion = <T>(data: T | VersionedData<T>): number | undefined => {
-  if (
-    typeof data === "object" &&
-    data !== null &&
-    "version" in data
-  ) {
+  if (typeof data === "object" && data !== null && "version" in data) {
     const version = Number(
-      (data as unknown as { version: number | string }).version
+      (data as unknown as { version: number | string }).version,
     );
     if (!isNaN(version)) {
       return version;

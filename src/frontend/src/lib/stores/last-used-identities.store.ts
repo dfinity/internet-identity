@@ -13,7 +13,7 @@ export type LastUsedIdentitiesData = {
 type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
   addLatestUsed: (identityNumber: bigint, name: string) => void;
   reset: () => void;
-}
+};
 
 export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const { subscribe, set, update } = writableStored<LastUsedIdentitiesData>({
@@ -37,11 +37,16 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     reset: () => {
       set({});
     },
-  }
+  };
 };
 
 export const lastUsedIdentitiesStore = initLastUsedIdentitiesStore();
 
-export const lastUsedIdentityStore: Readable<LastUsedIdentity> = derived(lastUsedIdentitiesStore, (lastUsedIdentities) => {
-  return Object.values(lastUsedIdentities).sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)[0];
-});
+export const lastUsedIdentityStore: Readable<LastUsedIdentity> = derived(
+  lastUsedIdentitiesStore,
+  (lastUsedIdentities) => {
+    return Object.values(lastUsedIdentities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    )[0];
+  },
+);
