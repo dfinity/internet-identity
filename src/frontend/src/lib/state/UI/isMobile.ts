@@ -7,7 +7,7 @@ function createDeviceStore() {
   function checkDevice() {
     if (typeof window === "undefined") return false;
     const isMobile =
-      window.innerWidth <= 768 && matchMedia("(pointer:coarse)").matches;
+      window.innerWidth <= 460 && matchMedia("(pointer:coarse)").matches;
     set(isMobile);
   }
 
