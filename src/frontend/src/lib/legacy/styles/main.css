@@ -1205,13 +1205,19 @@ a:hover,
   .c-landingPage__right__info {
     display: block;
     margin-bottom: 1rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 
   .c-landingPage__right__info h1 {
-    font-size: 2.2rem;
+    font-size: 3.2rem;
+    line-height: 1.25;
     font-weight: bold;
+    margin-bottom: 0.8rem;
+  }
+
+  .c-landingPage__right__info h2 {
+    margin-bottom: 2rem;
   }
 
   .c-landingPage__right {
@@ -1219,7 +1225,8 @@ a:hover,
 
     background: var(--nvc-surface-dark);
     border-radius: var(--rs-card-border-radius);
-    padding: var(--rs-split-page-right-pane-bezzel--mobile);
+    /* padding: var(--rs-split-page-right-pane-bezzel--mobile); */
+    padding: 2rem;
 
     overflow: auto;
   }
