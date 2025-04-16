@@ -8,7 +8,6 @@
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import FlyWrapper from "$lib/components/UI/animation/FlyWrapper.svelte";
   import NameIdentityCard from "$lib/components/UI/NameIdentityCard.svelte";
 
   // TODO: this should really be pulled from a central store that initializes itself on load
