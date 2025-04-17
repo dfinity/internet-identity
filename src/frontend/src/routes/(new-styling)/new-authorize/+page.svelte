@@ -52,6 +52,7 @@
 
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
+    credentialId: ArrayBuffer | undefined,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
@@ -90,16 +91,19 @@
         () => userNumber,
         passkeyIdentity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
     } catch {
       // If error or cancelled, go back to method selection
       pickAuthenticationMethod();
     }
   };
 
-  const authenticateWithPasskey = async (credentialId: ArrayBuffer) => {
+  const authenticateWithPasskey = async (credentialId: ArrayBuffer | undefined) => {
     currentState = { state: "loading" };
     try {
+      if (!credentialId) {
+        throw new Error("Credential ID is required");
+      }
       const lookupResult = await connection.lookupDeviceKey(
         new Uint8Array(credentialId),
       );
@@ -119,9 +123,10 @@
         [credentialData]
       );
       if (result.kind === "loginSuccess") {
-        onAuthenticate(result.connection);
+        onAuthenticate(result.connection, credentialId);
+      } else {
+        throw new Error("Failed to login");
       }
-      throw new Error("Failed to login");
     } catch {
       // If error or cancelled, go back to method selection
       pickAuthenticationMethod();
@@ -182,7 +187,7 @@
         () => identity_number,
         data.session.identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkey.getCredentialId());
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -224,7 +229,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -317,7 +322,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -341,7 +346,7 @@
     authenticate: (context) => {
       authContext = context;
       return new Promise((resolve) => {
-        onAuthenticate = async (authenticatedConnection) => {
+        onAuthenticate = async (authenticatedConnection, credentialId: ArrayBuffer | undefined) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([
@@ -355,10 +360,6 @@
           ]);
           if ("error" in result) {
             return;
-          }
-          let credentialId: ArrayBuffer | undefined;
-          if (authenticatedConnection.identity instanceof DiscoverablePasskeyIdentity || authenticatedConnection.identity instanceof MultiWebAuthnIdentity || authenticatedConnection.identity instanceof WebAuthnIdentity) {
-            credentialId = authenticatedConnection.identity.getCredentialId();
           }
           const [userKey, parsed_signed_delegation] = result;
           lastUsedIdentitiesStore.addLatestUsed({
@@ -378,6 +379,7 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
+              credentialId: data.lastUsedIdentity.credentialId,
               continue: authenticateWithPasskey,
               useAnother: pickAuthenticationMethod,
             }
