@@ -1,5 +1,6 @@
 import type {
   DeviceData,
+  CredentialId as CredentialIdType,
   DeviceKey,
 } from "$lib/generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
@@ -16,7 +17,11 @@ const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
   new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
 
 export const convertToValidCredentialData = (
-  device: Omit<DeviceData, "alias">,
+  device: {
+    origin: [] | [string];
+    pubkey: DeviceKey;
+    credential_id: [] | [CredentialIdType];
+  },
 ): CredentialData | undefined => {
   // In certain cases, e.g. Chrome on Windows 10, an invalid credential id is
   // not ignored but instead will result in a WebAuthn error that prevents a

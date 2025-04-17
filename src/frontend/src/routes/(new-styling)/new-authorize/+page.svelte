@@ -38,6 +38,9 @@
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { convertToValidCredentialData } from "$lib/utils/credential-devices";
+  import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
+  import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 
   const { data }: PageProps = $props();
 
@@ -59,12 +62,12 @@
   const connectOrCreatePasskey = async () => {
     currentState = {
       state: "connectOrCreatePasskey",
-      connect: authenticateWithPasskey,
+      connect: authenticateWithDiscoverablePasskey,
       create: createPasskey,
     };
   };
 
-  const authenticateWithPasskey = async () => {
+  const authenticateWithDiscoverablePasskey = async () => {
     currentState = { state: "loading" };
     try {
       let userNumber: UserNumber;
@@ -93,6 +96,37 @@
       pickAuthenticationMethod();
     }
   };
+
+  const authenticateWithPasskey = async (credentialId: ArrayBuffer) => {
+    currentState = { state: "loading" };
+    try {
+      const lookupResult = await connection.lookupDeviceKey(
+        new Uint8Array(credentialId),
+      );
+      if (isNullish(lookupResult)) {
+        throw new Error("Account not migrated yet");
+      }
+      const credentialData = convertToValidCredentialData({
+        origin: lookupResult.origin,
+        credential_id: [new Uint8Array(credentialId)],
+        pubkey: lookupResult.pubkey,
+      });
+      if (!credentialData) {
+        throw new Error("Invalid credential data");
+      }
+      const result = await connection.fromWebauthnCredentials(
+        lookupResult.anchor_number,
+        [credentialData]
+      );
+      if (result.kind === "loginSuccess") {
+        onAuthenticate(result.connection);
+      }
+      throw new Error("Failed to login");
+    } catch {
+      // If error or cancelled, go back to method selection
+      pickAuthenticationMethod();
+    }
+  }
 
   const createPasskey = async () => {
     currentState = {
@@ -322,11 +356,16 @@
           if ("error" in result) {
             return;
           }
+          let credentialId: ArrayBuffer | undefined;
+          if (authenticatedConnection.identity instanceof DiscoverablePasskeyIdentity || authenticatedConnection.identity instanceof MultiWebAuthnIdentity || authenticatedConnection.identity instanceof WebAuthnIdentity) {
+            credentialId = authenticatedConnection.identity.getCredentialId();
+          }
           const [userKey, parsed_signed_delegation] = result;
-          lastUsedIdentitiesStore.addLatestUsed(
-            authenticatedConnection.userNumber,
-            anchorInfo.name[0],
-          );
+          lastUsedIdentitiesStore.addLatestUsed({
+            identityNumber: authenticatedConnection.userNumber,
+            name: anchorInfo.name[0],
+            credentialId,
+          });
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
@@ -339,6 +378,8 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
+              continue: authenticateWithPasskey,
+              useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
       });
