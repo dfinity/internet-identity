@@ -342,6 +342,7 @@ export const idlFactory = ({ IDL }) => {
     'RateLimitExceeded' : IDL.Null,
   });
   const DeviceKeyWithAnchor = IDL.Record({
+    'origin' : IDL.Opt(IDL.Text),
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
   });
