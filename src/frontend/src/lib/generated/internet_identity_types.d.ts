@@ -123,6 +123,7 @@ export interface DeviceData {
 }
 export type DeviceKey = PublicKey;
 export interface DeviceKeyWithAnchor {
+  'origin' : [] | [string],
   'pubkey' : DeviceKey,
   'anchor_number' : UserNumber,
 }
