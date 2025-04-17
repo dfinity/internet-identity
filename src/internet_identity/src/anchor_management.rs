@@ -252,6 +252,7 @@ pub fn lookup_device_key_with_credential_id(
     device.map(|device| DeviceKeyWithAnchor {
         pubkey: device.pubkey.clone(),
         anchor_number,
+        origin: device.origin.clone(),
     })
 }
 
