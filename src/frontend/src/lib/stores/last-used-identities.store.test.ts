@@ -14,6 +14,10 @@ vi.mock("$app/environment", () => ({
   browser: true, // Or false, depending on the test case
 }));
 
+// Helper function to create ArrayBuffer from string
+const strToArrBuf = (str: string): ArrayBuffer =>
+  Uint8Array.from(Buffer.from(str)).buffer;
+
 describe("lastUsedIdentitiesStore", () => {
   const mockTimestamp1 = 1700000000000;
   const mockTimestamp2 = 1700000001000;
@@ -21,8 +25,10 @@ describe("lastUsedIdentitiesStore", () => {
 
   const identity1 = BigInt("111");
   const name1 = "Test ID 1";
+  const credId1 = strToArrBuf("cred-111");
   const identity2 = BigInt("222");
   const name2 = "Test ID 2";
+  const credId2 = strToArrBuf("cred-222");
 
   beforeEach(() => {
     // Reset the store state and time before each test
@@ -41,12 +47,17 @@ describe("lastUsedIdentitiesStore", () => {
   });
 
   it("should add the first identity correctly", () => {
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     const expected: LastUsedIdentitiesData = {
       [identity1.toString()]: {
         identityNumber: identity1,
         name: name1,
+        credentialId: credId1,
         lastUsedTimestampMillis: mockTimestamp1,
       },
     };
@@ -55,21 +66,31 @@ describe("lastUsedIdentitiesStore", () => {
 
   it("should add multiple identities with correct timestamps", () => {
     // Add first identity
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     // Advance time and add second identity
     vi.setSystemTime(mockTimestamp2);
-    lastUsedIdentitiesStore.addLatestUsed(identity2, name2);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity2,
+      name: name2,
+      credentialId: credId2,
+    });
 
     const expected: LastUsedIdentitiesData = {
       [identity1.toString()]: {
         identityNumber: identity1,
         name: name1,
+        credentialId: credId1,
         lastUsedTimestampMillis: mockTimestamp1,
       },
       [identity2.toString()]: {
         identityNumber: identity2,
         name: name2,
+        credentialId: credId2,
         lastUsedTimestampMillis: mockTimestamp2,
       },
     };
@@ -78,7 +99,11 @@ describe("lastUsedIdentitiesStore", () => {
 
   it("should update the timestamp when adding an existing identity", () => {
     // Add identity initially
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
     expect(
       get(lastUsedIdentitiesStore)[identity1.toString()]
         .lastUsedTimestampMillis,
@@ -86,12 +111,17 @@ describe("lastUsedIdentitiesStore", () => {
 
     // Advance time and add the same identity again
     vi.setSystemTime(mockTimestamp3);
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1); // Name doesn't matter for update logic here
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    }); // Pass the full object
 
     const expected: LastUsedIdentitiesData = {
       [identity1.toString()]: {
         identityNumber: identity1,
         name: name1, // Name should remain the same from the *last* call
+        credentialId: credId1, // Keep original credential ID
         lastUsedTimestampMillis: mockTimestamp3,
       },
     };
@@ -103,7 +133,11 @@ describe("lastUsedIdentitiesStore", () => {
   });
 
   it("should reset the store to an empty object", () => {
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
     expect(get(lastUsedIdentitiesStore)).not.toEqual({}); // Ensure it's not empty
 
     lastUsedIdentitiesStore.reset();
@@ -111,17 +145,20 @@ describe("lastUsedIdentitiesStore", () => {
   });
 });
 
-describe("lastUsedIdentityStore (derived)", () => {
+describe("lastUsedIdentityStore (derived store)", () => {
   const mockTimestamp1 = 1700000000000;
   const mockTimestamp2 = 1700000001000;
   const mockTimestamp3 = 1700000002000;
 
   const identity1 = BigInt("101");
   const name1 = "Derived ID 1";
+  const credId1 = strToArrBuf("cred-101");
   const identity2 = BigInt("202");
   const name2 = "Derived ID 2";
+  const credId2 = strToArrBuf("cred-202");
   const identity3 = BigInt("303");
   const name3 = "Derived ID 3";
+  const credId3 = strToArrBuf("cred-303");
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -139,11 +176,16 @@ describe("lastUsedIdentityStore (derived)", () => {
   });
 
   it("should return the only identity when one is added", () => {
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     const expected: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
+      credentialId: credId1,
       lastUsedTimestampMillis: mockTimestamp1,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
@@ -151,24 +193,38 @@ describe("lastUsedIdentityStore (derived)", () => {
 
   it("should return the latest identity when multiple are added", () => {
     vi.setSystemTime(mockTimestamp1);
-    lastUsedIdentitiesStore.addLatestUsed(identity2, name2);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity2,
+      name: name2,
+      credentialId: credId2,
+    });
 
     vi.setSystemTime(mockTimestamp2);
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     const expectedLatest: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
+      credentialId: credId1,
       lastUsedTimestampMillis: mockTimestamp2,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedLatest);
 
     // Add identity 3 (at time 3) - Should become the latest
     vi.setSystemTime(mockTimestamp3);
-    lastUsedIdentitiesStore.addLatestUsed(identity3, name3);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity3,
+      name: name3,
+      credentialId: credId3,
+    });
     const expectedNewest: LastUsedIdentity = {
       identityNumber: identity3,
       name: name3,
+      credentialId: credId3,
       lastUsedTimestampMillis: mockTimestamp3,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedNewest);
@@ -176,27 +232,44 @@ describe("lastUsedIdentityStore (derived)", () => {
 
   it("should update when an existing identity becomes the latest again", () => {
     // Add 1 at time 1
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     // Add 2 at time 2 (latest is now 2)
     vi.setSystemTime(mockTimestamp2);
-    lastUsedIdentitiesStore.addLatestUsed(identity2, name2);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity2,
+      name: name2,
+      credentialId: credId2,
+    });
     expect(get(lastUsedIdentityStore)?.identityNumber).toBe(identity2);
 
     // Add 1 again at time 3 (latest is now 1 again)
     vi.setSystemTime(mockTimestamp3);
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
 
     const expected: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
+      credentialId: credId1,
       lastUsedTimestampMillis: mockTimestamp3,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
   });
 
   it("should become undefined after the source store is reset", () => {
-    lastUsedIdentitiesStore.addLatestUsed(identity1, name1);
+    lastUsedIdentitiesStore.addLatestUsed({
+      identityNumber: identity1,
+      name: name1,
+      credentialId: credId1,
+    });
     expect(get(lastUsedIdentityStore)).toBeDefined();
 
     lastUsedIdentitiesStore.reset();
