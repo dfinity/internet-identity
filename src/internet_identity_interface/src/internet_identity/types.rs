@@ -316,4 +316,5 @@ pub enum AuthorizationKey {
 pub struct DeviceKeyWithAnchor {
     pub pubkey: DeviceKey,
     pub anchor_number: AnchorNumber,
+    pub origin: Option<String>,
 }
