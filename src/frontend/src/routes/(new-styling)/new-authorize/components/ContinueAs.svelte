@@ -4,14 +4,22 @@
 
   type Props = Extract<State, { state: "continueAs" }>;
 
-  const { number, name }: Props = $props();
+  const {
+    number,
+    name,
+    credentialId,
+    continue: continueFn,
+    useAnother,
+  }: Props = $props();
 </script>
 
 <div class="flex flex-col items-stretch gap-4">
-  <Button class="px-6 py-4 text-left" variant="primary"
-    >Continue as {name ?? number}</Button
+  <Button
+    onclick={() => continueFn($state.snapshot(credentialId))}
+    class="px-6 py-4 text-left"
+    variant="primary">Continue as {name ?? number}</Button
   >
-  <Button class="px-6 py-4 text-left" variant="dashed"
+  <Button onclick={useAnother} class="px-6 py-4 text-left" variant="dashed"
     >Use another Internet Identity</Button
   >
 </div>

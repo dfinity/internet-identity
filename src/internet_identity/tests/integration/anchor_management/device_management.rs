@@ -840,9 +840,11 @@ fn should_lookup_device_key_with_credential_id() -> Result<(), CallError> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
     let credential_id = ByteBuf::from(vec![1, 2, 3]);
+    let device_origin = "https://example.com".to_string();
     let device = DeviceData {
         credential_id: Some(credential_id.clone()),
         key_type: KeyType::Platform,
+        origin: Some(device_origin.clone()),
         ..DeviceData::auth_test_device()
     };
 
@@ -853,9 +855,11 @@ fn should_lookup_device_key_with_credential_id() -> Result<(), CallError> {
     let DeviceKeyWithAnchor {
         pubkey,
         anchor_number,
+        origin,
     } = api::lookup_device_key(&env, canister_id, principal_1(), &credential_id)?.unwrap();
     assert_eq!(pubkey, device.pubkey);
     assert_eq!(anchor_number, user_number);
+    assert_eq!(origin, Some(device_origin.clone()));
 
     // Remove device
     api::remove(

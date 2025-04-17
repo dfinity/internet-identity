@@ -222,6 +222,10 @@ export class WebAuthnIdentity extends SignIdentity {
     return this._publicKey;
   }
 
+  public getCredentialId(): ArrayBuffer {
+    return this.rawId;
+  }
+
   /**
    * WebAuthn level 3 spec introduces a new attribute on successful WebAuthn interactions,
    * see https://w3c.github.io/webauthn/#dom-publickeycredential-authenticatorattachment.

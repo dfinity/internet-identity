@@ -1,6 +1,13 @@
 export type State =
   | { state: "loading" }
-  | { state: "continueAs"; number: bigint; name?: string }
+  | {
+      state: "continueAs";
+      number: bigint;
+      name?: string;
+      credentialId: ArrayBuffer | undefined;
+      continue: (credentialId: ArrayBuffer | undefined) => void;
+      useAnother: () => void;
+    }
   | {
       state: "pickAuthenticationMethod";
     }

@@ -38,6 +38,9 @@
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { convertToValidCredentialData } from "$lib/utils/credential-devices";
+  import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
+  import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 
   const { data }: PageProps = $props();
 
@@ -49,6 +52,7 @@
 
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
+    credentialId: ArrayBuffer | undefined,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
@@ -59,12 +63,12 @@
   const connectOrCreatePasskey = async () => {
     currentState = {
       state: "connectOrCreatePasskey",
-      connect: authenticateWithPasskey,
+      connect: authenticateWithDiscoverablePasskey,
       create: createPasskey,
     };
   };
 
-  const authenticateWithPasskey = async () => {
+  const authenticateWithDiscoverablePasskey = async () => {
     currentState = { state: "loading" };
     try {
       let userNumber: UserNumber;
@@ -87,7 +91,44 @@
         () => userNumber,
         passkeyIdentity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
+    } catch {
+      // If error or cancelled, go back to method selection
+      pickAuthenticationMethod();
+    }
+  };
+
+  const authenticateWithPasskey = async (
+    credentialId: ArrayBuffer | undefined,
+  ) => {
+    currentState = { state: "loading" };
+    try {
+      if (!credentialId) {
+        throw new Error("Credential ID is required");
+      }
+      const lookupResult = await connection.lookupDeviceKey(
+        new Uint8Array(credentialId),
+      );
+      if (isNullish(lookupResult)) {
+        throw new Error("Account not migrated yet");
+      }
+      const credentialData = convertToValidCredentialData({
+        origin: lookupResult.origin,
+        credential_id: [new Uint8Array(credentialId)],
+        pubkey: lookupResult.pubkey,
+      });
+      if (!credentialData) {
+        throw new Error("Invalid credential data");
+      }
+      const result = await connection.fromWebauthnCredentials(
+        lookupResult.anchor_number,
+        [credentialData],
+      );
+      if (result.kind === "loginSuccess") {
+        onAuthenticate(result.connection, credentialId);
+      } else {
+        throw new Error("Failed to login");
+      }
     } catch {
       // If error or cancelled, go back to method selection
       pickAuthenticationMethod();
@@ -148,7 +189,7 @@
         () => identity_number,
         data.session.identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkey.getCredentialId());
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -190,7 +231,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -283,7 +324,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -307,7 +348,10 @@
     authenticate: (context) => {
       authContext = context;
       return new Promise((resolve) => {
-        onAuthenticate = async (authenticatedConnection) => {
+        onAuthenticate = async (
+          authenticatedConnection,
+          credentialId: ArrayBuffer | undefined,
+        ) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([
@@ -323,10 +367,11 @@
             return;
           }
           const [userKey, parsed_signed_delegation] = result;
-          lastUsedIdentitiesStore.addLatestUsed(
-            authenticatedConnection.userNumber,
-            anchorInfo.name[0],
-          );
+          lastUsedIdentitiesStore.addLatestUsed({
+            identityNumber: authenticatedConnection.userNumber,
+            name: anchorInfo.name[0],
+            credentialId,
+          });
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
@@ -339,6 +384,9 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
+              credentialId: data.lastUsedIdentity.credentialId,
+              continue: authenticateWithPasskey,
+              useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
       });
