@@ -98,7 +98,9 @@
     }
   };
 
-  const authenticateWithPasskey = async (credentialId: ArrayBuffer | undefined) => {
+  const authenticateWithPasskey = async (
+    credentialId: ArrayBuffer | undefined,
+  ) => {
     currentState = { state: "loading" };
     try {
       if (!credentialId) {
@@ -120,7 +122,7 @@
       }
       const result = await connection.fromWebauthnCredentials(
         lookupResult.anchor_number,
-        [credentialData]
+        [credentialData],
       );
       if (result.kind === "loginSuccess") {
         onAuthenticate(result.connection, credentialId);
@@ -131,7 +133,7 @@
       // If error or cancelled, go back to method selection
       pickAuthenticationMethod();
     }
-  }
+  };
 
   const createPasskey = async () => {
     currentState = {
@@ -346,7 +348,10 @@
     authenticate: (context) => {
       authContext = context;
       return new Promise((resolve) => {
-        onAuthenticate = async (authenticatedConnection, credentialId: ArrayBuffer | undefined) => {
+        onAuthenticate = async (
+          authenticatedConnection,
+          credentialId: ArrayBuffer | undefined,
+        ) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([

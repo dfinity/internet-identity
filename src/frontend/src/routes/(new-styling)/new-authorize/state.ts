@@ -5,8 +5,8 @@ export type State =
       number: bigint;
       name?: string;
       credentialId: ArrayBuffer | undefined;
-      continue: (credentialId: ArrayBuffer | undefined) => void,
-      useAnother: () => void,
+      continue: (credentialId: ArrayBuffer | undefined) => void;
+      useAnother: () => void;
     }
   | {
       state: "pickAuthenticationMethod";

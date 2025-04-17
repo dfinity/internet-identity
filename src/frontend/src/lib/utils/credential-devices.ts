@@ -16,13 +16,11 @@ export type CredentialData = {
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
   new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
 
-export const convertToValidCredentialData = (
-  device: {
-    origin: [] | [string];
-    pubkey: DeviceKey;
-    credential_id: [] | [CredentialIdType];
-  },
-): CredentialData | undefined => {
+export const convertToValidCredentialData = (device: {
+  origin: [] | [string];
+  pubkey: DeviceKey;
+  credential_id: [] | [CredentialIdType];
+}): CredentialData | undefined => {
   // In certain cases, e.g. Chrome on Windows 10, an invalid credential id is
   // not ignored but instead will result in a WebAuthn error that prevents a
   // user from authenticating with any of their registered devices.

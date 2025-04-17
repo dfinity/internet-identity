@@ -8,24 +8,24 @@ const JSON_KEY_ARRAYBUFFER = "__arraybuffer__";
 
 // Helper function to convert ArrayBuffer to Base64
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-	let binary = "";
-	const bytes = new Uint8Array(buffer);
-	const len = bytes.byteLength;
-	for (let i = 0; i < len; i++) {
-		binary += String.fromCharCode(bytes[i]);
-	}
-	return btoa(binary);
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 };
 
 // Helper function to convert Base64 to ArrayBuffer
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-	const binary_string = atob(base64);
-	const len = binary_string.length;
-	const bytes = new Uint8Array(len);
-	for (let i = 0; i < len; i++) {
-		bytes[i] = binary_string.charCodeAt(i);
-	}
-	return bytes.buffer;
+  const binary_string = atob(base64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary_string.charCodeAt(i);
+  }
+  return bytes.buffer;
 };
 
 /**
@@ -43,23 +43,23 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
  * @returns {unknown} The transformed value if it matches a known type, otherwise the original value.
  */
 export const jsonReplacer = (_key: string, value: unknown): unknown => {
-	if (typeof value === "bigint") {
-		return { [JSON_KEY_BIGINT]: `${value}` };
-	}
+  if (typeof value === "bigint") {
+    return { [JSON_KEY_BIGINT]: `${value}` };
+  }
 
-	if (nonNullish(value) && value instanceof Principal) {
-		return { [JSON_KEY_PRINCIPAL]: value.toText() };
-	}
+  if (nonNullish(value) && value instanceof Principal) {
+    return { [JSON_KEY_PRINCIPAL]: value.toText() };
+  }
 
-	if (nonNullish(value) && value instanceof Uint8Array) {
-		return { [JSON_KEY_UINT8ARRAY]: Array.from(value) };
-	}
+  if (nonNullish(value) && value instanceof Uint8Array) {
+    return { [JSON_KEY_UINT8ARRAY]: Array.from(value) };
+  }
 
-	if (nonNullish(value) && value instanceof ArrayBuffer) {
-		return { [JSON_KEY_ARRAYBUFFER]: arrayBufferToBase64(value) };
-	}
+  if (nonNullish(value) && value instanceof ArrayBuffer) {
+    return { [JSON_KEY_ARRAYBUFFER]: arrayBufferToBase64(value) };
+  }
 
-	return value;
+  return value;
 };
 
 /**
@@ -78,39 +78,39 @@ export const jsonReplacer = (_key: string, value: unknown): unknown => {
  * @returns {unknown} The reconstructed value if it matches a known type, otherwise the original value.
  */
 export const jsonReviver = (_key: string, value: unknown): unknown => {
-	const mapValue = <T>(key: string): T => (value as Record<string, T>)[key];
+  const mapValue = <T>(key: string): T => (value as Record<string, T>)[key];
 
-	if (
-		nonNullish(value) &&
-		typeof value === "object" &&
-		JSON_KEY_BIGINT in value
-	) {
-		return BigInt(mapValue(JSON_KEY_BIGINT));
-	}
+  if (
+    nonNullish(value) &&
+    typeof value === "object" &&
+    JSON_KEY_BIGINT in value
+  ) {
+    return BigInt(mapValue(JSON_KEY_BIGINT));
+  }
 
-	if (
-		nonNullish(value) &&
-		typeof value === "object" &&
-		JSON_KEY_PRINCIPAL in value
-	) {
-		return Principal.fromText(mapValue(JSON_KEY_PRINCIPAL));
-	}
+  if (
+    nonNullish(value) &&
+    typeof value === "object" &&
+    JSON_KEY_PRINCIPAL in value
+  ) {
+    return Principal.fromText(mapValue(JSON_KEY_PRINCIPAL));
+  }
 
-	if (
-		nonNullish(value) &&
-		typeof value === "object" &&
-		JSON_KEY_UINT8ARRAY in value
-	) {
-		return Uint8Array.from(mapValue(JSON_KEY_UINT8ARRAY));
-	}
+  if (
+    nonNullish(value) &&
+    typeof value === "object" &&
+    JSON_KEY_UINT8ARRAY in value
+  ) {
+    return Uint8Array.from(mapValue(JSON_KEY_UINT8ARRAY));
+  }
 
-	if (
-		nonNullish(value) &&
-		typeof value === "object" &&
-		JSON_KEY_ARRAYBUFFER in value
-	) {
-		return base64ToArrayBuffer(mapValue(JSON_KEY_ARRAYBUFFER));
-	}
+  if (
+    nonNullish(value) &&
+    typeof value === "object" &&
+    JSON_KEY_ARRAYBUFFER in value
+  ) {
+    return base64ToArrayBuffer(mapValue(JSON_KEY_ARRAYBUFFER));
+  }
 
-	return value;
+  return value;
 };
