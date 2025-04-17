@@ -2,7 +2,7 @@ import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { writableStored } from "$lib/stores/writable.store";
 import { get } from "svelte/store";
 import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-import { jsonReplacer } from "@dfinity/utils";
+import { jsonReplacer } from "$lib/utils/json.utils";
 
 vi.mock("$app/environment", () => ({
   browser: true, // Or false, depending on the test case
