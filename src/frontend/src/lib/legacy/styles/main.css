@@ -156,8 +156,8 @@
   --nvc-text-grey: oklch(0.34 0 0);
   /* #ffffff */
   --nvc-text-light: oklch(1 0 0);
-  /* #ffffff */
-  --nvc-surface-light: oklch(1 0 0);
+  /* #c6c6c6 */
+  --nvc-surface-light: oklch(0.83 0 259);
 
   /**
    * value tokens: sizes (--vs => valueSize)
