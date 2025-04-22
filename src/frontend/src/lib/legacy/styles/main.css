@@ -141,10 +141,10 @@
   * We are adding these additional tokens so we definitely don't break anything for now
   */
 
-  /* #0d0d0b */
-  --nvc-surface-dark: oklch(0.16 0.0041 106.86);
-  /* #2b2c30 */
-  --nvc-surface-medium: oklch(0.29 0.0074 274.72);
+  /* #131620 */
+  --nvc-surface-medium: oklch(0.2 0.0206 271.51);
+  /* #060b15 */
+  --nvc-surface-dark: oklch(0.15 0.0236 261.52);
   /* #1b1d1c */
   --nvc-input-grey: oklch(0.23 0.0036 164.73);
   /* #6353c4 */
@@ -234,7 +234,7 @@
   --rc-button--disabled: var(--vc-shadow);
 
   --rc-background-image--highlight: var(--vc-brand-gradient);
-  --rc-background--highlight: var(--nvc-surface-dark);
+  --rc-background--highlight: var(--nvc-surface-medium);
   --rc-background--highlight-text: var(--vc-snow);
 
   /*
@@ -479,7 +479,7 @@ display:revert; revert to element instead of attribute */
   font-weight: 350;
   letter-spacing: -0.005em;
 
-  background: var(--nvc-surface-medium);
+  background: var(--nvc-surface-dark);
   color: var(--nvc-text-light);
 }
 
@@ -495,7 +495,7 @@ body {
   font-size: 1.6rem;
   line-height: var(--rs-line-height-body);
   /* background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt)); */
-  background-color: var(--nvc-surface-medium);
+  background-color: var(--nvc-surface-dark);
   background-size: 100% 100%;
   min-height: 100dvh;
 
@@ -1072,7 +1072,7 @@ a:hover,
 
 .c-landingPage__left {
   /* background-image: var(--rc-background-image--highlight); */
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   color: var(--rc-background--highlight-text);
 
   grid-area: left;
@@ -1122,7 +1122,7 @@ a:hover,
   /* This is necessary in case the content is bigger than the parent. */
   /* It keeps the start of the box at the top of the container. */
   max-height: 90%;
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   padding: 2rem;
   border-radius: 1rem;
 
@@ -1162,7 +1162,7 @@ a:hover,
     align-items: center;
 
     /* background-image: var(--rc-background-image--highlight); */
-    background-color: var(--nvc-surface-medium);
+    background-color: var(--nvc-surface-dark);
 
     height: auto;
     min-height: 100vh;
@@ -1225,7 +1225,7 @@ a:hover,
   .c-landingPage__right {
     order: 1;
 
-    background: var(--nvc-surface-dark);
+    background: var(--nvc-surface-medium);
     border-radius: var(--rs-card-border-radius);
     /* padding: var(--rs-split-page-right-pane-bezzel--mobile); */
     padding: 2rem;
@@ -1259,7 +1259,7 @@ a:hover,
 
   padding: var(--bezel-y) var(--bezel-x);
 
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   border-radius: var(--rs-card-border-radius);
 }
 
@@ -1301,7 +1301,7 @@ a:hover,
   --bezel-x: var(--rs-card-bezel);
   --bezel-y: var(--rs-card-bezel);
 
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   border: none;
 }
 
@@ -1343,7 +1343,7 @@ a:hover,
   --bezel-x: calc(var(--rs-card-bezel) * 0.3);
   --bezel-y: calc(var(--rs-card-bezel) * 0.3);
 
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
 }
 
 @media (max-width: 512px) {
@@ -1363,7 +1363,7 @@ a:hover,
 
   overflow-y: auto;
 
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
 
   border: var(--rs-line) solid var(--nvc-text-grey);
 
@@ -1493,7 +1493,7 @@ by all browsers (FF is missing) */
 
 .c-card--warning::after,
 .c-card--modal::after {
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
   border-radius: var(--rs-card-border-radius);
   /* box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4); */
 }
@@ -1850,13 +1850,13 @@ by all browsers (FF is missing) */
 }
 
 .c-button--secondary {
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
   color: var(--nvc-text-light);
   border: var(--rs-line) solid var(--nvc-text-grey);
 }
 
 .c-button--secondary {
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
   color: var(--nvc-text-light);
   border: var(--rs-line) solid var(--nvc-text-grey);
 }
@@ -2100,7 +2100,7 @@ by all browsers (FF is missing) */
 }
 
 .c-origin-preview--header {
-  background-color: var(--nvc-surface-light);
+  margin-top: -1.5rem;
 }
 
 .c-origin-preview__logo {
@@ -2203,7 +2203,7 @@ by all browsers (FF is missing) */
  */
 
 .c-footer {
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
   color: var(--nvc-text-light);
   padding: var(--rs-footer-gutter);
 }
@@ -2316,7 +2316,7 @@ by all browsers (FF is missing) */
   /* Needed for the floating "copy" button, if present */
   position: relative;
 
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   border-radius: var(--rs-input-border-radius);
   --bezel: calc(1.5 * var(--rs-input-bezel));
   padding: var(--bezel);
@@ -2345,7 +2345,7 @@ by all browsers (FF is missing) */
     it creates a scoped design logic that is easier to understand
     and maintain.
   */
-  --bg: var(--nvc-surface-dark);
+  --bg: var(--nvc-surface-medium);
   --fg: var(--rc-onInput);
 
   position: relative;
@@ -2386,7 +2386,7 @@ by all browsers (FF is missing) */
   * the index shown is important for recovery. Also this works around issues related
   * to different counter behavior on Safari & Chrome. */
   content: var(--index);
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   color: var(--nvc-text-light);
   padding: 0 0.4em 0 0.4em;
   font-size: 0.8em;
@@ -2463,7 +2463,7 @@ by all browsers (FF is missing) */
 
 /* When a word is disabled, make it more opaque to look non-interactive */
 .c-list--recovery-word__disabled {
-  --bg: var(--nvc-surface-dark);
+  --bg: var(--nvc-surface-medium);
   --fg: var(--rc-onInput-readonly);
   background-color: var(--vc-mist);
   /* make sure the user can't select the word */
@@ -2472,7 +2472,7 @@ by all browsers (FF is missing) */
 
 /* When a word requires attention make it look interactive */
 .c-list--recovery-word__attention {
-  --bg: var(--nvc-surface-dark);
+  --bg: var(--nvc-surface-medium);
 }
 
 /* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
@@ -2571,7 +2571,7 @@ by all browsers (FF is missing) */
 
 .c-list--anchors .c-list__item::after {
   /* background: var(--vc-brand-alt); */
-  background-color: var(--nvc-surface-dark);
+  background-color: var(--nvc-surface-medium);
   opacity: 0;
   mix-blend-mode: darken;
   transition: opacity 200ms linear;
@@ -2659,7 +2659,7 @@ by all browsers (FF is missing) */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
 }
 
 .c-list__parcel--detail {
@@ -2754,7 +2754,7 @@ by all browsers (FF is missing) */
   min-width: 15rem;
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
-  background-color: var(--nvc-surface-medium);
+  background-color: var(--nvc-surface-dark);
 
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -2821,7 +2821,7 @@ by all browsers (FF is missing) */
 
 .c-action-list {
   margin-top: 1rem;
-  background: var(--nvc-surface-dark);
+  background: var(--nvc-surface-medium);
   border: var(--rs-line) solid var(--nvc-text-grey);
   padding: var(--rs-list-parcel-bezel);
 }
@@ -3008,7 +3008,7 @@ a.c-action-list__item {
   background-size: 200% 100%;
   background-position: 0 0;
 
-  color: var(--nvc-surface-dark);
+  color: var(--nvc-surface-medium);
 
   width: var(--bullet-size);
   height: var(--bullet-size);
@@ -3026,7 +3026,7 @@ a.c-action-list__item {
 .c-progress-stepper__step[aria-current="true"]
   ~ .c-progress-stepper__step
   .c-progress-stepper__icon {
-  color: var(--nvc-surface-dark);
+  color: var(--nvc-surface-medium);
   background-position: 100% 0;
 }
 
