@@ -2790,7 +2790,7 @@ by all browsers (FF is missing) */
 }
 
 .c-chasm__content {
-  background-color: var(--rc-input);
+  background-color: var(--nvc-input-grey);
   padding: calc(1.25 * var(--rs-card-bezel));
 }
 
@@ -2798,7 +2798,7 @@ by all browsers (FF is missing) */
   margin: auto;
   width: 0;
   height: 0;
-  background: var(--rc-input);
+  background: var(--nvc-input-grey);
   width: 2.5rem;
   height: 1.2rem;
   /* triangle path */
