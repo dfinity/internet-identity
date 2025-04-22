@@ -346,14 +346,13 @@
             authnMethod: "passkey",
           });
         };
-        currentState =
-          false && nonNullish(data.lastUsedIdentity)
-            ? {
-                state: "continueAs",
-                number: data.lastUsedIdentity.identityNumber,
-                name: data.lastUsedIdentity.name,
-              }
-            : { state: "pickAuthenticationMethod" };
+        currentState = nonNullish(data.lastUsedIdentity)
+          ? {
+              state: "continueAs",
+              number: data.lastUsedIdentity.identityNumber,
+              name: data.lastUsedIdentity.name,
+            }
+          : { state: "pickAuthenticationMethod" };
       });
     },
     onProgress: () => {},
