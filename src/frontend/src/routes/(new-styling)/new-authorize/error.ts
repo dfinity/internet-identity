@@ -47,7 +47,7 @@ export const handleError = (error: unknown) => {
         break;
       case "AlreadyInProgress":
       case "WrongSolution":
-        // Errors that should have been handled but weren't
+        // Should be handled up the stack; reaching here means they weren’t.
         toaster.error({
           title: "Unhandled error",
           description: error.type,
