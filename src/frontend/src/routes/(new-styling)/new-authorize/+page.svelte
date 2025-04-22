@@ -38,6 +38,7 @@
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { handleError } from "./error";
 
   const { data }: PageProps = $props();
 
@@ -88,8 +89,8 @@
         passkeyIdentity,
       );
       onAuthenticate(result.connection);
-    } catch {
-      // If error or cancelled, go back to method selection
+    } catch (error) {
+      handleError(error);
       pickAuthenticationMethod();
     }
   };
@@ -112,8 +113,8 @@
           });
           await startRegistration();
           await registerWithPasskey(passkeyIdentity);
-        } catch {
-          // If error or cancelled, go back to method selection
+        } catch (error) {
+          handleError(error);
           pickAuthenticationMethod();
         }
       },
@@ -121,22 +122,25 @@
     };
   };
 
-  const registerWithPasskey = async (passkey: DiscoverablePasskeyIdentity) => {
+  const registerWithPasskey = async (
+    passkeyIdentity: DiscoverablePasskeyIdentity,
+    attempts = 0,
+  ) => {
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
-      authenticatorType: passkey.getAuthenticatorAttachment(),
+      authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkey.getAaguid(),
+      aaguid: passkeyIdentity.getAaguid(),
     });
     const authnMethod = passkeyAuthnMethodData({
       alias,
-      pubKey: passkey.getPublicKey().toDer(),
-      credentialId: passkey.getCredentialId()!,
-      authenticatorAttachment: passkey.getAuthenticatorAttachment(),
+      pubKey: passkeyIdentity.getPublicKey().toDer(),
+      credentialId: passkeyIdentity.getCredentialId()!,
+      authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    const name = passkey.getName();
+    const name = passkeyIdentity.getName();
     try {
       const { identity_number } = await data.session.actor
         .identity_registration_finish({
@@ -150,21 +154,31 @@
       );
       onAuthenticate(result.connection);
     } catch (error) {
-      if (
-        isCanisterError<IdRegFinishError>(error) &&
-        error.type === "UnexpectedCall"
-      ) {
-        const nextStep = error.value(error.type).next_step;
-        if ("CheckCaptcha" in nextStep) {
-          // Show CAPTCHA if it was skipped but is required
-          await solveCaptcha(
-            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
-          );
-          await registerWithPasskey(passkey);
-          return;
+      if (isCanisterError<IdRegFinishError>(error)) {
+        switch (error.type) {
+          case "UnexpectedCall":
+            const nextStep = error.value(error.type).next_step;
+            if ("CheckCaptcha" in nextStep) {
+              if (attempts < 3) {
+                // Show CAPTCHA if it was skipped but is required
+                await solveCaptcha(
+                  `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+                );
+                return registerWithPasskey(passkeyIdentity, attempts + 1);
+              }
+            }
+            break;
+          case "NoRegistrationFlow":
+            if (attempts < 3) {
+              // Apparently the flow has been cleaned up, try again.
+              await startRegistration();
+              return await registerWithPasskey(passkeyIdentity, attempts + 1);
+            }
+            break;
         }
       }
-      throw error;
+      handleError(error);
+      pickAuthenticationMethod();
     }
   };
 
@@ -198,11 +212,10 @@
         nonNullish(jwt)
       ) {
         await startRegistration();
-        await registerWithGoogle(jwt);
-        return;
+        return registerWithGoogle(jwt);
       }
-      currentState = { state: "pickAuthenticationMethod" };
-      throw error;
+      handleError(error);
+      pickAuthenticationMethod();
     }
   };
 
@@ -224,7 +237,8 @@
         // Ignore since it means we can continue with an existing registration
         return;
       }
-      throw error;
+      handleError(error);
+      pickAuthenticationMethod();
     }
   };
 
@@ -249,12 +263,9 @@
     solution: string,
   ): Promise<string | undefined> => {
     try {
-      const { next_step } = await data.session.actor
+      await data.session.actor
         .check_captcha({ solution })
         .then(throwCanisterError);
-      if ("CheckCaptcha" in next_step) {
-        return `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`;
-      }
     } catch (error) {
       if (
         isCanisterError<CheckCaptchaError>(error) &&
@@ -262,7 +273,8 @@
       ) {
         return `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
       }
-      throw error;
+      handleError(error);
+      pickAuthenticationMethod();
     }
   };
 
@@ -295,11 +307,11 @@
           await solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
-          await registerWithGoogle(jwt);
-          return;
+          return registerWithGoogle(jwt);
         }
       }
-      throw error;
+      handleError(error);
+      pickAuthenticationMethod();
     }
   };
 
@@ -334,13 +346,14 @@
             authnMethod: "passkey",
           });
         };
-        currentState = nonNullish(data.lastUsedIdentity)
-          ? {
-              state: "continueAs",
-              number: data.lastUsedIdentity.identityNumber,
-              name: data.lastUsedIdentity.name,
-            }
-          : { state: "pickAuthenticationMethod" };
+        currentState =
+          false && nonNullish(data.lastUsedIdentity)
+            ? {
+                state: "continueAs",
+                number: data.lastUsedIdentity.identityNumber,
+                name: data.lastUsedIdentity.name,
+              }
+            : { state: "pickAuthenticationMethod" };
       });
     },
     onProgress: () => {},
