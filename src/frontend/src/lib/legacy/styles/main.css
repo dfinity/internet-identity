@@ -156,6 +156,8 @@
   --nvc-text-grey: oklch(0.34 0 0);
   /* #ffffff */
   --nvc-text-light: oklch(1 0 0);
+  /* #ffffff */
+  --nvc-surface-light: oklch(1 0 0);
 
   /**
    * value tokens: sizes (--vs => valueSize)
@@ -2098,7 +2100,7 @@ by all browsers (FF is missing) */
 }
 
 .c-origin-preview--header {
-  margin-top: -1.5rem;
+  background-color: var(--nvc-surface-light);
 }
 
 .c-origin-preview__logo {
@@ -2743,7 +2745,7 @@ by all browsers (FF is missing) */
   left: 0;
   top: 100%;
   opacity: 0;
-  color: var(--rc-text);
+  color: var(--nvc-text-light);
   visibility: hidden;
   font-size: 0.8em;
   line-height: 1.4;
@@ -2752,7 +2754,7 @@ by all browsers (FF is missing) */
   min-width: 15rem;
   max-width: 20rem;
   transition: opacity 0.2s ease-in;
-  background-color: var(--rc-background);
+  background-color: var(--nvc-surface-medium);
 
   overflow-wrap: break-word;
   word-wrap: break-word;
