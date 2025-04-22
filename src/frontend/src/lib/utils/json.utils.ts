@@ -1,32 +1,11 @@
 import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
+import { fromBase64, toBase64 } from "./utils";
 
 const JSON_KEY_BIGINT = "__bigint__";
 const JSON_KEY_PRINCIPAL = "__principal__";
 const JSON_KEY_UINT8ARRAY = "__uint8array__";
 const JSON_KEY_ARRAYBUFFER = "__arraybuffer__";
-
-// Helper function to convert ArrayBuffer to Base64
-const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-};
-
-// Helper function to convert Base64 to ArrayBuffer
-const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binary_string = atob(base64);
-  const len = binary_string.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary_string.charCodeAt(i);
-  }
-  return bytes.buffer;
-};
 
 /**
  * A custom replacer for `JSON.stringify` that converts specific types not natively supported
@@ -56,7 +35,7 @@ export const jsonReplacer = (_key: string, value: unknown): unknown => {
   }
 
   if (nonNullish(value) && value instanceof ArrayBuffer) {
-    return { [JSON_KEY_ARRAYBUFFER]: arrayBufferToBase64(value) };
+    return { [JSON_KEY_ARRAYBUFFER]: toBase64(value) };
   }
 
   return value;
@@ -109,7 +88,7 @@ export const jsonReviver = (_key: string, value: unknown): unknown => {
     typeof value === "object" &&
     JSON_KEY_ARRAYBUFFER in value
   ) {
-    return base64ToArrayBuffer(mapValue(JSON_KEY_ARRAYBUFFER));
+    return fromBase64(mapValue(JSON_KEY_ARRAYBUFFER));
   }
 
   return value;

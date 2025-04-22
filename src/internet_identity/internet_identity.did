@@ -102,7 +102,6 @@ type DeviceWithUsage = record {
 type DeviceKeyWithAnchor = record {
     pubkey : DeviceKey;
     anchor_number : UserNumber;
-    origin : opt text;
 };
 
 // Map with some variants for the value type.
