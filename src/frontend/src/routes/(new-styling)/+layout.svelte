@@ -2,6 +2,8 @@
   // Enable new styles only in the new layout pages.
   import "$lib/app.css";
   import Background from "$lib/components/UI/Background.svelte";
+  import { Toaster } from "@skeletonlabs/skeleton-svelte";
+  import { toaster } from "$lib/utils/toaster";
 
   const { children, data } = $props();
 </script>
@@ -12,4 +14,5 @@
   >
     {@render children()}
   </Background>
+  <Toaster {toaster}></Toaster>
 {/key}
