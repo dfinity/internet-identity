@@ -369,12 +369,23 @@ impl Anchor {
         &mut self,
         openid_credential: OpenIdCredential,
     ) -> Result<(), AnchorError> {
+        const MAX_LINKED_CREDENTIALS: usize = 100;
+
         if self
             .openid_credential_index(&openid_credential.key())
             .is_ok()
         {
             return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
         }
+
+        let num_credentials = self.openid_credentials().len();
+        if num_credentials >= MAX_LINKED_CREDENTIALS {
+            return Err(AnchorError::TooManyOpenIdCredentials {
+                limit: MAX_LINKED_CREDENTIALS,
+                num_credentials,
+            });
+        }
+
         self.openid_credentials.push(openid_credential);
         Ok(())
     }
