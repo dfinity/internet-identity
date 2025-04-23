@@ -1,5 +1,5 @@
 export type State =
-  | { state: "loading" }
+  | { state: "loading"; label?: string }
   | {
       state: "continueAs";
       number: bigint;
