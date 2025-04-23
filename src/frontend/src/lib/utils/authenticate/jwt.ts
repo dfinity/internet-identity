@@ -6,7 +6,7 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
-import { decodeJwt } from "jose";
+import { decodeJWT } from "$lib/utils/openID";
 
 export const authenticateWithJWT = async ({
   jwt,
@@ -25,7 +25,7 @@ export const authenticateWithJWT = async ({
   const sessionKey = new Uint8Array(identity.getPublicKey().toDer());
 
   // Decode JWT using jose
-  const payload = decodeJwt(jwt);
+  const payload = decodeJWT(jwt);
   const sub = payload?.sub;
 
   const { anchor_number, expiration, user_key } = await actor
