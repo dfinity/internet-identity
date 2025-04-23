@@ -50,6 +50,7 @@
 
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
+    credentialId: ArrayBuffer | undefined,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
@@ -60,12 +61,12 @@
   const connectOrCreatePasskey = async () => {
     currentState = {
       state: "connectOrCreatePasskey",
-      connect: authenticateWithPasskey,
+      connect: authenticateWithDiscoverablePasskey,
       create: createPasskey,
     };
   };
 
-  const authenticateWithPasskey = async () => {
+  const authenticateWithDiscoverablePasskey = async () => {
     currentState = { state: "loading" };
     try {
       let userNumber: UserNumber;
@@ -88,9 +89,63 @@
         () => userNumber,
         passkeyIdentity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
     } catch (error) {
       handleError(error);
+      pickAuthenticationMethod();
+    }
+  };
+
+  const authenticateWithPasskey = async ({
+    anchorNumber,
+    credentialId,
+  }: {
+    anchorNumber: UserNumber;
+    credentialId: ArrayBuffer | undefined;
+  }) => {
+    currentState = { state: "loading" };
+    if (!credentialId) {
+      console.error("Credential ID is required for passkey authentication");
+      pickAuthenticationMethod();
+      return;
+    }
+
+    try {
+      const passkeyIdentity = new DiscoverablePasskeyIdentity({
+        credentialRequestOptions: {
+          publicKey: {
+            allowCredentials: [{ type: "public-key", id: credentialId }],
+          },
+        },
+        getPublicKey: async (result) => {
+          const lookupResult = await connection.lookupDeviceKey(
+            new Uint8Array(result.rawId),
+          );
+          if (isNullish(lookupResult)) {
+            throw new Error("Account not migrated yet");
+          }
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
+      });
+
+      const delegationIdentity =
+        await connection.requestFEDelegation(passkeyIdentity);
+
+      const actor = await connection.createActor(delegationIdentity);
+
+      const authenticatedConnection = new AuthenticatedConnection(
+        connection.canisterId,
+        connection.canisterConfig,
+        passkeyIdentity,
+        delegationIdentity,
+        anchorNumber,
+        actor,
+      );
+
+      onAuthenticate(authenticatedConnection, credentialId);
+    } catch (err) {
+      console.error("Authentication error:", err);
+      handleError(err);
       pickAuthenticationMethod();
     }
   };
@@ -152,7 +207,7 @@
         () => identity_number,
         data.session.identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
         switch (error.type) {
@@ -160,7 +215,6 @@
             const nextStep = error.value(error.type).next_step;
             if ("CheckCaptcha" in nextStep) {
               if (attempts < 3) {
-                // Show CAPTCHA if it was skipped but is required
                 await solveCaptcha(
                   `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
                 );
@@ -204,7 +258,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -295,7 +349,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection);
+      onAuthenticate(result.connection, undefined);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -303,7 +357,6 @@
       ) {
         const nextStep = error.value(error.type).next_step;
         if ("CheckCaptcha" in nextStep) {
-          // Show CAPTCHA if it was skipped but is required
           await solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
@@ -319,7 +372,10 @@
     authenticate: (context) => {
       authContext = context;
       return new Promise((resolve) => {
-        onAuthenticate = async (authenticatedConnection) => {
+        onAuthenticate = async (
+          authenticatedConnection,
+          credentialId: ArrayBuffer | undefined,
+        ) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([
@@ -335,10 +391,13 @@
             return;
           }
           const [userKey, parsed_signed_delegation] = result;
-          lastUsedIdentitiesStore.addLatestUsed(
-            authenticatedConnection.userNumber,
-            anchorInfo.name[0],
-          );
+          lastUsedIdentitiesStore.addLatestUsed({
+            identityNumber: authenticatedConnection.userNumber,
+            name: anchorInfo.name[0],
+            credentialId: credentialId
+              ? new Uint8Array(credentialId)
+              : undefined,
+          });
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
@@ -351,6 +410,12 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
+              continue: () =>
+                authenticateWithPasskey({
+                  anchorNumber: data.lastUsedIdentity.identityNumber,
+                  credentialId: data.lastUsedIdentity.credentialId,
+                }),
+              useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
       });

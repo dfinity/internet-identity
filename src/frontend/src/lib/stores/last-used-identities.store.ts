@@ -6,12 +6,17 @@ export type LastUsedIdentity = {
   name?: string;
   lastUsedTimestampMillis: number;
   identityNumber: bigint;
+  credentialId: Uint8Array | undefined;
 };
 export type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
 };
 type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
-  addLatestUsed: (identityNumber: bigint, name?: string) => void;
+  addLatestUsed: (params: {
+    identityNumber: bigint;
+    name?: string;
+    credentialId: Uint8Array | undefined;
+  }) => void;
   reset: () => void;
 };
 
@@ -24,12 +29,21 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
 
   return {
     subscribe,
-    addLatestUsed: (identityNumber: bigint, name?: string) => {
+    addLatestUsed: ({
+      identityNumber,
+      name,
+      credentialId,
+    }: {
+      identityNumber: bigint;
+      name?: string;
+      credentialId: Uint8Array | undefined;
+    }) => {
       update((lastUsedIdentities) => {
         lastUsedIdentities[identityNumber.toString()] = {
           name,
           lastUsedTimestampMillis: Date.now(),
           identityNumber,
+          credentialId,
         };
         return lastUsedIdentities;
       });
