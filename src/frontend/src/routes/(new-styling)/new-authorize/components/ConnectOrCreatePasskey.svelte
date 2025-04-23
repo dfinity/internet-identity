@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
-  import { State } from "../+page.svelte";
+  import { type State } from "../+page.svelte";
 
   type Props = Extract<State, { state: "connectOrCreatePasskey" }>;
 
