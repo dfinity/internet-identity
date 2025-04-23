@@ -41,6 +41,7 @@
   import { handleError } from "./error";
 
   const { data }: PageProps = $props();
+  const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 
   let currentState = $state<State>({ state: "loading" });
   let authContext = $state.raw<AuthContext>();
@@ -449,8 +450,18 @@
         <ContinueAs {...currentState} />
       {:else}
         <div class="flex flex-col items-stretch gap-4">
-          <Button onclick={connectOrCreatePasskey} variant="primary"
-            >Continue with Passkey</Button
+          {#if !supportsPasskeys}
+            <div class="card preset-filled-surface-100-900 p-4">
+              <p class="font-semibold">
+                Passkeys are unavailable on this browser
+              </p>
+              <p class="text-sm">Please choose another sign-in method</p>
+            </div>
+          {/if}
+          <Button
+            onclick={connectOrCreatePasskey}
+            variant="primary"
+            disabled={!supportsPasskeys}>Continue with Passkey</Button
           >
           <Button onclick={authenticateWithGoogle} variant="secondary"
             >Continue with Google</Button
