@@ -15,14 +15,8 @@ vi.mock("$app/environment", () => ({
 }));
 
 // Helper function to create Uint8Array from string
-const strToUint8Array = (str: string): Uint8Array => {
-  const buf = new ArrayBuffer(str.length);
-  const bufView = new Uint8Array(buf);
-  for (let i = 0, strLen = str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  return bufView;
-};
+const strToUint8Array = (str: string): Uint8Array =>
+  new TextEncoder().encode(str);
 
 describe("lastUsedIdentitiesStore", () => {
   const mockTimestamp1 = 1700000000000;
