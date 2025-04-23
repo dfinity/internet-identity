@@ -1,6 +1,5 @@
 import type {
   DeviceData,
-  CredentialId as CredentialIdType,
   DeviceKey,
 } from "$lib/generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
