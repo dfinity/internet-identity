@@ -39,10 +39,11 @@
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
+  import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
 
   const { data }: PageProps = $props();
 
-  let currentState = $state<State>({ state: "loading" });
+  let currentState = $state<State>({ state: "loading", label: "Connecting" });
   let authContext = $state.raw<AuthContext>();
   let dappName = $derived<string>(
     authContext ? authContext?.requestOrigin : "",
@@ -67,7 +68,7 @@
   };
 
   const authenticateWithDiscoverablePasskey = async () => {
-    currentState = { state: "loading" };
+    currentState = { state: "loading", label: "Authenticating" };
     try {
       let userNumber: UserNumber;
       const passkeyIdentity = new DiscoverablePasskeyIdentity({
@@ -103,7 +104,7 @@
     anchorNumber: UserNumber;
     credentialId: ArrayBuffer | undefined;
   }) => {
-    currentState = { state: "loading" };
+    currentState = { state: "loading", label: "Authenticating" };
     if (!credentialId) {
       console.error("Credential ID is required for passkey authentication");
       pickAuthenticationMethod();
@@ -154,7 +155,7 @@
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
-        currentState = { state: "loading" };
+        currentState = { state: "loading", label: "Creating Passkey" };
         try {
           const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
             publicKey: {
@@ -166,6 +167,7 @@
               },
             },
           });
+          currentState = { state: "loading", label: "Creating Identity" };
           await startRegistration();
           await registerWithPasskey(passkeyIdentity);
         } catch (error) {
@@ -203,6 +205,7 @@
           authn_method: authnMethod,
         })
         .then(throwCanisterError);
+      currentState = { state: "loading", label: "Authenticating" };
       const result = await connection.fromIdentity(
         () => identity_number,
         data.session.identity,
@@ -241,7 +244,7 @@
     if (isNullish(clientId)) {
       return;
     }
-    currentState = { state: "loading" };
+    currentState = { state: "loading", label: "Authenticating" };
     const requestConfig = createGoogleRequestConfig(clientId);
     let jwt: string | undefined;
     try {
@@ -265,6 +268,7 @@
         error.type === "NoSuchAnchor" &&
         nonNullish(jwt)
       ) {
+        currentState = { state: "loading", label: "Creating Identity" };
         await startRegistration();
         return registerWithGoogle(jwt);
       }
@@ -427,7 +431,12 @@
 <CenterContainer data-page="new-authorize-view">
   <CenterCard>
     {#if currentState.state === "loading"}
-      <p>Loading...</p>
+      <div class="flex flex-col items-center justify-center gap-2">
+        <ProgressRing value={null} size="size-14" />
+        {#if nonNullish(currentState.label)}
+          <p class="opacity-60">{currentState.label}</p>
+        {/if}
+      </div>
     {:else if currentState.state === "solveCaptcha"}
       <Dialog
         title={currentState.state === "solveCaptcha"
