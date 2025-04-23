@@ -8,6 +8,8 @@ export type LastUsedIdentity = {
   identityNumber: bigint;
   credentialId: Uint8Array | undefined;
   authMethod: "passkey" | "google";
+  // In case the auth method is google, this will be the sub (or email)
+  sub?: string;
 };
 export type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
@@ -18,6 +20,7 @@ type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
     name?: string;
     credentialId: Uint8Array | undefined;
     authMethod: "passkey" | "google";
+    sub?: string;
   }) => void;
   reset: () => void;
 };
@@ -36,11 +39,13 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
       name,
       credentialId,
       authMethod,
+      sub,
     }: {
       identityNumber: bigint;
       name?: string;
       credentialId: Uint8Array | undefined;
       authMethod: "passkey" | "google";
+      sub?: string;
     }) => {
       update((lastUsedIdentities) => {
         lastUsedIdentities[identityNumber.toString()] = {
@@ -49,6 +54,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           identityNumber,
           credentialId,
           authMethod,
+          sub,
         };
         return lastUsedIdentities;
       });

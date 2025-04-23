@@ -51,7 +51,8 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     const expected: LastUsedIdentitiesData = {
@@ -59,7 +60,8 @@ describe("lastUsedIdentitiesStore", () => {
         identityNumber: identity1,
         name: name1,
         credentialId: credId1,
-        authMethod: 'passkey',
+        authMethod: "passkey",
+        sub: `mock.user+${identity1}@example.com`,
         lastUsedTimestampMillis: mockTimestamp1,
       },
     };
@@ -72,7 +74,8 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     // Advance time and add second identity
@@ -81,7 +84,8 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity2,
       name: name2,
       credentialId: credId2,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity2}@example.com`,
     });
 
     const expected: LastUsedIdentitiesData = {
@@ -89,14 +93,16 @@ describe("lastUsedIdentitiesStore", () => {
         identityNumber: identity1,
         name: name1,
         credentialId: credId1,
-        authMethod: 'passkey',
+        authMethod: "passkey",
+        sub: `mock.user+${identity1}@example.com`,
         lastUsedTimestampMillis: mockTimestamp1,
       },
       [identity2.toString()]: {
         identityNumber: identity2,
         name: name2,
         credentialId: credId2,
-        authMethod: 'passkey',
+        authMethod: "passkey",
+        sub: `mock.user+${identity2}@example.com`,
         lastUsedTimestampMillis: mockTimestamp2,
       },
     };
@@ -109,7 +115,8 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
     expect(
       get(lastUsedIdentitiesStore)[identity1.toString()]
@@ -122,15 +129,17 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
-    }); // Pass the full object
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
+    });
 
     const expected: LastUsedIdentitiesData = {
       [identity1.toString()]: {
         identityNumber: identity1,
         name: name1, // Name should remain the same from the *last* call
         credentialId: credId1, // Keep original credential ID
-        authMethod: 'passkey',
+        authMethod: "passkey",
+        sub: `mock.user+${identity1}@example.com`, // Expect sub field
         lastUsedTimestampMillis: mockTimestamp3,
       },
     };
@@ -146,7 +155,8 @@ describe("lastUsedIdentitiesStore", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
     expect(get(lastUsedIdentitiesStore)).not.toEqual({}); // Ensure it's not empty
 
@@ -190,14 +200,16 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     const expected: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
       lastUsedTimestampMillis: mockTimestamp1,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
@@ -209,7 +221,8 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity2,
       name: name2,
       credentialId: credId2,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity2}@example.com`,
     });
 
     vi.setSystemTime(mockTimestamp2);
@@ -217,14 +230,16 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     const expectedLatest: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
       lastUsedTimestampMillis: mockTimestamp2,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedLatest);
@@ -235,13 +250,15 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity3,
       name: name3,
       credentialId: credId3,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity3}@example.com`,
     });
     const expectedNewest: LastUsedIdentity = {
       identityNumber: identity3,
       name: name3,
       credentialId: credId3,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity3}@example.com`,
       lastUsedTimestampMillis: mockTimestamp3,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedNewest);
@@ -253,7 +270,8 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     // Add 2 at time 2 (latest is now 2)
@@ -262,7 +280,8 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity2,
       name: name2,
       credentialId: credId2,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity2}@example.com`,
     });
     expect(get(lastUsedIdentityStore)?.identityNumber).toBe(identity2);
 
@@ -272,14 +291,16 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
 
     const expected: LastUsedIdentity = {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
       lastUsedTimestampMillis: mockTimestamp3,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
@@ -290,7 +311,8 @@ describe("lastUsedIdentityStore (derived store)", () => {
       identityNumber: identity1,
       name: name1,
       credentialId: credId1,
-      authMethod: 'passkey',
+      authMethod: "passkey",
+      sub: `mock.user+${identity1}@example.com`,
     });
     expect(get(lastUsedIdentityStore)).toBeDefined();
 

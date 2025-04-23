@@ -6,6 +6,7 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
+import { decodeJwt } from "jose";
 
 export const authenticateWithJWT = async ({
   jwt,
@@ -15,9 +16,18 @@ export const authenticateWithJWT = async ({
   jwt: string;
   salt: Uint8Array;
   actor: ActorSubclass<_SERVICE>;
-}): Promise<{ identity: SignIdentity; anchorNumber: bigint }> => {
+}): Promise<{
+  identity: SignIdentity;
+  anchorNumber: bigint;
+  sub: string | undefined;
+}> => {
   const identity = await identityFromActor(actor);
   const sessionKey = new Uint8Array(identity.getPublicKey().toDer());
+
+  // Decode JWT using jose
+  const payload = decodeJwt(jwt);
+  const sub = payload?.sub;
+
   const { anchor_number, expiration, user_key } = await actor
     .openid_prepare_delegation(jwt, salt, sessionKey)
     .then(throwCanisterError);
@@ -32,5 +42,6 @@ export const authenticateWithJWT = async ({
   return {
     identity: DelegationIdentity.fromDelegation(identity, delegationChain),
     anchorNumber: anchor_number,
+    sub: typeof sub !== "string" ? undefined : sub,
   };
 };
