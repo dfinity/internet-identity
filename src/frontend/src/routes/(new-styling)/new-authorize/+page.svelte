@@ -39,9 +39,6 @@
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
-  import { convertToValidCredentialData } from "$lib/utils/credential-devices";
-  import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
-  import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 
   const { data }: PageProps = $props();
 
