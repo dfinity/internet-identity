@@ -1,6 +1,6 @@
 <script lang="ts">
   import Button from "$lib/components/UI/Button.svelte";
-  import { type State } from "../state";
+  import { type State } from "../+page.svelte";
 
   type Props = Extract<State, { state: "continueAs" }>;
 

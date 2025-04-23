@@ -1,3 +1,92 @@
+<script lang="ts" module>
+  import { isWebAuthnCancel } from "$lib/utils/webAuthnErrorUtils";
+  import { toaster } from "$lib/utils/toaster";
+
+  export type State =
+    | { state: "loading" }
+    | { state: "continueAs"; number: bigint; name?: string }
+    | {
+        state: "pickAuthenticationMethod";
+      }
+    | {
+        state: "connectOrCreatePasskey";
+        connect: () => void;
+        create: () => void;
+      }
+    | {
+        state: "createPasskey";
+        create: (name: string) => void;
+        cancel: () => void;
+      }
+    | {
+        state: "solveCaptcha";
+        image: string;
+        attempt: number;
+        solve: (solution: string) => void;
+        cancel: () => void;
+      };
+
+  export const handleError = (error: unknown) => {
+    // Handle browser errors
+    if (isWebAuthnCancel(error)) {
+      toaster.info({
+        title: "Operation canceled",
+        description:
+          "The interaction was canceled or timed out. Please try again.",
+      });
+      return;
+    }
+
+    // Handle canister errors
+    if (
+      isCanisterError<IdRegStartError | IdRegFinishError | CheckCaptchaError>(
+        error,
+      )
+    ) {
+      switch (error.type) {
+        case "RateLimitExceeded":
+        case "IdentityLimitReached":
+          toaster.error({
+            title: "It seems like registration is unavailable at this moment",
+          });
+          break;
+        case "InvalidCaller":
+        case "UnexpectedCall":
+        case "NoRegistrationFlow":
+          toaster.error({
+            title: "Something went wrong during registration",
+          });
+          break;
+        case "InvalidAuthnMethod":
+        case "StorageError":
+          toaster.error({
+            title: "Something went wrong during registration",
+            description: error.value(error.type),
+          });
+          break;
+        case "AlreadyInProgress":
+        case "WrongSolution":
+          // Should be handled up the stack; reaching here means they weren’t.
+          toaster.error({
+            title: "Unhandled error",
+            description: error.type,
+          });
+          break;
+        default: {
+          void (error.type satisfies never);
+        }
+      }
+      return;
+    }
+
+    // Handle unexpected errors
+    toaster.error({
+      title: "Unexpected error",
+      description: error instanceof Error ? error.message : undefined,
+    });
+  };
+</script>
+
 <script lang="ts">
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
@@ -30,7 +119,6 @@
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";
-  import { type State } from "./state";
   import ConnectOrCreatePasskey from "./components/ConnectOrCreatePasskey.svelte";
   import CreatePasskey from "./components/CreatePasskey.svelte";
   import SolveCaptcha from "./components/SolveCaptcha.svelte";
@@ -38,7 +126,6 @@
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { handleError } from "./error";
 
   const { data }: PageProps = $props();
 
