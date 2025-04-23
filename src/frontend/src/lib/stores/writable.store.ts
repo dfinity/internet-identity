@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { nonNullish, jsonReplacer, jsonReviver } from "@dfinity/utils";
+import { jsonReplacer, jsonReviver, nonNullish } from "@dfinity/utils";
 import { writable, type Unsubscriber, type Writable } from "svelte/store";
 import { type StoreLocalStorageKey } from "$lib/constants/store.constants";
 
