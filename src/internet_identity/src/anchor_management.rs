@@ -205,7 +205,6 @@ pub fn add_openid_credential(
     if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
     }
-
     anchor.add_openid_credential(openid_credential.clone())?;
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
