@@ -4,8 +4,7 @@ export type State =
       state: "continueAs";
       number: bigint;
       name?: string;
-      credentialId: ArrayBuffer | undefined;
-      continue: (credentialId: ArrayBuffer | undefined) => void;
+      continue: () => void;
       useAnother: () => void;
     }
   | {

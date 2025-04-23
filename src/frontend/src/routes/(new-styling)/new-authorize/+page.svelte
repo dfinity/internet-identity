@@ -99,39 +99,56 @@
     }
   };
 
-  const authenticateWithPasskey = async (
-    credentialId: ArrayBuffer | undefined,
-  ) => {
+  const authenticateWithPasskey = async ({
+    anchorNumber,
+    credentialId,
+  }: {
+    anchorNumber: UserNumber;
+    credentialId: ArrayBuffer | undefined;
+  }) => {
     currentState = { state: "loading" };
+    if (!credentialId) {
+      console.error("Credential ID is required for passkey authentication");
+      pickAuthenticationMethod();
+      return;
+    }
+
     try {
-      if (!credentialId) {
-        throw new Error("Credential ID is required");
-      }
-      const lookupResult = await connection.lookupDeviceKey(
-        new Uint8Array(credentialId),
-      );
-      if (isNullish(lookupResult)) {
-        throw new Error("Account not migrated yet");
-      }
-      const credentialData = convertToValidCredentialData({
-        origin: lookupResult.origin,
-        credential_id: [new Uint8Array(credentialId)],
-        pubkey: lookupResult.pubkey,
+      const passkeyIdentity = new DiscoverablePasskeyIdentity({
+        credentialRequestOptions: {
+          publicKey: {
+            allowCredentials: [{ type: "public-key", id: credentialId }],
+          },
+        },
+        getPublicKey: async (result) => {
+          const lookupResult = await connection.lookupDeviceKey(
+            new Uint8Array(result.rawId),
+          );
+          if (isNullish(lookupResult)) {
+            throw new Error("Account not migrated yet");
+          }
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
       });
-      if (!credentialData) {
-        throw new Error("Invalid credential data");
-      }
-      const result = await connection.fromWebauthnCredentials(
-        lookupResult.anchor_number,
-        [credentialData],
+
+      const delegationIdentity =
+        await connection.requestFEDelegation(passkeyIdentity);
+
+      const actor = await connection.createActor(delegationIdentity);
+
+      const authenticatedConnection = new AuthenticatedConnection(
+        connection.canisterId,
+        connection.canisterConfig,
+        passkeyIdentity,
+        delegationIdentity,
+        anchorNumber,
+        actor,
       );
-      if (result.kind === "loginSuccess") {
-        onAuthenticate(result.connection, credentialId);
-      } else {
-        throw new Error("Failed to login");
-      }
-    } catch {
-      // If error or cancelled, go back to method selection
+
+      onAuthenticate(authenticatedConnection, credentialId);
+    } catch (err) {
+      console.error("Authentication error:", err);
+      handleError(err);
       pickAuthenticationMethod();
     }
   };
@@ -201,7 +218,6 @@
             const nextStep = error.value(error.type).next_step;
             if ("CheckCaptcha" in nextStep) {
               if (attempts < 3) {
-                // Show CAPTCHA if it was skipped but is required
                 await solveCaptcha(
                   `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
                 );
@@ -344,7 +360,6 @@
       ) {
         const nextStep = error.value(error.type).next_step;
         if ("CheckCaptcha" in nextStep) {
-          // Show CAPTCHA if it was skipped but is required
           await solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
@@ -396,8 +411,11 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
-              credentialId: data.lastUsedIdentity.credentialId,
-              continue: authenticateWithPasskey,
+              continue: () =>
+                authenticateWithPasskey({
+                  anchorNumber: data.lastUsedIdentity.identityNumber,
+                  credentialId: data.lastUsedIdentity.credentialId,
+                }),
               useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
