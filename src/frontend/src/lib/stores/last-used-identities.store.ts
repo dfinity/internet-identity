@@ -7,6 +7,7 @@ export type LastUsedIdentity = {
   lastUsedTimestampMillis: number;
   identityNumber: bigint;
   credentialId: Uint8Array | undefined;
+  authMethod: "passkey" | "google";
 };
 export type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
@@ -16,6 +17,7 @@ type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
     identityNumber: bigint;
     name?: string;
     credentialId: Uint8Array | undefined;
+    authMethod: "passkey" | "google";
   }) => void;
   reset: () => void;
 };
@@ -33,10 +35,12 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
       identityNumber,
       name,
       credentialId,
+      authMethod,
     }: {
       identityNumber: bigint;
       name?: string;
       credentialId: Uint8Array | undefined;
+      authMethod: "passkey" | "google";
     }) => {
       update((lastUsedIdentities) => {
         lastUsedIdentities[identityNumber.toString()] = {
@@ -44,6 +48,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           lastUsedTimestampMillis: Date.now(),
           identityNumber,
           credentialId,
+          authMethod,
         };
         return lastUsedIdentities;
       });

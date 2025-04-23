@@ -394,14 +394,17 @@
           lastUsedIdentitiesStore.addLatestUsed({
             identityNumber: authenticatedConnection.userNumber,
             name: anchorInfo.name[0],
-            credentialId: credentialId
+            credentialId: nonNullish(credentialId)
               ? new Uint8Array(credentialId)
               : undefined,
+            authMethod: nonNullish(credentialId) ? "passkey" : "google",
           });
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
             userPublicKey: new Uint8Array(userKey),
+            // This is a authnMethod forwarded to the app that requested authorization.
+            // We don't want to leak which authnMethod was used.
             authnMethod: "passkey",
           });
         };
@@ -411,10 +414,12 @@
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
               continue: () =>
-                authenticateWithPasskey({
-                  anchorNumber: data.lastUsedIdentity.identityNumber,
-                  credentialId: data.lastUsedIdentity.credentialId,
-                }),
+                data.lastUsedIdentity.authMethod === "passkey"
+                  ? authenticateWithPasskey({
+                      anchorNumber: data.lastUsedIdentity.identityNumber,
+                      credentialId: data.lastUsedIdentity.credentialId,
+                    })
+                  : authenticateWithGoogle(),
               useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
