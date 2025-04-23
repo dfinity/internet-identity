@@ -394,7 +394,9 @@
           lastUsedIdentitiesStore.addLatestUsed({
             identityNumber: authenticatedConnection.userNumber,
             name: anchorInfo.name[0],
-            credentialId,
+            credentialId: credentialId
+              ? new Uint8Array(credentialId)
+              : undefined,
           });
           resolve({
             kind: "success",

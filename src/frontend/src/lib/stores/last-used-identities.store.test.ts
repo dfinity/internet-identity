@@ -14,9 +14,15 @@ vi.mock("$app/environment", () => ({
   browser: true, // Or false, depending on the test case
 }));
 
-// Helper function to create ArrayBuffer from string
-const strToArrBuf = (str: string): ArrayBuffer =>
-  new TextEncoder().encode(str).buffer;
+// Helper function to create Uint8Array from string
+const strToUint8Array = (str: string): Uint8Array => {
+  const buf = new ArrayBuffer(str.length);
+  const bufView = new Uint8Array(buf);
+  for (let i = 0, strLen = str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return bufView;
+};
 
 describe("lastUsedIdentitiesStore", () => {
   const mockTimestamp1 = 1700000000000;
@@ -25,10 +31,10 @@ describe("lastUsedIdentitiesStore", () => {
 
   const identity1 = BigInt("111");
   const name1 = "Test ID 1";
-  const credId1 = strToArrBuf("cred-111");
+  const credId1 = strToUint8Array("cred-111");
   const identity2 = BigInt("222");
   const name2 = "Test ID 2";
-  const credId2 = strToArrBuf("cred-222");
+  const credId2 = strToUint8Array("cred-222");
 
   beforeEach(() => {
     // Reset the store state and time before each test
@@ -152,13 +158,13 @@ describe("lastUsedIdentityStore (derived store)", () => {
 
   const identity1 = BigInt("101");
   const name1 = "Derived ID 1";
-  const credId1 = strToArrBuf("cred-101");
+  const credId1 = strToUint8Array("cred-101");
   const identity2 = BigInt("202");
   const name2 = "Derived ID 2";
-  const credId2 = strToArrBuf("cred-202");
+  const credId2 = strToUint8Array("cred-202");
   const identity3 = BigInt("303");
   const name3 = "Derived ID 3";
-  const credId3 = strToArrBuf("cred-303");
+  const credId3 = strToUint8Array("cred-303");
 
   beforeEach(() => {
     vi.useFakeTimers();
