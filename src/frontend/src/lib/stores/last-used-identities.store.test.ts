@@ -16,7 +16,7 @@ vi.mock("$app/environment", () => ({
 
 // Helper function to create ArrayBuffer from string
 const strToArrBuf = (str: string): ArrayBuffer =>
-  Uint8Array.from(Buffer.from(str)).buffer;
+  new TextEncoder().encode(str).buffer;
 
 describe("lastUsedIdentitiesStore", () => {
   const mockTimestamp1 = 1700000000000;

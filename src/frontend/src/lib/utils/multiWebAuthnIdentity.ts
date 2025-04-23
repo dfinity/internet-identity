@@ -57,10 +57,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     }
   }
 
-  public getCredentialId(): ArrayBuffer | undefined {
-    return this._actualIdentity?.getCredentialId();
-  }
-
   /* The use the 'sign'ing for two things:
    * - figure out the actual webauthn identity (pubkey) that the user uses
    * - actual signing
