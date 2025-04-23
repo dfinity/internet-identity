@@ -20,6 +20,7 @@ use std::{cell::RefCell, collections::HashMap};
 mod google;
 
 const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+pub const OPENID_MAX_LINKED_CREDENTIALS: usize = 100;
 
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;

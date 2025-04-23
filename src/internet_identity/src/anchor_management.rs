@@ -1,5 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
-use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey, OPENID_MAX_LINKED_CREDENTIALS};
 use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
@@ -205,6 +205,15 @@ pub fn add_openid_credential(
     if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
     }
+
+    let current_number_of_anchors = anchor.openid_credentials().len();
+    if current_number_of_anchors >= OPENID_MAX_LINKED_CREDENTIALS {
+        return Err(AnchorError::TooManyOpenIdCredentials {
+            limit: OPENID_MAX_LINKED_CREDENTIALS,
+            num_credentials: current_number_of_anchors,
+        });
+    }
+
     anchor.add_openid_credential(openid_credential.clone())?;
     Ok(Operation::AddOpenIdCredential {
         iss: openid_credential.iss,
