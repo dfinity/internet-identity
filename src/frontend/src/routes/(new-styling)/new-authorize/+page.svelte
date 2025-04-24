@@ -473,7 +473,8 @@
           <button
             onclick={connectOrCreatePasskey}
             class="btn preset-filled py-2"
-            disabled={!supportsPasskeys}>Continue with Passkey</button>
+            disabled={!supportsPasskeys}>Continue with Passkey</button
+          >
           <button
             onclick={authenticateWithGoogle}
             class="btn preset-outlined py-2">Continue with Google</button
