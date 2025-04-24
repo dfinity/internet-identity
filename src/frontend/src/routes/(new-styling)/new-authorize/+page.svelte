@@ -41,6 +41,7 @@
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
 
   const { data }: PageProps = $props();
+  const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 
   let currentState = $state<State>({ state: "loading", label: "Connecting" });
   let authContext = $state.raw<AuthContext>();
@@ -461,10 +462,18 @@
         <ContinueAs {...currentState} />
       {:else}
         <div class="flex flex-col items-stretch gap-4">
+          {#if !supportsPasskeys}
+            <div class="card preset-filled-surface-100-900 p-4">
+              <p class="font-semibold">
+                Passkeys are unavailable on this browser
+              </p>
+              <p class="text-sm">Please choose another sign-in method</p>
+            </div>
+          {/if}
           <button
             onclick={connectOrCreatePasskey}
-            class="btn preset-filled py-2">Continue with Passkey</button
-          >
+            class="btn preset-filled py-2"
+            disabled={!supportsPasskeys}>Continue with Passkey</button>
           <button
             onclick={authenticateWithGoogle}
             class="btn preset-outlined py-2">Continue with Google</button

@@ -369,12 +369,23 @@ impl Anchor {
         &mut self,
         openid_credential: OpenIdCredential,
     ) -> Result<(), AnchorError> {
+        const MAX_LINKED_CREDENTIALS: usize = 100;
+
         if self
             .openid_credential_index(&openid_credential.key())
             .is_ok()
         {
             return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
         }
+
+        let num_credentials = self.openid_credentials().len();
+        if num_credentials >= MAX_LINKED_CREDENTIALS {
+            return Err(AnchorError::TooManyOpenIdCredentials {
+                limit: MAX_LINKED_CREDENTIALS,
+                num_credentials,
+            });
+        }
+
         self.openid_credentials.push(openid_credential);
         Ok(())
     }
@@ -745,6 +756,10 @@ pub enum AnchorError {
     NameTooLong {
         limit: usize,
     },
+    TooManyOpenIdCredentials {
+        limit: usize,
+        num_credentials: usize,
+    },
 }
 
 impl fmt::Display for AnchorError {
@@ -783,6 +798,7 @@ impl fmt::Display for AnchorError {
             AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
             AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
+            AnchorError::TooManyOpenIdCredentials { limit, num_credentials } => write!(f, "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."),
         }
     }
 }

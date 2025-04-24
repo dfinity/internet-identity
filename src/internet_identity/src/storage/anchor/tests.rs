@@ -575,6 +575,23 @@ fn should_update_openid_credential() {
     );
 }
 
+#[test]
+fn should_enforce_max_number_of_openid_credentials() {
+    let mut anchor = Anchor::new(ANCHOR_NUMBER);
+    for i in 0..100 {
+        anchor.add_openid_credential(openid_credential(i)).unwrap();
+    }
+
+    let result = anchor.add_openid_credential(openid_credential(101));
+    println!("{:?}", result);
+
+    assert!(matches!(
+        result,
+        Err(AnchorError::TooManyOpenIdCredentials { .. })
+    ));
+    assert_eq!(anchor.openid_credentials().len(), 100);
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("public key of some sample device"),
