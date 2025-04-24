@@ -246,6 +246,109 @@ fn cannot_register_with_faulty_jwt() {
     );
 }
 
+/// Verifies that JWT cannot be maliciously gotten by reassociating the credential and anchors between the prepare and get calls.
+#[test]
+fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError> {
+    let env = env();
+
+    let canister_id = setup_canister(&env);
+
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method_data) = openid_test_data();
+    let (
+        second_jwt,
+        second_salt,
+        _second_claims,
+        second_test_time,
+        second_test_principal,
+        second_test_authn_method_data,
+    ) = second_openid_test_data();
+
+    // Create identity
+    let identity_number =
+        create_identity_with_authn_method(&env, canister_id, &test_authn_method_data);
+
+    // Link Google Account to Identity
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    let second_time_to_advance =
+        Duration::from_millis(second_test_time) - Duration::from_millis(test_time);
+
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )?
+    .map_err(|e| CallError::Reject(format!("Error at first add: {:?}", e)))?;
+
+    // Create session key
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Prepare the delegation
+    let prepare_response = match api::openid_prepare_delegation(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+    )? {
+        Ok(response) => response,
+        Err(err) => panic!("Failing at openid_prepare_delegation: {:?}", err),
+    };
+
+    assert_eq!(
+        prepare_response.expiration,
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
+    );
+
+    api::openid_credential_remove(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &claims.key(),
+    )?
+    .map_err(|e| CallError::Reject(format!("Error at remove: {:?}", e)))?;
+
+    env.advance_time(second_time_to_advance);
+
+    let second_identity_number =
+        create_identity_with_authn_method(&env, canister_id, &second_test_authn_method_data);
+
+    api::openid_credential_add(
+        &env,
+        canister_id,
+        second_test_principal,
+        second_identity_number,
+        &second_jwt,
+        &second_salt,
+    )?
+    .map_err(|e| CallError::Reject(format!("Error at second add: {:?}", e)))?;
+
+    // Create session key
+    let second_pub_session_key = ByteBuf::from("session public key");
+
+    // Get the delegation
+    match api::openid_get_delegation(
+        &env,
+        canister_id,
+        second_test_principal,
+        &second_jwt,
+        &second_salt,
+        &second_pub_session_key,
+        &prepare_response.expiration,
+    )? {
+        Ok(_) => Err(CallError::Reject(
+            "We shouldn't be able to get this delegation!".to_string(),
+        )),
+        Err(err) => Ok(()),
+    }
+}
+
 static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
 
 #[derive(Deserialize)]
@@ -364,6 +467,59 @@ pub fn openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMet
         171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129, 211, 34, 88, 32, 158,
         197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38, 255, 65, 92, 234, 229,
         245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+    ];
+
+    let test_authn_method = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(test_pubkey),
+        }),
+        metadata: Default::default(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    (
+        jwt.into(),
+        salt,
+        claims,
+        test_time,
+        test_principal,
+        test_authn_method,
+    )
+}
+
+fn second_openid_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+    // This JWT is for testing purposes, it's already been expired before this commit has been made,
+    // additionally the audience of this JWT is a test Google client registration, not production.
+    let jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjI1ZjgyMTE3MTM3ODhiNjE0NTQ3NGI1MDI5YjAxNDFiZDViM2RlOWMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJHc1NfbzBPa05CTF9PMTkxZVNOR0lEeHhmYzdXTjNrZGdhWUpMcWFhSHRrIiwibmJmIjoxNzQxMDE2NjAyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQxMDE2OTAyLCJleHAiOjE3NDEwMjA1MDIsImp0aSI6ImZkZjYwYmU3ZGE4NTcxMDRiMWYzZWM0MDdmZDI0NTVhZjBiMzQ2MGQifQ.NBtQpzUb5F5qWLovJNaTbqLgw3ieeWqpmdvN94YwJ8SK3QHeMhg9nq18gzQeUIEsAItwtmJJUTI4VRuVJUtrZIdKwl1Y0Cv0hSeLKDMON3N5juysvkmm8uJC5PV14mAZTPwbN6uK3hZHEddnQGnTWZzh2QvjBPdFehQ9yMce_VregMuirPpEXHX-qRfy9QYw7FxNpy6zw7pqLW_cicMM2WP_7g1eUryD6RgsB9V_QCLftnDlIhB70pPiZ7dnCIZtTqT4NV_8WfCowXw-nfcJ001tgoQHoSd_o1uRDRheGYwpk7cdRRovratwFQKPxmeweVuqUxeYUVmCHqPa7Y5qsg";
+    let salt: [u8; 32] = [
+        73, 220, 36, 27, 90, 88, 236, 203, 175, 35, 73, 47, 62, 19, 239, 54, 105, 37, 123, 90, 175,
+        248, 124, 179, 244, 231, 182, 142, 180, 139, 171, 253,
+    ];
+    let validation_item = Decoder::new()
+        .decode_compact_serialization(jwt.as_bytes(), None)
+        .unwrap();
+    let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
+    let test_time = 1741016902000;
+    let test_principal = Principal::from_slice(&[
+        189, 168, 196, 34, 223, 103, 250, 254, 55, 167, 15, 174, 41, 207, 68, 219, 125, 21, 215,
+        167, 119, 47, 20, 195, 139, 233, 255, 210, 2,
+    ]);
+
+    // This is the public key of the credential used to sign in
+    // You get it with connection.identity.credentialData[0].pubkey
+    // Notably, you don't get it with connection.identity.getPublicKey()
+    // Even though you get the above principal with connection.identity.getPrincipal()
+
+    let test_pubkey = [
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 186, 6, 79, 74, 150, 108, 73, 69, 11, 154, 213, 120, 228, 162, 244, 219, 50,
+        15, 108, 166, 154, 59, 197, 43, 180, 128, 122, 81, 145, 5, 55, 89, 34, 88, 32, 110, 143,
+        94, 76, 94, 197, 172, 41, 10, 127, 224, 31, 66, 150, 206, 21, 4, 148, 86, 141, 117, 36, 16,
+        119, 242, 232, 155, 6, 154, 223, 6, 123,
     ];
 
     let test_authn_method = AuthnMethodData {
