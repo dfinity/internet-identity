@@ -52,6 +52,7 @@
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
     credentialId: ArrayBuffer | undefined,
+    sub?: string,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
@@ -90,7 +91,11 @@
         () => userNumber,
         passkeyIdentity,
       );
-      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
+      onAuthenticate(
+        result.connection,
+        passkeyIdentity.getCredentialId(),
+        undefined,
+      );
     } catch (error) {
       handleError(error);
       pickAuthenticationMethod();
@@ -143,7 +148,7 @@
         actor,
       );
 
-      onAuthenticate(authenticatedConnection, credentialId);
+      onAuthenticate(authenticatedConnection, credentialId, undefined);
     } catch (err) {
       console.error("Authentication error:", err);
       handleError(err);
@@ -210,7 +215,11 @@
         () => identity_number,
         data.session.identity,
       );
-      onAuthenticate(result.connection, passkeyIdentity.getCredentialId());
+      onAuthenticate(
+        result.connection,
+        passkeyIdentity.getCredentialId(),
+        undefined,
+      );
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
         switch (error.type) {
@@ -239,7 +248,7 @@
     }
   };
 
-  const authenticateWithGoogle = async () => {
+  const authenticateWithGoogle = async (loginHint?: string) => {
     const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
       return;
@@ -251,8 +260,9 @@
       jwt = await requestJWT(requestConfig, {
         nonce: data.session.nonce,
         mediation: "required",
+        loginHint,
       });
-      const { identity, anchorNumber } = await authenticateWithJWT({
+      const { identity, anchorNumber, sub } = await authenticateWithJWT({
         jwt,
         salt: data.session.salt,
         actor: data.session.actor,
@@ -261,7 +271,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection, undefined);
+      onAuthenticate(result.connection, undefined, sub);
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -344,7 +354,7 @@
           salt: data.session.salt,
         })
         .then(throwCanisterError);
-      const { identity, anchorNumber } = await authenticateWithJWT({
+      const { identity, anchorNumber, sub } = await authenticateWithJWT({
         jwt,
         salt: data.session.salt,
         actor: data.session.actor,
@@ -353,7 +363,7 @@
         anchorNumber,
         identity,
       );
-      onAuthenticate(result.connection, undefined);
+      onAuthenticate(result.connection, undefined, sub);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -379,6 +389,7 @@
         onAuthenticate = async (
           authenticatedConnection,
           credentialId: ArrayBuffer | undefined,
+          sub?: string,
         ) => {
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
@@ -398,14 +409,18 @@
           lastUsedIdentitiesStore.addLatestUsed({
             identityNumber: authenticatedConnection.userNumber,
             name: anchorInfo.name[0],
-            credentialId: credentialId
+            credentialId: nonNullish(credentialId)
               ? new Uint8Array(credentialId)
               : undefined,
+            authMethod: nonNullish(credentialId) ? "passkey" : "google",
+            sub,
           });
           resolve({
             kind: "success",
             delegations: [parsed_signed_delegation],
             userPublicKey: new Uint8Array(userKey),
+            // This is a authnMethod forwarded to the app that requested authorization.
+            // We don't want to leak which authnMethod was used.
             authnMethod: "passkey",
           });
         };
@@ -415,10 +430,12 @@
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
               continue: () =>
-                authenticateWithPasskey({
-                  anchorNumber: data.lastUsedIdentity.identityNumber,
-                  credentialId: data.lastUsedIdentity.credentialId,
-                }),
+                data.lastUsedIdentity.authMethod === "passkey"
+                  ? authenticateWithPasskey({
+                      anchorNumber: data.lastUsedIdentity.identityNumber,
+                      credentialId: data.lastUsedIdentity.credentialId,
+                    })
+                  : authenticateWithGoogle(data.lastUsedIdentity.sub),
               useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
@@ -476,7 +493,7 @@
             disabled={!supportsPasskeys}>Continue with Passkey</button
           >
           <button
-            onclick={authenticateWithGoogle}
+            onclick={() => authenticateWithGoogle()}
             class="btn preset-outlined py-2">Continue with Google</button
           >
         </div>
