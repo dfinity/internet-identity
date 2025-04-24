@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/UI/Button.svelte";
   import { type State } from "../state";
 
   type Props = Extract<State, { state: "continueAs" }>;
@@ -8,10 +7,16 @@
 </script>
 
 <div class="flex flex-col items-stretch gap-4">
-  <Button onclick={continueFn} class="px-6 py-4 text-left" variant="primary"
-    >Continue as {name ?? number}</Button
+  <button
+    onclick={continueFn}
+    class="btn preset-filled py-4 pr-4 pl-12 text-left"
   >
-  <Button onclick={useAnother} class="px-6 py-4 text-left" variant="dashed"
-    >Use another Internet Identity</Button
+    <span class="flex-1 text-center">
+      Continue as <span class="font-medium">{name ?? number}</span>
+    </span>
+    <span class="min-w-8 text-center text-lg">→</span>
+  </button>
+  <button onclick={useAnother} class="btn preset-tonal px-6 py-2 text-left"
+    >Use another identity</button
   >
 </div>

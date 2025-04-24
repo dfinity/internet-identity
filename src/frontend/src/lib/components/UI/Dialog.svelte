@@ -53,8 +53,8 @@
   oncancel={onCancel}
   closedby={closeOnOutsideClick ? "any" : "none"}
   class={[
-    "flex max-h-screen max-w-full flex-col overflow-hidden bg-transparent backdrop:opacity-0 backdrop:backdrop-brightness-75 backdrop:transition-opacity backdrop:duration-200 max-[460px]:min-w-full",
-    backdrop && "[&[data-visible]]:backdrop:opacity-100",
+    "backdrop:bg-surface-100 flex max-h-screen max-w-full flex-col overflow-hidden bg-transparent backdrop:opacity-0 backdrop:transition-opacity backdrop:duration-200 max-[460px]:min-w-full backdrop:dark:bg-[#040404]",
+    backdrop && "[&[data-visible]]:backdrop:opacity-80",
     ($isMobile && bottomSheet === "mobile") || bottomSheet === "always"
       ? "mx-auto mt-auto"
       : "m-auto max-[460px]:m-0 max-[460px]:min-h-full",
@@ -65,7 +65,7 @@
 >
   <div
     class={[
-      "bg-ii-background-primary-light dark:bg-ii-background-primary-dark text-ii-text-primary-dark dark:text-ii-text-primary-light flex max-h-screen w-100 flex-col overflow-hidden p-6 max-[460px]:max-w-full max-[460px]:min-w-full",
+      "preset-filled-surface-50-950 flex max-h-screen w-100 flex-col overflow-hidden p-6 max-[460px]:max-w-full max-[460px]:min-w-full",
       ($isMobile && bottomSheet === "mobile") || bottomSheet === "always"
         ? "max-w-full rounded-t-2xl"
         : "rounded-2xl max-[460px]:flex-1 max-[460px]:rounded-none",
@@ -85,7 +85,7 @@
       {/if}
     </div>
     <div
-      class="bg-ii-background-primary-light dark:bg-ii-background-primary-dark flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+      class="preset-filled-surface-50-950 flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
     >
       {@render children?.()}
     </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
   import { type State } from "../state";
   import { onMount } from "svelte";
@@ -21,10 +20,10 @@
 </script>
 
 <form class="flex flex-1 flex-col gap-8">
-  <div class="flex flex-col gap-4" in:fly={{ duration: 200, x: 10 }}>
-    <p>
-      Explicabo corrupti temporibus consequuntur quae accusamus eligendi eius,
-      ducimus iste iure.
+  <div class="flex flex-col gap-6" in:fly={{ duration: 200, x: 10 }}>
+    <p class="opacity-80">
+      You're about to create a passkey, a secure way to sign in. To help you
+      recognize it later, give your passkey a name that reflects your identity.
     </p>
     <label class="label">
       <span class="label-text">Name</span>
@@ -37,12 +36,12 @@
     </label>
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-4">
-    <Button
+    <button
       onclick={handleSubmit}
       type="submit"
       disabled={name.length === 0}
-      variant="primary">{"Create Passkey"}</Button
+      class="btn preset-filled py-2">{"Create Passkey"}</button
     >
-    <Button onclick={cancel} variant="secondary">Cancel</Button>
+    <button onclick={cancel} class="btn preset-outlined py-2">Go Back</button>
   </div>
 </form>

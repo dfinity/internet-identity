@@ -36,7 +36,6 @@
   import SolveCaptcha from "./components/SolveCaptcha.svelte";
   import ContinueAs from "./components/ContinueAs.svelte";
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import Button from "$lib/components/UI/Button.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
@@ -432,7 +431,11 @@
   <CenterCard>
     {#if currentState.state === "loading"}
       <div class="flex flex-col items-center justify-center gap-2">
-        <ProgressRing value={null} size="size-14" />
+        <ProgressRing
+          value={null}
+          size="size-14"
+          meterStroke="stroke-primary-900-100"
+        />
         {#if nonNullish(currentState.label)}
           <p class="opacity-60">{currentState.label}</p>
         {/if}
@@ -448,7 +451,7 @@
       </Dialog>
     {:else}
       <div class="mb-8 flex flex-col gap-1">
-        <h1 class="h1 font-bold">Sign in</h1>
+        <h1 class="h1">Sign in</h1>
         <p class="p font-medium">
           to continue with <span class="font-bold">{dappName.slice(7, 18)}</span
           >
@@ -458,19 +461,20 @@
         <ContinueAs {...currentState} />
       {:else}
         <div class="flex flex-col items-stretch gap-4">
-          <Button onclick={connectOrCreatePasskey} variant="primary"
-            >Continue with Passkey</Button
+          <button
+            onclick={connectOrCreatePasskey}
+            class="btn preset-filled py-2">Continue with Passkey</button
           >
-          <Button onclick={authenticateWithGoogle} variant="secondary"
-            >Continue with Google</Button
+          <button
+            onclick={authenticateWithGoogle}
+            class="btn preset-outlined py-2">Continue with Google</button
           >
-          <Button variant="text-only">Cancel</Button>
         </div>
         {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
           <Dialog
             title={"Continue with Passkey"}
             onClose={pickAuthenticationMethod}
-            class="min-h-96 w-100"
+            class="min-h-100 w-100"
           >
             {#if currentState.state === "connectOrCreatePasskey"}
               <ConnectOrCreatePasskey {...currentState} />

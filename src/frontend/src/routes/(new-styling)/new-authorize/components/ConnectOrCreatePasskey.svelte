@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/UI/Button.svelte";
   import { fly } from "svelte/transition";
   import { type State } from "../state.js";
 
@@ -8,19 +7,24 @@
   const { connect, create }: Props = $props();
 </script>
 
-<div class="mb-8 flex flex-col gap-4" in:fly={{ duration: 200, x: -10 }}>
+<div
+  class="mb-8 flex flex-col gap-3 opacity-80"
+  in:fly={{ duration: 200, x: -10 }}
+>
   <p>
-    Lorem ipsum dolor sit amet consectetur, adipisicing elit. Doloribus alias
-    amet quas, ducimus iste iure et.
+    Passkeys offer a secure, password-free method for logging into your
+    accounts, eliminating the need to remember complex passwords.
   </p>
   <p>
-    Boriosam aliquid rerum dolore porro optio, explicabo corrupti temporibus
-    consequuntur quae accusamus eligendi eius.
+    A unique cryptographic key is stored on your device, enabling a faster, more
+    secure, and reliable way to authenticate your identity.
   </p>
 </div>
 <div class="mt-auto flex flex-col items-stretch gap-4">
-  <Button onclick={connect} variant="primary">Connect my Passkey</Button>
-  <Button onclick={create} variant="secondary"
-    >Don't have a passkey? Create one</Button
+  <button onclick={create} class="btn preset-filled py-2"
+    >Set Up a New Passkey</button
+  >
+  <button onclick={connect} class="btn preset-outlined py-2"
+    >Use an Existing Passkey</button
   >
 </div>
