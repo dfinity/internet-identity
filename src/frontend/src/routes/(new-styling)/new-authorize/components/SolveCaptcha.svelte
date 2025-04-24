@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Button from "$lib/components/UI/Button.svelte";
   import { type State } from "../state";
   import { tick } from "svelte";
+  import Button from "$lib/components/UI/Button.svelte";
 
   type Props = Extract<State, { state: "solveCaptcha" }>;
 
@@ -57,14 +57,14 @@
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-4">
-    <Button
+    <button
       onclick={handleSubmit}
       type="submit"
       disabled={solution.length === 0 || loading}
-      variant="primary">{loading ? "Loading..." : "Submit"}</Button
+      class="btn preset-filled py-2">{loading ? "Loading..." : "Submit"}</button
     >
-    <Button onclick={cancel} disabled={loading} variant="secondary"
-      >Cancel</Button
+    <button onclick={cancel} disabled={loading} class="btn preset-outlined py-2"
+      >Cancel</button
     >
   </div>
 </form>
