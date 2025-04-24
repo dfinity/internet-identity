@@ -16,6 +16,8 @@
 
   onMount(() => {
     inputRef.focus();
+    // Make sure mobile keyboard does not overlap the input
+    setTimeout(() => inputRef.scrollIntoView(), 100);
   });
 </script>
 

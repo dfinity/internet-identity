@@ -56,7 +56,7 @@
     "backdrop:bg-surface-100 flex max-h-screen max-w-full flex-col overflow-hidden bg-transparent backdrop:opacity-0 backdrop:transition-opacity backdrop:duration-200 max-[460px]:min-w-full backdrop:dark:bg-[#040404]",
     backdrop && "[&[data-visible]]:backdrop:opacity-80",
     ($isMobile && bottomSheet === "mobile") || bottomSheet === "always"
-      ? "mx-auto mt-auto"
+      ? "fixed top-auto bottom-0 mx-auto"
       : "m-auto max-[460px]:m-0 max-[460px]:min-h-full",
   ]}
   transition:transitionFn|global
