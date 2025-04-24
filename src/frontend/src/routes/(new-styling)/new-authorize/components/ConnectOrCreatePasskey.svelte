@@ -19,8 +19,8 @@
   </p>
 </div>
 <div class="mt-auto flex flex-col items-stretch gap-4">
-  <Button onclick={connect} variant="primary">Connect my Passkey</Button>
   <Button onclick={create} variant="secondary"
     >Don't have a passkey? Create one</Button
   >
+  <Button onclick={connect} variant="secondary">Connect my Passkey</Button>
 </div>
