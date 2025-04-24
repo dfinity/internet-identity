@@ -42,6 +42,6 @@
       disabled={name.length === 0}
       class="btn preset-filled py-2">{"Create Passkey"}</button
     >
-    <button onclick={cancel} class="btn preset-outlined py-2">Go Back</button>
+    <button onclick={cancel} class="btn preset-outlined py-2">Go back</button>
   </div>
 </form>

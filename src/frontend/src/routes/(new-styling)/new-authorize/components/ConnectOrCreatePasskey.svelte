@@ -22,9 +22,9 @@
 </div>
 <div class="mt-auto flex flex-col items-stretch gap-4">
   <button onclick={create} class="btn preset-filled py-2"
-    >Set Up a New Passkey</button
+    >Set up a new Passkey</button
   >
   <button onclick={connect} class="btn preset-outlined py-2"
-    >Use an Existing Passkey</button
+    >Use an existing Passkey</button
   >
 </div>
