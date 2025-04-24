@@ -139,7 +139,7 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1, // Name should remain the same from the *last* call
         credentialId: credId1, // Keep original credential ID
         authMethod: "passkey",
-        sub: `mock.user+${identity1}@example.com`, // Expect sub field
+        sub: `mock.user+${identity1}@example.com`,
         lastUsedTimestampMillis: mockTimestamp3,
       },
     };

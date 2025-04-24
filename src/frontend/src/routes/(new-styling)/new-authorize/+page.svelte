@@ -147,7 +147,7 @@
         actor,
       );
 
-      onAuthenticate(authenticatedConnection, credentialId, undefined); // Pass empty string for sub
+      onAuthenticate(authenticatedConnection, credentialId, undefined);
     } catch (err) {
       console.error("Authentication error:", err);
       handleError(err);
