@@ -305,6 +305,15 @@ fn should_not_overwrite_device_credential_lookup() {
             .unwrap(),
         anchor_0.anchor_number()
     );
+    // Make sure that lookup of anchor_0 is not remove by anchor_1
+    anchor_1.remove_device(&device_1.pubkey).unwrap();
+    storage.update(anchor_1.clone()).unwrap();
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor_0.anchor_number()
+    );
 }
 
 fn sample_device() -> Device {
