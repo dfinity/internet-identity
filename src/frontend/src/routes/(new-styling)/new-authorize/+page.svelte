@@ -39,6 +39,11 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
+  import SelectAuthMethod from "./components/SelectAuthMethod.svelte";
 
   const { data }: PageProps = $props();
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
@@ -69,6 +74,7 @@
   };
 
   const authenticateWithDiscoverablePasskey = async () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
     currentState = { state: "loading", label: "Authenticating" };
     try {
       let userNumber: UserNumber;
@@ -109,6 +115,7 @@
     anchorNumber: UserNumber;
     credentialId: ArrayBuffer | undefined;
   }) => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsPasskey);
     currentState = { state: "loading", label: "Authenticating" };
     if (!credentialId) {
       console.error("Credential ID is required for passkey authentication");
@@ -157,11 +164,15 @@
   };
 
   const createPasskey = async () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
         currentState = { state: "loading", label: "Creating Passkey" };
         try {
+          authenticationV2Funnel.trigger(
+            AuthenticationV2Events.StartWebauthnCreation,
+          );
           const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
             publicKey: {
               ...creationOptions([], undefined, undefined),
@@ -210,6 +221,9 @@
           authn_method: authnMethod,
         })
         .then(throwCanisterError);
+      authenticationV2Funnel.trigger(
+        AuthenticationV2Events.SuccessfulPasskeyRegistration,
+      );
       currentState = { state: "loading", label: "Authenticating" };
       const result = await connection.fromIdentity(
         () => identity_number,
@@ -267,6 +281,11 @@
         salt: data.session.salt,
         actor: data.session.actor,
       });
+      // If the previous call succeeds, it means the google user already exists in II.
+      // Therefore, they are logging in.
+      // If the call fails, it means the google user does not exist in II.
+      // In that case, we register them.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
       const result = await connection.fromDelegationIdentity(
         anchorNumber,
         identity,
@@ -279,6 +298,9 @@
         nonNullish(jwt)
       ) {
         currentState = { state: "loading", label: "Creating Identity" };
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithGoogle,
+        );
         await startRegistration();
         return registerWithGoogle(jwt);
       }
@@ -363,6 +385,9 @@
         anchorNumber,
         identity,
       );
+      authenticationV2Funnel.trigger(
+        AuthenticationV2Events.SuccessfulGoogleRegistration,
+      );
       onAuthenticate(result.connection, undefined, sub);
     } catch (error) {
       if (
@@ -424,6 +449,15 @@
             authnMethod: "passkey",
           });
         };
+        if (nonNullish(data.lastUsedIdentity)) {
+          authenticationV2Funnel.trigger(
+            AuthenticationV2Events.LastUsedPresent,
+          );
+        } else {
+          authenticationV2Funnel.trigger(
+            AuthenticationV2Events.LastUsedNotPresent,
+          );
+        }
         currentState = nonNullish(data.lastUsedIdentity)
           ? {
               state: "continueAs",
@@ -435,7 +469,12 @@
                       anchorNumber: data.lastUsedIdentity.identityNumber,
                       credentialId: data.lastUsedIdentity.credentialId,
                     })
-                  : authenticateWithGoogle(data.lastUsedIdentity.sub),
+                  : () => {
+                      authenticationV2Funnel.trigger(
+                        AuthenticationV2Events.ContinueAsGoogle,
+                      );
+                      authenticateWithGoogle(data.lastUsedIdentity.sub);
+                    },
               useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
@@ -478,25 +517,7 @@
       {#if currentState.state === "continueAs"}
         <ContinueAs {...currentState} />
       {:else}
-        <div class="flex flex-col items-stretch gap-4">
-          {#if !supportsPasskeys}
-            <div class="card preset-filled-surface-100-900 p-4">
-              <p class="font-semibold">
-                Passkeys are unavailable on this browser
-              </p>
-              <p class="text-sm">Please choose another sign-in method</p>
-            </div>
-          {/if}
-          <button
-            onclick={connectOrCreatePasskey}
-            class="btn preset-filled py-2"
-            disabled={!supportsPasskeys}>Continue with Passkey</button
-          >
-          <button
-            onclick={() => authenticateWithGoogle()}
-            class="btn preset-outlined py-2">Continue with Google</button
-          >
-        </div>
+        <SelectAuthMethod {connectOrCreatePasskey} {authenticateWithGoogle} />
         {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
           <Dialog
             title={"Continue with Passkey"}

@@ -2,6 +2,10 @@
   import { fly } from "svelte/transition";
   import { type State } from "../state";
   import { onMount } from "svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
 
   type Props = Extract<State, { state: "createPasskey" }>;
 
@@ -16,6 +20,7 @@
 
   onMount(() => {
     inputRef.focus();
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     // Make sure mobile keyboard does not overlap the input
     setTimeout(() => inputRef.scrollIntoView(), 100);
   });
