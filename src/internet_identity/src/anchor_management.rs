@@ -109,7 +109,6 @@ pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operat
 /// Panics if this operation violates anchor constraints (see [Anchor]).
 pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
     let new_device = Device::from(device_data);
-
     anchor
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
@@ -160,7 +159,6 @@ pub fn replace_device(
         .remove_device(&old_device)
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
     let new_device = Device::from(new_device);
-
     anchor
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
