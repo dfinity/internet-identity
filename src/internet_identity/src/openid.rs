@@ -1,3 +1,4 @@
+use crate::anchor_management::lookup_anchor_with_openid_credential;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
@@ -10,8 +11,8 @@ use ic_certification::Hash;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{
-    Delegation, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey, SignedDelegation, Timestamp,
-    UserKey,
+    AnchorNumber, Delegation, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey,
+    SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -41,16 +42,21 @@ impl OpenIdCredential {
     }
 
     pub fn principal(&self) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        let anchor_number = lookup_anchor_with_openid_credential(&self.key()).unwrap(); // TODO: handle better?
+        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
         let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
         Principal::self_authenticating(public_key)
     }
 
-    pub async fn prepare_jwt_delegation(&self, session_key: SessionKey) -> (UserKey, Timestamp) {
+    pub async fn prepare_jwt_delegation(
+        &self,
+        session_key: SessionKey,
+        anchor_number: AnchorNumber,
+    ) -> (UserKey, Timestamp) {
         state::ensure_salt_set().await;
 
         let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
-        let seed = calculate_delegation_seed(&self.aud, &self.key());
+        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
 
         state::signature_map_mut(|sigs| {
             add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
@@ -67,11 +73,12 @@ impl OpenIdCredential {
         &self,
         session_key: SessionKey,
         expiration: Timestamp,
+        anchor_number: AnchorNumber,
     ) -> Result<SignedDelegation, OpenIdDelegationError> {
         state::assets_and_signatures(|certified_assets, sigs| {
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
-                seed: &calculate_delegation_seed(&self.aud, &self.key()),
+                seed: &calculate_delegation_seed(&self.aud, &self.key(), anchor_number),
                 message: &delegation_signature_msg(&session_key, expiration, None),
             };
 
@@ -145,7 +152,11 @@ where
 /// * `client_id`: The client id for which the `OpenIdCredential` was created
 /// * `(iss, sub)`: The key of the `OpenIdCredential` to create a `Hash` from
 #[allow(clippy::cast_possible_truncation)]
-fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) -> Hash {
+fn calculate_delegation_seed(
+    client_id: &str,
+    (iss, sub): &OpenIdCredentialKey,
+    anchor_number: AnchorNumber,
+) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
@@ -157,6 +168,9 @@ fn calculate_delegation_seed(client_id: &str, (iss, sub): &OpenIdCredentialKey) 
 
     blob.push(sub.len() as u8);
     blob.extend(sub.bytes());
+
+    blob.push(anchor_number as u8);
+
     let mut hasher = Sha256::new();
     hasher.update(blob);
     hasher.finalize().into()

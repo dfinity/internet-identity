@@ -878,7 +878,9 @@ mod openid_api {
         state::storage_borrow_mut(|storage| storage.update(anchor))
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-        let (user_key, expiration) = openid_credential.prepare_jwt_delegation(session_key).await;
+        let (user_key, expiration) = openid_credential
+            .prepare_jwt_delegation(session_key, anchor_number)
+            .await;
 
         // Checking again because the association could've changed during the .await
         let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
@@ -907,7 +909,9 @@ mod openid_api {
                 .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
         match lookup_anchor_with_openid_credential(&openid_credential.key()) {
-            Some(_) => openid_credential.get_jwt_delegation(session_key, expiration),
+            Some(anchor_number) => {
+                openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
+            }
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
     }

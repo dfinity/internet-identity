@@ -329,9 +329,6 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
     )?
     .map_err(|e| CallError::Reject(format!("Error at second add: {:?}", e)))?;
 
-    // Create session key
-    let second_pub_session_key = ByteBuf::from("session public key");
-
     // Get the delegation
     match api::openid_get_delegation(
         &env,
@@ -339,13 +336,13 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         second_test_principal,
         &second_jwt,
         &second_salt,
-        &second_pub_session_key,
+        &pub_session_key, // Note that this only works if we have access to the original session key
         &prepare_response.expiration,
     )? {
         Ok(_) => Err(CallError::Reject(
             "We shouldn't be able to get this delegation!".to_string(),
         )),
-        Err(err) => Ok(()),
+        Err(_) => Ok(()),
     }
 }
 
