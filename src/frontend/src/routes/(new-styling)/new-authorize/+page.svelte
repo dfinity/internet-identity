@@ -463,18 +463,19 @@
               state: "continueAs",
               number: data.lastUsedIdentity.identityNumber,
               name: data.lastUsedIdentity.name,
-              continue: () =>
-                data.lastUsedIdentity.authMethod === "passkey"
-                  ? authenticateWithPasskey({
-                      anchorNumber: data.lastUsedIdentity.identityNumber,
-                      credentialId: data.lastUsedIdentity.credentialId,
-                    })
-                  : () => {
-                      authenticationV2Funnel.trigger(
-                        AuthenticationV2Events.ContinueAsGoogle,
-                      );
-                      authenticateWithGoogle(data.lastUsedIdentity.sub);
-                    },
+              continue: () => {
+                if (data.lastUsedIdentity.authMethod === "passkey") {
+                  authenticateWithPasskey({
+                    anchorNumber: data.lastUsedIdentity.identityNumber,
+                    credentialId: data.lastUsedIdentity.credentialId,
+                  });
+                } else {
+                  authenticationV2Funnel.trigger(
+                    AuthenticationV2Events.ContinueAsGoogle,
+                  );
+                  authenticateWithGoogle(data.lastUsedIdentity.sub);
+                }
+              },
               useAnother: pickAuthenticationMethod,
             }
           : { state: "pickAuthenticationMethod" };
