@@ -570,11 +570,11 @@ impl<M: Memory + Clone> Storage<M> {
             .cloned()
             .map(StorableCredentialId::from)
             .for_each(|credential_id| {
-                // Only insert if the credential id isn't assigned to another anchor
+                // Only insert if the credential id isn't assigned to an anchor
                 if self
                     .lookup_anchor_with_device_credential_memory
                     .get(&credential_id)
-                    .is_none_or(|other_anchor_number| other_anchor_number == anchor_number)
+                    .is_none()
                 {
                     self.lookup_anchor_with_device_credential_memory
                         .insert(credential_id, anchor_number);
