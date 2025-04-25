@@ -109,13 +109,7 @@ pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operat
 /// Panics if this operation violates anchor constraints (see [Anchor]).
 pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
     let new_device = Device::from(device_data);
-    if new_device
-        .credential_id
-        .as_ref()
-        .is_some_and(|credential_id| lookup_device_key_with_credential_id(credential_id).is_some())
-    {
-        trap("failed to add device: credential_id is already registered");
-    }
+
     anchor
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
@@ -142,16 +136,6 @@ pub fn update_device(
     new_device.apply_device_data(device_data);
     let diff = device_diff(existing_device, &new_device);
 
-    if new_device
-        .credential_id
-        .as_ref()
-        .is_some_and(|credential_id| {
-            existing_device.credential_id != new_device.credential_id
-                && lookup_device_key_with_credential_id(credential_id).is_some()
-        })
-    {
-        trap("failed to modify device: credential_id is already registered");
-    }
     anchor
         .modify_device(&device_key, new_device)
         .unwrap_or_else(|err| trap(&format!("failed to modify device: {err}")));
@@ -177,13 +161,6 @@ pub fn replace_device(
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
     let new_device = Device::from(new_device);
 
-    if new_device
-        .credential_id
-        .as_ref()
-        .is_some_and(|credential_id| lookup_device_key_with_credential_id(credential_id).is_some())
-    {
-        trap("failed to replace device: credential_id is already registered");
-    }
     anchor
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
