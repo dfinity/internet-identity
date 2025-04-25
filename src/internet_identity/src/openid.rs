@@ -1,4 +1,3 @@
-use crate::anchor_management::lookup_anchor_with_openid_credential;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
