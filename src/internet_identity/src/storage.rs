@@ -566,8 +566,15 @@ impl<M: Memory + Clone> Storage<M> {
             .cloned()
             .map(StorableCredentialId::from)
             .for_each(|credential_id| {
-                self.lookup_anchor_with_device_credential_memory
-                    .remove(&credential_id);
+                // Only remove if the credential is assigned to this anchor
+                if self
+                    .lookup_anchor_with_device_credential_memory
+                    .get(&credential_id)
+                    .is_some_and(|other_anchor_number| other_anchor_number == anchor_number)
+                {
+                    self.lookup_anchor_with_device_credential_memory
+                        .remove(&credential_id);
+                }
             });
         credential_to_be_added
             .cloned()
