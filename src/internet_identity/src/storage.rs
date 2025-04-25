@@ -562,14 +562,24 @@ impl<M: Memory + Clone> Storage<M> {
             .collect();
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
-        credential_to_be_removed.cloned().for_each(|key| {
+        credential_to_be_removed.cloned().for_each(|credential_id| {
             self.lookup_anchor_with_device_credential_memory
-                .remove(&key.into());
+                .remove(&credential_id.into());
         });
-        credential_to_be_added.cloned().for_each(|key| {
-            self.lookup_anchor_with_device_credential_memory
-                .insert(key.into(), anchor_number);
-        });
+        credential_to_be_added
+            .cloned()
+            .map(StorableCredentialId::from)
+            .for_each(|credential_id| {
+                // Only insert if the credential id isn't assigned to another anchor
+                if self
+                    .lookup_anchor_with_device_credential_memory
+                    .get(&credential_id)
+                    .is_none_or(|other_anchor_number| other_anchor_number == anchor_number)
+                {
+                    self.lookup_anchor_with_device_credential_memory
+                        .insert(credential_id, anchor_number);
+                }
+            });
     }
 
     #[allow(dead_code)]

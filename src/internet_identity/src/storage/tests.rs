@@ -276,6 +276,37 @@ fn should_write_and_update_device_credential_lookup() {
     );
 }
 
+#[test]
+fn should_not_overwrite_device_credential_lookup() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut anchor_0 = storage.allocate_anchor().unwrap();
+    let mut anchor_1 = storage.allocate_anchor().unwrap();
+    let device_0 = Device {
+        pubkey: ByteBuf::from(vec![0]),
+        credential_id: Some(ByteBuf::from(vec![0])),
+        ..sample_device()
+    };
+    let device_1 = Device {
+        pubkey: ByteBuf::from(vec![1]),
+        credential_id: device_0.credential_id.clone(),
+        ..sample_device()
+    };
+    anchor_0.add_device(device_0.clone()).unwrap();
+    anchor_1.add_device(device_1.clone()).unwrap();
+
+    // Make sure that lookup of anchor_0 is not overwritten with anchor_1
+    storage.create(anchor_0.clone()).unwrap();
+    storage.create(anchor_1.clone()).unwrap();
+    assert_eq!(
+        storage
+            .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
+            .unwrap(),
+        anchor_0.anchor_number()
+    );
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
