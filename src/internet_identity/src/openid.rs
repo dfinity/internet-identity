@@ -41,8 +41,7 @@ impl OpenIdCredential {
         (self.iss.clone(), self.sub.clone())
     }
 
-    pub fn principal(&self) -> Principal {
-        let anchor_number = lookup_anchor_with_openid_credential(&self.key()).unwrap(); // TODO: handle better?
+    pub fn principal(&self, anchor_number: AnchorNumber) -> Principal {
         let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
         let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
         Principal::self_authenticating(public_key)
@@ -151,6 +150,7 @@ where
 ///
 /// * `client_id`: The client id for which the `OpenIdCredential` was created
 /// * `(iss, sub)`: The key of the `OpenIdCredential` to create a `Hash` from
+/// * `anchor_number`: The anchor number the credential is assigned to
 #[allow(clippy::cast_possible_truncation)]
 fn calculate_delegation_seed(
     client_id: &str,
