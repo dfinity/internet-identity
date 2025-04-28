@@ -298,9 +298,9 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(_anchor_number: AnchorNumber, _origin: Option<FrontendHostname>) -> Vec<Account> {
+fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<Account> {
     vec![Account {
-        account: None,
+        account_number: None,
         origin: "example.com".to_string(),
         last_used: Some(0u64),
         name: Some("Default Mock Account".to_string()),
@@ -314,7 +314,7 @@ fn create_account(
     _name: String,
 ) -> Result<Account, CreateAccountError> {
     Ok(Account {
-        account: None,
+        account_number: None,
         origin: "example.com".to_string(),
         last_used: Some(0u64),
         name: Some("Default Mock Account".to_string()),
@@ -329,7 +329,7 @@ fn update_account(
     _update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     Ok(Account {
-        account: None,
+        account_number: None,
         origin: "example.com".to_string(),
         last_used: Some(0u64),
         name: Some("Default Mock Account".to_string()),

@@ -321,7 +321,7 @@ pub struct DeviceKeyWithAnchor {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Account {
-    pub account: Option<AccountNumber>, // Null is unreserved default account
+    pub account_number: Option<AccountNumber>, // Null is unreserved default account
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
@@ -334,10 +334,10 @@ pub struct AccountUpdate {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum CreateAccountError {
-    InternalError,
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
-    InternalError,
+    InternalCanisterError(String),
 }

@@ -692,7 +692,7 @@ type IdRegFinishError = variant {
 
 type Account = record {
     // Null is unreserved default account
-    account : opt AccountNumber;
+    account_number : opt AccountNumber;
     origin : text;
     last_used : opt Timestamp;
     // Configurable properties
@@ -842,7 +842,7 @@ service : (opt InternetIdentityInit) -> {
     // Multiple accounts
     get_accounts : (
         anchor_number : UserNumber,
-        origin : opt FrontendHostname, // Either get all accounts or a specific origin
+        origin : FrontendHostname, // Either get all accounts or a specific origin
     ) -> (vec Account) query;
 
     create_account : (
