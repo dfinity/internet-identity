@@ -2,6 +2,14 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export interface Account {
+  'name' : [] | [string],
+  'origin' : string,
+  'account' : [] | [AccountNumber],
+  'last_used' : [] | [Timestamp],
+}
+export type AccountNumber = bigint;
+export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     'device_registration_mode_off' : null
   } |
@@ -102,6 +110,7 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
+export type CreateAccountError = { 'InternalError' : null };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -337,6 +346,7 @@ export type StreamingStrategy = {
 export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
+export type UpdateAccountError = { 'InternalError' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export type VerifyTentativeDeviceResponse = {
@@ -411,11 +421,24 @@ export interface _SERVICE {
       { 'Err' : CheckCaptchaError }
   >,
   'config' : ActorMethod<[], InternetIdentityInit>,
+  'create_account' : ActorMethod<
+    [UserNumber, FrontendHostname, string],
+    { 'Ok' : Account } |
+      { 'Err' : CreateAccountError }
+  >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  'get_account_delegation' : ActorMethod<
+    [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
+    GetDelegationResponse
+  >,
+  'get_accounts' : ActorMethod<
+    [UserNumber, [] | [FrontendHostname]],
+    Array<Account>
+  >,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
   'get_delegation' : ActorMethod<
@@ -486,6 +509,16 @@ export interface _SERVICE {
     { 'Ok' : OpenIdPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError }
   >,
+  'prepare_account_delegation' : ActorMethod<
+    [
+      UserNumber,
+      FrontendHostname,
+      [] | [AccountNumber],
+      SessionKey,
+      [] | [bigint],
+    ],
+    [UserKey, Timestamp]
+  >,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
@@ -503,6 +536,11 @@ export interface _SERVICE {
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'update_account' : ActorMethod<
+    [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
+    { 'Ok' : Account } |
+      { 'Err' : UpdateAccountError }
+  >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
