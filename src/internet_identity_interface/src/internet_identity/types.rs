@@ -339,5 +339,5 @@ pub enum CreateAccountError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
-    InternlError,
+    InternalError,
 }
