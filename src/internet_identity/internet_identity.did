@@ -560,11 +560,11 @@ type IdentityMetadataReplaceError = variant {
 };
 
 type CreateAccountError = variant {
-    InternalError;
+    InternalCanisterError : text;
 };
 
 type UpdateAccountError = variant {
-    InternalError;
+    InternalCanisterError : text;
 };
 
 type PrepareIdAliasRequest = record {
