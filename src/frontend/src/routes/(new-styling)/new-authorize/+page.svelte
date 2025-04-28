@@ -36,7 +36,10 @@
   import SolveCaptcha from "./components/SolveCaptcha.svelte";
   import ContinueAs from "./components/ContinueAs.svelte";
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import {
+    lastUsedIdentitiesStore,
+    LastUsedIdentity,
+  } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
   import {
@@ -63,6 +66,25 @@
   const pickAuthenticationMethod = () => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
     currentState = { state: "pickAuthenticationMethod" };
+  };
+
+  const continueAs = (lastUsedIdentity: LastUsedIdentity) => {
+    currentState = {
+      state: "continueAs",
+      number: lastUsedIdentity.identityNumber,
+      name: lastUsedIdentity.name,
+      continue: () => {
+        switch (lastUsedIdentity.authMethod) {
+          case "passkey":
+            return authenticateWithPasskey(lastUsedIdentity.credentialId);
+          case "google":
+            return authenticateWithGoogle(lastUsedIdentity.sub);
+          default:
+            void (lastUsedIdentity.authMethod satisfies never);
+        }
+      },
+      useAnother,
+    };
   };
 
   const useAnother = () => {
@@ -422,24 +444,7 @@
             : AuthenticationV2Events.LastUsedNotPresent,
         );
         if (nonNullish(data.lastUsedIdentity)) {
-          currentState = {
-            state: "continueAs",
-            number: data.lastUsedIdentity.identityNumber,
-            name: data.lastUsedIdentity.name,
-            continue: () => {
-              switch (data.lastUsedIdentity.authMethod) {
-                case "passkey":
-                  return authenticateWithPasskey(
-                    data.lastUsedIdentity.credentialId,
-                  );
-                case "google":
-                  return authenticateWithGoogle(data.lastUsedIdentity.sub);
-                default:
-                  void (data.lastUsedIdentity.authMethod satisfies never);
-              }
-            },
-            useAnother,
-          };
+          continueAs(data.lastUsedIdentity);
         } else {
           pickAuthenticationMethod();
         }
