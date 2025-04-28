@@ -124,7 +124,7 @@
     }
   };
 
-  const createPasskey = (): void => {
+  const createPasskey = () => {
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
