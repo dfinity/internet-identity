@@ -330,7 +330,6 @@ pub struct Account {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AccountUpdate {
   pub name : Option<String>,
-  pub hidden : Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
