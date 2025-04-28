@@ -1,4 +1,5 @@
 type UserNumber = nat64;
+type AccountNumber = nat64;
 type PublicKey = blob;
 type CredentialId = blob;
 type DeviceKey = PublicKey;
@@ -558,6 +559,14 @@ type IdentityMetadataReplaceError = variant {
     InternalCanisterError : text;
 };
 
+type CreateAccountError = variant {
+    InternalError;
+};
+
+type UpdateAccountError = variant {
+    InternalError;
+};
+
 type PrepareIdAliasRequest = record {
     // Origin of the issuer in the attribute sharing flow.
     issuer : FrontendHostname;
@@ -680,6 +689,20 @@ type IdRegFinishError = variant {
     // Error while persisting the new identity.
     StorageError : text;
 };
+
+type Account = record {
+    // Null is unreserved default account
+    account : opt AccountNumber;
+    origin : text;
+    last_used : opt Timestamp;
+    // Configurable properties
+    name : opt text;
+};
+
+type AccountUpdate = record {
+    name : opt text;
+};
+
 
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
@@ -815,4 +838,39 @@ service : (opt InternetIdentityInit) -> {
 
     // Discoverable passkeys protocol
     lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
+
+    // Multiple accounts
+    get_accounts : (
+        anchor_number : UserNumber,
+        origin : opt FrontendHostname, // Either get all accounts or a specific origin
+    ) -> (vec Account) query;
+
+    create_account : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        name : text
+    ) -> (variant { Ok : Account; Err: CreateAccountError });
+
+    update_account : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        account_number : opt AccountNumber, // Null is unreserved default account
+        update : AccountUpdate
+    ) ->  (variant { Ok : Account; Err: UpdateAccountError });
+
+    prepare_account_delegation : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        account_number : opt AccountNumber, // Null is unreserved default account
+        session_key : SessionKey,
+        max_ttl : opt nat64
+    ) -> (UserKey, Timestamp);
+    
+    get_account_delegation : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        account_number : AccountNumber, // Null is unreserved default account
+        session_key : SessionKey,
+        expiration : Timestamp
+    ) -> (GetDelegationResponse) query;
 };

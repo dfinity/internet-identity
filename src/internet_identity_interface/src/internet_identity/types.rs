@@ -14,6 +14,7 @@ pub type Timestamp = u64; // in nanos since epoch
 pub type Signature = ByteBuf;
 pub type DeviceVerificationCode = String;
 pub type FailedAttemptsCounter = u8;
+pub type AccountNumber = u64;
 
 mod api_v2;
 pub mod openid;
@@ -316,4 +317,28 @@ pub enum AuthorizationKey {
 pub struct DeviceKeyWithAnchor {
     pub pubkey: DeviceKey,
     pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Account {
+  pub account : Option<AccountNumber>, // Null is unreserved default account
+  pub origin : FrontendHostname,
+  pub last_used : Option<Timestamp>,
+  pub name : Option<String>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AccountUpdate {
+  pub name : Option<String>,
+  pub hidden : Option<bool>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum CreateAccountError {
+    InternalError,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum UpdateAccountError {
+    InternlError,
 }

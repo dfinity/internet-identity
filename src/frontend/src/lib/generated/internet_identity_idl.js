@@ -176,6 +176,15 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
+  const FrontendHostname = IDL.Text;
+  const AccountNumber = IDL.Nat64;
+  const Account = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
+    'origin' : IDL.Text,
+    'account' : IDL.Opt(AccountNumber),
+    'last_used' : IDL.Opt(Timestamp),
+  });
+  const CreateAccountError = IDL.Variant({ 'InternalError' : IDL.Null });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -191,6 +200,20 @@ export const idlFactory = ({ IDL }) => {
     'entry' : IDL.Vec(IDL.Nat8),
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
+  });
+  const SessionKey = PublicKey;
+  const Delegation = IDL.Record({
+    'pubkey' : PublicKey,
+    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'expiration' : Timestamp,
+  });
+  const SignedDelegation = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'delegation' : Delegation,
+  });
+  const GetDelegationResponse = IDL.Variant({
+    'no_such_delegation' : IDL.Null,
+    'signed_delegation' : SignedDelegation,
   });
   const WebAuthnCredential = IDL.Record({
     'pubkey' : PublicKey,
@@ -231,21 +254,6 @@ export const idlFactory = ({ IDL }) => {
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
-  });
-  const FrontendHostname = IDL.Text;
-  const SessionKey = PublicKey;
-  const Delegation = IDL.Record({
-    'pubkey' : PublicKey,
-    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'expiration' : Timestamp,
-  });
-  const SignedDelegation = IDL.Record({
-    'signature' : IDL.Vec(IDL.Nat8),
-    'delegation' : Delegation,
-  });
-  const GetDelegationResponse = IDL.Variant({
-    'no_such_delegation' : IDL.Null,
-    'signed_delegation' : SignedDelegation,
   });
   const GetIdAliasRequest = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
@@ -408,6 +416,8 @@ export const idlFactory = ({ IDL }) => {
       IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
     ),
   });
+  const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
+  const UpdateAccountError = IDL.Variant({ 'InternalError' : IDL.Null });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
@@ -503,11 +513,26 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
+    'create_account' : IDL.Func(
+        [UserNumber, FrontendHostname, IDL.Text],
+        [IDL.Variant({ 'Ok' : Account, 'Err' : CreateAccountError })],
+        [],
+      ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
+    'get_account_delegation' : IDL.Func(
+        [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
+        [GetDelegationResponse],
+        ['query'],
+      ),
+    'get_accounts' : IDL.Func(
+        [UserNumber, IDL.Opt(FrontendHostname)],
+        [IDL.Vec(Account)],
+        ['query'],
+      ),
     'get_anchor_credentials' : IDL.Func(
         [UserNumber],
         [AnchorCredentials],
@@ -603,6 +628,17 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'prepare_account_delegation' : IDL.Func(
+        [
+          UserNumber,
+          FrontendHostname,
+          IDL.Opt(AccountNumber),
+          SessionKey,
+          IDL.Opt(IDL.Nat64),
+        ],
+        [UserKey, Timestamp],
+        [],
+      ),
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
@@ -622,6 +658,11 @@ export const idlFactory = ({ IDL }) => {
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'update_account' : IDL.Func(
+        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
+        [IDL.Variant({ 'Ok' : Account, 'Err' : UpdateAccountError })],
+        [],
+      ),
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
         [VerifyTentativeDeviceResponse],

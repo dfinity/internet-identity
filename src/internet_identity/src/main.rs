@@ -298,6 +298,72 @@ fn get_delegation(
 }
 
 #[query]
+fn get_accounts(
+    _anchor_number: AnchorNumber,
+    _origin: Option<FrontendHostname>,
+) -> Vec<Account> {
+    vec![
+        Account {
+            account: None,
+            origin: "example.com".to_string(),
+            last_used: Some(0u64),
+            name: Some("Default Mock Account".to_string()),
+        }
+    ]
+}
+
+#[update]
+fn create_account(
+    _anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+    _name: String,
+) -> Result<Account, CreateAccountError> {
+    Ok(Account {
+        account: None,
+        origin: "example.com".to_string(),
+        last_used: Some(0u64),
+        name: Some("Default Mock Account".to_string()),
+    })
+}
+
+#[update]
+fn update_account(
+    _anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+    _account_number: Option<AccountNumber>,
+    _update: AccountUpdate,
+) -> Result<Account, UpdateAccountError> {
+    Ok(Account {
+        account: None,
+        origin: "example.com".to_string(),
+        last_used: Some(0u64),
+        name: Some("Default Mock Account".to_string()),
+    })
+}
+
+#[update]
+fn prepare_account_delegation(
+    _anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+    _account_number: Option<AccountNumber>,
+    _session_key: SessionKey,
+    _max_ttl: Option<u64>,
+) -> (UserKey, Timestamp) {
+    (ByteBuf::new(), 0)
+}
+
+#[query]
+fn get_account_delegation(
+    _anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+    _account_number: AccountNumber,
+    _session_key: SessionKey,
+    _expiration: Timestamp,
+) -> GetDelegationResponse {
+    GetDelegationResponse::NoSuchDelegation
+}
+
+#[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
     http::http_request(req)
 }
