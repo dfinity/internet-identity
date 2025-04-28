@@ -298,18 +298,13 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(
-    _anchor_number: AnchorNumber,
-    _origin: Option<FrontendHostname>,
-) -> Vec<Account> {
-    vec![
-        Account {
-            account: None,
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Default Mock Account".to_string()),
-        }
-    ]
+fn get_accounts(_anchor_number: AnchorNumber, _origin: Option<FrontendHostname>) -> Vec<Account> {
+    vec![Account {
+        account: None,
+        origin: "example.com".to_string(),
+        last_used: Some(0u64),
+        name: Some("Default Mock Account".to_string()),
+    }]
 }
 
 #[update]
