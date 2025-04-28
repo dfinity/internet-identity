@@ -1,21 +1,10 @@
 <script lang="ts">
   import { fly } from "svelte/transition";
   import { type State } from "../state.js";
-  import { onMount } from "svelte";
-  import {
-    AuthenticationV2Events,
-    authenticationV2Funnel,
-  } from "$lib/utils/analytics/authenticationV2Funnel";
 
   type Props = Extract<State, { state: "connectOrCreatePasskey" }>;
 
   const { connect, create }: Props = $props();
-
-  onMount(() => {
-    authenticationV2Funnel.trigger(
-      AuthenticationV2Events.ContinueWithPasskeyScreen,
-    );
-  });
 </script>
 
 <div
