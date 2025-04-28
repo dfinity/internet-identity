@@ -128,11 +128,11 @@
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.StartWebauthnCreation,
+        );
         currentState = { state: "loading", label: "Creating Passkey" };
         try {
-          authenticationV2Funnel.trigger(
-            AuthenticationV2Events.StartWebauthnCreation,
-          );
           const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
             publicKey: {
               ...creationOptions([], undefined, undefined),
