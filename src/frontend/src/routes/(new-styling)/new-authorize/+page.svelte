@@ -263,10 +263,10 @@
         error.type === "NoSuchAnchor" &&
         nonNullish(jwt)
       ) {
-        currentState = { state: "loading", label: "Creating Identity" };
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.RegisterWithGoogle,
         );
+        currentState = { state: "loading", label: "Creating Identity" };
         await startRegistration();
         return registerWithGoogle(jwt);
       }
