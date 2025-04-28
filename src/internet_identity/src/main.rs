@@ -782,14 +782,16 @@ mod openid_api {
         add_openid_credential, lookup_anchor_with_openid_credential, registration,
         remove_openid_credential, update_openid_credential,
     };
-    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
+    use crate::authz_utils::{
+        anchor_operation_with_authz_check, check_authz_and_record_activity, IdentityUpdateError,
+    };
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
     };
-    use ic_cdk::caller;
+    use ic_cdk::{caller, trap};
     use ic_cdk_macros::{query, update};
     use internet_identity_interface::internet_identity::types::{
         CreateIdentityData, IdRegFinishError, IdRegFinishResult, OpenIDRegFinishArg,
@@ -869,6 +871,9 @@ mod openid_api {
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+        let _ii_domain = check_authz_and_record_activity(anchor_number)
+            .unwrap_or_else(|err| trap(&format!("{err}")));
 
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.

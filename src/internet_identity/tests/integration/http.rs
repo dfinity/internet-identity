@@ -1,9 +1,10 @@
 //! Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
 
+use crate::openid::{openid_test_data, setup_canister};
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
-    sample_pubkey_authn_method, test_authn_method,
+    create_identity_with_openid_credential, sample_pubkey_authn_method, test_authn_method,
 };
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
@@ -1323,6 +1324,76 @@ fn should_report_registration_rates() -> Result<(), CallError> {
         0.48,
         0.1,
     );
+    Ok(())
+}
+
+#[test]
+fn should_report_openid_in_active_authn_methods() -> Result<(), CallError> {
+    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) = openid_test_data();
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+    // Create session key
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Create identity (this will panic if it doesn't work)
+    // the test principal here is technically from webauthn, while in practice it would be a temporary random frontend keypair
+    // however, this makes no functional difference. we just need a principal and salt together with a jwt
+    // which contains a signed nonce derived from said principal and salt.
+
+    let _identity_number =
+        create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
+
+    // Prepare the delegation
+    let prepare_response = match api::openid_prepare_delegation(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+    )? {
+        Ok(response) => response,
+        Err(err) => panic!("Failing at openid_prepare_delegation: {:?}", err),
+    };
+
+    assert_eq!(
+        prepare_response.expiration,
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
+    );
+
+    // Get the delegation
+    let signed_delegation = match api::openid_get_delegation(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+        &prepare_response.expiration,
+    )? {
+        Ok(signed_delegation) => signed_delegation,
+        Err(err) => {
+            panic!("Failing at openid_get_delegation: {:?}", err)
+        }
+    };
+
+    env.advance_time(Duration::from_secs(500));
+    env.tick();
+
+    let metrics = get_metrics(&env, canister_id);
+
+    println!("{}", metrics);
+
+    assert_metric(
+        &metrics,
+        "internet_identity_monthly_active_authn_methods{type=\"openid\"}",
+        1.,
+    );
+
+    println!("{}", metrics);
+    panic!("stop");
     Ok(())
 }
 
