@@ -38,7 +38,7 @@
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import {
     lastUsedIdentitiesStore,
-    LastUsedIdentity,
+    type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
