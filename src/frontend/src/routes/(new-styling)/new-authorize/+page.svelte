@@ -124,6 +124,37 @@
     }
   };
 
+  const createPasskey = (): void => {
+    currentState = {
+      state: "createPasskey",
+      create: async (name: string) => {
+        currentState = { state: "loading", label: "Creating Passkey" };
+        try {
+          authenticationV2Funnel.trigger(
+            AuthenticationV2Events.StartWebauthnCreation,
+          );
+          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
+            publicKey: {
+              ...creationOptions([], undefined, undefined),
+              user: {
+                id: window.crypto.getRandomValues(new Uint8Array(16)),
+                name,
+                displayName: name,
+              },
+            },
+          });
+          currentState = { state: "loading", label: "Creating Identity" };
+          await startRegistration();
+          await registerWithPasskey(passkeyIdentity);
+        } catch (error) {
+          handleError(error);
+          pickAuthenticationMethod();
+        }
+      },
+      cancel: connectOrCreatePasskey,
+    };
+  };
+
   const registerWithPasskey = async (
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
@@ -265,37 +296,6 @@
       handleError(error);
       pickAuthenticationMethod();
     }
-  };
-
-  const createPasskey = (): void => {
-    currentState = {
-      state: "createPasskey",
-      create: async (name: string) => {
-        currentState = { state: "loading", label: "Creating Passkey" };
-        try {
-          authenticationV2Funnel.trigger(
-            AuthenticationV2Events.StartWebauthnCreation,
-          );
-          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
-            publicKey: {
-              ...creationOptions([], undefined, undefined),
-              user: {
-                id: window.crypto.getRandomValues(new Uint8Array(16)),
-                name,
-                displayName: name,
-              },
-            },
-          });
-          currentState = { state: "loading", label: "Creating Identity" };
-          await startRegistration();
-          await registerWithPasskey(passkeyIdentity);
-        } catch (error) {
-          handleError(error);
-          pickAuthenticationMethod();
-        }
-      },
-      cancel: connectOrCreatePasskey,
-    };
   };
 
   const solveCaptcha = async (captcha: string, attempt = 0): Promise<void> =>
