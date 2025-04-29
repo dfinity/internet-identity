@@ -1,6 +1,10 @@
 // Types and functions related to the window post message interface used by
 // applications that want to authenticate the user using Internet Identity
 import {
+  AuthenticationV2Events,
+  authenticationV2Funnel,
+} from "$lib/utils/analytics/authenticationV2Funnel";
+import {
   authorizeClientFunnel,
   AuthorizeClientEvents,
 } from "$lib/utils/analytics/authorizeClientFunnel";
@@ -136,6 +140,7 @@ export async function authenticationProtocol({
   authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestValid);
   loginFunnel.init({ origin: requestOrigin });
   registrationFunnel.init({ origin: requestOrigin });
+  authenticationV2Funnel.init({ origin: requestOrigin });
 
   const authContext = {
     authRequest: requestResult.request,
@@ -150,6 +155,7 @@ export async function authenticationProtocol({
   try {
     authenticateResult = await authenticate(authContext);
     authorizeClientFunnel.trigger(AuthorizeClientEvents.Authenticate);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.AuthSuccess);
   } catch (error: unknown) {
     console.error("Unexpected error during authentication", error);
     authenticateResult = {

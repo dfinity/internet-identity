@@ -6,6 +6,7 @@ import type {
   IdRegFinishError,
   IdRegStartError,
 } from "$lib/generated/internet_identity_types";
+import { isPermissionError } from "$lib/utils/openID";
 
 export const handleError = (error: unknown) => {
   // Handle browser errors
@@ -14,6 +15,14 @@ export const handleError = (error: unknown) => {
       title: "Operation canceled",
       description:
         "The interaction was canceled or timed out. Please try again.",
+    });
+    return;
+  }
+  if (isPermissionError(error)) {
+    toaster.error({
+      title: "Permission denied",
+      description:
+        'You need to enable the "Third-party sign-in" browser permission for this site',
     });
     return;
   }

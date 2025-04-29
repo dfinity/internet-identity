@@ -36,12 +36,19 @@
   import SolveCaptcha from "./components/SolveCaptcha.svelte";
   import ContinueAs from "./components/ContinueAs.svelte";
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import {
+    lastUsedIdentitiesStore,
+    type LastUsedIdentity,
+  } from "$lib/stores/last-used-identities.store";
   import { handleError } from "./error";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
+  import PickAuthenticationMethod from "./components/PickAuthenticationMethod.svelte";
 
   const { data }: PageProps = $props();
-  const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 
   let currentState = $state<State>({ state: "loading", label: "Connecting" });
   let authContext = $state.raw<AuthContext>();
@@ -51,30 +58,68 @@
 
   let onAuthenticate: (
     authenticatedConnection: AuthenticatedConnection,
-    credentialId: ArrayBuffer | undefined,
+    credentialId?: ArrayBuffer,
     sub?: string,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
   const pickAuthenticationMethod = () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
     currentState = { state: "pickAuthenticationMethod" };
   };
 
+  const continueAs = (lastUsedIdentity: LastUsedIdentity) => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
+    currentState = {
+      state: "continueAs",
+      number: lastUsedIdentity.identityNumber,
+      name: lastUsedIdentity.name,
+      continue: () => {
+        switch (lastUsedIdentity.authMethod) {
+          case "passkey":
+            return authenticateWithPasskey(lastUsedIdentity.credentialId);
+          case "google":
+            return authenticateWithGoogle(lastUsedIdentity.sub);
+          default:
+            void (lastUsedIdentity.authMethod satisfies never);
+        }
+      },
+      useAnother,
+    };
+  };
+
+  const useAnother = () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
+    pickAuthenticationMethod();
+  };
+
   const connectOrCreatePasskey = async () => {
+    authenticationV2Funnel.trigger(
+      AuthenticationV2Events.ContinueWithPasskeyScreen,
+    );
     currentState = {
       state: "connectOrCreatePasskey",
-      connect: authenticateWithDiscoverablePasskey,
+      connect: authenticateWithPasskey,
       create: createPasskey,
     };
   };
 
-  const authenticateWithDiscoverablePasskey = async () => {
+  const authenticateWithPasskey = async (credentialId?: Uint8Array) => {
+    if (nonNullish(credentialId)) {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsPasskey);
+    } else {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+    }
     currentState = { state: "loading", label: "Authenticating" };
     try {
       let userNumber: UserNumber;
       const passkeyIdentity = new DiscoverablePasskeyIdentity({
         credentialRequestOptions: {
-          publicKey: creationOptions([], undefined, undefined),
+          publicKey: nonNullish(credentialId)
+            ? {
+                allowCredentials: [{ type: "public-key", id: credentialId }],
+              }
+            : creationOptions([], undefined, undefined),
         },
         getPublicKey: async (result) => {
           const lookupResult = await connection.lookupDeviceKey(
@@ -102,64 +147,14 @@
     }
   };
 
-  const authenticateWithPasskey = async ({
-    anchorNumber,
-    credentialId,
-  }: {
-    anchorNumber: UserNumber;
-    credentialId: ArrayBuffer | undefined;
-  }) => {
-    currentState = { state: "loading", label: "Authenticating" };
-    if (!credentialId) {
-      console.error("Credential ID is required for passkey authentication");
-      pickAuthenticationMethod();
-      return;
-    }
-
-    try {
-      const passkeyIdentity = new DiscoverablePasskeyIdentity({
-        credentialRequestOptions: {
-          publicKey: {
-            allowCredentials: [{ type: "public-key", id: credentialId }],
-          },
-        },
-        getPublicKey: async (result) => {
-          const lookupResult = await connection.lookupDeviceKey(
-            new Uint8Array(result.rawId),
-          );
-          if (isNullish(lookupResult)) {
-            throw new Error("Account not migrated yet");
-          }
-          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-        },
-      });
-
-      const delegationIdentity =
-        await connection.requestFEDelegation(passkeyIdentity);
-
-      const actor = await connection.createActor(delegationIdentity);
-
-      const authenticatedConnection = new AuthenticatedConnection(
-        connection.canisterId,
-        connection.canisterConfig,
-        passkeyIdentity,
-        delegationIdentity,
-        anchorNumber,
-        actor,
-      );
-
-      onAuthenticate(authenticatedConnection, credentialId, undefined);
-    } catch (err) {
-      console.error("Authentication error:", err);
-      handleError(err);
-      pickAuthenticationMethod();
-    }
-  };
-
-  const createPasskey = async () => {
+  const createPasskey = () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.StartWebauthnCreation,
+        );
         currentState = { state: "loading", label: "Creating Passkey" };
         try {
           const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
@@ -188,6 +183,7 @@
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
   ) => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
@@ -210,6 +206,9 @@
           authn_method: authnMethod,
         })
         .then(throwCanisterError);
+      authenticationV2Funnel.trigger(
+        AuthenticationV2Events.SuccessfulPasskeyRegistration,
+      );
       currentState = { state: "loading", label: "Authenticating" };
       const result = await connection.fromIdentity(
         () => identity_number,
@@ -249,6 +248,11 @@
   };
 
   const authenticateWithGoogle = async (loginHint?: string) => {
+    if (nonNullish(loginHint)) {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsGoogle);
+    } else {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+    }
     const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
       return;
@@ -267,6 +271,11 @@
         salt: data.session.salt,
         actor: data.session.actor,
       });
+      // If the previous call succeeds, it means the Google user already exists in II.
+      // Therefore, they are logging in.
+      // If the call fails, it means the Google user does not exist in II.
+      // In that case, we register them.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
       const result = await connection.fromDelegationIdentity(
         anchorNumber,
         identity,
@@ -278,6 +287,9 @@
         error.type === "NoSuchAnchor" &&
         nonNullish(jwt)
       ) {
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithGoogle,
+        );
         currentState = { state: "loading", label: "Creating Identity" };
         await startRegistration();
         return registerWithGoogle(jwt);
@@ -363,6 +375,9 @@
         anchorNumber,
         identity,
       );
+      authenticationV2Funnel.trigger(
+        AuthenticationV2Events.SuccessfulGoogleRegistration,
+      );
       onAuthenticate(result.connection, undefined, sub);
     } catch (error) {
       if (
@@ -388,7 +403,7 @@
       return new Promise((resolve) => {
         onAuthenticate = async (
           authenticatedConnection,
-          credentialId: ArrayBuffer | undefined,
+          credentialId?: ArrayBuffer,
           sub?: string,
         ) => {
           const derivationOrigin =
@@ -424,21 +439,17 @@
             authnMethod: "passkey",
           });
         };
-        currentState = nonNullish(data.lastUsedIdentity)
-          ? {
-              state: "continueAs",
-              number: data.lastUsedIdentity.identityNumber,
-              name: data.lastUsedIdentity.name,
-              continue: () =>
-                data.lastUsedIdentity.authMethod === "passkey"
-                  ? authenticateWithPasskey({
-                      anchorNumber: data.lastUsedIdentity.identityNumber,
-                      credentialId: data.lastUsedIdentity.credentialId,
-                    })
-                  : authenticateWithGoogle(data.lastUsedIdentity.sub),
-              useAnother: pickAuthenticationMethod,
-            }
-          : { state: "pickAuthenticationMethod" };
+
+        authenticationV2Funnel.trigger(
+          nonNullish(data.lastUsedIdentity)
+            ? AuthenticationV2Events.LastUsedPresent
+            : AuthenticationV2Events.LastUsedNotPresent,
+        );
+        if (nonNullish(data.lastUsedIdentity)) {
+          continueAs(data.lastUsedIdentity);
+        } else {
+          pickAuthenticationMethod();
+        }
       });
     },
     onProgress: () => {},
@@ -478,25 +489,10 @@
       {#if currentState.state === "continueAs"}
         <ContinueAs {...currentState} />
       {:else}
-        <div class="flex flex-col items-stretch gap-4">
-          {#if !supportsPasskeys}
-            <div class="card preset-filled-surface-100-900 p-4">
-              <p class="font-semibold">
-                Passkeys are unavailable on this browser
-              </p>
-              <p class="text-sm">Please choose another sign-in method</p>
-            </div>
-          {/if}
-          <button
-            onclick={connectOrCreatePasskey}
-            class="btn preset-filled py-2"
-            disabled={!supportsPasskeys}>Continue with Passkey</button
-          >
-          <button
-            onclick={() => authenticateWithGoogle()}
-            class="btn preset-outlined py-2">Continue with Google</button
-          >
-        </div>
+        <PickAuthenticationMethod
+          {connectOrCreatePasskey}
+          {authenticateWithGoogle}
+        />
         {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
           <Dialog
             title={"Continue with Passkey"}
