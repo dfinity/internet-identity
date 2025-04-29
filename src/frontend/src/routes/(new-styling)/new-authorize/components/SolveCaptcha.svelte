@@ -1,7 +1,6 @@
 <script lang="ts">
   import { type State } from "../state";
   import { tick } from "svelte";
-  import Button from "$lib/components/UI/Button.svelte";
 
   type Props = Extract<State, { state: "solveCaptcha" }>;
 

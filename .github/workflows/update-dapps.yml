@@ -2,9 +2,10 @@
 name: Dapps Update
 
 on:
-  schedule:
-    # Check for updates daily
-    - cron: "0 0 * * *"
+  # TODO: Enable once we fix the script
+  # schedule:
+  # Check for updates daily
+  # - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
