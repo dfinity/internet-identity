@@ -97,7 +97,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::account_management::{StorableAccount, StorableApplication};
+use crate::account_management::{OriginHash, StorableAccount, StorableApplication};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -148,7 +148,8 @@ const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
-const STABLE_ORIGIN_MEMORY_INDEX: u8 = 11u8;
+const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
+const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -160,11 +161,13 @@ const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
     MemoryId::new(REGISTRATION_CURRENT_RATE_MEMORY_INDEX);
 const STABLE_ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_MEMORY_INDEX);
 const STABLE_ACCOUNT_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_MEMORY_INDEX);
-const STABLE_ORIGIN_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ORIGIN_MEMORY_INDEX);
+const STABLE_APPLICATION_MEMORY_ID: MemoryId = MemoryId::new(STABLE_APPLICATION_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX);
+const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX);
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -230,9 +233,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the stable account memory.
     stable_account_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_memory: StableBTreeMap<AccountNumber, StorableAccount, ManagedMemory<M>>,
-    /// Memory wrapper used to report the size of the stable origin memory.
-    stable_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_origin_memory: StableBTreeMap<ApplicationNumber, StorableApplication, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the stable application memory.
+    stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    stable_application_memory:
+        StableBTreeMap<ApplicationNumber, StorableApplication, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -241,6 +245,9 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_device_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_device_credential_memory:
         StableBTreeMap<StorableCredentialId, AnchorNumber, ManagedMemory<M>>,
+    lookup_application_with_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_application_with_origin_memory:
+        StableBTreeMap<OriginHash, ApplicationNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -304,11 +311,13 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(REGISTRATION_CURRENT_RATE_MEMORY_ID);
         let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
         let stable_account_memory = memory_manager.get(STABLE_ACCOUNT_MEMORY_ID);
-        let stable_origin_memory = memory_manager.get(STABLE_ORIGIN_MEMORY_ID);
+        let stable_application_memory = memory_manager.get(STABLE_APPLICATION_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_device_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID);
+        let lookup_application_with_origin_memory =
+            memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -345,8 +354,10 @@ impl<M: Memory + Clone> Storage<M> {
             stable_anchor_memory: StableBTreeMap::init(stable_anchor_memory),
             stable_account_memory_wrapper: MemoryWrapper::new(stable_account_memory.clone()),
             stable_account_memory: StableBTreeMap::init(stable_account_memory),
-            stable_origin_memory_wrapper: MemoryWrapper::new(stable_origin_memory.clone()),
-            stable_origin_memory: StableBTreeMap::init(stable_origin_memory),
+            stable_application_memory_wrapper: MemoryWrapper::new(
+                stable_application_memory.clone(),
+            ),
+            stable_application_memory: StableBTreeMap::init(stable_application_memory),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_openid_credential_memory.clone(),
             ),
@@ -358,6 +369,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_device_credential_memory: StableBTreeMap::init(
                 lookup_anchor_with_device_credential_memory,
+            ),
+            lookup_application_with_origin_memory_wrapper: MemoryWrapper::new(
+                lookup_application_with_origin_memory.clone(),
+            ),
+            lookup_application_with_origin_memory: StableBTreeMap::init(
+                lookup_application_with_origin_memory,
             ),
         }
     }
@@ -612,6 +629,14 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn lookup_anchor_with_device_credential(&self, key: &CredentialId) -> Option<AnchorNumber> {
         self.lookup_anchor_with_device_credential_memory
             .get(&key.clone().into())
+    }
+
+    pub fn lookup_application_with_origin(
+        &self,
+        origin: FrontendHostname,
+    ) -> Option<ApplicationNumber> {
+        self.lookup_application_with_origin_memory
+            .get(&OriginHash::from_origin(origin))
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
