@@ -30,6 +30,7 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
+mod account_management;
 mod anchor_management;
 mod archive;
 mod assets;
