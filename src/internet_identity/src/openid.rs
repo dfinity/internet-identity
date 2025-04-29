@@ -168,7 +168,8 @@ fn calculate_delegation_seed(
     blob.push(sub.len() as u8);
     blob.extend(sub.bytes());
 
-    blob.push(anchor_number as u8);
+    blob.push(anchor_number.to_be_bytes().len() as u8);
+    blob.extend(anchor_number.to_le_bytes());
 
     let mut hasher = Sha256::new();
     hasher.update(blob);
