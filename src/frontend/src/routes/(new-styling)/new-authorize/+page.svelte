@@ -69,6 +69,7 @@
   };
 
   const continueAs = (lastUsedIdentity: LastUsedIdentity) => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
     currentState = {
       state: "continueAs",
       number: lastUsedIdentity.identityNumber,
@@ -147,6 +148,7 @@
   };
 
   const createPasskey = () => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     currentState = {
       state: "createPasskey",
       create: async (name: string) => {
