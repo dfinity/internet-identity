@@ -27,7 +27,7 @@ const confirmUnlinkAccountTemplate = ({
     <hgroup data-page="confirm-unlink-account-page">
       <div class="c-card__label c-card__label--hasIcon">
         ${warningLabelIcon}
-        <h2>${copy.label}</h2>
+        <h2 class="c-warning">${copy.label}</h2>
       </div>
       <h1 class="t-title t-title--main">${copy.title}</h1>
       <p class="t-paragraph">${copy.message}</p>

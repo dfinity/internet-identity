@@ -103,7 +103,7 @@ const confirmSeedPhraseTemplate = ({
         <button
           @click=${() => back()}
           data-action="back"
-          class="c-button c-button--secondary"
+          class="c-button c-button--secondary transparent"
         >
           ${copy.back}
         </button>

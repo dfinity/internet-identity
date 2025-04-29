@@ -41,6 +41,7 @@ const requestWithCredentials = async (
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     identity: {
+      context: "use",
       providers: [
         {
           configURL: config.configURL,
@@ -152,19 +153,11 @@ export const requestJWT = (
   config: RequestConfig,
   options: RequestOptions,
 ): Promise<string> => {
-  if (isNullish(config.configURL)) {
-    // FedCM is not supported for this OpenID Provider
+  if (isNullish(config.configURL) || !("IdentityCredential" in window)) {
+    // FedCM is not supported for this OpenID Provider or in this browser
     return requestWithRedirect(config, options);
   }
-  try {
-    return requestWithCredentials(config, options);
-  } catch (error) {
-    if (isNotSupportedError(error)) {
-      // FedCM is not supported in this browser
-      return requestWithRedirect(config, options);
-    }
-    throw error;
-  }
+  return requestWithCredentials(config, options);
 };
 
 /**

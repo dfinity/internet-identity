@@ -109,6 +109,7 @@ export const authnTemplateManage = ({
       `,
       useExistingText: "Use existing",
       createAnchorText: "Create Internet Identity",
+      landingType: "firstTime",
     },
     useExisting: {
       slot: html`
@@ -116,6 +117,7 @@ export const authnTemplateManage = ({
           ${title("Enter Identity 🔑")} ${subtitle("to continue")}
         </header>
       `,
+      landingType: "useExisting",
     },
 
     pick: {
@@ -124,6 +126,7 @@ export const authnTemplateManage = ({
           ${title("Choose Identity 🔑")} ${subtitle("you want to manage")}
         </header>
       `,
+      landingType: "pick",
     },
   };
 };

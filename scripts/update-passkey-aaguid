@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPTS_DIR/.."
 
-JSON_FILE="$PWD/src/frontend/src/assets/passkey_aaguid_data.json"
+JSON_FILE="$PWD/src/frontend/src/lib/legacy/assets/passkey_aaguid_data.json"
 
 if [[ -f "$JSON_FILE" ]]; then
     declare -A currentEntries

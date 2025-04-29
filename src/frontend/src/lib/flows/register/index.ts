@@ -180,7 +180,9 @@ export const registerFlow = async ({
         return _startResult;
       }
 
-      const openIdResult = await openidIdentityRegistrationFinish();
+      const openIdResult = await withLoader(() => {
+        return openidIdentityRegistrationFinish();
+      });
 
       if (openIdResult.kind === "loginSuccess") {
         return {

@@ -35,7 +35,6 @@ import type {
   UserNumber,
   VerifyTentativeDeviceResponse,
 } from "$lib/generated/internet_identity_types";
-import { withLoader } from "$lib/templates/loader";
 import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { get } from "svelte/store";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
@@ -385,12 +384,10 @@ export class Connection {
 
     const googleRequestConfig = createGoogleRequestConfig(googleClientId);
 
-    const jwt = await withLoader(() =>
-      requestJWT(googleRequestConfig, {
-        mediation: "required",
-        nonce,
-      }),
-    );
+    const jwt = await requestJWT(googleRequestConfig, {
+      mediation: "required",
+      nonce,
+    });
 
     let finishResponse;
     try {
@@ -849,8 +846,12 @@ export class Connection {
     const { anchor_number, expiration, user_key } =
       prepareDelegationResponse.Ok;
 
-    const signedDelegation = await withLoader(() =>
-      retryGetJwtDelegation(jwt, salt, sessionKey, expiration, actor),
+    const signedDelegation = await retryGetJwtDelegation(
+      jwt,
+      salt,
+      sessionKey,
+      expiration,
+      actor,
     );
 
     const transformedDelegation = transformSignedDelegation(signedDelegation);

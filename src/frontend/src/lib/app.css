@@ -1,16 +1,26 @@
 @import "tailwindcss" source("../");
-@plugin "@tailwindcss/forms";
-
 @import "@skeletonlabs/skeleton";
 @import "@skeletonlabs/skeleton/optional/presets";
 @import "@skeletonlabs/skeleton/themes/cerberus";
 
+@plugin "@tailwindcss/forms";
+
 @source '../../../../node_modules/@skeletonlabs/skeleton-svelte/dist';
 
-@theme {
-  --color-ii-background-primary-light: oklch(0.85 0.0222 222.35);
-  --color-ii-background-primary-dark: oklch(0.21 0.0271 271.06);
+[data-theme="cerberus"] {
+  /* Change primary color to match surface (greyscale) */
+  --color-primary-50: var(--color-surface-50);
+  --color-primary-100: var(--color-surface-100);
+  --color-primary-200: var(--color-surface-200);
+  --color-primary-300: var(--color-surface-300);
+  --color-primary-400: var(--color-surface-400);
+  --color-primary-500: var(--color-surface-500);
+  --color-primary-600: var(--color-surface-600);
+  --color-primary-700: var(--color-surface-700);
+  --color-primary-800: var(--color-surface-800);
+  --color-primary-900: var(--color-surface-900);
+  --color-primary-950: var(--color-surface-950);
 
-  --color-ii-text-primary-dark: oklch(0.21 0.0271 271.06);
-  --color-ii-text-primary-light: oklch(0.85 0.0222 222.35);
+  /* Change heading font weight to be less bold */
+  --heading-font-weight: 600;
 }

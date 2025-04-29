@@ -17,12 +17,15 @@ test("anchors are forwarded", () => {
       slot: html``,
       useExistingText: "",
       createAnchorText: "",
+      landingType: "firstTime",
     },
     useExisting: {
       slot: html``,
+      landingType: "useExisting",
     },
     pick: {
       slot: html``,
+      landingType: "pick",
     },
   });
 
