@@ -119,7 +119,7 @@ pub fn check_authorization(
     }
     // Else check OpenID authorization
     for credential in anchor.openid_credentials() {
-        if caller == credential.principal() {
+        if caller == credential.principal(anchor_number) {
             return Ok((
                 anchor.clone(),
                 AuthorizationKey::OpenIdCredentialKey(credential.key()),
