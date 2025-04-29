@@ -18,12 +18,4 @@ export const reroute: Reroute = ({ url }) => {
   if (url.hash === "#authorize") {
     return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
   }
-  // TODO: this is out of scope for this release
-  // if (url.pathname === "/" && get(DISCOVERABLE_PASSKEY_FLOW)) {
-  //   return "/new-authenticate";
-  // }
-  // for now, reroute to index if someone tries to get in there
-  if (url.pathname === "/new-authenticate") {
-    return "/";
-  }
 };
