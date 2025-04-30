@@ -97,7 +97,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::account_management::{OriginHash, StorableAccount, StorableApplication};
+use crate::account_management::{Application, OriginHash, StorableAccount};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -235,8 +235,7 @@ pub struct Storage<M: Memory> {
     stable_account_memory: StableBTreeMap<AccountNumber, StorableAccount, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_application_memory:
-        StableBTreeMap<ApplicationNumber, StorableApplication, ManagedMemory<M>>,
+    stable_application_memory: StableBTreeMap<ApplicationNumber, Application, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -631,12 +630,29 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
     }
 
-    pub fn lookup_application_with_origin(
-        &self,
-        origin: FrontendHostname,
-    ) -> Option<ApplicationNumber> {
+    pub fn lookup_or_insert_application_with_origin(
+        &mut self,
+        origin: &FrontendHostname,
+    ) -> ApplicationNumber {
         self.lookup_application_with_origin_memory
             .get(&OriginHash::from_origin(origin))
+            .or_else(|| {
+                let new_number: ApplicationNumber =
+                    self.lookup_application_with_origin_memory.len();
+
+                self.lookup_application_with_origin_memory
+                    .insert(OriginHash::from_origin(origin), new_number);
+
+                let new_application = Application {
+                    origin: origin.to_string(),
+                    total_accounts: 0u64,
+                };
+
+                self.stable_application_memory
+                    .insert(new_number, new_application);
+                Some(new_number)
+            })
+            .expect("This should not happen.")
     }
 
     /// Make sure all the required metadata is recorded to stable memory.

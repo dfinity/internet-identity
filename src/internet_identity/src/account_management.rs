@@ -9,6 +9,8 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
+use crate::state::storage_borrow_mut;
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is unreserved default account
@@ -55,15 +57,16 @@ impl Account {
     }
 
     pub fn to_storable(&self) -> StorableAccount {
-        // TODO: handle origin (lookup origin, if exists get number, otherwise create and get number)
-
+        let origin_number = storage_borrow_mut(|storage| {
+            storage.lookup_or_insert_application_with_origin(&self.origin)
+        });
         StorableAccount {
-            account_number: self.account_number,
-            anchor_number: self.anchor_number,
-            origin_number: todo!(),
-            last_used: self.last_used,
-            name: self.name,
-            seed_from_anchor: self.seed_from_anchor,
+            account_number: self.account_number.clone(),
+            anchor_number: self.anchor_number.clone(),
+            origin_number,
+            last_used: self.last_used.clone(),
+            name: self.name.clone(),
+            seed_from_anchor: self.seed_from_anchor.clone(),
         }
     }
 }
@@ -80,7 +83,7 @@ pub struct StorableAccount {
 
 impl StorableAccount {
     pub fn to_account(&self) -> Account {
-        // TODO: handle origin (lookup origin, get number)
+        // TODO: handle origin (lookup origin, get number
         Account {
             account_number: self.account_number,
             anchor_number: self.anchor_number,
@@ -104,13 +107,13 @@ impl Storable for StorableAccount {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]
-pub struct StorableApplication {
+#[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Application {
     pub origin: FrontendHostname,
     pub total_accounts: u64,
 }
 
-impl Storable for StorableApplication {
+impl Storable for Application {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(serde_cbor::to_vec(&self).unwrap())
     }
@@ -145,12 +148,23 @@ impl Storable for OriginHash {
 }
 
 impl OriginHash {
-    pub fn from_origin(origin: FrontendHostname) -> Self {
+    pub fn from_origin(origin: &FrontendHostname) -> Self {
         let mut hasher = DefaultHasher::new();
         origin.hash(&mut hasher);
         let hash_u64 = hasher.finish();
         Self {
             hash: hash_u64.to_le_bytes(),
         }
+    }
+
+    pub fn get_hash(&self) -> &[u8; 8] {
+        &self.hash
+    }
+}
+
+mod test {
+    #[test]
+    fn can_store_and_retrieve_origin() {
+        todo!()
     }
 }

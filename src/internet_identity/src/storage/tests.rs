@@ -316,6 +316,12 @@ fn should_not_overwrite_device_credential_lookup() {
     );
 }
 
+#[test]
+fn should_add_application_correctly() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
