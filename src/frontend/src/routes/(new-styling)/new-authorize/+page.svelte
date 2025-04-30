@@ -43,6 +43,11 @@
   import { authenticateWithPasskey } from "$lib/utils/authenticate/passkey";
   import { Actor, HttpAgent, SignIdentity } from "@dfinity/agent";
   import PickAccount from "./components/PickAccount.svelte";
+  import {
+    DelegationChain,
+    DelegationIdentity,
+    ECDSAKeyIdentity,
+  } from "@dfinity/identity";
 
   const { data }: PageProps = $props();
 
@@ -322,8 +327,18 @@
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
       );
       currentState = { state: "loading", label: "Authenticating" };
+      // Workaround: create delegation identity since iiConnection expects this
+      const identity = await ECDSAKeyIdentity.generate({ extractable: false });
+      const delegation = await DelegationChain.create(
+        data.session.identity,
+        identity.getPublicKey(),
+      );
+      const delegationIdentity = DelegationIdentity.fromDelegation(
+        identity,
+        delegation,
+      );
       authenticate(
-        passkeyIdentity,
+        delegationIdentity,
         identity_number,
         undefined,
         passkeyIdentity.getCredentialId(),

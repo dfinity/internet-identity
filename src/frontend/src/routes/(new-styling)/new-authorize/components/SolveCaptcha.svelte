@@ -37,7 +37,7 @@
         alt="CAPTCHA Characters"
       />
       <div
-        class="dark:bg-ii-background-primary-light bg-ii-background-primary-dark absolute h-30 w-55 mix-blend-lighten dark:mix-blend-darken"
+        class="dark:bg-surface-contrast-50-950 absolute h-30 w-55 mix-blend-lighten dark:mix-blend-darken"
       ></div>
     </div>
     <p>
