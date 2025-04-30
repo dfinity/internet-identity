@@ -97,11 +97,13 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::account_management::{Application, OriginHash, StorableAccount};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
+use crate::storage::account::{
+    Account, AccountReference, Application, OriginHash, StorableAccount,
+};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -115,6 +117,8 @@ use internet_identity_interface::internet_identity::types::*;
 
 pub mod anchor;
 pub mod registration_rates;
+
+pub mod account;
 
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
@@ -630,7 +634,8 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
     }
 
-    pub fn lookup_or_insert_application_with_origin(
+    /// Look up an application number per origin, create entry in applications and lookup table if it doesn't exist
+    pub fn lookup_or_insert_application_number_with_origin(
         &mut self,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
@@ -653,6 +658,71 @@ impl<M: Memory + Clone> Storage<M> {
                 Some(new_number)
             })
             .expect("This should not happen.")
+    }
+
+    pub fn lookup_application_number_with_origin(
+        &self,
+        origin: &FrontendHostname,
+    ) -> Option<ApplicationNumber> {
+        self.lookup_application_with_origin_memory
+            .get(&OriginHash::from_origin(origin))
+    }
+
+    pub fn lookup_application_with_application_number(
+        &self,
+        application_number: &ApplicationNumber,
+    ) -> Option<Application> {
+        self.stable_application_memory.get(application_number)
+    }
+
+    pub fn create_account(&self, acc: Account) {}
+
+    pub fn get_account_by_id(&self, id: AccountNumber) -> Option<StorableAccount> {
+        self.stable_account_memory.get(&id)
+    }
+
+    pub fn read_account(&self, acc_ref: AccountReference) -> Option<Account> {
+        self.lookup_application_number_with_origin(&acc_ref.origin)
+            .and_then(|num| self.stable_account_memory.get(&num))
+            .and_then(|storable_acc| {
+                Some(Account::new(
+                    acc_ref.anchor_number,
+                    acc_ref.origin,
+                    storable_acc.name,
+                ))
+                //TODO: this is incorrect still!
+                //TODO: last_used, account_number, seed_from_anchor are default here!
+                todo!()
+            })
+    }
+
+    pub fn update_account(&self) {}
+
+    pub fn list_accounts(
+        &self,
+        anchor_number: &AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Vec<AccountReference> {
+        let application_number = self
+            .lookup_application_number_with_origin(origin)
+            .expect("Could not find origin!"); //TODO: handle better
+        self
+            .stable_anchor_memory
+            .get(anchor_number)
+            .and_then(|anchor| anchor.application_accounts)
+            .and_then(|app_map| app_map.get(&application_number).cloned())
+            .map(|maybe_storable_acc_ref_vec| {
+                maybe_storable_acc_ref_vec
+                    .iter()
+                    .map(|maybe_storable_acc_ref| {
+                        maybe_storable_acc_ref.as_ref().and_then(|storable_acc_ref| {
+                            Some((anchor_number, storable_acc_ref).into())
+                        })
+                        .expect("No Storable Accounr Reference here!")
+                    })
+                    .collect::<Vec<AccountReference>>()
+            })
+            .expect("No AccountReferences!")
     }
 
     /// Make sure all the required metadata is recorded to stable memory.

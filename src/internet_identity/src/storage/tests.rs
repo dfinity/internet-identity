@@ -9,7 +9,7 @@ use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, DeviceProtection, KeyType, Purpose,
+    ArchiveConfig, DeviceProtection, FrontendHostname, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -314,12 +314,6 @@ fn should_not_overwrite_device_credential_lookup() {
             .unwrap(),
         anchor_0.anchor_number()
     );
-}
-
-#[test]
-fn should_add_application_correctly() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory);
 }
 
 fn sample_device() -> Device {

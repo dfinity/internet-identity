@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use storage::{Salt, Storage};
+use storage::{account::Account, Salt, Storage};
 
 mod account_management;
 mod anchor_management;
@@ -299,50 +299,38 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<Account> {
+fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Account> {
     vec![
-        Account {
-            account_number: None,
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Default Mock Account".to_string()),
-        },
-        Account {
-            account_number: Some(1),
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Additional Mock Account".to_string()),
-        },
+        Account::new(
+            anchor_number,
+            origin.clone(),
+            Some("Default Mock Account".to_string()),
+        ),
+        Account::new(
+            anchor_number,
+            origin,
+            Some("Additinal Mock Account".to_string()),
+        )
     ]
 }
 
 #[update]
 fn create_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    Ok(Account {
-        account_number: Some(ic_cdk::api::time()),
-        origin: "example.com".to_string(),
-        last_used: None,
-        name: Some(name),
-    })
+    Ok(Account::new(anchor_number, origin, Some(name)))
 }
 
 #[update]
 fn update_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
     _account_number: Option<AccountNumber>,
     _update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    Ok(Account {
-        account_number: None,
-        origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
-    })
+    Ok(Account::new(anchor_number, origin, None))
 }
 
 #[update]

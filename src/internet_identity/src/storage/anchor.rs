@@ -1,5 +1,6 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::storage::account::AccountReference;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -24,6 +25,7 @@ pub struct Anchor {
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
     name: Option<String>,
+    application_accounts: Option<HashMap<ApplicationNumber, Vec<Option<AccountReference>>>>,
 }
 
 impl Device {
@@ -138,6 +140,24 @@ impl From<Anchor> for (StorableAnchor, StableAnchor) {
             StableAnchor {
                 openid_credentials: anchor.openid_credentials,
                 name: anchor.name,
+                application_accounts: anchor.application_accounts.map(|accounts_map| {
+                    accounts_map
+                        .iter()
+                        .map(|(app_num, acc_ref_opt_vec)| {
+                            (
+                                app_num.clone(),
+                                acc_ref_opt_vec
+                                    .iter()
+                                    .map(|maybe_acc_ref| {
+                                        maybe_acc_ref
+                                            .as_ref()
+                                            .and_then(|acc_ref| Some(acc_ref.to_storable()))
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect()
+                }),
             },
         )
     }
@@ -159,7 +179,27 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
                 .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
-            name: stable_anchor.and_then(|anchor| anchor.name),
+            name: stable_anchor.clone().and_then(|anchor| anchor.name),
+            application_accounts: stable_anchor.and_then(|anchor| {
+                anchor.application_accounts.map(|accounts_map| {
+                    accounts_map
+                        .iter()
+                        .map(|(app_num, acc_ref_opt_vec)| {
+                            (
+                                app_num.clone(),
+                                acc_ref_opt_vec
+                                    .iter()
+                                    .map(|maybe_acc_ref| {
+                                        maybe_acc_ref.as_ref().and_then(|acc_ref| {
+                                            Some((&anchor_number, acc_ref).into())
+                                        })
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect()
+                })
+            }),
         }
     }
 }
@@ -174,6 +214,7 @@ impl Anchor {
             openid_credentials: vec![],
             metadata: None,
             name: None,
+            application_accounts: None,
         }
     }
 
