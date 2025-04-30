@@ -430,34 +430,28 @@
         image: captcha,
         attempt,
         solve: async (solution) => {
-          const nextCaptcha = await validateCaptcha(solution);
-          if (nonNullish(nextCaptcha)) {
-            await solveCaptcha(nextCaptcha, attempt + 1);
+          try {
+            await data.session.actor
+              .check_captcha({ solution })
+              .then(throwCanisterError);
+            resolve();
+          } catch (error) {
+            if (
+              isCanisterError<CheckCaptchaError>(error) &&
+              error.type === "WrongSolution"
+            ) {
+              const nextCaptcha = `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
+              await solveCaptcha(nextCaptcha, attempt + 1);
+              resolve();
+              return;
+            }
+            handleError(error);
+            pickAuthenticationMethod();
           }
-          resolve();
         },
         cancel: pickAuthenticationMethod,
       };
     });
-
-  const validateCaptcha = async (
-    solution: string,
-  ): Promise<string | undefined> => {
-    try {
-      await data.session.actor
-        .check_captcha({ solution })
-        .then(throwCanisterError);
-    } catch (error) {
-      if (
-        isCanisterError<CheckCaptchaError>(error) &&
-        error.type === "WrongSolution"
-      ) {
-        return `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
-      }
-      handleError(error);
-      pickAuthenticationMethod();
-    }
-  };
 
   const registerWithGoogle = async (jwt: string) => {
     try {
@@ -472,10 +466,6 @@
         salt: data.session.salt,
         actor: data.session.actor,
       });
-      const result = await connection.fromDelegationIdentity(
-        anchorNumber,
-        identity,
-      );
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
