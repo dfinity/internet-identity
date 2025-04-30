@@ -842,7 +842,7 @@ service : (opt InternetIdentityInit) -> {
     // Multiple accounts
     get_accounts : (
         anchor_number : UserNumber,
-        origin : FrontendHostname, // Either get all accounts or a specific origin
+        origin : FrontendHostname,
     ) -> (vec Account) query;
 
     create_account : (

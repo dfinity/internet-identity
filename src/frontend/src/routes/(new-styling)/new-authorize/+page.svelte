@@ -2,23 +2,16 @@
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import {
-    AuthenticatedConnection,
-    Connection,
-    creationOptions,
-  } from "$lib/utils/iiConnection";
+  import { Connection, creationOptions } from "$lib/utils/iiConnection";
   import { readCanisterId, readCanisterConfig } from "$lib/utils/init";
   import type {
+    AccountNumber,
     CheckCaptchaError,
     IdRegFinishError,
     IdRegStartError,
     OpenIdDelegationError,
-    UserNumber,
   } from "$lib/generated/internet_identity_types";
-  import {
-    CosePublicKey,
-    DiscoverablePasskeyIdentity,
-  } from "$lib/utils/discoverablePasskeyIdentity";
+  import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
   import {
     type AuthContext,
     authenticationProtocol,
@@ -47,6 +40,9 @@
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import PickAuthenticationMethod from "./components/PickAuthenticationMethod.svelte";
+  import { authenticateWithPasskey } from "$lib/utils/authenticate/passkey";
+  import { Actor, HttpAgent, SignIdentity } from "@dfinity/agent";
+  import PickAccount from "./components/PickAccount.svelte";
 
   const { data }: PageProps = $props();
 
@@ -56,10 +52,12 @@
     authContext ? authContext?.requestOrigin : "",
   );
 
-  let onAuthenticate: (
-    authenticatedConnection: AuthenticatedConnection,
-    credentialId?: ArrayBuffer,
-    sub?: string,
+  let authenticate: (
+    identity: SignIdentity,
+    anchorNumber: bigint,
+    accountNumber: AccountNumber | undefined,
+    credentialId: ArrayBuffer | undefined,
+    sub: string | undefined,
   ) => void;
   const connection = new Connection(readCanisterId(), readCanisterConfig());
 
@@ -68,29 +66,173 @@
     currentState = { state: "pickAuthenticationMethod" };
   };
 
-  const continueAs = (lastUsedIdentity: LastUsedIdentity) => {
+  const continueAs = (
+    currentIdentity: LastUsedIdentity,
+    identities: LastUsedIdentity[],
+  ) => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
-    currentState = {
+    const nextState = {
       state: "continueAs",
-      number: lastUsedIdentity.identityNumber,
-      name: lastUsedIdentity.name,
-      continue: () => {
-        switch (lastUsedIdentity.authMethod) {
-          case "passkey":
-            return authenticateWithPasskey(lastUsedIdentity.credentialId);
-          case "google":
-            return authenticateWithGoogle(lastUsedIdentity.sub);
-          default:
-            void (lastUsedIdentity.authMethod satisfies never);
+      currentIdentity,
+      identities,
+      continueAs: async (identity) => {
+        try {
+          switch (identity.authMethod) {
+            case "passkey": {
+              authenticationV2Funnel.trigger(
+                AuthenticationV2Events.ContinueAsPasskey,
+              );
+              const {
+                identity: passkeyIdentity,
+                anchorNumber,
+                credentialId,
+              } = await authenticateWithPasskey({
+                credentialId: identity.credentialId,
+                actor: data.session.actor,
+              });
+              return authenticate(
+                passkeyIdentity,
+                anchorNumber,
+                undefined,
+                credentialId,
+                undefined,
+              );
+            }
+            case "google": {
+              authenticationV2Funnel.trigger(
+                AuthenticationV2Events.ContinueAsGoogle,
+              );
+              const clientId =
+                data.session.config.openid_google?.[0]?.[0]?.client_id;
+              if (isNullish(clientId)) {
+                return;
+              }
+              const requestConfig = createGoogleRequestConfig(clientId!);
+              const jwt = await requestJWT(requestConfig, {
+                nonce: data.session.nonce,
+                mediation: "required",
+                loginHint: identity.sub,
+              });
+              const {
+                identity: jwtIdentity,
+                anchorNumber,
+                sub,
+              } = await authenticateWithJWT({
+                jwt,
+                salt: data.session.salt,
+                actor: data.session.actor,
+              });
+              return authenticate(
+                jwtIdentity,
+                anchorNumber,
+                undefined,
+                undefined,
+                sub,
+              );
+            }
+            default:
+              void (identity.authMethod satisfies never);
+          }
+        } catch (error) {
+          handleError(error);
+          pickAuthenticationMethod();
         }
       },
-      useAnother,
-    };
+      switchIdentity: (identity) => {
+        currentState = { ...nextState, currentIdentity: identity };
+      },
+      useAnotherIdentity,
+      useAnotherAccount,
+    } satisfies State;
+    currentState = nextState;
   };
 
-  const useAnother = () => {
+  const useAnotherIdentity = () => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
     pickAuthenticationMethod();
+  };
+
+  const useAnotherAccount = async (lastUsedIdentity: LastUsedIdentity) => {
+    currentState = { state: "loading", label: "Authenticating" };
+    switch (lastUsedIdentity.authMethod) {
+      case "passkey": {
+        const { identity, anchorNumber, credentialId } =
+          await authenticateWithPasskey({
+            credentialId: lastUsedIdentity.credentialId,
+            actor: data.session.actor,
+          });
+        return pickAccount(identity, anchorNumber, credentialId, undefined);
+      }
+      case "google": {
+        const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
+        if (isNullish(clientId)) {
+          return;
+        }
+        const requestConfig = createGoogleRequestConfig(clientId!);
+        const jwt = await requestJWT(requestConfig, {
+          nonce: data.session.nonce,
+          mediation: "required",
+          loginHint: lastUsedIdentity.sub,
+        });
+        const { identity, anchorNumber, sub } = await authenticateWithJWT({
+          jwt,
+          salt: data.session.salt,
+          actor: data.session.actor,
+        });
+        return pickAccount(identity, anchorNumber, undefined, sub);
+      }
+      default:
+        void (lastUsedIdentity.authMethod satisfies never);
+    }
+  };
+
+  const pickAccount = async (
+    identity: SignIdentity,
+    anchorNumber: bigint,
+    credentialId: ArrayBuffer | undefined,
+    sub: string | undefined,
+  ) => {
+    const agent = await HttpAgent.from(
+      Actor.agentOf(data.session.actor) as HttpAgent,
+    );
+    agent.replaceIdentity(identity);
+    const accounts = await data.session.actor.get_accounts.withOptions({
+      agent,
+    })(anchorNumber, authContext?.requestOrigin!);
+    let currentAccountNumber = accounts[0].account_number[0];
+    const nextState = {
+      state: "pickAccount",
+      accounts,
+      currentAccountNumber: accounts[0].account_number[0],
+      selectAccount: (accountNumber) => {
+        currentAccountNumber = accountNumber;
+        currentState = { ...nextState, currentAccountNumber };
+      },
+      createAccount: async (name) => {
+        const account = await data.session.actor.create_account
+          .withOptions({
+            agent,
+          })(anchorNumber, authContext?.requestOrigin!, name)
+          .then(throwCanisterError);
+        accounts.push(account);
+        currentState = {
+          ...nextState,
+          accounts,
+          currentAccountNumber: account.account_number[0],
+        };
+      },
+      authenticate: () => {
+        currentState = { state: "loading", label: "Authenticating" };
+        authenticate(
+          identity,
+          anchorNumber,
+          currentAccountNumber,
+          credentialId,
+          sub,
+        );
+      },
+    } satisfies State;
+    currentState = nextState;
   };
 
   const connectOrCreatePasskey = async () => {
@@ -99,48 +241,18 @@
     );
     currentState = {
       state: "connectOrCreatePasskey",
-      connect: authenticateWithPasskey,
+      connect: continueWithExistingPasskey,
       create: createPasskey,
     };
   };
 
-  const authenticateWithPasskey = async (credentialId?: Uint8Array) => {
-    if (nonNullish(credentialId)) {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsPasskey);
-    } else {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
-    }
-    currentState = { state: "loading", label: "Authenticating" };
+  const continueWithExistingPasskey = async () => {
     try {
-      let userNumber: UserNumber;
-      const passkeyIdentity = new DiscoverablePasskeyIdentity({
-        credentialRequestOptions: {
-          publicKey: nonNullish(credentialId)
-            ? {
-                allowCredentials: [{ type: "public-key", id: credentialId }],
-              }
-            : creationOptions([], undefined, undefined),
-        },
-        getPublicKey: async (result) => {
-          const lookupResult = await connection.lookupDeviceKey(
-            new Uint8Array(result.rawId),
-          );
-          if (isNullish(lookupResult)) {
-            throw new Error("Account not migrated yet");
-          }
-          userNumber = lookupResult.anchor_number;
-          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-        },
-      });
-      const result = await connection.fromIdentity(
-        () => userNumber,
-        passkeyIdentity,
-      );
-      onAuthenticate(
-        result.connection,
-        passkeyIdentity.getCredentialId(),
-        undefined,
-      );
+      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+      currentState = { state: "loading", label: "Authenticating" };
+      const { identity, anchorNumber, credentialId } =
+        await authenticateWithPasskey({ actor: data.session.actor });
+      authenticate(identity, anchorNumber, undefined, credentialId, undefined);
     } catch (error) {
       handleError(error);
       pickAuthenticationMethod();
@@ -210,12 +322,10 @@
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
       );
       currentState = { state: "loading", label: "Authenticating" };
-      const result = await connection.fromIdentity(
-        () => identity_number,
-        data.session.identity,
-      );
-      onAuthenticate(
-        result.connection,
+      authenticate(
+        passkeyIdentity,
+        identity_number,
+        undefined,
         passkeyIdentity.getCredentialId(),
         undefined,
       );
@@ -247,24 +357,19 @@
     }
   };
 
-  const authenticateWithGoogle = async (loginHint?: string) => {
-    if (nonNullish(loginHint)) {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsGoogle);
-    } else {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
-    }
-    const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
-    if (isNullish(clientId)) {
-      return;
-    }
-    currentState = { state: "loading", label: "Authenticating" };
-    const requestConfig = createGoogleRequestConfig(clientId);
+  const continueWithGoogle = async () => {
     let jwt: string | undefined;
     try {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+      currentState = { state: "loading", label: "Authenticating" };
+      const clientId = data.session.config.openid_google?.[0]?.[0]?.client_id;
+      if (isNullish(clientId)) {
+        return;
+      }
+      const requestConfig = createGoogleRequestConfig(clientId!);
       jwt = await requestJWT(requestConfig, {
         nonce: data.session.nonce,
         mediation: "required",
-        loginHint,
       });
       const { identity, anchorNumber, sub } = await authenticateWithJWT({
         jwt,
@@ -276,11 +381,7 @@
       // If the call fails, it means the Google user does not exist in II.
       // In that case, we register them.
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
-      const result = await connection.fromDelegationIdentity(
-        anchorNumber,
-        identity,
-      );
-      onAuthenticate(result.connection, undefined, sub);
+      authenticate(identity, anchorNumber, undefined, undefined, sub);
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -378,7 +479,7 @@
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
-      onAuthenticate(result.connection, undefined, sub);
+      authenticate(identity, anchorNumber, undefined, undefined, sub);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -401,11 +502,15 @@
     authenticate: (context) => {
       authContext = context;
       return new Promise((resolve) => {
-        onAuthenticate = async (
-          authenticatedConnection,
-          credentialId?: ArrayBuffer,
-          sub?: string,
+        authenticate = async (
+          identity,
+          anchorNumber,
+          _accountNumber, // TODO: Implement prepare/get account delegation
+          credentialId,
+          sub,
         ) => {
+          const { connection: authenticatedConnection } =
+            await connection.fromDelegationIdentity(anchorNumber, identity);
           const derivationOrigin =
             context.authRequest.derivationOrigin ?? context.requestOrigin;
           const [result, anchorInfo] = await Promise.all([
@@ -446,7 +551,7 @@
             : AuthenticationV2Events.LastUsedNotPresent,
         );
         if (nonNullish(data.lastUsedIdentity)) {
-          continueAs(data.lastUsedIdentity);
+          continueAs(data.lastUsedIdentity, data.lastUsedIdentities);
         } else {
           pickAuthenticationMethod();
         }
@@ -488,10 +593,12 @@
       </div>
       {#if currentState.state === "continueAs"}
         <ContinueAs {...currentState} />
+      {:else if currentState.state === "pickAccount"}
+        <PickAccount {...currentState} />
       {:else}
         <PickAuthenticationMethod
           {connectOrCreatePasskey}
-          {authenticateWithGoogle}
+          {continueWithGoogle}
         />
         {#if currentState.state === "connectOrCreatePasskey" || currentState.state === "createPasskey"}
           <Dialog

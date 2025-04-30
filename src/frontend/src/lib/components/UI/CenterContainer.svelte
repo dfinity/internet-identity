@@ -13,7 +13,7 @@
 </script>
 
 <div
-  class={`flex h-screen w-screen items-center justify-center ${classes}`}
+  class={`flex min-h-screen w-screen items-center justify-center ${classes}`}
   {...rest}
 >
   {@render children()}

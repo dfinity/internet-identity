@@ -299,25 +299,33 @@ fn get_delegation(
 
 #[query]
 fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<Account> {
-    vec![Account {
-        account_number: None,
-        origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
-    }]
+    vec![
+        Account {
+            account_number: None,
+            origin: "example.com".to_string(),
+            last_used: Some(0u64),
+            name: Some("Default Mock Account".to_string()),
+        },
+        Account {
+            account_number: Some(1),
+            origin: "example.com".to_string(),
+            last_used: Some(0u64),
+            name: Some("Additional Mock Account".to_string()),
+        },
+    ]
 }
 
 #[update]
 fn create_account(
     _anchor_number: AnchorNumber,
     _origin: FrontendHostname,
-    _name: String,
+    name: String,
 ) -> Result<Account, CreateAccountError> {
     Ok(Account {
-        account_number: None,
+        account_number: Some(ic_cdk::api::time()),
         origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
+        last_used: None,
+        name: Some(name),
     })
 }
 

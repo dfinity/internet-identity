@@ -74,7 +74,7 @@
   >
     <div class="flex">
       {#if nonNullish(title)}
-        <h1 class="h1 -mt-1 mb-4 flex-1 items-center text-2xl">{title}</h1>
+        <h1 class="h1 -mt-1 mb-4 flex-1 items-center text-xl">{title}</h1>
       {/if}
       {#if showCloseButton && nonNullish(onClose)}
         <button
