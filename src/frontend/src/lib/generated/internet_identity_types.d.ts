@@ -5,7 +5,7 @@ import type { IDL } from '@dfinity/candid';
 export interface Account {
   'name' : [] | [string],
   'origin' : string,
-  'account' : [] | [AccountNumber],
+  'account_number' : [] | [AccountNumber],
   'last_used' : [] | [Timestamp],
 }
 export type AccountNumber = bigint;
@@ -110,7 +110,7 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
-export type CreateAccountError = { 'InternalError' : null };
+export type CreateAccountError = { 'InternalCanisterError' : string };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -346,7 +346,7 @@ export type StreamingStrategy = {
 export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
-export type UpdateAccountError = { 'InternalError' : null };
+export type UpdateAccountError = { 'InternalCanisterError' : string };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export type VerifyTentativeDeviceResponse = {
@@ -435,10 +435,7 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_accounts' : ActorMethod<
-    [UserNumber, [] | [FrontendHostname]],
-    Array<Account>
-  >,
+  'get_accounts' : ActorMethod<[UserNumber, FrontendHostname], Array<Account>>,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
   'get_delegation' : ActorMethod<

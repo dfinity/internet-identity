@@ -67,11 +67,9 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
 
 export const lastUsedIdentitiesStore = initLastUsedIdentitiesStore();
 
-export const lastUsedIdentityStore: Readable<LastUsedIdentity> = derived(
-  lastUsedIdentitiesStore,
-  (lastUsedIdentities) => {
+export const lastUsedIdentityStore: Readable<LastUsedIdentity | undefined> =
+  derived(lastUsedIdentitiesStore, (lastUsedIdentities) => {
     return Object.values(lastUsedIdentities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
     )[0];
-  },
-);
+  });

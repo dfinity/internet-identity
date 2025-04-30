@@ -3,10 +3,10 @@
 
   type Props = {
     connectOrCreatePasskey: () => void;
-    authenticateWithGoogle: (loginHint?: string) => void;
+    continueWithGoogle: () => void;
   };
 
-  const { connectOrCreatePasskey, authenticateWithGoogle }: Props = $props();
+  const { connectOrCreatePasskey, continueWithGoogle }: Props = $props();
 
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 </script>
@@ -23,8 +23,7 @@
     class="btn preset-filled py-2"
     disabled={!supportsPasskeys}>Continue with Passkey</button
   >
-  <button
-    onclick={() => authenticateWithGoogle()}
-    class="btn preset-outlined py-2">Continue with Google</button
+  <button onclick={continueWithGoogle} class="btn preset-outlined py-2"
+    >Continue with Google</button
   >
 </div>

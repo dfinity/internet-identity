@@ -181,10 +181,12 @@ export const idlFactory = ({ IDL }) => {
   const Account = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
-    'account' : IDL.Opt(AccountNumber),
+    'account_number' : IDL.Opt(AccountNumber),
     'last_used' : IDL.Opt(Timestamp),
   });
-  const CreateAccountError = IDL.Variant({ 'InternalError' : IDL.Null });
+  const CreateAccountError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+  });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
     'png_base64' : IDL.Text,
@@ -417,7 +419,9 @@ export const idlFactory = ({ IDL }) => {
     ),
   });
   const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
-  const UpdateAccountError = IDL.Variant({ 'InternalError' : IDL.Null });
+  const UpdateAccountError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+  });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'verified' : IDL.Null,
@@ -529,7 +533,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_accounts' : IDL.Func(
-        [UserNumber, IDL.Opt(FrontendHostname)],
+        [UserNumber, FrontendHostname],
         [IDL.Vec(Account)],
         ['query'],
       ),
