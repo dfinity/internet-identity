@@ -19,7 +19,7 @@
   import { inferPasskeyAlias, loadUAParser } from "$lib/flows/register";
   import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
   import { fetchDelegation } from "$lib/flows/authorize/fetchDelegation";
-  import type { PageProps } from "./$types";
+  import type { PageProps } from "../../../../../../../.svelte-kit/types/src/frontend";
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import { authenticateWithJWT } from "$lib/utils/authenticate/jwt";

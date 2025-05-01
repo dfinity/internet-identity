@@ -1,19 +1,11 @@
 <script lang="ts">
-  import { type State } from "../state";
+  import type { PageProps } from "../../../../../../../../../.svelte-kit/types/src/frontend";
   import type { FocusEventHandler, MouseEventHandler } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
   import { formatLastUsage } from "$lib/utils/time";
 
-  type Props = Extract<State, { state: "pickAccount" }>;
-
-  const {
-    accounts,
-    currentAccountNumber,
-    selectAccount,
-    createAccount,
-    authenticate,
-  }: Props = $props();
+  const { data }: PageProps = $props();
 
   let createAccountFocused = $state(false);
   let creatingAccount = $state(false);

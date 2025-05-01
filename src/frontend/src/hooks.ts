@@ -16,6 +16,6 @@ export const reroute: Reroute = ({ url }) => {
     return "/vc-flow/index";
   }
   if (url.hash === "#authorize") {
-    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/new-authorize" : "/authorize";
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
   }
 };

@@ -3,25 +3,26 @@ import { derived, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
 
 export type LastUsedIdentity = {
-  name?: string;
+  identity: {
+    identityNumber: bigint;
+    name?: string;
+  };
+  authMethod:
+    | { passkey: { credentialId: Uint8Array } }
+    | { openid: { iss: string; sub: string } };
+  account: {
+    accountNumber?: bigint;
+    name?: string;
+  };
   lastUsedTimestampMillis: number;
-  identityNumber: bigint;
-  credentialId: Uint8Array | undefined;
-  authMethod: "passkey" | "google";
-  // In case the auth method is google, this will be the sub (or email)
-  sub?: string;
 };
 export type LastUsedIdentitiesData = {
   [identityNumber: string]: LastUsedIdentity;
 };
 type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
-  addLatestUsed: (params: {
-    identityNumber: bigint;
-    name?: string;
-    credentialId: Uint8Array | undefined;
-    authMethod: "passkey" | "google";
-    sub?: string;
-  }) => void;
+  addLatestUsed: (
+    params: Omit<LastUsedIdentity, "lastUsedTimestampMillis">,
+  ) => void;
   reset: () => void;
 };
 
@@ -29,32 +30,16 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const { subscribe, set, update } = writableStored<LastUsedIdentitiesData>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 1,
+    version: 2,
   });
 
   return {
     subscribe,
-    addLatestUsed: ({
-      identityNumber,
-      name,
-      credentialId,
-      authMethod,
-      sub,
-    }: {
-      identityNumber: bigint;
-      name?: string;
-      credentialId: Uint8Array | undefined;
-      authMethod: "passkey" | "google";
-      sub?: string;
-    }) => {
+    addLatestUsed: (params) => {
       update((lastUsedIdentities) => {
-        lastUsedIdentities[identityNumber.toString()] = {
-          name,
+        lastUsedIdentities[params.identity.identityNumber.toString()] = {
+          ...params,
           lastUsedTimestampMillis: Date.now(),
-          identityNumber,
-          credentialId,
-          authMethod,
-          sub,
         };
         return lastUsedIdentities;
       });

@@ -6,21 +6,42 @@ import {
 } from "$lib/utils/discoverablePasskeyIdentity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { creationOptions } from "$lib/utils/iiConnection";
-import { ActorSubclass } from "@dfinity/agent";
-import { identityFromActor } from "$lib/utils/authenticate/actor";
+import { Actor, HttpAgent, SignIdentity } from "@dfinity/agent";
+import { Principal } from "@dfinity/principal";
+import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+
+export class IdentityNotMigratedError extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, IdentityNotMigratedError.prototype);
+  }
+
+  message = "Identity has not been migrated.";
+}
 
 export const authenticateWithPasskey = async ({
+  canisterId,
+  agent,
   credentialId,
-  actor,
+  expiration = 30 * 60 * 1000,
 }: {
+  canisterId: Principal;
+  agent: HttpAgent;
   credentialId?: Uint8Array;
-  actor: ActorSubclass<_SERVICE>;
+  expiration?: number;
 }): Promise<{
   identity: DelegationIdentity;
   anchorNumber: bigint;
   credentialId: Uint8Array;
 }> => {
-  const identity = await identityFromActor(actor);
+  const identity = await agent.config.identity;
+  if (!identity || !(identity instanceof SignIdentity)) {
+    throw new Error("Agent with a SignIdentity required");
+  }
+  const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent,
+    canisterId,
+  });
   let anchorNumber: bigint;
   const passkeyIdentity = new DiscoverablePasskeyIdentity({
     credentialRequestOptions: {
@@ -35,7 +56,7 @@ export const authenticateWithPasskey = async ({
         await actor.lookup_device_key(new Uint8Array(result.rawId))
       )[0];
       if (isNullish(lookupResult)) {
-        throw new Error("Account not migrated yet");
+        throw new IdentityNotMigratedError();
       }
       anchorNumber = lookupResult.anchor_number;
       return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
@@ -44,7 +65,7 @@ export const authenticateWithPasskey = async ({
   const delegation = await DelegationChain.create(
     passkeyIdentity,
     identity.getPublicKey(),
-    new Date(Date.now() + 30 * 60 * 1000),
+    new Date(Date.now() + expiration),
   );
   const delegationIdentity = DelegationIdentity.fromDelegation(
     identity,
