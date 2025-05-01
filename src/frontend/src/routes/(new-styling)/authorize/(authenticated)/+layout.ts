@@ -1,5 +1,5 @@
 import type { LayoutLoad } from "./$types";
-import { authenticationState } from "$lib/state/authenticated";
+import { authenticationState } from "$lib/state/authentication";
 import { readCanisterConfig } from "$lib/utils/init";
 import { inferHost } from "$lib/utils/iiConnection";
 import { HttpAgent } from "@dfinity/agent";

@@ -1,11 +1,9 @@
-import type { PageLoad } from "./$types";
-import { get } from "svelte/store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import type { LayoutLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { authenticationState } from "$lib/state/authenticated";
+import { authenticationState } from "$lib/state/authentication";
 import { nonNullish } from "@dfinity/utils";
 
-export const load: PageLoad = () => {
+export const load: LayoutLoad = () => {
   if (nonNullish(authenticationState.authenticated)) {
     throw redirect(302, "/authorize/account");
   }

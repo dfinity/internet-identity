@@ -2,7 +2,7 @@
   import type { PageProps } from "./$types";
   import Dialog from "$lib/components/UI/Dialog.svelte";
   import { authenticateWithLastUsed } from "$lib/utils/authenticate/lastUsed";
-  import { authenticationState } from "$lib/state/authenticated";
+  import { authenticationState } from "$lib/state/authentication";
 
   const { data }: PageProps = $props();
   const { canisterId, config, session, lastUsedIdentities } = data;
