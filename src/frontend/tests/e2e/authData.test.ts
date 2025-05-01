@@ -96,7 +96,7 @@ test("Should show error after manually navigating to authorize url", async () =>
     const errorView = new ErrorView(browser);
     await errorView.waitForDisplay();
     expect(await errorView.getErrorMessage()).toEqual(
-      "Seems you arrived here for authentication, but no service has requested it.",
+      "We couldn't process your authentication request. Try a different browser; if the issue persists, contact the developer.",
     );
   });
 }, 300_000);
