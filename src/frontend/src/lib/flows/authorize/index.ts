@@ -295,7 +295,7 @@ export const authFlowAuthorize = async (
 
   if (result === "orphan") {
     await displayError({
-      title: copy.wrong_place,
+      title: copy.missing_request,
       message: copy.no_request_received,
       primaryButton: copy.go_home,
     });
