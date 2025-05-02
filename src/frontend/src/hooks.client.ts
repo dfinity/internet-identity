@@ -1,9 +1,12 @@
-import type { ServerInit } from "@sveltejs/kit";
+import type { ClientInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
+import { authenticationStore } from "$lib/stores/authentication.store";
+import { sessionStore } from "$lib/stores/session.store";
+import { initGlobals, canisterId, agentOptions } from "$lib/globals";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
-export const init: ServerInit = () => {
+const overrideFeatureFlags = () => {
   // Override feature flags based on search params before any other code
   // including other hooks runs that might depend on these feature flags.
   //
@@ -35,4 +38,13 @@ export const init: ServerInit = () => {
   // SvelteKit will log a warning to the console here in dev mode since we're
   // not using the method supplied by SvelteKit, this can be safely ignored.
   window.history.replaceState(undefined, "", url);
+};
+
+export const init: ClientInit = async () => {
+  overrideFeatureFlags();
+  await initGlobals();
+  await Promise.all([
+    sessionStore.init({ canisterId, agentOptions }),
+    authenticationStore.init({ canisterId, agentOptions }),
+  ]);
 };

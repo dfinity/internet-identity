@@ -1,7 +1,6 @@
 <script lang="ts">
   import Flow from "$lib/components/Flow.svelte";
   import { AuthenticatedConnection, Connection } from "$lib/utils/iiConnection";
-  import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
   import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
@@ -11,6 +10,7 @@
   import { renderManage } from "$lib/flows/manage";
   import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png?url";
   import { PreLoadImage } from "$lib/utils/preLoadImage";
+  import { canisterConfig, canisterId } from "$lib/globals";
 
   analytics.event("page-add-new-device");
 
@@ -19,7 +19,7 @@
   );
 
   const addDeviceAnchor = getAddDeviceAnchor(new URL(window.location.href))!;
-  const connection = new Connection(readCanisterId(), readCanisterConfig());
+  const connection = new Connection(canisterId.toText(), canisterConfig);
   const onResolve = async (
     registerDeviceResult: Awaited<ReturnType<typeof registerTentativeDevice>>,
   ) => {

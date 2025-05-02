@@ -3,7 +3,7 @@
   import "$lib/app.css";
   import { Toaster } from "@skeletonlabs/skeleton-svelte";
   import { toaster } from "$lib/utils/toaster";
-  import { LayoutProps } from "./$types";
+  import type { LayoutProps } from "./$types";
 
   const { children }: LayoutProps = $props();
 </script>

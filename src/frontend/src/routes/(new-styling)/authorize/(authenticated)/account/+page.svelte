@@ -1,12 +1,19 @@
 <script lang="ts">
-  import type { PageProps } from "../../../../../../../../../.svelte-kit/types/src/frontend";
+  import type { PageProps } from "./$types";
   import type { FocusEventHandler, MouseEventHandler } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
   import { ProgressRing } from "@skeletonlabs/skeleton-svelte";
   import { formatLastUsage } from "$lib/utils/time";
+  import { throwCanisterError } from "$lib/utils/utils";
+  import { invalidate } from "$app/navigation";
+  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
 
   const { data }: PageProps = $props();
+  const { accounts } = data;
 
+  let selectedAccount = $state.raw(accounts[0]);
   let createAccountFocused = $state(false);
   let creatingAccount = $state(false);
   let newAccountName = $state("");
@@ -26,19 +33,31 @@
     newAccountName = "";
     createAccountFocused = false;
   };
-  const handleCreate: MouseEventHandler<HTMLButtonElement> = (event) => {
+  const handleCreate: MouseEventHandler<HTMLButtonElement> = async (event) => {
     creatingAccount = true;
-    createAccount(newAccountName);
-    event.currentTarget.closest("form")?.querySelector("input")?.blur();
+    const _account = await $authenticationStore.actor
+      .create_account(
+        $authenticationStore.identityNumber,
+        $authorizationStore.requestOrigin,
+        newAccountName,
+      )
+      .then(throwCanisterError);
+    creatingAccount = false;
+    newAccountName = "";
+    await invalidate("/authorize/account");
   };
 
-  $effect(() => {
-    if (accounts.length) {
-      createAccountFocused = false;
-      creatingAccount = false;
-      newAccountName = "";
-    }
-  });
+  const handleContinue = () => {
+    lastUsedIdentitiesStore.addLastUsedAccount({
+      origin:
+        $authorizationStore.authRequest.derivationOrigin ??
+        $authorizationStore.requestOrigin,
+      identityNumber: $authenticationStore.identityNumber,
+      accountNumber: selectedAccount.account_number[0],
+      name: selectedAccount.name[0],
+    });
+    authorizationStore.authorize(selectedAccount.account_number[0]);
+  };
 </script>
 
 <div class="flex flex-col items-start">
@@ -48,15 +67,15 @@
   >
     {#each accounts as account}
       <button
-        onclick={() => selectAccount(account.account_number[0])}
+        onclick={() => (selectedAccount = account)}
         class={[
           "btn box-border flex h-18 flex-col items-start justify-center gap-0 rounded-lg p-4 px-4 text-left transition-none",
-          account.account_number[0] === currentAccountNumber
+          account === selectedAccount
             ? "bg-surface-200-800 border-surface-0 border-2 font-semibold"
             : "preset-outlined-surface-300-700",
         ]}
         role="radio"
-        aria-checked={account.account_number[0] === currentAccountNumber}
+        aria-checked={account === selectedAccount}
       >
         <span class="-mt-0.5">{account.name[0] ?? "Primary account"}</span>
         <span class="text-sm opacity-80"
@@ -100,7 +119,7 @@
       {/if}
     </form>
   </div>
-  <button onclick={authenticate} class="btn preset-filled self-stretch py-2"
+  <button onclick={handleContinue} class="btn preset-filled self-stretch py-2"
     >Continue</button
   >
 </div>

@@ -1,44 +1,102 @@
 <script lang="ts">
-  import type { PageProps } from "./$types";
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { authenticateWithLastUsed } from "$lib/utils/authenticate/lastUsed";
-  import { authenticationState } from "$lib/state/authentication";
+  import { goto } from "$app/navigation";
+  import {
+    authenticateWithJWT,
+    authenticateWithPasskey,
+  } from "$lib/utils/authentication";
+  import { isNullish } from "@dfinity/utils";
+  import {
+    lastUsedIdentitiesStore,
+    type LastUsedIdentity,
+  } from "$lib/stores/last-used-identities.store";
+  import { canisterConfig, canisterId } from "$lib/globals";
+  import { sessionStore } from "$lib/stores/session.store";
+  import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
+  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
 
-  const { data }: PageProps = $props();
-  const { canisterId, config, session, lastUsedIdentities } = data;
-
-  let selectedIdentity = $state(lastUsedIdentities[0]);
+  const lastUsedIdentities = $derived(
+    Object.values($lastUsedIdentitiesStore).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
+  );
+  let selectedIdentity = $state.raw(lastUsedIdentities[0]);
+  const lastUsedAccount = $derived(
+    selectedIdentity.accounts?.[
+      $authorizationStore.authRequest.derivationOrigin ??
+        $authorizationStore.requestOrigin
+    ],
+  );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(
     "lastUsedAccount",
   );
   let identitySwitcherVisible = $state(false);
 
   const handleContinue = async () => {
-    const { identity, anchorNumber } = await authenticateWithLastUsed({
-      canisterId,
-      config,
-      session,
-      lastUsed: selectedIdentity,
-    });
+    if ("passkey" in selectedIdentity.authMethod) {
+      const { identity, identityNumber, credentialId } =
+        await authenticateWithPasskey({
+          canisterId,
+          session: $sessionStore,
+          credentialId: selectedIdentity.authMethod.passkey.credentialId,
+        });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticationStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
+      });
+    } else if (
+      "openid" in selectedIdentity.authMethod &&
+      selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
+    ) {
+      const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
+      const requestConfig = createGoogleRequestConfig(clientId);
+      const jwt = await requestJWT(requestConfig, {
+        nonce: $sessionStore.nonce,
+        mediation: "required",
+        loginHint: selectedIdentity.authMethod.openid.sub,
+      });
+      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
+        canisterId,
+        session: $sessionStore,
+        jwt,
+      });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticationStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { openid: { iss, sub } },
+      });
+    } else {
+      throw new Error("Unrecognized authentication method");
+    }
 
     switch (continueWith) {
       case "lastUsedAccount":
-        // TODO
-        break;
+        if (isNullish(lastUsedAccount)) {
+          // Unreachable, user shouldn't have been redirected to this page
+          return;
+        }
+        lastUsedIdentitiesStore.addLastUsedAccount(lastUsedAccount);
+        return authorizationStore.authorize(lastUsedAccount.accountNumber);
       case "anotherAccount":
-        authenticationState.authenticated = { identity, anchorNumber };
-        break;
+        return goto("/authorize/account");
       default:
         void (continueWith satisfies never);
     }
   };
 
-  // $effect(() => {
-  //   if (currentIdentity) {
-  //     selectedOption = "continueAs";
-  //     showOtherIdentities = false;
-  //   }
-  // });
+  const switchIdentity = (identity: LastUsedIdentity) => {
+    identitySwitcherVisible = false;
+    selectedIdentity = identity;
+    continueWith = "lastUsedAccount";
+  };
 </script>
 
 <div class="flex flex-col items-start">
@@ -47,8 +105,8 @@
     class="btn mb-3 self-start px-0 py-1 font-medium"
   >
     <span
-      >{selectedIdentity.identity.name ??
-        selectedIdentity.identity.identityNumber}'s Internet Identity</span
+      >{selectedIdentity.name ?? selectedIdentity.identityNumber}'s Internet
+      Identity</span
     >
     <span class="-mt-2.5">⌄</span>
   </button>
@@ -67,7 +125,7 @@
       role="radio"
       aria-checked={continueWith === "lastUsedAccount"}
     >
-      {selectedIdentity.account.name ?? "Primary account"}
+      {lastUsedAccount?.name ?? "Primary account"}
     </button>
     <button
       onclick={() => (continueWith = "anotherAccount")}
@@ -95,12 +153,12 @@
     <div class="h-4"></div>
     {#each lastUsedIdentities as lastUsedIdentity}
       <button
-        onclick={() => (selectedIdentity = lastUsedIdentity)}
+        onclick={() => switchIdentity(lastUsedIdentity)}
         class="border-t-surface-100-900 text-surface-contrast-50-950/80 flex items-center border-t p-2 text-start"
       >
         <span class="flex-1"
-          >{lastUsedIdentity.identity.name ??
-            lastUsedIdentity.identity.identityNumber}'s Internet Identity</span
+          >{lastUsedIdentity.name ?? lastUsedIdentity.identityNumber}'s Internet
+          Identity</span
         >
         {#if lastUsedIdentity === selectedIdentity}
           <span

@@ -1,33 +1,42 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
+import { isNullish } from "@dfinity/utils";
 
+export type LastUsedAccount = {
+  identityNumber: bigint;
+  accountNumber: bigint | undefined;
+  origin: string;
+  name?: string;
+  lastUsedTimestampMillis: number;
+};
+export type LastUsedAccounts = {
+  [origin: string]: LastUsedAccount;
+};
 export type LastUsedIdentity = {
-  identity: {
-    identityNumber: bigint;
-    name?: string;
-  };
+  identityNumber: bigint;
+  name?: string;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } };
-  account: {
-    accountNumber?: bigint;
-    name?: string;
-  };
+  accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
 };
-export type LastUsedIdentitiesData = {
+export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
 };
-type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
-  addLatestUsed: (
-    params: Omit<LastUsedIdentity, "lastUsedTimestampMillis">,
+type LastUsedIdentitiesStore = Readable<LastUsedIdentities> & {
+  addLastUsedIdentity: (
+    params: Pick<LastUsedIdentity, "identityNumber" | "name" | "authMethod">,
+  ) => void;
+  addLastUsedAccount: (
+    params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
   reset: () => void;
 };
 
 export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
-  const { subscribe, set, update } = writableStored<LastUsedIdentitiesData>({
+  const { subscribe, set, update } = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
     version: 2,
@@ -35,9 +44,27 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
 
   return {
     subscribe,
-    addLatestUsed: (params) => {
+    addLastUsedIdentity: (params) => {
       update((lastUsedIdentities) => {
-        lastUsedIdentities[params.identity.identityNumber.toString()] = {
+        const identity = lastUsedIdentities[params.identityNumber.toString()];
+        lastUsedIdentities[params.identityNumber.toString()] = {
+          accounts: identity?.accounts,
+          ...params,
+          lastUsedTimestampMillis: Date.now(),
+        };
+        return lastUsedIdentities;
+      });
+    },
+    addLastUsedAccount: (params) => {
+      update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[params.identityNumber.toString()];
+        if (isNullish(identity)) {
+          return lastUsedIdentities;
+        }
+        if (isNullish(identity.accounts)) {
+          identity.accounts = {};
+        }
+        identity.accounts[params.origin] = {
           ...params,
           lastUsedTimestampMillis: Date.now(),
         };

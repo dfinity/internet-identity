@@ -1,33 +1,11 @@
 import type { LayoutLoad } from "./$types";
-import { authenticationState } from "$lib/state/authentication";
-import { readCanisterConfig } from "$lib/utils/init";
-import { inferHost } from "$lib/utils/iiConnection";
-import { HttpAgent } from "@dfinity/agent";
-import { features } from "$lib/legacy/features";
-import { isNullish } from "@dfinity/utils";
 import { redirect } from "@sveltejs/kit";
+import { get } from "svelte/store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 
 export const load: LayoutLoad = () => {
-  const config = readCanisterConfig();
-  const host = inferHost();
-  const shouldFetchRootKey =
-    features.FETCH_ROOT_KEY || (config.fetch_root_key[0] ?? false);
-
-  const { authenticated } = authenticationState;
-
-  if (isNullish(authenticated)) {
-    throw redirect(302, "./");
+  // Go back to /authorize if not authenticated
+  if (!get(authenticationStore.isAuthenticated)) {
+    throw redirect(302, "/authorize");
   }
-
-  // Create authenticated agent, used on e.g. manage accounts
-  return {
-    authenticated: {
-      agent: HttpAgent.createSync({
-        identity: authenticated.identity,
-        host,
-        shouldFetchRootKey,
-      }),
-      anchorNumber: authenticated.anchorNumber,
-    },
-  };
 };

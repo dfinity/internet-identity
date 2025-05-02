@@ -59,7 +59,7 @@
       ? "fixed top-auto bottom-0 mx-auto"
       : "m-auto max-[460px]:m-0 max-[460px]:min-h-full",
   ]}
-  transition:transitionFn|global
+  transition:transitionFn
   onoutrostart={fadeOutBackDrop}
   {...props}
 >
