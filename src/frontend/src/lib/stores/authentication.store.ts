@@ -1,4 +1,4 @@
-import { type Readable, derived, writable, readonly } from "svelte/store";
+import { type Readable, derived, writable } from "svelte/store";
 import { DelegationIdentity } from "@dfinity/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {

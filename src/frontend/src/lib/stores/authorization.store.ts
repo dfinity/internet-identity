@@ -48,9 +48,9 @@ const createAuthorizationStore = (): AuthorizationStore => {
         authenticate: (context) => {
           store.set({ context: context, status: "authenticating" });
           return new Promise((resolve) => {
-            authorize = async (accountNumber) => {
-              const { identityNumber, identity } = get(authenticationStore);
+            authorize = async (_accountNumber) => {
               // TODO: use prepare/get account delegation instead of iiConnection
+              const { identityNumber, identity } = get(authenticationStore);
               const { connection } = await new Connection(
                 canisterId.toText(),
                 canisterConfig,
