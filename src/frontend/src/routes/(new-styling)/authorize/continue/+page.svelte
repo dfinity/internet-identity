@@ -1,6 +1,6 @@
 <script lang="ts">
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { goto } from "$app/navigation";
+  import { goto, invalidate } from "$app/navigation";
   import {
     authenticateWithJWT,
     authenticateWithPasskey,
