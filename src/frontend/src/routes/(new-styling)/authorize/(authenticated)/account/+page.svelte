@@ -9,11 +9,11 @@
   import { authorizationStore } from "$lib/stores/authorization.store";
 
   const { data }: PageProps = $props();
+  const { accounts } = data;
 
   const origin =
     $authorizationStore.authRequest.derivationOrigin ??
     $authorizationStore.requestOrigin;
-  let accounts = $derived(data.accounts);
   let selectedAccountNumber = $state(accounts[0].account_number[0]);
   let accountRefs = $state<HTMLButtonElement[]>([]);
   let createAccountFocused = $state(false);
