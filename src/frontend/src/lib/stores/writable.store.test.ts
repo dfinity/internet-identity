@@ -13,16 +13,14 @@ const mockIdentity1: LastUsedIdentity = {
   name: "Test Identity 1",
   lastUsedTimestampMillis: 1678886400000, // Example timestamp
   identityNumber: BigInt("10001"),
-  credentialId: new Uint8Array(),
-  authMethod: "passkey",
+  authMethod: { passkey: { credentialId: new Uint8Array() } },
 };
 
 const mockIdentity2: LastUsedIdentity = {
   name: "Test Identity 2",
   lastUsedTimestampMillis: 1678887400000, // Slightly later timestamp
   identityNumber: BigInt("10002"),
-  credentialId: new Uint8Array(),
-  authMethod: "passkey",
+  authMethod: { passkey: { credentialId: new Uint8Array() } },
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
