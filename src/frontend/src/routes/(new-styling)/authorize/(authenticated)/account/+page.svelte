@@ -14,7 +14,6 @@
     $authorizationStore.authRequest.derivationOrigin ??
     $authorizationStore.requestOrigin;
   let selectedAccountNumber = $state(accounts[0].account_number[0]);
-  let accountRefs = $state<HTMLButtonElement[]>([]);
   let creatingAccount = $state(false);
   let newAccountName = $state("");
 
@@ -56,7 +55,6 @@
     {#each accounts as account, index}
       {@const selected = account.account_number[0] === selectedAccountNumber}
       <button
-        bind:this={accountRefs[index]}
         onclick={() => handleSelectAccount(account.account_number[0])}
         class={[
           "btn box-border flex h-18 flex-col items-start justify-center gap-0 rounded-lg p-4 px-4 text-left transition-none",

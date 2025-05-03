@@ -16,6 +16,7 @@
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { authorizationStore } from "$lib/stores/authorization.store";
 
+  let continueButtonRef = $state<HTMLButtonElement>();
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
@@ -97,6 +98,10 @@
     selectedIdentity = identity;
     continueWith = "lastUsedAccount";
   };
+
+  $effect(() => {
+    continueButtonRef?.focus();
+  });
 </script>
 
 <div class="flex flex-col items-start">
@@ -141,8 +146,10 @@
       Use another account
     </button>
   </div>
-  <button onclick={handleContinue} class="btn preset-filled self-stretch py-2"
-    >Continue</button
+  <button
+    bind:this={continueButtonRef}
+    onclick={handleContinue}
+    class="btn preset-filled self-stretch py-2">Continue</button
   >
 </div>
 {#if identitySwitcherVisible}

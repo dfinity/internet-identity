@@ -6,7 +6,6 @@ import { authorizationStore } from "$lib/stores/authorization.store";
 export const load: PageLoad = async () => {
   const { identityNumber, actor } = get(authenticationStore);
   const { authRequest, requestOrigin } = get(authorizationStore);
-  console.log("load");
   const accounts = await actor.get_accounts(
     identityNumber,
     authRequest.derivationOrigin ?? requestOrigin,
