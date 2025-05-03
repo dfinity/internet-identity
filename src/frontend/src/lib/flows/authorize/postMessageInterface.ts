@@ -107,16 +107,19 @@ export async function authenticationProtocol({
   /* Progress update messages to let the user know what's happening. */
   onProgress: (state: "waiting" | "validating") => void;
 }): Promise<"orphan" | "closed" | "invalid" | "success" | "failure"> {
+  authorizeClientFunnel.init();
+
   if (window.opener === null) {
     if (window.history.length > 1) {
       // If there's no `window.opener` and a user has manually navigated to "/#authorize".
       // Signal that there will never be an authentication request incoming.
+      authorizeClientFunnel.trigger(AuthorizeClientEvents.Orphan);
       return "orphan";
     }
     // Else signal that the connection has been unexpectedly closed.
+    authorizeClientFunnel.trigger(AuthorizeClientEvents.Closed);
     return "closed";
   }
-  authorizeClientFunnel.init();
 
   // Send a message to indicate we're ready.
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
@@ -127,17 +130,18 @@ export async function authenticationProtocol({
   onProgress("waiting");
 
   const requestResult = await waitForRequest();
-  authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestReceived);
   if (requestResult.kind === "timeout") {
+    authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestTimeout);
     return "closed";
   }
   if (requestResult.kind === "invalid") {
+    authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestInvalid);
     return "invalid";
   }
   void (requestResult.kind satisfies "received");
+  authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestReceived);
   const requestOrigin =
     requestResult.request.derivationOrigin ?? requestResult.origin;
-  authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestValid);
   loginFunnel.init({ origin: requestOrigin });
   registrationFunnel.init({ origin: requestOrigin });
   authenticationV2Funnel.init({ origin: requestOrigin });
