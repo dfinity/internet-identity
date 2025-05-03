@@ -82,11 +82,11 @@
         ? "Enter account name"
         : "Create additional account"}
       onfocus={handleCreateAccountFocus}
+      minlength="1"
       class={[
-        "input not-focus:ring-surface-300-700 box-border h-15 justify-start rounded-lg py-4 ps-4 pe-16 text-left transition-none not-focus:cursor-pointer",
-        (creatingAccount || newAccountName.length > 0) &&
-          "!ring-surface-contrast-50-950 bg-surface-200-800 ring-2",
-        newAccountName.length > 0 && "font-semibold",
+        "input ring-surface-300-700 placeholder:text-surface-contrast-50-950 box-border h-15 justify-start rounded-lg py-4 ps-4 pe-16 text-left font-semibold transition-none not-focus:cursor-pointer placeholder:font-normal",
+        creatingAccount &&
+          "!ring-surface-contrast-50-950 !bg-surface-200-800 placeholder:!text-surface-700-300 ring-2",
       ]}
     />
   </div>
