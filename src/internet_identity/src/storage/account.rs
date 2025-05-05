@@ -1,5 +1,4 @@
 use candid::CandidType;
-use ic_canister_sig_creation::hash_bytes;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
@@ -9,8 +8,6 @@ use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
 };
-
-use crate::state;
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AccountReference {
@@ -66,48 +63,21 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
-    seed_from_anchor: AnchorNumber,
 }
 
 impl Account {
-    pub fn seed(&self) -> [u8; 32] {
-        let salt = state::salt();
-
-        let mut blob: Vec<u8> = vec![];
-        blob.push(salt.len() as u8);
-        blob.extend_from_slice(&salt);
-
-        let anchor_number_str = self.anchor_number.to_string();
-        let anchor_number_blob = anchor_number_str.bytes();
-        blob.push(anchor_number_blob.len() as u8);
-        blob.extend(anchor_number_blob);
-
-        blob.push(self.origin.len() as u8);
-        blob.extend(self.origin.bytes());
-
-        // If default account, we should match the original principal.
-        if self.account_number.is_some() {
-            let account_number_str = self.account_number.expect("unreachable").to_string();
-            let account_number_blob = account_number_str.bytes();
-            blob.push(account_number_blob.len() as u8);
-            blob.extend(account_number_blob);
-        }
-
-        hash_bytes(blob)
-    }
-
     pub fn new(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
+        account_number: Option<AccountNumber>,
     ) -> Account {
         Self {
-            account_number: None, // TODO: this needs to depend on pre-existing accounts
+            account_number,
             anchor_number,
             origin,
             last_used: None,
             name,
-            seed_from_anchor: anchor_number,
         }
     }
 
@@ -119,7 +89,6 @@ impl Account {
         origin: FrontendHostname,
         last_used: Option<Timestamp>,
         name: Option<String>,
-        seed_from_anchor: AnchorNumber,
     ) -> Self {
         Self {
             account_number,
@@ -127,10 +96,11 @@ impl Account {
             origin,
             last_used,
             name,
-            seed_from_anchor, // Set the private field
         }
     }
 
+    // Used in tests (for now)
+    #[allow(dead_code)]
     pub fn to_reference(&self) -> AccountReference {
         AccountReference {
             account_number: self.account_number.clone(),
@@ -138,25 +108,13 @@ impl Account {
             last_used: self.last_used.clone(),
         }
     }
-
-    pub fn to_storable(&self) -> StorableAccount {
-        StorableAccount {
-            name: self.name.clone(),
-            seed_from_anchor: self.seed_from_anchor.clone(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]
 pub struct StorableAccount {
-    pub name: Option<String>,
-    seed_from_anchor: AnchorNumber,
-}
-
-impl StorableAccount {
-    pub fn seed_from_anchor(&self) -> AnchorNumber {
-        self.seed_from_anchor
-    }
+    pub name: String,
+    // Set if this is a default account
+    pub seed_from_anchor: Option<AnchorNumber>,
 }
 
 impl Storable for StorableAccount {
@@ -219,9 +177,5 @@ impl OriginHash {
         Self {
             hash: hash_u64.to_le_bytes(),
         }
-    }
-
-    pub fn get_hash(&self) -> &[u8; 8] {
-        &self.hash
     }
 }

@@ -351,7 +351,7 @@ fn should_write_account() {
     );
 
     // 4. Create new account
-    let new_account = Account::new(anchor_number, origin.clone(), account_name.clone());
+    let new_account = Account::new(anchor_number, origin.clone(), account_name.clone(), None);
 
     // 5. Check that get_account_by_id returns None
     // Create AccountReference for lookup
@@ -373,7 +373,6 @@ fn should_write_account() {
         new_account.origin.clone(),
         new_account.last_used, // Should be None initially
         new_account.name.clone(),
-        new_account.anchor_number.clone(), // seed_from_anchor is anchor_number in new()
     );
 
     // 6. Write account using write_account
@@ -400,6 +399,47 @@ fn should_write_account() {
     for acc_ref in application_accounts.unwrap() {
         assert_eq!(acc_ref, expected_retrieved_account.to_reference());
     }
+}
+
+#[test]
+fn should_list_accounts() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define anchor number and origin
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = None;
+
+    // 2. Save anchor to stable memory
+    let anchor = storage.allocate_anchor().unwrap();
+    storage.create(anchor).unwrap();
+
+    // Look up or insert application number
+    let _app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+    // 3. Create new account
+    let new_account = Account::new(anchor_number, origin.clone(), account_name.clone(), None);
+    let expected_account_ref = new_account.to_reference();
+
+    // 4. Write account using write_account
+    storage.write_account(new_account).unwrap();
+
+    // 5. Use list_accounts to read the account and check that it's present.
+    let listed_accounts = storage.list_accounts(&anchor_number, &origin);
+
+    // 6. Assert that the list contains exactly one account and it matches the expected one
+    assert_eq!(
+        listed_accounts.len(),
+        1,
+        "Expected exactly one account to be listed"
+    );
+    assert_eq!(
+        listed_accounts[0],
+        expected_account_ref,
+        "Listed account reference does not match the written account reference"
+    );
 }
 
 fn sample_device() -> Device {

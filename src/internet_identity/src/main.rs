@@ -305,11 +305,13 @@ fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Ac
             anchor_number,
             origin.clone(),
             Some("Default Mock Account".to_string()),
+            None,
         ),
         Account::new(
             anchor_number,
             origin,
             Some("Additinal Mock Account".to_string()),
+            Some(1)
         )
     ]
 }
@@ -320,7 +322,7 @@ fn create_account(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    Ok(Account::new(anchor_number, origin, Some(name)))
+    Ok(Account::new(anchor_number, origin, Some(name), None))
 }
 
 #[update]
@@ -330,7 +332,7 @@ fn update_account(
     _account_number: Option<AccountNumber>,
     _update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    Ok(Account::new(anchor_number, origin, None))
+    Ok(Account::new(anchor_number, origin, None, None))
 }
 
 #[update]

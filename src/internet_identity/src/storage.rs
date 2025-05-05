@@ -682,7 +682,8 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    pub fn write_account(&mut self, acc: Account) -> Result<(), StorageError> {
+    pub fn write_account(&mut self, acc: Account) -> Result<Account, StorageError> {
+        // TODO: LM what if this is called with an account_number?
         let anchor_number = acc.anchor_number;
         let origin = &acc.origin;
 
@@ -694,28 +695,18 @@ impl<M: Memory + Clone> Storage<M> {
         let mut application_data = self.stable_application_memory.get(&app_num)
             .expect("Application data should exist after lookup_or_insert");
 
-        // 4. Convert Account to StorableAccount
-        let storable_acc = acc.to_storable();
-
-        // 5. Insert StorableAccount into stable memory ONLY if account_number is present
-        //    Overwrite existing entry if it exists
-        if let Some(account_number) = acc.account_number {
-            self.stable_account_memory.insert(account_number, storable_acc);
-        }
-
-
-        // 6. Manually construct StorableAccountReference
+        // 4. Manually construct StorableAccountReference
         let storable_ref = StorableAccountReference {
             account_number: acc.account_number, // Pass the Option through
             last_used: acc.last_used,
         };
 
-        // 7. Get StableAnchor
+        // 5. Get StableAnchor
         let mut stable_anchor = self.stable_anchor_memory.get(&anchor_number).ok_or_else(|| {
             StorageError::AnchorNotFound { anchor_number }
         })?;
 
-        // 8. Update application_accounts in StableAnchor
+        // 6. Update application_accounts in StableAnchor
         let app_accounts_map = stable_anchor
             .application_accounts
             .get_or_insert_with(HashMap::new);
@@ -742,7 +733,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        // 9. Update memory in case the account was created
+        // 5. Update memory in case the account was created
         if !account_exists {
             account_refs_vec.push(storable_ref);
             application_data.total_accounts += 1;
@@ -750,12 +741,35 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(app_num, application_data);
         }
 
-        // 10. Write updated StableAnchor back
+        // 6. Write updated StableAnchor back
         self.stable_anchor_memory
             .insert(anchor_number, stable_anchor);
+        
+        // 7. If it has a name, it's an unreserved account and it must be created also in the accounts memory.
+        if let Some(name) = acc.name {
+            let account_number = self.stable_account_memory.len() as AccountNumber;
+            self.stable_account_memory.insert(account_number, StorableAccount {
+                name: name.clone(),
+                seed_from_anchor: None
+            });
+            // 7.1 Return Ok
+            return Ok(Account {
+                account_number: Some(account_number),
+                anchor_number,
+                origin: acc.origin.clone(),
+                last_used: acc.last_used,
+                name: Some(name.clone()),
+            });
+        }
 
-        // 11. Return Ok
-        Ok(())
+        // 8. Return Ok
+        Ok(Account {
+            account_number: None,
+            anchor_number,
+            origin: acc.origin.clone(),
+            last_used: acc.last_used,
+            name: None,
+        })
     }
 
     #[allow(dead_code)]
@@ -770,14 +784,12 @@ impl<M: Memory + Clone> Storage<M> {
                 Some(account_number) => {
                     // Account number is present, try to read from stable memory
                     return self.stable_account_memory.get(&account_number).map(|storable_acc| {
-                        let seed = storable_acc.seed_from_anchor();
                         Account::reconstruct(
                             Some(account_number),
                             acc_ref.anchor_number,
                             application.origin.clone(),
                             acc_ref.last_used,
-                            storable_acc.name,
-                            seed,
+                            Some(storable_acc.name),
                         )
                     });
                 }
@@ -797,7 +809,6 @@ impl<M: Memory + Clone> Storage<M> {
                                     application.origin.clone(),
                                     storable_acc_ref.last_used,
                                     None,
-                                    storable_acc_ref.anchor_number,
                                 )
                             })
                     }
@@ -990,6 +1001,14 @@ impl<M: Memory + Clone> Storage<M> {
                 self.stable_anchor_memory_wrapper.size(),
             ),
             (
+                "stable_accounts".to_string(),
+                self.stable_account_memory_wrapper.size(),
+            ),
+            (
+                "stable_applications".to_string(),
+                self.stable_application_memory_wrapper.size(),
+            ),
+            (
                 "lookup_anchor_with_openid_credential".to_string(),
                 self.lookup_anchor_with_openid_credential_memory_wrapper
                     .size(),
@@ -998,6 +1017,10 @@ impl<M: Memory + Clone> Storage<M> {
                 "lookup_anchor_with_device_credential".to_string(),
                 self.lookup_anchor_with_device_credential_memory_wrapper
                     .size(),
+            ),
+            (
+                "lookup_application_with_origin".to_string(),
+                self.lookup_application_with_origin_memory_wrapper.size(),
             ),
         ])
     }
