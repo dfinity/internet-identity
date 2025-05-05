@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use storage::{account::Account, Salt, Storage};
+use storage::{Salt, Storage};
 
 mod anchor_management;
 mod archive;
@@ -300,18 +300,20 @@ fn get_delegation(
 #[query]
 fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Account> {
     vec![
-        Account::new(
+        Account {
             anchor_number,
-            origin.clone(),
-            Some("Default Mock Account".to_string()),
-            None,
-        ),
-        Account::new(
-            anchor_number,
+            origin: origin.clone(),
+            name: Some("Default Mock Account".to_string()),
+            account_number: None,
+            last_used: None,
+        },
+        Account {
+            anchor_number,  
             origin,
-            Some("Additinal Mock Account".to_string()),
-            Some(1),
-        ),
+            name: Some("Additinal Mock Account".to_string()),
+            account_number: Some(1),
+            last_used: None,
+        },
     ]
 }
 
@@ -321,7 +323,13 @@ fn create_account(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    Ok(Account::new(anchor_number, origin, Some(name), None))
+    Ok(Account {
+        anchor_number,
+        origin,
+        name: Some(name),
+        account_number: None,
+        last_used: None,
+    })
 }
 
 #[update]
@@ -331,7 +339,13 @@ fn update_account(
     _account_number: Option<AccountNumber>,
     _update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    Ok(Account::new(anchor_number, origin, None, None))
+    Ok(Account {
+        anchor_number,
+        origin,
+        name: None,
+        account_number: None,
+        last_used: None,
+    })
 }
 
 #[update]

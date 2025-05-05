@@ -335,7 +335,6 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
-    seed_from_anchor: AnchorNumber,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
