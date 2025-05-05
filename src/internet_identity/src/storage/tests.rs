@@ -351,7 +351,8 @@ fn should_write_account() {
     );
 
     // 4. Create new account
-    let new_account = InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
+    let new_account =
+        InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
 
     // 5. Check that read_account returns None
     // Create AccountReference for lookup
@@ -419,7 +420,8 @@ fn should_list_accounts() {
     let _app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
 
     // 3. Create new account
-    let new_account = InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
+    let new_account =
+        InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
     let expected_account_ref = new_account.to_reference();
 
     // 4. Write account using write_account

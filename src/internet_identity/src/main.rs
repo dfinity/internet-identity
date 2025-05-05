@@ -308,7 +308,7 @@ fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Ac
             last_used: None,
         },
         Account {
-            anchor_number,  
+            anchor_number,
             origin,
             name: Some("Additinal Mock Account".to_string()),
             account_number: Some(1),

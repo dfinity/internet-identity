@@ -103,9 +103,7 @@ use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{
-    StorableAccount, InternalAccountReference, Application, OriginHash,
-};
+use crate::storage::account::{Application, InternalAccountReference, OriginHash, StorableAccount};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
