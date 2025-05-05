@@ -197,8 +197,7 @@
 
   --rc-overlay-backdrop: var(--vc-night);
 
-  --rc-text: var(--rc-dark);
-  --rc-text--weak: var(--vc-night);
+  --rc-text: var(--rc-light);
   --rc-text--disabled: var(--vc-shadow);
 
   --rc-text-interaction: var(--vc-brand-purple);
@@ -3198,7 +3197,7 @@ a.c-action-list__item {
   z-index: var(--z-tooltip);
   min-width: 100%;
   width: max-content;
-  background-color: var(--rc-background);
+  background-color: var(--nvc-surface-light);
   border-radius: var(--border-radius);
   margin-top: calc(-1 * var(--rs-line));
   text-align: right;
@@ -3235,7 +3234,8 @@ a.c-action-list__item {
 
 .c-dropdown__item {
   display: block;
-  color: var(--rc-text);
+  /* Dropdown has a light background */
+  color: var(--rc-dark);
   text-decoration: none;
 }
 
@@ -3245,7 +3245,8 @@ a.c-action-list__item {
 
 .c-dropdown__link {
   display: block;
-  color: var(--rc-text);
+  /* Dropdown has a light background */
+  color: var(--rc-dark);
   font-size: 0.8em;
   text-decoration: none;
   cursor: pointer;
