@@ -353,7 +353,7 @@ fn should_write_account() {
     // 4. Create new account
     let new_account = Account::new(anchor_number, origin.clone(), account_name.clone(), None);
 
-    // 5. Check that get_account_by_id returns None
+    // 5. Check that read_account returns None
     // Create AccountReference for lookup
     let account_ref_lookup = AccountReference {
         account_number: None, // Default account ID
@@ -366,7 +366,7 @@ fn should_write_account() {
     );
 
     // Reconstruct the expected account as it would be retrieved (including potentially updated last_used)
-    // Account::new sets last_used to None. Assuming get_account_by_id does not modify it on read for this test.
+    // Account::new sets last_used to None. Assuming read_account does not modify it on read for this test.
     let expected_retrieved_account = Account::reconstruct(
         new_account.account_number, // None for default account
         new_account.anchor_number,
@@ -378,7 +378,7 @@ fn should_write_account() {
     // 6. Write account using write_account
     storage.write_account(new_account).unwrap();
 
-    // 7. Use get_account_by_id to read the account and check that it's present.
+    // 7. Use read_account to read the account and check that it's present.
     let retrieved_account = storage
         .read_account(&account_ref_lookup, &origin)
         .expect("Account should exist after writing");
