@@ -145,7 +145,7 @@ impl From<Anchor> for (StorableAnchor, StableAnchor) {
                         .iter()
                         .map(|(app_num, acc_ref_opt_vec)| {
                             (
-                                app_num.clone(),
+                                *app_num,
                                 acc_ref_opt_vec
                                     .iter()
                                     .map(|acc_ref| acc_ref.to_storable())
@@ -182,7 +182,7 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
                         .iter()
                         .map(|(app_num, acc_ref_vec)| {
                             (
-                                app_num.clone(),
+                                *app_num,
                                 acc_ref_vec
                                     .iter()
                                     .map(|acc_ref| (&anchor_number, acc_ref).into())

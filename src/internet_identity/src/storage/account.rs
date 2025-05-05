@@ -32,7 +32,7 @@ impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
 
         Self {
             account_number: storable_acc_ref.account_number,
-            anchor_number: anchor_number.clone(),
+            anchor_number: *anchor_number,
             last_used: storable_acc_ref.last_used,
         }
     }
@@ -103,9 +103,9 @@ impl Account {
     #[allow(dead_code)]
     pub fn to_reference(&self) -> AccountReference {
         AccountReference {
-            account_number: self.account_number.clone(),
-            anchor_number: self.anchor_number.clone(),
-            last_used: self.last_used.clone(),
+            account_number: self.account_number,
+            anchor_number: self.anchor_number,
+            last_used: self.last_used,
         }
     }
 }
