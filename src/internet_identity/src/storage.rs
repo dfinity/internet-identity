@@ -779,23 +779,21 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
             // 7.1 Return Ok
-            return Ok(InternalAccount {
-                account_number: Some(account_number),
+            return Ok(InternalAccount::new(
                 anchor_number,
-                origin: acc.origin.clone(),
-                last_used: acc.last_used,
-                name: Some(name.clone()),
-            });
+                origin.clone(),
+                Some(name.clone()),
+                Some(account_number),
+            ));
         }
 
         // 8. Return Ok
-        Ok(InternalAccount {
-            account_number: None,
+        Ok(InternalAccount::new(
             anchor_number,
-            origin: acc.origin.clone(),
-            last_used: acc.last_used,
-            name: None,
-        })
+            origin.clone(),
+            None,
+            None,
+        ))
     }
 
     #[allow(dead_code)]
