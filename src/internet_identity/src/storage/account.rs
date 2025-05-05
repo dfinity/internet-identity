@@ -10,13 +10,13 @@ use std::{
 };
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct AccountReference {
+pub struct InternalAccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub anchor_number: AnchorNumber,
     pub last_used: Option<Timestamp>,
 }
 
-impl AccountReference {
+impl InternalAccountReference {
     pub fn to_storable(&self) -> StorableAccountReference {
         StorableAccountReference {
             account_number: self.account_number,
@@ -25,7 +25,7 @@ impl AccountReference {
     }
 }
 
-impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
+impl From<(&AnchorNumber, &StorableAccountReference)> for InternalAccountReference {
     fn from(value: (&AnchorNumber, &StorableAccountReference)) -> Self {
         let anchor_number = value.0;
         let storable_acc_ref = value.1;
@@ -57,21 +57,21 @@ impl Storable for StorableAccountReference {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct Account {
-    pub account_number: Option<AccountNumber>, // None is the unreserved default account
+pub struct InternalAccount {
+    pub account_number: Option<AccountNumber>, // None is unreserved default account
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
 }
 
-impl Account {
+impl InternalAccount {
     pub fn new(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
         account_number: Option<AccountNumber>,
-    ) -> Account {
+    ) -> InternalAccount {
         Self {
             account_number,
             anchor_number,
@@ -101,8 +101,8 @@ impl Account {
 
     // Used in tests (for now)
     #[allow(dead_code)]
-    pub fn to_reference(&self) -> AccountReference {
-        AccountReference {
+    pub fn to_reference(&self) -> InternalAccountReference {
+        InternalAccountReference {
             account_number: self.account_number,
             anchor_number: self.anchor_number,
             last_used: self.last_used,

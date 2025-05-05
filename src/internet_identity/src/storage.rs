@@ -104,7 +104,7 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
-    Account, AccountReference, Application, OriginHash, StorableAccount,
+    StorableAccount, InternalAccountReference, Application, OriginHash, StorableAccount,
 };
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
@@ -696,7 +696,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///   - Returns the Account with the new AccountNumber.
     /// - Otherwise (reserved account): Returns the Account with `account_number = None`.
     #[allow(dead_code)]
-    pub fn write_account(&mut self, acc: Account) -> Result<Account, StorageError> {
+    pub fn write_account(&mut self, acc: StorableAccount) -> Result<StorableAccount, StorageError> {
         // TODO: LM what if this is called with an account_number?
         // Do we want to fail if the account already exists within the anchor or substitute it?
 
@@ -781,7 +781,7 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
             // 7.1 Return Ok
-            return Ok(Account {
+            return Ok(StorableAccount {
                 account_number: Some(account_number),
                 anchor_number,
                 origin: acc.origin.clone(),
@@ -791,7 +791,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // 8. Return Ok
-        Ok(Account {
+        Ok(StorableAccount {
             account_number: None,
             anchor_number,
             origin: acc.origin.clone(),
@@ -808,9 +808,9 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn read_account(
         &self,
-        acc_ref: &AccountReference,
+        acc_ref: &InternalAccountReference,
         origin: &FrontendHostname,
-    ) -> Option<Account> {
+    ) -> Option<StorableAccount> {
         if let Some(application) = self.lookup_application_with_origin(origin) {
             match acc_ref.account_number {
                 Some(account_number) => {
@@ -819,7 +819,7 @@ impl<M: Memory + Clone> Storage<M> {
                         .stable_account_memory
                         .get(&account_number)
                         .map(|storable_acc| {
-                            Account::reconstruct(
+                            StorableAccount::reconstruct(
                                 Some(account_number),
                                 acc_ref.anchor_number,
                                 application.origin.clone(),
@@ -838,7 +838,7 @@ impl<M: Memory + Clone> Storage<M> {
                             .iter()
                             .find(|storable_acc_ref| storable_acc_ref.account_number.is_none())
                             .map(|storable_acc_ref| {
-                                Account::reconstruct(
+                                StorableAccount::reconstruct(
                                     None,
                                     storable_acc_ref.anchor_number,
                                     application.origin.clone(),
@@ -859,7 +859,7 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: &AnchorNumber,
         origin: &FrontendHostname,
-    ) -> Vec<AccountReference> {
+    ) -> Vec<InternalAccountReference> {
         let application_number = self
             .lookup_application_number_with_origin(origin)
             .expect("Could not find origin!"); //TODO: handle better

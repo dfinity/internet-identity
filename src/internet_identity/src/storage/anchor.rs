@@ -1,6 +1,6 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::storage::account::AccountReference;
+use crate::storage::account::InternalAccountReference;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -25,7 +25,7 @@ pub struct Anchor {
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
     name: Option<String>,
-    application_accounts: Option<HashMap<ApplicationNumber, Vec<AccountReference>>>,
+    application_accounts: Option<HashMap<ApplicationNumber, Vec<InternalAccountReference>>>,
 }
 
 impl Device {
@@ -217,7 +217,7 @@ impl Anchor {
     pub fn application_accounts(
         &self,
         application_number: ApplicationNumber,
-    ) -> Option<Vec<AccountReference>> {
+    ) -> Option<Vec<InternalAccountReference>> {
         self.application_accounts
             .as_ref()
             .and_then(|accounts_map| accounts_map.get(&application_number).cloned())
