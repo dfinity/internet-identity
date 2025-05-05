@@ -681,9 +681,29 @@ impl<M: Memory + Clone> Storage<M> {
             .and_then(|application_number| self.lookup_application_with_application_number(&application_number))
     }
 
+    /// Writes or updates an Account in stable storage, linking it to an anchor and application (origin).
+    /// - Looks up or creates an Application entry based on the account's origin.
+    /// - Retrieves the StableAnchor associated with the account's anchor_number.
+    /// - Checks if an AccountReference already exists for this anchor/app pair.
+    ///   - If yes: Updates the `last_used` timestamp.
+    ///   - If no: Adds a new AccountReference and increments the application's `total_accounts`.
+    /// - Saves the updated StableAnchor and Application data.
+    /// - If the account has a `name` (unreserved account):
+    ///   - Creates a new permanent StorableAccount entry.
+    ///   - Assigns a globally unique AccountNumber.
+    ///   - Returns the Account with the new AccountNumber.
+    /// - Otherwise (reserved account): Returns the Account with `account_number = None`.
     #[allow(dead_code)]
     pub fn write_account(&mut self, acc: Account) -> Result<Account, StorageError> {
         // TODO: LM what if this is called with an account_number?
+        // Do we want to fail if the account already exists within the anchor or substitute it?
+
+        // How about expecing the following instead of the whole Account
+        // - anchor_number
+        // - origin
+        // - name: Option<String>
+        // This way we don't have the questions with account_number. It's only generated here.
+        
         let anchor_number = acc.anchor_number;
         let origin = &acc.origin;
 
