@@ -331,7 +331,6 @@ pub struct AccountReference {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Account {
     pub account_number: Option<AccountNumber>, // None is the unreserved default account
-    pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
