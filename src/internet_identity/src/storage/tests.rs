@@ -3,7 +3,7 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
-use crate::storage::account::{StorableAccount, InternalAccountReference, Application};
+use crate::storage::account::{Application, InternalAccount, InternalAccountReference};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, StorageError, MAX_ENTRIES};
 use crate::Storage;
@@ -351,7 +351,7 @@ fn should_write_account() {
     );
 
     // 4. Create new account
-    let new_account = StorableAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
+    let new_account = InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
 
     // 5. Check that read_account returns None
     // Create AccountReference for lookup
@@ -367,7 +367,7 @@ fn should_write_account() {
 
     // Reconstruct the expected account as it would be retrieved (including potentially updated last_used)
     // Account::new sets last_used to None. Assuming read_account does not modify it on read for this test.
-    let expected_retrieved_account = StorableAccount::reconstruct(
+    let expected_retrieved_account = InternalAccount::reconstruct(
         new_account.account_number, // None for default account
         new_account.anchor_number,
         new_account.origin.clone(),
@@ -419,7 +419,7 @@ fn should_list_accounts() {
     let _app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
 
     // 3. Create new account
-    let new_account = StorableAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
+    let new_account = InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
     let expected_account_ref = new_account.to_reference();
 
     // 4. Write account using write_account

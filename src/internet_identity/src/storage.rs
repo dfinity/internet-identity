@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::StorableAccountReference;
+use account::{InternalAccount, StorableAccountReference};
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -104,7 +104,7 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
-    StorableAccount, InternalAccountReference, Application, OriginHash, StorableAccount,
+    StorableAccount, InternalAccountReference, Application, OriginHash,
 };
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
@@ -696,7 +696,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///   - Returns the Account with the new AccountNumber.
     /// - Otherwise (reserved account): Returns the Account with `account_number = None`.
     #[allow(dead_code)]
-    pub fn write_account(&mut self, acc: StorableAccount) -> Result<StorableAccount, StorageError> {
+    pub fn write_account(&mut self, acc: InternalAccount) -> Result<InternalAccount, StorageError> {
         // TODO: LM what if this is called with an account_number?
         // Do we want to fail if the account already exists within the anchor or substitute it?
 
@@ -781,7 +781,7 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
             // 7.1 Return Ok
-            return Ok(StorableAccount {
+            return Ok(InternalAccount {
                 account_number: Some(account_number),
                 anchor_number,
                 origin: acc.origin.clone(),
@@ -791,7 +791,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // 8. Return Ok
-        Ok(StorableAccount {
+        Ok(InternalAccount {
             account_number: None,
             anchor_number,
             origin: acc.origin.clone(),
@@ -801,16 +801,11 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    pub fn get_account_by_id(&self, id: AccountNumber) -> Option<StorableAccount> {
-        self.stable_account_memory.get(&id)
-    }
-
-    #[allow(dead_code)]
     pub fn read_account(
         &self,
         acc_ref: &InternalAccountReference,
         origin: &FrontendHostname,
-    ) -> Option<StorableAccount> {
+    ) -> Option<InternalAccount> {
         if let Some(application) = self.lookup_application_with_origin(origin) {
             match acc_ref.account_number {
                 Some(account_number) => {
@@ -819,7 +814,7 @@ impl<M: Memory + Clone> Storage<M> {
                         .stable_account_memory
                         .get(&account_number)
                         .map(|storable_acc| {
-                            StorableAccount::reconstruct(
+                            InternalAccount::reconstruct(
                                 Some(account_number),
                                 acc_ref.anchor_number,
                                 application.origin.clone(),
@@ -838,7 +833,7 @@ impl<M: Memory + Clone> Storage<M> {
                             .iter()
                             .find(|storable_acc_ref| storable_acc_ref.account_number.is_none())
                             .map(|storable_acc_ref| {
-                                StorableAccount::reconstruct(
+                                InternalAccount::reconstruct(
                                     None,
                                     storable_acc_ref.anchor_number,
                                     application.origin.clone(),
