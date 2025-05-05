@@ -2,7 +2,7 @@ use candid::CandidType;
 use ic_canister_sig_creation::hash_bytes;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, FrontendHostname, Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
 };
 use serde::Deserialize;
 use std::{
@@ -10,15 +10,12 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use crate::state::{self, storage_borrow, storage_borrow_mut};
-
-use super::{stable_anchor::StableAnchor, storable_anchor::StorableAnchor};
+use crate::state;
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is unreserved default account
     pub anchor_number: AnchorNumber,
-    pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
 }
 
@@ -27,9 +24,6 @@ impl AccountReference {
         StorableAccountReference {
             account_number: self.account_number,
             last_used: self.last_used,
-            application_number: storage_borrow_mut(|storage| {
-                storage.lookup_or_insert_application_number_with_origin(&self.origin)
-            }),
         }
     }
 }
@@ -42,13 +36,6 @@ impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
         Self {
             account_number: storable_acc_ref.account_number,
             anchor_number: anchor_number.clone(),
-            origin: storage_borrow(|storage| {
-                storage.lookup_application_with_application_number(
-                    &storable_acc_ref.application_number,
-                )
-            })
-            .and_then(|app| Some(app.origin))
-            .expect("Help! Could not find an origin!"), // XXX: This might be handled more elegantly at some point.
             last_used: storable_acc_ref.last_used,
         }
     }
@@ -56,10 +43,8 @@ impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
 
 #[derive(Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq)]
 pub struct StorableAccountReference {
-    account_number: Option<AccountNumber>,
-    last_used: Option<Timestamp>,
-    // XXX: I know the design doc doesn't include this but not having it makes conversion rather tedious (feel free to refactor)
-    application_number: ApplicationNumber,
+    pub account_number: Option<AccountNumber>,
+    pub last_used: Option<Timestamp>,
 }
 
 impl Storable for StorableAccountReference {
@@ -125,11 +110,31 @@ impl Account {
             seed_from_anchor: anchor_number,
         }
     }
+
+    /// Reconstructs an Account from its constituent parts, including the seed.
+    /// Used when reading from storage where all fields are known.
+    pub fn reconstruct(
+        account_number: Option<AccountNumber>,
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        last_used: Option<Timestamp>,
+        name: Option<String>,
+        seed_from_anchor: AnchorNumber,
+    ) -> Self {
+        Self {
+            account_number,
+            anchor_number,
+            origin,
+            last_used,
+            name,
+            seed_from_anchor, // Set the private field
+        }
+    }
+
     pub fn to_reference(&self) -> AccountReference {
         AccountReference {
             account_number: self.account_number.clone(),
             anchor_number: self.anchor_number.clone(),
-            origin: self.origin.clone(),
             last_used: self.last_used.clone(),
         }
     }
@@ -140,23 +145,6 @@ impl Account {
             seed_from_anchor: self.seed_from_anchor.clone(),
         }
     }
-
-    // pub fn from_storable_and_anchor(
-    //     storable_acc: StorableAccount,
-    //     anchor_number: AnchorNumber,
-    // ) -> Self {
-    //     let storable_ref = storage_borrow(|storage| {
-    //         storage.
-    //     });
-    //     Self {
-    //         account_number: (),
-    //         anchor_number: (),
-    //         origin: (),
-    //         last_used: (),
-    //         name: storable_acc.name,
-    //         seed_from_anchor: storable_acc.seed_from_anchor,
-    //     }
-    // }
 }
 
 #[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]

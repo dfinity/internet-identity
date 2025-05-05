@@ -25,7 +25,7 @@ pub struct Anchor {
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
     name: Option<String>,
-    application_accounts: Option<HashMap<ApplicationNumber, Vec<Option<AccountReference>>>>,
+    application_accounts: Option<HashMap<ApplicationNumber, Vec<AccountReference>>>,
 }
 
 impl Device {
@@ -148,11 +148,7 @@ impl From<Anchor> for (StorableAnchor, StableAnchor) {
                                 app_num.clone(),
                                 acc_ref_opt_vec
                                     .iter()
-                                    .map(|maybe_acc_ref| {
-                                        maybe_acc_ref
-                                            .as_ref()
-                                            .and_then(|acc_ref| Some(acc_ref.to_storable()))
-                                    })
+                                    .map(|acc_ref| acc_ref.to_storable())
                                     .collect(),
                             )
                         })
@@ -184,16 +180,12 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
                 anchor.application_accounts.map(|accounts_map| {
                     accounts_map
                         .iter()
-                        .map(|(app_num, acc_ref_opt_vec)| {
+                        .map(|(app_num, acc_ref_vec)| {
                             (
                                 app_num.clone(),
-                                acc_ref_opt_vec
+                                acc_ref_vec
                                     .iter()
-                                    .map(|maybe_acc_ref| {
-                                        maybe_acc_ref.as_ref().and_then(|acc_ref| {
-                                            Some((&anchor_number, acc_ref).into())
-                                        })
-                                    })
+                                    .map(|acc_ref| (&anchor_number, acc_ref).into())
                                     .collect(),
                             )
                         })
@@ -220,6 +212,10 @@ impl Anchor {
 
     pub fn anchor_number(&self) -> AnchorNumber {
         self.anchor_number
+    }
+
+    pub fn application_accounts(&self, application_number: ApplicationNumber) -> Option<Vec<AccountReference>> {
+        self.application_accounts.as_ref().and_then(|accounts_map| accounts_map.get(&application_number).cloned())
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {

@@ -79,8 +79,10 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
+use account::StorableAccountReference;
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
+use storable_anchor_number_list::StorableAnchorNumberList;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -109,7 +111,6 @@ use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
-use crate::storage::storable_anchor_number_list::StorableAnchorNumberList;
 use crate::storage::storable_credential_id::StorableCredentialId;
 use crate::storage::storable_openid_credential_key::StorableOpenIdCredentialKey;
 use crate::storage::storable_persistent_state::StorablePersistentState;
@@ -675,29 +676,139 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_application_memory.get(application_number)
     }
 
-    pub fn create_account(&self, acc: Account) {}
+    pub fn lookup_application_with_origin(&self, origin: &FrontendHostname) -> Option<Application> {
+        self.lookup_application_number_with_origin(origin)
+            .and_then(|application_number| self.lookup_application_with_application_number(&application_number))
+    }
 
+    #[allow(dead_code)]
+    pub fn write_account(&mut self, acc: Account) -> Result<(), StorageError> {
+        let anchor_number = acc.anchor_number;
+        let origin = &acc.origin;
+
+        // 1. & 2. Get ApplicationNumber, creating Application entry if new
+        let app_num = self.lookup_or_insert_application_number_with_origin(origin);
+
+        // 3. Get existing application data to check if account is new for this app
+        //    lookup_or_insert... already ensures the entry exists in stable_application_memory
+        let mut application_data = self.stable_application_memory.get(&app_num)
+            .expect("Application data should exist after lookup_or_insert");
+
+        // 4. Convert Account to StorableAccount
+        let storable_acc = acc.to_storable();
+
+        // 5. Insert StorableAccount into stable memory ONLY if account_number is present
+        //    Overwrite existing entry if it exists
+        if let Some(account_number) = acc.account_number {
+            self.stable_account_memory.insert(account_number, storable_acc);
+        }
+
+
+        // 6. Manually construct StorableAccountReference
+        let storable_ref = StorableAccountReference {
+            account_number: acc.account_number, // Pass the Option through
+            last_used: acc.last_used,
+        };
+
+        // 7. Get StableAnchor
+        let mut stable_anchor = self.stable_anchor_memory.get(&anchor_number).ok_or_else(|| {
+            StorageError::AnchorNotFound { anchor_number }
+        })?;
+
+        // 8. Update application_accounts in StableAnchor
+        let app_accounts_map = stable_anchor
+            .application_accounts
+            .get_or_insert_with(HashMap::new);
+        let account_refs_vec = app_accounts_map.entry(app_num).or_insert_with(Vec::new);
+
+        let mut account_exists = false;
+        // Iterate through existing references first
+        for existing_ref in account_refs_vec.iter_mut() {
+            match (existing_ref.account_number, acc.account_number) {
+                // Case 1: Both have account numbers and they match
+                (Some(existing_num), Some(new_num)) if existing_num == new_num => {
+                    *existing_ref = storable_ref.clone();
+                    account_exists = true;
+                    break;
+                }
+                // Case 2: Both lack account numbers (match for the default/unreserved account)
+                (None, None) => {
+                    *existing_ref = storable_ref.clone();
+                    account_exists = true;
+                    break;
+                }
+                // Other cases (e.g., one has number, other doesn't, or numbers don't match) are not considered matches
+                _ => {},
+            }
+        }
+
+        // 9. Update memory in case the account was created
+        if !account_exists {
+            account_refs_vec.push(storable_ref);
+            application_data.total_accounts += 1;
+            self.stable_application_memory
+                .insert(app_num, application_data);
+        }
+
+        // 10. Write updated StableAnchor back
+        self.stable_anchor_memory
+            .insert(anchor_number, stable_anchor);
+
+        // 11. Return Ok
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     pub fn get_account_by_id(&self, id: AccountNumber) -> Option<StorableAccount> {
         self.stable_account_memory.get(&id)
     }
 
-    pub fn read_account(&self, acc_ref: AccountReference) -> Option<Account> {
-        self.lookup_application_number_with_origin(&acc_ref.origin)
-            .and_then(|num| self.stable_account_memory.get(&num))
-            .and_then(|storable_acc| {
-                Some(Account::new(
-                    acc_ref.anchor_number,
-                    acc_ref.origin,
-                    storable_acc.name,
-                ))
-                //TODO: this is incorrect still!
-                //TODO: last_used, account_number, seed_from_anchor are default here!
-                todo!()
-            })
+    #[allow(dead_code)]
+    pub fn read_account(&self, acc_ref: &AccountReference, origin: &FrontendHostname) -> Option<Account> {
+        if let Some(application) = self.lookup_application_with_origin(origin) {
+            match acc_ref.account_number {
+                Some(account_number) => {
+                    // Account number is present, try to read from stable memory
+                    return self.stable_account_memory.get(&account_number).map(|storable_acc| {
+                        let seed = storable_acc.seed_from_anchor();
+                        Account::reconstruct(
+                            Some(account_number),
+                            acc_ref.anchor_number,
+                            application.origin.clone(),
+                            acc_ref.last_used,
+                            storable_acc.name,
+                            seed,
+                        )
+                    });
+                }
+                None => {
+                    let anchor = self.read(acc_ref.anchor_number).unwrap();
+                    // TODO LM: Improve this part by looking up at the same time the application and the number
+                    let application_number = self.lookup_application_number_with_origin(origin).unwrap();
+                    if let Some(accounts) = anchor.application_accounts(application_number) {
+                        return accounts
+                            .iter()
+                            .find(|storable_acc_ref| {
+                                storable_acc_ref.account_number.is_none()
+                            }).map(|storable_acc_ref| {
+                                Account::reconstruct(
+                                    None,
+                                    storable_acc_ref.anchor_number,
+                                    application.origin.clone(),
+                                    storable_acc_ref.last_used,
+                                    None,
+                                    storable_acc_ref.anchor_number,
+                                )
+                            })
+                    }
+                    return None;
+                }
+            }
+        }
+        None
     }
 
-    pub fn update_account(&self) {}
-
+    #[allow(dead_code)]
     pub fn list_accounts(
         &self,
         anchor_number: &AnchorNumber,
@@ -714,13 +825,8 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|maybe_storable_acc_ref_vec| {
                 maybe_storable_acc_ref_vec
                     .iter()
-                    .map(|maybe_storable_acc_ref| {
-                        maybe_storable_acc_ref.as_ref().and_then(|storable_acc_ref| {
-                            Some((anchor_number, storable_acc_ref).into())
-                        })
-                        .expect("No Storable Accounr Reference here!")
-                    })
-                    .collect::<Vec<AccountReference>>()
+                    .map(|storable_acc_ref| (anchor_number, storable_acc_ref).into())
+                    .collect()
             })
             .expect("No AccountReferences!")
     }
@@ -910,6 +1016,9 @@ pub enum StorageError {
         space_required: u64,
         space_available: u64,
     },
+    AnchorNotFound {
+        anchor_number: AnchorNumber,
+    },
 }
 
 impl fmt::Display for StorageError {
@@ -938,6 +1047,9 @@ impl fmt::Display for StorageError {
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
             ),
+            Self::AnchorNotFound { anchor_number } => { 
+                write!(f, "StableAnchor not found for anchor number {}", anchor_number)
+            }
         }
     }
 }

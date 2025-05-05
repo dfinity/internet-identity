@@ -3,13 +3,14 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
+use crate::storage::account::{Account, AccountReference, Application};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, StorageError, MAX_ENTRIES};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, DeviceProtection, FrontendHostname, KeyType, Purpose,
+    AnchorNumber, ArchiveConfig, DeviceProtection, FrontendHostname, KeyType, Purpose
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -47,7 +48,7 @@ fn should_serialize_header_v9() {
 fn should_recover_header_from_memory_v9() {
     let memory = VectorMemory::default();
     memory.grow(1);
-    memory.write(0, &hex::decode("494943090500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000000").unwrap());
+    memory.write(0, &hex::decode("494943090500000040e2010000000000f1fb090000000000000843434343434343434343434343434343434343434343434343434343434343430002000000000000000000000000000000000000000000000").unwrap());
 
     let storage = Storage::from_memory(memory);
     assert_eq!(storage.assigned_anchor_number_range(), (123456, 654321));
@@ -316,6 +317,91 @@ fn should_not_overwrite_device_credential_lookup() {
     );
 }
 
+#[test]
+fn should_write_account() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define anchor number and origin
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = None;
+
+    // 2. Save anchor to stable memory
+    let anchor = storage.allocate_anchor().unwrap();
+
+    storage.create(anchor).unwrap();
+
+    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    let app = Application {
+        origin: origin.to_string(),
+        total_accounts: 0u64,
+    };
+    assert_eq!(
+        storage.lookup_application_with_application_number(&app_num),
+        Some(app),
+    );
+
+    // 3. Read anchor and check that application_accounts is empty
+    let read_anchor_1 = storage.read(anchor_number).unwrap();
+    assert!(
+        read_anchor_1.application_accounts(app_num).is_none(),
+        "Initial anchor should have no accounts"
+    );
+
+    // 4. Create new account
+    let new_account = Account::new(anchor_number, origin.clone(), account_name.clone());
+
+    // 5. Check that get_account_by_id returns None
+    // Create AccountReference for lookup
+    let account_ref_lookup = AccountReference {
+        account_number: None, // Default account ID
+        anchor_number,
+        last_used: None, // Not relevant for lookup by ID
+    };
+    assert!(
+        storage.read_account(&account_ref_lookup, &origin).is_none(),
+        "Account should not exist before writing"
+    );
+
+    // Reconstruct the expected account as it would be retrieved (including potentially updated last_used)
+    // Account::new sets last_used to None. Assuming get_account_by_id does not modify it on read for this test.
+    let expected_retrieved_account = Account::reconstruct(
+        new_account.account_number, // None for default account
+        new_account.anchor_number,
+        new_account.origin.clone(),
+        new_account.last_used, // Should be None initially
+        new_account.name.clone(),
+        new_account.anchor_number.clone(), // seed_from_anchor is anchor_number in new()
+    );
+
+    // 6. Write account using write_account
+    storage.write_account(new_account).unwrap();
+
+    // 7. Use get_account_by_id to read the account and check that it's present.
+    let retrieved_account = storage
+        .read_account(&account_ref_lookup, &origin)
+        .expect("Account should exist after writing");
+
+    assert_eq!(
+        retrieved_account,
+        expected_retrieved_account,
+        "Retrieved account does not match written account"
+    );
+
+    // 8. Read anchor and check that the new account is present in application_accounts
+    let read_anchor_2 = storage.read(anchor_number).unwrap();
+    let application_accounts = read_anchor_2.application_accounts(app_num);
+    assert!(
+        application_accounts.is_some(),
+        "Anchor should have accounts after writing"
+    );
+    for acc_ref in application_accounts.unwrap() {
+        assert_eq!(acc_ref, expected_retrieved_account.to_reference());
+    }
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),
@@ -339,6 +425,7 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         metadata: HashMap::default(),
     }
 }
+
 fn sample_persistent_state() -> PersistentState {
     PersistentState {
         archive_state: ArchiveState::Created {

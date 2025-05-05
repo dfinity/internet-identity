@@ -9,12 +9,12 @@ use std::collections::HashMap;
 
 use super::account::StorableAccountReference;
 
-#[derive(CandidType, Deserialize, Clone)]
+#[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct StableAnchor {
     pub name: Option<String>,
     pub openid_credentials: Vec<OpenIdCredential>,
     pub application_accounts:
-        Option<HashMap<ApplicationNumber, Vec<Option<StorableAccountReference>>>>,
+        Option<HashMap<ApplicationNumber, Vec<StorableAccountReference>>>,
 }
 
 impl Storable for StableAnchor {
