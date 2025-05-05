@@ -13,8 +13,7 @@ use super::account::StorableAccountReference;
 pub struct StableAnchor {
     pub name: Option<String>,
     pub openid_credentials: Vec<OpenIdCredential>,
-    pub application_accounts:
-        Option<HashMap<ApplicationNumber, Vec<StorableAccountReference>>>,
+    pub application_accounts: Option<HashMap<ApplicationNumber, Vec<StorableAccountReference>>>,
 }
 
 impl Storable for StableAnchor {

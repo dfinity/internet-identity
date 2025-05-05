@@ -214,8 +214,13 @@ impl Anchor {
         self.anchor_number
     }
 
-    pub fn application_accounts(&self, application_number: ApplicationNumber) -> Option<Vec<AccountReference>> {
-        self.application_accounts.as_ref().and_then(|accounts_map| accounts_map.get(&application_number).cloned())
+    pub fn application_accounts(
+        &self,
+        application_number: ApplicationNumber,
+    ) -> Option<Vec<AccountReference>> {
+        self.application_accounts
+            .as_ref()
+            .and_then(|accounts_map| accounts_map.get(&application_number).cloned())
     }
 
     pub fn add_device(&mut self, device: Device) -> Result<(), AnchorError> {

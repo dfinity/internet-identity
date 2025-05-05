@@ -10,7 +10,7 @@ use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ArchiveConfig, DeviceProtection, FrontendHostname, KeyType, Purpose
+    AnchorNumber, ArchiveConfig, DeviceProtection, FrontendHostname, KeyType, Purpose,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -384,8 +384,7 @@ fn should_write_account() {
         .expect("Account should exist after writing");
 
     assert_eq!(
-        retrieved_account,
-        expected_retrieved_account,
+        retrieved_account, expected_retrieved_account,
         "Retrieved account does not match written account"
     );
 
@@ -436,8 +435,7 @@ fn should_list_accounts() {
         "Expected exactly one account to be listed"
     );
     assert_eq!(
-        listed_accounts[0],
-        expected_account_ref,
+        listed_accounts[0], expected_account_ref,
         "Listed account reference does not match the written account reference"
     );
 }
