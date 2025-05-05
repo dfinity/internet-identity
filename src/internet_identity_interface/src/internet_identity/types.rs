@@ -322,7 +322,7 @@ pub struct DeviceKeyWithAnchor {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AccountReference {
-    pub account_number: Option<AccountNumber>, // None is unreserved default account
+    pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
@@ -330,7 +330,7 @@ pub struct AccountReference {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Account {
-    pub account_number: Option<AccountNumber>, // None is unreserved default account
+    pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,

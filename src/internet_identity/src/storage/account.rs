@@ -11,7 +11,7 @@ use std::{
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AccountReference {
-    pub account_number: Option<AccountNumber>, // None is unreserved default account
+    pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub anchor_number: AnchorNumber,
     pub last_used: Option<Timestamp>,
 }
@@ -58,7 +58,7 @@ impl Storable for StorableAccountReference {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct Account {
-    pub account_number: Option<AccountNumber>, // None is unreserved default account
+    pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
@@ -81,7 +81,7 @@ impl Account {
         }
     }
 
-    /// Reconstructs an Account from its constituent parts, including the seed.
+    /// Reconstructs an Account from its constituent parts.
     /// Used when reading from storage where all fields are known.
     pub fn reconstruct(
         account_number: Option<AccountNumber>,
