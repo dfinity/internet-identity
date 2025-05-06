@@ -37,6 +37,10 @@ export default defineConfig(({ command, mode }): UserConfig => {
           manualChunks: (id) => {
             const folder = dirname(id);
 
+            if (folder.includes("tailwind")) {
+              return "tailwind";
+            }
+
             if (
               ["@sveltejs", "svelte"].find((lib) => folder.includes(lib)) ===
                 undefined &&
