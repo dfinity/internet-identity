@@ -5,7 +5,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import path from "path";
+import { dirname } from "node:path";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -33,6 +33,21 @@ export default defineConfig(({ command, mode }): UserConfig => {
       rollupOptions: {
         // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
+        output: {
+          manualChunks: (id) => {
+            const folder = dirname(id);
+
+            if (
+              ["@sveltejs", "svelte"].find((lib) => folder.includes(lib)) ===
+                undefined &&
+              folder.includes("node_modules")
+            ) {
+              return "vendor";
+            }
+
+            return "index";
+          },
+        },
       },
       commonjsOptions: {
         // Source: https://github.com/rollup/plugins/issues/1425#issuecomment-1465626736
