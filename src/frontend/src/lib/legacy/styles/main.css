@@ -142,7 +142,7 @@
   */
 
   /* #131620 */
-  --nvc-surface-medium: oklch(0.2 0.0206 271.51);
+  --nvc-surface-medium: oklch(0.25 0.0206 271.51);
   /* #060b15 */
   --nvc-surface-dark: oklch(0.15 0.0236 261.52);
   /* #1b1d1c */
