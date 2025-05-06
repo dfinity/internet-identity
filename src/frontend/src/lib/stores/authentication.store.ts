@@ -55,7 +55,7 @@ export const authenticationStore: AuthenticationStore = {
       if (isNullish(initialized)) {
         throw new Error("Not initialized");
       }
-      initialized.agent.replaceIdentity(authentication.identity);
+      initialized.agent.replaceIdentity(authenticated.identity);
       return { authenticated, initialized };
     }),
   reset: () =>
@@ -71,7 +71,7 @@ export const authenticationStore: AuthenticationStore = {
 export const authenticatedStore: Readable<Authenticated> = derived(
   authenticationStore,
   (authenticated) => {
-    if (isNullish(authentication)) {
+    if (isNullish(authenticated)) {
       throw new Error("Not authenticated");
     }
     return authenticated;
