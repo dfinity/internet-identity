@@ -17,7 +17,10 @@
     authenticatedStore,
     authenticationStore,
   } from "$lib/stores/authentication.store";
-  import { authorizationStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationStore,
+    authorizationContextStore,
+  } from "$lib/stores/authorization.store";
 
   let continueButtonRef = $state<HTMLButtonElement>();
   const lastUsedIdentities = $derived(
@@ -28,8 +31,8 @@
   let selectedIdentity = $state.raw(lastUsedIdentities[0]);
   const lastUsedAccount = $derived(
     selectedIdentity.accounts?.[
-      $authorizationStore.authRequest.derivationOrigin ??
-        $authorizationStore.requestOrigin
+      $authorizationContextStore.authRequest.derivationOrigin ??
+        $authorizationContextStore.requestOrigin
     ],
   );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(

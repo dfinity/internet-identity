@@ -5,14 +5,14 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authorizationStore } from "$lib/stores/authorization.store";
+  import { authorizationContextStore } from "$lib/stores/authorization.store";
 
   const { data }: PageProps = $props();
   const { accounts } = data;
 
   const origin =
-    $authorizationStore.authRequest.derivationOrigin ??
-    $authorizationStore.requestOrigin;
+    $authorizationContextStore.authRequest.derivationOrigin ??
+    $authorizationContextStore.requestOrigin;
   let selectedAccountNumber = $state(accounts[0].account_number[0]);
   let creatingAccount = $state(false);
   let newAccountName = $state("");
@@ -43,7 +43,7 @@
       accountNumber: account.account_number[0],
       name: account.name[0],
     });
-    await authorizationStore.authorize(account.account_number[0]);
+    await authorizationContextStore.authorize(account.account_number[0]);
   };
 </script>
 

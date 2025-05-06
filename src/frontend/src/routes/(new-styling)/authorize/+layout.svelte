@@ -5,11 +5,14 @@
   import CenterCard from "$lib/components/UI/CenterCard.svelte";
   import CenterContainer from "$lib/components/UI/CenterContainer.svelte";
   import { canisterConfig, canisterId } from "$lib/globals";
-  import { authorizationStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationStore,
+    authorizationStatusStore,
+  } from "$lib/stores/authorization.store";
 
   const { children }: LayoutProps = $props();
 
-  const { status } = authorizationStore;
+  const status = $derived($authorizationStatusStore);
 
   onMount(() => {
     authorizationStore.init({ canisterId, canisterConfig });
@@ -18,7 +21,7 @@
 
 <CenterContainer data-page="new-authorize-view">
   <CenterCard>
-    {#if $status === "init" || $status === "waiting" || $status === "validating"}
+    {#if status === "init" || status === "waiting" || status === "validating"}
       <div class="flex flex-col items-center justify-center gap-2">
         <ProgressRing
           value={null}
@@ -27,7 +30,7 @@
         />
         <p class="opacity-60">Loading</p>
       </div>
-    {:else if $status === "authenticating"}
+    {:else if status === "authenticating"}
       <div class="mb-8 flex flex-col gap-1">
         <h1 class="h1">Sign in</h1>
         <p class="p font-medium">
@@ -35,9 +38,9 @@
         </p>
       </div>
       {@render children()}
-    {:else if $status === "orphan" || $status === "closed" || $status === "invalid" || $status === "failure"}
+    {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure"}
       <div>Error</div>
-    {:else if $status === "success"}
+    {:else if status === "success"}
       <div>Success</div>
     {/if}
   </CenterCard>

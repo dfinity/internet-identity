@@ -36,7 +36,10 @@
     authenticationStore,
   } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
-  import { authorizationStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationStore,
+    authorizationContextStore,
+  } from "$lib/stores/authorization.store";
 
   let currentState = $state<State>({ state: "pickAuthenticationMethod" });
 
@@ -151,8 +154,8 @@
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
         origin:
-          $authorizationStore.authRequest.derivationOrigin ??
-          $authorizationStore.requestOrigin,
+          $authorizationContextStore.authRequest.derivationOrigin ??
+          $authorizationContextStore.requestOrigin,
         identityNumber,
         accountNumber: undefined,
       });
@@ -307,8 +310,8 @@
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
         origin:
-          $authorizationStore.authRequest.derivationOrigin ??
-          $authorizationStore.requestOrigin,
+          $authorizationContextStore.authRequest.derivationOrigin ??
+          $authorizationContextStore.requestOrigin,
         identityNumber,
         accountNumber: undefined,
       });
