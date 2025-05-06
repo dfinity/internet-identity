@@ -10,7 +10,7 @@ export const dappsHeader = ({
   clickable: boolean;
 }): TemplateResult => html`
   <figure
-    class="c-card__teaser c-marquee ${clickable
+    class="c-card__teaser l-stack--tight c-marquee ${clickable
       ? "c-marquee--clickable"
       : undefined}"
   >
