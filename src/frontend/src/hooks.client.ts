@@ -1,9 +1,6 @@
 import type { ClientInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
-import {
-  authenticatedStore,
-  authenticationStore,
-} from "$lib/stores/authentication.store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { initGlobals, canisterId, agentOptions } from "$lib/globals";
 
