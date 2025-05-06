@@ -367,7 +367,7 @@ export const isValidKey = <T>(
 };
 
 // Converts a union type to an intersection type to extract shared keys
-type UnionToIntersection<U> = (
+export type UnionToIntersection<U> = (
   U extends unknown ? (k: U) => void : never
 ) extends (k: infer I) => void
   ? I

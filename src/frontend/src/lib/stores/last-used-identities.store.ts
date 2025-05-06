@@ -1,60 +1,72 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
+import { isNullish } from "@dfinity/utils";
 
-export type LastUsedIdentity = {
+export type LastUsedAccount = {
+  identityNumber: bigint;
+  accountNumber: bigint | undefined;
+  origin: string;
   name?: string;
   lastUsedTimestampMillis: number;
-  identityNumber: bigint;
-  credentialId: Uint8Array | undefined;
-  authMethod: "passkey" | "google";
-  // In case the auth method is google, this will be the sub (or email)
-  sub?: string;
 };
-export type LastUsedIdentitiesData = {
+export type LastUsedAccounts = {
+  [origin: string]: LastUsedAccount;
+};
+export type LastUsedIdentity = {
+  identityNumber: bigint;
+  name?: string;
+  authMethod:
+    | { passkey: { credentialId: Uint8Array } }
+    | { openid: { iss: string; sub: string } };
+  accounts?: LastUsedAccounts;
+  lastUsedTimestampMillis: number;
+};
+export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
 };
-type LastUsedIdentitiesStore = Readable<LastUsedIdentitiesData> & {
-  addLatestUsed: (params: {
-    identityNumber: bigint;
-    name?: string;
-    credentialId: Uint8Array | undefined;
-    authMethod: "passkey" | "google";
-    sub?: string;
-  }) => void;
+type LastUsedIdentitiesStore = Readable<LastUsedIdentities> & {
+  addLastUsedIdentity: (
+    params: Pick<LastUsedIdentity, "identityNumber" | "name" | "authMethod">,
+  ) => void;
+  addLastUsedAccount: (
+    params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
+  ) => void;
   reset: () => void;
 };
 
 export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
-  const { subscribe, set, update } = writableStored<LastUsedIdentitiesData>({
+  const { subscribe, set, update } = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 1,
+    version: 2,
   });
 
   return {
     subscribe,
-    addLatestUsed: ({
-      identityNumber,
-      name,
-      credentialId,
-      authMethod,
-      sub,
-    }: {
-      identityNumber: bigint;
-      name?: string;
-      credentialId: Uint8Array | undefined;
-      authMethod: "passkey" | "google";
-      sub?: string;
-    }) => {
+    addLastUsedIdentity: (params) => {
       update((lastUsedIdentities) => {
-        lastUsedIdentities[identityNumber.toString()] = {
-          name,
+        const identity = lastUsedIdentities[params.identityNumber.toString()];
+        lastUsedIdentities[params.identityNumber.toString()] = {
+          accounts: identity?.accounts,
+          ...params,
           lastUsedTimestampMillis: Date.now(),
-          identityNumber,
-          credentialId,
-          authMethod,
-          sub,
+        };
+        return lastUsedIdentities;
+      });
+    },
+    addLastUsedAccount: (params) => {
+      update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[params.identityNumber.toString()];
+        if (isNullish(identity)) {
+          return lastUsedIdentities;
+        }
+        if (isNullish(identity.accounts)) {
+          identity.accounts = {};
+        }
+        identity.accounts[params.origin] = {
+          ...params,
+          lastUsedTimestampMillis: Date.now(),
         };
         return lastUsedIdentities;
       });

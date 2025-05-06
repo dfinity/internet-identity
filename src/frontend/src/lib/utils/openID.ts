@@ -149,15 +149,20 @@ export const createAnonymousNonce = async (
  * @param config of the OpenID provider
  * @param options for the JWT request
  */
-export const requestJWT = (
+export const requestJWT = async (
   config: RequestConfig,
   options: RequestOptions,
 ): Promise<string> => {
-  if (isNullish(config.configURL) || !("IdentityCredential" in window)) {
-    // FedCM is not supported for this OpenID Provider or in this browser
-    return requestWithRedirect(config, options);
+  const supportsFedCM =
+    nonNullish(config.configURL) && "IdentityCredential" in window;
+  const jwt = supportsFedCM
+    ? await requestWithCredentials(config, options)
+    : await requestWithRedirect(config, options);
+  const { sub } = decodeJWT(jwt);
+  if (nonNullish(options.loginHint) && sub !== options.loginHint) {
+    throw new Error("Account doesn't match");
   }
-  return requestWithCredentials(config, options);
+  return jwt;
 };
 
 /**

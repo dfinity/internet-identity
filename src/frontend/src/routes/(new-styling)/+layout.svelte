@@ -3,11 +3,10 @@
   import "$lib/app.css";
   import { Toaster } from "@skeletonlabs/skeleton-svelte";
   import { toaster } from "$lib/utils/toaster";
+  import type { LayoutProps } from "./$types";
 
-  const { children, data } = $props();
+  const { children }: LayoutProps = $props();
 </script>
 
-{#key data.url}
-  {@render children()}
-  <Toaster {toaster}></Toaster>
-{/key}
+{@render children()}
+<Toaster {toaster}></Toaster>
