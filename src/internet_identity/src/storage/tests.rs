@@ -428,7 +428,7 @@ fn should_list_accounts() {
     storage.write_account(new_account).unwrap();
 
     // 5. Use list_accounts to read the account and check that it's present.
-    let listed_accounts = storage.list_accounts(&anchor_number, &origin);
+    let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
 
     // 6. Assert that the list contains exactly one account and it matches the expected one
     assert_eq!(

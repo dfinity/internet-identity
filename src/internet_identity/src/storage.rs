@@ -696,13 +696,17 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn write_account(&mut self, acc: InternalAccount) -> Result<InternalAccount, StorageError> {
         // TODO: LM what if this is called with an account_number?
-        // Do we want to fail if the account already exists within the anchor or substitute it?
 
-        // How about expecing the following instead of the whole Account
+        // How about expecting the following instead of the whole Account
         // - anchor_number
         // - origin
         // - name: Option<String>
         // This way we don't have the questions with account_number. It's only generated here.
+        // It would follow more the allocate_anchor pattern.
+
+        // We should raise an error if the default account already exists for this anchor.
+
+        // Should we use the length of the application_accounts to determine the account_number?
 
         let anchor_number = acc.anchor_number;
         let origin = &acc.origin;
@@ -713,14 +717,14 @@ impl<M: Memory + Clone> Storage<M> {
         // 3. Get existing application data to check if account is new for this app
         //    lookup_or_insert... already ensures the entry exists in stable_application_memory
         let mut application_data = self
-            .stable_application_memory
-            .get(&app_num)
+            .lookup_application_with_application_number(&app_num)
             .expect("Application data should exist after lookup_or_insert");
 
         // 4. Manually construct StorableAccountReference
         let storable_ref = StorableAccountReference {
-            account_number: acc.account_number, // Pass the Option through
-            last_used: acc.last_used,
+            account_number: acc.account_number,
+            // We don't consider it used at this point.
+            last_used: None,
         };
 
         // 5. Get StableAnchor
@@ -736,16 +740,18 @@ impl<M: Memory + Clone> Storage<M> {
         let account_refs_vec = app_accounts_map.entry(app_num).or_insert_with(Vec::new);
 
         let mut account_exists = false;
-        // Iterate through existing references first
+        // Should we raise an error if the account already exists?
         for existing_ref in account_refs_vec.iter_mut() {
             match (existing_ref.account_number, acc.account_number) {
                 // Case 1: Both have account numbers and they match
+                // This part would never happen if we don't have an account number in the parameters.
                 (Some(existing_num), Some(new_num)) if existing_num == new_num => {
                     *existing_ref = storable_ref.clone();
                     account_exists = true;
                     break;
                 }
                 // Case 2: Both lack account numbers (match for the default/unreserved account)
+                // If there is no name, but the anchor already has a default account, we should raise an error.
                 (None, None) => {
                     *existing_ref = storable_ref.clone();
                     account_exists = true;
@@ -759,12 +765,13 @@ impl<M: Memory + Clone> Storage<M> {
         // 5. Update memory in case the account was created
         if !account_exists {
             account_refs_vec.push(storable_ref);
-            application_data.total_accounts += 1;
-            self.stable_application_memory
-                .insert(app_num, application_data);
         }
-
-        // 6. Write updated StableAnchor back
+        
+        
+        // 6. Write updated StableAnchor and Application data
+        application_data.total_accounts += 1;
+        self.stable_application_memory
+            .insert(app_num, application_data);
         self.stable_anchor_memory
             .insert(anchor_number, stable_anchor);
 
@@ -794,6 +801,32 @@ impl<M: Memory + Clone> Storage<M> {
             None,
             None,
         ))
+    }
+
+    #[allow(dead_code)]
+    pub fn list_accounts(
+        &self,
+        anchor_number: &AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Result<Vec<InternalAccountReference>, StorageError> {
+        let application_number = self
+            .lookup_application_number_with_origin(origin)
+            .ok_or(StorageError::ApplicationNotFound { origin: origin.clone() })?;
+
+        let anchor = self.stable_anchor_memory
+        .get(anchor_number).ok_or(StorageError::AnchorNotFound { anchor_number: *anchor_number })?;
+
+
+        Ok(anchor.application_accounts
+            .and_then(|app_map| app_map.get(&application_number).cloned())
+            .map(|maybe_storable_acc_ref_vec| {
+                maybe_storable_acc_ref_vec
+                    .iter()
+                    .map(|storable_acc_ref| (anchor_number, storable_acc_ref).into())
+                    .collect()
+            })
+            .unwrap_or_default()
+        )
     }
 
     #[allow(dead_code)]
@@ -843,28 +876,6 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
         None
-    }
-
-    #[allow(dead_code)]
-    pub fn list_accounts(
-        &self,
-        anchor_number: &AnchorNumber,
-        origin: &FrontendHostname,
-    ) -> Vec<InternalAccountReference> {
-        let application_number = self
-            .lookup_application_number_with_origin(origin)
-            .expect("Could not find origin!"); //TODO: handle better
-        self.stable_anchor_memory
-            .get(anchor_number)
-            .and_then(|anchor| anchor.application_accounts)
-            .and_then(|app_map| app_map.get(&application_number).cloned())
-            .map(|maybe_storable_acc_ref_vec| {
-                maybe_storable_acc_ref_vec
-                    .iter()
-                    .map(|storable_acc_ref| (anchor_number, storable_acc_ref).into())
-                    .collect()
-            })
-            .expect("No AccountReferences!")
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -1067,6 +1078,9 @@ pub enum StorageError {
     AnchorNotFound {
         anchor_number: AnchorNumber,
     },
+    ApplicationNotFound {
+        origin: FrontendHostname,
+    }
 }
 
 impl fmt::Display for StorageError {
@@ -1101,6 +1115,9 @@ impl fmt::Display for StorageError {
                     "StableAnchor not found for anchor number {}",
                     anchor_number
                 )
+            }
+            Self::ApplicationNotFound { origin } => {
+                write!(f, "Application not found for origin {}", origin)
             }
         }
     }
