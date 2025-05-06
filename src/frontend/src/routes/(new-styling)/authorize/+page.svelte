@@ -31,7 +31,10 @@
   import { canisterConfig, canisterId } from "$lib/globals";
   import { sessionStore } from "$lib/stores/session.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    authenticatedStore,
+    authenticationStore,
+  } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { authorizationStore } from "$lib/stores/authorization.store";
 
@@ -63,7 +66,7 @@
         });
       authenticationStore.set({ identity, identityNumber });
       const info =
-        await $authenticationStore.actor.get_anchor_info(identityNumber);
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
@@ -204,7 +207,7 @@
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
       authenticationStore.set({ identity, identityNumber });
       const info =
-        await $authenticationStore.actor.get_anchor_info(identityNumber);
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],

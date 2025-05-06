@@ -3,7 +3,7 @@
   import { nonNullish } from "@dfinity/utils";
   import { formatLastUsage } from "$lib/utils/time";
   import { throwCanisterError } from "$lib/utils/utils";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { authorizationStore } from "$lib/stores/authorization.store";
 
@@ -27,9 +27,9 @@
   };
   const handleContinue = async () => {
     const account = creatingAccount
-      ? await $authenticationStore.actor
+      ? await $authenticatedStore.actor
           .create_account(
-            $authenticationStore.identityNumber,
+            $authenticatedStore.identityNumber,
             origin,
             newAccountName,
           )
@@ -39,7 +39,7 @@
         )!;
     lastUsedIdentitiesStore.addLastUsedAccount({
       origin,
-      identityNumber: $authenticationStore.identityNumber,
+      identityNumber: $authenticatedStore.identityNumber,
       accountNumber: account.account_number[0],
       name: account.name[0],
     });

@@ -11,67 +11,74 @@ import { Principal } from "@dfinity/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 
-export interface Authentication {
+export interface Authenticated {
   identityNumber: bigint;
   identity: DelegationIdentity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
 }
 
-type AuthenticationStore = Readable<Authentication> & {
+type AuthenticationStore = Readable<Authenticated | undefined> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => Promise<void>;
-  isAuthenticated: Readable<boolean>;
-  set: (value: Omit<Authentication, "agent" | "actor">) => void;
+  set: (value: Omit<Authenticated, "agent" | "actor">) => void;
   reset: () => void;
 };
 
-const createAuthenticationStore = (): AuthenticationStore => {
-  const store = writable<{
-    authentication?: Omit<Authentication, "agent" | "actor">;
-    initialized?: Pick<Authentication, "agent" | "actor">;
-  }>();
+const internalStore = writable<{
+  authenticated?: Omit<Authenticated, "agent" | "actor">;
+  initialized?: Pick<Authenticated, "agent" | "actor">;
+}>();
 
-  return {
-    init: async ({ canisterId, agentOptions }) => {
-      const agent = await HttpAgent.create(agentOptions);
-      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-        agent,
-        canisterId,
-      });
-      store.set({ initialized: { agent, actor } });
-    },
-    isAuthenticated: derived(store, ({ authentication }) =>
-      nonNullish(authentication),
-    ),
-    subscribe: derived(store, ({ authentication, initialized }) => {
+export const authenticationStore: AuthenticationStore = {
+  init: async ({ canisterId, agentOptions }) => {
+    const agent = await HttpAgent.create(agentOptions);
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId,
+    });
+    internalStore.set({ initialized: { agent, actor } });
+  },
+  subscribe: derived(internalStore, ({ authenticated, initialized }) => {
+    if (isNullish(initialized)) {
+      throw new Error("Not initialized");
+    }
+    if (isNullish(authenticated)) {
+      return undefined;
+    }
+    return { ...authenticated, ...initialized };
+  }).subscribe,
+  set: (authenticated) =>
+    internalStore.update(({ initialized }) => {
       if (isNullish(initialized)) {
         throw new Error("Not initialized");
       }
-      if (isNullish(authentication)) {
-        throw new Error("Not authenticated");
+      initialized.agent.replaceIdentity(authentication.identity);
+      return { authenticated, initialized };
+    }),
+  reset: () =>
+    internalStore.update(({ initialized }) => {
+      if (isNullish(initialized)) {
+        throw new Error("Not initialized");
       }
-      return { ...authentication, ...initialized };
-    }).subscribe,
-    set: (authentication) =>
-      store.update(({ initialized }) => {
-        if (isNullish(initialized)) {
-          throw new Error("Not initialized");
-        }
-        initialized.agent.replaceIdentity(authentication.identity);
-        return { authentication, initialized };
-      }),
-    reset: () =>
-      store.update(({ initialized }) => {
-        if (isNullish(initialized)) {
-          throw new Error("Not initialized");
-        }
-        initialized.agent.invalidateIdentity();
-        return { authentication: undefined, initialized };
-      }),
-  };
+      initialized.agent.invalidateIdentity();
+      return { authenticated: undefined, initialized };
+    }),
 };
 
-export const authenticationStore = createAuthenticationStore();
+export const authenticatedStore: Readable<Authenticated> = derived(
+  authenticationStore,
+  (authenticated) => {
+    if (isNullish(authentication)) {
+      throw new Error("Not authenticated");
+    }
+    return authenticated;
+  },
+);
+
+export const isAuthenticatedStore: Readable<boolean> = derived(
+  authenticationStore,
+  (authenticated) => nonNullish(authenticated),
+);

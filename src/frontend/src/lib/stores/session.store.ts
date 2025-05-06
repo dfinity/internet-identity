@@ -29,47 +29,39 @@ type SessionStore = Readable<Session> & {
   reset: () => Promise<void>;
 };
 
-const createSessionStore = (): SessionStore => {
-  const store = writable<Session | undefined>();
+const internalStore = writable<Session | undefined>();
 
-  return {
-    init: async ({ canisterId, agentOptions }) => {
-      const identity = await ECDSAKeyIdentity.generate({
-        extractable: false,
-      });
-      const agent = await HttpAgent.create({ ...agentOptions, identity });
-      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-        agent,
-        canisterId,
-      });
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
-      store.set({ identity, agent, actor, nonce, salt });
-    },
-    subscribe: derived(store, (session) => {
+export const sessionStore: SessionStore = {
+  init: async ({ canisterId, agentOptions }) => {
+    const identity = await ECDSAKeyIdentity.generate({
+      extractable: false,
+    });
+    const agent = await HttpAgent.create({ ...agentOptions, identity });
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId,
+    });
+    const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
+    internalStore.set({ identity, agent, actor, nonce, salt });
+  },
+  subscribe: derived(internalStore, (session) => {
+    if (isNullish(session)) {
+      throw new Error("Not initialized");
+    }
+    return session;
+  }).subscribe,
+  reset: async () => {
+    const identity = await ECDSAKeyIdentity.generate({
+      extractable: false,
+    });
+    const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
+    internalStore.update((session) => {
       if (isNullish(session)) {
         throw new Error("Not initialized");
       }
-      return session;
-    }).subscribe,
-    reset: async () => {
-      const identity = await ECDSAKeyIdentity.generate({
-        extractable: false,
-      });
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
-      store.update((session) => {
-        if (isNullish(session)) {
-          throw new Error("Not initialized");
-        }
-        const { agent, actor } = session;
-        agent.replaceIdentity(identity);
-        return { identity, agent, actor, nonce, salt };
-      });
-    },
-  };
+      const { agent, actor } = session;
+      agent.replaceIdentity(identity);
+      return { identity, agent, actor, nonce, salt };
+    });
+  },
 };
-
-export const sessionStore = createSessionStore();

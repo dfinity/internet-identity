@@ -6,7 +6,7 @@ import {
   authenticationProtocol,
   AuthRequest,
 } from "$lib/flows/authorize/postMessageInterface";
-import { authenticationStore } from "$lib/stores/authentication.store";
+import { authenticatedStore } from "$lib/stores/authentication.store";
 import { Connection } from "$lib/utils/iiConnection";
 import { fetchDelegation } from "$lib/flows/authorize/fetchDelegation";
 
@@ -50,7 +50,7 @@ const createAuthorizationStore = (): AuthorizationStore => {
           return new Promise((resolve) => {
             authorize = async (_accountNumber) => {
               // TODO: use prepare/get account delegation instead of iiConnection
-              const { identityNumber, identity } = get(authenticationStore);
+              const { identityNumber, identity } = get(authenticatedStore);
               const { connection } = await new Connection(
                 canisterId.toText(),
                 canisterConfig,

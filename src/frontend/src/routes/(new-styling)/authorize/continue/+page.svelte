@@ -1,6 +1,6 @@
 <script lang="ts">
   import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { goto, invalidate } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import {
     authenticateWithJWT,
     authenticateWithPasskey,
@@ -13,7 +13,10 @@
   import { canisterConfig, canisterId } from "$lib/globals";
   import { sessionStore } from "$lib/stores/session.store";
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    authenticatedStore,
+    authenticationStore,
+  } from "$lib/stores/authentication.store";
   import { authorizationStore } from "$lib/stores/authorization.store";
 
   let continueButtonRef = $state<HTMLButtonElement>();
@@ -44,7 +47,7 @@
         });
       authenticationStore.set({ identity, identityNumber });
       const info =
-        await $authenticationStore.actor.get_anchor_info(identityNumber);
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
@@ -68,7 +71,7 @@
       });
       authenticationStore.set({ identity, identityNumber });
       const info =
-        await $authenticationStore.actor.get_anchor_info(identityNumber);
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
