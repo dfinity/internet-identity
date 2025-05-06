@@ -21,7 +21,7 @@ export interface Session {
   salt: Uint8Array;
 }
 
-type AuthenticationStore = Readable<Session> & {
+type SessionStore = Readable<Session> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
@@ -29,7 +29,7 @@ type AuthenticationStore = Readable<Session> & {
   reset: () => Promise<void>;
 };
 
-const createSessionStore = (): AuthenticationStore => {
+const createSessionStore = (): SessionStore => {
   const store = writable<Session | undefined>();
 
   return {

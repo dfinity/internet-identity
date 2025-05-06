@@ -52,7 +52,7 @@
     class="mb-6 flex flex-col items-stretch gap-3 self-stretch"
     role="radiogroup"
   >
-    {#each accounts as account, index}
+    {#each accounts as account}
       {@const selected = account.account_number[0] === selectedAccountNumber}
       <button
         onclick={() => handleSelectAccount(account.account_number[0])}
