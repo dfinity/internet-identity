@@ -3,9 +3,9 @@ import { II_URL } from "./constants";
 import { NewAuthorizeView, AuthenticateView } from "./views";
 
 const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
-  return browser.execute(async () => {
+  return browser.execute(() => {
     for (const style of Array.from(document.styleSheets)) {
-      const rules = await style.cssRules;
+      const rules = style.cssRules;
       for (const rule of Array.from(rules)) {
         if (rule.cssText.includes("@layer base")) {
           // This should be tailwind only but can be made more specific
@@ -18,9 +18,9 @@ const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
 };
 
 const checkIfHasSkeleton = (browser: WebdriverIO.Browser) => {
-  return browser.execute(async () => {
+  return browser.execute(() => {
     for (const style of Array.from(document.styleSheets)) {
-      const rules = await style.cssRules;
+      const rules = style.cssRules;
       for (const rule of Array.from(rules)) {
         if (rule.cssText.includes("cerberus")) {
           // This should be tailwind only but can be made more specific
