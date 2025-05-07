@@ -1,12 +1,8 @@
 use crate::storage::account::{Account, AccountReference};
-use crate::storage::{
-    CreateAdditionalAccountParams, ReadAccountParams, UpdateAccountParams,
-};
+use crate::storage::{CreateAdditionalAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
-use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname
-};
+use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
 
 #[test]
 fn should_create_additional_account() {
@@ -180,9 +176,7 @@ fn should_update_default_account() {
     let account_name = "account name".to_string();
 
     // 2. Default account exists withuot creating it
-    let initial_accounts = storage
-        .list_accounts(&anchor_number, &origin)
-        .unwrap();
+    let initial_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
     let expected_unreserved_account = AccountReference {
         account_number: None,
         last_used: None,
@@ -199,9 +193,7 @@ fn should_update_default_account() {
     let new_account_number = storage.update_account(updated_account_params).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
-    let updated_accounts = storage
-        .list_accounts(&anchor_number, &origin)
-        .unwrap();
+    let updated_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
     let expected_updated_account = AccountReference {
         account_number: Some(new_account_number),
         last_used: None,

@@ -693,11 +693,11 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> ApplicationNumber {
         let origin_hash = OriginHash::from_origin(origin);
 
-        if let Some(existing_number) = self.lookup_application_with_origin_memory.get(&origin_hash) {
+        if let Some(existing_number) = self.lookup_application_with_origin_memory.get(&origin_hash)
+        {
             existing_number
         } else {
-            let new_number: ApplicationNumber =
-                self.lookup_application_with_origin_memory.len();
+            let new_number: ApplicationNumber = self.lookup_application_with_origin_memory.len();
 
             self.lookup_application_with_origin_memory
                 .insert(origin_hash, new_number);
@@ -811,8 +811,10 @@ impl<M: Memory + Clone> Storage<M> {
                     account_number: None,
                     last_used: None,
                 };
-                self.stable_account_reference_list_memory
-                    .insert((anchor_number, app_num), vec![default_account_reference, additional_account_reference].into());
+                self.stable_account_reference_list_memory.insert(
+                    (anchor_number, app_num),
+                    vec![default_account_reference, additional_account_reference].into(),
+                );
             }
             Some(existing_storable_list) => {
                 // If the list exists, push the new account and reinsert it to memory
@@ -846,25 +848,17 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
     ) -> Result<Vec<AccountReference>, StorageError> {
         match self.lookup_application_number_with_origin(origin) {
-            None => {
-                Ok(vec![AccountReference {
+            None => Ok(vec![AccountReference {
+                account_number: None,
+                last_used: None,
+            }]),
+            Some(app_num) => match self.lookup_account_references(*anchor_number, app_num) {
+                None => Ok(vec![AccountReference {
                     account_number: None,
                     last_used: None,
-                }])
-            }
-            Some(app_num) => {
-                match self.lookup_account_references(*anchor_number, app_num) {
-                    None => {
-                        Ok(vec![AccountReference {
-                            account_number: None,
-                            last_used: None,
-                        }])
-                    }
-                    Some(refs) => {
-                        Ok(refs)
-                    }
-                }
-            }
+                }]),
+                Some(refs) => Ok(refs),
+            },
         }
     }
 
@@ -952,7 +946,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
     }
-    
+
     #[allow(dead_code)]
     /// Used in `update_account` to create a default account.
     /// Default account are not initially stored. They are stored when updated.
