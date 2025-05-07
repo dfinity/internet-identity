@@ -104,7 +104,7 @@ use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{Application, InternalAccountReference, OriginHash, StorableAccount};
+use crate::storage::account::{Application, AccountReference, OriginHash, StorableAccount};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -749,7 +749,7 @@ impl<M: Memory + Clone> Storage<M> {
         let range_start = (anchor_number, ApplicationNumber::MIN); // u64::MIN is 0
         let range_end = (anchor_number, ApplicationNumber::MAX); // u64::MAX
 
-        for ((_found_anchor, app_num), storable_account_ref_list_val) in self
+        for ((_found_anchor, _app_num), storable_account_ref_list_val) in self
             .stable_account_reference_list_memory
             .range(range_start..=range_end)
         {
@@ -758,22 +758,11 @@ impl<M: Memory + Clone> Storage<M> {
                 storable_account_ref_list_val.into();
 
             // Look up the application to get the origin (FrontendHostname)
-            if let Some(application) = self.stable_application_memory.get(&app_num) {
-                let origin = &application.origin;
-
-                for storable_ref in storable_refs_vec {
-                    all_accounts.push(AccountReference {
-                        account_number: storable_ref.account_number,
-                        anchor_number, // The anchor_number given as input to the function
-                        origin: origin.clone(), // Clone origin as it's a String and used in a loop
-                        last_used: storable_ref.last_used,
-                    });
-                }
-            } else {
-                // This case implies a data inconsistency: an account reference list exists for an app_num
-                // but the app_num itself is not found in stable_application_memory.
-                // Depending on requirements, this could be logged or handled as an error.
-                ic_cdk::println!("Warning: Application not found for app_num {} while listing accounts for anchor {}", app_num, anchor_number);
+            for storable_ref in storable_refs_vec {
+                all_accounts.push(AccountReference {
+                    account_number: storable_ref.account_number,
+                    last_used: storable_ref.last_used,
+                });
             }
         }
 
@@ -864,14 +853,13 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: &AnchorNumber,
         origin: &FrontendHostname,
-    ) -> Result<Vec<InternalAccountReference>, StorageError> {
+    ) -> Result<Vec<AccountReference>, StorageError> {
         match self.lookup_application_number_with_origin(origin) {
             None => {
                 // Application doesn't exist for this origin.
                 // Return a vector with a new InternalAccountReference representing the default account.
-                Ok(vec![InternalAccountReference {
+                Ok(vec![AccountReference {
                     account_number: None, // Default account for the application/anchor
-                    anchor_number: *anchor_number,
                     last_used: None, // No usage info for a new/default account reference
                 }])
             }
@@ -881,18 +869,16 @@ impl<M: Memory + Clone> Storage<M> {
                     None => {
                         // No account references found for this application and anchor.
                         // Return a vector with a new InternalAccountReference representing the default account.
-                        Ok(vec![InternalAccountReference {
+                        Ok(vec![AccountReference {
                             account_number: None,
-                            anchor_number: *anchor_number,
                             last_used: None,
                         }])
                     }
                     Some(refs) => {
                         let internal_refs = refs
                             .into_iter()
-                            .map(|s_ref| InternalAccountReference {
+                            .map(|s_ref| AccountReference {
                                 account_number: s_ref.account_number,
-                                anchor_number: *anchor_number, // All refs for this anchor share the same anchor_number
                                 last_used: s_ref.last_used,
                             })
                             .collect();
@@ -906,14 +892,15 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn read_account(
         &self,
-        acc_ref: &InternalAccountReference,
+        acc_ref: &AccountReference,
+        anchor_number: &AnchorNumber,
         origin: &FrontendHostname,
     ) -> Option<InternalAccount> {
         match acc_ref.account_number {
             None => {
                 // Application number doesn't exist, return a default InternalAccount
                 Some(InternalAccount::new(
-                    acc_ref.anchor_number,
+                    *anchor_number,
                     origin.clone(),
                     // Default accounts have no name
                     None,
@@ -923,7 +910,7 @@ impl<M: Memory + Clone> Storage<M> {
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
                 Some(storable_account) => Some(InternalAccount::new(
-                    acc_ref.anchor_number,
+                    *anchor_number,
                     origin.clone(),
                     Some(storable_account.name.clone()),
                     acc_ref.account_number,

@@ -1,6 +1,6 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::storage::account::InternalAccountReference;
+use crate::storage::account::AccountReference;
 use crate::storage::stable_anchor::StableAnchor;
 use crate::storage::storable_anchor::StorableAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};

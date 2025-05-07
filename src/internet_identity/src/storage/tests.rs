@@ -3,7 +3,7 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
-use crate::storage::account::{InternalAccount, InternalAccountReference};
+use crate::storage::account::{InternalAccount, AccountReference};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{
     CreateAdditionalAccountParams, Header, StorageError, UpdateAccountParams, MAX_ENTRIES,
@@ -335,12 +335,11 @@ fn should_write_additional_account() {
     storage.create(anchor).unwrap();
 
     // 3. Additional account and application don't exist yet.
-    let acc_ref = InternalAccountReference {
+    let acc_ref = AccountReference {
         account_number: None,
-        anchor_number,
         last_used: None,
     };
-    let additional_account_1 = storage.read_account(&acc_ref, &origin);
+    let additional_account_1 = storage.read_account(&acc_ref, &anchor_number, &origin);
     assert!(
         additional_account_1.is_none(),
         "Initial anchor should have no accounts"
@@ -358,12 +357,11 @@ fn should_write_additional_account() {
         .unwrap();
 
     // 5. Check that read_account returns additional account and creates application.
-    let account_ref_lookup = InternalAccountReference {
+    let account_ref_lookup = AccountReference {
         account_number: Some(1), // First account created
-        anchor_number,
         last_used: None,
     };
-    let additional_account = storage.read_account(&account_ref_lookup, &origin).unwrap();
+    let additional_account = storage.read_account(&account_ref_lookup, &anchor_number, &origin).unwrap();
     let expected_account = InternalAccount {
         account_number: Some(1),
         anchor_number,
@@ -401,14 +399,12 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account_ref = InternalAccountReference {
+    let expected_additional_account_ref = AccountReference {
         account_number: Some(1),
-        anchor_number,
         last_used: None,
     };
-    let expected_default_account_ref = InternalAccountReference {
+    let expected_default_account_ref = AccountReference {
         account_number: None,
-        anchor_number,
         last_used: None,
     };
     storage.create_additional_account(new_account).unwrap();
@@ -497,11 +493,11 @@ fn should_update_default_account() {
     // 2. Default account exists withuot creating it
     let default_account = storage
         .read_account(
-            &InternalAccountReference {
+            &AccountReference {
                 account_number: None,
-                anchor_number,
                 last_used: None,
             },
+            &anchor_number,
             &origin,
         )
         .unwrap();
@@ -526,11 +522,11 @@ fn should_update_default_account() {
     // 4. Check that the default account has been created with the updated values.
     let updated_account = storage
         .read_account(
-            &InternalAccountReference {
+            &AccountReference {
                 account_number: Some(new_account_number),
-                anchor_number,
                 last_used: None,
             },
+            &anchor_number,
             &origin,
         )
         .unwrap();

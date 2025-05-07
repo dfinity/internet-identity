@@ -690,7 +690,7 @@ type IdRegFinishError = variant {
     StorageError : text;
 };
 
-type Account = record {
+type AccountInfo = record {
     // Null is unreserved default account
     account_number : opt AccountNumber;
     origin : text;
@@ -843,13 +843,13 @@ service : (opt InternetIdentityInit) -> {
     get_accounts : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
-    ) -> (vec Account) query;
+    ) -> (vec AccountInfo) query;
 
     create_account : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
         name : text
-    ) -> (variant { Ok : Account; Err: CreateAccountError });
+    ) -> (variant { Ok : AccountInfo; Err: CreateAccountError });
 
     update_account : (
         anchor_number : UserNumber,

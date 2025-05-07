@@ -10,36 +10,17 @@ use std::{
 };
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct InternalAccountReference {
+pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved default account
-    pub anchor_number: AnchorNumber,
     pub last_used: Option<Timestamp>,
 }
 
-impl InternalAccountReference {
-    pub fn create(anchor_number: AnchorNumber) -> Self {
-        Self {
-            account_number: None,
-            anchor_number,
-            last_used: None,
-        }
-    }
-    pub fn to_storable(&self) -> StorableAccountReference {
-        StorableAccountReference {
-            account_number: self.account_number,
-            last_used: self.last_used,
-        }
-    }
-}
-
-impl From<(&AnchorNumber, &StorableAccountReference)> for InternalAccountReference {
+impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
     fn from(value: (&AnchorNumber, &StorableAccountReference)) -> Self {
-        let anchor_number = value.0;
         let storable_acc_ref = value.1;
 
         Self {
             account_number: storable_acc_ref.account_number,
-            anchor_number: *anchor_number,
             last_used: storable_acc_ref.last_used,
         }
     }
@@ -90,30 +71,11 @@ impl InternalAccount {
         }
     }
 
-    /// Reconstructs an Account from its constituent parts.
-    /// Used when reading from storage where all fields are known.
-    pub fn reconstruct(
-        account_number: Option<AccountNumber>,
-        anchor_number: AnchorNumber,
-        origin: FrontendHostname,
-        last_used: Option<Timestamp>,
-        name: Option<String>,
-    ) -> Self {
-        Self {
-            account_number,
-            anchor_number,
-            origin,
-            last_used,
-            name,
-        }
-    }
-
     // Used in tests (for now)
     #[allow(dead_code)]
-    pub fn to_reference(&self) -> InternalAccountReference {
-        InternalAccountReference {
+    pub fn to_reference(&self) -> AccountReference {
+        AccountReference {
             account_number: self.account_number,
-            anchor_number: self.anchor_number,
             last_used: self.last_used,
         }
     }
