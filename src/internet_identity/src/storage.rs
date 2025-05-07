@@ -691,25 +691,26 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
-        self.lookup_application_with_origin_memory
-            .get(&OriginHash::from_origin(origin))
-            .or_else(|| {
-                let new_number: ApplicationNumber =
-                    self.lookup_application_with_origin_memory.len();
+        let origin_hash = OriginHash::from_origin(origin);
 
-                self.lookup_application_with_origin_memory
-                    .insert(OriginHash::from_origin(origin), new_number);
+        if let Some(existing_number) = self.lookup_application_with_origin_memory.get(&origin_hash) {
+            existing_number
+        } else {
+            let new_number: ApplicationNumber =
+                self.lookup_application_with_origin_memory.len();
 
-                let new_application = Application {
-                    origin: origin.to_string(),
-                    stored_accounts: 0u64,
-                };
+            self.lookup_application_with_origin_memory
+                .insert(origin_hash, new_number);
 
-                self.stable_application_memory
-                    .insert(new_number, new_application);
-                Some(new_number)
-            })
-            .expect("This should not happen.")
+            let new_application = Application {
+                origin: origin.to_string(),
+                stored_accounts: 0u64,
+            };
+
+            self.stable_application_memory
+                .insert(new_number, new_application);
+            new_number
+        }
     }
 
     pub fn lookup_application_number_with_origin(
@@ -817,10 +818,8 @@ impl<M: Memory + Clone> Storage<M> {
                     account_number: None,
                     last_used: None,
                 };
-                self.stable_account_reference_list_memory.insert(
-                    (anchor_number, app_num),
-                    vec![default_account_reference, additional_account_reference].into(),
-                );
+                self.stable_account_reference_list_memory
+                    .insert((anchor_number, app_num), vec![default_account_reference, additional_account_reference].into());
             }
             Some(existing_storable_list) => {
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
@@ -1009,6 +1008,7 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
+                // This is because we don't create default accounts explicitly.
                 let new_ref = AccountReference {
                     account_number: Some(new_account_number),
                     last_used: None,

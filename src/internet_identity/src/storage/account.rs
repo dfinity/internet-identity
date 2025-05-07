@@ -6,6 +6,9 @@ use internet_identity_interface::internet_identity::types::{
 use serde::Deserialize;
 use std::borrow::Cow;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(
     Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq, Ord, PartialOrd,
 )]
