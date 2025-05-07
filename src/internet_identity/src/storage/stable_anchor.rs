@@ -5,7 +5,7 @@ use ic_stable_structures::Storable;
 use serde::Deserialize;
 use std::borrow::Cow;
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Clone)]
 pub struct StableAnchor {
     pub name: Option<String>,
     pub openid_credentials: Vec<OpenIdCredential>,
