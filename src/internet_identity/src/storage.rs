@@ -836,7 +836,7 @@ impl<M: Memory + Clone> Storage<M> {
 
                 if !found_and_updated {
                     return Err(StorageError::MissingAccount {
-                        anchor_number: anchor_number,
+                        anchor_number,
                         name: params.name.clone(),
                     });
                 }
@@ -848,10 +848,10 @@ impl<M: Memory + Clone> Storage<M> {
         // Return an InternalAccount reflecting the new_account_number.
         Ok(Account {
             account_number: Some(account_number),
-            anchor_number: anchor_number,
+            anchor_number,
             origin: origin.clone(),
             last_used: None,
-            name: Some(params.name.clone()), // Corrected: Ensure Option<String>
+            name: Some(params.name.clone()),
         })
     }
 
