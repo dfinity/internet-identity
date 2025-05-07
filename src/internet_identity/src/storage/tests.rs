@@ -344,7 +344,7 @@ fn should_write_additional_account() {
         additional_account_1.is_none(),
         "Initial anchor should have no accounts"
     );
-    assert!(storage.lookup_application_with_origin(&origin).is_none(),);
+    assert!(storage.lookup_application_number_with_origin(&origin).is_none(),);
 
     // 4. Create additional account
     let new_account_params = CreateAdditionalAccountParams {
@@ -370,7 +370,7 @@ fn should_write_additional_account() {
         last_used: None,
     };
     assert_eq!(additional_account, expected_account);
-    assert!(storage.lookup_application_with_origin(&origin).is_some(),);
+    assert!(storage.lookup_application_number_with_origin(&origin).is_some(),);
 }
 
 #[test]

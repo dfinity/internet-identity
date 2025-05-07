@@ -104,7 +104,8 @@ use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{Application, AccountReference, OriginHash, StorableAccount};
+use crate::storage::account::{AccountReference, StorableAccount};
+use crate::storage::application::{Application, OriginHash};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -119,6 +120,7 @@ pub mod anchor;
 pub mod registration_rates;
 
 pub mod account;
+pub mod application;
 
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
@@ -693,7 +695,7 @@ impl<M: Memory + Clone> Storage<M> {
 
                 let new_application = Application {
                     origin: origin.to_string(),
-                    total_accounts: 0u64,
+                    stored_accounts: 0u64,
                 };
 
                 self.stable_application_memory
@@ -726,13 +728,6 @@ impl<M: Memory + Clone> Storage<M> {
         application_number: &ApplicationNumber,
     ) -> Option<Application> {
         self.stable_application_memory.get(application_number)
-    }
-
-    pub fn lookup_application_with_origin(&self, origin: &FrontendHostname) -> Option<Application> {
-        self.lookup_application_number_with_origin(origin)
-            .and_then(|application_number| {
-                self.lookup_application_with_application_number(&application_number)
-            })
     }
 
     // Add 1 to avoid having an account number 0
@@ -795,7 +790,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mut application_data = self
             .lookup_application_with_application_number(&app_num)
             .expect("Application data should exist after lookup_or_insert");
-        application_data.total_accounts += 1;
+        application_data.stored_accounts += 1;
         self.stable_application_memory
             .insert(app_num, application_data);
 
@@ -940,7 +935,7 @@ impl<M: Memory + Clone> Storage<M> {
                     .lookup_application_with_application_number(&application_number)
                     .expect("This application should exist it was created in the line above");
                 let mut updated_application = application.clone();
-                updated_application.total_accounts += 1;
+                updated_application.stored_accounts += 1;
                 self.stable_application_memory
                     .insert(application_number, updated_application);
 
