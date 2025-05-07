@@ -1,5 +1,5 @@
 use crate::storage::account::{Account, AccountReference};
-use crate::storage::{CreateAdditionalAccountParams, ReadAccountParams, UpdateAccountParams};
+use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
@@ -34,7 +34,7 @@ fn should_create_additional_account() {
     );
 
     // 3. Create additional account
-    let new_account_params = CreateAdditionalAccountParams {
+    let new_account_params = CreateAccountParams {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
@@ -79,7 +79,7 @@ fn should_list_accounts() {
     assert!(listed_accounts[0].account_number.is_none());
 
     // 4. Create new account
-    let new_account = CreateAdditionalAccountParams {
+    let new_account = CreateAccountParams {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
@@ -134,7 +134,7 @@ fn should_list_all_identity_accounts() {
     assert_eq!(listed_accounts.len(), 0);
 
     // 4. Create additional account
-    let new_account_params = CreateAdditionalAccountParams {
+    let new_account_params = CreateAccountParams {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
@@ -149,7 +149,7 @@ fn should_list_all_identity_accounts() {
     assert_eq!(listed_accounts.len(), 2);
 
     // 6. Create additional account
-    let new_account_params = CreateAdditionalAccountParams {
+    let new_account_params = CreateAccountParams {
         anchor_number,
         origin: origin_2.clone(),
         name: account_name.clone(),
@@ -233,7 +233,7 @@ fn should_update_additional_account() {
     );
 
     // 3. Create additional account
-    let new_account_params = CreateAdditionalAccountParams {
+    let new_account_params = CreateAccountParams {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),

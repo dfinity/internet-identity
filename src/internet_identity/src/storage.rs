@@ -279,7 +279,7 @@ struct Header {
     salt: [u8; 32],
 }
 
-pub struct CreateAdditionalAccountParams {
+pub struct CreateAccountParams {
     anchor_number: AnchorNumber,
     name: String,
     origin: FrontendHostname,
@@ -294,12 +294,6 @@ pub struct UpdateAccountParams {
 
 struct UpdateExistinAccountParams {
     account_number: AccountNumber,
-    name: String,
-}
-
-struct CreateDefaultAccountParams {
-    anchor_number: AnchorNumber,
-    application_number: ApplicationNumber,
     name: String,
 }
 
@@ -771,7 +765,7 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn create_additional_account(
         &mut self,
-        params: CreateAdditionalAccountParams,
+        params: CreateAccountParams,
     ) -> Result<Account, StorageError> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
@@ -905,23 +899,12 @@ impl<M: Memory + Clone> Storage<M> {
                 name: params.name,
             }),
             None => {
-                // Get or create an application number for the account's origin.
-                let application_number =
-                    self.lookup_or_insert_application_number_with_origin(&params.origin);
-                let application = self
-                    .lookup_application_with_application_number(&application_number)
-                    .expect("This application should exist it was created in the line above");
-                let mut updated_application = application.clone();
-                updated_application.stored_accounts += 1;
-                self.stable_application_memory
-                    .insert(application_number, updated_application);
-
                 // Default accounts are not stored by default.
                 // They are created only once they are updated.
-                self.create_default_account(CreateDefaultAccountParams {
+                self.create_default_account(CreateAccountParams {
                     anchor_number: params.anchor_number,
                     name: params.name,
-                    application_number,
+                    origin: params.origin.clone(),
                 })
             }
         }
@@ -954,7 +937,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the default account reference exists, its account number must be updated.
     fn create_default_account(
         &mut self,
-        params: CreateDefaultAccountParams,
+        params: CreateAccountParams,
     ) -> Result<AccountNumber, StorageError> {
         // Create and store the default account.
         let new_account_number = self.get_next_account_number();
@@ -966,8 +949,19 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_memory
             .insert(new_account_number, storable_account);
 
+        // Get or create an application number from the account's origin.
+        let application_number =
+            self.lookup_or_insert_application_number_with_origin(&params.origin);
+        let application = self
+            .lookup_application_with_application_number(&application_number)
+            .expect("This application should exist it was created in the line above");
+        let mut updated_application = application.clone();
+        updated_application.stored_accounts += 1;
+        self.stable_application_memory
+            .insert(application_number, updated_application);
+
         // Update the account references list.
-        let account_references_key = (params.anchor_number, params.application_number);
+        let account_references_key = (params.anchor_number, application_number);
         match self
             .stable_account_reference_list_memory
             .get(&account_references_key)
