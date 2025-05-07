@@ -5,7 +5,9 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::{InternalAccount, InternalAccountReference};
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::{CreateAdditionalAccountParams, Header, StorageError, UpdateAccountParams, MAX_ENTRIES};
+use crate::storage::{
+    CreateAdditionalAccountParams, Header, StorageError, UpdateAccountParams, MAX_ENTRIES,
+};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -343,9 +345,7 @@ fn should_write_additional_account() {
         additional_account_1.is_none(),
         "Initial anchor should have no accounts"
     );
-    assert!(
-        storage.lookup_application_with_origin(&origin).is_none(),
-    );
+    assert!(storage.lookup_application_with_origin(&origin).is_none(),);
 
     // 4. Create additional account
     let new_account_params = CreateAdditionalAccountParams {
@@ -353,7 +353,9 @@ fn should_write_additional_account() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    storage.create_additional_account(new_account_params).unwrap();
+    storage
+        .create_additional_account(new_account_params)
+        .unwrap();
 
     // 5. Check that read_account returns additional account and creates application.
     let account_ref_lookup = InternalAccountReference {
@@ -370,9 +372,7 @@ fn should_write_additional_account() {
         last_used: None,
     };
     assert_eq!(additional_account, expected_account);
-    assert!(
-        storage.lookup_application_with_origin(&origin).is_some(),
-    );
+    assert!(storage.lookup_application_with_origin(&origin).is_some(),);
 }
 
 #[test]
@@ -458,7 +458,9 @@ fn should_list_identity_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    storage.create_additional_account(new_account_params).unwrap();
+    storage
+        .create_additional_account(new_account_params)
+        .unwrap();
 
     // 5. List accounts returns default account
     let listed_accounts = storage.list_identity_accounts(anchor_number);
@@ -471,7 +473,9 @@ fn should_list_identity_accounts() {
         origin: origin_2.clone(),
         name: account_name.clone(),
     };
-    storage.create_additional_account(new_account_params).unwrap();
+    storage
+        .create_additional_account(new_account_params)
+        .unwrap();
 
     // 7. List accounts returns default account
     let listed_accounts = storage.list_identity_accounts(anchor_number);
@@ -491,7 +495,16 @@ fn should_update_default_account() {
     let account_name = "account name".to_string();
 
     // 2. Default account exists withuot creating it
-    let default_account = storage.read_account(&InternalAccountReference { account_number: None, anchor_number, last_used: None }, &origin).unwrap();
+    let default_account = storage
+        .read_account(
+            &InternalAccountReference {
+                account_number: None,
+                anchor_number,
+                last_used: None,
+            },
+            &origin,
+        )
+        .unwrap();
     let expected_unreserved_account = InternalAccount {
         account_number: None,
         anchor_number,
@@ -511,7 +524,16 @@ fn should_update_default_account() {
     let new_account_number = storage.update_account(updated_account_params).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
-    let updated_account = storage.read_account(&InternalAccountReference { account_number: Some(new_account_number), anchor_number, last_used: None }, &origin).unwrap();
+    let updated_account = storage
+        .read_account(
+            &InternalAccountReference {
+                account_number: Some(new_account_number),
+                anchor_number,
+                last_used: None,
+            },
+            &origin,
+        )
+        .unwrap();
     let expected_updated_account = InternalAccount {
         account_number: Some(new_account_number),
         anchor_number,

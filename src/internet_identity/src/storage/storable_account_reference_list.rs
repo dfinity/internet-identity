@@ -1,9 +1,9 @@
+use super::account::StorableAccountReference;
 use candid::CandidType;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use serde::Deserialize;
 use std::borrow::Cow;
-use super::account::StorableAccountReference;
 
 /// Vectors are not supported yet in ic-stable-structures, this file
 /// implements a struct to wrap this vector so it can be stored.
