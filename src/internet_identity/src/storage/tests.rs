@@ -3,7 +3,7 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
-use crate::storage::account::{InternalAccount, AccountReference};
+use crate::storage::account::{Account, AccountReference};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{
     CreateAdditionalAccountParams, Header, StorageError, UpdateAccountParams, MAX_ENTRIES,
@@ -362,7 +362,7 @@ fn should_write_additional_account() {
         last_used: None,
     };
     let additional_account = storage.read_account(&account_ref_lookup, &anchor_number, &origin).unwrap();
-    let expected_account = InternalAccount {
+    let expected_account = Account {
         account_number: Some(1),
         anchor_number,
         origin: origin.clone(),
@@ -501,7 +501,7 @@ fn should_update_default_account() {
             &origin,
         )
         .unwrap();
-    let expected_unreserved_account = InternalAccount {
+    let expected_unreserved_account = Account {
         account_number: None,
         anchor_number,
         origin: origin.clone(),
@@ -530,7 +530,7 @@ fn should_update_default_account() {
             &origin,
         )
         .unwrap();
-    let expected_updated_account = InternalAccount {
+    let expected_updated_account = Account {
         account_number: Some(new_account_number),
         anchor_number,
         origin: origin.clone(),

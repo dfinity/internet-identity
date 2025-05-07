@@ -9,32 +9,15 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(
+    Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq, Ord, PartialOrd,
+)]
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub last_used: Option<Timestamp>,
 }
 
-impl From<(&AnchorNumber, &StorableAccountReference)> for AccountReference {
-    fn from(value: (&AnchorNumber, &StorableAccountReference)) -> Self {
-        let storable_acc_ref = value.1;
-
-        Self {
-            account_number: storable_acc_ref.account_number,
-            last_used: storable_acc_ref.last_used,
-        }
-    }
-}
-
-#[derive(
-    Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq, Ord, PartialOrd,
-)]
-pub struct StorableAccountReference {
-    pub account_number: Option<AccountNumber>,
-    pub last_used: Option<Timestamp>,
-}
-
-impl Storable for StorableAccountReference {
+impl Storable for AccountReference {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(serde_cbor::to_vec(&self).unwrap())
     }
@@ -47,7 +30,7 @@ impl Storable for StorableAccountReference {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct InternalAccount {
+pub struct Account {
     pub account_number: Option<AccountNumber>, // None is unreserved default account
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
@@ -55,13 +38,13 @@ pub struct InternalAccount {
     pub name: Option<String>,
 }
 
-impl InternalAccount {
+impl Account {
     pub fn new(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
         account_number: Option<AccountNumber>,
-    ) -> InternalAccount {
+    ) -> Account {
         Self {
             account_number,
             anchor_number,

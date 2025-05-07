@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{InternalAccount, StorableAccountReference};
+use account::Account;
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -715,7 +715,7 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-    ) -> Option<Vec<StorableAccountReference>> {
+    ) -> Option<Vec<AccountReference>> {
         self.stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
             .map(|list| list.into())
@@ -754,7 +754,7 @@ impl<M: Memory + Clone> Storage<M> {
             .range(range_start..=range_end)
         {
             // _found_anchor is expected to be equal to anchor_number due to the range query.
-            let storable_refs_vec: Vec<StorableAccountReference> =
+            let storable_refs_vec: Vec<AccountReference> =
                 storable_account_ref_list_val.into();
 
             // Look up the application to get the origin (FrontendHostname)
@@ -773,7 +773,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn create_additional_account(
         &mut self,
         params: CreateAdditionalAccountParams,
-    ) -> Result<InternalAccount, StorageError> {
+    ) -> Result<Account, StorageError> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
@@ -799,7 +799,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_application_memory
             .insert(app_num, application_data);
 
-        // 5: Process StorableAccountReferenceList
+        // 5: Process AccountReferenceList
         match self
             .stable_account_reference_list_memory
             .get(&(anchor_number, app_num))
@@ -807,7 +807,7 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
-                let new_ref = StorableAccountReference {
+                let new_ref = AccountReference {
                     account_number: Some(account_number),
                     last_used: None,
                 };
@@ -815,7 +815,7 @@ impl<M: Memory + Clone> Storage<M> {
                     .insert((anchor_number, app_num), vec![new_ref].into());
             }
             Some(existing_storable_list) => {
-                let mut refs_vec: Vec<StorableAccountReference> = existing_storable_list.into();
+                let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
                 let mut found_and_updated = false;
                 for r_mut in refs_vec.iter_mut() {
                     if r_mut.account_number.is_none() {
@@ -838,7 +838,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // Return an InternalAccount reflecting the new_account_number.
-        Ok(InternalAccount {
+        Ok(Account {
             account_number: Some(account_number),
             anchor_number: anchor_number,
             origin: origin.clone(),
@@ -895,11 +895,11 @@ impl<M: Memory + Clone> Storage<M> {
         acc_ref: &AccountReference,
         anchor_number: &AnchorNumber,
         origin: &FrontendHostname,
-    ) -> Option<InternalAccount> {
+    ) -> Option<Account> {
         match acc_ref.account_number {
             None => {
                 // Application number doesn't exist, return a default InternalAccount
-                Some(InternalAccount::new(
+                Some(Account::new(
                     *anchor_number,
                     origin.clone(),
                     // Default accounts have no name
@@ -909,7 +909,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
-                Some(storable_account) => Some(InternalAccount::new(
+                Some(storable_account) => Some(Account::new(
                     *anchor_number,
                     origin.clone(),
                     Some(storable_account.name.clone()),
@@ -1006,7 +1006,7 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
-                let new_ref = StorableAccountReference {
+                let new_ref = AccountReference {
                     account_number: Some(new_account_number),
                     last_used: None,
                 };
@@ -1014,7 +1014,7 @@ impl<M: Memory + Clone> Storage<M> {
                     .insert(account_references_key, vec![new_ref].into());
             }
             Some(existing_storable_list) => {
-                let mut refs_vec: Vec<StorableAccountReference> = existing_storable_list.into();
+                let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
                 let mut found_and_updated = false;
                 for r_mut in refs_vec.iter_mut() {
                     if r_mut.account_number.is_none() {

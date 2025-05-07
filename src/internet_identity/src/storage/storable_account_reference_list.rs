@@ -1,4 +1,4 @@
-use super::account::StorableAccountReference;
+use super::account::AccountReference;
 use candid::CandidType;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -8,16 +8,16 @@ use std::borrow::Cow;
 /// Vectors are not supported yet in ic-stable-structures, this file
 /// implements a struct to wrap this vector so it can be stored.
 #[derive(Deserialize, CandidType, Clone, Ord, Eq, PartialEq, PartialOrd, Default)]
-pub struct StorableAccountReferenceList(Vec<StorableAccountReference>);
+pub struct StorableAccountReferenceList(Vec<AccountReference>);
 
-impl From<StorableAccountReferenceList> for Vec<StorableAccountReference> {
+impl From<StorableAccountReferenceList> for Vec<AccountReference> {
     fn from(value: StorableAccountReferenceList) -> Self {
         value.0
     }
 }
 
-impl From<Vec<StorableAccountReference>> for StorableAccountReferenceList {
-    fn from(value: Vec<StorableAccountReference>) -> Self {
+impl From<Vec<AccountReference>> for StorableAccountReferenceList {
+    fn from(value: Vec<AccountReference>) -> Self {
         StorableAccountReferenceList(value)
     }
 }
