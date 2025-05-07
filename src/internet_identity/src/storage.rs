@@ -105,8 +105,8 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{AccountReference, StorableAccount};
-use crate::storage::application::{Application, OriginHash};
 use crate::storage::anchor::{Anchor, Device};
+use crate::storage::application::{Application, OriginHash};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::stable_anchor::StableAnchor;
@@ -756,8 +756,7 @@ impl<M: Memory + Clone> Storage<M> {
             .range(range_start..=range_end)
         {
             // _found_anchor is expected to be equal to anchor_number due to the range query.
-            let storable_refs_vec: Vec<AccountReference> =
-                storable_account_ref_list_val.into();
+            let storable_refs_vec: Vec<AccountReference> = storable_account_ref_list_val.into();
 
             // Look up the application to get the origin (FrontendHostname)
             for storable_ref in storable_refs_vec {
@@ -818,8 +817,10 @@ impl<M: Memory + Clone> Storage<M> {
                     account_number: None,
                     last_used: None,
                 };
-                self.stable_account_reference_list_memory
-                    .insert((anchor_number, app_num), vec![default_account_reference, additional_account_reference].into());
+                self.stable_account_reference_list_memory.insert(
+                    (anchor_number, app_num),
+                    vec![default_account_reference, additional_account_reference].into(),
+                );
             }
             Some(existing_storable_list) => {
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
@@ -867,7 +868,7 @@ impl<M: Memory + Clone> Storage<M> {
                 // Return a vector with a new InternalAccountReference representing the default account.
                 Ok(vec![AccountReference {
                     account_number: None, // Default account for the application/anchor
-                    last_used: None, // No usage info for a new/default account reference
+                    last_used: None,      // No usage info for a new/default account reference
                 }])
             }
             Some(app_num) => {
@@ -897,10 +898,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    pub fn read_account(
-        &self,
-        params: ReadAccountParams,
-    ) -> Option<Account> {
+    pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
         match params.account_number {
             None => {
                 // Application number doesn't exist, return a default InternalAccount

@@ -6,7 +6,8 @@ use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, Ongoin
 use crate::storage::account::{Account, AccountReference};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{
-    CreateAdditionalAccountParams, Header, ReadAccountParams, StorageError, UpdateAccountParams, MAX_ENTRIES
+    CreateAdditionalAccountParams, Header, ReadAccountParams, StorageError, UpdateAccountParams,
+    MAX_ENTRIES,
 };
 use crate::Storage;
 use candid::Principal;
@@ -341,7 +342,12 @@ fn should_write_additional_account() {
         additional_account_1.is_none(),
         "Additional account should not exist yet"
     );
-    assert!(storage.lookup_application_number_with_origin(&origin).is_none(), "Application should not exist yet");
+    assert!(
+        storage
+            .lookup_application_number_with_origin(&origin)
+            .is_none(),
+        "Application should not exist yet"
+    );
 
     // 3. Create additional account
     let new_account_params = CreateAdditionalAccountParams {
@@ -363,7 +369,9 @@ fn should_write_additional_account() {
         last_used: None,
     };
     assert_eq!(additional_account, expected_account);
-    assert!(storage.lookup_application_number_with_origin(&origin).is_some(),);
+    assert!(storage
+        .lookup_application_number_with_origin(&origin)
+        .is_some(),);
 }
 
 #[test]
@@ -485,13 +493,11 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let default_account = storage
-        .read_account(
-            ReadAccountParams {
-                account_number: None,
-                anchor_number,
-                origin: origin.clone(),
-            },
-        )
+        .read_account(ReadAccountParams {
+            account_number: None,
+            anchor_number,
+            origin: origin.clone(),
+        })
         .unwrap();
     let expected_unreserved_account = Account {
         account_number: None,
@@ -513,13 +519,11 @@ fn should_update_default_account() {
 
     // 4. Check that the default account has been created with the updated values.
     let updated_account = storage
-        .read_account(
-            ReadAccountParams {
-                account_number: Some(new_account_number),
-                anchor_number,
-                origin: origin.clone(),
-            },
-        )
+        .read_account(ReadAccountParams {
+            account_number: Some(new_account_number),
+            anchor_number,
+            origin: origin.clone(),
+        })
         .unwrap();
     let expected_updated_account = Account {
         account_number: Some(new_account_number),
@@ -555,7 +559,12 @@ fn should_update_additional_account() {
         additional_account_1.is_none(),
         "Additional account should not exist yet"
     );
-    assert!(storage.lookup_application_number_with_origin(&origin).is_none(), "Application should not exist yet");
+    assert!(
+        storage
+            .lookup_application_number_with_origin(&origin)
+            .is_none(),
+        "Application should not exist yet"
+    );
 
     // 3. Create additional account
     let new_account_params = CreateAdditionalAccountParams {
@@ -581,13 +590,11 @@ fn should_update_additional_account() {
 
     // 5. Check that the additional account has been created with the updated values.
     let updated_account = storage
-        .read_account(
-            ReadAccountParams {
-                account_number: Some(update_account_return_value),
-                anchor_number,
-                origin: origin.clone(),
-            },
-        )
+        .read_account(ReadAccountParams {
+            account_number: Some(update_account_return_value),
+            anchor_number,
+            origin: origin.clone(),
+        })
         .unwrap();
     let expected_updated_account = Account {
         account_number: Some(update_account_return_value),

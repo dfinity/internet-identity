@@ -55,8 +55,6 @@ impl OriginHash {
             .try_into()
             .expect("Failed to truncate SHA256 hash to 8 bytes; slice length should be 8.");
 
-        Self {
-            hash: hash_8_bytes,
-        }
+        Self { hash: hash_8_bytes }
     }
 }

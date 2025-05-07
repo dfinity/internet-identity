@@ -79,5 +79,3 @@ impl Storable for StorableAccount {
 
     const BOUND: Bound = Bound::Unbounded;
 }
-
-
