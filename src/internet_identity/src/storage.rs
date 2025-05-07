@@ -303,6 +303,13 @@ struct CreateDefaultAccountParams {
     application_number: ApplicationNumber,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReadAccountParams {
+    account_number: Option<AccountNumber>,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+}
+
 impl<M: Memory + Clone> Storage<M> {
     /// Creates a new empty storage that manages the data of anchors in
     /// the specified range.
@@ -837,7 +844,7 @@ impl<M: Memory + Clone> Storage<M> {
             account_number: Some(account_number),
             anchor_number: anchor_number,
             origin: origin.clone(),
-            last_used: Some(ic_cdk::api::time()),
+            last_used: None,
             name: Some(params.name.clone()), // Corrected: Ensure Option<String>
         })
     }
@@ -887,28 +894,26 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     pub fn read_account(
         &self,
-        acc_ref: &AccountReference,
-        anchor_number: &AnchorNumber,
-        origin: &FrontendHostname,
+        params: ReadAccountParams,
     ) -> Option<Account> {
-        match acc_ref.account_number {
+        match params.account_number {
             None => {
                 // Application number doesn't exist, return a default InternalAccount
                 Some(Account::new(
-                    *anchor_number,
-                    origin.clone(),
+                    params.anchor_number,
+                    params.origin.clone(),
                     // Default accounts have no name
                     None,
-                    acc_ref.account_number,
+                    params.account_number,
                 ))
             }
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
                 Some(storable_account) => Some(Account::new(
-                    *anchor_number,
-                    origin.clone(),
+                    params.anchor_number,
+                    params.origin.clone(),
                     Some(storable_account.name.clone()),
-                    acc_ref.account_number,
+                    Some(account_number),
                 )),
             },
         }
